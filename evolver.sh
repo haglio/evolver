@@ -17,6 +17,7 @@ set -Eeuo pipefail
 ### ===================== CONFIG =====================
 
 BASE_DIR="/c/path/to/suite-root"
+PROJECT_DIR="$BASE_DIR/projects/evolver"
 AI_DIR="$BASE_DIR/videos/videos/2D/AI"
 
 INBOX_DIR="$AI_DIR/0_inbox"
@@ -42,7 +43,7 @@ CLEAN_EMPTY_INBOX_DIRS=1
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 die() { log "ERROR: $*"; exit 1; }
-LOG_FILE="$BASE_DIR/process_AI_videos.log"
+LOG_FILE="$PROJECT_DIR/evolver.log"
 exec >>"$LOG_FILE" 2>&1
 
 command -v ffprobe >/dev/null 2>&1 || die "ffprobe not found in PATH. Install ffmpeg (which includes ffprobe)."
