@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 ###############################################################################
-# process_AI_videos.sh
+# evolver.sh
 #
 # New behavior (efficient / idempotent):
 #   Stage 1) Move videos from "0_inbox/<source>/" -> "1_sorted/<source>/<orientation>/"
