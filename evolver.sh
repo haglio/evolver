@@ -8,6 +8,7 @@ set -Eeuo pipefail
 #   Stage 1) Move videos from "0_inbox/<source>/" -> "1_sorted/<source>/<orientation>/"
 #   Stage 2) Upscale videos from "1_sorted/<source>/<orientation>/" into:
 #              "2_outbox/upscaled_by_orientation/{landscape,portrait}/<source>/"
+#           Apply Apollo frame interpolation to 60 fps and Gaia CG 4x upscale.
 #           Skip if output already exists in:
 #              - outbox/upscaled_by_orientation/landscape/<source>/
 #              - outbox/upscaled_by_orientation/portrait/<source>/
@@ -222,7 +223,7 @@ for source in "${SOURCES[@]}"; do
       if "$FFMPEG" -hide_banner -nostdin -y -strict 2 -hwaccel cuda \
           -i "$in" \
           -sws_flags spline+accurate_rnd+full_chroma_int \
-          -filter_complex "tvai_fi=model=apo-8:slowmo=1:rdt=0.01:device=0:vram=1:instances=1,tvai_up=model=gcg-5:scale=2:device=0:vram=1:instances=1" \
+          -filter_complex "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,tvai_up=model=gcg-5:scale=4:device=0:vram=1:instances=1" \
           -c:v hevc_nvenc \
           -profile:v main \
           -pix_fmt yuv420p \
@@ -240,10 +241,10 @@ for source in "${SOURCES[@]}"; do
           -an \
           -map_metadata 0 \
           -map_metadata:s:v 0:s:v \
-          -fps_mode:v passthrough \
+          -fps_mode:v cfr \
           -movflags frag_keyframe+empty_moov+delay_moov+use_metadata_tags+write_colr \
           -bf 0 \
-          -metadata "videoai=Processed using apo-8 replacing duplicate frames. Enhanced using gcg-5. 4x upscale" \
+          -metadata "videoai=Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale" \
           -f mp4 \
           "$tmp"
       then
