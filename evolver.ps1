@@ -1,11 +1,11 @@
 $ErrorActionPreference = "Stop"
 
-$bash = "C:\Program Files\Git\bin\bash.exe"
-$cmd  = "/c/path/to/suite-root/projects/evolver/evolver.sh"
+$python = "C:\Python314\python.exe"
+$script = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "evolver.py"
 $workingDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-$process = Start-Process -FilePath $bash `
-	-ArgumentList '-lc', $cmd `
+$process = Start-Process -FilePath $python `
+	-ArgumentList $script `
 	-WorkingDirectory $workingDirectory `
 	-WindowStyle Hidden `
 	-PassThru `
