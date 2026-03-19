@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tasks import sort as sort_task
 
@@ -46,6 +47,36 @@ class TestSortHelpers(unittest.TestCase):
 
             self.assertFalse((root / "a").exists())
             self.assertTrue(nonempty_sub.exists())
+
+    def test_run_processes_dynamic_source_directory(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            inbox = td_path / "0_inbox"
+            sorted_dir = td_path / "1_sorted"
+            dynamic_source = "newsource"
+            source_dir = inbox / dynamic_source
+            source_dir.mkdir(parents=True)
+            src = source_dir / "clip.mp4"
+            src.write_bytes(b"video")
+
+            old_inbox = sort_task.config.INBOX_DIR
+            old_sorted = sort_task.config.SORTED_DIR
+            old_clean = sort_task.config.CLEAN_EMPTY_INBOX_DIRS
+
+            sort_task.config.INBOX_DIR = inbox
+            sort_task.config.SORTED_DIR = sorted_dir
+            sort_task.config.CLEAN_EMPTY_INBOX_DIRS = False
+            try:
+                with patch("tasks.sort.get_orientation", return_value="landscape"):
+                    result = sort_task.run()
+
+                self.assertEqual(result.moved, 1)
+                self.assertTrue((sorted_dir / dynamic_source / "landscape" / "clip.mp4").exists())
+                self.assertFalse(src.exists())
+            finally:
+                sort_task.config.INBOX_DIR = old_inbox
+                sort_task.config.SORTED_DIR = old_sorted
+                sort_task.config.CLEAN_EMPTY_INBOX_DIRS = old_clean
 
 
 if __name__ == "__main__":

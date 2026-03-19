@@ -26,9 +26,6 @@ def run() -> UpscaleResult:
     for orient in ("landscape", "portrait"):
         (config.OUT_UPSCALED_DIR / orient).mkdir(parents=True, exist_ok=True)
     config.WEIRD_DIR.mkdir(parents=True, exist_ok=True)
-    for source in config.SOURCES:
-        for orient in ("landscape", "portrait"):
-            (config.OUT_UPSCALED_DIR / orient / source).mkdir(parents=True, exist_ok=True)
 
     log.info("=== Stage 2: upscale from 1_sorted ===")
     log.info("OUT: %s/{landscape,portrait}/<source>/", config.OUT_UPSCALED_DIR)
@@ -36,11 +33,14 @@ def run() -> UpscaleResult:
 
     env = {**os.environ, "TVAI_MODEL_DIR": str(config.TVAI_MODEL_DIR), "TVAI_MODEL_DATA_DIR": str(config.TVAI_MODEL_DIR)}
 
-    for source in config.SOURCES:
+    for source in _iter_sources(config.SORTED_DIR):
         for orient in ("landscape", "portrait"):
             in_root = config.SORTED_DIR / source / orient
             if not in_root.is_dir():
                 continue
+
+            out_dir = config.OUT_UPSCALED_DIR / orient / source
+            out_dir.mkdir(parents=True, exist_ok=True)
 
             log.info("--- Upscaling: %s / %s ---", source, orient)
 
@@ -52,7 +52,7 @@ def run() -> UpscaleResult:
                     result.already_done += 1
                     continue
 
-                out = config.OUT_UPSCALED_DIR / orient / source / out_name
+                out = out_dir / out_name
                 tmp = out.with_name(f"{in_file.stem}.partial.{uuid.uuid4().hex}.mp4")
 
                 log.info("Process: %s -> %s  [%s/%s]", in_file.name, out_name, orient, source)
@@ -130,3 +130,11 @@ def _iter_videos(root: Path):
     for p in root.rglob("*"):
         if p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS:
             yield p
+
+
+def _iter_sources(root: Path):
+    if not root.is_dir():
+        return
+    for p in sorted(root.iterdir()):
+        if p.is_dir():
+            yield p.name

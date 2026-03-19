@@ -5,6 +5,8 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
 1. Sorts videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`
 2. Upscales/interpolates sorted videos into `2_outbox/upscaled_by_orientation/<orientation>/<source>/` using Topaz Video AI ffmpeg
 
+`<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
+
 ## Current architecture
 
 - Scheduler: Windows Task Scheduler task `evolver` (15-minute trigger)

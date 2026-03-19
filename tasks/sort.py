@@ -25,11 +25,12 @@ def run() -> SortResult:
     log.info("INBOX:  %s", config.INBOX_DIR)
     log.info("SORTED: %s", config.SORTED_DIR)
 
-    for source in config.SOURCES:
-        src_root = config.INBOX_DIR / source
-        if not src_root.is_dir():
-            log.info("Source missing (skipping): %s", src_root)
-            continue
+    sources = list(_iter_source_dirs(config.INBOX_DIR))
+    if not sources:
+        log.info("No source directories found in inbox: %s", config.INBOX_DIR)
+
+    for src_root in sources:
+        source = src_root.name
 
         log.info("--- Sorting source: %s ---", source)
 
@@ -74,6 +75,14 @@ def _move_unique(src: Path, dest: Path) -> bool:
 def _iter_videos(root: Path):
     for p in root.rglob("*"):
         if p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS:
+            yield p
+
+
+def _iter_source_dirs(root: Path):
+    if not root.is_dir():
+        return
+    for p in sorted(root.iterdir()):
+        if p.is_dir():
             yield p
 
 

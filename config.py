@@ -11,8 +11,6 @@ OUTBOX_DIR   = AI_DIR / "2_outbox"
 OUT_UPSCALED_DIR = OUTBOX_DIR / "upscaled_by_orientation"
 WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 
-SOURCES = ["provider", "provider2", "provider3"]
-
 FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")
 TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
 
