@@ -1,14 +1,14 @@
 $ErrorActionPreference = "Stop"
 
-$python = (Get-Command python -ErrorAction SilentlyContinue)?.Source
-if ($python) {
-    & $python .\evolver.py
+$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+if ($pythonCmd) {
+    & $pythonCmd.Source .\evolver.py
     exit $LASTEXITCODE
 }
 
-$py = (Get-Command py -ErrorAction SilentlyContinue)?.Source
-if ($py) {
-    & $py -3 .\evolver.py
+$pyCmd = Get-Command py -ErrorAction SilentlyContinue
+if ($pyCmd) {
+    & $pyCmd.Source -3 .\evolver.py
     exit $LASTEXITCODE
 }
 

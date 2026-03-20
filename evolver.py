@@ -3,15 +3,18 @@
 
 Runs on a 15-minute Task Scheduler trigger. Stages:
   1. sort    - move new videos from inbox into sorted folders by source/orientation
-  2. upscale - apply Topaz frame interpolation + 4x upscale to sorted videos
+    2. purge   - remove weird outputs and their matching sources
+    3. upscale - apply Topaz frame interpolation + 4x upscale to sorted videos
+    4. verify  - check 1_sorted and 2_outbox are in 1-to-1 correspondence
 """
 
 import logging
 import subprocess
 import sys
 
+import check_correspondence
 import config
-from tasks import sort, upscale
+from tasks import purge_weird, sort, upscale
 
 
 def setup_logging():
@@ -44,13 +47,25 @@ def main():
     sort_result = sort.run()
     log.info("")
 
-    if sort_result.moved == 0:
-        log.info("No new videos moved from inbox. Skipping Stage 2.")
-        sys.exit(0)
+    purge_result = purge_weird.run()
+    log.info("")
 
-    upscale_result = upscale.run()
-    sys.exit(1 if upscale_result.failed > 0 else 0)
+    upscale_result = None
+    if sort_result.moved == 0:
+        log.info("No new videos moved from inbox. Skipping Stage 3.")
+    else:
+        upscale_result = upscale.run()
+        log.info("")
+
+    correspondence_result = check_correspondence.run(show_popup=True)
+
+    has_errors = bool(purge_result.missing_sorted) or not correspondence_result.ok
+    if upscale_result is not None:
+        has_errors = has_errors or upscale_result.failed > 0
+
+    sys.exit(1 if has_errors else 0)
 
 
 if __name__ == "__main__":
     main()
+
