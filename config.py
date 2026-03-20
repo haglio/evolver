@@ -3,6 +3,7 @@ from pathlib import Path
 BASE_DIR     = Path(r"C:\path\to\suite-root")
 PROJECT_DIR  = BASE_DIR / "projects" / "evolver"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
+NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
 
 INBOX_DIR    = AI_DIR / "0_inbox"
 SORTED_DIR   = AI_DIR / "1_sorted"

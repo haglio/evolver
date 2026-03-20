@@ -3,9 +3,10 @@
 
 Runs on a 15-minute Task Scheduler trigger. Stages:
   1. sort    - move new videos from inbox into sorted folders by source/orientation
-    2. purge   - remove weird outputs and their matching sources
-    3. upscale - apply Topaz frame interpolation + 4x upscale to sorted videos
-    4. verify  - check 1_sorted and 2_outbox are in 1-to-1 correspondence
+  2. purge   - remove weird outputs and their matching sources
+  3. upscale - apply Topaz frame interpolation + 4x upscale to sorted videos
+  4. dupes   - scan 1_sorted for likely duplicate videos by exact filesize
+  5. verify  - check 1_sorted and 2_outbox are in 1-to-1 correspondence
 """
 
 import logging
@@ -13,6 +14,7 @@ import subprocess
 import sys
 
 import check_correspondence
+import check_duplicate_sizes
 import config
 from tasks import purge_weird, sort, upscale
 
@@ -57,9 +59,16 @@ def main():
         upscale_result = upscale.run()
         log.info("")
 
+    duplicate_sizes_result = check_duplicate_sizes.run(show_popup=True)
+    log.info("")
+
     correspondence_result = check_correspondence.run(show_popup=True)
 
-    has_errors = bool(purge_result.missing_sorted) or not correspondence_result.ok
+    has_errors = (
+        bool(purge_result.missing_sorted)
+        or not duplicate_sizes_result.ok
+        or not correspondence_result.ok
+    )
     if upscale_result is not None:
         has_errors = has_errors or upscale_result.failed > 0
 
