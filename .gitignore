@@ -17,3 +17,6 @@ venv/
 .coverage
 .coverage.*
 htmlcov/
+
+# Repo-local temp artifacts
+.tmp-test/
