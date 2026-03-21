@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify 1_sorted and 2_outbox are in 1-to-1 correspondence."""
+"""Verify 1_sorted and the active outbox set are in 1-to-1 correspondence."""
 
 import logging
 from dataclasses import dataclass, field
@@ -36,14 +36,19 @@ def sorted_to_outbox_name(sorted_file: Path) -> str:
 
 def run(show_popup: bool = False) -> CorrespondenceResult:
     sorted_files = sorted(iter_videos(config.SORTED_DIR))
-    outbox_files = sorted(iter_videos(config.OUTBOX_DIR))
+    outbox_roots = config.active_outbox_dirs()
+    outbox_files = []
+    for root in outbox_roots:
+        outbox_files.extend(iter_videos(root))
+    outbox_files = sorted(outbox_files)
 
     expected_outbox_names = {sorted_to_outbox_name(p) for p in sorted_files}
     outbox_name_to_paths: dict[str, list[str]] = {}
 
     orphan_outbox: list[str] = []
     for outbox_file in outbox_files:
-        relative_outbox = str(outbox_file.relative_to(config.OUTBOX_DIR))
+        root = next(root for root in outbox_roots if outbox_file.is_relative_to(root))
+        relative_outbox = str(Path(root.name) / outbox_file.relative_to(root))
         outbox_name = outbox_file.name
         outbox_name_to_paths.setdefault(outbox_name, []).append(relative_outbox)
         if outbox_name not in expected_outbox_names:
@@ -81,7 +86,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
 def _log_result(result: CorrespondenceResult) -> None:
     log.info("=== Stage 5: correspondence check ===")
     log.info("1_sorted: %d video file(s) in %s", result.sorted_count, config.SORTED_DIR)
-    log.info("2_outbox: %d video file(s) in %s", result.outbox_count, config.OUTBOX_DIR)
+    log.info("Outboxes: %d video file(s) across %s", result.outbox_count, ", ".join(str(p) for p in config.active_outbox_dirs()))
 
     if result.sorted_count == result.outbox_count:
         log.info("Count check OK: %d files each", result.sorted_count)
@@ -100,20 +105,20 @@ def _log_result(result: CorrespondenceResult) -> None:
             log.error("  -> %s", path)
 
     if result.ok:
-        log.info("Stage 5 done. 1_sorted and 2_outbox are in perfect 1-to-1 correspondence.")
+        log.info("Stage 5 done. 1_sorted and the active outbox set are in perfect 1-to-1 correspondence.")
     else:
         log.error("Stage 5 failed. See log entries above for the mismatch details.")
 
 
 def _popup_message(result: CorrespondenceResult) -> str:
     lines = [
-        "Evolver found a 1_sorted / 2_outbox correspondence problem.",
+        "Evolver found a 1_sorted / outbox correspondence problem.",
         "",
         f"Check the log for full details:",
         str(config.LOG_FILE),
         "",
         f"1_sorted files: {result.sorted_count}",
-        f"2_outbox files: {result.outbox_count}",
+        f"Outbox files: {result.outbox_count}",
     ]
 
     if result.orphan_outbox:
@@ -155,7 +160,7 @@ def main() -> int:
     result = run(show_popup=False)
 
     print(f"1_sorted  : {result.sorted_count} video file(s)  in  {config.SORTED_DIR}")
-    print(f"2_outbox  : {result.outbox_count} video file(s)  in  {config.OUTBOX_DIR}")
+    print(f"outboxes  : {result.outbox_count} video file(s)  in  {', '.join(str(p) for p in config.active_outbox_dirs())}")
     print()
 
     if result.sorted_count == result.outbox_count:
@@ -186,7 +191,7 @@ def main() -> int:
         print()
 
     if result.ok:
-        print("[OK] 1_sorted and 2_outbox are in perfect 1-to-1 correspondence.")
+        print("[OK] 1_sorted and the active outbox set are in perfect 1-to-1 correspondence.")
         return 0
 
     print(f"[FAIL] Correspondence issues found. See {config.LOG_FILE} for the full log.")

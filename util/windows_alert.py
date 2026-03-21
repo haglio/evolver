@@ -1,4 +1,4 @@
-"""Windows error dialog helpers."""
+"""Windows dialog helpers."""
 
 import ctypes
 import logging
@@ -19,15 +19,23 @@ def _is_session_zero() -> bool:
 
 
 def show_error_window(title: str, message: str) -> None:
+    _show_window(title, message, 0x10, "error")
+
+
+def show_info_window(title: str, message: str) -> None:
+    _show_window(title, message, 0x40, "info")
+
+
+def _show_window(title: str, message: str, icon_flag: int, level: str) -> None:
     shown = False
 
     if not _is_session_zero():
         try:
-            result = ctypes.windll.user32.MessageBoxW(0, message, title, 0x10)
+            result = ctypes.windll.user32.MessageBoxW(0, message, title, icon_flag)
             shown = result != 0
             log.info("MessageBoxW returned %d (shown=%s)", result, shown)
         except Exception:
-            log.exception("Failed to show Windows error dialog: %s", title)
+            log.exception("Failed to show Windows %s dialog: %s", level, title)
 
     if shown:
         return
@@ -44,7 +52,7 @@ def show_error_window(title: str, message: str) -> None:
         sent = _send_msg("*", title, msg_text)
 
     if sent:
-        log.error("Fallback notification sent via msg.exe: %s", title)
+        log.log(logging.ERROR if level == "error" else logging.INFO, "Fallback notification sent via msg.exe: %s", title)
     else:
         log.error("Fallback notification failed via msg.exe: %s", title)
 

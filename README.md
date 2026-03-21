@@ -3,10 +3,10 @@
 Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
 
 1. Sorts videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`
-2. Purges `2_outbox/kinda_weird/` — deletes every file there and its corresponding source from `1_sorted/`. A Windows error dialog pops up if any source file cannot be found.
-3. Upscales/interpolates sorted videos into `2_outbox/upscaled_by_orientation/<orientation>/<source>/` using Topaz Video AI ffmpeg
+2. Purges `kinda_weird/` outputs from the active outbox set — normally `2_outbox`, and both `2_outbox` plus `3_new_outbox` while regeneration mode is enabled. It also deletes each weird file's corresponding source from `1_sorted/`. A Windows error dialog pops up if any source file cannot be found.
+3. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
 4. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
-5. Runs a final 1-to-1 correspondence check between `1_sorted` and `2_outbox`, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
+5. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
@@ -65,7 +65,18 @@ Output reports any mismatches — orphaned outbox files, orphaned sorted files, 
 ## Logs
 
 - Log file: `evolver.log`
-- Each run logs Stage 1 and Stage 2 summary counts
+- Each run logs sort, purge, upscale, duplicate-scan, and correspondence summary counts
+
+## Regeneration mode
+
+When `config.REGEN_ENABLED = True`, Evolver writes new outputs to `3_new_outbox` instead of `2_outbox`.
+
+- Correspondence checks treat `2_outbox` and `3_new_outbox` as one combined active output set.
+- Existing `2_outbox` files remain valid until their regenerated `3_new_outbox` replacement succeeds.
+- After a successful regenerated write, Evolver can delete the matching legacy `2_outbox` file immediately to save disk space.
+- When correspondence is clean and the legacy `2_outbox` payload has been fully drained, Evolver can notify you, remove the emptied legacy tree, and rename `3_new_outbox` back to `2_outbox` automatically.
+- A completion marker is written to `config.REGEN_COMPLETE_MARKER` so later scheduler ticks stay in normal mode after cutover instead of starting a second regeneration by accident.
+- This makes it possible to regenerate the library incrementally while keeping the old outbox available until cutover.
 
 ## Test suite
 
@@ -90,14 +101,17 @@ What is covered:
 - Kinda-weird cleanup and missing-source popup behavior (`tasks/purge_weird.py`)
 - Duplicate-size scan for likely same-content source videos (`check_duplicate_sizes.py`)
 - Correspondence rules for `<sorted_stem>_topaz<ext>` matching (`check_correspondence.py`)
-- Scheduler flow behavior, including always-running purge and skip-upscale-on-no-sort (`evolver.py`)
+- Scheduler flow behavior, including always-running purge and pending-work-based Stage 3 decisions (`evolver.py`)
 - Interactive popup vs Session-0 `msg.exe` fallback behavior (`util/windows_alert.py`)
 - Already-processed detection (`tasks/upscale.py`)
 
 ## Notes
 
 - Stage 2 (purge_weird) always runs, regardless of Stage 1 activity.
-- Stage 3 only runs when Stage 1 moved at least one file during that run.
+- Stage 3 runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick.
+- Stage 3 is conservative by default: it processes at most `config.UPSCALE_BATCH_LIMIT` videos per run.
+- If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips Stage 3 for that scheduler tick instead of competing with other work.
+- If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops Stage 3 early and warns instead of continuing toward a full disk.
 - Stage 4 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
 - Stage 5 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
 - In interactive runs, errors use a normal Windows message box. In the scheduled S4U task, errors are delivered via `msg.exe` to the active logged-in user.

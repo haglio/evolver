@@ -21,39 +21,45 @@ class PurgeWeirdResult:
 
 def run() -> PurgeWeirdResult:
     result = PurgeWeirdResult()
-
-    if not config.WEIRD_DIR.is_dir():
+    roots = [root for root in config.active_weird_dirs() if root.is_dir()]
+    if not roots:
         return result
 
-    weird_files = [
-        p for p in config.WEIRD_DIR.iterdir()
-        if p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS
-    ]
+    seen_header = False
+    for weird_root in roots:
+        weird_files = [
+            p for p in weird_root.iterdir()
+            if p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS
+        ]
+        if not weird_files:
+            continue
 
-    if not weird_files:
+        if not seen_header:
+            log.info("=== Stage 3: purge kinda_weird ===")
+            seen_header = True
+        log.info("WEIRD:  %s", weird_root)
+        log.info("Found %d file(s) to purge", len(weird_files))
+
+        for weird_file in sorted(weird_files):
+            src_name = _source_name(weird_file)
+            matches = list(config.SORTED_DIR.rglob(src_name))
+            matches = [p for p in matches if p.is_file()]
+
+            if not matches:
+                log.warning("No source found in 1_sorted for: %s  (expected: %s)", weird_file.name, src_name)
+                result.missing_sorted.append(weird_file.name)
+            else:
+                for match in matches:
+                    match.unlink()
+                    result.deleted_sorted += 1
+                    log.info("Deleted source: %s", match)
+
+            weird_file.unlink()
+            result.deleted_weird += 1
+            log.info("Deleted weird:  %s", weird_file.name)
+
+    if not seen_header:
         return result
-
-    log.info("=== Stage 3: purge kinda_weird ===")
-    log.info("WEIRD:  %s", config.WEIRD_DIR)
-    log.info("Found %d file(s) to purge", len(weird_files))
-
-    for weird_file in sorted(weird_files):
-        src_name = _source_name(weird_file)
-        matches = list(config.SORTED_DIR.rglob(src_name))
-        matches = [p for p in matches if p.is_file()]
-
-        if not matches:
-            log.warning("No source found in 1_sorted for: %s  (expected: %s)", weird_file.name, src_name)
-            result.missing_sorted.append(weird_file.name)
-        else:
-            for match in matches:
-                match.unlink()
-                result.deleted_sorted += 1
-                log.info("Deleted source: %s", match)
-
-        weird_file.unlink()
-        result.deleted_weird += 1
-        log.info("Deleted weird:  %s", weird_file.name)
 
     if result.missing_sorted:
         _show_error_window(result.missing_sorted)

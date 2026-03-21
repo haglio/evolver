@@ -1,7 +1,7 @@
 """Stage 1: Move videos from 0_inbox/<source>/ -> 1_sorted/<source>/<orientation>/"""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
@@ -15,6 +15,7 @@ class SortResult:
     moved: int = 0
     deleted_collisions: int = 0
     skipped_unknown: int = 0
+    moved_files: list[Path] = field(default_factory=list)
 
 
 def run() -> SortResult:
@@ -49,6 +50,7 @@ def run() -> SortResult:
             log.info("MOVE  [%s/%s] %s", source, orient, rel)
             if _move_unique(src, dest):
                 result.moved += 1
+                result.moved_files.append(dest)
             else:
                 result.deleted_collisions += 1
 
