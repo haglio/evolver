@@ -56,6 +56,25 @@ class TestWindowsAlert(unittest.TestCase):
             check=False,
         )
 
+    @patch("util.windows_alert._send_msg")
+    @patch("util.windows_alert._get_active_users")
+    @patch("util.windows_alert._is_session_zero", return_value=False)
+    @patch("util.windows_alert.ctypes.windll.user32.MessageBoxW", create=True)
+    def test_show_info_window_uses_info_icon_for_interactive_session(
+        self,
+        message_box,
+        is_session_zero,
+        get_active_users,
+        send_msg,
+    ):
+        message_box.return_value = 1
+
+        windows_alert.show_info_window("Title", "Body")
+
+        message_box.assert_called_once_with(0, "Body", "Title", 0x40)
+        get_active_users.assert_not_called()
+        send_msg.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

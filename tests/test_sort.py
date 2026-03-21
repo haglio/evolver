@@ -1,15 +1,14 @@
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from tasks import sort as sort_task
+from tests.temp_helpers import workspace_temp_dir
 
 
 class TestSortHelpers(unittest.TestCase):
     def test_move_unique_moves_when_no_collision(self):
-        with tempfile.TemporaryDirectory() as td:
-            td_path = Path(td)
+        with workspace_temp_dir() as td_path:
             src = td_path / "src.mp4"
             dest = td_path / "dest.mp4"
             src.write_text("x", encoding="utf-8")
@@ -21,8 +20,7 @@ class TestSortHelpers(unittest.TestCase):
             self.assertTrue(dest.exists())
 
     def test_move_unique_deletes_src_on_collision(self):
-        with tempfile.TemporaryDirectory() as td:
-            td_path = Path(td)
+        with workspace_temp_dir() as td_path:
             src = td_path / "src.mp4"
             dest = td_path / "dest.mp4"
             src.write_text("src", encoding="utf-8")
@@ -35,8 +33,7 @@ class TestSortHelpers(unittest.TestCase):
             self.assertEqual(dest.read_text(encoding="utf-8"), "dest")
 
     def test_remove_empty_dirs_removes_only_empty(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
+        with workspace_temp_dir() as root:
             empty_sub = root / "a" / "b"
             nonempty_sub = root / "c"
             empty_sub.mkdir(parents=True)
@@ -49,8 +46,7 @@ class TestSortHelpers(unittest.TestCase):
             self.assertTrue(nonempty_sub.exists())
 
     def test_run_processes_dynamic_source_directory(self):
-        with tempfile.TemporaryDirectory() as td:
-            td_path = Path(td)
+        with workspace_temp_dir() as td_path:
             inbox = td_path / "0_inbox"
             sorted_dir = td_path / "1_sorted"
             dynamic_source = "newsource"

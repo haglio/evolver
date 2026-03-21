@@ -1,10 +1,10 @@
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import config
 from tasks import purge_weird
+from tests.temp_helpers import workspace_temp_dir
 
 
 class TestPurgeWeird(unittest.TestCase):
@@ -15,8 +15,7 @@ class TestPurgeWeird(unittest.TestCase):
         self.assertEqual(purge_weird.source_stem("clip_apo8_gcg5_Copy(2)"), "clip")
 
     def test_run_deletes_weird_and_matching_sorted_file(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
+        with workspace_temp_dir() as root:
             weird_dir = root / "weird"
             sorted_dir = root / "sorted"
             weird_dir.mkdir(parents=True)
@@ -43,8 +42,7 @@ class TestPurgeWeird(unittest.TestCase):
             self.assertFalse(sorted_file.exists())
 
     def test_run_shows_popup_when_matching_sorted_file_missing(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
+        with workspace_temp_dir() as root:
             weird_dir = root / "weird"
             sorted_dir = root / "sorted"
             weird_dir.mkdir(parents=True)

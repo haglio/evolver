@@ -1,16 +1,15 @@
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import check_duplicate_sizes
 import config
+from tests.temp_helpers import workspace_temp_dir
 
 
 class TestDuplicateSizes(unittest.TestCase):
     def test_run_is_ok_when_all_files_have_unique_sizes(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
+        with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
 
             (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
@@ -31,8 +30,7 @@ class TestDuplicateSizes(unittest.TestCase):
             self.assertEqual(result.duplicate_groups, {})
 
     def test_run_reports_exact_size_duplicates_and_can_show_popup(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
+        with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
 
             (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
