@@ -2,6 +2,7 @@ from pathlib import Path
 
 BASE_DIR     = Path(r"C:\path\to\suite-root")
 PROJECT_DIR  = BASE_DIR / "projects" / "evolver"
+FUN_TIME_PROJECT_DIR = BASE_DIR / "projects" / "fun_time"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
 
@@ -33,6 +34,7 @@ AUTO_CUTOVER_ON_REGEN_COMPLETE = True
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
 REGEN_COMPLETE_MARKER = PROJECT_DIR / ".regen-complete"
+FUN_TIME_CONFIG_FILE = FUN_TIME_PROJECT_DIR / "fun_time_config.json"
 
 
 def regen_mode_active() -> bool:

@@ -10,6 +10,7 @@ Runs on a 15-minute Task Scheduler trigger. Stages:
 """
 
 import logging
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -117,6 +118,7 @@ def _finish_regen_if_complete(log: logging.Logger, correspondence_result) -> boo
         config.OUTBOX_DIR.rmdir()
 
     config.REGEN_OUTBOX_DIR.rename(config.OUTBOX_DIR)
+    _simplify_fun_time_config(log)
     config.REGEN_COMPLETE_MARKER.write_text("complete\n", encoding="utf-8")
     log.info("Final regen cutover complete. %s is now the live outbox again.", config.OUTBOX_DIR)
     show_info_window(
@@ -146,6 +148,28 @@ def _remove_empty_dirs(root: Path) -> None:
                 path.rmdir()
             except OSError:
                 pass
+
+
+def _simplify_fun_time_config(log: logging.Logger) -> None:
+    path = config.FUN_TIME_CONFIG_FILE
+    if not path.is_file():
+        log.warning("Fun Time config not found during regen cutover: %s", path)
+        return
+
+    with path.open("r", encoding="utf-8") as fp:
+        raw = json.load(fp)
+
+    paths = raw.get("paths")
+    if not isinstance(paths, dict):
+        raise RuntimeError(f"Fun Time config has invalid paths section: {path}")
+
+    paths["portrait_dirs"] = [str(config.OUT_UPSCALED_DIR / "portrait").replace("\\", "/")]
+    paths["landscape_dirs"] = [str(config.OUT_UPSCALED_DIR / "landscape").replace("\\", "/")]
+
+    with path.open("w", encoding="utf-8", newline="\n") as fp:
+        json.dump(raw, fp, indent=2)
+        fp.write("\n")
+    log.info("Simplified Fun Time config back to single live outbox folders: %s", path)
 
 
 if __name__ == "__main__":

@@ -25,13 +25,16 @@ class TestCorrespondence(unittest.TestCase):
 
             old_sorted = config.SORTED_DIR
             old_outbox = config.OUTBOX_DIR
+            old_regen_enabled = config.REGEN_ENABLED
             config.SORTED_DIR = sorted_dir
             config.OUTBOX_DIR = outbox_dir
+            config.REGEN_ENABLED = False
             try:
                 result = check_correspondence.run(show_popup=False)
             finally:
                 config.SORTED_DIR = old_sorted
                 config.OUTBOX_DIR = old_outbox
+                config.REGEN_ENABLED = old_regen_enabled
 
             self.assertTrue(result.ok)
             self.assertEqual(result.sorted_count, 2)
@@ -51,14 +54,17 @@ class TestCorrespondence(unittest.TestCase):
 
             old_sorted = config.SORTED_DIR
             old_outbox = config.OUTBOX_DIR
+            old_regen_enabled = config.REGEN_ENABLED
             config.SORTED_DIR = sorted_dir
             config.OUTBOX_DIR = outbox_dir
+            config.REGEN_ENABLED = False
             try:
                 with patch("check_correspondence.show_error_window") as show_error_window:
                     result = check_correspondence.run(show_popup=True)
             finally:
                 config.SORTED_DIR = old_sorted
                 config.OUTBOX_DIR = old_outbox
+                config.REGEN_ENABLED = old_regen_enabled
 
             self.assertFalse(result.ok)
             self.assertEqual(result.sorted_count, 1)

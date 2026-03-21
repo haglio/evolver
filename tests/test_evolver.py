@@ -1,9 +1,10 @@
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import config
 import evolver
+from tests.temp_helpers import workspace_temp_dir
 
 
 class TestEvolverMain(unittest.TestCase):
@@ -144,6 +145,63 @@ class TestEvolverMain(unittest.TestCase):
 
         self.assertEqual(exc.exception.code, 0)
         upscale_run.assert_not_called()
+
+    def test_finish_regen_if_complete_simplifies_fun_time_config(self):
+        with workspace_temp_dir() as root:
+            old_outbox = root / "2_outbox"
+            regen_outbox = root / "3_new_outbox"
+            fun_time_config = root / "fun_time_config.json"
+            marker = root / ".regen-complete"
+
+            (old_outbox / "upscaled_by_orientation").mkdir(parents=True)
+            (regen_outbox / "upscaled_by_orientation" / "portrait" / "src").mkdir(parents=True)
+            (regen_outbox / "upscaled_by_orientation" / "landscape" / "src").mkdir(parents=True)
+            (regen_outbox / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4").write_bytes(b"x")
+            (regen_outbox / "upscaled_by_orientation" / "landscape" / "src" / "clip_topaz.mp4").write_bytes(b"x")
+            fun_time_config.write_text(
+                '{\n'
+                '  "paths": {\n'
+                '    "portrait_dirs": ["old", "new"],\n'
+                '    "landscape_dirs": ["old", "new"]\n'
+                "  }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            saved = {
+                "OUTBOX_DIR": config.OUTBOX_DIR,
+                "OUT_UPSCALED_DIR": config.OUT_UPSCALED_DIR,
+                "REGEN_OUTBOX_DIR": config.REGEN_OUTBOX_DIR,
+                "REGEN_OUT_UPSCALED_DIR": config.REGEN_OUT_UPSCALED_DIR,
+                "REGEN_COMPLETE_MARKER": config.REGEN_COMPLETE_MARKER,
+                "FUN_TIME_CONFIG_FILE": config.FUN_TIME_CONFIG_FILE,
+                "REGEN_ENABLED": config.REGEN_ENABLED,
+                "AUTO_CUTOVER_ON_REGEN_COMPLETE": config.AUTO_CUTOVER_ON_REGEN_COMPLETE,
+            }
+            config.OUTBOX_DIR = old_outbox
+            config.OUT_UPSCALED_DIR = old_outbox / "upscaled_by_orientation"
+            config.REGEN_OUTBOX_DIR = regen_outbox
+            config.REGEN_OUT_UPSCALED_DIR = regen_outbox / "upscaled_by_orientation"
+            config.REGEN_COMPLETE_MARKER = marker
+            config.FUN_TIME_CONFIG_FILE = fun_time_config
+            config.REGEN_ENABLED = True
+            config.AUTO_CUTOVER_ON_REGEN_COMPLETE = True
+            try:
+                with patch("evolver.show_info_window") as show_info_window:
+                    done = evolver._finish_regen_if_complete(Mock(), Mock(ok=True))
+                self.assertTrue(done)
+                self.assertTrue(show_info_window.called)
+                self.assertTrue(marker.exists())
+                self.assertTrue((old_outbox / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4").exists())
+                updated = fun_time_config.read_text(encoding="utf-8")
+                self.assertIn('"portrait_dirs": [', updated)
+                self.assertIn('"landscape_dirs": [', updated)
+                self.assertIn('2_outbox/upscaled_by_orientation/portrait', updated)
+                self.assertIn('2_outbox/upscaled_by_orientation/landscape', updated)
+                self.assertNotIn('"old", "new"', updated)
+            finally:
+                for key, value in saved.items():
+                    setattr(config, key, value)
 
 
 if __name__ == "__main__":
