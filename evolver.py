@@ -128,7 +128,8 @@ def _finish_regen_if_complete(log: logging.Logger, correspondence_result) -> boo
             "Evolver finished regenerating the active outbox.\n\n"
             f"Cutover complete: {config.REGEN_OUTBOX_DIR.name} was renamed back to {config.OUTBOX_DIR.name}.\n"
             f"Completion marker: {config.REGEN_COMPLETE_MARKER}\n\n"
-            "Future runs will use 2_outbox normally unless you clear the completion marker and start another regeneration."
+            "Future runs will use 2_outbox normally unless you clear the completion marker and start another regeneration.\n\n"
+            "Manual review recommended: check the current config/state and decide whether you want to set REGEN_ENABLED back to False and remove dormant regen-only cleanup paths."
         ),
     )
     return True

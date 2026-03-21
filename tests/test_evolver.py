@@ -194,6 +194,9 @@ class TestEvolverMain(unittest.TestCase):
                     done = evolver._finish_regen_if_complete(Mock(), Mock(ok=True))
                 self.assertTrue(done)
                 self.assertTrue(show_info_window.called)
+                popup_message = show_info_window.call_args.args[1]
+                self.assertIn("Manual review recommended", popup_message)
+                self.assertIn("REGEN_ENABLED back to False", popup_message)
                 self.assertTrue(marker.exists())
                 self.assertTrue(cleanup_note.exists())
                 self.assertTrue((old_outbox / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4").exists())
