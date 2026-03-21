@@ -120,6 +120,7 @@ def _finish_regen_if_complete(log: logging.Logger, correspondence_result) -> boo
     config.REGEN_OUTBOX_DIR.rename(config.OUTBOX_DIR)
     _simplify_fun_time_config(log)
     config.REGEN_COMPLETE_MARKER.write_text("complete\n", encoding="utf-8")
+    _write_post_regen_cleanup_note(log)
     log.info("Final regen cutover complete. %s is now the live outbox again.", config.OUTBOX_DIR)
     show_info_window(
         "Evolver - Regeneration Complete",
@@ -170,6 +171,23 @@ def _simplify_fun_time_config(log: logging.Logger) -> None:
         json.dump(raw, fp, indent=2)
         fp.write("\n")
     log.info("Simplified Fun Time config back to single live outbox folders: %s", path)
+
+
+def _write_post_regen_cleanup_note(log: logging.Logger) -> None:
+    note = (
+        "# Post-Regen Cleanup\n\n"
+        "The one-time 2_outbox -> 3_new_outbox regeneration has completed.\n\n"
+        "Operational cutover is already finished:\n"
+        "- 3_new_outbox was renamed back to 2_outbox.\n"
+        "- Fun Time was simplified back to single live 2_outbox folders.\n"
+        "- Evolver wrote the regen completion marker.\n\n"
+        "Optional cleanup for a future maintenance pass:\n"
+        "- set REGEN_ENABLED back to False in config.py\n"
+        "- remove the regen completion marker file if you no longer want it\n"
+        "- remove dormant regen-specific code/config paths if you are confident this migration will never be repeated\n"
+    )
+    config.POST_REGEN_CLEANUP_NOTE.write_text(note, encoding="utf-8")
+    log.info("Wrote post-regen cleanup note: %s", config.POST_REGEN_CLEANUP_NOTE)
 
 
 if __name__ == "__main__":

@@ -152,6 +152,7 @@ class TestEvolverMain(unittest.TestCase):
             regen_outbox = root / "3_new_outbox"
             fun_time_config = root / "fun_time_config.json"
             marker = root / ".regen-complete"
+            cleanup_note = root / "POST_REGEN_CLEANUP.md"
 
             (old_outbox / "upscaled_by_orientation").mkdir(parents=True)
             (regen_outbox / "upscaled_by_orientation" / "portrait" / "src").mkdir(parents=True)
@@ -174,6 +175,7 @@ class TestEvolverMain(unittest.TestCase):
                 "REGEN_OUTBOX_DIR": config.REGEN_OUTBOX_DIR,
                 "REGEN_OUT_UPSCALED_DIR": config.REGEN_OUT_UPSCALED_DIR,
                 "REGEN_COMPLETE_MARKER": config.REGEN_COMPLETE_MARKER,
+                "POST_REGEN_CLEANUP_NOTE": config.POST_REGEN_CLEANUP_NOTE,
                 "FUN_TIME_CONFIG_FILE": config.FUN_TIME_CONFIG_FILE,
                 "REGEN_ENABLED": config.REGEN_ENABLED,
                 "AUTO_CUTOVER_ON_REGEN_COMPLETE": config.AUTO_CUTOVER_ON_REGEN_COMPLETE,
@@ -183,6 +185,7 @@ class TestEvolverMain(unittest.TestCase):
             config.REGEN_OUTBOX_DIR = regen_outbox
             config.REGEN_OUT_UPSCALED_DIR = regen_outbox / "upscaled_by_orientation"
             config.REGEN_COMPLETE_MARKER = marker
+            config.POST_REGEN_CLEANUP_NOTE = cleanup_note
             config.FUN_TIME_CONFIG_FILE = fun_time_config
             config.REGEN_ENABLED = True
             config.AUTO_CUTOVER_ON_REGEN_COMPLETE = True
@@ -192,6 +195,7 @@ class TestEvolverMain(unittest.TestCase):
                 self.assertTrue(done)
                 self.assertTrue(show_info_window.called)
                 self.assertTrue(marker.exists())
+                self.assertTrue(cleanup_note.exists())
                 self.assertTrue((old_outbox / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4").exists())
                 updated = fun_time_config.read_text(encoding="utf-8")
                 self.assertIn('"portrait_dirs": [', updated)
@@ -199,6 +203,9 @@ class TestEvolverMain(unittest.TestCase):
                 self.assertIn('2_outbox/upscaled_by_orientation/portrait', updated)
                 self.assertIn('2_outbox/upscaled_by_orientation/landscape', updated)
                 self.assertNotIn('"old", "new"', updated)
+                note_text = cleanup_note.read_text(encoding="utf-8")
+                self.assertIn("Post-Regen Cleanup", note_text)
+                self.assertIn("REGEN_ENABLED back to False", note_text)
             finally:
                 for key, value in saved.items():
                     setattr(config, key, value)
