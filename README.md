@@ -5,9 +5,10 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
 1. Sorts videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`
 2. Purges `kinda_weird/` outputs from the active outbox set — normally `2_outbox`, and both `2_outbox` plus `3_new_outbox` while regeneration mode is enabled. It also deletes each weird file's corresponding source from `1_sorted/`. A Windows error dialog pops up if any source file cannot be found.
 3. Rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match in the video library; unmatched or ambiguous names are logged and left alone. After that, Evolver also copies missing funscripts across matching processed/original video variants, including `1_sorted` <-> `2_outbox` / `3_new_outbox` `_topaz` pairs and matching `processed` <-> non-processed variants within the same source bucket.
-4. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
-5. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
-6. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
+4. Syncs `fun_time/favs.csv` into a `Fun Time Favs` folder on the Chrome bookmarks bar for the Chrome profile whose visible name is `Blair`. Only the `web_url` column is used, and each run replaces that folder's contents with the current CSV URLs.
+5. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
+6. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
+7. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
@@ -67,7 +68,7 @@ Output reports any mismatches — orphaned outbox files, orphaned sorted files, 
 ## Logs
 
 - Log file: `evolver.log`
-- Each run logs sort, purge, scripts-sync, upscale, duplicate-scan, and correspondence summary counts
+- Each run logs sort, purge, scripts-sync, bookmark-sync, upscale, duplicate-scan, and correspondence summary counts
 
 ## Regeneration mode
 
@@ -122,12 +123,13 @@ What is covered:
 
 - Stage 2 (purge_weird) always runs, regardless of Stage 1 activity.
 - Stage 3 always runs after purge. It first moves a script when its basename matches exactly one video in `videos/videos`, then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously.
-- Stage 4 runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick.
-- Stage 4 is conservative by default: it processes at most `config.UPSCALE_BATCH_LIMIT` videos per run.
-- If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips Stage 4 for that scheduler tick instead of competing with other work.
-- If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops Stage 4 early and warns instead of continuing toward a full disk.
-- Stage 5 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
-- Stage 6 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
+- Stage 4 always runs after scripts sync. It reads `fun_time/favs.csv`, resolves the Chrome profile named `Blair` from Chrome `Local State`, and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the CSV's `web_url` values.
+- Stage 5 runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick.
+- Stage 5 is conservative by default: it processes at most `config.UPSCALE_BATCH_LIMIT` videos per run.
+- If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips Stage 5 for that scheduler tick instead of competing with other work.
+- If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops Stage 5 early and warns instead of continuing toward a full disk.
+- Stage 6 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
+- Stage 7 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
 - In interactive runs, errors use a normal Windows message box. In the scheduled S4U task, errors are delivered via `msg.exe` to the active logged-in user.
 - Existing output checks prevent duplicate processing.
 - Scheduled Task currently points to `evolver.ps1`; updating launcher logic updates scheduled behavior without task re-install.

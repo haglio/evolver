@@ -1,12 +1,17 @@
 from pathlib import Path
+import os
 
 BASE_DIR     = Path(r"C:\path\to\suite-root")
 PROJECT_DIR  = BASE_DIR / "projects" / "evolver"
 FUN_TIME_PROJECT_DIR = BASE_DIR / "projects" / "fun_time"
+FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
 VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
 SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
+CHROME_USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"
+CHROME_PROFILE_NAME = "Blair"
+CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
 
 INBOX_DIR    = AI_DIR / "0_inbox"
 SORTED_DIR   = AI_DIR / "1_sorted"
