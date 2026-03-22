@@ -1,5 +1,6 @@
 import json
 import unittest
+from pathlib import Path
 
 import config
 from tasks import bookmarks_sync
@@ -7,6 +8,239 @@ from tests.temp_helpers import workspace_temp_dir
 
 
 class TestBookmarksSync(unittest.TestCase):
+    def test_run_prunes_rows_with_missing_source_files_before_sync(self):
+        with workspace_temp_dir() as root:
+            existing_media = root / "clips" / "keep.mp4"
+            existing_media.parent.mkdir(parents=True, exist_ok=True)
+            existing_media.write_text("x", encoding="utf-8")
+            missing_media = root / "clips" / "missing.mp4"
+            favs_path = root / "favs.csv"
+            user_data_dir = root / "User Data"
+            profile_dir = user_data_dir / "Profile 2"
+            bookmarks_path = profile_dir / "Bookmarks"
+            user_data_dir.mkdir(parents=True, exist_ok=True)
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            favs_path.write_text(
+                "file,web_url\n"
+                f"{existing_media.relative_to(root)},https://example.com/keep\n"
+                f"{missing_media.relative_to(root)},https://example.com/drop\n",
+                encoding="utf-8",
+            )
+            (user_data_dir / "Local State").write_text(
+                json.dumps(
+                    {
+                        "profile": {
+                            "info_cache": {
+                                "Profile 2": {
+                                    "name": "Blair",
+                                }
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            saved = {
+                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
+                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
+                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
+                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
+            }
+            config.FUN_TIME_FAVS_FILE = favs_path
+            config.CHROME_USER_DATA_DIR = user_data_dir
+            config.CHROME_PROFILE_NAME = "Blair"
+            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
+            try:
+                result = bookmarks_sync.run()
+            finally:
+                for key, value in saved.items():
+                    setattr(config, key, value)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.removed_missing_files, 1)
+            self.assertEqual(result.added, 1)
+            self.assertEqual(
+                favs_path.read_text(encoding="utf-8").splitlines(),
+                [
+                    "file,web_url",
+                    "clips\\keep.mp4,https://example.com/keep",
+                ],
+            )
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            folder = written["roots"]["bookmark_bar"]["children"][0]
+            self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/keep"])
+
+    def test_run_prunes_hyperlink_local_file_rows_with_missing_sources(self):
+        with workspace_temp_dir() as root:
+            existing_media = root / "clips" / "keep clip.mp4"
+            existing_media.parent.mkdir(parents=True, exist_ok=True)
+            existing_media.write_text("x", encoding="utf-8")
+            missing_media = root / "clips" / "missing clip.mp4"
+            favs_path = root / "favs.csv"
+            user_data_dir = root / "User Data"
+            profile_dir = user_data_dir / "Profile 2"
+            bookmarks_path = profile_dir / "Bookmarks"
+            user_data_dir.mkdir(parents=True, exist_ok=True)
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            favs_path.write_text(
+                "local_file,web_url\n"
+                '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/keep\n'
+                '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/drop\n'.format(
+                    existing_media.as_posix().replace(":", ":"),
+                    str(existing_media),
+                    missing_media.as_posix().replace(":", ":"),
+                    str(missing_media),
+                ),
+                encoding="utf-8",
+            )
+            (user_data_dir / "Local State").write_text(
+                json.dumps(
+                    {
+                        "profile": {
+                            "info_cache": {
+                                "Profile 2": {
+                                    "name": "Blair",
+                                }
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            saved = {
+                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
+                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
+                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
+                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
+            }
+            config.FUN_TIME_FAVS_FILE = favs_path
+            config.CHROME_USER_DATA_DIR = user_data_dir
+            config.CHROME_PROFILE_NAME = "Blair"
+            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
+            try:
+                result = bookmarks_sync.run()
+            finally:
+                for key, value in saved.items():
+                    setattr(config, key, value)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.removed_missing_files, 1)
+            self.assertEqual(result.added, 1)
+            self.assertIn("https://example.com/keep", favs_path.read_text(encoding="utf-8"))
+            self.assertNotIn("https://example.com/drop", favs_path.read_text(encoding="utf-8"))
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            folder = written["roots"]["bookmark_bar"]["children"][0]
+            self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/keep"])
+
+    def test_run_keeps_local_file_row_when_regen_twin_exists(self):
+        with workspace_temp_dir() as root:
+            regen_media = root / "videos" / "3_new_outbox" / "portrait" / "provider2" / "abc_topaz.mp4"
+            regen_media.parent.mkdir(parents=True, exist_ok=True)
+            regen_media.write_text("x", encoding="utf-8")
+            stale_media = Path(str(regen_media).replace("\\3_new_outbox\\", "\\2_outbox\\"))
+            favs_path = root / "favs.csv"
+            user_data_dir = root / "User Data"
+            profile_dir = user_data_dir / "Profile 2"
+            bookmarks_path = profile_dir / "Bookmarks"
+            user_data_dir.mkdir(parents=True, exist_ok=True)
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            favs_path.write_text(
+                'local_file,web_url\n'
+                f'"=HYPERLINK(""file:///{stale_media.as_posix()}"";""{stale_media}"")",https://example.net/image/abc\n',
+                encoding="utf-8",
+            )
+            (user_data_dir / "Local State").write_text(
+                json.dumps(
+                    {
+                        "profile": {
+                            "info_cache": {
+                                "Profile 2": {
+                                    "name": "Blair",
+                                }
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            saved = {
+                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
+                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
+                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
+                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
+            }
+            config.FUN_TIME_FAVS_FILE = favs_path
+            config.CHROME_USER_DATA_DIR = user_data_dir
+            config.CHROME_PROFILE_NAME = "Blair"
+            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
+            try:
+                result = bookmarks_sync.run()
+            finally:
+                for key, value in saved.items():
+                    setattr(config, key, value)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.removed_missing_files, 0)
+            content = favs_path.read_text(encoding="utf-8")
+            self.assertIn(str(stale_media), content)
+            self.assertNotIn(str(regen_media), content)
+
+    def test_run_normalizes_3_new_outbox_references_back_to_2_outbox(self):
+        with workspace_temp_dir() as root:
+            stale_media = root / "videos" / "2_outbox" / "portrait" / "provider2" / "abc_topaz.mp4"
+            regen_media = Path(str(stale_media).replace("\\2_outbox\\", "\\3_new_outbox\\"))
+            regen_media.parent.mkdir(parents=True, exist_ok=True)
+            regen_media.write_text("x", encoding="utf-8")
+            favs_path = root / "favs.csv"
+            user_data_dir = root / "User Data"
+            profile_dir = user_data_dir / "Profile 2"
+            user_data_dir.mkdir(parents=True, exist_ok=True)
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            favs_path.write_text(
+                'local_file,web_url\n'
+                f'"=HYPERLINK(""file:///{regen_media.as_posix()}"";""{regen_media}"")",https://example.net/image/abc\n',
+                encoding="utf-8",
+            )
+            (user_data_dir / "Local State").write_text(
+                json.dumps(
+                    {
+                        "profile": {
+                            "info_cache": {
+                                "Profile 2": {
+                                    "name": "Blair",
+                                }
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            saved = {
+                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
+                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
+                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
+                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
+            }
+            config.FUN_TIME_FAVS_FILE = favs_path
+            config.CHROME_USER_DATA_DIR = user_data_dir
+            config.CHROME_PROFILE_NAME = "Blair"
+            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
+            try:
+                result = bookmarks_sync.run()
+            finally:
+                for key, value in saved.items():
+                    setattr(config, key, value)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.normalized_outbox_paths, 1)
+            content = favs_path.read_text(encoding="utf-8")
+            self.assertIn(str(stale_media), content)
+            self.assertNotIn(str(regen_media), content)
+
     def test_run_syncs_web_urls_into_named_profile_folder(self):
         with workspace_temp_dir() as root:
             favs_path = root / "favs.csv"
