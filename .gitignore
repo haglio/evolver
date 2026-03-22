@@ -20,3 +20,6 @@ htmlcov/
 
 # Repo-local temp artifacts
 .tmp-test/
+
+# Regen-mode runtime state
+.regen-skip.txt

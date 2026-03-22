@@ -78,6 +78,16 @@ When `config.REGEN_ENABLED = True`, Evolver writes new outputs to `3_new_outbox`
 - A completion marker is written to `config.REGEN_COMPLETE_MARKER` so later scheduler ticks stay in normal mode after cutover instead of starting a second regeneration by accident.
 - This makes it possible to regenerate the library incrementally while keeping the old outbox available until cutover.
 
+### Regen skip manifest
+
+During regeneration mode, Evolver may write `.regen-skip.txt` in the repo root.
+
+- This is a generated runtime manifest, not source code.
+- Each line is a `1_sorted`-relative video path that should be skipped on future regen retries.
+- Evolver records an entry when regen work fails but the matching legacy `2_outbox` counterpart still exists, so the same item does not get retried every scheduler run.
+- If you want Evolver to retry one of those items, remove that line from `.regen-skip.txt` after dealing with the underlying issue.
+- The file is intentionally gitignored.
+
 ## Test suite
 
 This repo includes a basic `unittest` suite with no external dependencies.
