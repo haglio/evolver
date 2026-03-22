@@ -61,6 +61,62 @@ class TestScriptsSync(unittest.TestCase):
             self.assertEqual(result.ambiguous, 1)
             self.assertTrue(script_path.exists())
 
+    def test_ai_script_ignores_duplicate_non_ai_video_match(self):
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            ai_video = video_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
+            non_ai_duplicate = video_root / "2D" / "non_AI" / "actually_AI_but_funscripted" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
+            script_path = script_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.funscript"
+            ai_video.parent.mkdir(parents=True, exist_ok=True)
+            non_ai_duplicate.parent.mkdir(parents=True, exist_ok=True)
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            ai_video.write_bytes(b"ai-video")
+            non_ai_duplicate.write_bytes(b"duplicate")
+            script_path.write_text("{}", encoding="utf-8")
+
+            saved_video_root = config.VIDEO_LIBRARY_DIR
+            saved_script_root = config.SCRIPT_LIBRARY_DIR
+            config.VIDEO_LIBRARY_DIR = video_root
+            config.SCRIPT_LIBRARY_DIR = script_root
+            try:
+                result = scripts_sync.run()
+            finally:
+                config.VIDEO_LIBRARY_DIR = saved_video_root
+                config.SCRIPT_LIBRARY_DIR = saved_script_root
+
+            self.assertEqual(result.ambiguous, 0)
+            self.assertEqual(result.already_aligned, 1)
+            self.assertTrue(script_path.exists())
+
+    def test_non_ai_script_ignores_ai_video_match(self):
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            non_ai_video = video_root / "2D" / "non_AI" / "site" / "0 unsorted" / "clip.mp4"
+            ai_video = video_root / "2D" / "AI" / "1_sorted" / "site" / "portrait" / "clip.mp4"
+            script_path = script_root / "2D" / "non_AI" / "site" / "0 unsorted" / "clip.funscript"
+            non_ai_video.parent.mkdir(parents=True, exist_ok=True)
+            ai_video.parent.mkdir(parents=True, exist_ok=True)
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            non_ai_video.write_bytes(b"non-ai-video")
+            ai_video.write_bytes(b"ai-video")
+            script_path.write_text("{}", encoding="utf-8")
+
+            saved_video_root = config.VIDEO_LIBRARY_DIR
+            saved_script_root = config.SCRIPT_LIBRARY_DIR
+            config.VIDEO_LIBRARY_DIR = video_root
+            config.SCRIPT_LIBRARY_DIR = script_root
+            try:
+                result = scripts_sync.run()
+            finally:
+                config.VIDEO_LIBRARY_DIR = saved_video_root
+                config.SCRIPT_LIBRARY_DIR = saved_script_root
+
+            self.assertEqual(result.ambiguous, 0)
+            self.assertEqual(result.already_aligned, 1)
+            self.assertTrue(script_path.exists())
+
     def test_counts_script_as_already_aligned(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"

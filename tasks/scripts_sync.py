@@ -47,7 +47,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
     video_index = _index_videos(config.VIDEO_LIBRARY_DIR)
 
     for script_path in _iter_funscripts(config.SCRIPT_LIBRARY_DIR):
-        matches = video_index.get(script_path.stem, [])
+        matches = _matching_videos_for_script(script_path, video_index)
         if not matches:
             log.info("UNMATCHED script (no video basename match): %s", script_path)
             result.unmatched += 1
@@ -110,6 +110,14 @@ def _iter_funscripts(root: Path):
     for path in root.rglob(f"*{config.FUNSCRIPT_EXTENSION}"):
         if path.is_file():
             yield path
+
+
+def _matching_videos_for_script(script_path: Path, video_index: dict[str, list[Path]]) -> list[Path]:
+    matches = video_index.get(script_path.stem, [])
+    bucket = _script_match_bucket(script_path)
+    if bucket is None:
+        return matches
+    return [video_path for video_path in matches if _video_match_bucket(video_path) == bucket]
 
 
 def _script_path_for_video(video_path: Path) -> Path:
@@ -233,6 +241,22 @@ def _variant_kind(video_path: Path) -> str:
     if "processed" in parts:
         return "processed"
     return "original"
+
+
+def _script_match_bucket(script_path: Path) -> str | None:
+    rel = script_path.relative_to(config.SCRIPT_LIBRARY_DIR)
+    parts = rel.parts
+    if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
+        return parts[1]
+    return None
+
+
+def _video_match_bucket(video_path: Path) -> str | None:
+    rel = video_path.relative_to(config.VIDEO_LIBRARY_DIR)
+    parts = rel.parts
+    if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
+        return parts[1]
+    return None
 
 
 def _video_path_for_script(script_path: Path) -> Path | None:
