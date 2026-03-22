@@ -6,9 +6,10 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
 2. Purges `kinda_weird/` outputs from the active outbox set — normally `2_outbox`, and both `2_outbox` plus `3_new_outbox` while regeneration mode is enabled. It also deletes each weird file's corresponding source from `1_sorted/`. A Windows error dialog pops up if any source file cannot be found.
 3. Rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match in the same library lane; scripts under `2D/AI` only consider `2D/AI` videos, and scripts under `2D/non_AI` only consider `2D/non_AI` videos. Unmatched or ambiguous names are logged and left alone. After that, Evolver also copies missing funscripts across matching processed/original video variants, including `1_sorted` <-> `2_outbox` / `3_new_outbox` `_topaz` pairs and matching `processed` <-> non-processed variants within the same source bucket. Finally, any AI video that has a funscript under `videos/scripts/scripts/2D/AI` is duplicated into `videos/videos/2D/non_AI/actually_AI_but_funscripted`, preserving its relative subfolders, so Fun Time's primary VLC window can pick it up.
 4. Prunes stale rows from `fun_time/favs.csv` when the `local_file` or `file` column points at a missing local file, while treating a `2_outbox` favorite as still valid if the matching file currently lives in `3_new_outbox` during regeneration. The CSV itself always keeps `2_outbox` paths, then the remaining `web_url` values are synced into a `Fun Time Favs` folder on the Chrome bookmarks bar for the Chrome profile whose visible name is `Blair`.
-5. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
-6. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
-7. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
+5. Scrapes prompt metadata for AI videos into `videos/prompts`, mirroring the active outbox tree. Each JSON file is named after its video and currently supports Provider prompt extraction with `video_prompt` plus optional source-image prompt keys.
+6. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
+7. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
+8. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
@@ -21,10 +22,12 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
   - `config.py` - paths and settings
   - `tasks/sort.py` - Stage 1 inbox sorting
   - `tasks/purge_weird.py` - Stage 2 kinda_weird cleanup
-- `tasks/scripts_sync.py` - Stage 3 funscript/video tree alignment, processed/original variant copying, and AI-video duplication for Fun Time's primary VLC window
-  - `tasks/upscale.py` - Stage 4 Topaz processing
-  - `check_duplicate_sizes.py` - Stage 5 duplicate-size scan for likely source duplicates
-  - `check_correspondence.py` - Stage 6 integrity verification and one-time manual check
+  - `tasks/scripts_sync.py` - Stage 3 funscript/video tree alignment, processed/original variant copying, and AI-video duplication for Fun Time's primary VLC window
+  - `tasks/bookmarks_sync.py` - Stage 3.5 favorites -> Chrome bookmarks sync
+  - `tasks/prompt_scrape.py` - Stage 4 prompt scraping into mirrored JSON files
+  - `tasks/upscale.py` - Stage 5 Topaz processing
+  - `check_duplicate_sizes.py` - Stage 6 duplicate-size scan for likely source duplicates
+  - `check_correspondence.py` - Stage 7 integrity verification and one-time manual check
   - `util/ffprobe.py` - orientation probing
 
 ## Requirements
@@ -68,7 +71,7 @@ Output reports any mismatches — orphaned outbox files, orphaned sorted files, 
 ## Logs
 
 - Log file: `evolver.log`
-- Each run logs sort, purge, scripts-sync, bookmark-sync, upscale, duplicate-scan, and correspondence summary counts
+- Each run logs sort, purge, scripts-sync, bookmark-sync, prompt-scrape, upscale, duplicate-scan, and correspondence summary counts
 
 ## Regeneration mode
 
@@ -124,12 +127,13 @@ What is covered:
 - Stage 2 (purge_weird) always runs, regardless of Stage 1 activity.
 - Stage 3 always runs after purge. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` lane within `videos/videos`, then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously, then mirrors any funscripted AI videos into `videos/videos/2D/non_AI/actually_AI_but_funscripted`.
 - Stage 4 always runs after scripts sync. It first normalizes any accidental `3_new_outbox` references in `favs.csv` back to `2_outbox`, then removes rows whose local favorite file no longer exists in either `2_outbox` or `3_new_outbox`, and finally resolves the Chrome profile named `Blair` from Chrome `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the remaining CSV `web_url` values.
-- Stage 5 runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick.
-- Stage 5 is conservative by default: it processes at most `config.UPSCALE_BATCH_LIMIT` videos per run.
-- If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips Stage 5 for that scheduler tick instead of competing with other work.
-- If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops Stage 5 early and warns instead of continuing toward a full disk.
-- Stage 6 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
-- Stage 7 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
+- Stage 5 writes prompt JSON files under `videos/prompts/<2_outbox or 3_new_outbox>/.../<video-name>.json`, skipping files that already have JSON output. The current scraper only extracts Provider prompts.
+- Stage 6 runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick.
+- Stage 6 is conservative by default: it processes at most `config.UPSCALE_BATCH_LIMIT` videos per run.
+- If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips Stage 6 for that scheduler tick instead of competing with other work.
+- If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops Stage 6 early and warns instead of continuing toward a full disk.
+- Stage 7 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
+- Stage 8 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
 - In interactive runs, errors use a normal Windows message box. In the scheduled S4U task, errors are delivered via `msg.exe` to the active logged-in user.
 - Existing output checks prevent duplicate processing.
 - Scheduled Task currently points to `evolver.ps1`; updating launcher logic updates scheduled behavior without task re-install.

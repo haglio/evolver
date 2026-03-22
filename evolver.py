@@ -6,9 +6,10 @@ Runs on a 15-minute Task Scheduler trigger. Stages:
   2. purge   - remove weird outputs and their matching sources
   3. scripts - align funscripts to mirror the video library tree
   3.5.bookmarks - sync Fun Time favorites into a Chrome bookmarks folder
-  4. upscale - apply Topaz frame interpolation + 4x upscale to sorted videos
-  5. dupes   - scan 1_sorted for likely duplicate videos by exact filesize
-  6. verify  - check 1_sorted and 2_outbox are in 1-to-1 correspondence
+  4. prompts - scrape AI prompt metadata into mirrored JSON files
+  5. upscale - apply Topaz frame interpolation + 4x upscale to sorted videos
+  6. dupes   - scan 1_sorted for likely duplicate videos by exact filesize
+  7. verify  - check 1_sorted and 2_outbox are in 1-to-1 correspondence
 """
 
 import logging
@@ -20,7 +21,7 @@ from pathlib import Path
 import check_correspondence
 import check_duplicate_sizes
 import config
-from tasks import bookmarks_sync, purge_weird, scripts_sync, sort, upscale
+from tasks import bookmarks_sync, prompt_scrape, purge_weird, scripts_sync, sort, upscale
 from util import system_resources
 from util.windows_alert import show_info_window
 
@@ -64,12 +65,15 @@ def main():
     bookmarks_sync_result = bookmarks_sync.run()
     log.info("")
 
+    prompt_scrape_result = prompt_scrape.run()
+    log.info("")
+
     priority_files = getattr(sort_result, "moved_files", [])
     upscale_result = None
     if not upscale.has_pending_work(priority_files=priority_files):
-        log.info("No pending Stage 3 work found. Skipping upscale.")
+        log.info("No pending Stage 5 work found. Skipping upscale.")
     elif _should_skip_upscale_due_to_cpu(log):
-        log.info("Skipping Stage 3 because CPU usage is above the configured threshold.")
+        log.info("Skipping Stage 5 because CPU usage is above the configured threshold.")
     else:
         upscale_result = upscale.run(priority_files=priority_files, max_items=config.UPSCALE_BATCH_LIMIT)
         log.info("")
@@ -84,6 +88,7 @@ def main():
         bool(purge_result.missing_sorted)
         or not scripts_sync_result.ok
         or not bookmarks_sync_result.ok
+        or not prompt_scrape_result.ok
         or not duplicate_sizes_result.ok
         or not correspondence_result.ok
     )
@@ -99,7 +104,7 @@ def _should_skip_upscale_due_to_cpu(log: logging.Logger) -> bool:
     try:
         busy_percent = system_resources.cpu_busy_percent(config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
     except Exception:
-        log.exception("CPU usage probe failed; proceeding with Stage 3.")
+        log.exception("CPU usage probe failed; proceeding with Stage 5.")
         return False
 
     log.info(
