@@ -3,6 +3,8 @@ from pathlib import Path
 BASE_DIR     = Path(r"C:\path\to\suite-root")
 PROJECT_DIR  = BASE_DIR / "projects" / "evolver"
 FUN_TIME_PROJECT_DIR = BASE_DIR / "projects" / "fun_time"
+VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
+SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
 
@@ -20,6 +22,7 @@ FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")
 TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm", ".m4v"}
+FUNSCRIPT_EXTENSION = ".funscript"
 
 CLEAN_EMPTY_INBOX_DIRS = True
 
