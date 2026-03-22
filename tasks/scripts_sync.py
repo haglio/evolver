@@ -23,6 +23,8 @@ class ScriptsSyncResult:
     copied_variants: int = 0
     ambiguous_variant_groups: int = 0
     variant_copy_errors: int = 0
+    duplicated_ai_videos: int = 0
+    ai_video_duplicate_errors: int = 0
     copied_variant_paths: list[str] | None = None
 
     def __post_init__(self) -> None:
@@ -71,8 +73,9 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
 
     _remove_empty_dirs(config.SCRIPT_LIBRARY_DIR)
     _copy_missing_variant_scripts(video_index, result)
+    _duplicate_ai_videos_for_funscripted_primary_vlc(result)
     log.info(
-        "Stage 3 done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d",
+        "Stage 3 done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d, AI video duplicates: %d, AI video duplicate errors: %d",
         result.moved,
         result.already_aligned,
         result.unmatched,
@@ -81,6 +84,8 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
         result.copied_variants,
         result.ambiguous_variant_groups,
         result.variant_copy_errors,
+        result.duplicated_ai_videos,
+        result.ai_video_duplicate_errors,
     )
     if not result.ok:
         log.error("Stage 3 failed. See log entries above for unresolved funscript alignment issues.")
@@ -158,6 +163,34 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: Sc
             log.info("COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
 
 
+def _duplicate_ai_videos_for_funscripted_primary_vlc(result: ScriptsSyncResult) -> None:
+    ai_scripts_root = config.SCRIPT_LIBRARY_DIR / "2D" / "AI"
+    if not ai_scripts_root.is_dir():
+        return
+
+    for script_path in _iter_funscripts(ai_scripts_root):
+        source_video = _video_path_for_script(script_path)
+        if source_video is None:
+            result.ai_video_duplicate_errors += 1
+            log.warning("AI SCRIPT HAS NO MIRRORED VIDEO FOR PRIMARY VLC DUPLICATION: %s", script_path)
+            continue
+
+        rel = script_path.relative_to(ai_scripts_root)
+        dest_video = config.ai_funscripted_dupes_dir() / rel.parent / source_video.name
+        try:
+            if dest_video.exists() and filecmp.cmp(source_video, dest_video, shallow=False):
+                continue
+            dest_video.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_video, dest_video)
+        except OSError:
+            result.ai_video_duplicate_errors += 1
+            log.exception("FAILED TO DUPLICATE AI VIDEO FOR PRIMARY VLC  %s  ->  %s", source_video, dest_video)
+            continue
+
+        result.duplicated_ai_videos += 1
+        log.info("DUPLICATE AI VIDEO FOR PRIMARY VLC  %s  ->  %s", source_video, dest_video)
+
+
 def _pick_variant_source(target_video: Path, existing_sources: list[Path]) -> Path | None:
     ordered = sorted(
         existing_sources,
@@ -200,6 +233,20 @@ def _variant_kind(video_path: Path) -> str:
     if "processed" in parts:
         return "processed"
     return "original"
+
+
+def _video_path_for_script(script_path: Path) -> Path | None:
+    rel = script_path.relative_to(config.SCRIPT_LIBRARY_DIR).with_suffix("")
+    parent = config.VIDEO_LIBRARY_DIR / rel.parent
+    stem = rel.name
+    matches = sorted(
+        candidate
+        for candidate in parent.glob(f"{stem}.*")
+        if candidate.is_file() and candidate.suffix.lower() in config.VIDEO_EXTENSIONS
+    )
+    if len(matches) != 1:
+        return None
+    return matches[0]
 
 
 def _normalized_stem(stem: str) -> str:
