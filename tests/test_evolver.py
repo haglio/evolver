@@ -12,6 +12,7 @@ class TestEvolverMain(unittest.TestCase):
     @patch("evolver.upscale.has_pending_work", return_value=False)
     @patch("evolver.check_duplicate_sizes.run")
     @patch("evolver.check_correspondence.run")
+    @patch("evolver.bookmarks_sync.run")
     @patch("evolver.upscale.run")
     @patch("evolver.scripts_sync.run")
     @patch("evolver.purge_weird.run")
@@ -26,14 +27,16 @@ class TestEvolverMain(unittest.TestCase):
         purge_run,
         scripts_sync_run,
         upscale_run,
-        duplicate_sizes_run,
+        bookmarks_sync_run,
         correspondence_run,
+        duplicate_sizes_run,
         has_pending_work,
         should_skip_cpu,
     ):
         sort_run.return_value = Mock(moved=0, moved_files=[])
         purge_run.return_value = Mock(missing_sorted=[])
         scripts_sync_run.return_value = Mock(ok=True)
+        bookmarks_sync_run.return_value = Mock(ok=True)
         duplicate_sizes_run.return_value = Mock(ok=True)
         correspondence_run.return_value = Mock(ok=True)
 
@@ -43,6 +46,7 @@ class TestEvolverMain(unittest.TestCase):
         self.assertEqual(exc.exception.code, 0)
         purge_run.assert_called_once_with()
         scripts_sync_run.assert_called_once_with(show_popup=True)
+        bookmarks_sync_run.assert_called_once_with()
         upscale_run.assert_not_called()
         duplicate_sizes_run.assert_called_once_with(show_popup=True)
         correspondence_run.assert_called_once_with(show_popup=True)
@@ -51,6 +55,7 @@ class TestEvolverMain(unittest.TestCase):
     @patch("evolver.upscale.has_pending_work", return_value=True)
     @patch("evolver.check_duplicate_sizes.run")
     @patch("evolver.check_correspondence.run")
+    @patch("evolver.bookmarks_sync.run")
     @patch("evolver.upscale.run")
     @patch("evolver.scripts_sync.run")
     @patch("evolver.purge_weird.run")
@@ -65,14 +70,16 @@ class TestEvolverMain(unittest.TestCase):
         purge_run,
         scripts_sync_run,
         upscale_run,
-        duplicate_sizes_run,
+        bookmarks_sync_run,
         correspondence_run,
+        duplicate_sizes_run,
         has_pending_work,
         should_skip_cpu,
     ):
         sort_run.return_value = Mock(moved=1, moved_files=["new-file"])
         purge_run.return_value = Mock(missing_sorted=[])
         scripts_sync_run.return_value = Mock(ok=True)
+        bookmarks_sync_run.return_value = Mock(ok=True)
         upscale_run.return_value = Mock(failed=0, deferred_low_disk=False)
         duplicate_sizes_run.return_value = Mock(ok=True)
         correspondence_run.return_value = Mock(ok=False)
@@ -83,6 +90,7 @@ class TestEvolverMain(unittest.TestCase):
         self.assertEqual(exc.exception.code, 1)
         purge_run.assert_called_once_with()
         scripts_sync_run.assert_called_once_with(show_popup=True)
+        bookmarks_sync_run.assert_called_once_with()
         upscale_run.assert_called_once_with(priority_files=["new-file"], max_items=evolver.config.UPSCALE_BATCH_LIMIT)
         duplicate_sizes_run.assert_called_once_with(show_popup=True)
         correspondence_run.assert_called_once_with(show_popup=True)
@@ -91,6 +99,7 @@ class TestEvolverMain(unittest.TestCase):
     @patch("evolver.upscale.has_pending_work", return_value=False)
     @patch("evolver.check_duplicate_sizes.run")
     @patch("evolver.check_correspondence.run")
+    @patch("evolver.bookmarks_sync.run")
     @patch("evolver.upscale.run")
     @patch("evolver.scripts_sync.run")
     @patch("evolver.purge_weird.run")
@@ -105,14 +114,16 @@ class TestEvolverMain(unittest.TestCase):
         purge_run,
         scripts_sync_run,
         upscale_run,
-        duplicate_sizes_run,
+        bookmarks_sync_run,
         correspondence_run,
+        duplicate_sizes_run,
         has_pending_work,
         should_skip_cpu,
     ):
         sort_run.return_value = Mock(moved=0, moved_files=[])
         purge_run.return_value = Mock(missing_sorted=[])
         scripts_sync_run.return_value = Mock(ok=True)
+        bookmarks_sync_run.return_value = Mock(ok=True)
         duplicate_sizes_run.return_value = Mock(ok=False)
         correspondence_run.return_value = Mock(ok=True)
 
@@ -122,6 +133,7 @@ class TestEvolverMain(unittest.TestCase):
         self.assertEqual(exc.exception.code, 1)
         purge_run.assert_called_once_with()
         scripts_sync_run.assert_called_once_with(show_popup=True)
+        bookmarks_sync_run.assert_called_once_with()
         upscale_run.assert_not_called()
         duplicate_sizes_run.assert_called_once_with(show_popup=True)
         correspondence_run.assert_called_once_with(show_popup=True)
@@ -130,6 +142,7 @@ class TestEvolverMain(unittest.TestCase):
     @patch("evolver.upscale.has_pending_work", return_value=True)
     @patch("evolver.check_duplicate_sizes.run")
     @patch("evolver.check_correspondence.run")
+    @patch("evolver.bookmarks_sync.run")
     @patch("evolver.upscale.run")
     @patch("evolver.scripts_sync.run")
     @patch("evolver.purge_weird.run")
@@ -144,14 +157,16 @@ class TestEvolverMain(unittest.TestCase):
         purge_run,
         scripts_sync_run,
         upscale_run,
-        duplicate_sizes_run,
+        bookmarks_sync_run,
         correspondence_run,
+        duplicate_sizes_run,
         has_pending_work,
         should_skip_cpu,
     ):
         sort_run.return_value = Mock(moved=1, moved_files=["new-file"])
         purge_run.return_value = Mock(missing_sorted=[])
         scripts_sync_run.return_value = Mock(ok=True)
+        bookmarks_sync_run.return_value = Mock(ok=True)
         duplicate_sizes_run.return_value = Mock(ok=True)
         correspondence_run.return_value = Mock(ok=True)
 
@@ -160,12 +175,14 @@ class TestEvolverMain(unittest.TestCase):
 
         self.assertEqual(exc.exception.code, 0)
         scripts_sync_run.assert_called_once_with(show_popup=True)
+        bookmarks_sync_run.assert_called_once_with()
         upscale_run.assert_not_called()
 
     @patch("evolver._should_skip_upscale_due_to_cpu", return_value=False)
     @patch("evolver.upscale.has_pending_work", return_value=False)
     @patch("evolver.check_duplicate_sizes.run")
     @patch("evolver.check_correspondence.run")
+    @patch("evolver.bookmarks_sync.run")
     @patch("evolver.upscale.run")
     @patch("evolver.scripts_sync.run")
     @patch("evolver.purge_weird.run")
@@ -180,14 +197,16 @@ class TestEvolverMain(unittest.TestCase):
         purge_run,
         scripts_sync_run,
         upscale_run,
-        duplicate_sizes_run,
+        bookmarks_sync_run,
         correspondence_run,
+        duplicate_sizes_run,
         has_pending_work,
         should_skip_cpu,
     ):
         sort_run.return_value = Mock(moved=0, moved_files=[])
         purge_run.return_value = Mock(missing_sorted=[])
         scripts_sync_run.return_value = Mock(ok=False)
+        bookmarks_sync_run.return_value = Mock(ok=True)
         duplicate_sizes_run.return_value = Mock(ok=True)
         correspondence_run.return_value = Mock(ok=True)
 
@@ -196,6 +215,46 @@ class TestEvolverMain(unittest.TestCase):
 
         self.assertEqual(exc.exception.code, 1)
         scripts_sync_run.assert_called_once_with(show_popup=True)
+        bookmarks_sync_run.assert_called_once_with()
+        upscale_run.assert_not_called()
+
+    @patch("evolver._should_skip_upscale_due_to_cpu", return_value=False)
+    @patch("evolver.upscale.has_pending_work", return_value=False)
+    @patch("evolver.check_duplicate_sizes.run")
+    @patch("evolver.check_correspondence.run")
+    @patch("evolver.bookmarks_sync.run")
+    @patch("evolver.upscale.run")
+    @patch("evolver.scripts_sync.run")
+    @patch("evolver.purge_weird.run")
+    @patch("evolver.sort.run")
+    @patch("evolver.check_dependencies")
+    @patch("evolver.setup_logging")
+    def test_main_exits_nonzero_on_bookmarks_sync_failure(
+        self,
+        setup_logging,
+        check_dependencies,
+        sort_run,
+        purge_run,
+        scripts_sync_run,
+        upscale_run,
+        bookmarks_sync_run,
+        correspondence_run,
+        duplicate_sizes_run,
+        has_pending_work,
+        should_skip_cpu,
+    ):
+        sort_run.return_value = Mock(moved=0, moved_files=[])
+        purge_run.return_value = Mock(missing_sorted=[])
+        scripts_sync_run.return_value = Mock(ok=True)
+        bookmarks_sync_run.return_value = Mock(ok=False)
+        duplicate_sizes_run.return_value = Mock(ok=True)
+        correspondence_run.return_value = Mock(ok=True)
+
+        with self.assertRaises(SystemExit) as exc:
+            evolver.main()
+
+        self.assertEqual(exc.exception.code, 1)
+        bookmarks_sync_run.assert_called_once_with()
         upscale_run.assert_not_called()
 
     def test_finish_regen_if_complete_simplifies_fun_time_config(self):
