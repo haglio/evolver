@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from tasks import sort as sort_task
 from tests.temp_helpers import workspace_temp_dir
+from util.media_files import is_partial_video_path
 
 
 class TestSortHelpers(unittest.TestCase):
@@ -73,6 +74,18 @@ class TestSortHelpers(unittest.TestCase):
                 sort_task.config.INBOX_DIR = old_inbox
                 sort_task.config.SORTED_DIR = old_sorted
                 sort_task.config.CLEAN_EMPTY_INBOX_DIRS = old_clean
+
+    def test_iter_videos_ignores_partial_files(self):
+        with workspace_temp_dir() as td_path:
+            good = td_path / "clip.mp4"
+            partial = td_path / "clip.partial.deadbeef.mp4"
+            good.write_bytes(b"video")
+            partial.write_bytes(b"partial")
+
+            result = list(sort_task._iter_videos(td_path))
+
+            self.assertEqual(result, [good])
+            self.assertTrue(is_partial_video_path(partial))
 
 
 if __name__ == "__main__":

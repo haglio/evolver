@@ -12,6 +12,7 @@ from pathlib import Path
 
 import config
 from util import system_resources
+from util.media_files import is_finalized_video_file, iter_finalized_videos, remove_partial_video_files
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -40,10 +41,13 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None) 
     for orient in ("landscape", "portrait"):
         (target_upscaled_dir / orient).mkdir(parents=True, exist_ok=True)
     target_weird_dir.mkdir(parents=True, exist_ok=True)
+    removed_partial_outputs = remove_partial_video_files(target_upscaled_dir, config.VIDEO_EXTENSIONS, logger=log)
 
     log.info("=== Stage 2: upscale from 1_sorted ===")
     log.info("OUT: %s/{landscape,portrait}/<source>/", target_upscaled_dir)
     log.info("Also skip if exists in: %s", target_weird_dir)
+    if removed_partial_outputs:
+        log.info("Removed %d stale partial output file(s) from %s", removed_partial_outputs, target_upscaled_dir)
     if config.regen_mode_active():
         log.info("Regen mode enabled. Legacy outbox remains at: %s", config.OUTBOX_DIR)
 
@@ -95,9 +99,18 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None) 
             _delete_legacy_counterpart(orient, source, out_name)
             continue
 
-        if _run_ffmpeg(in_file, tmp, env):
+        ffmpeg_ok = False
+        try:
+            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env)
+        except OSError:
+            log.exception("FAILED (ffmpeg launch error): %s", in_file)
+
+        if ffmpeg_ok:
             if tmp.exists() and tmp.stat().st_size > 0:
-                tmp.replace(out)
+                try:
+                    tmp.replace(out)
+                finally:
+                    tmp.unlink(missing_ok=True)
                 result.processed += 1
                 log.info("Wrote: %s", out)
                 _delete_legacy_counterpart(orient, source, out_name)
@@ -157,7 +170,7 @@ def collect_candidates(priority_files: list[Path] | None = None, limit: int | No
         source, orient = rel.parts[0], rel.parts[1]
         if orient not in ("landscape", "portrait"):
             continue
-        if in_file.is_file() and in_file.suffix.lower() in config.VIDEO_EXTENSIONS:
+        if is_finalized_video_file(in_file, config.VIDEO_EXTENSIONS):
             if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
                 return candidates
 
@@ -389,9 +402,7 @@ def _show_low_disk_warning() -> None:
 
 
 def _iter_videos(root: Path):
-    for p in root.rglob("*"):
-        if p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS:
-            yield p
+    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
 def _iter_sources(root: Path):

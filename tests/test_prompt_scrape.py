@@ -144,6 +144,42 @@ class TestPromptScrape(unittest.TestCase):
             self.assertEqual(result.skipped_non_provider, 1)
             fetch_dom.assert_not_called()
 
+    def test_run_ignores_partial_video_files(self):
+        with workspace_temp_dir() as root:
+            outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
+            prompts_dir = root / "videos" / "prompts"
+            favs_path = root / "favs.csv"
+            final_video = outbox / "upscaled_by_orientation" / "portrait" / "provider" / "one_topaz.mp4"
+            partial_video = outbox / "upscaled_by_orientation" / "portrait" / "provider" / "one.partial.deadbeef.mp4"
+            final_video.parent.mkdir(parents=True, exist_ok=True)
+            final_video.write_text("x", encoding="utf-8")
+            partial_video.write_text("x", encoding="utf-8")
+            favs_path.write_text("local_file,web_url\n", encoding="utf-8")
+
+            saved = {
+                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
+                "PROMPTS_DIR": config.PROMPTS_DIR,
+                "OUTBOX_DIR": config.OUTBOX_DIR,
+                "REGEN_OUTBOX_DIR": config.REGEN_OUTBOX_DIR,
+                "REGEN_ENABLED": config.REGEN_ENABLED,
+            }
+            config.FUN_TIME_FAVS_FILE = favs_path
+            config.PROMPTS_DIR = prompts_dir
+            config.OUTBOX_DIR = outbox
+            config.REGEN_OUTBOX_DIR = root / "videos" / "videos" / "2D" / "AI" / "3_new_outbox"
+            config.REGEN_ENABLED = False
+            try:
+                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
+                        result = prompt_scrape.run()
+            finally:
+                for key, value in saved.items():
+                    setattr(config, key, value)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.scraped, 1)
+            self.assertFalse((prompts_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "one.partial.deadbeef.json").exists())
+
     @staticmethod
     def _fetch_dom_with_source_image(url: str, browser: Path) -> str:
         if "/image/" in url:

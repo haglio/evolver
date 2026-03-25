@@ -15,6 +15,7 @@ from urllib.parse import unquote, urlparse
 import config
 from tasks import bookmarks_sync
 from tasks.purge_weird import source_stem
+from util.media_files import iter_finalized_videos
 
 log = logging.getLogger(__name__)
 
@@ -167,9 +168,7 @@ def _extract_url(value: str) -> str | None:
 
 
 def _iter_video_files(root: Path):
-    for path in root.rglob("*"):
-        if path.is_file() and path.suffix.lower() in config.VIDEO_EXTENSIONS:
-            yield path
+    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
 def _prompt_output_path(video_path: Path, outbox_root: Path) -> Path:

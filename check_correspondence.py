@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util.media_files import iter_finalized_videos
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -25,9 +26,7 @@ class CorrespondenceResult:
 
 
 def iter_videos(root: Path):
-    for p in root.rglob("*"):
-        if p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS:
-            yield p
+    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
 def sorted_to_outbox_name(sorted_file: Path) -> str:
@@ -200,4 +199,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

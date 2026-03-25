@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List
 
 import config
+from util.media_files import is_finalized_video_file
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ def run() -> PurgeWeirdResult:
     for weird_root in roots:
         weird_files = [
             p for p in weird_root.iterdir()
-            if p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS
+            if is_finalized_video_file(p, config.VIDEO_EXTENSIONS)
         ]
         if not weird_files:
             continue

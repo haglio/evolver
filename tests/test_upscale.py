@@ -108,6 +108,47 @@ class TestUpscaleHelpers(unittest.TestCase):
             self.assertEqual(candidates[0][0], priority)
             self.assertEqual(candidates[1][0], backlog)
 
+    def test_run_removes_stale_partial_outputs_before_processing(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            source = "provider2"
+            in_file = sorted_dir / source / "landscape" / "clip.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            stale_partial = out_dir / "landscape" / source / "clip.partial.deadbeef.mp4"
+            stale_partial.parent.mkdir(parents=True)
+            stale_partial.write_bytes(b"partial")
+
+            old_sorted = config.SORTED_DIR
+            old_out = config.OUT_UPSCALED_DIR
+            old_weird = config.WEIRD_DIR
+            old_regen_enabled = config.REGEN_ENABLED
+            config.SORTED_DIR = sorted_dir
+            config.OUT_UPSCALED_DIR = out_dir
+            config.WEIRD_DIR = weird_dir
+            config.REGEN_ENABLED = False
+
+            def fake_run_ffmpeg(_in_file, tmp, _env):
+                tmp.write_bytes(b"upscaled")
+                return True
+
+            try:
+                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    result = upscale.run(max_items=1)
+            finally:
+                config.SORTED_DIR = old_sorted
+                config.OUT_UPSCALED_DIR = old_out
+                config.WEIRD_DIR = old_weird
+                config.REGEN_ENABLED = old_regen_enabled
+
+            self.assertEqual(result.processed, 1)
+            self.assertFalse(stale_partial.exists())
+            self.assertTrue((out_dir / "landscape" / source / "clip_topaz.mp4").exists())
+
     def test_run_deletes_legacy_counterpart_in_regen_mode(self):
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
