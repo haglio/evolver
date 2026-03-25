@@ -29,6 +29,7 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
   - `check_duplicate_sizes.py` - Stage 6 duplicate-size scan for likely source duplicates
   - `check_correspondence.py` - Stage 7 integrity verification and one-time manual check
   - `util/ffprobe.py` - orientation probing
+  - `util/media_files.py` - shared helpers for finalized-vs-partial video detection and stale partial cleanup
 
 ## Requirements
 
@@ -121,6 +122,18 @@ What is covered:
 - Scheduler flow behavior, including always-running purge and pending-work-based Stage 3 decisions (`evolver.py`)
 - Interactive popup vs Session-0 `msg.exe` fallback behavior (`util/windows_alert.py`)
 - Already-processed detection (`tasks/upscale.py`)
+- Partial-file handling across upscale cleanup and downstream scanners (`tasks/upscale.py`, `check_correspondence.py`, `tasks/prompt_scrape.py`, `tasks/sort.py`)
+
+## Output temp-file contract
+
+Stage 5 writes Topaz output to a temporary filename before promoting it to the final `_topaz` path.
+
+- Temp files use the pattern `*.partial.<uuid>.mp4`
+- Temp files are not considered valid library videos
+- Shared filtering and cleanup lives in `util/media_files.py`
+- On each Stage 5 run, stale partial outputs under the active upscale target are deleted before new work starts
+
+For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 
 ## Notes
 
