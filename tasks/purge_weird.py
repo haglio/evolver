@@ -81,11 +81,15 @@ def source_stem(stem: str) -> str:
     Examples:
         'abc_topaz'         -> 'abc'
         'abc_topaz_cfr'     -> 'abc'
+        'abc_apo8_gcg5_topaz' -> 'abc_apo8_gcg5'
         'abc_topaz_extra'   -> 'abc'
         'abc_apo8_gcg5'     -> 'abc'
         'abc_apo8_gcg5_x'   -> 'abc'
     """
-    return re.sub(r"_(?:topaz|apo8_gcg5).*$", "", stem)
+    stripped_topaz = re.sub(r"_topaz(?:_.*)?$", "", stem)
+    if stripped_topaz != stem:
+        return stripped_topaz
+    return re.sub(r"_apo8_gcg5(?:_.*)?$", "", stem)
 
 
 def _source_name(outbox_file: Path) -> str:
@@ -104,4 +108,3 @@ def _show_error_window(missing: List[str]) -> None:
         f"Affected files:\n{lines}{ellipsis}"
     )
     show_error_window("Evolver - Missing Sources", msg)
-
