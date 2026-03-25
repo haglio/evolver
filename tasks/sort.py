@@ -6,6 +6,7 @@ from pathlib import Path
 
 import config
 from util.ffprobe import get_orientation
+from util.media_files import iter_finalized_videos
 
 log = logging.getLogger(__name__)
 
@@ -75,9 +76,7 @@ def _move_unique(src: Path, dest: Path) -> bool:
 
 
 def _iter_videos(root: Path):
-    for p in root.rglob("*"):
-        if p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS:
-            yield p
+    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
 def _iter_source_dirs(root: Path):

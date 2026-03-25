@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
+from util.media_files import is_finalized_video_file, iter_finalized_videos
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -100,9 +101,8 @@ def _index_videos(root: Path) -> dict[str, list[Path]]:
     index: dict[str, list[Path]] = defaultdict(list)
     if not root.is_dir():
         return index
-    for video_path in root.rglob("*"):
-        if video_path.is_file() and video_path.suffix.lower() in config.VIDEO_EXTENSIONS:
-            index[video_path.stem].append(video_path)
+    for video_path in iter_finalized_videos(root, config.VIDEO_EXTENSIONS):
+        index[video_path.stem].append(video_path)
     return index
 
 
@@ -266,7 +266,7 @@ def _video_path_for_script(script_path: Path) -> Path | None:
     matches = sorted(
         candidate
         for candidate in parent.glob(f"{stem}.*")
-        if candidate.is_file() and candidate.suffix.lower() in config.VIDEO_EXTENSIONS
+        if is_finalized_video_file(candidate, config.VIDEO_EXTENSIONS)
     )
     if len(matches) != 1:
         return None

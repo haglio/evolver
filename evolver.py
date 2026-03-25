@@ -22,6 +22,7 @@ import check_correspondence
 import check_duplicate_sizes
 import config
 from tasks import bookmarks_sync, prompt_scrape, purge_weird, scripts_sync, sort, upscale
+from util.media_files import iter_finalized_videos
 from util import system_resources
 from util.windows_alert import show_info_window
 
@@ -153,7 +154,7 @@ def _finish_regen_if_complete(log: logging.Logger, correspondence_result) -> boo
 def _dir_has_video_files(root: Path) -> bool:
     if not root.is_dir():
         return False
-    return any(p.is_file() and p.suffix.lower() in config.VIDEO_EXTENSIONS for p in root.rglob("*"))
+    return any(iter_finalized_videos(root, config.VIDEO_EXTENSIONS))
 
 
 def _remove_empty_dirs(root: Path) -> None:
