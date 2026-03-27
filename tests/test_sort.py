@@ -3,8 +3,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import sort as sort_task
-from tests.temp_helpers import workspace_temp_dir
-from util.media_files import is_partial_video_path
+from tests.temp_helpers import override_config, workspace_temp_dir
+from util.media_files import is_partial_video_path, remove_empty_dirs
 
 
 class TestSortHelpers(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestSortHelpers(unittest.TestCase):
             nonempty_sub.mkdir(parents=True)
             (nonempty_sub / "file.txt").write_text("x", encoding="utf-8")
 
-            sort_task._remove_empty_dirs(root)
+            remove_empty_dirs(root)
 
             self.assertFalse((root / "a").exists())
             self.assertTrue(nonempty_sub.exists())
@@ -56,24 +56,13 @@ class TestSortHelpers(unittest.TestCase):
             src = source_dir / "clip.mp4"
             src.write_bytes(b"video")
 
-            old_inbox = sort_task.config.INBOX_DIR
-            old_sorted = sort_task.config.SORTED_DIR
-            old_clean = sort_task.config.CLEAN_EMPTY_INBOX_DIRS
-
-            sort_task.config.INBOX_DIR = inbox
-            sort_task.config.SORTED_DIR = sorted_dir
-            sort_task.config.CLEAN_EMPTY_INBOX_DIRS = False
-            try:
+            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir, CLEAN_EMPTY_INBOX_DIRS=False):
                 with patch("tasks.sort.get_orientation", return_value="landscape"):
                     result = sort_task.run()
 
-                self.assertEqual(result.moved, 1)
-                self.assertTrue((sorted_dir / dynamic_source / "landscape" / "clip.mp4").exists())
-                self.assertFalse(src.exists())
-            finally:
-                sort_task.config.INBOX_DIR = old_inbox
-                sort_task.config.SORTED_DIR = old_sorted
-                sort_task.config.CLEAN_EMPTY_INBOX_DIRS = old_clean
+            self.assertEqual(result.moved, 1)
+            self.assertTrue((sorted_dir / dynamic_source / "landscape" / "clip.mp4").exists())
+            self.assertFalse(src.exists())
 
     def test_iter_videos_ignores_partial_files(self):
         with workspace_temp_dir() as td_path:

@@ -2,9 +2,42 @@ import json
 import unittest
 from pathlib import Path
 
-import config
 from tasks import bookmarks_sync
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir
+
+
+class TestExtractUrl(unittest.TestCase):
+    def test_extracts_plain_urls(self):
+        cases = [
+            ("https://example.com/page", "https://example.com/page"),
+            ("http://example.com/", "http://example.com/"),
+            ("not-a-url", None),
+            ("ftp://example.com/", None),
+            ("", None),
+        ]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(bookmarks_sync._extract_url(value), expected)
+
+    def test_extracts_hyperlink_formulas(self):
+        self.assertEqual(
+            bookmarks_sync._extract_url('=HYPERLINK("https://example.com/abc";"label")'),
+            "https://example.com/abc",
+        )
+        self.assertIsNone(bookmarks_sync._extract_url('=HYPERLINK("not-a-url";"label")'))
+
+
+class TestBookmarkName(unittest.TestCase):
+    def test_generates_name_from_url(self):
+        cases = [
+            ("https://example.com/image/abc", "example.com - abc"),
+            ("https://example.net/image/xyz", "example.net - xyz"),
+            ("https://example.com/", "https://example.com/"),
+            ("https://example.com", "https://example.com"),
+        ]
+        for url, expected in cases:
+            with self.subTest(url=url):
+                self.assertEqual(bookmarks_sync._bookmark_name(url), expected)
 
 
 class TestBookmarksSync(unittest.TestCase):
@@ -17,7 +50,6 @@ class TestBookmarksSync(unittest.TestCase):
             favs_path = root / "favs.csv"
             user_data_dir = root / "User Data"
             profile_dir = user_data_dir / "Profile 2"
-            bookmarks_path = profile_dir / "Bookmarks"
             user_data_dir.mkdir(parents=True, exist_ok=True)
             profile_dir.mkdir(parents=True, exist_ok=True)
             favs_path.write_text(
@@ -27,36 +59,19 @@ class TestBookmarksSync(unittest.TestCase):
                 encoding="utf-8",
             )
             (user_data_dir / "Local State").write_text(
-                json.dumps(
-                    {
-                        "profile": {
-                            "info_cache": {
-                                "Profile 2": {
-                                    "name": "Blair",
-                                }
-                            }
-                        }
-                    }
-                ),
+                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
 
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
-                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
-                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.CHROME_USER_DATA_DIR = user_data_dir
-            config.CHROME_PROFILE_NAME = "Blair"
-            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
-            try:
+            with override_config(
+                FUN_TIME_FAVS_FILE=favs_path,
+                CHROME_USER_DATA_DIR=user_data_dir,
+                CHROME_PROFILE_NAME="Blair",
+                CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
+            ):
                 result = bookmarks_sync.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
 
+            bookmarks_path = profile_dir / "Bookmarks"
             self.assertTrue(result.ok)
             self.assertEqual(result.removed_missing_files, 1)
             self.assertEqual(result.added, 1)
@@ -80,7 +95,6 @@ class TestBookmarksSync(unittest.TestCase):
             favs_path = root / "favs.csv"
             user_data_dir = root / "User Data"
             profile_dir = user_data_dir / "Profile 2"
-            bookmarks_path = profile_dir / "Bookmarks"
             user_data_dir.mkdir(parents=True, exist_ok=True)
             profile_dir.mkdir(parents=True, exist_ok=True)
             favs_path.write_text(
@@ -95,151 +109,27 @@ class TestBookmarksSync(unittest.TestCase):
                 encoding="utf-8",
             )
             (user_data_dir / "Local State").write_text(
-                json.dumps(
-                    {
-                        "profile": {
-                            "info_cache": {
-                                "Profile 2": {
-                                    "name": "Blair",
-                                }
-                            }
-                        }
-                    }
-                ),
+                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
 
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
-                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
-                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.CHROME_USER_DATA_DIR = user_data_dir
-            config.CHROME_PROFILE_NAME = "Blair"
-            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
-            try:
+            with override_config(
+                FUN_TIME_FAVS_FILE=favs_path,
+                CHROME_USER_DATA_DIR=user_data_dir,
+                CHROME_PROFILE_NAME="Blair",
+                CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
+            ):
                 result = bookmarks_sync.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
 
             self.assertTrue(result.ok)
             self.assertEqual(result.removed_missing_files, 1)
             self.assertEqual(result.added, 1)
             self.assertIn("https://example.com/keep", favs_path.read_text(encoding="utf-8"))
             self.assertNotIn("https://example.com/drop", favs_path.read_text(encoding="utf-8"))
+            bookmarks_path = profile_dir / "Bookmarks"
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
             self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/keep"])
-
-    def test_run_keeps_local_file_row_when_regen_twin_exists(self):
-        with workspace_temp_dir() as root:
-            regen_media = root / "videos" / "3_new_outbox" / "portrait" / "provider2" / "abc_topaz.mp4"
-            regen_media.parent.mkdir(parents=True, exist_ok=True)
-            regen_media.write_text("x", encoding="utf-8")
-            stale_media = Path(str(regen_media).replace("\\3_new_outbox\\", "\\2_outbox\\"))
-            favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            bookmarks_path = profile_dir / "Bookmarks"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
-            favs_path.write_text(
-                'local_file,web_url\n'
-                f'"=HYPERLINK(""file:///{stale_media.as_posix()}"";""{stale_media}"")",https://example.net/image/abc\n',
-                encoding="utf-8",
-            )
-            (user_data_dir / "Local State").write_text(
-                json.dumps(
-                    {
-                        "profile": {
-                            "info_cache": {
-                                "Profile 2": {
-                                    "name": "Blair",
-                                }
-                            }
-                        }
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
-                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
-                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.CHROME_USER_DATA_DIR = user_data_dir
-            config.CHROME_PROFILE_NAME = "Blair"
-            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
-            try:
-                result = bookmarks_sync.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
-
-            self.assertTrue(result.ok)
-            self.assertEqual(result.removed_missing_files, 0)
-            content = favs_path.read_text(encoding="utf-8")
-            self.assertIn(str(stale_media), content)
-            self.assertNotIn(str(regen_media), content)
-
-    def test_run_normalizes_3_new_outbox_references_back_to_2_outbox(self):
-        with workspace_temp_dir() as root:
-            stale_media = root / "videos" / "2_outbox" / "portrait" / "provider2" / "abc_topaz.mp4"
-            regen_media = Path(str(stale_media).replace("\\2_outbox\\", "\\3_new_outbox\\"))
-            regen_media.parent.mkdir(parents=True, exist_ok=True)
-            regen_media.write_text("x", encoding="utf-8")
-            favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
-            favs_path.write_text(
-                'local_file,web_url\n'
-                f'"=HYPERLINK(""file:///{regen_media.as_posix()}"";""{regen_media}"")",https://example.net/image/abc\n',
-                encoding="utf-8",
-            )
-            (user_data_dir / "Local State").write_text(
-                json.dumps(
-                    {
-                        "profile": {
-                            "info_cache": {
-                                "Profile 2": {
-                                    "name": "Blair",
-                                }
-                            }
-                        }
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
-                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
-                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.CHROME_USER_DATA_DIR = user_data_dir
-            config.CHROME_PROFILE_NAME = "Blair"
-            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
-            try:
-                result = bookmarks_sync.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
-
-            self.assertTrue(result.ok)
-            self.assertEqual(result.normalized_outbox_paths, 1)
-            content = favs_path.read_text(encoding="utf-8")
-            self.assertIn(str(stale_media), content)
-            self.assertNotIn(str(regen_media), content)
 
     def test_run_syncs_web_urls_into_named_profile_folder(self):
         with workspace_temp_dir() as root:
@@ -257,17 +147,7 @@ class TestBookmarksSync(unittest.TestCase):
                 encoding="utf-8",
             )
             (user_data_dir / "Local State").write_text(
-                json.dumps(
-                    {
-                        "profile": {
-                            "info_cache": {
-                                "Profile 2": {
-                                    "name": "Blair",
-                                }
-                            }
-                        }
-                    }
-                ),
+                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
             bookmarks_path.write_text(
@@ -330,21 +210,13 @@ class TestBookmarksSync(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
-                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
-                "CHROME_BOOKMARKS_FOLDER_NAME": config.CHROME_BOOKMARKS_FOLDER_NAME,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.CHROME_USER_DATA_DIR = user_data_dir
-            config.CHROME_PROFILE_NAME = "Blair"
-            config.CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
-            try:
+            with override_config(
+                FUN_TIME_FAVS_FILE=favs_path,
+                CHROME_USER_DATA_DIR=user_data_dir,
+                CHROME_PROFILE_NAME="Blair",
+                CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
+            ):
                 result = bookmarks_sync.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
 
             self.assertTrue(result.ok)
             self.assertEqual(result.added, 2)
@@ -360,6 +232,41 @@ class TestBookmarksSync(unittest.TestCase):
                 ],
             )
 
+    def test_run_deduplicates_identical_urls(self):
+        with workspace_temp_dir() as root:
+            favs_path = root / "favs.csv"
+            user_data_dir = root / "User Data"
+            profile_dir = user_data_dir / "Profile 2"
+            bookmarks_path = profile_dir / "Bookmarks"
+            user_data_dir.mkdir(parents=True, exist_ok=True)
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            favs_path.write_text(
+                "local_file,web_url\n"
+                "one,https://example.com/same\n"
+                "two,https://example.com/same\n"
+                "three,https://example.com/different\n",
+                encoding="utf-8",
+            )
+            (user_data_dir / "Local State").write_text(
+                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
+                encoding="utf-8",
+            )
+
+            with override_config(
+                FUN_TIME_FAVS_FILE=favs_path,
+                CHROME_USER_DATA_DIR=user_data_dir,
+                CHROME_PROFILE_NAME="Blair",
+                CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
+            ):
+                result = bookmarks_sync.run()
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.added, 2)
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            folder = written["roots"]["bookmark_bar"]["children"][0]
+            urls = [child["url"] for child in folder["children"]]
+            self.assertEqual(urls, ["https://example.com/same", "https://example.com/different"])
+
     def test_run_reports_missing_profile(self):
         with workspace_temp_dir() as root:
             favs_path = root / "favs.csv"
@@ -371,19 +278,12 @@ class TestBookmarksSync(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "CHROME_USER_DATA_DIR": config.CHROME_USER_DATA_DIR,
-                "CHROME_PROFILE_NAME": config.CHROME_PROFILE_NAME,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.CHROME_USER_DATA_DIR = user_data_dir
-            config.CHROME_PROFILE_NAME = "Blair"
-            try:
+            with override_config(
+                FUN_TIME_FAVS_FILE=favs_path,
+                CHROME_USER_DATA_DIR=user_data_dir,
+                CHROME_PROFILE_NAME="Blair",
+            ):
                 result = bookmarks_sync.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
 
             self.assertFalse(result.ok)
             self.assertTrue(result.profile_missing)

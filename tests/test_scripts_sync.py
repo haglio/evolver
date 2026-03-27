@@ -3,7 +3,29 @@ from unittest.mock import patch
 
 import config
 from tasks import scripts_sync
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir
+
+
+class TestNormalizedStem(unittest.TestCase):
+    def test_strips_processing_suffixes_recursively(self):
+        cases = [
+            ("clip", "clip"),
+            ("clip_topaz", "clip"),
+            ("clip_apo8_gcg5", "clip"),
+            ("clip_apo8_gcg5_topaz", "clip"),
+            ("clip_topaz_cfr", "clip"),
+            ("clip_apo8_gcg5_topaz_cfr", "clip"),
+            ("clip_apo8", "clip"),
+            ("clip_apf2", "clip"),
+            ("clip_iris3", "clip"),
+            ("clip_iris2", "clip"),
+            ("clip_enh", "clip"),
+            ("clip_apo8_iris2", "clip"),
+            ("no_suffix", "no_suffix"),
+        ]
+        for stem, expected in cases:
+            with self.subTest(stem=stem):
+                self.assertEqual(scripts_sync._normalized_stem(stem), expected)
 
 
 class TestScriptsSync(unittest.TestCase):
@@ -18,15 +40,8 @@ class TestScriptsSync(unittest.TestCase):
             video_path.write_bytes(b"video")
             old_script_path.write_text("{}", encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             expected = script_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.funscript"
             self.assertEqual(result.moved, 1)
@@ -48,15 +63,8 @@ class TestScriptsSync(unittest.TestCase):
             second.write_bytes(b"video-b")
             script_path.write_text("{}", encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             self.assertEqual(result.ambiguous, 1)
             self.assertTrue(script_path.exists())
@@ -65,9 +73,9 @@ class TestScriptsSync(unittest.TestCase):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
-            ai_video = video_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
-            non_ai_duplicate = video_root / "2D" / "non_AI" / "actually_AI_but_funscripted" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
-            script_path = script_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.funscript"
+            ai_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
+            non_ai_duplicate = video_root / "2D" / "non_AI" / "actually_AI_but_funscripted" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
+            script_path = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.funscript"
             ai_video.parent.mkdir(parents=True, exist_ok=True)
             non_ai_duplicate.parent.mkdir(parents=True, exist_ok=True)
             script_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,15 +83,8 @@ class TestScriptsSync(unittest.TestCase):
             non_ai_duplicate.write_bytes(b"duplicate")
             script_path.write_text("{}", encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             self.assertEqual(result.ambiguous, 0)
             self.assertEqual(result.already_aligned, 1)
@@ -103,15 +104,8 @@ class TestScriptsSync(unittest.TestCase):
             ai_video.write_bytes(b"ai-video")
             script_path.write_text("{}", encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             self.assertEqual(result.ambiguous, 0)
             self.assertEqual(result.already_aligned, 1)
@@ -128,15 +122,8 @@ class TestScriptsSync(unittest.TestCase):
             video_path.write_bytes(b"video")
             script_path.write_text("{}", encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             self.assertEqual(result.already_aligned, 1)
             self.assertTrue(script_path.exists())
@@ -149,16 +136,9 @@ class TestScriptsSync(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text("{}", encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 with patch("tasks.scripts_sync.show_error_window") as show_error_window:
                     result = scripts_sync.run(show_popup=True)
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             self.assertFalse(result.ok)
             self.assertEqual(result.unmatched, 1)
@@ -169,7 +149,7 @@ class TestScriptsSync(unittest.TestCase):
             video_root = root / "videos"
             script_root = root / "scripts"
             sorted_video = video_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.mp4"
-            outbox_video = video_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
+            outbox_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
             sorted_script = script_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.funscript"
             sorted_video.parent.mkdir(parents=True, exist_ok=True)
             outbox_video.parent.mkdir(parents=True, exist_ok=True)
@@ -178,17 +158,10 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             sorted_script.write_text('{"actions":[1]}', encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
-            outbox_script = script_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.funscript"
+            outbox_script = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.funscript"
             self.assertEqual(result.copied_variants, 1)
             self.assertTrue(outbox_script.exists())
             self.assertEqual(outbox_script.read_text(encoding="utf-8"), sorted_script.read_text(encoding="utf-8"))
@@ -207,15 +180,8 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             outbox_script.write_text('{"actions":[2]}', encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             sorted_script = script_root / "2D" / "AI" / "1_sorted" / "src" / "landscape" / "clip.funscript"
             self.assertEqual(result.copied_variants, 1)
@@ -236,15 +202,8 @@ class TestScriptsSync(unittest.TestCase):
             processed_video.write_bytes(b"processed")
             processed_script.write_text('{"actions":[3]}', encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             original_script = script_root / "2D" / "non_AI" / "winston" / "0 unsorted" / "clip.funscript"
             self.assertEqual(result.copied_variants, 1)
@@ -256,7 +215,7 @@ class TestScriptsSync(unittest.TestCase):
             video_root = root / "videos"
             script_root = root / "scripts"
             sorted_video = video_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.mp4"
-            outbox_video = video_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
+            outbox_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
             sorted_script = script_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.funscript"
             sorted_video.parent.mkdir(parents=True, exist_ok=True)
             outbox_video.parent.mkdir(parents=True, exist_ok=True)
@@ -265,18 +224,11 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             sorted_script.write_text('{"actions":[1]}', encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 with patch("tasks.scripts_sync.shutil.copy2", side_effect=PermissionError("denied")):
                     result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
-            outbox_script = script_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.funscript"
+            outbox_script = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.funscript"
             self.assertEqual(result.variant_copy_errors, 1)
             self.assertEqual(result.copied_variants, 0)
             self.assertFalse(result.ok)
@@ -294,15 +246,8 @@ class TestScriptsSync(unittest.TestCase):
             video_path.write_bytes(b"video")
             script_path.write_text('{"actions":[4]}', encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             duplicate_path = duplicate_root / "1_sorted" / "src" / "portrait" / "clip.mp4"
             self.assertEqual(result.duplicated_ai_videos, 1)
@@ -316,7 +261,7 @@ class TestScriptsSync(unittest.TestCase):
             script_root = root / "scripts"
             duplicate_root = video_root / "2D" / "non_AI" / "actually_AI_but_funscripted"
             sorted_video = video_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.mp4"
-            outbox_video = video_root / "2D" / "AI" / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
+            outbox_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
             sorted_script = script_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.funscript"
             sorted_video.parent.mkdir(parents=True, exist_ok=True)
             outbox_video.parent.mkdir(parents=True, exist_ok=True)
@@ -325,18 +270,11 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             sorted_script.write_text('{"actions":[5]}', encoding="utf-8")
 
-            saved_video_root = config.VIDEO_LIBRARY_DIR
-            saved_script_root = config.SCRIPT_LIBRARY_DIR
-            config.VIDEO_LIBRARY_DIR = video_root
-            config.SCRIPT_LIBRARY_DIR = script_root
-            try:
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
                 result = scripts_sync.run()
-            finally:
-                config.VIDEO_LIBRARY_DIR = saved_video_root
-                config.SCRIPT_LIBRARY_DIR = saved_script_root
 
             sorted_duplicate = duplicate_root / "1_sorted" / "src" / "portrait" / "clip.mp4"
-            outbox_duplicate = duplicate_root / "3_new_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
+            outbox_duplicate = duplicate_root / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
             self.assertEqual(result.copied_variants, 1)
             self.assertEqual(result.duplicated_ai_videos, 2)
             self.assertTrue(sorted_duplicate.exists())
