@@ -17,12 +17,9 @@ CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
 INBOX_DIR    = AI_DIR / "0_inbox"
 SORTED_DIR   = AI_DIR / "1_sorted"
 OUTBOX_DIR   = AI_DIR / "2_outbox"
-REGEN_OUTBOX_DIR = AI_DIR / "3_new_outbox"
 
 OUT_UPSCALED_DIR = OUTBOX_DIR / "upscaled_by_orientation"
 WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
-REGEN_OUT_UPSCALED_DIR = REGEN_OUTBOX_DIR / "upscaled_by_orientation"
-REGEN_WEIRD_DIR        = REGEN_OUTBOX_DIR / "kinda_weird"
 
 FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")
 TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
@@ -35,35 +32,21 @@ CLEAN_EMPTY_INBOX_DIRS = True
 UPSCALE_BATCH_LIMIT = 5
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
-REGEN_ENABLED = True
-DELETE_OLD_OUTBOX_AFTER_REGEN_SUCCESS = True
 LOW_DISK_WARNING_GB = 250
 ENABLE_CPU_BUSY_SKIP = True
 CPU_BUSY_SKIP_THRESHOLD_PCT = 65.0
 CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
-AUTO_CUTOVER_ON_REGEN_COMPLETE = True
 CURRENT_UPSCALE_VIDEOAI_TAG = "Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale"
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
-REGEN_COMPLETE_MARKER = PROJECT_DIR / ".regen-complete"
-POST_REGEN_CLEANUP_NOTE = PROJECT_DIR / "POST_REGEN_CLEANUP.md"
-REGEN_SKIP_FILE = PROJECT_DIR / ".regen-skip.txt"
 FUN_TIME_CONFIG_FILE = FUN_TIME_PROJECT_DIR / "fun_time_config.json"
 
 
-def regen_mode_active() -> bool:
-    return REGEN_ENABLED and not REGEN_COMPLETE_MARKER.exists()
-
-
 def active_outbox_dirs() -> list[Path]:
-    if regen_mode_active():
-        return [OUTBOX_DIR, REGEN_OUTBOX_DIR]
     return [OUTBOX_DIR]
 
 
 def active_weird_dirs() -> list[Path]:
-    if regen_mode_active():
-        return [WEIRD_DIR, REGEN_WEIRD_DIR]
     return [WEIRD_DIR]
 
 
