@@ -43,7 +43,6 @@ _IMAGE_NEGATIVE_PROMPT_SELECTOR = (
     r"div.font-regular.selection\:bg-primary > div.max-h-80.overflow-y-auto.rounded-sm."
     r"p-2.text-\[\#fefefe\]"
 )
-_HYPERLINK_URL_RE = re.compile(r'^=HYPERLINK\("([^"]+)"[;,]', re.IGNORECASE)
 _provider_HOSTS = {"example.com", "www.example.com"}
 
 
@@ -146,7 +145,7 @@ def _load_video_urls(result: PromptScrapeResult) -> dict[Path, str]:
 
 
 def _resolve_favorite_path(value: str, base_dir: Path) -> Path:
-    match = _HYPERLINK_URL_RE.match(value)
+    match = bookmarks_sync._HYPERLINK_URL_RE.match(value)
     candidate = match.group(1) if match else value
     parsed = urlparse(candidate)
     if parsed.scheme == "file":
