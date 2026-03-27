@@ -26,6 +26,32 @@ class TestExtractUrl(unittest.TestCase):
         self.assertIsNone(bookmarks_sync._extract_url('=HYPERLINK("not-a-url";"label")'))
 
 
+class TestLooksLikeFilesystemReference(unittest.TestCase):
+    def test_recognizes_filesystem_paths(self):
+        cases = [
+            ("C:\\Users\\file.mp4", True),
+            ("D:/videos/clip.mp4", True),
+            ("file:///C:/videos/clip.mp4", True),
+            ("\\\\server\\share\\file.mp4", True),
+            ("./relative/path.mp4", True),
+            ("../parent/path.mp4", True),
+            ("/absolute/unix/path.mp4", True),
+            ("subdir/file.mp4", True),
+            ("https://example.com/page", True),  # "/" in candidate — URLs match too
+            ("just-a-name", False),
+        ]
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(bookmarks_sync._looks_like_filesystem_reference(value), expected)
+
+    def test_recognizes_hyperlink_wrapped_file_paths(self):
+        self.assertTrue(
+            bookmarks_sync._looks_like_filesystem_reference(
+                '=HYPERLINK("file:///C:/videos/clip.mp4";"label")'
+            )
+        )
+
+
 class TestBookmarkName(unittest.TestCase):
     def test_generates_name_from_url(self):
         cases = [
