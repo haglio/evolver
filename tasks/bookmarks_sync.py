@@ -172,6 +172,8 @@ def _looks_like_filesystem_reference(value: str) -> bool:
     match = _HYPERLINK_URL_RE.match(value)
     candidate = match.group(1) if match else value
     parsed = urlparse(candidate)
+    if parsed.scheme in {"http", "https"}:
+        return False
     if parsed.scheme == "file":
         return True
     if re.match(r"^[A-Za-z]:[\\/]", candidate):
