@@ -37,7 +37,8 @@ class TestLooksLikeFilesystemReference(unittest.TestCase):
             ("../parent/path.mp4", True),
             ("/absolute/unix/path.mp4", True),
             ("subdir/file.mp4", True),
-            ("https://example.com/page", True),  # "/" in candidate — URLs match too
+            ("https://example.com/page", False),
+            ("http://example.com/", False),
             ("just-a-name", False),
         ]
         for value, expected in cases:
