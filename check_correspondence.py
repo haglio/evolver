@@ -83,7 +83,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
 
 
 def _log_result(result: CorrespondenceResult) -> None:
-    log.info("=== Stage 5: correspondence check ===")
+    log.info("=== Stage 8: correspondence check ===")
     log.info("1_sorted: %d video file(s) in %s", result.sorted_count, config.SORTED_DIR)
     log.info("Outboxes: %d video file(s) across %s", result.outbox_count, ", ".join(str(p) for p in config.active_outbox_dirs()))
 
@@ -104,9 +104,9 @@ def _log_result(result: CorrespondenceResult) -> None:
             log.error("  -> %s", path)
 
     if result.ok:
-        log.info("Stage 5 done. 1_sorted and the active outbox set are in perfect 1-to-1 correspondence.")
+        log.info("Stage 8 done. 1_sorted and the active outbox set are in perfect 1-to-1 correspondence.")
     else:
-        log.error("Stage 5 failed. See log entries above for the mismatch details.")
+        log.error("Stage 8 failed. See log entries above for the mismatch details.")
 
 
 def _popup_message(result: CorrespondenceResult) -> str:

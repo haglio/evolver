@@ -26,7 +26,6 @@ _BOOKMARKS_BAR_KEY = "bookmark_bar"
 class BookmarksSyncResult:
     added: int = 0
     removed_missing_files: int = 0
-    normalized_outbox_paths: int = 0
     skipped_blank: int = 0
     skipped_invalid: int = 0
     source_missing: bool = False
@@ -40,7 +39,7 @@ class BookmarksSyncResult:
 
 def run() -> BookmarksSyncResult:
     result = BookmarksSyncResult()
-    log.info("=== Stage 3.5: bookmarks -> Chrome profile %s ===", config.CHROME_PROFILE_NAME)
+    log.info("=== Stage 4: bookmarks -> Chrome profile %s ===", config.CHROME_PROFILE_NAME)
     log.info("SOURCE CSV: %s", config.FUN_TIME_FAVS_FILE)
     log.info("CHROME USER DATA: %s", config.CHROME_USER_DATA_DIR)
 
@@ -75,7 +74,7 @@ def run() -> BookmarksSyncResult:
 
     result.added = added
     log.info(
-        "Stage 3.5 done. Added: %d, Blank skipped: %d, Invalid skipped: %d, Target: %s",
+        "Stage 4 done. Added: %d, Blank skipped: %d, Invalid skipped: %d, Target: %s",
         result.added,
         result.skipped_blank,
         result.skipped_invalid,
@@ -110,12 +109,9 @@ def _read_urls(result: BookmarksSyncResult) -> list[str]:
         seen.add(url)
         urls.append(url)
 
-    if result.removed_missing_files or result.normalized_outbox_paths:
-        _write_rows(path, fieldnames, rows)
     if result.removed_missing_files:
+        _write_rows(path, fieldnames, rows)
         log.info("Removed %d stale favorite row(s) whose source file is gone.", result.removed_missing_files)
-    if result.normalized_outbox_paths:
-        log.info("Normalized %d favorite row(s) from 3_new_outbox back to 2_outbox.", result.normalized_outbox_paths)
     return urls
 
 
@@ -126,8 +122,6 @@ def _load_and_prune_rows(path: Path, result: BookmarksSyncResult) -> tuple[list[
         file_column = _file_column_name(fieldnames)
         kept_rows: list[dict[str, str]] = []
         for row in reader:
-            if file_column:
-                result.normalized_outbox_paths += _normalize_outbox_reference(row, file_column)
             if file_column and _prune_or_rewire_row(row, file_column, path.parent, result):
                 result.removed_missing_files += 1
                 continue
@@ -158,14 +152,7 @@ def _prune_or_rewire_row(
         return False
 
     candidate = _extract_local_path(raw_value, base_dir)
-    if candidate.exists():
-        return False
-
-    alternate = _alternate_regen_path(candidate)
-    if alternate is not None and alternate.exists():
-        return False
-
-    return True
+    return not candidate.exists()
 
 
 def _extract_local_path(value: str, base_dir: Path) -> Path:
@@ -192,27 +179,6 @@ def _looks_like_filesystem_reference(value: str) -> bool:
     if candidate.startswith(("\\\\", "/", "./", "../")):
         return True
     return "\\" in candidate or "/" in candidate
-
-
-def _alternate_regen_path(path: Path) -> Path | None:
-    raw = str(path)
-    if "\\2_outbox\\" in raw:
-        return Path(raw.replace("\\2_outbox\\", "\\3_new_outbox\\"))
-    if "\\3_new_outbox\\" in raw:
-        return Path(raw.replace("\\3_new_outbox\\", "\\2_outbox\\"))
-    if "/2_outbox/" in raw:
-        return Path(raw.replace("/2_outbox/", "/3_new_outbox/"))
-    if "/3_new_outbox/" in raw:
-        return Path(raw.replace("/3_new_outbox/", "/2_outbox/"))
-    return None
-
-
-def _normalize_outbox_reference(row: dict[str, str], file_column: str) -> int:
-    raw_value = row.get(file_column)
-    if not raw_value or "3_new_outbox" not in raw_value:
-        return 0
-    row[file_column] = raw_value.replace("3_new_outbox", "2_outbox")
-    return 1
 
 
 
