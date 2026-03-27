@@ -63,7 +63,7 @@ class PromptScrapeResult:
 
 def run() -> PromptScrapeResult:
     result = PromptScrapeResult()
-    log.info("=== Stage 4: scrape AI prompts ===")
+    log.info("=== Stage 5: scrape AI prompts ===")
     log.info("SOURCE CSV: %s", config.FUN_TIME_FAVS_FILE)
     log.info("PROMPTS DIR: %s", config.PROMPTS_DIR)
 
@@ -113,7 +113,7 @@ def run() -> PromptScrapeResult:
             log.info("Wrote prompts: %s", output_path)
 
     log.info(
-        "Stage 4 done. Scraped: %d, Existing skipped: %d, Non-Provider skipped: %d, Missing URL: %d, Failures: %d",
+        "Stage 5 done. Scraped: %d, Existing skipped: %d, Non-Provider skipped: %d, Missing URL: %d, Failures: %d",
         result.scraped,
         result.skipped_existing,
         result.skipped_non_provider,
@@ -135,7 +135,7 @@ def _load_video_urls(result: PromptScrapeResult) -> dict[Path, str]:
         mapping: dict[Path, str] = {}
         for row in reader:
             raw_url = (row.get("web_url") or "").strip()
-            url = _extract_url(raw_url)
+            url = bookmarks_sync._extract_url(raw_url)
             if url is None:
                 continue
             if file_column:
@@ -156,15 +156,6 @@ def _resolve_favorite_path(value: str, base_dir: Path) -> Path:
     if not path.is_absolute():
         path = base_dir / path
     return path.resolve()
-
-
-def _extract_url(value: str) -> str | None:
-    match = _HYPERLINK_URL_RE.match(value)
-    candidate = match.group(1) if match else value
-    parsed = urlparse(candidate)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return None
-    return candidate
 
 
 def _iter_video_files(root: Path):

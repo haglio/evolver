@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util.media_files import is_finalized_video_file, iter_finalized_videos
+from util.media_files import is_finalized_video_file, iter_finalized_videos, remove_empty_dirs
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
         script_path.rename(dest)
         result.moved += 1
 
-    _remove_empty_dirs(config.SCRIPT_LIBRARY_DIR)
+    remove_empty_dirs(config.SCRIPT_LIBRARY_DIR)
     _copy_missing_variant_scripts(video_index, result)
     _duplicate_ai_videos_for_funscripted_primary_vlc(result)
     log.info(
@@ -223,7 +223,7 @@ def _variant_bucket(video_path: Path) -> tuple[str, ...]:
     if len(parts) >= 6 and parts[0] == "2D" and parts[1] == "AI":
         if parts[2] == "1_sorted":
             return ("2D", "AI", parts[3], parts[4])
-        if parts[2] in {"2_outbox", "3_new_outbox"} and parts[3] == "upscaled_by_orientation":
+        if parts[2] == "2_outbox" and parts[3] == "upscaled_by_orientation":
             return ("2D", "AI", parts[5], parts[4])
     if len(parts) >= 3 and parts[0] == "2D" and parts[1] == "non_AI":
         return tuple(parts[:3])
@@ -236,7 +236,7 @@ def _variant_kind(video_path: Path) -> str:
     if len(parts) >= 3 and parts[0] == "2D" and parts[1] == "AI":
         if parts[2] == "1_sorted":
             return "original"
-        if parts[2] in {"2_outbox", "3_new_outbox"}:
+        if parts[2] == "2_outbox":
             return "processed"
     if "processed" in parts:
         return "processed"
@@ -297,15 +297,6 @@ def _strip_processing_suffix_once(stem: str) -> str:
         if stem.endswith(suffix):
             return stem[: -len(suffix)]
     return stem
-
-
-def _remove_empty_dirs(root: Path) -> None:
-    for path in sorted(root.rglob("*"), reverse=True):
-        if path.is_dir():
-            try:
-                path.rmdir()
-            except OSError:
-                pass
 
 
 def _popup_message(result: ScriptsSyncResult) -> str:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import config
 from util.ffprobe import get_orientation
-from util.media_files import iter_finalized_videos
+from util.media_files import iter_finalized_videos, remove_empty_dirs
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def run() -> SortResult:
                 result.deleted_collisions += 1
 
         if config.CLEAN_EMPTY_INBOX_DIRS:
-            _remove_empty_dirs(src_root)
+            remove_empty_dirs(src_root)
 
     log.info(
         "Stage 1 done. Moved: %d, Deleted collisions: %d, Unknown skipped: %d",
@@ -87,10 +87,3 @@ def _iter_source_dirs(root: Path):
             yield p
 
 
-def _remove_empty_dirs(root: Path):
-    for d in sorted(root.rglob("*"), reverse=True):
-        if d.is_dir():
-            try:
-                d.rmdir()  # no-op if not empty
-            except OSError:
-                pass
