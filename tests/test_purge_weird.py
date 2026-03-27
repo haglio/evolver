@@ -2,18 +2,27 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import config
 from tasks import purge_weird
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir
 
 
 class TestPurgeWeird(unittest.TestCase):
     def test_source_stem_strips_known_processing_suffixes(self):
-        self.assertEqual(purge_weird.source_stem("clip_topaz"), "clip")
-        self.assertEqual(purge_weird.source_stem("clip_topaz_cfr"), "clip")
-        self.assertEqual(purge_weird.source_stem("clip_apo8_gcg5_topaz"), "clip_apo8_gcg5")
-        self.assertEqual(purge_weird.source_stem("clip_apo8_gcg5"), "clip")
-        self.assertEqual(purge_weird.source_stem("clip_apo8_gcg5_Copy(2)"), "clip")
+        cases = [
+            ("clip_topaz", "clip"),
+            ("clip_topaz_cfr", "clip"),
+            ("clip_apo8_gcg5_topaz", "clip_apo8_gcg5"),
+            ("clip_apo8_gcg5", "clip"),
+            ("clip_apo8_gcg5_Copy(2)", "clip"),
+            ("clip_topaz_extra", "clip"),
+            ("clip", "clip"),
+            ("no_suffix_at_all", "no_suffix_at_all"),
+            ("a_b_topaz", "a_b"),
+            ("clip_apo8_gcg5_topaz_cfr", "clip_apo8_gcg5"),
+        ]
+        for stem, expected in cases:
+            with self.subTest(stem=stem):
+                self.assertEqual(purge_weird.source_stem(stem), expected)
 
     def test_run_deletes_weird_and_matching_preprocessed_sorted_file(self):
         with workspace_temp_dir() as root:
@@ -26,15 +35,8 @@ class TestPurgeWeird(unittest.TestCase):
             weird_file = weird_dir / "clip_apo8_gcg5_topaz.mp4"
             weird_file.write_bytes(b"weird")
 
-            old_sorted = config.SORTED_DIR
-            old_weird = config.WEIRD_DIR
-            config.SORTED_DIR = sorted_dir
-            config.WEIRD_DIR = weird_dir
-            try:
+            with override_config(SORTED_DIR=sorted_dir, WEIRD_DIR=weird_dir):
                 result = purge_weird.run()
-            finally:
-                config.SORTED_DIR = old_sorted
-                config.WEIRD_DIR = old_weird
 
             self.assertEqual(result.deleted_weird, 1)
             self.assertEqual(result.deleted_sorted, 1)
@@ -53,15 +55,8 @@ class TestPurgeWeird(unittest.TestCase):
             weird_file = weird_dir / "clip_topaz.mp4"
             weird_file.write_bytes(b"weird")
 
-            old_sorted = config.SORTED_DIR
-            old_weird = config.WEIRD_DIR
-            config.SORTED_DIR = sorted_dir
-            config.WEIRD_DIR = weird_dir
-            try:
+            with override_config(SORTED_DIR=sorted_dir, WEIRD_DIR=weird_dir):
                 result = purge_weird.run()
-            finally:
-                config.SORTED_DIR = old_sorted
-                config.WEIRD_DIR = old_weird
 
             self.assertEqual(result.deleted_weird, 1)
             self.assertEqual(result.deleted_sorted, 1)
@@ -77,16 +72,9 @@ class TestPurgeWeird(unittest.TestCase):
             weird_file = weird_dir / "missing_topaz.mp4"
             weird_file.write_bytes(b"weird")
 
-            old_sorted = config.SORTED_DIR
-            old_weird = config.WEIRD_DIR
-            config.SORTED_DIR = sorted_dir
-            config.WEIRD_DIR = weird_dir
-            try:
+            with override_config(SORTED_DIR=sorted_dir, WEIRD_DIR=weird_dir):
                 with patch("tasks.purge_weird.show_error_window") as show_error_window:
                     result = purge_weird.run()
-            finally:
-                config.SORTED_DIR = old_sorted
-                config.WEIRD_DIR = old_weird
 
             self.assertEqual(result.deleted_weird, 1)
             self.assertEqual(result.deleted_sorted, 0)

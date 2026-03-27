@@ -1,352 +1,169 @@
 import unittest
-from pathlib import Path
+from contextlib import ExitStack
 from unittest.mock import Mock, patch
 
 import config
 import evolver
-from tests.temp_helpers import workspace_temp_dir
 
 
 class TestEvolverMain(unittest.TestCase):
-    @patch("evolver.prompt_scrape.run")
-    @patch("evolver._should_skip_upscale_due_to_cpu", return_value=False)
-    @patch("evolver.upscale.has_pending_work", return_value=False)
-    @patch("evolver.check_duplicate_sizes.run")
-    @patch("evolver.check_correspondence.run")
-    @patch("evolver.bookmarks_sync.run")
-    @patch("evolver.upscale.run")
-    @patch("evolver.scripts_sync.run")
-    @patch("evolver.purge_weird.run")
-    @patch("evolver.sort.run")
-    @patch("evolver.check_dependencies")
-    @patch("evolver.setup_logging")
-    def test_main_skips_upscale_when_no_pending_work(
-        self,
-        setup_logging,
-        check_dependencies,
-        sort_run,
-        purge_run,
-        scripts_sync_run,
-        upscale_run,
-        bookmarks_sync_run,
-        correspondence_run,
-        duplicate_sizes_run,
-        has_pending_work,
-        should_skip_cpu,
-        prompt_scrape_run,
-    ):
-        sort_run.return_value = Mock(moved=0, moved_files=[])
-        purge_run.return_value = Mock(missing_sorted=[])
-        scripts_sync_run.return_value = Mock(ok=True)
-        bookmarks_sync_run.return_value = Mock(ok=True)
-        prompt_scrape_run.return_value = Mock(ok=True)
-        duplicate_sizes_run.return_value = Mock(ok=True)
-        correspondence_run.return_value = Mock(ok=True)
+    """Tests for the evolver.main() pipeline orchestration."""
 
-        with self.assertRaises(SystemExit) as exc:
-            evolver.main()
+    def _run_pipeline(self, **overrides):
+        """Run evolver.main() with all stages mocked.
 
-        self.assertEqual(exc.exception.code, 0)
-        purge_run.assert_called_once_with()
-        scripts_sync_run.assert_called_once_with(show_popup=True)
-        bookmarks_sync_run.assert_called_once_with()
-        prompt_scrape_run.assert_called_once_with()
-        upscale_run.assert_not_called()
-        duplicate_sizes_run.assert_called_once_with(show_popup=True)
-        correspondence_run.assert_called_once_with(show_popup=True)
+        Returns a dict of mock objects keyed by stage name. Callers can
+        pre-configure mocks via **overrides before the run, e.g.:
 
-    @patch("evolver.prompt_scrape.run")
-    @patch("evolver._should_skip_upscale_due_to_cpu", return_value=False)
-    @patch("evolver.upscale.has_pending_work", return_value=True)
-    @patch("evolver.check_duplicate_sizes.run")
-    @patch("evolver.check_correspondence.run")
-    @patch("evolver.bookmarks_sync.run")
-    @patch("evolver.upscale.run")
-    @patch("evolver.scripts_sync.run")
-    @patch("evolver.purge_weird.run")
-    @patch("evolver.sort.run")
-    @patch("evolver.check_dependencies")
-    @patch("evolver.setup_logging")
-    def test_main_exits_nonzero_on_correspondence_failure(
-        self,
-        setup_logging,
-        check_dependencies,
-        sort_run,
-        purge_run,
-        scripts_sync_run,
-        upscale_run,
-        bookmarks_sync_run,
-        correspondence_run,
-        duplicate_sizes_run,
-        has_pending_work,
-        should_skip_cpu,
-        prompt_scrape_run,
-    ):
-        sort_run.return_value = Mock(moved=1, moved_files=["new-file"])
-        purge_run.return_value = Mock(missing_sorted=[])
-        scripts_sync_run.return_value = Mock(ok=True)
-        bookmarks_sync_run.return_value = Mock(ok=True)
-        prompt_scrape_run.return_value = Mock(ok=True)
-        upscale_run.return_value = Mock(failed=0, deferred_low_disk=False)
-        duplicate_sizes_run.return_value = Mock(ok=True)
-        correspondence_run.return_value = Mock(ok=False)
-
-        with self.assertRaises(SystemExit) as exc:
-            evolver.main()
-
-        self.assertEqual(exc.exception.code, 1)
-        purge_run.assert_called_once_with()
-        scripts_sync_run.assert_called_once_with(show_popup=True)
-        bookmarks_sync_run.assert_called_once_with()
-        prompt_scrape_run.assert_called_once_with()
-        upscale_run.assert_called_once_with(priority_files=["new-file"], max_items=evolver.config.UPSCALE_BATCH_LIMIT)
-        duplicate_sizes_run.assert_called_once_with(show_popup=True)
-        correspondence_run.assert_called_once_with(show_popup=True)
-
-    @patch("evolver.prompt_scrape.run")
-    @patch("evolver._should_skip_upscale_due_to_cpu", return_value=False)
-    @patch("evolver.upscale.has_pending_work", return_value=False)
-    @patch("evolver.check_duplicate_sizes.run")
-    @patch("evolver.check_correspondence.run")
-    @patch("evolver.bookmarks_sync.run")
-    @patch("evolver.upscale.run")
-    @patch("evolver.scripts_sync.run")
-    @patch("evolver.purge_weird.run")
-    @patch("evolver.sort.run")
-    @patch("evolver.check_dependencies")
-    @patch("evolver.setup_logging")
-    def test_main_exits_nonzero_on_duplicate_size_failure(
-        self,
-        setup_logging,
-        check_dependencies,
-        sort_run,
-        purge_run,
-        scripts_sync_run,
-        upscale_run,
-        bookmarks_sync_run,
-        correspondence_run,
-        duplicate_sizes_run,
-        has_pending_work,
-        should_skip_cpu,
-        prompt_scrape_run,
-    ):
-        sort_run.return_value = Mock(moved=0, moved_files=[])
-        purge_run.return_value = Mock(missing_sorted=[])
-        scripts_sync_run.return_value = Mock(ok=True)
-        bookmarks_sync_run.return_value = Mock(ok=True)
-        prompt_scrape_run.return_value = Mock(ok=True)
-        duplicate_sizes_run.return_value = Mock(ok=False)
-        correspondence_run.return_value = Mock(ok=True)
-
-        with self.assertRaises(SystemExit) as exc:
-            evolver.main()
-
-        self.assertEqual(exc.exception.code, 1)
-        purge_run.assert_called_once_with()
-        scripts_sync_run.assert_called_once_with(show_popup=True)
-        bookmarks_sync_run.assert_called_once_with()
-        prompt_scrape_run.assert_called_once_with()
-        upscale_run.assert_not_called()
-        duplicate_sizes_run.assert_called_once_with(show_popup=True)
-        correspondence_run.assert_called_once_with(show_popup=True)
-
-    @patch("evolver.prompt_scrape.run")
-    @patch("evolver._should_skip_upscale_due_to_cpu", return_value=True)
-    @patch("evolver.upscale.has_pending_work", return_value=True)
-    @patch("evolver.check_duplicate_sizes.run")
-    @patch("evolver.check_correspondence.run")
-    @patch("evolver.bookmarks_sync.run")
-    @patch("evolver.upscale.run")
-    @patch("evolver.scripts_sync.run")
-    @patch("evolver.purge_weird.run")
-    @patch("evolver.sort.run")
-    @patch("evolver.check_dependencies")
-    @patch("evolver.setup_logging")
-    def test_main_skips_upscale_when_cpu_busy(
-        self,
-        setup_logging,
-        check_dependencies,
-        sort_run,
-        purge_run,
-        scripts_sync_run,
-        upscale_run,
-        bookmarks_sync_run,
-        correspondence_run,
-        duplicate_sizes_run,
-        has_pending_work,
-        should_skip_cpu,
-        prompt_scrape_run,
-    ):
-        sort_run.return_value = Mock(moved=1, moved_files=["new-file"])
-        purge_run.return_value = Mock(missing_sorted=[])
-        scripts_sync_run.return_value = Mock(ok=True)
-        bookmarks_sync_run.return_value = Mock(ok=True)
-        prompt_scrape_run.return_value = Mock(ok=True)
-        duplicate_sizes_run.return_value = Mock(ok=True)
-        correspondence_run.return_value = Mock(ok=True)
-
-        with self.assertRaises(SystemExit) as exc:
-            evolver.main()
-
-        self.assertEqual(exc.exception.code, 0)
-        scripts_sync_run.assert_called_once_with(show_popup=True)
-        bookmarks_sync_run.assert_called_once_with()
-        prompt_scrape_run.assert_called_once_with()
-        upscale_run.assert_not_called()
-
-    @patch("evolver.prompt_scrape.run")
-    @patch("evolver._should_skip_upscale_due_to_cpu", return_value=False)
-    @patch("evolver.upscale.has_pending_work", return_value=False)
-    @patch("evolver.check_duplicate_sizes.run")
-    @patch("evolver.check_correspondence.run")
-    @patch("evolver.bookmarks_sync.run")
-    @patch("evolver.upscale.run")
-    @patch("evolver.scripts_sync.run")
-    @patch("evolver.purge_weird.run")
-    @patch("evolver.sort.run")
-    @patch("evolver.check_dependencies")
-    @patch("evolver.setup_logging")
-    def test_main_exits_nonzero_on_scripts_sync_failure(
-        self,
-        setup_logging,
-        check_dependencies,
-        sort_run,
-        purge_run,
-        scripts_sync_run,
-        upscale_run,
-        bookmarks_sync_run,
-        correspondence_run,
-        duplicate_sizes_run,
-        has_pending_work,
-        should_skip_cpu,
-        prompt_scrape_run,
-    ):
-        sort_run.return_value = Mock(moved=0, moved_files=[])
-        purge_run.return_value = Mock(missing_sorted=[])
-        scripts_sync_run.return_value = Mock(ok=False)
-        bookmarks_sync_run.return_value = Mock(ok=True)
-        prompt_scrape_run.return_value = Mock(ok=True)
-        duplicate_sizes_run.return_value = Mock(ok=True)
-        correspondence_run.return_value = Mock(ok=True)
-
-        with self.assertRaises(SystemExit) as exc:
-            evolver.main()
-
-        self.assertEqual(exc.exception.code, 1)
-        scripts_sync_run.assert_called_once_with(show_popup=True)
-        bookmarks_sync_run.assert_called_once_with()
-        prompt_scrape_run.assert_called_once_with()
-        upscale_run.assert_not_called()
-
-    @patch("evolver.prompt_scrape.run")
-    @patch("evolver._should_skip_upscale_due_to_cpu", return_value=False)
-    @patch("evolver.upscale.has_pending_work", return_value=False)
-    @patch("evolver.check_duplicate_sizes.run")
-    @patch("evolver.check_correspondence.run")
-    @patch("evolver.bookmarks_sync.run")
-    @patch("evolver.upscale.run")
-    @patch("evolver.scripts_sync.run")
-    @patch("evolver.purge_weird.run")
-    @patch("evolver.sort.run")
-    @patch("evolver.check_dependencies")
-    @patch("evolver.setup_logging")
-    def test_main_exits_nonzero_on_bookmarks_sync_failure(
-        self,
-        setup_logging,
-        check_dependencies,
-        sort_run,
-        purge_run,
-        scripts_sync_run,
-        upscale_run,
-        bookmarks_sync_run,
-        correspondence_run,
-        duplicate_sizes_run,
-        has_pending_work,
-        should_skip_cpu,
-        prompt_scrape_run,
-    ):
-        sort_run.return_value = Mock(moved=0, moved_files=[])
-        purge_run.return_value = Mock(missing_sorted=[])
-        scripts_sync_run.return_value = Mock(ok=True)
-        bookmarks_sync_run.return_value = Mock(ok=False)
-        prompt_scrape_run.return_value = Mock(ok=True)
-        duplicate_sizes_run.return_value = Mock(ok=True)
-        correspondence_run.return_value = Mock(ok=True)
-
-        with self.assertRaises(SystemExit) as exc:
-            evolver.main()
-
-        self.assertEqual(exc.exception.code, 1)
-        bookmarks_sync_run.assert_called_once_with()
-        prompt_scrape_run.assert_called_once_with()
-        upscale_run.assert_not_called()
-
-    def test_finish_regen_if_complete_simplifies_fun_time_config(self):
-        with workspace_temp_dir() as root:
-            old_outbox = root / "2_outbox"
-            regen_outbox = root / "3_new_outbox"
-            fun_time_config = root / "fun_time_config.json"
-            marker = root / ".regen-complete"
-            cleanup_note = root / "POST_REGEN_CLEANUP.md"
-
-            (old_outbox / "upscaled_by_orientation").mkdir(parents=True)
-            (regen_outbox / "upscaled_by_orientation" / "portrait" / "src").mkdir(parents=True)
-            (regen_outbox / "upscaled_by_orientation" / "landscape" / "src").mkdir(parents=True)
-            (regen_outbox / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4").write_bytes(b"x")
-            (regen_outbox / "upscaled_by_orientation" / "landscape" / "src" / "clip_topaz.mp4").write_bytes(b"x")
-            fun_time_config.write_text(
-                '{\n'
-                '  "paths": {\n'
-                '    "portrait_dirs": ["old", "new"],\n'
-                '    "landscape_dirs": ["old", "new"]\n'
-                "  }\n"
-                "}\n",
-                encoding="utf-8",
+            mocks = self._run_pipeline(
+                correspondence_run=Mock(return_value=Mock(ok=False)),
             )
+        """
+        defaults = {
+            "setup_logging": Mock(),
+            "check_dependencies": Mock(),
+            "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
+            "purge_run": Mock(return_value=Mock(missing_sorted=[])),
+            "scripts_sync_run": Mock(return_value=Mock(ok=True)),
+            "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
+            "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
+            "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
+            "has_pending_work": Mock(return_value=False),
+            "should_skip_cpu": Mock(return_value=False),
+            "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
+            "correspondence_run": Mock(return_value=Mock(ok=True)),
+        }
+        defaults.update(overrides)
+        mocks = defaults
 
-            saved = {
-                "OUTBOX_DIR": config.OUTBOX_DIR,
-                "OUT_UPSCALED_DIR": config.OUT_UPSCALED_DIR,
-                "REGEN_OUTBOX_DIR": config.REGEN_OUTBOX_DIR,
-                "REGEN_OUT_UPSCALED_DIR": config.REGEN_OUT_UPSCALED_DIR,
-                "REGEN_COMPLETE_MARKER": config.REGEN_COMPLETE_MARKER,
-                "POST_REGEN_CLEANUP_NOTE": config.POST_REGEN_CLEANUP_NOTE,
-                "FUN_TIME_CONFIG_FILE": config.FUN_TIME_CONFIG_FILE,
-                "REGEN_ENABLED": config.REGEN_ENABLED,
-                "AUTO_CUTOVER_ON_REGEN_COMPLETE": config.AUTO_CUTOVER_ON_REGEN_COMPLETE,
-            }
-            config.OUTBOX_DIR = old_outbox
-            config.OUT_UPSCALED_DIR = old_outbox / "upscaled_by_orientation"
-            config.REGEN_OUTBOX_DIR = regen_outbox
-            config.REGEN_OUT_UPSCALED_DIR = regen_outbox / "upscaled_by_orientation"
-            config.REGEN_COMPLETE_MARKER = marker
-            config.POST_REGEN_CLEANUP_NOTE = cleanup_note
-            config.FUN_TIME_CONFIG_FILE = fun_time_config
-            config.REGEN_ENABLED = True
-            config.AUTO_CUTOVER_ON_REGEN_COMPLETE = True
-            try:
-                with patch("evolver.show_info_window") as show_info_window:
-                    done = evolver._finish_regen_if_complete(Mock(), Mock(ok=True))
-                self.assertTrue(done)
-                self.assertTrue(show_info_window.called)
-                popup_message = show_info_window.call_args.args[1]
-                self.assertIn("Manual review recommended", popup_message)
-                self.assertIn("REGEN_ENABLED back to False", popup_message)
-                self.assertTrue(marker.exists())
-                self.assertTrue(cleanup_note.exists())
-                self.assertTrue((old_outbox / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4").exists())
-                updated = fun_time_config.read_text(encoding="utf-8")
-                self.assertIn('"portrait_dirs": [', updated)
-                self.assertIn('"landscape_dirs": [', updated)
-                self.assertIn('2_outbox/upscaled_by_orientation/portrait', updated)
-                self.assertIn('2_outbox/upscaled_by_orientation/landscape', updated)
-                self.assertNotIn('"old", "new"', updated)
-                note_text = cleanup_note.read_text(encoding="utf-8")
-                self.assertIn("Post-Regen Cleanup", note_text)
-                self.assertIn("REGEN_ENABLED back to False", note_text)
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
+        patch_map = [
+            ("evolver.setup_logging", "setup_logging"),
+            ("evolver.check_dependencies", "check_dependencies"),
+            ("evolver.sort.run", "sort_run"),
+            ("evolver.purge_weird.run", "purge_run"),
+            ("evolver.scripts_sync.run", "scripts_sync_run"),
+            ("evolver.upscale.run", "upscale_run"),
+            ("evolver.bookmarks_sync.run", "bookmarks_sync_run"),
+            ("evolver.check_correspondence.run", "correspondence_run"),
+            ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
+            ("evolver.upscale.has_pending_work", "has_pending_work"),
+            ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
+            ("evolver.prompt_scrape.run", "prompt_scrape_run"),
+        ]
+
+        with ExitStack() as stack:
+            for target, key in patch_map:
+                stack.enter_context(patch(target, mocks[key]))
+            with self.assertRaises(SystemExit) as exc:
+                evolver.main()
+
+        mocks["exit_code"] = exc.exception.code
+        return mocks
+
+    # --- Stage sequencing ---
+
+    def test_skips_upscale_when_no_pending_work(self):
+        mocks = self._run_pipeline()
+        self.assertEqual(mocks["exit_code"], 0)
+        mocks["upscale_run"].assert_not_called()
+        mocks["correspondence_run"].assert_called_once_with(show_popup=True)
+
+    def test_skips_correspondence_when_upscale_has_pending(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=3, moved_files=["a", "b", "c"])),
+            has_pending_work=Mock(return_value=True),
+            upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=1)),
+        )
+        self.assertEqual(mocks["exit_code"], 0)
+        mocks["upscale_run"].assert_called_once()
+        mocks["correspondence_run"].assert_not_called()
+
+    def test_skips_upscale_and_correspondence_when_cpu_busy(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
+            has_pending_work=Mock(return_value=True),
+            should_skip_cpu=Mock(return_value=True),
+        )
+        self.assertEqual(mocks["exit_code"], 0)
+        mocks["upscale_run"].assert_not_called()
+        mocks["correspondence_run"].assert_not_called()
+
+    def test_runs_upscale_with_priority_files(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
+            has_pending_work=Mock(return_value=True),
+        )
+        self.assertEqual(mocks["exit_code"], 0)
+        mocks["upscale_run"].assert_called_once_with(
+            priority_files=["new-file"], max_items=config.UPSCALE_BATCH_LIMIT,
+        )
+
+    # --- Exit code propagation ---
+
+    def test_exits_nonzero_on_correspondence_failure(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
+            has_pending_work=Mock(return_value=True),
+            correspondence_run=Mock(return_value=Mock(ok=False)),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+
+    def test_exits_nonzero_on_duplicate_size_failure(self):
+        mocks = self._run_pipeline(
+            duplicate_sizes_run=Mock(return_value=Mock(ok=False)),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+
+    def test_exits_nonzero_on_scripts_sync_failure(self):
+        mocks = self._run_pipeline(
+            scripts_sync_run=Mock(return_value=Mock(ok=False)),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+
+    def test_exits_nonzero_on_bookmarks_sync_failure(self):
+        mocks = self._run_pipeline(
+            bookmarks_sync_run=Mock(return_value=Mock(ok=False)),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+
+    def test_exits_nonzero_on_upscale_failure(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+            upscale_run=Mock(return_value=Mock(failed=2, deferred_low_disk=False, pending_after_run=0)),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+
+    def test_exits_nonzero_on_upscale_deferred_low_disk(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+            upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=True, pending_after_run=3)),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+
+    def test_exits_nonzero_on_prompt_scrape_failure(self):
+        mocks = self._run_pipeline(
+            prompt_scrape_run=Mock(return_value=Mock(ok=False)),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+
+    # --- All stages called on clean run ---
+
+    def test_all_stages_called_on_clean_run_with_pending_work(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+        )
+        self.assertEqual(mocks["exit_code"], 0)
+        mocks["sort_run"].assert_called_once()
+        mocks["purge_run"].assert_called_once()
+        mocks["scripts_sync_run"].assert_called_once_with(show_popup=True)
+        mocks["bookmarks_sync_run"].assert_called_once()
+        mocks["prompt_scrape_run"].assert_called_once()
+        mocks["upscale_run"].assert_called_once()
+        mocks["duplicate_sizes_run"].assert_called_once_with(show_popup=True)
+        mocks["correspondence_run"].assert_called_once_with(show_popup=True)
 
 
 if __name__ == "__main__":

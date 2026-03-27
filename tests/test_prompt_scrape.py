@@ -3,9 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import config
 from tasks import prompt_scrape
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir
 
 
 def _wrap_hyperlink(value: str) -> str:
@@ -28,25 +27,10 @@ class TestPromptScrape(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "PROMPTS_DIR": config.PROMPTS_DIR,
-                "OUTBOX_DIR": config.OUTBOX_DIR,
-                "REGEN_OUTBOX_DIR": config.REGEN_OUTBOX_DIR,
-                "REGEN_ENABLED": config.REGEN_ENABLED,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.PROMPTS_DIR = prompts_dir
-            config.OUTBOX_DIR = outbox
-            config.REGEN_OUTBOX_DIR = root / "videos" / "videos" / "2D" / "AI" / "3_new_outbox"
-            config.REGEN_ENABLED = False
-            try:
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_with_source_image):
                         result = prompt_scrape.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
 
             self.assertTrue(result.ok)
             self.assertEqual(result.scraped, 1)
@@ -71,25 +55,10 @@ class TestPromptScrape(unittest.TestCase):
             video_path.write_text("x", encoding="utf-8")
             favs_path.write_text("local_file,web_url\n", encoding="utf-8")
 
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "PROMPTS_DIR": config.PROMPTS_DIR,
-                "OUTBOX_DIR": config.OUTBOX_DIR,
-                "REGEN_OUTBOX_DIR": config.REGEN_OUTBOX_DIR,
-                "REGEN_ENABLED": config.REGEN_ENABLED,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.PROMPTS_DIR = prompts_dir
-            config.OUTBOX_DIR = outbox
-            config.REGEN_OUTBOX_DIR = root / "videos" / "videos" / "2D" / "AI" / "3_new_outbox"
-            config.REGEN_ENABLED = False
-            try:
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only) as fetch_dom:
                         result = prompt_scrape.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
 
             self.assertTrue(result.ok)
             self.assertEqual(result.scraped, 1)
@@ -119,25 +88,10 @@ class TestPromptScrape(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "PROMPTS_DIR": config.PROMPTS_DIR,
-                "OUTBOX_DIR": config.OUTBOX_DIR,
-                "REGEN_OUTBOX_DIR": config.REGEN_OUTBOX_DIR,
-                "REGEN_ENABLED": config.REGEN_ENABLED,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.PROMPTS_DIR = prompts_dir
-            config.OUTBOX_DIR = outbox
-            config.REGEN_OUTBOX_DIR = root / "videos" / "videos" / "2D" / "AI" / "3_new_outbox"
-            config.REGEN_ENABLED = False
-            try:
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom") as fetch_dom:
                         result = prompt_scrape.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
 
             self.assertTrue(result.ok)
             self.assertEqual(result.skipped_existing, 1)
@@ -156,29 +110,37 @@ class TestPromptScrape(unittest.TestCase):
             partial_video.write_text("x", encoding="utf-8")
             favs_path.write_text("local_file,web_url\n", encoding="utf-8")
 
-            saved = {
-                "FUN_TIME_FAVS_FILE": config.FUN_TIME_FAVS_FILE,
-                "PROMPTS_DIR": config.PROMPTS_DIR,
-                "OUTBOX_DIR": config.OUTBOX_DIR,
-                "REGEN_OUTBOX_DIR": config.REGEN_OUTBOX_DIR,
-                "REGEN_ENABLED": config.REGEN_ENABLED,
-            }
-            config.FUN_TIME_FAVS_FILE = favs_path
-            config.PROMPTS_DIR = prompts_dir
-            config.OUTBOX_DIR = outbox
-            config.REGEN_OUTBOX_DIR = root / "videos" / "videos" / "2D" / "AI" / "3_new_outbox"
-            config.REGEN_ENABLED = False
-            try:
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
                         result = prompt_scrape.run()
-            finally:
-                for key, value in saved.items():
-                    setattr(config, key, value)
 
             self.assertTrue(result.ok)
             self.assertEqual(result.scraped, 1)
             self.assertFalse((prompts_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "one.partial.deadbeef.json").exists())
+
+    def test_run_counts_fetch_failure_and_reports_not_ok(self):
+        with workspace_temp_dir() as root:
+            outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
+            prompts_dir = root / "videos" / "prompts"
+            favs_path = root / "favs.csv"
+            video_path = outbox / "upscaled_by_orientation" / "portrait" / "provider" / "fail_topaz.mp4"
+            video_path.parent.mkdir(parents=True, exist_ok=True)
+            video_path.write_text("x", encoding="utf-8")
+            favs_path.write_text(
+                "local_file,web_url\n"
+                f'{_wrap_hyperlink(str(video_path))},https://example.com/image/fail\n',
+                encoding="utf-8",
+            )
+
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
+                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("network error")):
+                        result = prompt_scrape.run()
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.fetch_failures, 1)
+            self.assertEqual(result.scraped, 0)
 
     @staticmethod
     def _fetch_dom_with_source_image(url: str, browser: Path) -> str:
@@ -264,6 +226,39 @@ class TestPromptScrape(unittest.TestCase):
           </div>
         </body>
         """
+
+
+
+class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
+    def test_extracts_prompt_from_embedded_json(self):
+        html = '{"id":"abc123","prompt":"a beautiful scene","negative_prompt":"ugly","parent_image_id":"img456"}'
+        result = prompt_scrape._extract_provider_embedded_metadata(html, "abc123")
+        self.assertEqual(result.prompt, "a beautiful scene")
+        self.assertEqual(result.negative_prompt, "ugly")
+        self.assertEqual(result.parent_image_id, "img456")
+
+    def test_returns_empty_when_no_match(self):
+        result = prompt_scrape._extract_provider_embedded_metadata("<html>nothing</html>", "missing")
+        self.assertEqual(result.prompt, "")
+        self.assertEqual(result.negative_prompt, "")
+        self.assertEqual(result.parent_image_id, "")
+
+    def test_handles_null_negative_prompt(self):
+        html = '{"id":"abc","prompt":"scene","negative_prompt":null,"parent_image_id":null}'
+        result = prompt_scrape._extract_provider_embedded_metadata(html, "abc")
+        self.assertEqual(result.prompt, "scene")
+        self.assertEqual(result.negative_prompt, "")
+        self.assertEqual(result.parent_image_id, "")
+
+
+class TestFallbackUrlForVideo(unittest.TestCase):
+    def test_generates_provider_url_from_video_path(self):
+        video = Path("C:/videos/2_outbox/upscaled_by_orientation/portrait/provider/abc_topaz.mp4")
+        self.assertEqual(prompt_scrape._fallback_url_for_video(video), "https://example.com/image/abc")
+
+    def test_returns_none_for_non_provider(self):
+        video = Path("C:/videos/2_outbox/upscaled_by_orientation/portrait/provider2/abc_topaz.mp4")
+        self.assertIsNone(prompt_scrape._fallback_url_for_video(video))
 
 
 if __name__ == "__main__":
