@@ -1,6 +1,5 @@
 import json
 import unittest
-from pathlib import Path
 
 from tasks import bookmarks_sync
 from tests.temp_helpers import override_config, workspace_temp_dir
