@@ -1,8 +1,43 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import check_correspondence
 from tests.temp_helpers import override_config, workspace_temp_dir
+
+
+class TestSortedToOutboxName(unittest.TestCase):
+    def test_appends_topaz_before_extension(self):
+        cases = [
+            (Path("clip.mp4"), "clip_topaz.mp4"),
+            (Path("clip_apo8_gcg5.mp4"), "clip_apo8_gcg5_topaz.mp4"),
+            (Path("a.mkv"), "a_topaz.mkv"),
+        ]
+        for sorted_file, expected in cases:
+            with self.subTest(sorted_file=sorted_file):
+                self.assertEqual(check_correspondence.sorted_to_outbox_name(sorted_file), expected)
+
+
+class TestCorrespondenceResult(unittest.TestCase):
+    def test_ok_requires_matching_counts_and_no_orphans(self):
+        result = check_correspondence.CorrespondenceResult(sorted_count=5, outbox_count=5)
+        self.assertTrue(result.ok)
+
+    def test_not_ok_on_count_mismatch(self):
+        result = check_correspondence.CorrespondenceResult(sorted_count=5, outbox_count=3)
+        self.assertFalse(result.ok)
+
+    def test_not_ok_on_orphan_outbox(self):
+        result = check_correspondence.CorrespondenceResult(
+            sorted_count=1, outbox_count=1, orphan_outbox=["stray.mp4"],
+        )
+        self.assertFalse(result.ok)
+
+    def test_not_ok_on_duplicates(self):
+        result = check_correspondence.CorrespondenceResult(
+            sorted_count=2, outbox_count=2, duplicates={"clip_topaz.mp4": ["a", "b"]},
+        )
+        self.assertFalse(result.ok)
 
 
 class TestCorrespondence(unittest.TestCase):

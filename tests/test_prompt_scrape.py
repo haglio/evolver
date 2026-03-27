@@ -251,6 +251,41 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
         self.assertEqual(result.parent_image_id, "")
 
 
+class TestCssSelector(unittest.TestCase):
+    def test_query_selector_finds_nested_element(self):
+        html = '<body><div class="outer"><div class="inner">found</div></div></body>'
+        doc = prompt_scrape._parse_html_document(html)
+        node = prompt_scrape._query_selector(doc, "body > div.outer > div.inner")
+        self.assertIsNotNone(node)
+        self.assertEqual(prompt_scrape._text_content(node).strip(), "found")
+
+    def test_query_selector_returns_none_for_no_match(self):
+        html = '<body><div class="other">text</div></body>'
+        doc = prompt_scrape._parse_html_document(html)
+        self.assertIsNone(prompt_scrape._query_selector(doc, "body > div.missing"))
+
+    def test_query_selector_nth_child(self):
+        html = '<body><div><span>first</span><span>second</span><span>third</span></div></body>'
+        doc = prompt_scrape._parse_html_document(html)
+        node = prompt_scrape._query_selector(doc, "body > div > span:nth-child(2)")
+        self.assertIsNotNone(node)
+        self.assertEqual(prompt_scrape._text_content(node).strip(), "second")
+
+    def test_query_selector_escaped_class_names(self):
+        html = '<body><div class="text-[#fefefe]">styled</div></body>'
+        doc = prompt_scrape._parse_html_document(html)
+        node = prompt_scrape._query_selector(doc, r"body > div.text-\[\#fefefe\]")
+        self.assertIsNotNone(node)
+        self.assertEqual(prompt_scrape._text_content(node).strip(), "styled")
+
+    def test_image_page_url_from_src(self):
+        self.assertEqual(
+            prompt_scrape._image_page_url_from_src("https://cdn1.example.com/abc123"),
+            "https://example.com/image/abc123",
+        )
+        self.assertEqual(prompt_scrape._image_page_url_from_src("https://cdn1.example.com/"), "")
+
+
 class TestFallbackUrlForVideo(unittest.TestCase):
     def test_generates_provider_url_from_video_path(self):
         video = Path("C:/videos/2_outbox/upscaled_by_orientation/portrait/provider/abc_topaz.mp4")
