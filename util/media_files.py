@@ -18,6 +18,16 @@ def iter_finalized_videos(root: Path, video_extensions: set[str]):
             yield path
 
 
+def remove_empty_dirs(root: Path) -> None:
+    """Delete empty subdirectories under *root*, leaves first."""
+    for path in sorted(root.rglob("*"), reverse=True):
+        if path.is_dir():
+            try:
+                path.rmdir()
+            except OSError:
+                pass
+
+
 def remove_partial_video_files(root: Path, video_extensions: set[str], logger: logging.Logger | None = None) -> int:
     if not root.is_dir():
         return 0
