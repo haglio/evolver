@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import patch
 
-import config
 from tasks import scripts_sync
 from tests.temp_helpers import override_config, workspace_temp_dir
 

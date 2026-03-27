@@ -60,6 +60,21 @@ class TestEvolverMain(unittest.TestCase):
         mocks["exit_code"] = exc.exception.code
         return mocks
 
+    # --- Dependency check ---
+
+    def test_exits_nonzero_on_dependency_check_failure(self):
+        mocks = self._run_pipeline(
+            check_dependencies=Mock(side_effect=RuntimeError("ffprobe not found")),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+        mocks["sort_run"].assert_not_called()
+
+    def test_exits_nonzero_on_purge_missing_sorted(self):
+        mocks = self._run_pipeline(
+            purge_run=Mock(return_value=Mock(missing_sorted=["file.mp4"])),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
+
     # --- Stage sequencing ---
 
     def test_skips_upscale_when_no_pending_work(self):

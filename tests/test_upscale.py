@@ -1,5 +1,4 @@
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 from tasks import upscale
@@ -114,6 +113,52 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             self.assertEqual(result.processed, 0)
             self.assertEqual(result.failed, 1)
+
+    def test_run_stops_early_when_budget_exceeded(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            for name in ("a", "b"):
+                f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_bytes(b"video")
+
+            def fake_run_ffmpeg(_in_file, tmp, _env):
+                tmp.write_bytes(b"upscaled")
+                return True
+
+            # Set a tiny budget so after the first item, remaining < min_start
+            with override_config(
+                SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir,
+                UPSCALE_RUN_BUDGET_SECONDS=1, UPSCALE_MIN_START_REMAINING_SECONDS=9999,
+            ):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    result = upscale.run(max_items=10)
+
+            # With budget=0, it should process the first item but stop before the second
+            self.assertEqual(result.processed, 1)
+            self.assertGreater(result.pending_after_run, 0)
+
+    def test_run_stops_early_on_low_disk(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+                with patch("tasks.upscale._run_ffmpeg") as ffmpeg_mock, \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=1), \
+                     patch("tasks.upscale.show_error_window"):
+                    result = upscale.run(max_items=5)
+
+            self.assertTrue(result.deferred_low_disk)
+            self.assertEqual(result.processed, 0)
+            ffmpeg_mock.assert_not_called()
 
     def test_run_records_failure_when_output_is_empty(self):
         with workspace_temp_dir() as root:
