@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 import config
-from gui.progress import RunProgressWidget
+from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS, RunProgressWidget
 from gui.run_record import RunRecord, load_runs
 
 
@@ -47,13 +47,14 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._info_label)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(4)
-        self._table.setHorizontalHeaderLabels(["Stage", "Status", "Duration", "Details"])
+        self._table.setColumnCount(5)
+        self._table.setHorizontalHeaderLabels(["#", "Stage", "Status", "Duration", "Details"])
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.verticalHeader().setVisible(False)
         layout.addWidget(self._table)
@@ -67,8 +68,25 @@ class RunDetailWidget(QWidget):
 
         self._table.setRowCount(len(record.stages))
         for i, stage in enumerate(record.stages):
-            self._table.setItem(i, 0, QTableWidgetItem(stage.get("name", "")))
+            stage_key = stage.get("name", "")
 
+            no_edit = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+
+            # Column 0: stage number
+            num = STAGE_NUMBER.get(stage_key, i + 1)
+            num_item = QTableWidgetItem(str(num))
+            num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            num_item.setForeground(QColor(0x80, 0x80, 0x80))
+            num_item.setFlags(no_edit)
+            self._table.setItem(i, 0, num_item)
+
+            # Column 1: stage name with tooltip
+            name_item = QTableWidgetItem(stage_key)
+            name_item.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
+            name_item.setFlags(no_edit)
+            self._table.setItem(i, 1, name_item)
+
+            # Column 2: status
             status_item = QTableWidgetItem(stage.get("status", ""))
             status = stage.get("status", "")
             if status == "completed":
@@ -77,13 +95,19 @@ class RunDetailWidget(QWidget):
                 status_item.setForeground(QColor(0x80, 0x80, 0x80))
             elif status == "error":
                 status_item.setForeground(QColor(0xE0, 0x30, 0x30))
-            self._table.setItem(i, 1, status_item)
+            status_item.setFlags(no_edit)
+            self._table.setItem(i, 2, status_item)
 
+            # Column 3: duration
             duration = stage.get("duration_seconds", 0.0)
-            self._table.setItem(i, 2, QTableWidgetItem(f"{duration:.1f}s"))
+            dur_item = QTableWidgetItem(f"{duration:.1f}s")
+            dur_item.setFlags(no_edit)
+            self._table.setItem(i, 3, dur_item)
 
+            # Column 4: details (double-click to select/copy text)
             details = _summarize_result(stage.get("result"), stage.get("skip_reason"))
-            self._table.setItem(i, 3, QTableWidgetItem(details))
+            details_item = QTableWidgetItem(details)
+            self._table.setItem(i, 4, details_item)
 
     def clear(self):
         self._header.setText("Select a run to view details")
