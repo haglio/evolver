@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from PyQt6.QtCore import Qt
@@ -15,6 +16,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QSplitter,
     QStackedWidget,
+    QStatusBar,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -146,6 +148,11 @@ class EvolverMainWindow(QMainWindow):
 
         splitter.setSizes([300, 700])
 
+        self._status_bar = QStatusBar()
+        self.setStatusBar(self._status_bar)
+        self._status_label = QLabel("Starting...")
+        self._status_bar.addWidget(self._status_label)
+
         self._records: list[RunRecord] = []
 
     @property
@@ -192,6 +199,17 @@ class EvolverMainWindow(QMainWindow):
         if 0 <= row < len(self._records):
             self._detail_widget.show_record(self._records[row])
             self._stack.setCurrentIndex(0)
+
+    def update_schedule_status(self, is_running: bool, is_paused: bool, next_run_at: datetime | None):
+        """Update the status bar with current scheduling state."""
+        if is_running:
+            self._status_label.setText("Status: Running...")
+        elif is_paused:
+            self._status_label.setText("Status: Scheduling paused")
+        elif next_run_at:
+            self._status_label.setText(f"Status: Scheduled  |  Next run: {next_run_at.strftime('%H:%M')}")
+        else:
+            self._status_label.setText("Status: Idle")
 
     def closeEvent(self, event):
         """Hide instead of close — the tray icon keeps the app alive."""
