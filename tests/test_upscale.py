@@ -1,6 +1,8 @@
+import json
 import unittest
 from unittest.mock import patch
 
+import config
 from tasks import upscale
 from tests.temp_helpers import override_config, workspace_temp_dir
 
@@ -36,7 +38,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            def fake_run_ffmpeg(_in_file, tmp, _env):
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
                 tmp.write_bytes(b"upscaled")
                 return True
 
@@ -83,7 +85,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             stale_partial.parent.mkdir(parents=True)
             stale_partial.write_bytes(b"partial")
 
-            def fake_run_ffmpeg(_in_file, tmp, _env):
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
                 tmp.write_bytes(b"upscaled")
                 return True
 
@@ -124,7 +126,7 @@ class TestUpscaleHelpers(unittest.TestCase):
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
 
-            def fake_run_ffmpeg(_in_file, tmp, _env):
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
                 tmp.write_bytes(b"upscaled")
                 return True
 
@@ -169,7 +171,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            def fake_run_ffmpeg_empty(_in_file, tmp, _env):
+            def fake_run_ffmpeg_empty(_in_file, tmp, _env, _filter="", _tag=""):
                 tmp.write_bytes(b"")
                 return True
 
@@ -180,6 +182,104 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             self.assertEqual(result.processed, 0)
             self.assertEqual(result.failed, 1)
+
+
+class TestIsT2vProvider(unittest.TestCase):
+    def test_true_for_provider_without_source_image(self):
+        with workspace_temp_dir() as root:
+            meta_dir = root / "meta"
+            json_path = meta_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
+
+            with override_config(METADATA_DIR=meta_dir):
+                self.assertTrue(upscale._is_t2v_provider("provider", "landscape", "clip"))
+
+    def test_false_for_provider_with_source_image(self):
+        with workspace_temp_dir() as root:
+            meta_dir = root / "meta"
+            json_path = meta_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text(json.dumps({"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}), encoding="utf-8")
+
+            with override_config(METADATA_DIR=meta_dir):
+                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip"))
+
+    def test_false_for_non_provider_source(self):
+        with workspace_temp_dir() as root:
+            meta_dir = root / "meta"
+            with override_config(METADATA_DIR=meta_dir):
+                self.assertFalse(upscale._is_t2v_provider("provider2", "landscape", "clip"))
+
+    def test_false_when_metadata_missing(self):
+        with workspace_temp_dir() as root:
+            meta_dir = root / "meta"
+            with override_config(METADATA_DIR=meta_dir):
+                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip"))
+
+
+class TestFilterSelection(unittest.TestCase):
+    def test_run_uses_t2v_filter_for_t2v_provider(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            meta_dir = root / "meta"
+
+            in_file = sorted_dir / "provider" / "landscape" / "clip.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            json_path = meta_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
+
+            captured_args = {}
+
+            def fake_run_ffmpeg(_in_file, tmp, _env, filter_complex, videoai_tag):
+                captured_args["filter_complex"] = filter_complex
+                captured_args["videoai_tag"] = videoai_tag
+                tmp.write_bytes(b"upscaled")
+                return True
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir, METADATA_DIR=meta_dir):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    upscale.run(max_items=1)
+
+            self.assertEqual(captured_args["filter_complex"], config.UPSCALE_FILTER_T2V_provider)
+            self.assertEqual(captured_args["videoai_tag"], config.VIDEOAI_TAG_T2V_provider)
+
+    def test_run_uses_default_filter_for_i2v_provider(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            meta_dir = root / "meta"
+
+            in_file = sorted_dir / "provider" / "landscape" / "clip.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            json_path = meta_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text(json.dumps({"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}), encoding="utf-8")
+
+            captured_args = {}
+
+            def fake_run_ffmpeg(_in_file, tmp, _env, filter_complex, videoai_tag):
+                captured_args["filter_complex"] = filter_complex
+                captured_args["videoai_tag"] = videoai_tag
+                tmp.write_bytes(b"upscaled")
+                return True
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir, METADATA_DIR=meta_dir):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    upscale.run(max_items=1)
+
+            self.assertEqual(captured_args["filter_complex"], config.UPSCALE_FILTER_DEFAULT)
+            self.assertEqual(captured_args["videoai_tag"], config.VIDEOAI_TAG_DEFAULT)
 
 
 if __name__ == "__main__":

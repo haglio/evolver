@@ -1,5 +1,6 @@
 """Stage 6: Upscale videos from 1_sorted/<source>/<orientation>/ using Topaz."""
 
+import json
 import logging
 import os
 import subprocess
@@ -84,9 +85,16 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None) 
 
         log.info("Process: %s -> %s  [%s/%s]", in_file.name, out_name, orient, source)
 
+        if _is_t2v_provider(source, orient, in_file.stem):
+            filter_complex = config.UPSCALE_FILTER_T2V_provider
+            videoai_tag = config.VIDEOAI_TAG_T2V_provider
+        else:
+            filter_complex = config.UPSCALE_FILTER_DEFAULT
+            videoai_tag = config.VIDEOAI_TAG_DEFAULT
+
         ffmpeg_ok = False
         try:
-            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env)
+            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, filter_complex, videoai_tag)
         except OSError:
             log.exception("FAILED (ffmpeg launch error): %s", in_file)
 
@@ -164,7 +172,7 @@ def collect_candidates(priority_files: list[Path] | None = None, limit: int | No
     return candidates
 
 
-def _run_ffmpeg(in_file: Path, tmp: Path, env: dict) -> bool:
+def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoai_tag: str) -> bool:
     cmd = [
         str(config.FFMPEG),
         "-hide_banner", "-nostdin", "-y",
@@ -172,9 +180,7 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict) -> bool:
         "-hwaccel", "cuda",
         "-i", str(in_file),
         "-sws_flags", "spline+accurate_rnd+full_chroma_int",
-        "-filter_complex",
-        "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
-        "tvai_up=model=gcg-5:scale=4:device=0:vram=1:instances=1",
+        "-filter_complex", filter_complex,
         "-c:v", "hevc_nvenc",
         "-profile:v", "main",
         "-pix_fmt", "yuv420p",
@@ -195,11 +201,24 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict) -> bool:
         "-fps_mode:v", "cfr",
         "-movflags", "frag_keyframe+empty_moov+delay_moov+use_metadata_tags+write_colr",
         "-bf", "0",
-        "-metadata", f"videoai={config.CURRENT_UPSCALE_VIDEOAI_TAG}",
+        "-metadata", f"videoai={videoai_tag}",
         "-f", "mp4",
         str(tmp),
     ]
     return subprocess.run(cmd, env=env).returncode == 0
+
+
+def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:
+    if source != "provider":
+        return False
+    meta_path = config.METADATA_DIR / "2_outbox" / "upscaled_by_orientation" / orient / source / f"{stem}_topaz.json"
+    if not meta_path.is_file():
+        return False
+    try:
+        payload = json.loads(meta_path.read_text(encoding="utf-8"))
+        return "source_image" not in payload
+    except Exception:
+        return False
 
 
 def _already_processed(source: str, fname: str) -> bool:
