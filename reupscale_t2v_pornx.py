@@ -25,6 +25,7 @@ def main():
 
     deleted_outbox = 0
     moved_to_inbox = 0
+    skipped_no_outbox = 0
     errors = []
 
     for json_path in sorted(meta_root.rglob("*.json")):
@@ -42,14 +43,17 @@ def main():
         topaz_name = json_path.stem + ".mp4"
         source_stem = json_path.stem.replace("_topaz", "")
 
-        # Delete outbox file
+        # Only process if outbox file exists (nothing to re-upscale otherwise)
         outbox_file = outbox_root / orient / source / topaz_name
-        if outbox_file.exists():
-            if dry_run:
-                print(f"DELETE {outbox_file}")
-            else:
-                outbox_file.unlink()
-            deleted_outbox += 1
+        if not outbox_file.exists():
+            skipped_no_outbox += 1
+            continue
+
+        if dry_run:
+            print(f"DELETE {outbox_file}")
+        else:
+            outbox_file.unlink()
+        deleted_outbox += 1
 
         # Move sorted file back to inbox
         sorted_file = None
@@ -75,6 +79,8 @@ def main():
     prefix = "[DRY RUN] " if dry_run else ""
     print(f"\n{prefix}Deleted from outbox: {deleted_outbox}")
     print(f"{prefix}Moved to inbox: {moved_to_inbox}")
+    if skipped_no_outbox:
+        print(f"Skipped (no outbox file): {skipped_no_outbox}")
     if errors:
         print(f"Errors: {len(errors)}")
         for e in errors:
