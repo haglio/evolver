@@ -5,9 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from PyQt6.QtCore import QModelIndex, Qt
-from PyQt6.QtGui import QColor, QFont, QPainter
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -17,24 +18,11 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QStatusBar,
-    QStyle,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
-
-
-class _NoFocusDelegate(QStyledItemDelegate):
-    """Item delegate that suppresses the focus rectangle by clearing the
-    focus state flag before passing to the default paint implementation."""
-
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
-        opt = QStyleOptionViewItem(option)
-        opt.state = QStyle.StateFlag(int(opt.state) & ~int(QStyle.StateFlag.State_HasFocus))
-        super().paint(painter, opt, index)
 
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS, RunProgressWidget
@@ -60,7 +48,7 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._info_label)
 
         self._table = QTableWidget()
-        self._table.setItemDelegate(_NoFocusDelegate(self._table))
+        self._table.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self._table.setColumnCount(5)
         self._table.setHorizontalHeaderLabels(["#", "Stage", "Status", "Duration", "Details"])
         self._table.horizontalHeader().setStretchLastSection(True)
@@ -68,7 +56,7 @@ class RunDetailWidget(QWidget):
         self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        self._table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.verticalHeader().setVisible(False)
         layout.addWidget(self._table)
@@ -171,7 +159,7 @@ class EvolverMainWindow(QMainWindow):
         left_layout.addWidget(history_header)
 
         self._history_list = QListWidget()
-        self._history_list.setItemDelegate(_NoFocusDelegate(self._history_list))
+        self._history_list.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self._history_list.currentRowChanged.connect(self._on_history_selection)
         left_layout.addWidget(self._history_list)
         splitter.addWidget(left)
