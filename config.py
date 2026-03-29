@@ -37,7 +37,17 @@ LOW_DISK_WARNING_GB = 250
 ENABLE_CPU_BUSY_SKIP = True
 CPU_BUSY_SKIP_THRESHOLD_PCT = 65.0
 CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
-CURRENT_UPSCALE_VIDEOAI_TAG = "Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale"
+UPSCALE_FILTER_DEFAULT = (
+    "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
+    "tvai_up=model=gcg-5:scale=4:device=0:vram=1:instances=1"
+)
+UPSCALE_FILTER_T2V_provider = (
+    "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
+    "tvai_up=model=prob-4:scale=4:preblur=0:noise=0.33:details=0.33:"
+    "halo=0:blur=0.67:compression=0:estimate=20:device=0:vram=1:instances=1"
+)
+VIDEOAI_TAG_DEFAULT = "Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale"
+VIDEOAI_TAG_T2V_provider = "Processed using apo-8 for 60 fps interpolation and prob-4 for 4x upscale (t2v provider)"
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
 FUN_TIME_CONFIG_FILE = FUN_TIME_PROJECT_DIR / "fun_time_config.json"
