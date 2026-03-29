@@ -25,6 +25,10 @@ htmlcov/
 # Regen-mode runtime state
 .regen-skip.txt
 
+# GUI runtime state
+runs/
+gui_settings.json
+
 # Claude Code local config
 .claude/
 .regen-complete
