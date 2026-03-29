@@ -29,7 +29,9 @@ _provider_HOSTS = {"example.com", "www.example.com"}
 @dataclass
 class PromptScrapeResult:
     scraped: int = 0
+    rescraped: int = 0
     skipped_existing: int = 0
+    skipped_legacy: int = 0
     skipped_non_provider: int = 0
     missing_url: int = 0
     fetch_failures: int = 0
@@ -63,8 +65,12 @@ def run() -> PromptScrapeResult:
         for video in sorted(_iter_video_files(root)):
             output_path = _prompt_output_path(video, root)
             if output_path.exists():
-                result.skipped_existing += 1
-                continue
+                if not _is_legacy_format(output_path):
+                    result.skipped_existing += 1
+                    continue
+                if result.rescraped >= config.RESCRAPE_BATCH_LIMIT:
+                    result.skipped_legacy += 1
+                    continue
 
             url = path_to_url.get(video.resolve())
             if url is None:
@@ -79,6 +85,7 @@ def run() -> PromptScrapeResult:
                 result.skipped_non_provider += 1
                 continue
 
+            is_rescrape = output_path.exists()
             try:
                 payload = _scrape_provider_video(video, url, browser)
             except Exception:
@@ -88,13 +95,20 @@ def run() -> PromptScrapeResult:
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-            result.scraped += 1
-            log.info("Wrote prompts: %s", output_path)
+            if is_rescrape:
+                result.rescraped += 1
+                log.info("Rescrapped legacy prompts: %s", output_path)
+            else:
+                result.scraped += 1
+                log.info("Wrote prompts: %s", output_path)
 
     log.info(
-        "Stage 5 done. Scraped: %d, Existing skipped: %d, Non-Provider skipped: %d, Missing URL: %d, Failures: %d",
+        "Stage 5 done. Scraped: %d, Rescrapped: %d, Existing skipped: %d, "
+        "Legacy skipped: %d, Non-Provider skipped: %d, Missing URL: %d, Failures: %d",
         result.scraped,
+        result.rescraped,
         result.skipped_existing,
+        result.skipped_legacy,
         result.skipped_non_provider,
         result.missing_url,
         result.fetch_failures,
@@ -139,6 +153,14 @@ def _resolve_favorite_path(value: str, base_dir: Path) -> Path:
 
 def _iter_video_files(root: Path):
     yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
+
+
+def _is_legacy_format(json_path: Path) -> bool:
+    try:
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        return "video" not in payload
+    except Exception:
+        return False
 
 
 def _prompt_output_path(video_path: Path, outbox_root: Path) -> Path:
