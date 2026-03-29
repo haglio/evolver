@@ -13,18 +13,21 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-STAGE_DISPLAY_NAMES = {
-    "sort": "Sort Inbox",
-    "purge": "Purge Weird",
-    "scripts": "Scripts Sync",
-    "bookmarks": "Bookmarks Sync",
-    "metadata": "Metadata Scrape",
-    "upscale": "Upscale",
-    "dupes": "Duplicate Check",
-    "verify": "Correspondence Check",
-}
+STAGES = [
+    ("sort",      "Sort Inbox",           "Move videos from 0_inbox into 1_sorted by source and orientation"),
+    ("purge",     "Purge Weird",          "Delete kinda_weird outputs and their matching sources in 1_sorted"),
+    ("scripts",   "Scripts Sync",         "Align funscripts to mirror the video library tree"),
+    ("bookmarks", "Bookmarks Sync",       "Sync Fun Time favorites into a Chrome bookmarks folder"),
+    ("metadata",  "Metadata Scrape",      "Scrape AI prompt metadata into mirrored JSON files"),
+    ("upscale",   "Upscale",              "Apply Topaz frame interpolation + 4x upscale to sorted videos"),
+    ("dupes",     "Duplicate Check",      "Scan non_AI for likely duplicate videos by exact filesize"),
+    ("verify",    "Correspondence Check", "Verify 1_sorted and 2_outbox are in 1-to-1 correspondence"),
+]
 
-ALL_STAGES = list(STAGE_DISPLAY_NAMES.keys())
+ALL_STAGES = [key for key, _, _ in STAGES]
+STAGE_DISPLAY_NAMES = {key: name for key, name, _ in STAGES}
+STAGE_TOOLTIPS = {key: tip for key, _, tip in STAGES}
+STAGE_NUMBER = {key: i + 1 for i, (key, _, _) in enumerate(STAGES)}
 
 
 class StageRow(QFrame):
@@ -36,6 +39,12 @@ class StageRow(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 2, 4, 2)
 
+        self._number_label = QLabel(str(STAGE_NUMBER.get(stage_key, "")))
+        self._number_label.setFixedWidth(20)
+        self._number_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._number_label.setStyleSheet("color: gray;")
+        layout.addWidget(self._number_label)
+
         self._icon_label = QLabel("\u2022")  # bullet
         self._icon_label.setFixedWidth(20)
         self._icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -43,6 +52,7 @@ class StageRow(QFrame):
 
         self._name_label = QLabel(STAGE_DISPLAY_NAMES.get(stage_key, stage_key))
         self._name_label.setFixedWidth(160)
+        self._name_label.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
         layout.addWidget(self._name_label)
 
         self._progress = QProgressBar()
