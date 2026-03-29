@@ -14,6 +14,8 @@ def _wrap_hyperlink(value: str) -> str:
 
 class TestPromptScrape(unittest.TestCase):
     def test_run_writes_mirrored_json_for_provider_video_with_source_image_prompts(self):
+        from datetime import date
+
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
             prompts_dir = root / "videos" / "prompts"
@@ -30,7 +32,8 @@ class TestPromptScrape(unittest.TestCase):
             with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_with_source_image):
-                        result = prompt_scrape.run()
+                        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+                            result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
             self.assertEqual(result.scraped, 1)
@@ -39,13 +42,27 @@ class TestPromptScrape(unittest.TestCase):
             self.assertEqual(
                 payload,
                 {
-                    "video_prompt": "video prompt text",
-                    "source_image_positive_prompt": "positive prompt text",
-                    "source_image_negative_prompt": "negative prompt text",
+                    "video": {
+                        "prompt": "video prompt text",
+                        "model": "Video v3",
+                        "seed": "123",
+                        "created": "2026-03-21",
+                    },
+                    "source_image": {
+                        "positive_prompt": "positive prompt text",
+                        "negative_prompt": "negative prompt text",
+                        "model": "X Dream",
+                        "seed": "999",
+                        "created": "2026-03-26",
+                        "style": "Realistic",
+                        "creativity": "Balance",
+                    },
                 },
             )
 
     def test_run_falls_back_to_filename_mapping_without_csv_row(self):
+        from datetime import date
+
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
             prompts_dir = root / "videos" / "prompts"
@@ -58,14 +75,25 @@ class TestPromptScrape(unittest.TestCase):
             with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only) as fetch_dom:
-                        result = prompt_scrape.run()
+                        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+                            result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
             self.assertEqual(result.scraped, 1)
             self.assertIn("https://example.com/image/uuid-123", fetch_dom.call_args_list[0].args[0])
             output_path = prompts_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "uuid-123_topaz.json"
             payload = json.loads(output_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload, {"video_prompt": "text only video prompt"})
+            self.assertEqual(
+                payload,
+                {
+                    "video": {
+                        "prompt": "text only video prompt",
+                        "model": "Video v3",
+                        "seed": "456",
+                        "created": "2026-03-25",
+                    },
+                },
+            )
 
     def test_run_skips_existing_json_and_non_provider_urls(self):
         with workspace_temp_dir() as root:
@@ -144,14 +172,9 @@ class TestPromptScrape(unittest.TestCase):
 
     @staticmethod
     def _fetch_dom_with_source_image(url: str, browser: Path) -> str:
-        if "/image/" in url:
+        if "/image/source-image-u1" in url:
             return """
             <body>
-              <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-              <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-              <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-              <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-              <div></div>
               <div>
                 <div class="relative flex h-full min-h-screen flex-col">
                   <main>
@@ -161,7 +184,18 @@ class TestPromptScrape(unittest.TestCase):
                           <div class="font-regular selection:bg-primary">
                             <div></div>
                             <div><div>positive prompt text</div></div>
+                            <div><span>Negative prompt</span></div>
                             <div class="max-h-80 overflow-y-auto rounded-sm p-2 text-[#fefefe]">negative prompt text</div>
+                            <div class="space-y-2.5 overflow-hidden">
+                              <div><h2>Model</h2><h1>X Dream</h1></div>
+                              <div><h2>Seed</h2><h1>999</h1></div>
+                              <div><h2>Created</h2><h1>2d ago</h1></div>
+                              <div><h2>Style</h2><h1>Realistic</h1></div>
+                              <div class="h-0 opacity-0">
+                                <div><h2>Creativity</h2><h1>Balance</h1></div>
+                                <div><h2>Inpainted</h2><h1>No</h1></div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -173,10 +207,6 @@ class TestPromptScrape(unittest.TestCase):
             """
         return """
         <body>
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
           <div>
             <div class="relative flex h-full min-h-screen flex-col">
               <main>
@@ -190,6 +220,11 @@ class TestPromptScrape(unittest.TestCase):
                           </div>
                         </div>
                         <div><div>video prompt text</div></div>
+                        <div class="space-y-2.5 overflow-hidden">
+                          <div><h2>Model</h2><h1>Video v3</h1></div>
+                          <div><h2>Seed</h2><h1>123</h1></div>
+                          <div><h2>Created</h2><h1>1w ago</h1></div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -204,10 +239,6 @@ class TestPromptScrape(unittest.TestCase):
     def _fetch_dom_text_only(url: str, browser: Path) -> str:
         return """
         <body>
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
           <div>
             <div class="relative flex h-full min-h-screen flex-col">
               <main>
@@ -217,6 +248,11 @@ class TestPromptScrape(unittest.TestCase):
                       <div class="font-regular selection:bg-primary">
                         <div></div>
                         <div><div>text only video prompt</div></div>
+                        <div class="space-y-2.5 overflow-hidden">
+                          <div><h2>Model</h2><h1>Video v3</h1></div>
+                          <div><h2>Seed</h2><h1>456</h1></div>
+                          <div><h2>Created</h2><h1>3d ago</h1></div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -294,6 +330,85 @@ class TestFallbackUrlForVideo(unittest.TestCase):
     def test_returns_none_for_non_provider(self):
         video = Path("C:/videos/2_outbox/upscaled_by_orientation/portrait/provider2/abc_topaz.mp4")
         self.assertIsNone(prompt_scrape._fallback_url_for_video(video))
+
+
+class TestExtractMetadataFields(unittest.TestCase):
+    def test_extracts_label_value_pairs(self):
+        html = """
+        <div>
+          <div><h2>Model</h2><h1>Video v3</h1></div>
+          <div><h2>Seed</h2><h1>12345</h1></div>
+          <div><h2>Style</h2><h1>Default</h1></div>
+        </div>
+        """
+        doc = prompt_scrape._parse_html_document(html)
+        result = prompt_scrape._extract_metadata_fields(doc)
+        self.assertEqual(result["model"], "Video v3")
+        self.assertEqual(result["seed"], "12345")
+        self.assertEqual(result["style"], "Default")
+
+    def test_extracts_creativity_from_hidden_section(self):
+        html = """
+        <div>
+          <div><h2>Model</h2><h1>X Dream</h1></div>
+          <div class="h-0 opacity-0 hidden">
+            <div><h2>Creativity</h2><h1>Balance</h1></div>
+          </div>
+        </div>
+        """
+        doc = prompt_scrape._parse_html_document(html)
+        result = prompt_scrape._extract_metadata_fields(doc)
+        self.assertEqual(result["model"], "X Dream")
+        self.assertEqual(result["creativity"], "Balance")
+
+    def test_converts_created_to_date(self):
+        from datetime import date
+        html = '<div><h2>Created</h2><h1>2w ago</h1></div>'
+        doc = prompt_scrape._parse_html_document(html)
+        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+            result = prompt_scrape._extract_metadata_fields(doc)
+        self.assertEqual(result["created"], "2026-03-14")
+
+    def test_ignores_unknown_labels(self):
+        html = '<div><h2>Inpainted</h2><h1>No</h1><h2>Model</h2><h1>v3</h1></div>'
+        doc = prompt_scrape._parse_html_document(html)
+        result = prompt_scrape._extract_metadata_fields(doc)
+        self.assertNotIn("inpainted", result)
+        self.assertEqual(result["model"], "v3")
+
+    def test_returns_empty_dict_when_no_fields(self):
+        html = '<div><p>Hello world</p></div>'
+        doc = prompt_scrape._parse_html_document(html)
+        result = prompt_scrape._extract_metadata_fields(doc)
+        self.assertEqual(result, {})
+
+
+class TestParseRelativeDate(unittest.TestCase):
+    def test_days_ago(self):
+        from datetime import date
+        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+            self.assertEqual(prompt_scrape._parse_relative_date("2d ago"), "2026-03-26")
+
+    def test_weeks_ago(self):
+        from datetime import date
+        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+            self.assertEqual(prompt_scrape._parse_relative_date("2w ago"), "2026-03-14")
+
+    def test_months_ago(self):
+        from datetime import date
+        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+            self.assertEqual(prompt_scrape._parse_relative_date("3mo ago"), "2025-12-28")
+
+    def test_hours_ago(self):
+        from datetime import date
+        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+            self.assertEqual(prompt_scrape._parse_relative_date("5h ago"), "2026-03-28")
+
+    def test_passthrough_non_relative(self):
+        self.assertEqual(prompt_scrape._parse_relative_date("2026-01-15"), "2026-01-15")
+
+    def test_passthrough_empty(self):
+        self.assertEqual(prompt_scrape._parse_relative_date(""), "")
 
 
 if __name__ == "__main__":
