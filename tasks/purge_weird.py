@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 class PurgeWeirdResult:
     deleted_weird: int = 0
     deleted_sorted: int = 0
+    deleted_metadata: int = 0
     missing_sorted: List[str] = field(default_factory=list)
 
 
@@ -55,6 +56,11 @@ def run() -> PurgeWeirdResult:
                     result.deleted_sorted += 1
                     log.info("Deleted source: %s", match)
 
+            for json_file in config.METADATA_DIR.rglob(weird_file.stem + ".json"):
+                json_file.unlink()
+                result.deleted_metadata += 1
+                log.info("Deleted metadata: %s", json_file)
+
             weird_file.unlink()
             result.deleted_weird += 1
             log.info("Deleted weird:  %s", weird_file.name)
@@ -66,8 +72,8 @@ def run() -> PurgeWeirdResult:
         _show_error_window(result.missing_sorted)
 
     log.info(
-        "Stage 2 done.  Deleted weird: %d, deleted sorted: %d, missing sources: %d",
-        result.deleted_weird, result.deleted_sorted, len(result.missing_sorted),
+        "Stage 2 done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
+        result.deleted_weird, result.deleted_sorted, result.deleted_metadata, len(result.missing_sorted),
     )
     return result
 
