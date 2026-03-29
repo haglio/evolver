@@ -15,8 +15,9 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
 
 ## Current architecture
 
-- Scheduler: Windows Task Scheduler task `evolver` (15-minute trigger)
-- Launcher: `evolver.ps1` (hidden, non-interactive)
+- **Tray app** (preferred): `pythonw.exe tray_app.py` — system tray icon with GUI, configurable timer (default 10 min), manual run trigger, run history, and live progress bars
+- **CLI mode** (legacy): `python evolver.py` — headless single run, returns exit code
+- **Task Scheduler** (deprecated): `evolver.ps1` / `evolver.xml` — kept for rollback but superseded by tray app
 - Pipeline entry point: `evolver.py`
 - Modules:
   - `config.py` - paths and settings
@@ -30,6 +31,15 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
   - `check_correspondence.py` - Stage 7 integrity verification and one-time manual check
   - `util/ffprobe.py` - orientation probing
   - `util/media_files.py` - shared helpers for finalized-vs-partial video detection and stale partial cleanup
+  - `gui/app.py` - tray application wiring and single-instance guard
+  - `gui/tray.py` - system tray icon and context menu
+  - `gui/main_window.py` - run history list and detail/progress panel
+  - `gui/progress.py` - live per-stage progress widget
+  - `gui/worker.py` - background QThread pipeline runner
+  - `gui/scheduler.py` - timer-based scheduling with run-guard
+  - `gui/run_record.py` - JSON run record persistence
+  - `gui/settings.py` - settings dataclass and persistence
+  - `gui/startup.py` - Windows Startup folder shortcut management
 
 ## Requirements
 
@@ -38,8 +48,20 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
 - `ffprobe` available in `PATH`
 - Topaz ffmpeg at `C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe`
 - Topaz model directory at `C:\ProgramData\Topaz Labs LLC\Topaz Video\models`
+- PyQt6 (`pip install PyQt6`) — for tray app mode
+- pywin32 (`pip install pywin32`) — for Windows startup shortcut registration
 
-## Run manually
+## Run as tray app (recommended)
+
+```bash
+pythonw.exe tray_app.py
+```
+
+This starts a system tray icon. Right-click for the context menu (Run Now, Pause/Resume, Settings, Quit) or double-click to open the main window with run history and live progress. Configure the run interval and Windows startup registration from Settings.
+
+Run history is stored as JSON files in `runs/` (gitignored). Settings are persisted to `gui_settings.json` (gitignored).
+
+## Run manually (CLI)
 
 From repo root:
 
@@ -53,7 +75,7 @@ Alternative (direct Python command):
 python evolver.py
 ```
 
-Or through the hidden launcher used by Scheduled Task:
+Or through the hidden launcher used by Scheduled Task (deprecated):
 
 ```bash
 powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File evolver.ps1
