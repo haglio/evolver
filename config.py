@@ -50,6 +50,8 @@ VIDEOAI_TAG_DEFAULT = "Processed using apo-8 for 60 fps interpolation and gcg-5 
 VIDEOAI_TAG_T2V_provider = "Processed using apo-8 for 60 fps interpolation and prob-4 for 4x upscale (t2v provider)"
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
+RUNS_DIR = PROJECT_DIR / "runs"
+GUI_SETTINGS_FILE = PROJECT_DIR / "gui_settings.json"
 FUN_TIME_CONFIG_FILE = FUN_TIME_PROJECT_DIR / "fun_time_config.json"
 
 
