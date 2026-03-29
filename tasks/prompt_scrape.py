@@ -44,9 +44,9 @@ class PromptScrapeResult:
 
 def run() -> PromptScrapeResult:
     result = PromptScrapeResult()
-    log.info("=== Stage 5: scrape AI prompts ===")
+    log.info("=== Stage 5: scrape AI metadata ===")
     log.info("SOURCE CSV: %s", config.FUN_TIME_FAVS_FILE)
-    log.info("PROMPTS DIR: %s", config.PROMPTS_DIR)
+    log.info("METADATA DIR: %s", config.METADATA_DIR)
 
     path_to_url = _load_video_urls(result)
     if result.source_missing:
@@ -164,7 +164,7 @@ def _is_legacy_format(json_path: Path) -> bool:
 
 
 def _prompt_output_path(video_path: Path, outbox_root: Path) -> Path:
-    return config.PROMPTS_DIR / outbox_root.name / video_path.relative_to(outbox_root).with_suffix(".json")
+    return config.METADATA_DIR / outbox_root.name / video_path.relative_to(outbox_root).with_suffix(".json")
 
 
 def _fallback_url_for_video(video_path: Path) -> str | None:

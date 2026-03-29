@@ -6,7 +6,7 @@ Runs on a 15-minute Task Scheduler trigger. Stages:
   2. purge      - remove weird outputs and their matching sources
   3. scripts    - align funscripts to mirror the video library tree
   4. bookmarks  - sync Fun Time favorites into a Chrome bookmarks folder
-  5. prompts    - scrape AI prompt metadata into mirrored JSON files
+  5. metadata   - scrape AI prompt metadata into mirrored JSON files
   6. upscale    - apply Topaz frame interpolation + 4x upscale to sorted videos
   7. dupes      - scan non_AI for likely duplicate videos by exact filesize
   8. verify     - check 1_sorted and 2_outbox are in 1-to-1 correspondence

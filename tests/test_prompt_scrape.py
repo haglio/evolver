@@ -18,7 +18,7 @@ class TestPromptScrape(unittest.TestCase):
 
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            prompts_dir = root / "videos" / "prompts"
+            metadata_dir = root / "videos" / "metadata"
             favs_path = root / "favs.csv"
             video_path = outbox / "upscaled_by_orientation" / "portrait" / "provider" / "abc_topaz.mp4"
             video_path.parent.mkdir(parents=True, exist_ok=True)
@@ -29,7 +29,7 @@ class TestPromptScrape(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, METADATA_DIR=metadata_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_with_source_image):
                         with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
@@ -37,7 +37,7 @@ class TestPromptScrape(unittest.TestCase):
 
             self.assertTrue(result.ok)
             self.assertEqual(result.scraped, 1)
-            output_path = prompts_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "abc_topaz.json"
+            output_path = metadata_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "abc_topaz.json"
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 payload,
@@ -65,14 +65,14 @@ class TestPromptScrape(unittest.TestCase):
 
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            prompts_dir = root / "videos" / "prompts"
+            metadata_dir = root / "videos" / "metadata"
             favs_path = root / "favs.csv"
             video_path = outbox / "upscaled_by_orientation" / "landscape" / "provider" / "uuid-123_topaz.mp4"
             video_path.parent.mkdir(parents=True, exist_ok=True)
             video_path.write_text("x", encoding="utf-8")
             favs_path.write_text("local_file,web_url\n", encoding="utf-8")
 
-            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, METADATA_DIR=metadata_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only) as fetch_dom:
                         with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
@@ -81,7 +81,7 @@ class TestPromptScrape(unittest.TestCase):
             self.assertTrue(result.ok)
             self.assertEqual(result.scraped, 1)
             self.assertIn("https://example.com/image/uuid-123", fetch_dom.call_args_list[0].args[0])
-            output_path = prompts_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "uuid-123_topaz.json"
+            output_path = metadata_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "uuid-123_topaz.json"
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 payload,
@@ -98,7 +98,7 @@ class TestPromptScrape(unittest.TestCase):
     def test_run_skips_existing_json_and_non_provider_urls(self):
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            prompts_dir = root / "videos" / "prompts"
+            metadata_dir = root / "videos" / "metadata"
             favs_path = root / "favs.csv"
             provider_video = outbox / "upscaled_by_orientation" / "portrait" / "provider" / "one_topaz.mp4"
             provider2_video = outbox / "upscaled_by_orientation" / "portrait" / "provider2" / "two_topaz.mp4"
@@ -106,7 +106,7 @@ class TestPromptScrape(unittest.TestCase):
             provider2_video.parent.mkdir(parents=True, exist_ok=True)
             provider_video.write_text("x", encoding="utf-8")
             provider2_video.write_text("x", encoding="utf-8")
-            existing_output = prompts_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "one_topaz.json"
+            existing_output = metadata_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "one_topaz.json"
             existing_output.parent.mkdir(parents=True, exist_ok=True)
             existing_output.write_text('{"video":{"prompt":"old"}}\n', encoding="utf-8")
             favs_path.write_text(
@@ -116,7 +116,7 @@ class TestPromptScrape(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, METADATA_DIR=metadata_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom") as fetch_dom:
                         result = prompt_scrape.run()
@@ -129,7 +129,7 @@ class TestPromptScrape(unittest.TestCase):
     def test_run_ignores_partial_video_files(self):
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            prompts_dir = root / "videos" / "prompts"
+            metadata_dir = root / "videos" / "metadata"
             favs_path = root / "favs.csv"
             final_video = outbox / "upscaled_by_orientation" / "portrait" / "provider" / "one_topaz.mp4"
             partial_video = outbox / "upscaled_by_orientation" / "portrait" / "provider" / "one.partial.deadbeef.mp4"
@@ -138,26 +138,26 @@ class TestPromptScrape(unittest.TestCase):
             partial_video.write_text("x", encoding="utf-8")
             favs_path.write_text("local_file,web_url\n", encoding="utf-8")
 
-            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, METADATA_DIR=metadata_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
                         result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
             self.assertEqual(result.scraped, 1)
-            self.assertFalse((prompts_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "one.partial.deadbeef.json").exists())
+            self.assertFalse((metadata_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "one.partial.deadbeef.json").exists())
 
     def test_run_rescraped_legacy_json_within_batch_limit(self):
         from datetime import date
 
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            prompts_dir = root / "videos" / "prompts"
+            metadata_dir = root / "videos" / "metadata"
             favs_path = root / "favs.csv"
             video_path = outbox / "upscaled_by_orientation" / "landscape" / "provider" / "abc_topaz.mp4"
             video_path.parent.mkdir(parents=True, exist_ok=True)
             video_path.write_text("x", encoding="utf-8")
-            legacy_path = prompts_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "abc_topaz.json"
+            legacy_path = metadata_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "abc_topaz.json"
             legacy_path.parent.mkdir(parents=True, exist_ok=True)
             legacy_path.write_text('{"video_prompt":"old prompt"}\n', encoding="utf-8")
             favs_path.write_text(
@@ -168,7 +168,7 @@ class TestPromptScrape(unittest.TestCase):
 
             with override_config(
                 FUN_TIME_FAVS_FILE=favs_path,
-                PROMPTS_DIR=prompts_dir,
+                METADATA_DIR=metadata_dir,
                 OUTBOX_DIR=outbox,
                 RESCRAPE_BATCH_LIMIT=5,
             ):
@@ -187,7 +187,7 @@ class TestPromptScrape(unittest.TestCase):
     def test_run_skips_legacy_rescrape_when_batch_limit_reached(self):
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            prompts_dir = root / "videos" / "prompts"
+            metadata_dir = root / "videos" / "metadata"
             favs_path = root / "favs.csv"
             v1 = outbox / "upscaled_by_orientation" / "landscape" / "provider" / "vid1_topaz.mp4"
             v2 = outbox / "upscaled_by_orientation" / "landscape" / "provider" / "vid2_topaz.mp4"
@@ -195,7 +195,7 @@ class TestPromptScrape(unittest.TestCase):
             v1.write_text("x", encoding="utf-8")
             v2.write_text("x", encoding="utf-8")
             for name in ("vid1_topaz.json", "vid2_topaz.json"):
-                p = prompts_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / name
+                p = metadata_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / name
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text('{"video_prompt":"old"}\n', encoding="utf-8")
             favs_path.write_text(
@@ -207,7 +207,7 @@ class TestPromptScrape(unittest.TestCase):
 
             with override_config(
                 FUN_TIME_FAVS_FILE=favs_path,
-                PROMPTS_DIR=prompts_dir,
+                METADATA_DIR=metadata_dir,
                 OUTBOX_DIR=outbox,
                 RESCRAPE_BATCH_LIMIT=1,
             ):
@@ -223,7 +223,7 @@ class TestPromptScrape(unittest.TestCase):
     def test_run_counts_fetch_failure_and_reports_not_ok(self):
         with workspace_temp_dir() as root:
             outbox = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            prompts_dir = root / "videos" / "prompts"
+            metadata_dir = root / "videos" / "metadata"
             favs_path = root / "favs.csv"
             video_path = outbox / "upscaled_by_orientation" / "portrait" / "provider" / "fail_topaz.mp4"
             video_path.parent.mkdir(parents=True, exist_ok=True)
@@ -234,7 +234,7 @@ class TestPromptScrape(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with override_config(FUN_TIME_FAVS_FILE=favs_path, PROMPTS_DIR=prompts_dir, OUTBOX_DIR=outbox):
+            with override_config(FUN_TIME_FAVS_FILE=favs_path, METADATA_DIR=metadata_dir, OUTBOX_DIR=outbox):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("network error")):
                         result = prompt_scrape.run()
