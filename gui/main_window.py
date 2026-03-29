@@ -8,9 +8,9 @@ from typing import Any
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QAbstractItemView,
     QHBoxLayout,
     QHeaderView,
+    QItemDelegate,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -23,6 +23,18 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+class _NoFocusRectDelegate(QItemDelegate):
+    """QItemDelegate subclass that suppresses the focus rectangle.
+
+    Uses QItemDelegate (not QStyledItemDelegate) because QItemDelegate
+    exposes drawFocus() as a dedicated override point for this purpose.
+    """
+
+    def drawFocus(self, painter, option, rect):
+        pass  # Don't draw the focus rectangle
+
 
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS, RunProgressWidget
@@ -48,7 +60,7 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._info_label)
 
         self._table = QTableWidget()
-        self._table.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        self._table.setItemDelegate(_NoFocusRectDelegate(self._table))
         self._table.setColumnCount(5)
         self._table.setHorizontalHeaderLabels(["#", "Stage", "Status", "Duration", "Details"])
         self._table.horizontalHeader().setStretchLastSection(True)
@@ -159,7 +171,7 @@ class EvolverMainWindow(QMainWindow):
         left_layout.addWidget(history_header)
 
         self._history_list = QListWidget()
-        self._history_list.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        self._history_list.setItemDelegate(_NoFocusRectDelegate(self._history_list))
         self._history_list.currentRowChanged.connect(self._on_history_selection)
         left_layout.addWidget(self._history_list)
         splitter.addWidget(left)
