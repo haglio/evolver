@@ -40,6 +40,8 @@ CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
 CURRENT_UPSCALE_VIDEOAI_TAG = "Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale"
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
+RUNS_DIR = PROJECT_DIR / "runs"
+GUI_SETTINGS_FILE = PROJECT_DIR / "gui_settings.json"
 FUN_TIME_CONFIG_FILE = FUN_TIME_PROJECT_DIR / "fun_time_config.json"
 
 
