@@ -6,7 +6,7 @@ PROJECT_DIR  = BASE_DIR / "projects" / "evolver"
 FUN_TIME_PROJECT_DIR = BASE_DIR / "projects" / "fun_time"
 FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
 VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
-PROMPTS_DIR = BASE_DIR / "videos" / "prompts"
+METADATA_DIR = BASE_DIR / "videos" / "metadata"
 SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
@@ -30,6 +30,7 @@ FUNSCRIPT_EXTENSION = ".funscript"
 CLEAN_EMPTY_INBOX_DIRS = True
 
 UPSCALE_BATCH_LIMIT = 5
+RESCRAPE_BATCH_LIMIT = 50
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
 LOW_DISK_WARNING_GB = 250

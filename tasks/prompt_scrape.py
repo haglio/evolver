@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import csv
+import datetime
 import json
 import logging
 import re
 import subprocess
+import tempfile
 from dataclasses import dataclass
+from email.utils import parsedate
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -19,37 +22,16 @@ from util.media_files import iter_finalized_videos
 
 log = logging.getLogger(__name__)
 
-_VIDEO_PROMPT_SELECTOR = (
-    r"body > div:nth-child(40) > div.relative.flex.h-full.min-h-screen.flex-col > main > "
-    r"div > div.mt-2.w-full.max-w-full.gap-x-2.rounded-sm.p-2 > div.flex-1.overflow-hidden > "
-    r"div.font-regular.selection\:bg-primary > div:nth-child(2) > div"
-)
-_SOURCE_IMAGE_THUMB_SELECTOR = (
-    r"body > div:nth-child(40) > div.relative.flex.h-full.min-h-screen.flex-col > main > "
-    r"div > div.mt-2.w-full.max-w-full.gap-x-2.rounded-sm.p-2 > div.flex-1.overflow-hidden > "
-    r"div.font-regular.selection\:bg-primary > div.-mt-4.px-2.pb-4 > "
-    r"div.h-25.w-fit.cursor-pointer.rounded-xl.border.border-\[\#151515\].bg-transparent.p-2."
-    r"text-white.transition-all.duration-200.ease-in-out.will-change-transform.hover\:bg-\[\#0e0e0e\]."
-    r"active\:scale-\[0\.95\].active\:border-\[\#303030\].active\:bg-\[\#171717\] > img"
-)
-_IMAGE_POSITIVE_PROMPT_SELECTOR = (
-    r"body > div:nth-child(42) > div.relative.flex.h-full.min-h-screen.flex-col > main > "
-    r"div > div.mt-2.w-full.max-w-full.gap-x-2.rounded-sm.p-2 > div.flex-1.overflow-hidden > "
-    r"div.font-regular.selection\:bg-primary > div:nth-child(2) > div"
-)
-_IMAGE_NEGATIVE_PROMPT_SELECTOR = (
-    r"body > div:nth-child(42) > div.relative.flex.h-full.min-h-screen.flex-col > main > "
-    r"div > div.mt-2.w-full.max-w-full.gap-x-2.rounded-sm.p-2 > div.flex-1.overflow-hidden > "
-    r"div.font-regular.selection\:bg-primary > div.max-h-80.overflow-y-auto.rounded-sm."
-    r"p-2.text-\[\#fefefe\]"
-)
+_CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.font-regular"
 _provider_HOSTS = {"example.com", "www.example.com"}
 
 
 @dataclass
 class PromptScrapeResult:
     scraped: int = 0
+    rescraped: int = 0
     skipped_existing: int = 0
+    skipped_legacy: int = 0
     skipped_non_provider: int = 0
     missing_url: int = 0
     fetch_failures: int = 0
@@ -62,9 +44,9 @@ class PromptScrapeResult:
 
 def run() -> PromptScrapeResult:
     result = PromptScrapeResult()
-    log.info("=== Stage 5: scrape AI prompts ===")
+    log.info("=== Stage 5: scrape AI metadata ===")
     log.info("SOURCE CSV: %s", config.FUN_TIME_FAVS_FILE)
-    log.info("PROMPTS DIR: %s", config.PROMPTS_DIR)
+    log.info("METADATA DIR: %s", config.METADATA_DIR)
 
     path_to_url = _load_video_urls(result)
     if result.source_missing:
@@ -83,8 +65,12 @@ def run() -> PromptScrapeResult:
         for video in sorted(_iter_video_files(root)):
             output_path = _prompt_output_path(video, root)
             if output_path.exists():
-                result.skipped_existing += 1
-                continue
+                if not _is_legacy_format(output_path):
+                    result.skipped_existing += 1
+                    continue
+                if result.rescraped >= config.RESCRAPE_BATCH_LIMIT:
+                    result.skipped_legacy += 1
+                    continue
 
             url = path_to_url.get(video.resolve())
             if url is None:
@@ -99,6 +85,7 @@ def run() -> PromptScrapeResult:
                 result.skipped_non_provider += 1
                 continue
 
+            is_rescrape = output_path.exists()
             try:
                 payload = _scrape_provider_video(video, url, browser)
             except Exception:
@@ -108,13 +95,20 @@ def run() -> PromptScrapeResult:
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-            result.scraped += 1
-            log.info("Wrote prompts: %s", output_path)
+            if is_rescrape:
+                result.rescraped += 1
+                log.info("Rescrapped legacy prompts: %s", output_path)
+            else:
+                result.scraped += 1
+                log.info("Wrote prompts: %s", output_path)
 
     log.info(
-        "Stage 5 done. Scraped: %d, Existing skipped: %d, Non-Provider skipped: %d, Missing URL: %d, Failures: %d",
+        "Stage 5 done. Scraped: %d, Rescrapped: %d, Existing skipped: %d, "
+        "Legacy skipped: %d, Non-Provider skipped: %d, Missing URL: %d, Failures: %d",
         result.scraped,
+        result.rescraped,
         result.skipped_existing,
+        result.skipped_legacy,
         result.skipped_non_provider,
         result.missing_url,
         result.fetch_failures,
@@ -161,8 +155,16 @@ def _iter_video_files(root: Path):
     yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
+def _is_legacy_format(json_path: Path) -> bool:
+    try:
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        return "video" not in payload
+    except Exception:
+        return False
+
+
 def _prompt_output_path(video_path: Path, outbox_root: Path) -> Path:
-    return config.PROMPTS_DIR / outbox_root.name / video_path.relative_to(outbox_root).with_suffix(".json")
+    return config.METADATA_DIR / outbox_root.name / video_path.relative_to(outbox_root).with_suffix(".json")
 
 
 def _fallback_url_for_video(video_path: Path) -> str | None:
@@ -184,41 +186,100 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
 
     video_prompt = ""
     source_image_url = ""
+    video_metadata: dict[str, str] = {}
     for candidate in candidate_urls:
         html = _fetch_dom(candidate, browser)
         document = _parse_html_document(html)
-        prompt_node = _query_selector(document, _VIDEO_PROMPT_SELECTOR)
-        if prompt_node is not None:
-            video_prompt = _text_content(prompt_node).strip()
-            thumb = _query_selector(document, _SOURCE_IMAGE_THUMB_SELECTOR)
-            if thumb is not None:
-                source_image_url = _image_page_url_from_src(thumb.attrs.get("src", ""))
-            break
-        embedded = _extract_provider_embedded_metadata(html, image_id)
-        if embedded.prompt:
-            video_prompt = embedded.prompt
-            if embedded.parent_image_id:
-                source_image_url = f"https://example.com/image/{embedded.parent_image_id}"
+        panel = _query_selector(document, _CONTENT_PANEL_SELECTOR)
+        if panel is not None:
+            video_prompt = _extract_prompt_text(panel)
+            source_image_url = _extract_source_image_url(panel)
+            video_metadata = _extract_metadata_fields(document)
+        if not video_prompt:
+            embedded = _extract_provider_embedded_metadata(html, image_id)
+            if embedded.prompt:
+                video_prompt = embedded.prompt
+                if not video_metadata:
+                    video_metadata = _embedded_to_video_metadata(embedded)
+                if embedded.parent_image_id and not source_image_url:
+                    source_image_url = f"https://example.com/image/{embedded.parent_image_id}"
+        if video_prompt:
             break
     if not video_prompt:
         raise RuntimeError(f"Could not extract Provider video prompt for {video_path.name}")
 
-    payload = {"video_prompt": video_prompt}
+    video_data: dict[str, str] = {"prompt": video_prompt, **video_metadata}
+    payload: dict[str, object] = {"video": video_data}
+
     if source_image_url:
         image_html = _fetch_dom(source_image_url, browser)
         image_document = _parse_html_document(image_html)
-        positive_node = _query_selector(image_document, _IMAGE_POSITIVE_PROMPT_SELECTOR)
-        negative_node = _query_selector(image_document, _IMAGE_NEGATIVE_PROMPT_SELECTOR)
-        embedded = _extract_provider_embedded_metadata(image_html, source_image_url.rstrip("/").split("/")[-1])
-        if positive_node is not None:
-            payload["source_image_positive_prompt"] = _text_content(positive_node).strip()
-        elif embedded.prompt:
-            payload["source_image_positive_prompt"] = embedded.prompt
-        if negative_node is not None:
-            payload["source_image_negative_prompt"] = _text_content(negative_node).strip()
-        elif embedded.negative_prompt:
-            payload["source_image_negative_prompt"] = embedded.negative_prompt
+        image_panel = _query_selector(image_document, _CONTENT_PANEL_SELECTOR)
+        image_data: dict[str, str] = {}
+        if image_panel is not None:
+            pos = _extract_prompt_text(image_panel)
+            neg = _extract_negative_prompt_text(image_panel)
+            if pos:
+                image_data["positive_prompt"] = pos
+            if neg:
+                image_data["negative_prompt"] = neg
+            image_data.update(_extract_metadata_fields(image_document))
+        else:
+            image_id_str = source_image_url.rstrip("/").split("/")[-1]
+            embedded = _extract_provider_embedded_metadata(image_html, image_id_str)
+            if embedded.prompt:
+                image_data["positive_prompt"] = embedded.prompt
+            if embedded.negative_prompt:
+                image_data["negative_prompt"] = embedded.negative_prompt
+            image_data.update(_embedded_to_image_metadata(embedded))
+        if image_data:
+            payload["source_image"] = image_data
     return payload
+
+
+def _extract_prompt_text(panel: _Node) -> str:
+    """Extract the positive prompt text from a content panel.
+
+    The prompt is the first text block inside a div > div structure that
+    doesn't contain h2 labels (which would be metadata fields).
+    """
+    for child in panel.children:
+        if child.tag != "div":
+            continue
+        inner_divs = [c for c in child.children if c.tag == "div"]
+        if len(inner_divs) == 1:
+            text = _text_content(inner_divs[0]).strip()
+            has_h2 = any(True for _ in _find_all_by_tag(inner_divs[0], "h2"))
+            if text and not has_h2:
+                return text
+    return ""
+
+
+def _extract_negative_prompt_text(panel: _Node) -> str:
+    """Extract the negative prompt text from a content panel.
+
+    The negative prompt is in a div with class 'max-h-80' that appears after
+    a span/div containing 'Negative prompt'.
+    """
+    found_label = False
+    for child in panel.children:
+        if not found_label:
+            text = _text_content(child).strip().lower()
+            if "negative prompt" in text and "max-h-80" not in child.attrs.get("class", ""):
+                found_label = True
+                continue
+        if found_label and "max-h-80" in child.attrs.get("class", ""):
+            return _text_content(child).strip()
+    return ""
+
+
+def _extract_source_image_url(panel: _Node) -> str:
+    """Find the source image thumbnail img and derive the image page URL."""
+    for img in _find_all_by_tag(panel, "img"):
+        src = img.attrs.get("src", "")
+        if src:
+            return _image_page_url_from_src(src)
+    return ""
 
 
 def _image_page_url_from_src(src: str) -> str:
@@ -314,6 +375,16 @@ class _ProviderEmbeddedMetadata:
     prompt: str = ""
     negative_prompt: str = ""
     parent_image_id: str = ""
+    model: str = ""
+    version: str = ""
+    seed: str = ""
+    aspect_ratio: str = ""
+    resolution: str = ""
+    quality: str = ""
+    created: str = ""
+    action: str = ""
+    style: str = ""
+    creativity: str = ""
 
 
 def _parse_html_document(html: str) -> _Node:
@@ -411,16 +482,44 @@ def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmb
     for index in _all_indices(html, page_id):
         window = html[max(0, index - 5000): index + 5000]
         for candidate in (window, window.replace('\\"', '"')):
-            prompt = _extract_json_string_field(candidate, "prompt")
-            if prompt and not metadata.prompt:
-                metadata.prompt = prompt
-            negative_prompt = _extract_nullable_json_string_field(candidate, "negative_prompt")
-            if negative_prompt and not metadata.negative_prompt:
-                metadata.negative_prompt = negative_prompt
-            parent_image_id = _extract_nullable_json_string_field(candidate, "parent_image_id")
-            if parent_image_id and not metadata.parent_image_id:
-                metadata.parent_image_id = parent_image_id
-        if metadata.prompt and (metadata.parent_image_id or metadata.negative_prompt):
+            if not metadata.prompt:
+                metadata.prompt = _extract_json_string_field(candidate, "prompt")
+            if not metadata.negative_prompt:
+                metadata.negative_prompt = _extract_nullable_json_string_field(candidate, "negative_prompt")
+            if not metadata.parent_image_id:
+                metadata.parent_image_id = _extract_nullable_json_string_field(candidate, "parent_image_id")
+            if not metadata.model:
+                metadata.model = _extract_json_string_field(candidate, "model")
+            if not metadata.version:
+                metadata.version = _extract_json_string_field(candidate, "version")
+            if not metadata.seed:
+                seed_int = _extract_json_int_field(candidate, "seed")
+                if seed_int is not None:
+                    metadata.seed = str(seed_int)
+            if not metadata.aspect_ratio:
+                metadata.aspect_ratio = _extract_json_string_field(candidate, "aspectRatio")
+            if not metadata.resolution:
+                width = _extract_json_int_field(candidate, "width")
+                height = _extract_json_int_field(candidate, "height")
+                if width is not None and height is not None:
+                    metadata.resolution = f"{width}x{height}"
+            if not metadata.quality:
+                metadata.quality = _extract_json_string_field(candidate, "quality")
+            if not metadata.created:
+                created_at = _extract_json_string_field(candidate, "createdAt")
+                if created_at:
+                    metadata.created = _parse_provider_created_at(created_at)
+            if not metadata.action:
+                raw_action = _extract_json_first_array_string(candidate, "action")
+                if raw_action:
+                    metadata.action = raw_action.replace("_", " ").title()
+            if not metadata.style:
+                metadata.style = _extract_nullable_json_string_field(candidate, "styleValue")
+            if not metadata.creativity:
+                creativity_int = _extract_json_int_field(candidate, "creativity")
+                if creativity_int is not None:
+                    metadata.creativity = str(creativity_int)
+        if metadata.prompt:
             break
     return metadata
 
@@ -437,6 +536,144 @@ def _extract_nullable_json_string_field(blob: str, field_name: str) -> str:
     if not match or match.group(1) == "null":
         return ""
     return json.loads(f'"{match.group(2)}"')
+
+
+def _extract_json_int_field(blob: str, field_name: str) -> int | None:
+    match = re.search(rf'"{re.escape(field_name)}":(\d+)', blob)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _extract_json_first_array_string(blob: str, field_name: str) -> str:
+    match = re.search(rf'"{re.escape(field_name)}":\["([^"]+)"', blob)
+    if not match:
+        return ""
+    return match.group(1)
+
+
+def _parse_provider_created_at(value: str) -> str:
+    try:
+        t = parsedate(value)
+        if t is not None:
+            return datetime.date(t[0], t[1], t[2]).isoformat()
+    except Exception:
+        pass
+    return value
+
+
+def _embedded_to_video_metadata(embedded: _ProviderEmbeddedMetadata) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    if embedded.version:
+        fields["model"] = f"Video {embedded.version}"
+    elif embedded.model:
+        fields["model"] = embedded.model
+    for key, value in (
+        ("action", embedded.action),
+        ("resolution", embedded.resolution),
+        ("aspect_ratio", embedded.aspect_ratio),
+        ("quality", embedded.quality),
+        ("seed", embedded.seed),
+        ("created", embedded.created),
+        ("style", embedded.style),
+    ):
+        if value:
+            fields[key] = value
+    return fields
+
+
+def _embedded_to_image_metadata(embedded: _ProviderEmbeddedMetadata) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    if embedded.model:
+        fields["model"] = embedded.model
+    for key, value in (
+        ("action", embedded.action),
+        ("resolution", embedded.resolution),
+        ("aspect_ratio", embedded.aspect_ratio),
+        ("quality", embedded.quality),
+        ("seed", embedded.seed),
+        ("created", embedded.created),
+        ("style", embedded.style),
+        ("creativity", embedded.creativity),
+    ):
+        if value:
+            fields[key] = value
+    return fields
+
+
+_METADATA_LABELS = {
+    "model", "action", "resolution", "aspect ratio", "quality",
+    "seed", "created", "style", "creativity",
+}
+
+
+def _extract_metadata_fields(root: _Node) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for h2 in _find_all_by_tag(root, "h2"):
+        label = _text_content(h2).strip().lower()
+        if label not in _METADATA_LABELS:
+            continue
+        parent = h2.parent
+        if parent is None:
+            continue
+        siblings = parent.children
+        try:
+            h2_index = siblings.index(h2)
+        except ValueError:
+            continue
+        h1 = next((c for c in siblings[h2_index + 1:] if c.tag == "h1"), None)
+        if h1 is None:
+            continue
+        key = label.replace(" ", "_")
+        value = _text_content(h1).strip()
+        if key == "created":
+            value = _parse_relative_date(value)
+        fields[key] = value
+    return fields
+
+
+def _find_all_by_tag(node: _Node, tag: str):
+    if node.tag == tag:
+        yield node
+    for child in node.children:
+        yield from _find_all_by_tag(child, tag)
+
+
+def _today() -> datetime.date:
+    return datetime.date.today()
+
+
+_RELATIVE_DATE_RE = re.compile(r"^(\d+)(mo|[mhdw])\s+ago$", re.IGNORECASE)
+
+
+def _parse_relative_date(value: str) -> str:
+    match = _RELATIVE_DATE_RE.match(value.strip())
+    if not match:
+        return value
+    amount = int(match.group(1))
+    unit = match.group(2).lower()
+    today = _today()
+    if unit == "m" or unit == "h":
+        return today.isoformat()
+    if unit == "d":
+        return (today - datetime.timedelta(days=amount)).isoformat()
+    if unit == "w":
+        return (today - datetime.timedelta(weeks=amount)).isoformat()
+    if unit == "mo":
+        month = today.month - amount
+        year = today.year
+        while month < 1:
+            month += 12
+            year -= 1
+        day = min(today.day, _days_in_month(year, month))
+        return datetime.date(year, month, day).isoformat()
+    return value
+
+
+def _days_in_month(year: int, month: int) -> int:
+    if month == 12:
+        return 31
+    return (datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)).day
 
 
 def _all_indices(haystack: str, needle: str) -> list[int]:
