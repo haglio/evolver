@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import QModelIndex, Qt
+from PyQt6.QtGui import QColor, QFont, QPainter
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -17,18 +17,24 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QStatusBar,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-_NO_FOCUS_STYLE = """
-    QTableWidget::item:focus { outline: none; border: none; }
-    QTableWidget:focus { outline: none; }
-    QListWidget::item:focus { outline: none; border: none; }
-    QListWidget:focus { outline: none; }
-"""
+
+class _NoFocusDelegate(QStyledItemDelegate):
+    """Item delegate that suppresses the focus rectangle by clearing the
+    focus state flag before passing to the default paint implementation."""
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+        opt = QStyleOptionViewItem(option)
+        opt.state = QStyle.StateFlag(int(opt.state) & ~int(QStyle.StateFlag.State_HasFocus))
+        super().paint(painter, opt, index)
 
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS, RunProgressWidget
@@ -54,6 +60,7 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._info_label)
 
         self._table = QTableWidget()
+        self._table.setItemDelegate(_NoFocusDelegate(self._table))
         self._table.setColumnCount(5)
         self._table.setHorizontalHeaderLabels(["#", "Stage", "Status", "Duration", "Details"])
         self._table.horizontalHeader().setStretchLastSection(True)
@@ -144,8 +151,6 @@ class EvolverMainWindow(QMainWindow):
         self.setWindowTitle("Evolver")
         self.setMinimumSize(800, 500)
         self.resize(1000, 600)
-        self.setStyleSheet(_NO_FOCUS_STYLE)
-
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
@@ -166,6 +171,7 @@ class EvolverMainWindow(QMainWindow):
         left_layout.addWidget(history_header)
 
         self._history_list = QListWidget()
+        self._history_list.setItemDelegate(_NoFocusDelegate(self._history_list))
         self._history_list.currentRowChanged.connect(self._on_history_selection)
         left_layout.addWidget(self._history_list)
         splitter.addWidget(left)
