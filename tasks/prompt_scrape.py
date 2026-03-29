@@ -8,7 +8,9 @@ import json
 import logging
 import re
 import subprocess
+import tempfile
 from dataclasses import dataclass
+from email.utils import parsedate
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -175,7 +177,9 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
             embedded = _extract_provider_embedded_metadata(html, image_id)
             if embedded.prompt:
                 video_prompt = embedded.prompt
-                if embedded.parent_image_id:
+                if not video_metadata:
+                    video_metadata = _embedded_to_video_metadata(embedded)
+                if embedded.parent_image_id and not source_image_url:
                     source_image_url = f"https://example.com/image/{embedded.parent_image_id}"
         if video_prompt:
             break
@@ -199,11 +203,13 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
                 image_data["negative_prompt"] = neg
             image_data.update(_extract_metadata_fields(image_document))
         else:
-            embedded = _extract_provider_embedded_metadata(image_html, source_image_url.rstrip("/").split("/")[-1])
+            image_id_str = source_image_url.rstrip("/").split("/")[-1]
+            embedded = _extract_provider_embedded_metadata(image_html, image_id_str)
             if embedded.prompt:
                 image_data["positive_prompt"] = embedded.prompt
             if embedded.negative_prompt:
                 image_data["negative_prompt"] = embedded.negative_prompt
+            image_data.update(_embedded_to_image_metadata(embedded))
         if image_data:
             payload["source_image"] = image_data
     return payload
@@ -347,6 +353,16 @@ class _ProviderEmbeddedMetadata:
     prompt: str = ""
     negative_prompt: str = ""
     parent_image_id: str = ""
+    model: str = ""
+    version: str = ""
+    seed: str = ""
+    aspect_ratio: str = ""
+    resolution: str = ""
+    quality: str = ""
+    created: str = ""
+    action: str = ""
+    style: str = ""
+    creativity: str = ""
 
 
 def _parse_html_document(html: str) -> _Node:
@@ -444,16 +460,44 @@ def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmb
     for index in _all_indices(html, page_id):
         window = html[max(0, index - 5000): index + 5000]
         for candidate in (window, window.replace('\\"', '"')):
-            prompt = _extract_json_string_field(candidate, "prompt")
-            if prompt and not metadata.prompt:
-                metadata.prompt = prompt
-            negative_prompt = _extract_nullable_json_string_field(candidate, "negative_prompt")
-            if negative_prompt and not metadata.negative_prompt:
-                metadata.negative_prompt = negative_prompt
-            parent_image_id = _extract_nullable_json_string_field(candidate, "parent_image_id")
-            if parent_image_id and not metadata.parent_image_id:
-                metadata.parent_image_id = parent_image_id
-        if metadata.prompt and (metadata.parent_image_id or metadata.negative_prompt):
+            if not metadata.prompt:
+                metadata.prompt = _extract_json_string_field(candidate, "prompt")
+            if not metadata.negative_prompt:
+                metadata.negative_prompt = _extract_nullable_json_string_field(candidate, "negative_prompt")
+            if not metadata.parent_image_id:
+                metadata.parent_image_id = _extract_nullable_json_string_field(candidate, "parent_image_id")
+            if not metadata.model:
+                metadata.model = _extract_json_string_field(candidate, "model")
+            if not metadata.version:
+                metadata.version = _extract_json_string_field(candidate, "version")
+            if not metadata.seed:
+                seed_int = _extract_json_int_field(candidate, "seed")
+                if seed_int is not None:
+                    metadata.seed = str(seed_int)
+            if not metadata.aspect_ratio:
+                metadata.aspect_ratio = _extract_json_string_field(candidate, "aspectRatio")
+            if not metadata.resolution:
+                width = _extract_json_int_field(candidate, "width")
+                height = _extract_json_int_field(candidate, "height")
+                if width is not None and height is not None:
+                    metadata.resolution = f"{width}x{height}"
+            if not metadata.quality:
+                metadata.quality = _extract_json_string_field(candidate, "quality")
+            if not metadata.created:
+                created_at = _extract_json_string_field(candidate, "createdAt")
+                if created_at:
+                    metadata.created = _parse_provider_created_at(created_at)
+            if not metadata.action:
+                raw_action = _extract_json_first_array_string(candidate, "action")
+                if raw_action:
+                    metadata.action = raw_action.replace("_", " ").title()
+            if not metadata.style:
+                metadata.style = _extract_nullable_json_string_field(candidate, "styleValue")
+            if not metadata.creativity:
+                creativity_int = _extract_json_int_field(candidate, "creativity")
+                if creativity_int is not None:
+                    metadata.creativity = str(creativity_int)
+        if metadata.prompt:
             break
     return metadata
 
@@ -470,6 +514,69 @@ def _extract_nullable_json_string_field(blob: str, field_name: str) -> str:
     if not match or match.group(1) == "null":
         return ""
     return json.loads(f'"{match.group(2)}"')
+
+
+def _extract_json_int_field(blob: str, field_name: str) -> int | None:
+    match = re.search(rf'"{re.escape(field_name)}":(\d+)', blob)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _extract_json_first_array_string(blob: str, field_name: str) -> str:
+    match = re.search(rf'"{re.escape(field_name)}":\["([^"]+)"', blob)
+    if not match:
+        return ""
+    return match.group(1)
+
+
+def _parse_provider_created_at(value: str) -> str:
+    try:
+        t = parsedate(value)
+        if t is not None:
+            return datetime.date(t[0], t[1], t[2]).isoformat()
+    except Exception:
+        pass
+    return value
+
+
+def _embedded_to_video_metadata(embedded: _ProviderEmbeddedMetadata) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    if embedded.version:
+        fields["model"] = f"Video {embedded.version}"
+    elif embedded.model:
+        fields["model"] = embedded.model
+    for key, value in (
+        ("action", embedded.action),
+        ("resolution", embedded.resolution),
+        ("aspect_ratio", embedded.aspect_ratio),
+        ("quality", embedded.quality),
+        ("seed", embedded.seed),
+        ("created", embedded.created),
+        ("style", embedded.style),
+    ):
+        if value:
+            fields[key] = value
+    return fields
+
+
+def _embedded_to_image_metadata(embedded: _ProviderEmbeddedMetadata) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    if embedded.model:
+        fields["model"] = embedded.model
+    for key, value in (
+        ("action", embedded.action),
+        ("resolution", embedded.resolution),
+        ("aspect_ratio", embedded.aspect_ratio),
+        ("quality", embedded.quality),
+        ("seed", embedded.seed),
+        ("created", embedded.created),
+        ("style", embedded.style),
+        ("creativity", embedded.creativity),
+    ):
+        if value:
+            fields[key] = value
+    return fields
 
 
 _METADATA_LABELS = {

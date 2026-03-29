@@ -286,6 +286,26 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
         self.assertEqual(result.negative_prompt, "")
         self.assertEqual(result.parent_image_id, "")
 
+    def test_extracts_extended_metadata_fields(self):
+        html = (
+            '{"imageId":"abc123","prompt":"a beautiful scene","negative_prompt":null,'
+            '"parent_image_id":null,"model":"Realism","version":"v3","seed":12345,'
+            '"aspectRatio":"16:9","width":1280,"height":720,"quality":"720p",'
+            '"styleValue":null,"action":["pov_gamma"],'
+            '"createdAt":"Fri, 13 Mar 2026 09:45:26 GMT","creativity":7}'
+        )
+        result = prompt_scrape._extract_provider_embedded_metadata(html, "abc123")
+        self.assertEqual(result.model, "Realism")
+        self.assertEqual(result.version, "v3")
+        self.assertEqual(result.seed, "12345")
+        self.assertEqual(result.aspect_ratio, "16:9")
+        self.assertEqual(result.resolution, "1280x720")
+        self.assertEqual(result.quality, "720p")
+        self.assertEqual(result.created, "2026-03-13")
+        self.assertEqual(result.action, "Pov Gamma")
+        self.assertEqual(result.style, "")
+        self.assertEqual(result.creativity, "7")
+
 
 class TestCssSelector(unittest.TestCase):
     def test_query_selector_finds_nested_element(self):
@@ -381,6 +401,40 @@ class TestExtractMetadataFields(unittest.TestCase):
         doc = prompt_scrape._parse_html_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
         self.assertEqual(result, {})
+
+
+class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
+    def test_uses_embedded_metadata_when_dom_panel_absent(self):
+        from datetime import date
+
+        html = (
+            "<html><body>"
+            '{"imageId":"vid1","prompt":"video prompt","negative_prompt":null,'
+            '"parent_image_id":null,"model":"Realism","version":"v3","seed":99999,'
+            '"aspectRatio":"9:16","width":720,"height":1280,"quality":"720p",'
+            '"styleValue":"Default","action":["alpha"],'
+            '"createdAt":"Fri, 13 Mar 2026 09:45:26 GMT","creativity":5}'
+            "</body></html>"
+        )
+
+        with patch("tasks.prompt_scrape._fetch_dom", return_value=html):
+            with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+                payload = prompt_scrape._scrape_provider_video(
+                    Path("vid1_topaz.mp4"),
+                    "https://example.com/image/vid1",
+                    Path("chrome.exe"),
+                )
+
+        self.assertEqual(payload["video"]["prompt"], "video prompt")
+        self.assertEqual(payload["video"]["model"], "Video v3")
+        self.assertEqual(payload["video"]["seed"], "99999")
+        self.assertEqual(payload["video"]["aspect_ratio"], "9:16")
+        self.assertEqual(payload["video"]["resolution"], "720x1280")
+        self.assertEqual(payload["video"]["quality"], "720p")
+        self.assertEqual(payload["video"]["created"], "2026-03-13")
+        self.assertEqual(payload["video"]["action"], "Alpha")
+        self.assertEqual(payload["video"]["style"], "Default")
+        self.assertNotIn("source_image", payload)
 
 
 class TestParseRelativeDate(unittest.TestCase):
