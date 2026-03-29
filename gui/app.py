@@ -42,6 +42,7 @@ class EvolverApp:
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.run_requested.connect(self._start_run)
+        self._scheduler.status_changed.connect(self._update_status_display)
 
         self._tray = EvolverTray()
         self._tray.open_action.triggered.connect(self._show_window)
@@ -80,6 +81,15 @@ class EvolverApp:
         if dialog.exec():
             self._settings = dialog.settings
             self._scheduler.set_interval_minutes(self._settings.interval_minutes)
+
+    def _update_status_display(self):
+        """Push scheduling state to tray and window."""
+        self._tray.set_next_run_at(self._scheduler.next_run_at)
+        self._window.update_schedule_status(
+            self._scheduler.is_running,
+            self._scheduler.is_paused,
+            self._scheduler.next_run_at,
+        )
 
     def _start_run(self, trigger: str):
         if self._worker is not None and self._worker.isRunning():
