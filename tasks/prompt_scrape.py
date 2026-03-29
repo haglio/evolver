@@ -8,7 +8,6 @@ import json
 import logging
 import re
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from email.utils import parsedate
 from html.parser import HTMLParser
