@@ -20,13 +20,22 @@ log = logging.getLogger(__name__)
 _MUTEX_NAME = "EvolverTrayApp_SingleInstance"
 
 
+_CreateMutexW = ctypes.windll.kernel32.CreateMutexW
+_CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
+_CreateMutexW.restype = ctypes.c_void_p
+
+_GetLastError = ctypes.windll.kernel32.GetLastError
+_GetLastError.argtypes = []
+_GetLastError.restype = ctypes.c_ulong
+
+
 def _acquire_single_instance_mutex() -> bool:
     """Try to acquire a named mutex. Returns True if this is the first instance."""
-    kernel32 = ctypes.windll.kernel32
-    mutex = kernel32.CreateMutexW(None, False, _MUTEX_NAME)
-    last_error = ctypes.get_last_error()
-    ERROR_ALREADY_EXISTS = 183
-    return last_error != ERROR_ALREADY_EXISTS
+    _ERROR_ALREADY_EXISTS = 183
+    handle = _CreateMutexW(None, False, _MUTEX_NAME)
+    if not handle:
+        return True  # CreateMutex failed entirely; proceed anyway
+    return _GetLastError() != _ERROR_ALREADY_EXISTS
 
 
 class EvolverApp:
