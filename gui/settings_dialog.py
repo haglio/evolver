@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+import logging
+
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QMessageBox,
     QSpinBox,
     QVBoxLayout,
 )
 
 from gui.settings import EvolverSettings
 from gui import startup
+
+log = logging.getLogger(__name__)
 
 
 class SettingsDialog(QDialog):
@@ -32,7 +37,7 @@ class SettingsDialog(QDialog):
         form.addRow("Run interval:", self._interval_spin)
 
         self._startup_check = QCheckBox("Start with Windows")
-        self._startup_check.setChecked(settings.start_with_windows)
+        self._startup_check.setChecked(startup.is_registered())
         form.addRow(self._startup_check)
 
         layout.addLayout(form)
@@ -47,10 +52,14 @@ class SettingsDialog(QDialog):
         self._settings.start_with_windows = self._startup_check.isChecked()
         self._settings.save()
 
-        if self._settings.start_with_windows:
-            startup.register_startup()
-        else:
-            startup.unregister_startup()
+        try:
+            if self._settings.start_with_windows:
+                startup.register_startup()
+            else:
+                startup.unregister_startup()
+        except Exception as exc:
+            log.exception("Failed to update startup registration")
+            QMessageBox.warning(self, "Startup Registration", f"Could not update startup shortcut:\n{exc}")
 
         super().accept()
 
