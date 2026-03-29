@@ -63,6 +63,28 @@ class TestPurgeWeird(unittest.TestCase):
             self.assertFalse(weird_file.exists())
             self.assertFalse(sorted_file.exists())
 
+    def test_run_deletes_orphaned_metadata_json(self):
+        with workspace_temp_dir() as root:
+            weird_dir = root / "weird"
+            sorted_dir = root / "sorted"
+            metadata_dir = root / "metadata"
+            weird_dir.mkdir(parents=True)
+            weird_file = weird_dir / "clip_topaz.mp4"
+            weird_file.write_bytes(b"weird")
+            # Metadata JSON lives under a different subpath than kinda_weird,
+            # mirroring where the file was scraped before it was moved to weird.
+            json_file = metadata_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "clip_topaz.json"
+            json_file.parent.mkdir(parents=True)
+            json_file.write_text('{"video":{"prompt":"test"}}', encoding="utf-8")
+
+            with override_config(SORTED_DIR=sorted_dir, WEIRD_DIR=weird_dir, METADATA_DIR=metadata_dir):
+                with patch("tasks.purge_weird.show_error_window"):
+                    result = purge_weird.run()
+
+            self.assertEqual(result.deleted_weird, 1)
+            self.assertEqual(result.deleted_metadata, 1)
+            self.assertFalse(json_file.exists())
+
     def test_run_shows_popup_when_matching_sorted_file_missing(self):
         with workspace_temp_dir() as root:
             weird_dir = root / "weird"
