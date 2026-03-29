@@ -47,6 +47,7 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._info_label)
 
         self._table = QTableWidget()
+        self._table.setStyleSheet("QTableWidget::item:focus { border: none; }")
         self._table.setColumnCount(5)
         self._table.setHorizontalHeaderLabels(["#", "Stage", "Status", "Duration", "Details"])
         self._table.horizontalHeader().setStretchLastSection(True)
@@ -158,6 +159,7 @@ class EvolverMainWindow(QMainWindow):
         left_layout.addWidget(history_header)
 
         self._history_list = QListWidget()
+        self._history_list.setStyleSheet("QListWidget::item:focus { border: none; }")
         self._history_list.currentRowChanged.connect(self._on_history_selection)
         left_layout.addWidget(self._history_list)
         splitter.addWidget(left)
