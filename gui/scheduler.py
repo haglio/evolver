@@ -1,41 +1,50 @@
-"""Timer-based pipeline scheduler with run-guard and pause/resume."""
+"""Timer-based pipeline scheduler with run-guard, pause/resume, and clock alignment."""
 
 from __future__ import annotations
+
+from datetime import datetime, timedelta
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 
 class PipelineScheduler(QObject):
-    """Fires run_requested on a configurable interval, with manual trigger support.
+    """Fires run_requested at clock-aligned intervals (e.g. :00, :10, :20).
 
     The scheduler silently drops ticks while a run is in progress (mirrors the
     Windows Task Scheduler IgnoreNew policy). Pause/resume controls the timer.
     """
 
     run_requested = pyqtSignal(str)  # "scheduled" or "manual"
+    status_changed = pyqtSignal()    # emitted when state changes that affect display
 
     def __init__(self, interval_minutes: int = 10, parent=None):
         super().__init__(parent)
         self._running = False
         self._paused = False
+        self._interval_minutes = interval_minutes
+        self._next_run_at: datetime | None = None
         self._timer = QTimer(self)
-        self._timer.setInterval(interval_minutes * 60 * 1000)
+        self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._on_tick)
 
     def start(self):
         if not self._paused:
-            self._timer.start()
+            self._schedule_next()
 
     def stop(self):
         self._timer.stop()
+        self._next_run_at = None
+        self.status_changed.emit()
 
     def pause(self):
         self._paused = True
         self._timer.stop()
+        self._next_run_at = None
+        self.status_changed.emit()
 
     def resume(self):
         self._paused = False
-        self._timer.start()
+        self._schedule_next()
 
     def run_now(self):
         if not self._running:
@@ -43,12 +52,20 @@ class PipelineScheduler(QObject):
 
     def mark_running(self):
         self._running = True
+        self.status_changed.emit()
 
     def mark_idle(self):
         self._running = False
+        self._schedule_next()
 
     def set_interval_minutes(self, minutes: int):
-        self._timer.setInterval(minutes * 60 * 1000)
+        self._interval_minutes = minutes
+        if not self._paused:
+            self._schedule_next()
+
+    @property
+    def interval_minutes(self) -> int:
+        return self._interval_minutes
 
     @property
     def is_running(self) -> bool:
@@ -58,6 +75,45 @@ class PipelineScheduler(QObject):
     def is_paused(self) -> bool:
         return self._paused
 
+    @property
+    def next_run_at(self) -> datetime | None:
+        return self._next_run_at
+
+    def _schedule_next(self):
+        """Set a one-shot timer for the next clock-aligned interval."""
+        now = datetime.now()
+        interval = self._interval_minutes
+
+        if interval <= 0:
+            # Testing mode: fire immediately
+            self._next_run_at = now
+            self._timer.start(0)
+            self.status_changed.emit()
+            return
+
+        # Align to clock: find next minute that's a multiple of interval
+        current_minute = now.hour * 60 + now.minute
+        next_slot = ((current_minute // interval) + 1) * interval
+        next_hour, next_minute = divmod(next_slot, 60)
+
+        target = now.replace(second=0, microsecond=0)
+        if next_hour >= 24:
+            # Wraps to next day
+            target = target.replace(hour=0, minute=0) + timedelta(days=1)
+            next_hour, next_minute = divmod(next_slot % (24 * 60), 60)
+            target = target.replace(hour=next_hour, minute=next_minute)
+        else:
+            target = target.replace(hour=next_hour, minute=next_minute)
+
+        ms_until = max(0, int((target - now).total_seconds() * 1000))
+        self._next_run_at = target
+        self._timer.start(ms_until)
+        self.status_changed.emit()
+
     def _on_tick(self):
         if not self._running:
             self.run_requested.emit("scheduled")
+        # Always schedule the next tick (if the run is in progress, mark_idle
+        # will call _schedule_next when it finishes)
+        if not self._running:
+            self._schedule_next()
