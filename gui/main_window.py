@@ -17,21 +17,18 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QStatusBar,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
-
-class _NoFocusDelegate(QStyledItemDelegate):
-    """Item delegate that suppresses the focus rectangle."""
-
-    def initStyleOption(self, option: QStyleOptionViewItem, index):
-        super().initStyleOption(option, index)
-        option.state &= ~option.State.State_HasFocus
+_NO_FOCUS_STYLE = """
+    QTableWidget::item:focus { outline: none; border: none; }
+    QTableWidget:focus { outline: none; }
+    QListWidget::item:focus { outline: none; border: none; }
+    QListWidget:focus { outline: none; }
+"""
 
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS, RunProgressWidget
@@ -57,7 +54,6 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._info_label)
 
         self._table = QTableWidget()
-        self._table.setItemDelegate(_NoFocusDelegate(self._table))
         self._table.setColumnCount(5)
         self._table.setHorizontalHeaderLabels(["#", "Stage", "Status", "Duration", "Details"])
         self._table.horizontalHeader().setStretchLastSection(True)
@@ -148,6 +144,7 @@ class EvolverMainWindow(QMainWindow):
         self.setWindowTitle("Evolver")
         self.setMinimumSize(800, 500)
         self.resize(1000, 600)
+        self.setStyleSheet(_NO_FOCUS_STYLE)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -169,7 +166,6 @@ class EvolverMainWindow(QMainWindow):
         left_layout.addWidget(history_header)
 
         self._history_list = QListWidget()
-        self._history_list.setItemDelegate(_NoFocusDelegate(self._history_list))
         self._history_list.currentRowChanged.connect(self._on_history_selection)
         left_layout.addWidget(self._history_list)
         splitter.addWidget(left)
