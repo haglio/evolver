@@ -28,6 +28,7 @@ htmlcov/
 # GUI runtime state
 runs/
 gui_settings.json
+tray_crash.log
 
 # Claude Code local config
 .claude/
