@@ -2,14 +2,14 @@
 """evolver.py - video collection maintenance pipeline.
 
 Invoked by the tray app scheduler or directly via CLI. Stages:
-  1. sort       - move new videos from inbox into sorted folders by source/orientation
-  2. purge      - remove weird outputs and their matching sources
-  3. scripts    - align funscripts to mirror the video library tree
-  4. bookmarks  - sync Fun Time favorites into a Chrome bookmarks folder
-  5. metadata   - scrape AI prompt metadata into mirrored JSON files
-  6. upscale    - apply Topaz frame interpolation + 4x upscale to sorted videos
-  7. dupes      - scan non_AI for likely duplicate videos by exact filesize
-  8. verify     - check 1_sorted and 2_outbox are in 1-to-1 correspondence
+  1. purge      - remove weird outputs and their matching sources
+  2. sort       - move new videos from inbox into sorted folders by source/orientation
+  3. metadata   - scrape AI prompt metadata into mirrored JSON files
+  4. upscale    - apply Topaz frame interpolation + 4x upscale to sorted videos
+  5. verify     - check 1_sorted and 2_outbox are in 1-to-1 correspondence
+  6. bookmarks  - sync Fun Time favorites into a Chrome bookmarks folder
+  7. scripts    - align funscripts to mirror the video library tree
+  8. dupes      - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -101,10 +101,8 @@ def run_pipeline(
         if on_stage_complete:
             on_stage_complete(name, None, 0.0, "skipped")
 
-    sort_result = _run_stage("sort", sort.run)
     purge_result = _run_stage("purge", purge_weird.run)
-    scripts_sync_result = _run_stage("scripts", scripts_sync.run, show_popup=True)
-    bookmarks_sync_result = _run_stage("bookmarks", bookmarks_sync.run)
+    sort_result = _run_stage("sort", sort.run)
     prompt_scrape_result = _run_stage("metadata", prompt_scrape.run)
 
     priority_files = getattr(sort_result, "moved_files", [])
@@ -125,8 +123,6 @@ def run_pipeline(
             upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
         upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
 
-    duplicate_sizes_result = _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
-
     upscale_still_pending = (
         upscale_skipped
         or (upscale_result is not None and upscale_result.pending_after_run > 0)
@@ -138,13 +134,17 @@ def run_pipeline(
     else:
         correspondence_result = _run_stage("verify", check_correspondence.run, show_popup=True)
 
+    bookmarks_sync_result = _run_stage("bookmarks", bookmarks_sync.run)
+    scripts_sync_result = _run_stage("scripts", scripts_sync.run, show_popup=True)
+    duplicate_sizes_result = _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
+
     has_errors = (
         bool(purge_result.missing_sorted)
-        or not scripts_sync_result.ok
-        or not bookmarks_sync_result.ok
         or not prompt_scrape_result.ok
-        or not duplicate_sizes_result.ok
         or not correspondence_result.ok
+        or not bookmarks_sync_result.ok
+        or not scripts_sync_result.ok
+        or not duplicate_sizes_result.ok
     )
     if upscale_result is not None:
         has_errors = has_errors or upscale_result.failed > 0 or upscale_result.deferred_low_disk
@@ -176,7 +176,7 @@ def _should_skip_upscale_due_to_cpu(log: logging.Logger) -> bool:
     try:
         busy_percent = system_resources.cpu_busy_percent(config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
     except Exception:
-        log.exception("CPU usage probe failed; proceeding with Stage 6.")
+        log.exception("CPU usage probe failed; proceeding with Stage 4.")
         return False
 
     log.info(

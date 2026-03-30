@@ -1,4 +1,4 @@
-"""Stage 2: Delete all files from kinda_weird and their source files from 1_sorted."""
+"""Stage 1: Delete all files from kinda_weird and their source files from 1_sorted."""
 
 import logging
 import re
@@ -37,7 +37,7 @@ def run() -> PurgeWeirdResult:
             continue
 
         if not seen_header:
-            log.info("=== Stage 2: purge kinda_weird ===")
+            log.info("=== Stage 1: purge kinda_weird ===")
             seen_header = True
         log.info("WEIRD:  %s", weird_root)
         log.info("Found %d file(s) to purge", len(weird_files))
@@ -72,7 +72,7 @@ def run() -> PurgeWeirdResult:
         _show_error_window(result.missing_sorted)
 
     log.info(
-        "Stage 2 done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
+        "Stage 1 done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
         result.deleted_weird, result.deleted_sorted, result.deleted_metadata, len(result.missing_sorted),
     )
     return result

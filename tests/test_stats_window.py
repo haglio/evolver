@@ -42,38 +42,38 @@ class TestStackedAreaChartSeries(unittest.TestCase):
 
     def test_normal_returns_raw_durations_chronological(self):
         series = self.chart._compute_series()
-        # Records are reversed to chronological, so sort values = [2, 4, 6]
-        sort_series = series[0]  # sort is first in ALL_STAGES
-        self.assertEqual(sort_series, [2.0, 4.0, 6.0])
+        # Records are reversed to chronological, so purge values = [1, 2, 3]
+        purge_series = series[0]  # purge is first in ALL_STAGES
+        self.assertEqual(purge_series, [1.0, 2.0, 3.0])
 
     def test_normal_returns_raw_for_second_stage(self):
         series = self.chart._compute_series()
-        purge_series = series[1]  # purge is second
-        self.assertEqual(purge_series, [1.0, 2.0, 3.0])
+        sort_series = series[1]  # sort is second
+        self.assertEqual(sort_series, [2.0, 4.0, 6.0])
 
     def test_missing_stage_returns_zero(self):
         series = self.chart._compute_series()
-        # "scripts" is third stage but not in our records
-        scripts_series = series[2]
-        self.assertEqual(scripts_series, [0.0, 0.0, 0.0])
+        # "metadata" is third stage but not in our records
+        metadata_series = series[2]
+        self.assertEqual(metadata_series, [0.0, 0.0, 0.0])
 
     def test_averages_returns_running_mean(self):
         self.chart.set_mode("averages")
         series = self.chart._compute_series()
-        sort_series = series[0]
-        # raw = [2, 4, 6], running avg = [2/1, 6/2, 12/3] = [2.0, 3.0, 4.0]
-        self.assertAlmostEqual(sort_series[0], 2.0)
-        self.assertAlmostEqual(sort_series[1], 3.0)
-        self.assertAlmostEqual(sort_series[2], 4.0)
+        purge_series = series[0]
+        # raw = [1, 2, 3], running avg = [1/1, 3/2, 6/3] = [1.0, 1.5, 2.0]
+        self.assertAlmostEqual(purge_series[0], 1.0)
+        self.assertAlmostEqual(purge_series[1], 1.5)
+        self.assertAlmostEqual(purge_series[2], 2.0)
 
     def test_averages_second_stage(self):
         self.chart.set_mode("averages")
         series = self.chart._compute_series()
-        purge_series = series[1]
-        # raw = [1, 2, 3], running avg = [1.0, 1.5, 2.0]
-        self.assertAlmostEqual(purge_series[0], 1.0)
-        self.assertAlmostEqual(purge_series[1], 1.5)
-        self.assertAlmostEqual(purge_series[2], 2.0)
+        sort_series = series[1]
+        # raw = [2, 4, 6], running avg = [2/1, 6/2, 12/3] = [2.0, 3.0, 4.0]
+        self.assertAlmostEqual(sort_series[0], 2.0)
+        self.assertAlmostEqual(sort_series[1], 3.0)
+        self.assertAlmostEqual(sort_series[2], 4.0)
 
     def test_set_mode_triggers_update(self):
         with patch.object(self.chart, "update") as mock_update:
