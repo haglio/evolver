@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import datetime
 import json
 import logging
@@ -12,49 +11,37 @@ from dataclasses import dataclass
 from email.utils import parsedate
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 
 import config
-from tasks import bookmarks_sync
 from tasks.purge_weird import source_stem
 from util.media_files import iter_finalized_videos
 
 log = logging.getLogger(__name__)
 
 _CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.font-regular"
-_provider_HOSTS = {"example.com", "www.example.com"}
 
 
 @dataclass
 class PromptScrapeResult:
-    scraped: int = 0
-    rescraped: int = 0
+    newly_scraped: int = 0
     skipped_existing: int = 0
-    skipped_legacy: int = 0
-    skipped_non_provider: int = 0
-    missing_url: int = 0
-    fetch_failures: int = 0
-    source_missing: bool = False
+    no_scrape_strat: int = 0
+    errors: int = 0
 
     @property
     def ok(self) -> bool:
-        return self.fetch_failures == 0
+        return self.errors == 0
 
 
 def run() -> PromptScrapeResult:
     result = PromptScrapeResult()
     log.info("=== Stage 5: scrape AI metadata ===")
-    log.info("SOURCE CSV: %s", config.FUN_TIME_FAVS_FILE)
     log.info("METADATA DIR: %s", config.METADATA_DIR)
-
-    path_to_url = _load_video_urls(result)
-    if result.source_missing:
-        log.info("Favorites CSV not found. Skipping prompt scrape.")
-        return result
 
     browser = _find_browser_executable()
     if browser is None:
-        result.fetch_failures += 1
+        result.errors += 1
         log.error("No supported browser executable found for prompt scraping.")
         return result
 
@@ -64,114 +51,54 @@ def run() -> PromptScrapeResult:
         for video in sorted(_iter_video_files(root)):
             output_path = _prompt_output_path(video, root)
             if output_path.exists():
-                if not _is_legacy_format(output_path):
-                    result.skipped_existing += 1
-                    continue
-                if result.rescraped >= config.RESCRAPE_BATCH_LIMIT:
-                    result.skipped_legacy += 1
-                    continue
-
-            url = path_to_url.get(video.resolve())
-            if url is None:
-                url = _fallback_url_for_video(video)
-            if url is None:
-                result.missing_url += 1
-                log.warning("No source URL found for: %s", video)
+                result.skipped_existing += 1
                 continue
 
-            parsed = urlparse(url)
-            if parsed.netloc.lower() not in _provider_HOSTS:
-                result.skipped_non_provider += 1
+            source = _source_for_video(video)
+            if source not in _SCRAPE_STRATEGIES:
+                result.no_scrape_strat += 1
                 continue
 
-            is_rescrape = output_path.exists()
+            url = _url_for_source(source, video)
             try:
-                payload = _scrape_provider_video(video, url, browser)
+                payload = _SCRAPE_STRATEGIES[source](video, url, browser)
             except Exception:
-                result.fetch_failures += 1
+                result.errors += 1
                 log.exception("Prompt scrape failed for: %s", video)
                 continue
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-            if is_rescrape:
-                result.rescraped += 1
-                log.info("Rescrapped legacy prompts: %s", output_path)
-            else:
-                result.scraped += 1
-                log.info("Wrote prompts: %s", output_path)
+            result.newly_scraped += 1
+            log.info("Wrote metadata: %s", output_path)
 
     log.info(
-        "Stage 5 done. Scraped: %d, Rescrapped: %d, Existing skipped: %d, "
-        "Legacy skipped: %d, Non-Provider skipped: %d, Missing URL: %d, Failures: %d",
-        result.scraped,
-        result.rescraped,
+        "Stage 5 done. Scraped: %d, Existing: %d, No strategy: %d, Errors: %d",
+        result.newly_scraped,
         result.skipped_existing,
-        result.skipped_legacy,
-        result.skipped_non_provider,
-        result.missing_url,
-        result.fetch_failures,
+        result.no_scrape_strat,
+        result.errors,
     )
     return result
 
 
-def _load_video_urls(result: PromptScrapeResult) -> dict[Path, str]:
-    path = config.FUN_TIME_FAVS_FILE
-    if not path.is_file():
-        result.source_missing = True
-        return {}
-
-    with path.open("r", encoding="utf-8-sig", newline="") as fh:
-        reader = csv.DictReader(fh)
-        file_column = bookmarks_sync._file_column_name(list(reader.fieldnames or []))
-        mapping: dict[Path, str] = {}
-        for row in reader:
-            raw_url = (row.get("web_url") or "").strip()
-            url = bookmarks_sync._extract_url(raw_url)
-            if url is None:
-                continue
-            if file_column:
-                raw_file = (row.get(file_column) or "").strip()
-                if raw_file:
-                    mapping[_resolve_favorite_path(raw_file, path.parent)] = url
-    return mapping
+def _source_for_video(video: Path) -> str:
+    return video.parent.name.lower()
 
 
-def _resolve_favorite_path(value: str, base_dir: Path) -> Path:
-    match = bookmarks_sync._HYPERLINK_URL_RE.match(value)
-    candidate = match.group(1) if match else value
-    parsed = urlparse(candidate)
-    if parsed.scheme == "file":
-        return Path(unquote(parsed.path.lstrip("/"))).resolve()
-
-    path = Path(candidate)
-    if not path.is_absolute():
-        path = base_dir / path
-    return path.resolve()
+def _url_for_source(source: str, video: Path) -> str:
+    stem = source_stem(video.stem)
+    if source == "provider":
+        return f"https://example.com/image/{stem}"
+    raise ValueError(f"No URL pattern for source: {source}")
 
 
 def _iter_video_files(root: Path):
     yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
-def _is_legacy_format(json_path: Path) -> bool:
-    try:
-        payload = json.loads(json_path.read_text(encoding="utf-8"))
-        return "video" not in payload
-    except Exception:
-        return False
-
-
 def _prompt_output_path(video_path: Path, outbox_root: Path) -> Path:
     return config.METADATA_DIR / outbox_root.name / video_path.relative_to(outbox_root).with_suffix(".json")
-
-
-def _fallback_url_for_video(video_path: Path) -> str | None:
-    stem = source_stem(video_path.stem)
-    source_name = next((part.lower() for part in video_path.parts if part.lower() in {"provider", "provider2"}), "")
-    if source_name == "provider":
-        return f"https://example.com/image/{stem}"
-    return None
 
 
 def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> dict[str, str]:
@@ -234,6 +161,9 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
         if image_data:
             payload["source_image"] = image_data
     return payload
+
+
+_SCRAPE_STRATEGIES = {"provider": _scrape_provider_video}
 
 
 def _extract_prompt_text(panel: _Node) -> str:
