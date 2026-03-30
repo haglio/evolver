@@ -42,6 +42,19 @@ class TestEvolverSettings(unittest.TestCase):
             loaded = EvolverSettings.load(path)
             self.assertEqual(loaded.interval_minutes, 10)
 
+    def test_enable_toasts_defaults_to_false(self):
+        s = EvolverSettings()
+        self.assertFalse(s.enable_toasts)
+
+    def test_enable_toasts_round_trip(self):
+        with workspace_temp_dir() as tmp:
+            path = tmp / "settings.json"
+            s = EvolverSettings(enable_toasts=True)
+            s.save(path)
+
+            loaded = EvolverSettings.load(path)
+            self.assertTrue(loaded.enable_toasts)
+
 
 if __name__ == "__main__":
     unittest.main()
