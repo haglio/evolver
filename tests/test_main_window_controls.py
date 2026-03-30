@@ -2,10 +2,12 @@
 
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 
-from PyQt6.QtWidgets import QApplication, QToolBar
+from PyQt6.QtWidgets import QApplication, QMessageBox, QToolBar
 
 from gui.main_window import EvolverMainWindow
+from gui.toggle_switch import ToggleSwitch
 
 _app = QApplication.instance() or QApplication([])
 
@@ -32,8 +34,8 @@ class TestMainWindowToolbarExists(unittest.TestCase):
     def test_has_active_toggle(self):
         self.assertIsNotNone(self.window.active_toggle)
 
-    def test_active_toggle_is_checkable(self):
-        self.assertTrue(self.window.active_toggle.isCheckable())
+    def test_active_toggle_is_toggle_switch(self):
+        self.assertIsInstance(self.window.active_toggle, ToggleSwitch)
 
     def test_active_toggle_starts_checked(self):
         self.assertTrue(self.window.active_toggle.isChecked())
@@ -50,13 +52,13 @@ class TestToolbarStateUpdates(unittest.TestCase):
         self.window.update_schedule_status(False, False, next_run)
         self.assertIn("14:30", self.window._next_run_label.text())
 
-    def test_next_run_hidden_when_paused(self):
+    def test_inactive_message_when_paused(self):
         self.window.update_schedule_status(False, True, None)
-        self.assertEqual(self.window._next_run_label.text(), "")
+        self.assertIn("inactive", self.window._next_run_label.text().lower())
 
-    def test_next_run_hidden_when_running(self):
+    def test_running_message_when_running(self):
         self.window.update_schedule_status(True, False, None)
-        self.assertEqual(self.window._next_run_label.text(), "")
+        self.assertIn("Running", self.window._next_run_label.text())
 
     def test_run_now_disabled_when_running(self):
         self.window.update_schedule_status(True, False, None)
@@ -76,23 +78,75 @@ class TestToolbarStateUpdates(unittest.TestCase):
         self.window.update_schedule_status(False, False, datetime.now())
         self.assertTrue(self.window.active_toggle.isChecked())
 
+    def test_no_status_bar(self):
+        self.assertIsNone(self.window.statusBar().currentMessage() or None)
+        # The window should not have a dedicated status bar widget
+        self.assertFalse(hasattr(self.window, "_status_bar"))
 
-class TestToolbarAppWiring(unittest.TestCase):
-    """EvolverApp should wire window toolbar actions the same as tray actions."""
 
-    def test_app_connects_window_toolbar_actions(self):
-        from unittest.mock import patch
+class TestToggleSwitch(unittest.TestCase):
+    """ToggleSwitch custom widget basics."""
+
+    def test_defaults_to_unchecked(self):
+        toggle = ToggleSwitch()
+        self.assertFalse(toggle.isChecked())
+
+    def test_set_checked(self):
+        toggle = ToggleSwitch()
+        toggle.setChecked(True)
+        self.assertTrue(toggle.isChecked())
+
+    def test_set_checked_false(self):
+        toggle = ToggleSwitch(checked=True)
+        toggle.setChecked(False)
+        self.assertFalse(toggle.isChecked())
+
+
+class TestQuitConfirmation(unittest.TestCase):
+    """Quit button in the window toolbar should prompt for confirmation."""
+
+    def test_quit_proceeds_on_accept(self):
         from gui.app import EvolverApp
 
         with patch("gui.app.QApplication", return_value=_app):
             app = EvolverApp()
 
-        # Verify the window toolbar actions are connected by checking
-        # that the actions' receivers count is > 0
+        with patch("gui.app.QMessageBox") as mock_box:
+            mock_box.StandardButton.Yes = QMessageBox.StandardButton.Yes
+            mock_box.StandardButton.No = QMessageBox.StandardButton.No
+            mock_box.question.return_value = QMessageBox.StandardButton.Yes
+            with patch.object(app, "_quit") as mock_quit:
+                app._confirm_quit()
+                mock_quit.assert_called_once()
+
+    def test_quit_cancelled_on_reject(self):
+        from gui.app import EvolverApp
+
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch("gui.app.QMessageBox") as mock_box:
+            mock_box.StandardButton.Yes = QMessageBox.StandardButton.Yes
+            mock_box.StandardButton.No = QMessageBox.StandardButton.No
+            mock_box.question.return_value = QMessageBox.StandardButton.No
+            with patch.object(app, "_quit") as mock_quit:
+                app._confirm_quit()
+                mock_quit.assert_not_called()
+
+
+class TestToolbarAppWiring(unittest.TestCase):
+    """EvolverApp should wire window toolbar actions the same as tray actions."""
+
+    def test_app_connects_window_toolbar_actions(self):
+        from gui.app import EvolverApp
+
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
         self.assertTrue(app._window.quit_action.receivers(app._window.quit_action.triggered) > 0)
         self.assertTrue(app._window.run_now_action.receivers(app._window.run_now_action.triggered) > 0)
         self.assertTrue(app._window.settings_action.receivers(app._window.settings_action.triggered) > 0)
-        self.assertTrue(app._window.active_toggle.receivers(app._window.active_toggle.triggered) > 0)
+        self.assertTrue(app._window.active_toggle.receivers(app._window.active_toggle.clicked) > 0)
 
 
 if __name__ == "__main__":
