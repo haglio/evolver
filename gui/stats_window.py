@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
@@ -29,10 +31,10 @@ STAGE_COLORS = {
 
 _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
 _LIMIT_SECONDS = 600.0
-_MARGIN_LEFT = 60
-_MARGIN_RIGHT = 20
+_MARGIN_LEFT = 70
+_MARGIN_RIGHT = 160
 _MARGIN_TOP = 20
-_MARGIN_BOTTOM = 40
+_MARGIN_BOTTOM = 50
 
 
 class StackedAreaChart(QWidget):
@@ -77,6 +79,17 @@ class StackedAreaChart(QWidget):
                 series.append(raw)
         return series
 
+    def _parse_timestamps(self) -> list[float]:
+        """Parse started_at into epoch seconds for each record."""
+        timestamps: list[float] = []
+        for rec in self._records:
+            try:
+                dt = datetime.fromisoformat(rec.started_at)
+            except (ValueError, TypeError):
+                dt = datetime(2000, 1, 1)
+            timestamps.append(dt.timestamp())
+        return timestamps
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -103,10 +116,13 @@ class StackedAreaChart(QWidget):
             return
 
         series = self._compute_series()
-        x_scale = chart_w / max(n - 1, 1)
+        timestamps = self._parse_timestamps()
+        t_min = min(timestamps)
+        t_max = max(timestamps)
+        t_range = t_max - t_min or 1.0
 
-        def to_x(i: int) -> float:
-            return chart_x + i * x_scale
+        def to_x(t: float) -> float:
+            return chart_x + chart_w * (t - t_min) / t_range
 
         def to_y(val: float) -> float:
             return chart_y + chart_h * (1 - val / _Y_MAX)
@@ -119,13 +135,11 @@ class StackedAreaChart(QWidget):
             color = STAGE_COLORS.get(stage_key, QColor(0x80, 0x80, 0x80))
 
             path = QPainterPath()
-            # Bottom edge (left to right along previous cumulative)
-            path.moveTo(to_x(0), to_y(prev_cum[0]))
+            path.moveTo(to_x(timestamps[0]), to_y(prev_cum[0]))
             for i in range(1, n):
-                path.lineTo(to_x(i), to_y(prev_cum[i]))
-            # Top edge (right to left along new cumulative)
+                path.lineTo(to_x(timestamps[i]), to_y(prev_cum[i]))
             for i in range(n - 1, -1, -1):
-                path.lineTo(to_x(i), to_y(prev_cum[i] + vals[i]))
+                path.lineTo(to_x(timestamps[i]), to_y(prev_cum[i] + vals[i]))
             path.closeSubpath()
 
             fill = QColor(color)
@@ -134,14 +148,13 @@ class StackedAreaChart(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawPath(path)
 
-            # Top edge outline
             painter.setPen(QPen(color, 1))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             for i in range(n - 1):
                 painter.drawLine(
-                    int(to_x(i)),
+                    int(to_x(timestamps[i])),
                     int(to_y(prev_cum[i] + vals[i])),
-                    int(to_x(i + 1)),
+                    int(to_x(timestamps[i + 1])),
                     int(to_y(prev_cum[i + 1] + vals[i + 1])),
                 )
 
@@ -159,37 +172,82 @@ class StackedAreaChart(QWidget):
         painter.setFont(font)
         painter.drawText(chart_x + chart_w - 40, limit_y - 4, "10 min")
 
-        # Y-axis ticks and labels
+        # Y-axis ticks and labels (skip 0)
         painter.setPen(QColor(0x60, 0x60, 0x60))
-        tick_intervals = [0, 120, 240, 360, 480, 600]
-        for secs in tick_intervals:
+        for secs in (120, 240, 360, 480, 600):
             y = int(to_y(secs))
             painter.drawLine(chart_x - 4, y, chart_x, y)
-            label = f"{secs // 60}m" if secs >= 60 else "0"
-            painter.drawText(chart_x - 35, y + 4, label)
+            painter.drawText(chart_x - 35, y + 4, f"{secs // 60}m")
+
+        # Y-axis label (rotated)
+        painter.save()
+        painter.setPen(QColor(0x50, 0x50, 0x50))
+        label_font = QFont()
+        label_font.setPointSize(9)
+        painter.setFont(label_font)
+        mid_y = chart_y + chart_h // 2
+        painter.translate(14, mid_y)
+        painter.rotate(-90)
+        painter.drawText(-40, 0, "run duration")
+        painter.restore()
 
         # X-axis line
         painter.setPen(QColor(0xA0, 0xA0, 0xA0))
         baseline_y = int(to_y(0))
         painter.drawLine(chart_x, baseline_y, chart_x + chart_w, baseline_y)
 
-        # X-axis labels (every Nth run)
-        if n > 1:
-            step = max(1, n // 10)
-            for i in range(0, n, step):
-                x = int(to_x(i))
-                painter.drawText(x - 5, baseline_y + 15, str(i + 1))
+        # X-axis date labels
+        self._draw_x_labels(painter, t_min, t_max, chart_x, chart_w, baseline_y)
 
-        # Chart border (left and bottom axes)
+        # Chart border (left axis)
         painter.setPen(QColor(0xA0, 0xA0, 0xA0))
         painter.drawLine(chart_x, chart_y, chart_x, baseline_y)
 
-        # Legend
-        self._draw_legend(painter, chart_x + chart_w, chart_y)
+        # Legend (in right margin, outside chart area)
+        self._draw_legend(painter, w, chart_y)
 
         painter.end()
 
-    def _draw_legend(self, painter: QPainter, right_x: float, top_y: float):
+    def _draw_x_labels(self, painter: QPainter, t_min: float, t_max: float,
+                       chart_x: int, chart_w: int, baseline_y: int):
+        font = QFont()
+        font.setPointSize(8)
+        painter.setFont(font)
+        painter.setPen(QColor(0x60, 0x60, 0x60))
+
+        num_labels = min(12, max(2, chart_w // 70))
+        t_range = t_max - t_min or 1.0
+
+        label_times: list[float] = []
+        for i in range(num_labels):
+            t = t_min + t_range * i / (num_labels - 1)
+            label_times.append(t)
+
+        # Format as dates, add times where dates collide
+        dates = [datetime.fromtimestamp(t) for t in label_times]
+        date_strs = [d.strftime("%m/%d") for d in dates]
+
+        # Check for duplicate dates — add time to disambiguate
+        labels: list[str] = []
+        for i, ds in enumerate(date_strs):
+            needs_time = False
+            if i > 0 and date_strs[i - 1] == ds:
+                needs_time = True
+            if i < len(date_strs) - 1 and date_strs[i + 1] == ds:
+                needs_time = True
+            if needs_time:
+                labels.append(dates[i].strftime("%m/%d\n%H:%M"))
+            else:
+                labels.append(ds)
+
+        for i, label in enumerate(labels):
+            x = int(chart_x + chart_w * i / (num_labels - 1))
+            lines = label.split("\n")
+            painter.drawText(x - 15, baseline_y + 14, lines[0])
+            if len(lines) > 1:
+                painter.drawText(x - 12, baseline_y + 26, lines[1])
+
+    def _draw_legend(self, painter: QPainter, widget_w: int, top_y: int):
         font = QFont()
         font.setPointSize(8)
         painter.setFont(font)
@@ -197,13 +255,13 @@ class StackedAreaChart(QWidget):
         box_size = 10
         line_height = 16
         padding = 6
-        legend_w = 140
-        legend_h = len(ALL_STAGES) * line_height + padding * 2
+        legend_w = _MARGIN_RIGHT - 20
 
-        lx = int(right_x - legend_w - 10)
+        lx = widget_w - _MARGIN_RIGHT + 10
         ly = int(top_y + 10)
 
-        # Background
+        legend_h = len(ALL_STAGES) * line_height + padding * 2
+
         bg = QColor(255, 255, 255, 220)
         painter.setBrush(bg)
         painter.setPen(QColor(0xC0, 0xC0, 0xC0))
