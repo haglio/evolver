@@ -4,6 +4,7 @@
 Launch with: pythonw.exe tray_app.py
 """
 
+import atexit
 import sys
 import traceback
 from datetime import datetime
@@ -11,11 +12,22 @@ from pathlib import Path
 
 CRASH_LOG = Path(__file__).resolve().parent / "tray_crash.log"
 
+_crash_logged = False
+
 
 def _write_crash(header: str, detail: str):
     """Write a timestamped crash entry to the crash log."""
+    global _crash_logged
+    _crash_logged = True
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     CRASH_LOG.write_text(f"[{timestamp}] {header}\n{detail}", encoding="utf-8")
+
+
+def _on_exit():
+    """Log clean exits so we can distinguish them from external kills."""
+    if not _crash_logged:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        CRASH_LOG.write_text(f"[{timestamp}] Clean exit\n", encoding="utf-8")
 
 
 def _install_excepthook():
@@ -33,6 +45,7 @@ def _install_excepthook():
 
 def main():
     _install_excepthook()
+    atexit.register(_on_exit)
     from gui.app import EvolverApp
     sys.exit(EvolverApp().run())
 
