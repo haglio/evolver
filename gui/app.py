@@ -13,6 +13,7 @@ import config
 from gui.run_record import load_runs
 
 from gui.main_window import EvolverMainWindow
+from gui.progress_popup import ProgressPopup
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
@@ -56,6 +57,7 @@ class EvolverApp:
         self._settings = EvolverSettings.load()
         self._worker: PipelineWorker | None = None
         self._stats_window: StatsWindow | None = None
+        self._progress_popup: ProgressPopup | None = None
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.run_requested.connect(self._start_run)
@@ -134,18 +136,22 @@ class EvolverApp:
         self._tray.set_running(True)
 
         self._worker = PipelineWorker(trigger=trigger)
-        self._worker.stage_started.connect(self._window.progress_widget.on_stage_started)
-        self._worker.stage_completed.connect(self._window.progress_widget.on_stage_completed)
         self._worker.pipeline_finished.connect(self._on_finished)
         self._worker.pipeline_error.connect(self._on_error)
 
-        self._window.show_progress()
+        self._progress_popup = ProgressPopup()
+        self._worker.stage_started.connect(self._progress_popup.on_stage_started)
+        self._worker.stage_completed.connect(self._progress_popup.on_stage_completed)
+        self._worker.stage_progress.connect(self._progress_popup.on_stage_progress)
+        self._progress_popup.show()
+
         self._worker.start()
 
     def _on_finished(self, record):
         self._scheduler.mark_idle()
         self._tray.set_running(False)
-        self._window.finish_progress()
+        if self._progress_popup is not None:
+            self._progress_popup.on_pipeline_finished()
         self._window.refresh_history()
 
         if self._settings.enable_toasts:
@@ -160,7 +166,8 @@ class EvolverApp:
     def _on_error(self, message: str):
         self._scheduler.mark_idle()
         self._tray.set_running(False)
-        self._window.finish_progress()
+        if self._progress_popup is not None:
+            self._progress_popup.on_pipeline_finished()
         self._window.refresh_history()
 
         if self._settings.enable_toasts:

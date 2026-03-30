@@ -218,6 +218,75 @@ class TestIsT2vProvider(unittest.TestCase):
                 self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip"))
 
 
+class TestOnProgressCallback(unittest.TestCase):
+    def test_on_progress_called_per_item(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            for name in ("a", "b", "c"):
+                f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_bytes(b"video")
+
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
+                tmp.write_bytes(b"upscaled")
+                return True
+
+            progress_calls = []
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+
+            self.assertEqual(len(progress_calls), 3)
+            self.assertEqual(progress_calls[0], (1, 3))
+            self.assertEqual(progress_calls[1], (2, 3))
+            self.assertEqual(progress_calls[2], (3, 3))
+
+    def test_on_progress_counts_failures(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            for name in ("a", "b"):
+                f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_bytes(b"video")
+
+            progress_calls = []
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+                with patch("tasks.upscale._run_ffmpeg", return_value=False), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+
+            self.assertEqual(len(progress_calls), 2)
+            self.assertEqual(progress_calls[-1], (2, 2))
+
+    def test_on_progress_not_required(self):
+        """Existing callers without on_progress still work."""
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            f = sorted_dir / "src" / "landscape" / "clip.mp4"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(b"video")
+
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
+                tmp.write_bytes(b"upscaled")
+                return True
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    result = upscale.run(max_items=5)
+
+            self.assertEqual(result.processed, 1)
+
+
 class TestFilterSelection(unittest.TestCase):
     def test_run_uses_t2v_filter_for_t2v_provider(self):
         with workspace_temp_dir() as root:

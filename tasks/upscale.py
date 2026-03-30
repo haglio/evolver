@@ -6,6 +6,7 @@ import os
 import subprocess
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,7 +27,8 @@ class UpscaleResult:
     pending_after_run: int = 0
 
 
-def run(priority_files: list[Path] | None = None, max_items: int | None = None) -> UpscaleResult:
+def run(priority_files: list[Path] | None = None, max_items: int | None = None,
+        on_progress: Callable[[int, int], None] | None = None) -> UpscaleResult:
     result = UpscaleResult()
     max_items = config.UPSCALE_BATCH_LIMIT if max_items is None else max_items
     run_budget_seconds = max(config.UPSCALE_RUN_BUDGET_SECONDS, 0)
@@ -114,6 +116,9 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None) 
             tmp.unlink(missing_ok=True)
             result.failed += 1
             log.info("FAILED (ffmpeg error): %s", in_file)
+
+        if on_progress:
+            on_progress(result.processed + result.failed, len(candidates))
 
     if not result.deferred_low_disk:
         result.pending_after_run = max(total_pending - result.processed - result.failed, 0)

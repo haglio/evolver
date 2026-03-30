@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QSizePolicy,
     QSplitter,
-    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
@@ -38,7 +37,7 @@ class _NoFocusRectDelegate(QItemDelegate):
 
 
 import config
-from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS, RunProgressWidget
+from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
 from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.toggle_switch import ToggleSwitch
 
@@ -181,13 +180,9 @@ class EvolverMainWindow(QMainWindow):
         left_layout.addWidget(self._history_list)
         splitter.addWidget(left)
 
-        # Right panel: stacked (detail view / progress view)
-        self._stack = QStackedWidget()
+        # Right panel: run detail view
         self._detail_widget = RunDetailWidget()
-        self._progress_widget = RunProgressWidget()
-        self._stack.addWidget(self._detail_widget)   # index 0
-        self._stack.addWidget(self._progress_widget)  # index 1
-        splitter.addWidget(self._stack)
+        splitter.addWidget(self._detail_widget)
 
         splitter.setSizes([300, 700])
 
@@ -241,31 +236,6 @@ class EvolverMainWindow(QMainWindow):
         self.quit_action = QAction("\u23FB  Quit", self)
         toolbar.addAction(self.quit_action)
 
-    @property
-    def progress_widget(self) -> RunProgressWidget:
-        return self._progress_widget
-
-    def show_progress(self):
-        """Switch the right panel to show live progress."""
-        self._progress_widget.reset()
-        self._stack.setCurrentIndex(1)
-        # Add a "Running..." entry at the top of the history list
-        item = QListWidgetItem("\u25B6  Running...")
-        font = item.font()
-        font.setBold(True)
-        item.setFont(font)
-        item.setForeground(QColor(0x30, 0x80, 0xE0))
-        self._history_list.insertItem(0, item)
-        self._history_list.setCurrentRow(0)
-
-    def finish_progress(self):
-        """Remove the 'Running...' entry and switch back to detail view."""
-        if self._history_list.count() > 0:
-            first = self._history_list.item(0)
-            if first and first.text().startswith("\u25B6"):
-                self._history_list.takeItem(0)
-        self._stack.setCurrentIndex(0)
-
     def refresh_history(self):
         """Reload run records from disk."""
         self._records = load_runs(config.RUNS_DIR)
@@ -283,7 +253,6 @@ class EvolverMainWindow(QMainWindow):
     def _on_history_selection(self, row: int):
         if 0 <= row < len(self._records):
             self._detail_widget.show_record(self._records[row])
-            self._stack.setCurrentIndex(0)
 
     def update_schedule_status(self, is_running: bool, is_paused: bool, next_run_at: datetime | None):
         """Update toolbar controls with current scheduling state."""
