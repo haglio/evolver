@@ -65,5 +65,36 @@ class TestWriteCrash(unittest.TestCase):
         self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
 
 
+class TestAtexitHandler(unittest.TestCase):
+    """_install_atexit registers a handler that logs clean exits."""
+
+    def setUp(self):
+        tray_app._crash_logged = False
+
+    def test_atexit_writes_when_no_crash(self):
+        mock_path = MagicMock()
+        with patch.object(tray_app, "CRASH_LOG", mock_path):
+            tray_app._on_exit()
+
+        mock_path.write_text.assert_called_once()
+        text = mock_path.write_text.call_args[0][0]
+        self.assertIn("Clean exit", text)
+
+    def test_atexit_skips_when_crash_already_logged(self):
+        tray_app._crash_logged = True
+        mock_path = MagicMock()
+        with patch.object(tray_app, "CRASH_LOG", mock_path):
+            tray_app._on_exit()
+
+        mock_path.write_text.assert_not_called()
+
+    def test_write_crash_sets_flag(self):
+        tray_app._crash_logged = False
+        mock_path = MagicMock()
+        with patch.object(tray_app, "CRASH_LOG", mock_path):
+            tray_app._write_crash("test:", "detail")
+        self.assertTrue(tray_app._crash_logged)
+
+
 if __name__ == "__main__":
     unittest.main()
