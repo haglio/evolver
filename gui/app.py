@@ -18,6 +18,7 @@ from gui.worker import PipelineWorker
 log = logging.getLogger(__name__)
 
 _MUTEX_NAME = "EvolverTrayApp_SingleInstance"
+_APP_MODEL_ID = "Evolver.TrayApp"
 
 
 _CreateMutexW = ctypes.windll.kernel32.CreateMutexW
@@ -42,6 +43,7 @@ class EvolverApp:
     """Wires together all GUI components and runs the Qt event loop."""
 
     def __init__(self):
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(_APP_MODEL_ID)
         self._app = QApplication(sys.argv)
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("Evolver")
