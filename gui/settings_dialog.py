@@ -40,6 +40,10 @@ class SettingsDialog(QDialog):
         self._startup_check.setChecked(startup.is_registered())
         form.addRow(self._startup_check)
 
+        self._toasts_check = QCheckBox("Enable toast notifications")
+        self._toasts_check.setChecked(settings.enable_toasts)
+        form.addRow(self._toasts_check)
+
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -50,6 +54,7 @@ class SettingsDialog(QDialog):
     def accept(self):
         self._settings.interval_minutes = self._interval_spin.value()
         self._settings.start_with_windows = self._startup_check.isChecked()
+        self._settings.enable_toasts = self._toasts_check.isChecked()
         self._settings.save()
 
         try:

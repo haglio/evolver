@@ -127,13 +127,14 @@ class EvolverApp:
         self._window.finish_progress()
         self._window.refresh_history()
 
-        status = "completed" if record.status == "success" else "completed with errors"
-        self._tray.showMessage(
-            "Evolver",
-            f"Pipeline {status} in {record.duration_seconds:.0f}s",
-            self._tray.MessageIcon.Information if record.status == "success" else self._tray.MessageIcon.Warning,
-            5000,
-        )
+        if self._settings.enable_toasts:
+            status = "completed" if record.status == "success" else "completed with errors"
+            self._tray.showMessage(
+                "Evolver",
+                f"Pipeline {status} in {record.duration_seconds:.0f}s",
+                self._tray.MessageIcon.Information if record.status == "success" else self._tray.MessageIcon.Warning,
+                5000,
+            )
 
     def _on_error(self, message: str):
         self._scheduler.mark_idle()
@@ -141,7 +142,8 @@ class EvolverApp:
         self._window.finish_progress()
         self._window.refresh_history()
 
-        self._tray.showMessage("Evolver", f"Pipeline error: {message}", self._tray.MessageIcon.Critical, 8000)
+        if self._settings.enable_toasts:
+            self._tray.showMessage("Evolver", f"Pipeline error: {message}", self._tray.MessageIcon.Critical, 8000)
         log.error("Pipeline error: %s", message)
 
     def _quit(self):

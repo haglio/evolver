@@ -13,6 +13,7 @@ import config
 class EvolverSettings:
     interval_minutes: int = 10
     start_with_windows: bool = False
+    enable_toasts: bool = False
 
     def save(self, path: Path | None = None):
         path = path or config.GUI_SETTINGS_FILE
