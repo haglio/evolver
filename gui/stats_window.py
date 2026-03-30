@@ -37,6 +37,25 @@ _MARGIN_TOP = 20
 _MARGIN_BOTTOM = 50
 
 
+def _pick_y_ticks(y_max: float) -> list[float]:
+    """Choose ~5 nice round tick values spanning (0, y_max], skipping 0."""
+    nice = [1, 2, 5, 10, 15, 30, 60, 120, 180, 300, 600]
+    # Pick the interval that gives closest to 5 ticks
+    best_step = nice[-1]
+    for step in nice:
+        count = int(y_max // step)
+        if count >= 3:
+            best_step = step
+            if count <= 7:
+                break
+    ticks = []
+    val = best_step
+    while val <= y_max:
+        ticks.append(val)
+        val += best_step
+    return ticks
+
+
 class StackedAreaChart(QWidget):
     """Custom-painted stacked area chart of stage durations across runs."""
 
@@ -44,10 +63,15 @@ class StackedAreaChart(QWidget):
         super().__init__(parent)
         self._records = list(reversed(records))  # chronological order
         self._mode = "normal"
+        self._fit = False
         self.setMinimumSize(600, 400)
 
     def set_mode(self, mode: str):
         self._mode = mode
+        self.update()
+
+    def set_fit(self, fit: bool):
+        self._fit = fit
         self.update()
 
     def _compute_series(self) -> list[list[float]]:
@@ -121,11 +145,21 @@ class StackedAreaChart(QWidget):
         t_max = max(timestamps)
         t_range = t_max - t_min or 1.0
 
+        if self._fit:
+            # Compute max stacked total across all runs
+            max_stack = 0.0
+            for i in range(n):
+                total = sum(s[i] for s in series)
+                max_stack = max(max_stack, total)
+            y_max = max(max_stack * 1.15, 1.0)  # 15% headroom
+        else:
+            y_max = _Y_MAX
+
         def to_x(t: float) -> float:
             return chart_x + chart_w * (t - t_min) / t_range
 
         def to_y(val: float) -> float:
-            return chart_y + chart_h * (1 - val / _Y_MAX)
+            return chart_y + chart_h * (1 - val / y_max)
 
         # Cumulative baselines for stacking
         prev_cum = [0.0] * n
@@ -161,23 +195,28 @@ class StackedAreaChart(QWidget):
             for i in range(n):
                 prev_cum[i] += vals[i]
 
-        # 10-minute dotted line
-        limit_y = int(to_y(_LIMIT_SECONDS))
-        pen = QPen(QColor(0x80, 0x80, 0x80), 1, Qt.PenStyle.DotLine)
-        painter.setPen(pen)
-        painter.drawLine(chart_x, limit_y, chart_x + chart_w, limit_y)
-        painter.setPen(QColor(0x80, 0x80, 0x80))
+        # 10-minute dotted line (only if visible)
         font = QFont()
         font.setPointSize(8)
         painter.setFont(font)
-        painter.drawText(chart_x + chart_w - 40, limit_y - 4, "10 min")
+        if _LIMIT_SECONDS <= y_max:
+            limit_y = int(to_y(_LIMIT_SECONDS))
+            pen = QPen(QColor(0x80, 0x80, 0x80), 1, Qt.PenStyle.DotLine)
+            painter.setPen(pen)
+            painter.drawLine(chart_x, limit_y, chart_x + chart_w, limit_y)
+            painter.setPen(QColor(0x80, 0x80, 0x80))
+            painter.drawText(chart_x + chart_w - 40, limit_y - 4, "10 min")
 
-        # Y-axis ticks and labels (skip 0)
+        # Y-axis ticks and labels
         painter.setPen(QColor(0x60, 0x60, 0x60))
-        for secs in (120, 240, 360, 480, 600):
+        tick_values = _pick_y_ticks(y_max)
+        for secs in tick_values:
             y = int(to_y(secs))
             painter.drawLine(chart_x - 4, y, chart_x, y)
-            painter.drawText(chart_x - 35, y + 4, f"{secs // 60}m")
+            if secs >= 60:
+                painter.drawText(chart_x - 35, y + 4, f"{secs / 60:.0f}m")
+            else:
+                painter.drawText(chart_x - 35, y + 4, f"{secs:.0f}s")
 
         # Y-axis label (rotated)
         painter.save()
@@ -297,6 +336,14 @@ class StatsWindow(QDialog):
         self._averages_btn.setCheckable(True)
         btn_row.addWidget(self._normal_btn)
         btn_row.addWidget(self._averages_btn)
+        btn_row.addSpacing(20)
+        self._10m_btn = QPushButton("10m")
+        self._10m_btn.setCheckable(True)
+        self._10m_btn.setChecked(True)
+        self._fit_btn = QPushButton("Fit")
+        self._fit_btn.setCheckable(True)
+        btn_row.addWidget(self._10m_btn)
+        btn_row.addWidget(self._fit_btn)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
@@ -311,6 +358,8 @@ class StatsWindow(QDialog):
 
         self._normal_btn.clicked.connect(self._on_normal)
         self._averages_btn.clicked.connect(self._on_averages)
+        self._10m_btn.clicked.connect(self._on_10m)
+        self._fit_btn.clicked.connect(self._on_fit)
 
     def _on_normal(self):
         self._normal_btn.setChecked(True)
@@ -323,3 +372,15 @@ class StatsWindow(QDialog):
         self._normal_btn.setChecked(False)
         if self._chart:
             self._chart.set_mode("averages")
+
+    def _on_10m(self):
+        self._10m_btn.setChecked(True)
+        self._fit_btn.setChecked(False)
+        if self._chart:
+            self._chart.set_fit(False)
+
+    def _on_fit(self):
+        self._fit_btn.setChecked(True)
+        self._10m_btn.setChecked(False)
+        if self._chart:
+            self._chart.set_fit(True)

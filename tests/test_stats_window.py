@@ -6,7 +6,7 @@ from unittest.mock import patch
 from PyQt6.QtWidgets import QApplication
 
 from gui.run_record import RunRecord
-from gui.stats_window import StackedAreaChart, StatsWindow
+from gui.stats_window import StackedAreaChart, StatsWindow, _pick_y_ticks
 
 _app = QApplication.instance() or QApplication([])
 
@@ -80,6 +80,11 @@ class TestStackedAreaChartSeries(unittest.TestCase):
             self.chart.set_mode("averages")
             mock_update.assert_called_once()
 
+    def test_set_fit_triggers_update(self):
+        with patch.object(self.chart, "update") as mock_update:
+            self.chart.set_fit(True)
+            mock_update.assert_called_once()
+
 
 class TestStackedAreaChartEdgeCases(unittest.TestCase):
     def test_empty_records(self):
@@ -96,6 +101,13 @@ class TestStackedAreaChartEdgeCases(unittest.TestCase):
 
     def test_paint_does_not_crash_empty(self):
         chart = StackedAreaChart([])
+        chart.resize(800, 400)
+        chart.repaint()
+
+    def test_paint_does_not_crash_fit_mode(self):
+        records = [_make_record({"sort": 1.0, "purge": 2.0})]
+        chart = StackedAreaChart(records)
+        chart.set_fit(True)
         chart.resize(800, 400)
         chart.repaint()
 
@@ -125,9 +137,45 @@ class TestStatsWindow(unittest.TestCase):
         self.assertTrue(window._normal_btn.isChecked())
         self.assertFalse(window._averages_btn.isChecked())
 
+    def test_10m_button_starts_checked(self):
+        window = StatsWindow([])
+        self.assertTrue(window._10m_btn.isChecked())
+        self.assertFalse(window._fit_btn.isChecked())
+
+    def test_toggle_to_fit(self):
+        records = [_make_record({"sort": 1.0})]
+        window = StatsWindow(records)
+        window._fit_btn.click()
+        self.assertTrue(window._fit_btn.isChecked())
+        self.assertFalse(window._10m_btn.isChecked())
+
+    def test_toggle_back_to_10m(self):
+        records = [_make_record({"sort": 1.0})]
+        window = StatsWindow(records)
+        window._fit_btn.click()
+        window._10m_btn.click()
+        self.assertTrue(window._10m_btn.isChecked())
+        self.assertFalse(window._fit_btn.isChecked())
+
     def test_empty_records_shows_placeholder(self):
         window = StatsWindow([])
         self.assertIsNone(window._chart)
+
+
+class TestPickYTicks(unittest.TestCase):
+    def test_full_scale(self):
+        ticks = _pick_y_ticks(700.0)
+        self.assertIn(600, ticks)
+        self.assertNotIn(0, ticks)
+
+    def test_small_scale(self):
+        ticks = _pick_y_ticks(10.0)
+        self.assertTrue(all(t <= 10.0 for t in ticks))
+        self.assertTrue(len(ticks) >= 2)
+
+    def test_medium_scale(self):
+        ticks = _pick_y_ticks(45.0)
+        self.assertTrue(all(t <= 45.0 for t in ticks))
 
 
 class TestStatsActionExists(unittest.TestCase):
