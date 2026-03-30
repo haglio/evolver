@@ -99,8 +99,8 @@ class TestBookmarksSync(unittest.TestCase):
 
             bookmarks_path = profile_dir / "Bookmarks"
             self.assertTrue(result.ok)
-            self.assertEqual(result.removed_missing_files, 1)
-            self.assertEqual(result.added, 1)
+            self.assertEqual(result.pruned, 1)
+            self.assertEqual(result.synced, 1)
             self.assertEqual(
                 favs_path.read_text(encoding="utf-8").splitlines(),
                 [
@@ -148,8 +148,8 @@ class TestBookmarksSync(unittest.TestCase):
                 result = bookmarks_sync.run()
 
             self.assertTrue(result.ok)
-            self.assertEqual(result.removed_missing_files, 1)
-            self.assertEqual(result.added, 1)
+            self.assertEqual(result.pruned, 1)
+            self.assertEqual(result.synced, 1)
             self.assertIn("https://example.com/keep", favs_path.read_text(encoding="utf-8"))
             self.assertNotIn("https://example.com/drop", favs_path.read_text(encoding="utf-8"))
             bookmarks_path = profile_dir / "Bookmarks"
@@ -245,8 +245,8 @@ class TestBookmarksSync(unittest.TestCase):
                 result = bookmarks_sync.run()
 
             self.assertTrue(result.ok)
-            self.assertEqual(result.added, 2)
-            self.assertEqual(result.skipped_blank, 1)
+            self.assertEqual(result.synced, 2)
+            self.assertEqual(result.no_url, 1)
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
             self.assertEqual(folder["name"], "Fun Time Favs")
@@ -287,7 +287,7 @@ class TestBookmarksSync(unittest.TestCase):
                 result = bookmarks_sync.run()
 
             self.assertTrue(result.ok)
-            self.assertEqual(result.added, 2)
+            self.assertEqual(result.synced, 2)
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
             urls = [child["url"] for child in folder["children"]]

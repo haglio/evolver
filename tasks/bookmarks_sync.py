@@ -24,10 +24,10 @@ _BOOKMARKS_BAR_KEY = "bookmark_bar"
 
 @dataclass
 class BookmarksSyncResult:
-    added: int = 0
-    removed_missing_files: int = 0
-    skipped_blank: int = 0
-    skipped_invalid: int = 0
+    synced: int = 0
+    pruned: int = 0
+    no_url: int = 0
+    bad_url: int = 0
     source_missing: bool = False
     profile_missing: bool = False
     write_error: str = ""
@@ -72,12 +72,12 @@ def run() -> BookmarksSyncResult:
         log.exception("Chrome bookmarks file is invalid: %s", bookmarks_path)
         return result
 
-    result.added = added
+    result.synced = added
     log.info(
-        "Stage 4 done. Added: %d, Blank skipped: %d, Invalid skipped: %d, Target: %s",
-        result.added,
-        result.skipped_blank,
-        result.skipped_invalid,
+        "Stage 4 done. Synced: %d, No URL: %d, Bad URL: %d, Target: %s",
+        result.synced,
+        result.no_url,
+        result.bad_url,
         bookmarks_path,
     )
     return result
@@ -96,12 +96,12 @@ def _read_urls(result: BookmarksSyncResult) -> list[str]:
     for row in rows:
         raw_value = (row.get("web_url") or "").strip()
         if not raw_value:
-            result.skipped_blank += 1
+            result.no_url += 1
             continue
 
         url = _extract_url(raw_value)
         if url is None:
-            result.skipped_invalid += 1
+            result.bad_url += 1
             log.warning("Skipping invalid web_url cell: %s", raw_value)
             continue
         if url in seen:
@@ -109,9 +109,9 @@ def _read_urls(result: BookmarksSyncResult) -> list[str]:
         seen.add(url)
         urls.append(url)
 
-    if result.removed_missing_files:
+    if result.pruned:
         _write_rows(path, fieldnames, rows)
-        log.info("Removed %d stale favorite row(s) whose source file is gone.", result.removed_missing_files)
+        log.info("Removed %d stale favorite row(s) whose source file is gone.", result.pruned)
     return urls
 
 
@@ -123,7 +123,7 @@ def _load_and_prune_rows(path: Path, result: BookmarksSyncResult) -> tuple[list[
         kept_rows: list[dict[str, str]] = []
         for row in reader:
             if file_column and _prune_or_rewire_row(row, file_column, path.parent, result):
-                result.removed_missing_files += 1
+                result.pruned += 1
                 continue
             kept_rows.append(row)
     return fieldnames, kept_rows
