@@ -36,7 +36,8 @@ class PromptScrapeResult:
 
 def run() -> PromptScrapeResult:
     result = PromptScrapeResult()
-    log.info("=== Stage 5: scrape AI metadata ===")
+    log.info("=== Stage 3: scrape AI metadata ===")
+    log.info("SORTED DIR: %s", config.SORTED_DIR)
     log.info("METADATA DIR: %s", config.METADATA_DIR)
 
     browser = _find_browser_executable()
@@ -45,45 +46,45 @@ def run() -> PromptScrapeResult:
         log.error("No supported browser executable found for prompt scraping.")
         return result
 
-    for root in config.active_outbox_dirs():
-        if not root.is_dir():
+    if not config.SORTED_DIR.is_dir():
+        return result
+
+    for video in sorted(_iter_video_files(config.SORTED_DIR)):
+        rel = video.relative_to(config.SORTED_DIR)
+        if len(rel.parts) < 3:
             continue
-        for video in sorted(_iter_video_files(root)):
-            output_path = _prompt_output_path(video, root)
-            if output_path.exists():
-                result.skipped_existing += 1
-                continue
+        source, orient = rel.parts[0], rel.parts[1]
 
-            source = _source_for_video(video)
-            if source not in _SCRAPE_STRATEGIES:
-                result.no_scrape_strat += 1
-                continue
+        output_path = _sorted_to_metadata_path(source, orient, video.stem)
+        if output_path.exists():
+            result.skipped_existing += 1
+            continue
 
-            url = _url_for_source(source, video)
-            try:
-                payload = _SCRAPE_STRATEGIES[source](video, url, browser)
-            except Exception:
-                result.errors += 1
-                log.exception("Prompt scrape failed for: %s", video)
-                continue
+        if source not in _SCRAPE_STRATEGIES:
+            result.no_scrape_strat += 1
+            continue
 
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-            result.newly_scraped += 1
-            log.info("Wrote metadata: %s", output_path)
+        url = _url_for_source(source, video)
+        try:
+            payload = _SCRAPE_STRATEGIES[source](video, url, browser)
+        except Exception:
+            result.errors += 1
+            log.exception("Prompt scrape failed for: %s", video)
+            continue
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        result.newly_scraped += 1
+        log.info("Wrote metadata: %s", output_path)
 
     log.info(
-        "Stage 5 done. Scraped: %d, Existing: %d, No strategy: %d, Errors: %d",
+        "Stage 3 done. Scraped: %d, Existing: %d, No strategy: %d, Errors: %d",
         result.newly_scraped,
         result.skipped_existing,
         result.no_scrape_strat,
         result.errors,
     )
     return result
-
-
-def _source_for_video(video: Path) -> str:
-    return video.parent.name.lower()
 
 
 def _url_for_source(source: str, video: Path) -> str:
@@ -97,8 +98,16 @@ def _iter_video_files(root: Path):
     yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
-def _prompt_output_path(video_path: Path, outbox_root: Path) -> Path:
-    return config.METADATA_DIR / outbox_root.name / video_path.relative_to(outbox_root).with_suffix(".json")
+def _sorted_to_metadata_path(source: str, orient: str, stem: str) -> Path:
+    """Compute the metadata JSON path for a file in 1_sorted.
+
+    Mirrors the 2_outbox/upscaled_by_orientation/<orient>/<source>/ structure
+    so that _is_t2v_provider in the upscale stage can find the metadata before
+    the upscaled file exists.
+    """
+    return (config.METADATA_DIR / config.OUTBOX_DIR.name
+            / config.OUT_UPSCALED_DIR.name / orient / source
+            / f"{stem}_topaz.json")
 
 
 def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> dict[str, str]:

@@ -55,7 +55,7 @@ def run(show_popup: bool = False) -> DuplicateSizesResult:
 
 
 def _log_result(result: DuplicateSizesResult) -> None:
-    log.info("=== Stage 7: duplicate-size scan ===")
+    log.info("=== Stage 8: duplicate-size scan ===")
     log.info("non_AI: %d video file(s) scanned in %s", result.scanned_count, config.NON_AI_DIR)
 
     for size, paths in result.duplicate_groups.items():
@@ -64,9 +64,9 @@ def _log_result(result: DuplicateSizesResult) -> None:
             log.error("  -> %s", path)
 
     if result.ok:
-        log.info("Stage 7 done. No likely duplicate non-AI videos found by exact filesize.")
+        log.info("Stage 8 done. No likely duplicate non-AI videos found by exact filesize.")
     else:
-        log.error("Stage 7 failed. See log entries above for likely duplicate non-AI videos.")
+        log.error("Stage 8 failed. See log entries above for likely duplicate non-AI videos.")
 
 
 def _popup_message(result: DuplicateSizesResult) -> str:

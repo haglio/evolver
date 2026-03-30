@@ -233,7 +233,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        self.assertEqual(names, ["sort", "purge", "scripts", "bookmarks", "metadata", "upscale", "dupes", "verify"])
+        self.assertEqual(names, ["purge", "sort", "metadata", "upscale", "verify", "bookmarks", "scripts", "dupes"])
 
     def test_skipped_stages_have_skip_status(self):
         stack, _ = self._patch_all_stages()
@@ -249,19 +249,19 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_start=on_start)
         started_names = [call.args[0] for call in on_start.call_args_list]
-        self.assertEqual(started_names, ["sort", "purge", "scripts", "bookmarks", "metadata", "upscale", "dupes", "verify"])
+        self.assertEqual(started_names, ["purge", "sort", "metadata", "upscale", "verify", "bookmarks", "scripts", "dupes"])
 
     def test_on_stage_complete_called_with_result_and_status(self):
         on_complete = Mock()
         stack, mocks = self._patch_all_stages()
         with stack:
             evolver.run_pipeline(on_stage_complete=on_complete)
-        # Check sort stage callback
-        sort_call = on_complete.call_args_list[0]
-        self.assertEqual(sort_call.args[0], "sort")
-        self.assertEqual(sort_call.args[1], mocks["sort_run"].return_value)
-        self.assertIsInstance(sort_call.args[2], float)  # elapsed
-        self.assertEqual(sort_call.args[3], "completed")
+        # Check purge stage callback (first stage)
+        purge_call = on_complete.call_args_list[0]
+        self.assertEqual(purge_call.args[0], "purge")
+        self.assertEqual(purge_call.args[1], mocks["purge_run"].return_value)
+        self.assertIsInstance(purge_call.args[2], float)  # elapsed
+        self.assertEqual(purge_call.args[3], "completed")
 
     def test_on_stage_complete_reports_skipped_for_upscale(self):
         on_complete = Mock()
