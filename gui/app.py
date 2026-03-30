@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import subprocess
 import sys
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
+
+import config
 
 from gui.main_window import EvolverMainWindow
 from gui.scheduler import PipelineScheduler
@@ -61,12 +64,14 @@ class EvolverApp:
         self._tray.run_now_action.triggered.connect(self._scheduler.run_now)
         self._tray.pause_action.triggered.connect(self._toggle_pause)
         self._tray.settings_action.triggered.connect(self._show_settings)
+        self._tray.restart_action.triggered.connect(self._restart)
         self._tray.quit_action.triggered.connect(self._quit)
 
         self._window = EvolverMainWindow()
         self._window.run_now_action.triggered.connect(self._scheduler.run_now)
         self._window.active_toggle.clicked.connect(self._toggle_pause)
         self._window.settings_action.triggered.connect(self._show_settings)
+        self._window.restart_action.triggered.connect(self._restart)
         self._window.quit_action.triggered.connect(self._confirm_quit)
         self._window.refresh_history()
 
@@ -158,6 +163,13 @@ class EvolverApp:
         )
         if result == QMessageBox.StandardButton.Yes:
             self._quit()
+
+    def _restart(self):
+        subprocess.Popen(
+            [sys.executable, str(config.PROJECT_DIR / "tray_app.py")],
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+        self._quit()
 
     def _quit(self):
         if self._worker is not None and self._worker.isRunning():

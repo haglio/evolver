@@ -35,5 +35,31 @@ class TestAppStartup(unittest.TestCase):
         mock_set_id.assert_called_once_with(_APP_MODEL_ID)
 
 
+class TestRestart(unittest.TestCase):
+    """_restart() should spawn a new process and quit the current one."""
+
+    def test_restart_spawns_process_and_quits(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch("gui.app.subprocess.Popen") as mock_popen, \
+             patch.object(app, "_quit") as mock_quit:
+            app._restart()
+            mock_popen.assert_called_once()
+            mock_quit.assert_called_once()
+
+    def test_restart_launches_tray_app(self):
+        import config
+
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch("gui.app.subprocess.Popen") as mock_popen, \
+             patch.object(app, "_quit"):
+            app._restart()
+            args = mock_popen.call_args[0][0]
+            self.assertEqual(args[1], str(config.PROJECT_DIR / "tray_app.py"))
+
+
 if __name__ == "__main__":
     unittest.main()
