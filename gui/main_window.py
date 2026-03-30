@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtGui import QAction, QColor, QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -15,11 +15,13 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QSizePolicy,
     QSplitter,
     QStackedWidget,
     QStatusBar,
     QTableWidget,
     QTableWidgetItem,
+    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -151,6 +153,9 @@ class EvolverMainWindow(QMainWindow):
         self.setWindowTitle("Evolver")
         self.setMinimumSize(800, 500)
         self.resize(1000, 600)
+
+        self._build_toolbar()
+
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
@@ -192,6 +197,43 @@ class EvolverMainWindow(QMainWindow):
         self._status_bar.addWidget(self._status_label)
 
         self._records: list[RunRecord] = []
+
+    def _build_toolbar(self):
+        toolbar = QToolBar()
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        self.addToolBar(toolbar)
+
+        # Active/Paused toggle (checkable — checked means active)
+        self.active_toggle = QAction("Active", self)
+        self.active_toggle.setCheckable(True)
+        self.active_toggle.setChecked(True)
+        toolbar.addAction(self.active_toggle)
+
+        toolbar.addSeparator()
+
+        # Next-run info label
+        self._next_run_label = QLabel("")
+        toolbar.addWidget(self._next_run_label)
+
+        # Spacer pushes remaining actions to the right
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        toolbar.addWidget(spacer)
+
+        # Run Now
+        self.run_now_action = QAction("\u25B6  Run Now", self)
+        toolbar.addAction(self.run_now_action)
+
+        toolbar.addSeparator()
+
+        # Settings
+        self.settings_action = QAction("\u2699  Settings", self)
+        toolbar.addAction(self.settings_action)
+
+        # Quit
+        self.quit_action = QAction("\u23FB  Quit", self)
+        toolbar.addAction(self.quit_action)
 
     @property
     def progress_widget(self) -> RunProgressWidget:
@@ -239,7 +281,17 @@ class EvolverMainWindow(QMainWindow):
             self._stack.setCurrentIndex(0)
 
     def update_schedule_status(self, is_running: bool, is_paused: bool, next_run_at: datetime | None):
-        """Update the status bar with current scheduling state."""
+        """Update toolbar and status bar with current scheduling state."""
+        # Toolbar controls
+        self.run_now_action.setEnabled(not is_running)
+        self.active_toggle.setChecked(not is_paused)
+
+        if next_run_at and not is_running and not is_paused:
+            self._next_run_label.setText(f"Next run: {next_run_at.strftime('%H:%M')}")
+        else:
+            self._next_run_label.setText("")
+
+        # Status bar
         if is_running:
             self._status_label.setText("Status: Running...")
         elif is_paused:
