@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.progress import ALL_STAGES, STAGE_DISPLAY_NAMES
+from gui.progress import ALL_STAGES
 from gui.run_record import RunRecord
 
 STAGE_COLORS = {
@@ -32,7 +32,7 @@ STAGE_COLORS = {
 _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
 _LIMIT_SECONDS = 600.0
 _MARGIN_LEFT = 70
-_MARGIN_RIGHT = 175
+_MARGIN_RIGHT = 110
 _MARGIN_TOP = 20
 _MARGIN_BOTTOM = 50
 
@@ -274,8 +274,7 @@ class StackedAreaChart(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(lx + padding, y_pos, box_size, box_size)
             painter.setPen(QColor(0x30, 0x30, 0x30))
-            display = STAGE_DISPLAY_NAMES.get(stage_key, stage_key)
-            painter.drawText(lx + padding + box_size + 6, y_pos + box_size - 1, display)
+            painter.drawText(lx + padding + box_size + 6, y_pos + box_size - 1, stage_key)
 
 
 class StatsWindow(QDialog):
