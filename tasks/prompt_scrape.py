@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 import config
 from tasks.purge_weird import source_stem
+from util.ffprobe import get_orientation
 from util.media_files import iter_finalized_videos
 
 log = logging.getLogger(__name__)
@@ -25,8 +26,8 @@ _CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.
 @dataclass
 class PromptScrapeResult:
     newly_scraped: int = 0
-    skipped_existing: int = 0
     no_scrape_strat: int = 0
+    skipped_unknown_orient: int = 0
     errors: int = 0
 
     @property
@@ -36,8 +37,8 @@ class PromptScrapeResult:
 
 def run() -> PromptScrapeResult:
     result = PromptScrapeResult()
-    log.info("=== Stage 3: scrape AI metadata ===")
-    log.info("SORTED DIR: %s", config.SORTED_DIR)
+    log.info("=== Stage 2: scrape AI metadata ===")
+    log.info("INBOX DIR: %s", config.INBOX_DIR)
     log.info("METADATA DIR: %s", config.METADATA_DIR)
 
     browser = _find_browser_executable()
@@ -46,42 +47,38 @@ def run() -> PromptScrapeResult:
         log.error("No supported browser executable found for prompt scraping.")
         return result
 
-    if not config.SORTED_DIR.is_dir():
-        return result
+    for source_dir in _iter_source_dirs(config.INBOX_DIR):
+        source = source_dir.name
 
-    for video in sorted(_iter_video_files(config.SORTED_DIR)):
-        rel = video.relative_to(config.SORTED_DIR)
-        if len(rel.parts) < 3:
-            continue
-        source, orient = rel.parts[0], rel.parts[1]
+        for video in sorted(_iter_video_files(source_dir)):
+            if source not in _SCRAPE_STRATEGIES:
+                result.no_scrape_strat += 1
+                continue
 
-        output_path = _sorted_to_metadata_path(source, orient, video.stem)
-        if output_path.exists():
-            result.skipped_existing += 1
-            continue
+            orient = get_orientation(video)
+            if orient not in ("landscape", "portrait"):
+                result.skipped_unknown_orient += 1
+                continue
 
-        if source not in _SCRAPE_STRATEGIES:
-            result.no_scrape_strat += 1
-            continue
+            output_path = _metadata_output_path(source, orient, video.stem)
+            url = _url_for_source(source, video)
+            try:
+                payload = _SCRAPE_STRATEGIES[source](video, url, browser)
+            except Exception:
+                result.errors += 1
+                log.exception("Prompt scrape failed for: %s", video)
+                continue
 
-        url = _url_for_source(source, video)
-        try:
-            payload = _SCRAPE_STRATEGIES[source](video, url, browser)
-        except Exception:
-            result.errors += 1
-            log.exception("Prompt scrape failed for: %s", video)
-            continue
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        result.newly_scraped += 1
-        log.info("Wrote metadata: %s", output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            result.newly_scraped += 1
+            log.info("Wrote metadata: %s", output_path)
 
     log.info(
-        "Stage 3 done. Scraped: %d, Existing: %d, No strategy: %d, Errors: %d",
+        "Stage 2 done. Scraped: %d, No strategy: %d, Unknown orient: %d, Errors: %d",
         result.newly_scraped,
-        result.skipped_existing,
         result.no_scrape_strat,
+        result.skipped_unknown_orient,
         result.errors,
     )
     return result
@@ -98,8 +95,16 @@ def _iter_video_files(root: Path):
     yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
-def _sorted_to_metadata_path(source: str, orient: str, stem: str) -> Path:
-    """Compute the metadata JSON path for a file in 1_sorted.
+def _iter_source_dirs(root: Path):
+    if not root.is_dir():
+        return
+    for p in sorted(root.iterdir()):
+        if p.is_dir():
+            yield p
+
+
+def _metadata_output_path(source: str, orient: str, stem: str) -> Path:
+    """Compute the metadata JSON path for an inbox file.
 
     Mirrors the 2_outbox/upscaled_by_orientation/<orient>/<source>/ structure
     so that _is_t2v_provider in the upscale stage can find the metadata before

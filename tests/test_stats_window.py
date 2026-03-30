@@ -46,15 +46,15 @@ class TestStackedAreaChartSeries(unittest.TestCase):
         purge_series = series[0]  # purge is first in ALL_STAGES
         self.assertEqual(purge_series, [1.0, 2.0, 3.0])
 
-    def test_normal_returns_raw_for_second_stage(self):
+    def test_normal_returns_raw_for_sort_stage(self):
         series = self.chart._compute_series()
-        sort_series = series[1]  # sort is second
+        sort_series = series[2]  # sort is third (after purge, metadata)
         self.assertEqual(sort_series, [2.0, 4.0, 6.0])
 
     def test_missing_stage_returns_zero(self):
         series = self.chart._compute_series()
-        # "metadata" is third stage but not in our records
-        metadata_series = series[2]
+        # "metadata" is second stage but not in our records
+        metadata_series = series[1]
         self.assertEqual(metadata_series, [0.0, 0.0, 0.0])
 
     def test_averages_returns_running_mean(self):
@@ -66,10 +66,10 @@ class TestStackedAreaChartSeries(unittest.TestCase):
         self.assertAlmostEqual(purge_series[1], 1.5)
         self.assertAlmostEqual(purge_series[2], 2.0)
 
-    def test_averages_second_stage(self):
+    def test_averages_sort_stage(self):
         self.chart.set_mode("averages")
         series = self.chart._compute_series()
-        sort_series = series[1]
+        sort_series = series[2]  # sort is third (after purge, metadata)
         # raw = [2, 4, 6], running avg = [2/1, 6/2, 12/3] = [2.0, 3.0, 4.0]
         self.assertAlmostEqual(sort_series[0], 2.0)
         self.assertAlmostEqual(sort_series[1], 3.0)
