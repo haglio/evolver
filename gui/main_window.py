@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QStackedWidget,
-    QStatusBar,
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
@@ -41,6 +40,7 @@ class _NoFocusRectDelegate(QItemDelegate):
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS, RunProgressWidget
 from gui.run_record import RunRecord, load_runs
+from gui.toggle_switch import ToggleSwitch
 
 
 class RunDetailWidget(QWidget):
@@ -191,11 +191,6 @@ class EvolverMainWindow(QMainWindow):
 
         splitter.setSizes([300, 700])
 
-        self._status_bar = QStatusBar()
-        self.setStatusBar(self._status_bar)
-        self._status_label = QLabel("Starting...")
-        self._status_bar.addWidget(self._status_label)
-
         self._records: list[RunRecord] = []
 
     def _build_toolbar(self):
@@ -204,11 +199,9 @@ class EvolverMainWindow(QMainWindow):
         toolbar.setFloatable(False)
         self.addToolBar(toolbar)
 
-        # Active/Paused toggle (checkable — checked means active)
-        self.active_toggle = QAction("Active", self)
-        self.active_toggle.setCheckable(True)
-        self.active_toggle.setChecked(True)
-        toolbar.addAction(self.active_toggle)
+        # Active/Paused toggle switch
+        self.active_toggle = ToggleSwitch(checked=True)
+        toolbar.addWidget(self.active_toggle)
 
         toolbar.addSeparator()
 
@@ -281,25 +274,18 @@ class EvolverMainWindow(QMainWindow):
             self._stack.setCurrentIndex(0)
 
     def update_schedule_status(self, is_running: bool, is_paused: bool, next_run_at: datetime | None):
-        """Update toolbar and status bar with current scheduling state."""
-        # Toolbar controls
+        """Update toolbar controls with current scheduling state."""
         self.run_now_action.setEnabled(not is_running)
         self.active_toggle.setChecked(not is_paused)
 
-        if next_run_at and not is_running and not is_paused:
+        if is_paused:
+            self._next_run_label.setText("No upcoming runs scheduled (inactive)")
+        elif is_running:
+            self._next_run_label.setText("Running...")
+        elif next_run_at:
             self._next_run_label.setText(f"Next run: {next_run_at.strftime('%H:%M')}")
         else:
             self._next_run_label.setText("")
-
-        # Status bar
-        if is_running:
-            self._status_label.setText("Status: Running...")
-        elif is_paused:
-            self._status_label.setText("Status: Scheduling paused")
-        elif next_run_at:
-            self._status_label.setText(f"Status: Scheduled  |  Next run: {next_run_at.strftime('%H:%M')}")
-        else:
-            self._status_label.setText("Status: Idle")
 
     def closeEvent(self, event):
         """Hide instead of close — the tray icon keeps the app alive."""
