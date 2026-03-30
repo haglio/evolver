@@ -39,7 +39,7 @@ class _NoFocusRectDelegate(QItemDelegate):
 
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS, RunProgressWidget
-from gui.run_record import RunRecord, load_runs
+from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.toggle_switch import ToggleSwitch
 
 
@@ -267,8 +267,7 @@ class EvolverMainWindow(QMainWindow):
         self._records = load_runs(config.RUNS_DIR)
         self._history_list.clear()
         for record in self._records:
-            status_icon = "\u2714" if record.status == "success" else "\u2718"
-            text = f"{status_icon}  {record.started_at}  ({record.duration_seconds:.0f}s)"
+            text = format_run_label(record.started_at, record.duration_seconds, record.status)
             item = QListWidgetItem(text)
             if record.status != "success":
                 item.setForeground(QColor(0xE0, 0x30, 0x30))

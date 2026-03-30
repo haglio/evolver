@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 from tests.temp_helpers import workspace_temp_dir
 
-from gui.run_record import RunRecord, result_to_dict, save_run, load_runs
+from gui.run_record import RunRecord, result_to_dict, save_run, load_runs, format_run_label
 
 
 class TestResultToDict(unittest.TestCase):
@@ -111,6 +111,27 @@ class TestRunRecordFromPipelineResult(unittest.TestCase):
         self.assertEqual(record.stages[0]["name"], "sort")
         self.assertEqual(record.stages[0]["status"], "completed")
         self.assertEqual(record.stages[1]["skip_reason"], "cpu_busy")
+
+
+class TestFormatRunLabel(unittest.TestCase):
+
+    def test_formats_utc_to_pacific_standard_time(self):
+        # 2026-01-15T06:05:00 UTC = 2025-01-14 22:05 PST (UTC-8)
+        label = format_run_label("2026-01-15T06:05:00", 5.0, "success")
+        self.assertEqual(label, "\u2714  2026/01/14 22:05 (5s)")
+
+    def test_formats_utc_to_pacific_daylight_time(self):
+        # 2026-07-15T03:20:00 UTC = 2026-07-14 20:20 PDT (UTC-7)
+        label = format_run_label("2026-07-15T03:20:00", 12.0, "success")
+        self.assertEqual(label, "\u2714  2026/07/14 20:20 (12s)")
+
+    def test_error_status_uses_cross_mark(self):
+        label = format_run_label("2026-03-30T05:20:00", 3.0, "error")
+        self.assertEqual(label, "\u2718  2026/03/29 22:20 (3s)")
+
+    def test_rounds_duration_to_integer(self):
+        label = format_run_label("2026-03-30T05:20:00", 83.7, "success")
+        self.assertEqual(label, "\u2714  2026/03/29 22:20 (84s)")
 
 
 if __name__ == "__main__":
