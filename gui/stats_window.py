@@ -32,7 +32,7 @@ STAGE_COLORS = {
 _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
 _LIMIT_SECONDS = 600.0
 _MARGIN_LEFT = 70
-_MARGIN_RIGHT = 160
+_MARGIN_RIGHT = 175
 _MARGIN_TOP = 20
 _MARGIN_BOTTOM = 50
 
