@@ -199,6 +199,11 @@ class EvolverMainWindow(QMainWindow):
         toolbar.setFloatable(False)
         self.addToolBar(toolbar)
 
+        # Small left pad so the toggle isn't flush with the window edge
+        left_pad = QWidget()
+        left_pad.setFixedWidth(6)
+        toolbar.addWidget(left_pad)
+
         # Active/Paused toggle switch
         self.active_toggle = ToggleSwitch(checked=True)
         toolbar.addWidget(self.active_toggle)
