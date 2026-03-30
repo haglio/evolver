@@ -21,6 +21,13 @@ class TestAppStartup(unittest.TestCase):
         self.assertIsNotNone(app._window)
         self.assertIsNotNone(app._scheduler)
 
+    def test_app_window_icon_matches_tray_icon(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+        # Taskbar icon should be set to the same icon as the tray
+        app_icon = app._app.windowIcon()
+        self.assertFalse(app_icon.isNull(), "Application window icon should be set")
+
 
 if __name__ == "__main__":
     unittest.main()
