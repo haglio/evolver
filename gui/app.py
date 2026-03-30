@@ -61,6 +61,10 @@ class EvolverApp:
         self._tray.quit_action.triggered.connect(self._quit)
 
         self._window = EvolverMainWindow()
+        self._window.run_now_action.triggered.connect(self._scheduler.run_now)
+        self._window.active_toggle.triggered.connect(self._toggle_pause)
+        self._window.settings_action.triggered.connect(self._show_settings)
+        self._window.quit_action.triggered.connect(self._quit)
         self._window.refresh_history()
 
     def run(self) -> int:
