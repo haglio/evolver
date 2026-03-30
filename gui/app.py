@@ -54,6 +54,7 @@ class EvolverApp:
         self._scheduler.status_changed.connect(self._update_status_display)
 
         self._tray = EvolverTray()
+        self._app.setWindowIcon(self._tray.icon())
         self._tray.open_action.triggered.connect(self._show_window)
         self._tray.run_now_action.triggered.connect(self._scheduler.run_now)
         self._tray.pause_action.triggered.connect(self._toggle_pause)
