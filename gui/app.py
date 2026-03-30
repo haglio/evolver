@@ -10,11 +10,13 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import config
+from gui.run_record import load_runs
 
 from gui.main_window import EvolverMainWindow
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
+from gui.stats_window import StatsWindow
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
 
@@ -53,6 +55,7 @@ class EvolverApp:
 
         self._settings = EvolverSettings.load()
         self._worker: PipelineWorker | None = None
+        self._stats_window: StatsWindow | None = None
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.run_requested.connect(self._start_run)
@@ -64,6 +67,7 @@ class EvolverApp:
         self._tray.run_now_action.triggered.connect(self._scheduler.run_now)
         self._tray.pause_action.triggered.connect(self._toggle_pause)
         self._tray.settings_action.triggered.connect(self._show_settings)
+        self._tray.stats_action.triggered.connect(self._show_stats)
         self._tray.restart_action.triggered.connect(self._restart)
         self._tray.quit_action.triggered.connect(self._quit)
 
@@ -71,6 +75,7 @@ class EvolverApp:
         self._window.run_now_action.triggered.connect(self._scheduler.run_now)
         self._window.active_toggle.clicked.connect(self._toggle_pause)
         self._window.settings_action.triggered.connect(self._show_settings)
+        self._window.stats_action.triggered.connect(self._show_stats)
         self._window.restart_action.triggered.connect(self._restart)
         self._window.quit_action.triggered.connect(self._confirm_quit)
         self._window.refresh_history()
@@ -102,6 +107,15 @@ class EvolverApp:
         if dialog.exec():
             self._settings = dialog.settings
             self._scheduler.set_interval_minutes(self._settings.interval_minutes)
+
+    def _show_stats(self):
+        if self._stats_window is not None and self._stats_window.isVisible():
+            self._stats_window.raise_()
+            self._stats_window.activateWindow()
+            return
+        records = load_runs(config.RUNS_DIR)
+        self._stats_window = StatsWindow(records, self._window)
+        self._stats_window.show()
 
     def _update_status_display(self):
         """Push scheduling state to tray and window."""
