@@ -1,14 +1,15 @@
 $ErrorActionPreference = "Stop"
 
-$python = "C:\Python314\python.exe"
-$script = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "evolver.py"
-$workingDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+if ($pythonCmd) {
+    & $pythonCmd.Source .\evolver.py
+    exit $LASTEXITCODE
+}
 
-$process = Start-Process -FilePath $python `
-	-ArgumentList $script `
-	-WorkingDirectory $workingDirectory `
-	-WindowStyle Hidden `
-	-PassThru `
-	-Wait
+$pyCmd = Get-Command py -ErrorAction SilentlyContinue
+if ($pyCmd) {
+    & $pyCmd.Source -3 .\evolver.py
+    exit $LASTEXITCODE
+}
 
-exit $process.ExitCode
+throw "Python launcher not found. Install Python and ensure 'python' or 'py' is in PATH."

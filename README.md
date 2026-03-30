@@ -1,6 +1,6 @@
 # Evolver
 
-Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
+Evolver is a video collection maintenance pipeline that runs as a system tray application and:
 
 1. Sorts videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`
 2. Purges `kinda_weird/` outputs from the active outbox set — normally `2_outbox`, and both `2_outbox` plus `3_new_outbox` while regeneration mode is enabled. It also deletes each weird file's corresponding source from `1_sorted/`. A Windows error dialog pops up if any source file cannot be found.
@@ -15,9 +15,8 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
 
 ## Current architecture
 
-- **Tray app** (preferred): `pythonw.exe tray_app.py` — system tray icon with GUI, configurable timer (default 10 min), manual run trigger, run history, and live progress bars
-- **CLI mode** (legacy): `python evolver.py` — headless single run, returns exit code
-- **Task Scheduler** (deprecated): `evolver.ps1` / `evolver.xml` — kept for rollback but superseded by tray app
+- **Tray app**: `pythonw.exe tray_app.py` — system tray icon with GUI, configurable timer (default 10 min), manual run trigger, run history, and live progress bars
+- **CLI mode**: `python evolver.py` — headless single run, returns exit code
 - Pipeline entry point: `evolver.py`
 - Modules:
   - `config.py` - paths and settings
@@ -44,12 +43,11 @@ Evolver is a Windows-scheduled video pipeline that runs every 15 minutes and:
 ## Requirements
 
 - Windows
-- Python 3.14+ (currently configured as `C:\Python314\python.exe` in `evolver.ps1`)
+- Python 3.14+
 - `ffprobe` available in `PATH`
 - Topaz ffmpeg at `C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe`
 - Topaz model directory at `C:\ProgramData\Topaz Labs LLC\Topaz Video\models`
-- PyQt6 (`pip install PyQt6`) — for tray app mode
-- pywin32 (`pip install pywin32`) — for Windows startup shortcut registration
+- PyQt6 (`pip install PyQt6`)
 
 ## Run as tray app (recommended)
 
@@ -66,19 +64,13 @@ Run history is stored as JSON files in `runs/` (gitignored). Settings are persis
 From repo root:
 
 ```bash
-powershell.exe -File run-evolver.ps1
+powershell.exe -File evolver.ps1
 ```
 
 Alternative (direct Python command):
 
 ```bash
 python evolver.py
-```
-
-Or through the hidden launcher used by Scheduled Task (deprecated):
-
-```bash
-powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File evolver.ps1
 ```
 
 ## One-time correspondence check
@@ -142,7 +134,6 @@ What is covered:
 - Funscript alignment so `videos/scripts/scripts` mirrors `videos/videos` when basename matches are unique within the same `AI` or `non_AI` lane, plus variant-copy support for processed/original counterparts and AI-video duplication into `actually_AI_but_funscripted` (`tasks/scripts_sync.py`)
 - Correspondence rules for `<sorted_stem>_topaz<ext>` matching (`check_correspondence.py`)
 - Scheduler flow behavior, including always-running purge and pending-work-based Stage 3 decisions (`evolver.py`)
-- Interactive popup vs Session-0 `msg.exe` fallback behavior (`util/windows_alert.py`)
 - Already-processed detection (`tasks/upscale.py`)
 - Partial-file handling across upscale cleanup and downstream scanners (`tasks/upscale.py`, `check_correspondence.py`, `tasks/prompt_scrape.py`, `tasks/sort.py`)
 
@@ -169,6 +160,5 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 - If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops Stage 6 early and warns instead of continuing toward a full disk.
 - Stage 7 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
 - Stage 8 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
-- In interactive runs, errors use a normal Windows message box. In the scheduled S4U task, errors are delivered via `msg.exe` to the active logged-in user.
+- Errors are shown via Windows message box.
 - Existing output checks prevent duplicate processing.
-- Scheduled Task currently points to `evolver.ps1`; updating launcher logic updates scheduled behavior without task re-install.

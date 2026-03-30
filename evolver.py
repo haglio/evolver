@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """evolver.py - video collection maintenance pipeline.
 
-Runs on a 15-minute Task Scheduler trigger. Stages:
+Invoked by the tray app scheduler or directly via CLI. Stages:
   1. sort       - move new videos from inbox into sorted folders by source/orientation
   2. purge      - remove weird outputs and their matching sources
   3. scripts    - align funscripts to mirror the video library tree

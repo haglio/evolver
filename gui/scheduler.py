@@ -10,8 +10,8 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 class PipelineScheduler(QObject):
     """Fires run_requested at clock-aligned intervals (e.g. :00, :10, :20).
 
-    The scheduler silently drops ticks while a run is in progress (mirrors the
-    Windows Task Scheduler IgnoreNew policy). Pause/resume controls the timer.
+    The scheduler silently drops ticks while a run is in progress (any tick
+    that arrives mid-run is ignored). Pause/resume controls the timer.
     """
 
     run_requested = pyqtSignal(str)  # "scheduled" or "manual"
