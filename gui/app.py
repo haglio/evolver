@@ -6,7 +6,7 @@ import ctypes
 import logging
 import sys
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from gui.main_window import EvolverMainWindow
 from gui.scheduler import PipelineScheduler
@@ -62,9 +62,9 @@ class EvolverApp:
 
         self._window = EvolverMainWindow()
         self._window.run_now_action.triggered.connect(self._scheduler.run_now)
-        self._window.active_toggle.triggered.connect(self._toggle_pause)
+        self._window.active_toggle.clicked.connect(self._toggle_pause)
         self._window.settings_action.triggered.connect(self._show_settings)
-        self._window.quit_action.triggered.connect(self._quit)
+        self._window.quit_action.triggered.connect(self._confirm_quit)
         self._window.refresh_history()
 
     def run(self) -> int:
@@ -142,6 +142,17 @@ class EvolverApp:
 
         self._tray.showMessage("Evolver", f"Pipeline error: {message}", self._tray.MessageIcon.Critical, 8000)
         log.error("Pipeline error: %s", message)
+
+    def _confirm_quit(self):
+        result = QMessageBox.question(
+            self._window,
+            "Quit Evolver",
+            "Are you sure?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if result == QMessageBox.StandardButton.Yes:
+            self._quit()
 
     def _quit(self):
         if self._worker is not None and self._worker.isRunning():
