@@ -64,6 +64,7 @@ def check_dependencies():
 def run_pipeline(
     on_stage_start: Callable[[str], None] | None = None,
     on_stage_complete: Callable[[str, object | None, float, str], None] | None = None,
+    on_stage_progress: Callable[[str, int, int], None] | None = None,
 ) -> PipelineResult:
     """Run the full evolver pipeline, optionally reporting progress via callbacks.
 
@@ -117,10 +118,12 @@ def run_pipeline(
         upscale_skipped = True
         _skip_stage("upscale", "cpu_busy")
     else:
-        upscale_result = _run_stage(
-            "upscale", upscale.run,
+        upscale_kwargs: dict = dict(
             priority_files=priority_files, max_items=config.UPSCALE_BATCH_LIMIT,
         )
+        if on_stage_progress is not None:
+            upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
+        upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
 
     duplicate_sizes_result = _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
 

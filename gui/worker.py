@@ -22,6 +22,7 @@ class PipelineWorker(QThread):
 
     stage_started = pyqtSignal(str)           # stage_name
     stage_completed = pyqtSignal(str, object, float, str)  # name, result, elapsed, status
+    stage_progress = pyqtSignal(str, int, int)  # name, current, total
     pipeline_finished = pyqtSignal(object)    # RunRecord
     pipeline_error = pyqtSignal(str)          # error message
 
@@ -36,6 +37,7 @@ class PipelineWorker(QThread):
             result = evolver.run_pipeline(
                 on_stage_start=self._on_stage_start,
                 on_stage_complete=self._on_stage_complete,
+                on_stage_progress=self._on_stage_progress,
             )
             record = RunRecord.from_pipeline_result(result, trigger=self._trigger)
             try:
@@ -51,3 +53,6 @@ class PipelineWorker(QThread):
 
     def _on_stage_complete(self, name: str, result: object, elapsed: float, status: str):
         self.stage_completed.emit(name, result, elapsed, status)
+
+    def _on_stage_progress(self, name: str, current: int, total: int):
+        self.stage_progress.emit(name, current, total)

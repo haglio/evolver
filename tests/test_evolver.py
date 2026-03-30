@@ -286,6 +286,54 @@ class TestRunPipeline(unittest.TestCase):
             result = evolver.run_pipeline()
         self.assertGreater(result.duration_seconds, 0.0)
 
+    def test_on_stage_progress_forwarded_to_upscale(self):
+        """When on_stage_progress is provided, upscale.run receives on_progress."""
+        on_progress = Mock()
+        stack, mocks = self._patch_all_stages(
+            has_pending_work=Mock(return_value=True),
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+        )
+        with stack:
+            evolver.run_pipeline(on_stage_progress=on_progress)
+        # upscale.run should have been called with on_progress kwarg
+        call_kwargs = mocks["upscale_run"].call_args.kwargs
+        self.assertIn("on_progress", call_kwargs)
+        self.assertIsNotNone(call_kwargs["on_progress"])
+
+    def test_on_stage_progress_not_passed_when_none(self):
+        """When on_stage_progress is None, upscale.run does not receive on_progress."""
+        stack, mocks = self._patch_all_stages(
+            has_pending_work=Mock(return_value=True),
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+        )
+        with stack:
+            evolver.run_pipeline(on_stage_progress=None)
+        call_kwargs = mocks["upscale_run"].call_args.kwargs
+        self.assertNotIn("on_progress", call_kwargs)
+
+    def test_on_stage_progress_callback_binds_stage_name(self):
+        """The on_progress closure passed to upscale.run calls on_stage_progress with stage name."""
+        progress_calls = []
+
+        def capture_upscale_run(**kwargs):
+            # Simulate upscale calling on_progress
+            cb = kwargs.get("on_progress")
+            if cb:
+                cb(1, 5)
+                cb(2, 5)
+            return Mock(failed=0, deferred_low_disk=False, pending_after_run=0)
+
+        stack, _ = self._patch_all_stages(
+            has_pending_work=Mock(return_value=True),
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            upscale_run=Mock(side_effect=capture_upscale_run),
+        )
+        with stack:
+            evolver.run_pipeline(
+                on_stage_progress=lambda name, cur, tot: progress_calls.append((name, cur, tot)),
+            )
+        self.assertEqual(progress_calls, [("upscale", 1, 5), ("upscale", 2, 5)])
+
 
 if __name__ == "__main__":
     unittest.main()
