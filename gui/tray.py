@@ -62,6 +62,9 @@ class EvolverTray(QSystemTrayIcon):
 
         self._menu.addSeparator()
 
+        self.restart_action = QAction("Restart", self._menu)
+        self._menu.addAction(self.restart_action)
+
         self.quit_action = QAction("Quit", self._menu)
         self._menu.addAction(self.quit_action)
 

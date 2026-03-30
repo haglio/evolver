@@ -229,6 +229,10 @@ class EvolverMainWindow(QMainWindow):
         self.settings_action = QAction("\u2699  Settings", self)
         toolbar.addAction(self.settings_action)
 
+        # Restart
+        self.restart_action = QAction("\u21BB  Restart", self)
+        toolbar.addAction(self.restart_action)
+
         # Quit
         self.quit_action = QAction("\u23FB  Quit", self)
         toolbar.addAction(self.quit_action)

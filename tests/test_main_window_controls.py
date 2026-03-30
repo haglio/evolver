@@ -22,6 +22,12 @@ class TestMainWindowToolbarExists(unittest.TestCase):
         toolbars = self.window.findChildren(QToolBar)
         self.assertGreaterEqual(len(toolbars), 1)
 
+    def test_has_restart_action(self):
+        self.assertIsNotNone(self.window.restart_action)
+
+    def test_restart_action_has_circular_arrow_icon(self):
+        self.assertIn("\u21BB", self.window.restart_action.text())
+
     def test_has_quit_action(self):
         self.assertIsNotNone(self.window.quit_action)
 
@@ -147,6 +153,22 @@ class TestToolbarAppWiring(unittest.TestCase):
         self.assertTrue(app._window.run_now_action.receivers(app._window.run_now_action.triggered) > 0)
         self.assertTrue(app._window.settings_action.receivers(app._window.settings_action.triggered) > 0)
         self.assertTrue(app._window.active_toggle.receivers(app._window.active_toggle.clicked) > 0)
+
+    def test_app_connects_window_restart_action(self):
+        from gui.app import EvolverApp
+
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        self.assertTrue(app._window.restart_action.receivers(app._window.restart_action.triggered) > 0)
+
+    def test_app_connects_tray_restart_action(self):
+        from gui.app import EvolverApp
+
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        self.assertTrue(app._tray.restart_action.receivers(app._tray.restart_action.triggered) > 0)
 
 
 if __name__ == "__main__":
