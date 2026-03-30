@@ -127,5 +127,30 @@ class TestPopupAutoClose(unittest.TestCase):
         self.assertEqual(args[0][0], 2000)
 
 
+class TestPopupPositioning(unittest.TestCase):
+    def test_centers_on_anchor_window(self):
+        from PyQt6.QtWidgets import QMainWindow
+        from gui.progress_popup import ProgressPopup
+
+        anchor = QMainWindow()
+        anchor.resize(800, 600)
+        anchor.move(200, 100)
+        anchor.show()
+
+        popup = ProgressPopup()
+        popup.show_over(anchor)
+
+        # Popup frame center should be near anchor frame center.
+        # Y tolerance is larger because Tool windows have a smaller title
+        # bar than QMainWindow on Windows (~18px difference).
+        anchor_center = anchor.frameGeometry().center()
+        popup_center = popup.frameGeometry().center()
+        self.assertAlmostEqual(popup_center.x(), anchor_center.x(), delta=5)
+        self.assertAlmostEqual(popup_center.y(), anchor_center.y(), delta=25)
+
+        popup.close()
+        anchor.close()
+
+
 if __name__ == "__main__":
     unittest.main()

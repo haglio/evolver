@@ -5,7 +5,6 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -114,12 +113,11 @@ class ProgressPopup(QWidget):
     def _update_total(self):
         self._total_bar.setValue(sum(self._stage_values.values()))
 
-    def show(self):
-        screen = QApplication.primaryScreen()
-        if screen:
-            geo = screen.availableGeometry()
-            self.adjustSize()
-            x = geo.right() - self.width() - 20
-            y = geo.bottom() - self.height() - 20
-            self.move(x, y)
-        super().show()
+    def show_over(self, anchor: QWidget):
+        """Show the popup centered on *anchor*'s visible area."""
+        self.adjustSize()
+        center = anchor.frameGeometry().center()
+        x = center.x() - self.width() // 2
+        y = center.y() - self.height() // 2
+        self.move(x, y)
+        self.show()
