@@ -3,8 +3,8 @@
 
 Invoked by the tray app scheduler or directly via CLI. Stages:
   1. purge      - remove weird outputs and their matching sources
-  2. sort       - move new videos from inbox into sorted folders by source/orientation
-  3. metadata   - scrape AI prompt metadata into mirrored JSON files
+  2. metadata   - scrape AI prompt metadata into mirrored JSON files
+  3. sort       - move new videos from inbox into sorted folders by source/orientation
   4. upscale    - apply Topaz frame interpolation + 4x upscale to sorted videos
   5. verify     - check 1_sorted and 2_outbox are in 1-to-1 correspondence
   6. bookmarks  - sync Fun Time favorites into a Chrome bookmarks folder
@@ -102,8 +102,8 @@ def run_pipeline(
             on_stage_complete(name, None, 0.0, "skipped")
 
     purge_result = _run_stage("purge", purge_weird.run)
-    sort_result = _run_stage("sort", sort.run)
     prompt_scrape_result = _run_stage("metadata", prompt_scrape.run)
+    sort_result = _run_stage("sort", sort.run)
 
     priority_files = getattr(sort_result, "moved_files", [])
     upscale_result = None
