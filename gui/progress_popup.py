@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.progress import ALL_STAGES, STAGE_DISPLAY_NAMES
+from gui.progress import ALL_STAGES
 
 
 class ProgressPopup(QWidget):
@@ -44,7 +44,7 @@ class ProgressPopup(QWidget):
 
         for key in ALL_STAGES:
             row_layout = QHBoxLayout()
-            label = QLabel(STAGE_DISPLAY_NAMES.get(key, key))
+            label = QLabel(key)
             label.setFixedWidth(160)
             row_layout.addWidget(label)
 
