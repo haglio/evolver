@@ -190,12 +190,15 @@ class EvolverApp:
 
     def _restart(self):
         cmd = [sys.executable, str(config.PROJECT_DIR / "tray_app.py")]
-        if self._window.isVisible():
+        show = self._window.isVisible()
+        if show:
             cmd.append("--show-window")
-        subprocess.Popen(
+        proc = subprocess.Popen(
             cmd,
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
+        if show:
+            ctypes.windll.user32.AllowSetForegroundWindow(proc.pid)
         self._quit()
 
     def _quit(self):

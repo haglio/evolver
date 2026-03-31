@@ -66,7 +66,8 @@ class TestRestart(unittest.TestCase):
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
              patch.object(app, "_quit"), \
-             patch.object(app._window, "isVisible", return_value=True):
+             patch.object(app._window, "isVisible", return_value=True), \
+             patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow"):
             app._restart()
             args = mock_popen.call_args[0][0]
             self.assertIn("--show-window", args)
@@ -81,6 +82,30 @@ class TestRestart(unittest.TestCase):
             app._restart()
             args = mock_popen.call_args[0][0]
             self.assertNotIn("--show-window", args)
+
+    def test_restart_grants_foreground_to_child_when_window_visible(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        mock_proc = unittest.mock.MagicMock()
+        mock_proc.pid = 12345
+        with patch("gui.app.subprocess.Popen", return_value=mock_proc), \
+             patch.object(app, "_quit"), \
+             patch.object(app._window, "isVisible", return_value=True), \
+             patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as mock_allow:
+            app._restart()
+            mock_allow.assert_called_once_with(12345)
+
+    def test_restart_skips_foreground_grant_when_window_hidden(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch("gui.app.subprocess.Popen"), \
+             patch.object(app, "_quit"), \
+             patch.object(app._window, "isVisible", return_value=False), \
+             patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as mock_allow:
+            app._restart()
+            mock_allow.assert_not_called()
 
 
 class TestShowWindowFlag(unittest.TestCase):
