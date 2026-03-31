@@ -11,6 +11,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import config
+import tray_app
 from gui.run_record import load_runs
 
 from gui.main_window import EvolverMainWindow
@@ -80,6 +81,8 @@ class EvolverApp:
         self._tray.restart_action.triggered.connect(self._restart)
         self._tray.quit_action.triggered.connect(self._quit)
 
+        self._app.commitDataRequest.connect(self._on_session_end)
+
         self._window = EvolverMainWindow()
         self._window.run_now_action.triggered.connect(self._scheduler.run_now)
         self._window.active_toggle.clicked.connect(self._toggle_pause)
@@ -91,6 +94,7 @@ class EvolverApp:
 
     def run(self) -> int:
         if not _acquire_single_instance_mutex():
+            tray_app._write_crash("Already running:", "duplicate instance rejected by mutex\n")
             self._tray.showMessage("Evolver", "Already running.", self._tray.MessageIcon.Information, 3000)
             return 0
 
@@ -216,6 +220,13 @@ class EvolverApp:
                 self._tray.MessageIcon.Critical,
                 8000,
             )
+
+    def _on_session_end(self, manager):
+        """Log Windows session-management events (shutdown, logoff, installer restart)."""
+        tray_app._write_crash(
+            "Windows session end requested:",
+            f"allowsInteraction={manager.allowsInteraction()}\n",
+        )
 
     def _confirm_quit(self):
         result = QMessageBox.question(
