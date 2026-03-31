@@ -57,7 +57,7 @@ def setup_logging():
 def check_dependencies():
     if not config.FFMPEG.is_file():
         raise RuntimeError(f"Topaz ffmpeg not found: {config.FFMPEG}")
-    if subprocess.run(["ffprobe", "-version"], capture_output=True).returncode != 0:
+    if subprocess.run(["ffprobe", "-version"], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW).returncode != 0:
         raise RuntimeError("ffprobe not found in PATH")
 
 

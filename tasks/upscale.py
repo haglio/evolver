@@ -221,7 +221,11 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoa
         "-f", "mp4",
         str(tmp),
     ]
-    return subprocess.run(cmd, env=env, timeout=timeout).returncode == 0
+    return subprocess.run(
+        cmd, env=env, timeout=timeout,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    ).returncode == 0
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:

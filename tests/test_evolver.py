@@ -1,3 +1,4 @@
+import subprocess
 import unittest
 from contextlib import ExitStack
 from unittest.mock import Mock, patch
@@ -333,6 +334,18 @@ class TestRunPipeline(unittest.TestCase):
                 on_stage_progress=lambda name, cur, tot: progress_calls.append((name, cur, tot)),
             )
         self.assertEqual(progress_calls, [("upscale", 1, 5), ("upscale", 2, 5)])
+
+
+class TestCheckDependenciesWindowSuppression(unittest.TestCase):
+    def test_ffprobe_check_passes_create_no_window(self):
+        """ffprobe version check must not spawn a visible console window."""
+        with patch("evolver.subprocess.run") as mock_run, \
+             patch("evolver.config.FFMPEG", Mock(is_file=Mock(return_value=True))):
+            mock_run.return_value = Mock(returncode=0)
+            evolver.check_dependencies()
+            kwargs = mock_run.call_args.kwargs
+            self.assertIn("creationflags", kwargs)
+            self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
 
 
 if __name__ == "__main__":

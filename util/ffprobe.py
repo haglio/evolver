@@ -41,5 +41,6 @@ def _probe(file: Path, show_entries: str) -> str:
         ],
         capture_output=True,
         text=True,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     return result.stdout.strip()
