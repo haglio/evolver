@@ -348,6 +348,20 @@ class TestSubprocessTimeout(unittest.TestCase):
             self.assertEqual(progress_calls[0], (1, 1))
 
 
+class TestFfmpegWindowSuppression(unittest.TestCase):
+    def test_run_ffmpeg_passes_create_no_window(self):
+        """ffmpeg must not spawn a visible console window on Windows."""
+        from pathlib import Path
+        with patch("tasks.upscale.subprocess.run") as mock_run:
+            mock_run.return_value = unittest.mock.MagicMock(returncode=0)
+            upscale._run_ffmpeg(
+                Path("in.mp4"), Path("out.mp4"), {}, "filter", "tag",
+            )
+            kwargs = mock_run.call_args.kwargs
+            self.assertIn("creationflags", kwargs)
+            self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
+
+
 class TestFilterSelection(unittest.TestCase):
     def test_run_uses_t2v_filter_for_t2v_provider(self):
         with workspace_temp_dir() as root:
