@@ -60,6 +60,60 @@ class TestRestart(unittest.TestCase):
             args = mock_popen.call_args[0][0]
             self.assertEqual(args[1], str(config.PROJECT_DIR / "tray_app.py"))
 
+    def test_restart_passes_show_window_when_window_visible(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch("gui.app.subprocess.Popen") as mock_popen, \
+             patch.object(app, "_quit"), \
+             patch.object(app._window, "isVisible", return_value=True):
+            app._restart()
+            args = mock_popen.call_args[0][0]
+            self.assertIn("--show-window", args)
+
+    def test_restart_omits_show_window_when_window_hidden(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch("gui.app.subprocess.Popen") as mock_popen, \
+             patch.object(app, "_quit"), \
+             patch.object(app._window, "isVisible", return_value=False):
+            app._restart()
+            args = mock_popen.call_args[0][0]
+            self.assertNotIn("--show-window", args)
+
+
+class TestShowWindowFlag(unittest.TestCase):
+    """--show-window should open the main window on startup."""
+
+    def test_run_shows_window_when_flag_present(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch.object(app, "_show_window") as mock_show, \
+             patch("gui.app._acquire_single_instance_mutex", return_value=True), \
+             patch.object(app._tray, "show"), \
+             patch.object(app._scheduler, "start"), \
+             patch.object(app._app, "exec", return_value=0), \
+             patch("gui.app.sys") as mock_sys:
+            mock_sys.argv = ["tray_app.py", "--show-window"]
+            app.run()
+            mock_show.assert_called_once()
+
+    def test_run_does_not_show_window_without_flag(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch.object(app, "_show_window") as mock_show, \
+             patch("gui.app._acquire_single_instance_mutex", return_value=True), \
+             patch.object(app._tray, "show"), \
+             patch.object(app._scheduler, "start"), \
+             patch.object(app._app, "exec", return_value=0), \
+             patch("gui.app.sys") as mock_sys:
+            mock_sys.argv = ["tray_app.py"]
+            app.run()
+            mock_show.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

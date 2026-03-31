@@ -89,6 +89,8 @@ class EvolverApp:
 
         self._tray.show()
         self._scheduler.start()
+        if "--show-window" in sys.argv:
+            self._show_window()
         return self._app.exec()
 
     def _show_window(self):
@@ -187,8 +189,11 @@ class EvolverApp:
             self._quit()
 
     def _restart(self):
+        cmd = [sys.executable, str(config.PROJECT_DIR / "tray_app.py")]
+        if self._window.isVisible():
+            cmd.append("--show-window")
         subprocess.Popen(
-            [sys.executable, str(config.PROJECT_DIR / "tray_app.py")],
+            cmd,
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
         self._quit()
