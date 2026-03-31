@@ -54,15 +54,43 @@ class TestWriteCrash(unittest.TestCase):
     """_write_crash must write a timestamped entry to CRASH_LOG."""
 
     def test_writes_header_and_detail(self):
-        mock_path = MagicMock()
-        with patch.object(tray_app, "CRASH_LOG", mock_path):
-            tray_app._write_crash("Test header:", "some detail")
+        import tempfile
+        from pathlib import Path
 
-        mock_path.write_text.assert_called_once()
-        text = mock_path.write_text.call_args[0][0]
-        self.assertIn("Test header:", text)
-        self.assertIn("some detail", text)
-        self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
+            tmp = Path(f.name)
+
+        try:
+            with patch.object(tray_app, "CRASH_LOG", tmp):
+                tray_app._crash_logged = False
+                tray_app._write_crash("Test header:", "some detail")
+
+            text = tmp.read_text(encoding="utf-8")
+            self.assertIn("Test header:", text)
+            self.assertIn("some detail", text)
+            self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
+        finally:
+            tmp.unlink()
+
+    def test_appends_to_existing_content(self):
+        """Crash entries must append, not overwrite, so we don't lose evidence."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
+            f.write("[2026-03-31 10:00:00] Previous entry\n")
+            tmp = Path(f.name)
+
+        try:
+            with patch.object(tray_app, "CRASH_LOG", tmp):
+                tray_app._crash_logged = False
+                tray_app._write_crash("New crash:", "details here")
+
+            content = tmp.read_text(encoding="utf-8")
+            self.assertIn("Previous entry", content)
+            self.assertIn("New crash:", content)
+        finally:
+            tmp.unlink()
 
 
 class TestAtexitHandler(unittest.TestCase):
@@ -73,12 +101,51 @@ class TestAtexitHandler(unittest.TestCase):
 
     def test_atexit_writes_when_no_crash(self):
         mock_path = MagicMock()
+        mock_path.open = unittest.mock.mock_open()
         with patch.object(tray_app, "CRASH_LOG", mock_path):
             tray_app._on_exit()
 
-        mock_path.write_text.assert_called_once()
-        text = mock_path.write_text.call_args[0][0]
-        self.assertIn("Clean exit", text)
+        mock_path.open.assert_called_once()
+        handle = mock_path.open()
+        written = "".join(c.args[0] for c in handle.write.call_args_list)
+        self.assertIn("Clean exit", written)
+
+    def test_atexit_includes_stack_trace(self):
+        """Clean exit must log a stack trace so we can diagnose what triggered it."""
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
+            tmp = Path(f.name)
+
+        try:
+            with patch.object(tray_app, "CRASH_LOG", tmp):
+                tray_app._on_exit()
+
+            content = tmp.read_text(encoding="utf-8")
+            self.assertIn("Clean exit", content)
+            # Must contain stack frames showing the call chain
+            self.assertIn("_on_exit", content)
+        finally:
+            tmp.unlink()
+
+    def test_atexit_appends_to_existing_content(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
+            f.write("[2026-03-31 10:00:00] Previous crash entry\n")
+            tmp = Path(f.name)
+
+        try:
+            with patch.object(tray_app, "CRASH_LOG", tmp):
+                tray_app._on_exit()
+
+            content = tmp.read_text(encoding="utf-8")
+            self.assertIn("Previous crash entry", content)
+            self.assertIn("Clean exit", content)
+        finally:
+            tmp.unlink()
 
     def test_atexit_skips_when_crash_already_logged(self):
         tray_app._crash_logged = True

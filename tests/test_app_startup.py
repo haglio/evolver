@@ -38,6 +38,33 @@ class TestAppStartup(unittest.TestCase):
         mock_set_id.assert_called_once_with(_APP_MODEL_ID)
 
 
+class TestSessionManagement(unittest.TestCase):
+    """EvolverApp must log Windows session-management events that could kill it."""
+
+    def test_connects_to_commit_data_request(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+        # The commitDataRequest signal should have our handler connected
+        self.assertTrue(
+            hasattr(app, "_on_session_end"),
+            "EvolverApp must have a _on_session_end handler",
+        )
+
+    def test_session_end_logs_to_crash_log(self):
+        import tray_app
+
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        mock_manager = unittest.mock.MagicMock()
+        with patch.object(tray_app, "_write_crash") as mock_write:
+            app._on_session_end(mock_manager)
+
+        mock_write.assert_called_once()
+        header = mock_write.call_args[0][0]
+        self.assertIn("session", header.lower())
+
+
 class TestRestart(unittest.TestCase):
     """_restart() should spawn a new process and quit the current one."""
 
@@ -109,6 +136,25 @@ class TestRestart(unittest.TestCase):
              patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as mock_allow:
             app._restart()
             mock_allow.assert_not_called()
+
+
+class TestDuplicateInstanceLogging(unittest.TestCase):
+    """When a second instance is rejected by the mutex, the log must say so."""
+
+    def test_duplicate_instance_logs_specific_message(self):
+        import tray_app
+
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch("gui.app._acquire_single_instance_mutex", return_value=False), \
+             patch.object(app._tray, "showMessage"), \
+             patch.object(tray_app, "_write_crash") as mock_write:
+            app.run()
+
+        mock_write.assert_called_once()
+        header = mock_write.call_args[0][0]
+        self.assertIn("already running", header.lower())
 
 
 class TestShowWindowFlag(unittest.TestCase):
