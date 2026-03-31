@@ -23,6 +23,7 @@ class UpscaleResult:
     processed: int = 0
     already_done: int = 0
     failed: int = 0
+    timed_out: int = 0
     deferred_low_disk: bool = False
     pending_after_run: int = 0
 
@@ -94,9 +95,19 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
             filter_complex = config.UPSCALE_FILTER_DEFAULT
             videoai_tag = config.VIDEOAI_TAG_DEFAULT
 
+        ffmpeg_timeout = max(remaining_budget, 1) if run_budget_seconds else None
         ffmpeg_ok = False
         try:
-            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, filter_complex, videoai_tag)
+            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, filter_complex, videoai_tag, timeout=ffmpeg_timeout)
+        except subprocess.TimeoutExpired:
+            elapsed_at_timeout = time.monotonic() - started_at
+            log.info("FAILED (timed out after %.1fs): %s", elapsed_at_timeout, in_file)
+            tmp.unlink(missing_ok=True)
+            result.timed_out += 1
+            result.failed += 1
+            if on_progress:
+                on_progress(result.processed + result.failed, len(candidates))
+            break
         except OSError:
             log.exception("FAILED (ffmpeg launch error): %s", in_file)
 
@@ -177,7 +188,7 @@ def collect_candidates(priority_files: list[Path] | None = None, limit: int | No
     return candidates
 
 
-def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoai_tag: str) -> bool:
+def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoai_tag: str, timeout: float | None = None) -> bool:
     cmd = [
         str(config.FFMPEG),
         "-hide_banner", "-nostdin", "-y",
@@ -210,7 +221,7 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoa
         "-f", "mp4",
         str(tmp),
     ]
-    return subprocess.run(cmd, env=env).returncode == 0
+    return subprocess.run(cmd, env=env, timeout=timeout).returncode == 0
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:

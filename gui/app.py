@@ -7,6 +7,7 @@ import logging
 import subprocess
 import sys
 
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import config
@@ -58,6 +59,10 @@ class EvolverApp:
         self._worker: PipelineWorker | None = None
         self._stats_window: StatsWindow | None = None
         self._progress_popup: ProgressPopup | None = None
+
+        self._watchdog = QTimer()
+        self._watchdog.setSingleShot(True)
+        self._watchdog.timeout.connect(self._on_watchdog)
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.run_requested.connect(self._start_run)
@@ -149,8 +154,10 @@ class EvolverApp:
             self._progress_popup.show_over(self._window)
 
         self._worker.start()
+        self._watchdog.start(config.PIPELINE_WALL_TIMEOUT_SECONDS * 1000)
 
     def _on_finished(self, record):
+        self._watchdog.stop()
         self._scheduler.mark_idle()
         self._tray.set_running(False)
         if self._progress_popup is not None:
@@ -167,6 +174,7 @@ class EvolverApp:
             )
 
     def _on_error(self, message: str):
+        self._watchdog.stop()
         self._scheduler.mark_idle()
         self._tray.set_running(False)
         if self._progress_popup is not None:
@@ -176,6 +184,36 @@ class EvolverApp:
         if self._settings.enable_toasts:
             self._tray.showMessage("Evolver", f"Pipeline error: {message}", self._tray.MessageIcon.Critical, 8000)
         log.error("Pipeline error: %s", message)
+
+    def _on_watchdog(self):
+        if self._worker is None or not self._worker.isRunning():
+            return  # Run finished just before the timer fired
+
+        log.critical(
+            "Watchdog fired: pipeline exceeded %d-second wall-clock limit",
+            config.PIPELINE_WALL_TIMEOUT_SECONDS,
+        )
+
+        try:
+            self._worker.pipeline_finished.disconnect(self._on_finished)
+            self._worker.pipeline_error.disconnect(self._on_error)
+        except TypeError:
+            pass
+        self._worker = None
+
+        self._scheduler.mark_idle()
+        self._tray.set_running(False)
+        if self._progress_popup is not None:
+            self._progress_popup.on_pipeline_finished()
+        self._window.refresh_history()
+
+        if self._settings.enable_toasts:
+            self._tray.showMessage(
+                "Evolver",
+                f"Pipeline killed: exceeded {config.PIPELINE_WALL_TIMEOUT_SECONDS // 60}-minute wall-clock limit",
+                self._tray.MessageIcon.Critical,
+                8000,
+            )
 
     def _confirm_quit(self):
         result = QMessageBox.question(

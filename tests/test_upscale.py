@@ -1,4 +1,5 @@
 import json
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -38,7 +39,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
                 tmp.write_bytes(b"upscaled")
                 return True
 
@@ -85,7 +86,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             stale_partial.parent.mkdir(parents=True)
             stale_partial.write_bytes(b"partial")
 
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
                 tmp.write_bytes(b"upscaled")
                 return True
 
@@ -126,7 +127,7 @@ class TestUpscaleHelpers(unittest.TestCase):
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
 
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
                 tmp.write_bytes(b"upscaled")
                 return True
 
@@ -171,7 +172,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            def fake_run_ffmpeg_empty(_in_file, tmp, _env, _filter="", _tag=""):
+            def fake_run_ffmpeg_empty(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
                 tmp.write_bytes(b"")
                 return True
 
@@ -229,7 +230,7 @@ class TestOnProgressCallback(unittest.TestCase):
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
 
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
                 tmp.write_bytes(b"upscaled")
                 return True
 
@@ -275,7 +276,7 @@ class TestOnProgressCallback(unittest.TestCase):
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(b"video")
 
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag=""):
+            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
                 tmp.write_bytes(b"upscaled")
                 return True
 
@@ -285,6 +286,66 @@ class TestOnProgressCallback(unittest.TestCase):
                     result = upscale.run(max_items=5)
 
             self.assertEqual(result.processed, 1)
+
+
+class TestSubprocessTimeout(unittest.TestCase):
+    def test_run_records_timeout_when_ffmpeg_times_out(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    result = upscale.run(max_items=5)
+
+            self.assertEqual(result.timed_out, 1)
+            self.assertEqual(result.failed, 1)
+            self.assertEqual(result.processed, 0)
+
+
+    def test_run_breaks_loop_after_timeout(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            for name in ("a", "b"):
+                f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_bytes(b"video")
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)) as mock_ffmpeg, \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    result = upscale.run(max_items=10)
+
+            mock_ffmpeg.assert_called_once()
+            self.assertEqual(result.timed_out, 1)
+            self.assertEqual(result.failed, 1)
+            self.assertEqual(result.pending_after_run, 1)
+
+    def test_on_progress_called_for_timed_out_item(self):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            out_dir = root / "out"
+            weird_dir = root / "weird"
+            in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            progress_calls = []
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    upscale.run(max_items=5, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+
+            self.assertEqual(len(progress_calls), 1)
+            self.assertEqual(progress_calls[0], (1, 1))
 
 
 class TestFilterSelection(unittest.TestCase):
@@ -305,7 +366,7 @@ class TestFilterSelection(unittest.TestCase):
 
             captured_args = {}
 
-            def fake_run_ffmpeg(_in_file, tmp, _env, filter_complex, videoai_tag):
+            def fake_run_ffmpeg(_in_file, tmp, _env, filter_complex, videoai_tag, **kwargs):
                 captured_args["filter_complex"] = filter_complex
                 captured_args["videoai_tag"] = videoai_tag
                 tmp.write_bytes(b"upscaled")
@@ -336,7 +397,7 @@ class TestFilterSelection(unittest.TestCase):
 
             captured_args = {}
 
-            def fake_run_ffmpeg(_in_file, tmp, _env, filter_complex, videoai_tag):
+            def fake_run_ffmpeg(_in_file, tmp, _env, filter_complex, videoai_tag, **kwargs):
                 captured_args["filter_complex"] = filter_complex
                 captured_args["videoai_tag"] = videoai_tag
                 tmp.write_bytes(b"upscaled")
