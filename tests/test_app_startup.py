@@ -1,11 +1,14 @@
 """Smoke test: verify the tray app can be constructed without crashing."""
 
+import ctypes
+import os
 import unittest
 from unittest.mock import patch
 
 from PyQt6.QtWidgets import QApplication
 
-from gui.app import EvolverApp, _APP_MODEL_ID
+import gui.app
+from gui.app import EvolverApp, _APP_MODEL_ID, _acquire_single_instance_mutex
 
 _app = QApplication.instance() or QApplication([])
 
@@ -138,6 +141,41 @@ class TestShowWindowFlag(unittest.TestCase):
             mock_sys.argv = ["tray_app.py"]
             app.run()
             mock_show.assert_not_called()
+
+
+class TestSingleInstanceMutex(unittest.TestCase):
+    """Verify the single-instance mutex works correctly and is immune to
+    GetLastError clobbering by injected DLLs (e.g. Windhawk)."""
+
+    def test_first_instance_returns_true(self):
+        unique = f"TestMutex_{os.getpid()}"
+        with patch("gui.app._MUTEX_NAME", unique):
+            self.assertTrue(_acquire_single_instance_mutex())
+
+    def test_second_instance_returns_false(self):
+        unique = f"TestMutex_Dup_{os.getpid()}"
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
+        kernel32.CreateMutexW.restype = ctypes.c_void_p
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel32.CloseHandle.restype = ctypes.c_int
+        h = kernel32.CreateMutexW(None, False, unique)
+        self.assertTrue(h, "Setup: CreateMutexW should succeed")
+        try:
+            with patch("gui.app._MUTEX_NAME", unique):
+                self.assertFalse(_acquire_single_instance_mutex())
+        finally:
+            kernel32.CloseHandle(h)
+
+    def test_not_vulnerable_to_stale_get_last_error(self):
+        """CreateMutexW must use use_last_error=True so that injected DLLs
+        (e.g. Windhawk) cannot clobber GetLastError between the call and
+        the error check.  The module must NOT expose a direct _GetLastError."""
+        self.assertFalse(
+            hasattr(gui.app, "_GetLastError"),
+            "_GetLastError (direct kernel32 call) is vulnerable to clobbering "
+            "by injected DLLs; use use_last_error=True + ctypes.get_last_error()",
+        )
 
 
 if __name__ == "__main__":
