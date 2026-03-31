@@ -61,7 +61,3 @@ def active_outbox_dirs() -> list[Path]:
 
 def active_weird_dirs() -> list[Path]:
     return [WEIRD_DIR]
-
-
-def ai_funscripted_dupes_dir() -> Path:
-    return VIDEO_LIBRARY_DIR / "2D" / "non_AI" / "actually_AI_but_funscripted"

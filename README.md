@@ -4,7 +4,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 
 1. Sorts videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`
 2. Purges `kinda_weird/` outputs from the active outbox set — normally `2_outbox`, and both `2_outbox` plus `3_new_outbox` while regeneration mode is enabled. It also deletes each weird file's corresponding source from `1_sorted/`. A Windows error dialog pops up if any source file cannot be found.
-3. Rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match in the same library lane; scripts under `2D/AI` only consider `2D/AI` videos, and scripts under `2D/non_AI` only consider `2D/non_AI` videos. Unmatched or ambiguous names are logged and left alone. After that, Evolver also copies missing funscripts across matching processed/original video variants, including `1_sorted` <-> `2_outbox` / `3_new_outbox` `_topaz` pairs and matching `processed` <-> non-processed variants within the same source bucket. Finally, any AI video that has a funscript under `videos/scripts/scripts/2D/AI` is duplicated into `videos/videos/2D/non_AI/actually_AI_but_funscripted`, preserving its relative subfolders, so Fun Time's primary VLC window can pick it up.
+3. Rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match in the same library lane; scripts under `2D/AI` only consider `2D/AI` videos, and scripts under `2D/non_AI` only consider `2D/non_AI` videos. Unmatched or ambiguous names are logged and left alone. After that, Evolver also copies missing funscripts across matching processed/original video variants, including `1_sorted` <-> `2_outbox` / `3_new_outbox` `_topaz` pairs and matching `processed` <-> non-processed variants within the same source bucket.
 4. Prunes stale rows from `fun_time/favs.csv` when the `local_file` or `file` column points at a missing local file, while treating a `2_outbox` favorite as still valid if the matching file currently lives in `3_new_outbox` during regeneration. The CSV itself always keeps `2_outbox` paths, then the remaining `web_url` values are synced into a `Fun Time Favs` folder on the Chrome bookmarks bar for the Chrome profile whose visible name is `Blair`.
 5. Scrapes prompt metadata for AI videos into `videos/prompts`, mirroring the active outbox tree. Each JSON file is named after its video and currently supports Provider prompt extraction with `video_prompt` plus optional source-image prompt keys.
 6. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
@@ -22,7 +22,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `config.py` - paths and settings
   - `tasks/sort.py` - Stage 1 inbox sorting
   - `tasks/purge_weird.py` - Stage 2 kinda_weird cleanup
-  - `tasks/scripts_sync.py` - Stage 3 funscript/video tree alignment, processed/original variant copying, and AI-video duplication for Fun Time's primary VLC window
+  - `tasks/scripts_sync.py` - Stage 3 funscript/video tree alignment and processed/original variant copying
   - `tasks/bookmarks_sync.py` - Stage 3.5 favorites -> Chrome bookmarks sync
   - `tasks/prompt_scrape.py` - Stage 4 prompt scraping into mirrored JSON files
   - `tasks/upscale.py` - Stage 5 Topaz processing
@@ -131,7 +131,7 @@ What is covered:
 - Sort-stage collision behavior and empty-dir cleanup (`tasks/sort.py`)
 - Kinda-weird cleanup and missing-source popup behavior (`tasks/purge_weird.py`)
 - Duplicate-size scan for likely same-content source videos (`check_duplicate_sizes.py`)
-- Funscript alignment so `videos/scripts/scripts` mirrors `videos/videos` when basename matches are unique within the same `AI` or `non_AI` lane, plus variant-copy support for processed/original counterparts and AI-video duplication into `actually_AI_but_funscripted` (`tasks/scripts_sync.py`)
+- Funscript alignment so `videos/scripts/scripts` mirrors `videos/videos` when basename matches are unique within the same `AI` or `non_AI` lane, plus variant-copy support for processed/original counterparts (`tasks/scripts_sync.py`)
 - Correspondence rules for `<sorted_stem>_topaz<ext>` matching (`check_correspondence.py`)
 - Scheduler flow behavior, including always-running purge and pending-work-based Stage 3 decisions (`evolver.py`)
 - Already-processed detection (`tasks/upscale.py`)
@@ -151,7 +151,7 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 ## Notes
 
 - Stage 2 (purge_weird) always runs, regardless of Stage 1 activity.
-- Stage 3 always runs after purge. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` lane within `videos/videos`, then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously, then mirrors any funscripted AI videos into `videos/videos/2D/non_AI/actually_AI_but_funscripted`.
+- Stage 3 always runs after purge. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` lane within `videos/videos`, then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously.
 - Stage 4 always runs after scripts sync. It first normalizes any accidental `3_new_outbox` references in `favs.csv` back to `2_outbox`, then removes rows whose local favorite file no longer exists in either `2_outbox` or `3_new_outbox`, and finally resolves the Chrome profile named `Blair` from Chrome `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the remaining CSV `web_url` values.
 - Stage 5 writes prompt JSON files under `videos/prompts/<2_outbox or 3_new_outbox>/.../<video-name>.json`, skipping files that already have JSON output. The current scraper only extracts Provider prompts.
 - Stage 6 runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick.
