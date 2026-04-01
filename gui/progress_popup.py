@@ -23,8 +23,7 @@ class ProgressPopup(QWidget):
         super().__init__(parent)
         self.setWindowTitle("Evolver - Pipeline Progress")
         self.setWindowFlags(
-            Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.Tool
+            Qt.WindowType.Tool
             | Qt.WindowType.WindowCloseButtonHint
         )
         self.setFixedWidth(400)

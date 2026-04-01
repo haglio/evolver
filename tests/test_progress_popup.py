@@ -29,9 +29,9 @@ class TestPopupConstruction(unittest.TestCase):
     def test_total_bar_range_is_800(self):
         self.assertEqual(self.popup._total_bar.maximum(), 800)
 
-    def test_window_flags_include_tool_and_stay_on_top(self):
+    def test_window_flags_include_tool_without_stay_on_top(self):
         flags = self.popup.windowFlags()
-        self.assertTrue(flags & Qt.WindowType.WindowStaysOnTopHint)
+        self.assertFalse(flags & Qt.WindowType.WindowStaysOnTopHint)
         self.assertTrue(flags & Qt.WindowType.Tool)
 
 

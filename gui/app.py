@@ -153,7 +153,7 @@ class EvolverApp:
         self._worker.pipeline_error.connect(self._on_error)
 
         if self._window.isVisible():
-            self._progress_popup = ProgressPopup()
+            self._progress_popup = ProgressPopup(parent=self._window)
             self._worker.stage_started.connect(self._progress_popup.on_stage_started)
             self._worker.stage_completed.connect(self._progress_popup.on_stage_completed)
             self._worker.stage_progress.connect(self._progress_popup.on_stage_progress)
