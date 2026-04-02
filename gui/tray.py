@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 import qtawesome as qta
 
 from shared_ui.colors import BLUE, TOGGLE_KNOB
+from shared_ui.fonts import make_font, FONT_UI
 
 _ICON_COLOR = "#333"
 
@@ -20,8 +21,7 @@ def _make_icon() -> QIcon:
     px.fill(BLUE)
     painter = QPainter(px)
     painter.setPen(TOGGLE_KNOB)
-    font = QFont("Segoe UI", 18, QFont.Weight.Bold)
-    painter.setFont(font)
+    painter.setFont(make_font(FONT_UI, 18, bold=True))
     painter.drawText(px.rect(), 0x0084, "E")  # AlignCenter
     painter.end()
     return QIcon(px)
