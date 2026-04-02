@@ -4,16 +4,22 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QColor, QFont
+from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QFont
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
+
+import qtawesome as qta
+
+from shared_ui.colors import BLUE, TOGGLE_KNOB
+
+_ICON_COLOR = "#333"
 
 
 def _make_icon() -> QIcon:
     """Draw a simple 'E' icon for the tray."""
     px = QPixmap(32, 32)
-    px.fill(QColor(0x30, 0x80, 0xE0))
+    px.fill(BLUE)
     painter = QPainter(px)
-    painter.setPen(QColor(255, 255, 255))
+    painter.setPen(TOGGLE_KNOB)
     font = QFont("Segoe UI", 18, QFont.Weight.Bold)
     painter.setFont(font)
     painter.drawText(px.rect(), 0x0084, "E")  # AlignCenter
@@ -43,32 +49,32 @@ class EvolverTray(QSystemTrayIcon):
 
         self._menu.addSeparator()
 
-        self.open_action = QAction("Open", self._menu)
+        self.open_action = QAction(qta.icon("fa5s.external-link-alt", color=_ICON_COLOR), "Open", self._menu)
         font = self.open_action.font()
         font.setBold(True)
         self.open_action.setFont(font)
         self._menu.addAction(self.open_action)
 
-        self.run_now_action = QAction("Run Now", self._menu)
+        self.run_now_action = QAction(qta.icon("fa5s.play", color=_ICON_COLOR), "Run Now", self._menu)
         self._menu.addAction(self.run_now_action)
 
-        self.pause_action = QAction("Pause Scheduling", self._menu)
+        self.pause_action = QAction(qta.icon("fa5s.pause", color=_ICON_COLOR), "Pause Scheduling", self._menu)
         self._menu.addAction(self.pause_action)
 
         self._menu.addSeparator()
 
-        self.settings_action = QAction("Settings...", self._menu)
+        self.settings_action = QAction(qta.icon("fa5s.cog", color=_ICON_COLOR), "Settings...", self._menu)
         self._menu.addAction(self.settings_action)
 
-        self.stats_action = QAction("Stats...", self._menu)
+        self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats...", self._menu)
         self._menu.addAction(self.stats_action)
 
         self._menu.addSeparator()
 
-        self.restart_action = QAction("Restart", self._menu)
+        self.restart_action = QAction(qta.icon("fa5s.redo", color=_ICON_COLOR), "Restart", self._menu)
         self._menu.addAction(self.restart_action)
 
-        self.quit_action = QAction("Quit", self._menu)
+        self.quit_action = QAction(qta.icon("fa5s.power-off", color=_ICON_COLOR), "Quit", self._menu)
         self._menu.addAction(self.quit_action)
 
         self.setContextMenu(self._menu)

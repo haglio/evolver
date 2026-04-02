@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QColor, QFont
+from PyQt6.QtGui import QAction, QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -36,10 +36,15 @@ class _NoFocusRectDelegate(QItemDelegate):
         pass  # Don't draw the focus rectangle
 
 
+import qtawesome as qta
+
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
 from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.toggle_switch import ToggleSwitch
+from shared_ui.colors import GREEN, RED, STATUS_NUMBER, STATUS_SKIP
+
+_ICON_COLOR = "#ddd"
 
 
 class RunDetailWidget(QWidget):
@@ -91,7 +96,7 @@ class RunDetailWidget(QWidget):
             num = STAGE_NUMBER.get(stage_key, i + 1)
             num_item = QTableWidgetItem(str(num))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            num_item.setForeground(QColor(0x80, 0x80, 0x80))
+            num_item.setForeground(STATUS_NUMBER)
             num_item.setFlags(no_edit)
             self._table.setItem(i, 0, num_item)
 
@@ -105,11 +110,11 @@ class RunDetailWidget(QWidget):
             status_item = QTableWidgetItem(stage.get("status", ""))
             status = stage.get("status", "")
             if status == "completed":
-                status_item.setForeground(QColor(0x30, 0xA0, 0x30))
+                status_item.setForeground(GREEN)
             elif status == "skipped":
-                status_item.setForeground(QColor(0x80, 0x80, 0x80))
+                status_item.setForeground(STATUS_SKIP)
             elif status == "error":
-                status_item.setForeground(QColor(0xE0, 0x30, 0x30))
+                status_item.setForeground(RED)
             status_item.setFlags(no_edit)
             self._table.setItem(i, 2, status_item)
 
@@ -192,6 +197,7 @@ class EvolverMainWindow(QMainWindow):
         toolbar = QToolBar()
         toolbar.setMovable(False)
         toolbar.setFloatable(False)
+        toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.addToolBar(toolbar)
 
         # Small left pad so the toggle isn't flush with the window edge
@@ -215,25 +221,25 @@ class EvolverMainWindow(QMainWindow):
         toolbar.addWidget(spacer)
 
         # Run Now
-        self.run_now_action = QAction("\u25B6  Run Now", self)
+        self.run_now_action = QAction(qta.icon("fa5s.play", color=_ICON_COLOR), "Run Now", self)
         toolbar.addAction(self.run_now_action)
 
         toolbar.addSeparator()
 
         # Settings
-        self.settings_action = QAction("\u2699  Settings", self)
+        self.settings_action = QAction(qta.icon("fa5s.cog", color=_ICON_COLOR), "Settings", self)
         toolbar.addAction(self.settings_action)
 
         # Stats
-        self.stats_action = QAction("\u2261  Stats", self)
+        self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats", self)
         toolbar.addAction(self.stats_action)
 
         # Restart
-        self.restart_action = QAction("\u21BB  Restart", self)
+        self.restart_action = QAction(qta.icon("fa5s.redo", color=_ICON_COLOR), "Restart", self)
         toolbar.addAction(self.restart_action)
 
         # Quit
-        self.quit_action = QAction("\u23FB  Quit", self)
+        self.quit_action = QAction(qta.icon("fa5s.power-off", color=_ICON_COLOR), "Quit", self)
         toolbar.addAction(self.quit_action)
 
     def refresh_history(self):
@@ -244,7 +250,7 @@ class EvolverMainWindow(QMainWindow):
             text = format_run_label(record.started_at, record.duration_seconds, record.status)
             item = QListWidgetItem(text)
             if record.status != "success":
-                item.setForeground(QColor(0xE0, 0x30, 0x30))
+                item.setForeground(RED)
             self._history_list.addItem(item)
 
         if self._records:
