@@ -25,8 +25,8 @@ class TestMainWindowToolbarExists(unittest.TestCase):
     def test_has_restart_action(self):
         self.assertIsNotNone(self.window.restart_action)
 
-    def test_restart_action_has_circular_arrow_icon(self):
-        self.assertIn("\u21BB", self.window.restart_action.text())
+    def test_restart_action_has_icon(self):
+        self.assertFalse(self.window.restart_action.icon().isNull())
 
     def test_has_quit_action(self):
         self.assertIsNotNone(self.window.quit_action)

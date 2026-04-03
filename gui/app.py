@@ -20,6 +20,7 @@ from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
 from gui.stats_window import StatsWindow
+from gui.taskbar import set_taskbar_properties
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
 
@@ -84,6 +85,13 @@ class EvolverApp:
         self._app.commitDataRequest.connect(self._on_session_end)
 
         self._window = EvolverMainWindow()
+        set_taskbar_properties(
+            int(self._window.winId()),
+            _APP_MODEL_ID,
+            f'"{sys.executable}" "{config.PROJECT_DIR / "tray_app.py"}" --show-window',
+            "Evolver",
+            str(config.PROJECT_DIR / "icon.ico"),
+        )
         self._window.run_now_action.triggered.connect(self._scheduler.run_now)
         self._window.active_toggle.clicked.connect(self._toggle_pause)
         self._window.settings_action.triggered.connect(self._show_settings)
