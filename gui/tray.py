@@ -4,27 +4,22 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QFont
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
 import qtawesome as qta
 
-from shared_ui.colors import BLUE, TOGGLE_KNOB
-from shared_ui.fonts import make_font, FONT_UI
+import config
 
 _ICON_COLOR = "#333"
 
 
 def _make_icon() -> QIcon:
-    """Draw a simple 'E' icon for the tray."""
-    px = QPixmap(32, 32)
-    px.fill(BLUE)
-    painter = QPainter(px)
-    painter.setPen(TOGGLE_KNOB)
-    painter.setFont(make_font(FONT_UI, 18, bold=True))
-    painter.drawText(px.rect(), 0x0084, "E")  # AlignCenter
-    painter.end()
-    return QIcon(px)
+    """Load the E icon from the project .ico file."""
+    icon_path = config.PROJECT_DIR / "icon.ico"
+    if icon_path.exists():
+        return QIcon(str(icon_path))
+    return QIcon()
 
 
 class EvolverTray(QSystemTrayIcon):
