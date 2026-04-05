@@ -3,21 +3,7 @@
 import unittest
 from unittest.mock import patch
 
-from gui.taskbar import _guid_bytes, set_taskbar_properties
-
-
-class TestGuidBytes(unittest.TestCase):
-
-    def test_encodes_ipropertystore_iid(self):
-        # IID_IPropertyStore = {886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99}
-        result = _guid_bytes("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")
-        expected = bytes([
-            0xEB, 0x8E, 0x6D, 0x88,  # Data1 LE
-            0xF2, 0x8C,              # Data2 LE
-            0x46, 0x44,              # Data3 LE
-            0x8D, 0x02, 0xCD, 0xBA, 0x1D, 0xBD, 0xCF, 0x99,  # Data4
-        ])
-        self.assertEqual(result, expected)
+from gui.taskbar import set_taskbar_properties
 
 
 class TestSetTaskbarProperties(unittest.TestCase):

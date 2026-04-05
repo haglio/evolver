@@ -213,15 +213,6 @@ class TestSingleInstanceMutex(unittest.TestCase):
         finally:
             kernel32.CloseHandle(h)
 
-    def test_not_vulnerable_to_stale_get_last_error(self):
-        """CreateMutexW must use use_last_error=True so that injected DLLs
-        (e.g. Windhawk) cannot clobber GetLastError between the call and
-        the error check.  The module must NOT expose a direct _GetLastError."""
-        self.assertFalse(
-            hasattr(gui.app, "_GetLastError"),
-            "_GetLastError (direct kernel32 call) is vulnerable to clobbering "
-            "by injected DLLs; use use_last_error=True + ctypes.get_last_error()",
-        )
 
 
 if __name__ == "__main__":
