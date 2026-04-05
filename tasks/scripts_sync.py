@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util.media_files import is_finalized_video_file, iter_finalized_videos, remove_empty_dirs
+from util.media_files import iter_finalized_videos, remove_empty_dirs
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -224,20 +224,6 @@ def _video_match_bucket(video_path: Path) -> str | None:
     if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
         return parts[1]
     return None
-
-
-def _video_path_for_script(script_path: Path) -> Path | None:
-    rel = script_path.relative_to(config.SCRIPT_LIBRARY_DIR).with_suffix("")
-    parent = config.VIDEO_LIBRARY_DIR / rel.parent
-    stem = rel.name
-    matches = sorted(
-        candidate
-        for candidate in parent.glob(f"{stem}.*")
-        if is_finalized_video_file(candidate, config.VIDEO_EXTENSIONS)
-    )
-    if len(matches) != 1:
-        return None
-    return matches[0]
 
 
 def _normalized_stem(stem: str) -> str:
