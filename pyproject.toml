@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "vulture"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
