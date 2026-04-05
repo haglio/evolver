@@ -12,6 +12,5 @@ STAGES = [
 ]
 
 ALL_STAGES = [key for key, _, _ in STAGES]
-STAGE_DISPLAY_NAMES = {key: name for key, name, _ in STAGES}
 STAGE_TOOLTIPS = {key: tip for key, _, tip in STAGES}
 STAGE_NUMBER = {key: i + 1 for i, (key, _, _) in enumerate(STAGES)}

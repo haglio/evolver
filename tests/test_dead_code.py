@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 def test_no_dead_code():
     result = subprocess.run(
-        [sys.executable, "-m", "vulture", ".", "--exclude", ".venv,tests"],
+        [sys.executable, "-m", "vulture", ".", "--exclude", ".venv,tests,.claude"],
         capture_output=True,
         text=True,
         cwd=str(PROJECT_ROOT),
