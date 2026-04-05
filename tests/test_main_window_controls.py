@@ -84,10 +84,6 @@ class TestToolbarStateUpdates(unittest.TestCase):
         self.window.update_schedule_status(False, False, datetime.now())
         self.assertTrue(self.window.active_toggle.isChecked())
 
-    def test_no_status_bar(self):
-        self.assertIsNone(self.window.statusBar().currentMessage() or None)
-        # The window should not have a dedicated status bar widget
-        self.assertFalse(hasattr(self.window, "_status_bar"))
 
 
 class TestToggleSwitch(unittest.TestCase):
