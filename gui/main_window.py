@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QFont
+from PyQt6.QtGui import QAction, QColor, QFont
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -42,7 +42,11 @@ import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
 from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.toggle_switch import ToggleSwitch
-from shared_ui.colors import GREEN, RED, STATUS_NUMBER, STATUS_SKIP
+
+GREEN = QColor(0x30, 0xA0, 0x30)
+RED = QColor(255, 60, 60)
+STATUS_NUMBER = QColor(0x80, 0x80, 0x80)
+STATUS_SKIP = QColor(0x80, 0x80, 0x80)
 
 _ICON_COLOR = "#ddd"
 

@@ -230,11 +230,17 @@ class EvolverApp:
             )
 
     def _on_session_end(self, manager):
-        """Log Windows session-management events (shutdown, logoff, installer restart)."""
-        tray_app._write_crash(
+        """Handle Windows session-management events (shutdown, logoff, installer restart).
+
+        Logs the event and initiates a graceful shutdown so the scheduler,
+        worker thread, and any running subprocesses are cleaned up before
+        Windows force-kills the process.
+        """
+        tray_app._write_info(
             "Windows session end requested:",
             f"allowsInteraction={manager.allowsInteraction()}\n",
         )
+        self._quit()
 
     def _confirm_quit(self):
         result = QMessageBox.question(

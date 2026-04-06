@@ -57,12 +57,23 @@ class TestSessionManagement(unittest.TestCase):
             app = EvolverApp()
 
         mock_manager = unittest.mock.MagicMock()
-        with patch.object(tray_app, "_write_crash") as mock_write:
+        with patch.object(tray_app, "_write_info") as mock_write:
             app._on_session_end(mock_manager)
 
         mock_write.assert_called_once()
         header = mock_write.call_args[0][0]
         self.assertIn("session", header.lower())
+
+    def test_session_end_quits_app(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        mock_manager = unittest.mock.MagicMock()
+        with patch.object(app, "_quit") as mock_quit, \
+             patch("gui.app.tray_app._write_info"):
+            app._on_session_end(mock_manager)
+
+        mock_quit.assert_called_once()
 
 
 class TestRestart(unittest.TestCase):
