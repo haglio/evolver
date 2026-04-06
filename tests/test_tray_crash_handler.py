@@ -163,5 +163,35 @@ class TestAtexitHandler(unittest.TestCase):
         self.assertTrue(tray_app._crash_logged)
 
 
+class TestWriteInfo(unittest.TestCase):
+    """_write_info logs without suppressing the atexit handler."""
+
+    def setUp(self):
+        tray_app._crash_logged = False
+
+    def test_write_info_does_not_set_crash_flag(self):
+        mock_path = MagicMock()
+        with patch.object(tray_app, "CRASH_LOG", mock_path):
+            tray_app._write_info("Session end:", "detail\n")
+        self.assertFalse(tray_app._crash_logged)
+
+    def test_write_info_writes_timestamped_entry(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
+            tmp = Path(f.name)
+
+        try:
+            with patch.object(tray_app, "CRASH_LOG", tmp):
+                tray_app._write_info("Session end:", "detail\n")
+
+            text = tmp.read_text(encoding="utf-8")
+            self.assertIn("Session end:", text)
+            self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
+        finally:
+            tmp.unlink()
+
+
 if __name__ == "__main__":
     unittest.main()

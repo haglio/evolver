@@ -187,7 +187,5 @@ def _should_skip_upscale_due_to_cpu(log: logging.Logger) -> bool:
     return busy_percent >= config.CPU_BUSY_SKIP_THRESHOLD_PCT
 
 
-
-
 if __name__ == "__main__":
     main()

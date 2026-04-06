@@ -16,9 +16,16 @@ _crash_logged = False
 
 
 def _write_crash(header: str, detail: str):
-    """Append a timestamped crash entry to the crash log."""
+    """Append a timestamped crash entry to the crash log and suppress the atexit 'Clean exit' line."""
     global _crash_logged
     _crash_logged = True
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with CRASH_LOG.open("a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {header}\n{detail}")
+
+
+def _write_info(header: str, detail: str):
+    """Append a timestamped informational entry without suppressing the atexit handler."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with CRASH_LOG.open("a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {header}\n{detail}")
