@@ -14,7 +14,7 @@ _app = QApplication.instance() or QApplication([])
 
 
 class TestRunDetailRendering(unittest.TestCase):
-    """RunDetailWidget should surface scrape outcomes and the unscraped gap."""
+    """RunDetailWidget should surface scrape successes alongside errors."""
 
     def _record(self):
         return RunRecord(
@@ -23,10 +23,8 @@ class TestRunDetailRendering(unittest.TestCase):
             trigger="manual", status="error",
             stages=[
                 {"name": "metadata", "status": "completed", "duration_seconds": 477.0,
-                 "result": {"newly_scraped": 0, "no_scrape_strat": 0,
-                            "skipped_unknown_orient": 0, "errors": 58}},
-                {"name": "sort", "status": "completed", "duration_seconds": 10.0,
-                 "result": {"moved": 103}},
+                 "result": {"newly_scraped": 0, "already_scraped": 0,
+                            "skipped_failed": 0, "no_scrape_strat": 0, "errors": 58}},
             ],
         )
 
@@ -42,11 +40,6 @@ class TestRunDetailRendering(unittest.TestCase):
         details = self._row_details(widget, "metadata")
         self.assertIn("newly_scraped=0", details)
         self.assertIn("errors=58", details)
-
-    def test_info_label_warns_about_unscraped_gap(self):
-        widget = RunDetailWidget()
-        widget.show_record(self._record())
-        self.assertIn("45", widget._info_label.text())
 
 
 class TestSummarizeResult(unittest.TestCase):

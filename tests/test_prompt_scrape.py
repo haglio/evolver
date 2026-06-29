@@ -8,29 +8,48 @@ from tests.temp_helpers import override_config, workspace_temp_dir
 
 
 class TestPromptScrape(unittest.TestCase):
+    def _dirs(self, root):
+        ai = root / "videos" / "videos" / "2D" / "AI"
+        sorted_dir = ai / "1_sorted"
+        outbox_dir = ai / "2_outbox"
+        out_upscaled_dir = outbox_dir / "upscaled_by_orientation"
+        metadata_dir = root / "videos" / "metadata"
+        return sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir
+
+    def _make_video(self, sorted_dir, source, orient, name):
+        video = sorted_dir / source / orient / name
+        video.parent.mkdir(parents=True, exist_ok=True)
+        video.write_text("x", encoding="utf-8")
+        return video
+
+    def _override(self, sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+        return override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir,
+                               OUT_UPSCALED_DIR=out_upscaled_dir, METADATA_DIR=metadata_dir)
+
+    def _mirror_path(self, metadata_dir, orient, source, stem):
+        return (metadata_dir / "2_outbox" / "upscaled_by_orientation"
+                / orient / source / f"{stem}_topaz.json")
+
+    def _marker_path(self, metadata_dir, orient, source, stem):
+        p = self._mirror_path(metadata_dir, orient, source, stem)
+        return p.with_name(p.name + ".failed")
+
     def test_run_writes_mirrored_json_for_provider_video_with_source_image_prompts(self):
         from datetime import date
 
         with workspace_temp_dir() as root:
-            inbox = root / "videos" / "videos" / "2D" / "AI" / "0_inbox"
-            outbox_dir = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            out_upscaled_dir = outbox_dir / "upscaled_by_orientation"
-            metadata_dir = root / "videos" / "metadata"
-            video_path = inbox / "provider" / "abc.mp4"
-            video_path.parent.mkdir(parents=True, exist_ok=True)
-            video_path.write_text("x", encoding="utf-8")
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "provider", "portrait", "abc.mp4")
 
-            with override_config(INBOX_DIR=inbox, OUTBOX_DIR=outbox_dir,
-                                 OUT_UPSCALED_DIR=out_upscaled_dir, METADATA_DIR=metadata_dir):
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape.get_orientation", return_value="portrait"):
-                        with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_with_source_image):
-                            with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
-                                result = prompt_scrape.run()
+                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_with_source_image):
+                        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+                            result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
             self.assertEqual(result.newly_scraped, 1)
-            output_path = metadata_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "abc_topaz.json"
+            output_path = self._mirror_path(metadata_dir, "portrait", "provider", "abc")
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 payload,
@@ -55,16 +74,10 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_run_no_scrape_strat_for_unknown_source(self):
         with workspace_temp_dir() as root:
-            inbox = root / "videos" / "videos" / "2D" / "AI" / "0_inbox"
-            outbox_dir = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            out_upscaled_dir = outbox_dir / "upscaled_by_orientation"
-            metadata_dir = root / "videos" / "metadata"
-            provider2_video = inbox / "provider2" / "two.mp4"
-            provider2_video.parent.mkdir(parents=True, exist_ok=True)
-            provider2_video.write_text("x", encoding="utf-8")
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "provider2", "portrait", "two.mp4")
 
-            with override_config(INBOX_DIR=inbox, OUTBOX_DIR=outbox_dir,
-                                 OUT_UPSCALED_DIR=out_upscaled_dir, METADATA_DIR=metadata_dir):
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom") as fetch_dom:
                         result = prompt_scrape.run()
@@ -75,76 +88,100 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_run_ignores_partial_video_files(self):
         with workspace_temp_dir() as root:
-            inbox = root / "videos" / "videos" / "2D" / "AI" / "0_inbox"
-            outbox_dir = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            out_upscaled_dir = outbox_dir / "upscaled_by_orientation"
-            metadata_dir = root / "videos" / "metadata"
-            final_video = inbox / "provider" / "one.mp4"
-            partial_video = inbox / "provider" / "one.partial.deadbeef.mp4"
-            final_video.parent.mkdir(parents=True, exist_ok=True)
-            final_video.write_text("x", encoding="utf-8")
-            partial_video.write_text("x", encoding="utf-8")
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "provider", "portrait", "one.mp4")
+            self._make_video(sorted_dir, "provider", "portrait", "one.partial.deadbeef.mp4")
 
-            with override_config(INBOX_DIR=inbox, OUTBOX_DIR=outbox_dir,
-                                 OUT_UPSCALED_DIR=out_upscaled_dir, METADATA_DIR=metadata_dir):
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape.get_orientation", return_value="portrait"):
-                        with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
-                            result = prompt_scrape.run()
+                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
+                        result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
             self.assertEqual(result.newly_scraped, 1)
-            self.assertFalse((metadata_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "one.partial.deadbeef_topaz.json").exists())
+            self.assertFalse(self._mirror_path(metadata_dir, "portrait", "provider", "one.partial.deadbeef").exists())
 
     def test_run_counts_error_and_reports_not_ok(self):
         with workspace_temp_dir() as root:
-            inbox = root / "videos" / "videos" / "2D" / "AI" / "0_inbox"
-            outbox_dir = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            out_upscaled_dir = outbox_dir / "upscaled_by_orientation"
-            metadata_dir = root / "videos" / "metadata"
-            video_path = inbox / "provider" / "fail.mp4"
-            video_path.parent.mkdir(parents=True, exist_ok=True)
-            video_path.write_text("x", encoding="utf-8")
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "provider", "landscape", "fail.mp4")
 
-            with override_config(INBOX_DIR=inbox, OUTBOX_DIR=outbox_dir,
-                                 OUT_UPSCALED_DIR=out_upscaled_dir, METADATA_DIR=metadata_dir):
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape.get_orientation", return_value="landscape"):
-                        with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("network error")):
-                            result = prompt_scrape.run()
+                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("network error")):
+                        result = prompt_scrape.run()
 
             self.assertFalse(result.ok)
             self.assertEqual(result.errors, 1)
             self.assertEqual(result.newly_scraped, 0)
 
-    def test_run_scans_inbox_and_writes_metadata_at_outbox_mirror_path(self):
-        """Metadata stage should scan 0_inbox and place JSONs where _is_t2v_provider expects them."""
+    def test_failed_scrape_writes_failure_marker(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "provider", "landscape", "fail.mp4")
+
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("source gone")):
+                        result = prompt_scrape.run()
+
+            self.assertEqual(result.errors, 1)
+            self.assertTrue(self._marker_path(metadata_dir, "landscape", "provider", "fail").exists())
+
+    def test_skips_video_that_already_has_json(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "provider", "portrait", "abc.mp4")
+            existing = self._mirror_path(metadata_dir, "portrait", "provider", "abc")
+            existing.parent.mkdir(parents=True, exist_ok=True)
+            existing.write_text("{}", encoding="utf-8")
+
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape._fetch_dom", return_value="<html></html>") as fetch_dom:
+                        result = prompt_scrape.run()
+
+            self.assertEqual(result.already_scraped, 1)
+            self.assertEqual(result.newly_scraped, 0)
+            fetch_dom.assert_not_called()
+
+    def test_skips_video_with_failure_marker(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "provider", "portrait", "abc.mp4")
+            marker = self._marker_path(metadata_dir, "portrait", "provider", "abc")
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text("previously failed", encoding="utf-8")
+
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape._fetch_dom", return_value="<html></html>") as fetch_dom:
+                        result = prompt_scrape.run()
+
+            self.assertEqual(result.skipped_failed, 1)
+            self.assertEqual(result.newly_scraped, 0)
+            fetch_dom.assert_not_called()
+
+    def test_run_scans_sorted_and_writes_metadata_at_outbox_mirror_path(self):
+        """Metadata stage should scan 1_sorted and place JSONs where _is_t2v_provider expects them."""
         from datetime import date
 
         with workspace_temp_dir() as root:
-            inbox = root / "videos" / "videos" / "2D" / "AI" / "0_inbox"
-            outbox_dir = root / "videos" / "videos" / "2D" / "AI" / "2_outbox"
-            out_upscaled_dir = outbox_dir / "upscaled_by_orientation"
-            metadata_dir = root / "videos" / "metadata"
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "provider", "portrait", "abc.mp4")
 
-            video_path = inbox / "provider" / "abc.mp4"
-            video_path.parent.mkdir(parents=True, exist_ok=True)
-            video_path.write_text("x", encoding="utf-8")
-
-            with override_config(INBOX_DIR=inbox, OUTBOX_DIR=outbox_dir,
-                                 OUT_UPSCALED_DIR=out_upscaled_dir, METADATA_DIR=metadata_dir):
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape.get_orientation", return_value="portrait"):
-                        with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
-                            with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
-                                result = prompt_scrape.run()
+                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
+                        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+                            result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
             self.assertEqual(result.newly_scraped, 1)
 
             # JSON must land where _is_t2v_provider looks:
             # METADATA_DIR / "2_outbox" / "upscaled_by_orientation" / <orient> / <source> / <stem>_topaz.json
-            expected_path = metadata_dir / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider" / "abc_topaz.json"
+            expected_path = self._mirror_path(metadata_dir, "portrait", "provider", "abc")
             self.assertTrue(expected_path.exists(), f"Expected metadata at {expected_path}")
             payload = json.loads(expected_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["video"]["prompt"], "text only video prompt")

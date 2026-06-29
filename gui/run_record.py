@@ -55,29 +55,6 @@ class RunRecord:
 
 _PACIFIC = ZoneInfo("America/Los_Angeles")
 
-# Metadata-stage counters whose sum is the number of inbox videos the scrape
-# stage actually looked at this run.
-_METADATA_SEEN_FIELDS = ("newly_scraped", "no_scrape_strat", "skipped_unknown_orient", "errors")
-
-
-def unscraped_gap(record: RunRecord) -> int:
-    """Videos sort moved into the library that the metadata stage never attempted.
-
-    Metadata scrapes ``0_inbox`` *before* sort drains it, so any file that lands in
-    the inbox mid-run is swept into ``1_sorted`` without a scrape attempt and is never
-    retried. The gap is ``sort.moved - (videos metadata saw)``, clamped at zero.
-    """
-    seen = moved = None
-    for stage in record.stages:
-        result = stage.get("result") or {}
-        if stage.get("name") == "metadata":
-            seen = sum(result.get(f, 0) for f in _METADATA_SEEN_FIELDS)
-        elif stage.get("name") == "sort":
-            moved = result.get("moved")
-    if seen is None or not isinstance(moved, int):
-        return 0
-    return max(0, moved - seen)
-
 
 def format_run_label(started_at: str, duration_seconds: float, status: str) -> str:
     """Format a run record for display in the history list.
