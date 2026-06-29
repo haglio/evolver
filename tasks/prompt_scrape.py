@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 
 import config
 from tasks.purge_weird import source_stem
-from util.ffprobe import get_orientation
 from util.media_files import iter_finalized_videos
 
 log = logging.getLogger(__name__)
@@ -26,8 +25,9 @@ _CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.
 @dataclass
 class PromptScrapeResult:
     newly_scraped: int = 0
+    already_scraped: int = 0
+    skipped_failed: int = 0
     no_scrape_strat: int = 0
-    skipped_unknown_orient: int = 0
     errors: int = 0
 
     @property
@@ -38,7 +38,7 @@ class PromptScrapeResult:
 def run() -> PromptScrapeResult:
     result = PromptScrapeResult()
     log.info("=== Stage 2: scrape AI metadata ===")
-    log.info("INBOX DIR: %s", config.INBOX_DIR)
+    log.info("SORTED DIR: %s", config.SORTED_DIR)
     log.info("METADATA DIR: %s", config.METADATA_DIR)
 
     browser = _find_browser_executable()
@@ -47,25 +47,33 @@ def run() -> PromptScrapeResult:
         log.error("No supported browser executable found for prompt scraping.")
         return result
 
-    for source_dir in _iter_source_dirs(config.INBOX_DIR):
+    for source_dir in _iter_source_dirs(config.SORTED_DIR):
         source = source_dir.name
+        has_strategy = source in _SCRAPE_STRATEGIES
 
         for video in sorted(_iter_video_files(source_dir)):
-            if source not in _SCRAPE_STRATEGIES:
+            if not has_strategy:
                 result.no_scrape_strat += 1
                 continue
 
-            orient = get_orientation(video)
+            orient = video.relative_to(source_dir).parts[0]
             if orient not in ("landscape", "portrait"):
-                result.skipped_unknown_orient += 1
                 continue
 
             output_path = _metadata_output_path(source, orient, video.stem)
+            if output_path.exists():
+                result.already_scraped += 1
+                continue
+            if _failure_marker_path(output_path).exists():
+                result.skipped_failed += 1
+                continue
+
             url = _url_for_source(source, video)
             try:
                 payload = _SCRAPE_STRATEGIES[source](video, url, browser)
-            except Exception:
+            except Exception as exc:
                 result.errors += 1
+                _write_failure_marker(output_path, video, exc)
                 log.exception("Prompt scrape failed for: %s", video)
                 continue
 
@@ -75,13 +83,29 @@ def run() -> PromptScrapeResult:
             log.info("Wrote metadata: %s", output_path)
 
     log.info(
-        "Stage 2 done. Scraped: %d, No strategy: %d, Unknown orient: %d, Errors: %d",
+        "Stage 2 done. Scraped: %d, Already: %d, Skipped failed: %d, No strategy: %d, Errors: %d",
         result.newly_scraped,
+        result.already_scraped,
+        result.skipped_failed,
         result.no_scrape_strat,
-        result.skipped_unknown_orient,
         result.errors,
     )
     return result
+
+
+def _failure_marker_path(output_path: Path) -> Path:
+    """Sidecar marking a video whose scrape failed, so it is not retried every run.
+
+    Delete this file to force a retry (e.g. after a transient failure is resolved).
+    Kept separate from the JSON so it never confuses _is_t2v_provider in the upscale stage.
+    """
+    return output_path.with_name(output_path.name + ".failed")
+
+
+def _write_failure_marker(output_path: Path, video: Path, error: BaseException) -> None:
+    marker = _failure_marker_path(output_path)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(f"{video.name}\n{error}\n", encoding="utf-8")
 
 
 def _url_for_source(source: str, video: Path) -> str:

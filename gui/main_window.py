@@ -40,7 +40,7 @@ import qtawesome as qta
 
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
-from gui.run_record import RunRecord, load_runs, format_run_label, unscraped_gap
+from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.toggle_switch import ToggleSwitch
 
 GREEN = QColor(0x30, 0xA0, 0x30)
@@ -86,13 +86,9 @@ class RunDetailWidget(QWidget):
     def show_record(self, record: RunRecord):
         self._header.setText(f"Run: {record.started_at}")
         status_text = "Success" if record.status == "success" else "Errors"
-        info = (
+        self._info_label.setText(
             f"Trigger: {record.trigger}  |  Duration: {record.duration_seconds:.1f}s  |  Status: {status_text}"
         )
-        gap = unscraped_gap(record)
-        if gap:
-            info += f"  |  ⚠ {gap} sorted without metadata scrape"
-        self._info_label.setText(info)
 
         self._table.setRowCount(len(record.stages))
         for i, stage in enumerate(record.stages):
