@@ -6,7 +6,14 @@ from unittest.mock import Mock
 
 from tests.temp_helpers import workspace_temp_dir
 
-from gui.run_record import RunRecord, result_to_dict, save_run, load_runs, format_run_label
+from gui.run_record import (
+    RunRecord,
+    result_to_dict,
+    save_run,
+    load_runs,
+    format_run_label,
+    unscraped_gap,
+)
 
 
 class TestResultToDict(unittest.TestCase):
@@ -111,6 +118,48 @@ class TestRunRecordFromPipelineResult(unittest.TestCase):
         self.assertEqual(record.stages[0]["name"], "sort")
         self.assertEqual(record.stages[0]["status"], "completed")
         self.assertEqual(record.stages[1]["skip_reason"], "cpu_busy")
+
+
+class TestUnscrapedGap(unittest.TestCase):
+    """unscraped_gap reports videos sort moved that metadata never attempted."""
+
+    def _record(self, stages):
+        return RunRecord(
+            id="x", started_at="x", finished_at="x",
+            duration_seconds=0.0, trigger="manual", status="error", stages=stages,
+        )
+
+    def test_counts_videos_sorted_after_metadata_scan(self):
+        record = self._record([
+            {"name": "metadata", "status": "completed", "duration_seconds": 1.0,
+             "result": {"newly_scraped": 0, "no_scrape_strat": 0,
+                        "skipped_unknown_orient": 0, "errors": 58}},
+            {"name": "sort", "status": "completed", "duration_seconds": 1.0,
+             "result": {"moved": 103, "deleted_collisions": 0, "skipped_unknown": 0}},
+        ])
+        self.assertEqual(unscraped_gap(record), 45)
+
+    def test_zero_when_metadata_saw_every_moved_file(self):
+        record = self._record([
+            {"name": "metadata", "result": {"newly_scraped": 90, "no_scrape_strat": 10,
+                                            "skipped_unknown_orient": 3, "errors": 0}},
+            {"name": "sort", "result": {"moved": 103}},
+        ])
+        self.assertEqual(unscraped_gap(record), 0)
+
+    def test_never_negative_when_sort_skipped_files_metadata_saw(self):
+        record = self._record([
+            {"name": "metadata", "result": {"newly_scraped": 50, "no_scrape_strat": 0,
+                                            "skipped_unknown_orient": 0, "errors": 0}},
+            {"name": "sort", "result": {"moved": 40}},
+        ])
+        self.assertEqual(unscraped_gap(record), 0)
+
+    def test_zero_when_a_stage_is_missing(self):
+        record = self._record([
+            {"name": "sort", "result": {"moved": 103}},
+        ])
+        self.assertEqual(unscraped_gap(record), 0)
 
 
 class TestFormatRunLabel(unittest.TestCase):
