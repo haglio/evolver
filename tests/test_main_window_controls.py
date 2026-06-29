@@ -6,10 +6,68 @@ from unittest.mock import patch
 
 from PyQt6.QtWidgets import QApplication, QMessageBox, QToolBar
 
-from gui.main_window import EvolverMainWindow
+from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
+from gui.run_record import RunRecord
 from gui.toggle_switch import ToggleSwitch
 
 _app = QApplication.instance() or QApplication([])
+
+
+class TestRunDetailRendering(unittest.TestCase):
+    """RunDetailWidget should surface scrape outcomes and the unscraped gap."""
+
+    def _record(self):
+        return RunRecord(
+            id="2026-06-27T22-18-46", started_at="2026-06-27T22:18:46",
+            finished_at="2026-06-27T22:18:46", duration_seconds=699.7,
+            trigger="manual", status="error",
+            stages=[
+                {"name": "metadata", "status": "completed", "duration_seconds": 477.0,
+                 "result": {"newly_scraped": 0, "no_scrape_strat": 0,
+                            "skipped_unknown_orient": 0, "errors": 58}},
+                {"name": "sort", "status": "completed", "duration_seconds": 10.0,
+                 "result": {"moved": 103}},
+            ],
+        )
+
+    def _row_details(self, widget, stage_name):
+        for row in range(widget._table.rowCount()):
+            if widget._table.item(row, 1).text() == stage_name:
+                return widget._table.item(row, 4).text()
+        return None
+
+    def test_metadata_row_shows_scraped_and_errors(self):
+        widget = RunDetailWidget()
+        widget.show_record(self._record())
+        details = self._row_details(widget, "metadata")
+        self.assertIn("newly_scraped=0", details)
+        self.assertIn("errors=58", details)
+
+    def test_info_label_warns_about_unscraped_gap(self):
+        widget = RunDetailWidget()
+        widget.show_record(self._record())
+        self.assertIn("45", widget._info_label.text())
+
+
+class TestSummarizeResult(unittest.TestCase):
+    """Stage detail summaries should make scrape success-vs-error legible."""
+
+    def test_metadata_shows_scraped_and_errors_even_when_zero(self):
+        result = {"newly_scraped": 0, "no_scrape_strat": 0,
+                  "skipped_unknown_orient": 0, "errors": 58}
+        summary = _summarize_result(result, None, "metadata")
+        self.assertIn("newly_scraped=0", summary)
+        self.assertIn("errors=58", summary)
+
+    def test_other_stages_still_hide_zero_fields(self):
+        result = {"moved": 103, "deleted_collisions": 0, "skipped_unknown": 0}
+        summary = _summarize_result(result, None, "sort")
+        self.assertIn("moved=103", summary)
+        self.assertNotIn("deleted_collisions", summary)
+
+    def test_skip_reason_takes_precedence(self):
+        summary = _summarize_result(None, "upscale_pending", "verify")
+        self.assertEqual(summary, "Reason: upscale_pending")
 
 
 class TestMainWindowToolbarExists(unittest.TestCase):

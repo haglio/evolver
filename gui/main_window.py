@@ -40,7 +40,7 @@ import qtawesome as qta
 
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
-from gui.run_record import RunRecord, load_runs, format_run_label
+from gui.run_record import RunRecord, load_runs, format_run_label, unscraped_gap
 from gui.toggle_switch import ToggleSwitch
 
 GREEN = QColor(0x30, 0xA0, 0x30)
@@ -86,9 +86,13 @@ class RunDetailWidget(QWidget):
     def show_record(self, record: RunRecord):
         self._header.setText(f"Run: {record.started_at}")
         status_text = "Success" if record.status == "success" else "Errors"
-        self._info_label.setText(
+        info = (
             f"Trigger: {record.trigger}  |  Duration: {record.duration_seconds:.1f}s  |  Status: {status_text}"
         )
+        gap = unscraped_gap(record)
+        if gap:
+            info += f"  |  ⚠ {gap} sorted without metadata scrape"
+        self._info_label.setText(info)
 
         self._table.setRowCount(len(record.stages))
         for i, stage in enumerate(record.stages):
@@ -129,7 +133,7 @@ class RunDetailWidget(QWidget):
             self._table.setItem(i, 3, dur_item)
 
             # Column 4: details (double-click to select/copy text)
-            details = _summarize_result(stage.get("result"), stage.get("skip_reason"))
+            details = _summarize_result(stage.get("result"), stage.get("skip_reason"), stage_key)
             details_item = QTableWidgetItem(details)
             self._table.setItem(i, 4, details_item)
 
@@ -139,15 +143,30 @@ class RunDetailWidget(QWidget):
         self._table.setRowCount(0)
 
 
-def _summarize_result(result: dict[str, Any] | None, skip_reason: str | None = None) -> str:
+# Fields always shown for a stage even when zero, so "0 succeeded" stays visible
+# instead of vanishing and making a total failure look like a partial one.
+_HEADLINE_FIELDS = {
+    "metadata": ("newly_scraped", "errors"),
+}
+
+
+def _summarize_result(
+    result: dict[str, Any] | None,
+    skip_reason: str | None = None,
+    stage_key: str = "",
+) -> str:
     """Build a short summary string from a stage result dict."""
     if skip_reason:
         return f"Reason: {skip_reason}"
     if not result:
         return ""
-    # Pick interesting non-zero numeric fields
-    parts = []
+    headline = _HEADLINE_FIELDS.get(stage_key, ())
+    parts = [f"{key}={result[key]}" for key in headline
+             if isinstance(result.get(key), (int, float))]
+    # Then any other interesting non-zero numeric fields.
     for key, value in result.items():
+        if key in headline:
+            continue
         if isinstance(value, (int, float)) and value and not key.startswith("_"):
             parts.append(f"{key}={value}")
     return ", ".join(parts[:5])
