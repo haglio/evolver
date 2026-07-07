@@ -5,6 +5,11 @@ BASE_DIR     = Path(r"C:\path\to\suite-root")
 PROJECT_DIR  = BASE_DIR / "projects" / "evolver"
 FUN_TIME_PROJECT_DIR = BASE_DIR / "projects" / "fun_time"
 FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
+# Origenerator (a sibling video-generation app) is treated as a normal external
+# content source: for videos it drops in 0_inbox/origenerator/, Evolver pulls the
+# generation metadata straight from Origenerator's own gallery database, read-only
+# (see tasks/origenerator_metadata.py). Origenerator never reaches into Evolver.
+ORIGENERATOR_DB_PATH = BASE_DIR / "projects" / "origenerator" / "state" / "origenerator.db"
 VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
 METADATA_DIR = BASE_DIR / "videos" / "metadata"
 SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"

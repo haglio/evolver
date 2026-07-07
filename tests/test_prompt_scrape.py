@@ -86,6 +86,26 @@ class TestPromptScrape(unittest.TestCase):
             self.assertEqual(result.no_scrape_strat, 1)
             fetch_dom.assert_not_called()
 
+    def test_run_builds_origenerator_metadata_without_browser(self):
+        """Origenerator metadata comes from its DB, so it needs no browser and
+        lands at the same mirrored path Provider sidecars do."""
+        with workspace_temp_dir() as root:
+            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "origenerator", "portrait", "wan22_i2v_00001_.mp4")
+            payload = {"video": {"prompt": "a scene", "seed": "42"}}
+
+            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+                with patch("tasks.prompt_scrape._find_browser_executable", return_value=None):
+                    with patch("tasks.prompt_scrape.origenerator_metadata.build_metadata",
+                               return_value=payload) as build:
+                        result = prompt_scrape.run()
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.newly_scraped, 1)
+            build.assert_called_once()
+            out = self._mirror_path(metadata_dir, "portrait", "origenerator", "wan22_i2v_00001_")
+            self.assertEqual(json.loads(out.read_text(encoding="utf-8")), payload)
+
     def test_run_ignores_partial_video_files(self):
         with workspace_temp_dir() as root:
             sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
@@ -357,15 +377,10 @@ class TestCssSelector(unittest.TestCase):
         self.assertEqual(prompt_scrape._image_page_url_from_src("https://cdn1.example.com/"), "")
 
 
-class TestUrlForSource(unittest.TestCase):
+class TestProviderImageUrl(unittest.TestCase):
     def test_generates_provider_url(self):
         video = Path("C:/videos/0_inbox/provider/abc.mp4")
-        self.assertEqual(prompt_scrape._url_for_source("provider", video), "https://example.com/image/abc")
-
-    def test_raises_for_unknown_source(self):
-        video = Path("C:/videos/0_inbox/provider2/abc.mp4")
-        with self.assertRaises(ValueError):
-            prompt_scrape._url_for_source("provider2", video)
+        self.assertEqual(prompt_scrape._provider_image_url(video), "https://example.com/image/abc")
 
 
 class TestExtractMetadataFields(unittest.TestCase):

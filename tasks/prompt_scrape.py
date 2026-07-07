@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import config
+from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
 from util.media_files import iter_finalized_videos
 
@@ -43,16 +44,15 @@ def run() -> PromptScrapeResult:
 
     browser = _find_browser_executable()
     if browser is None:
-        result.errors += 1
-        log.error("No supported browser executable found for prompt scraping.")
-        return result
+        log.warning("No supported browser found; Provider scraping is unavailable this run.")
+    strategies = _build_strategies(browser)
 
     for source_dir in _iter_source_dirs(config.SORTED_DIR):
         source = source_dir.name
-        has_strategy = source in _SCRAPE_STRATEGIES
+        strategy = strategies.get(source)
 
         for video in sorted(_iter_video_files(source_dir)):
-            if not has_strategy:
+            if strategy is None:
                 result.no_scrape_strat += 1
                 continue
 
@@ -68,13 +68,12 @@ def run() -> PromptScrapeResult:
                 result.skipped_failed += 1
                 continue
 
-            url = _url_for_source(source, video)
             try:
-                payload = _SCRAPE_STRATEGIES[source](video, url, browser)
+                payload = strategy(video)
             except Exception as exc:
                 result.errors += 1
                 _write_failure_marker(output_path, video, exc)
-                log.exception("Prompt scrape failed for: %s", video)
+                log.exception("Metadata build failed for: %s", video)
                 continue
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,11 +107,9 @@ def _write_failure_marker(output_path: Path, video: Path, error: BaseException) 
     marker.write_text(f"{video.name}\n{error}\n", encoding="utf-8")
 
 
-def _url_for_source(source: str, video: Path) -> str:
-    stem = source_stem(video.stem)
-    if source == "provider":
-        return f"https://example.com/image/{stem}"
-    raise ValueError(f"No URL pattern for source: {source}")
+def _provider_image_url(video: Path) -> str:
+    """The Provider image-page URL a video's stem maps to — its scrape entry point."""
+    return f"https://example.com/image/{source_stem(video.stem)}"
 
 
 def _iter_video_files(root: Path):
@@ -201,7 +198,20 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
     return payload
 
 
-_SCRAPE_STRATEGIES = {"provider": _scrape_provider_video}
+def _build_strategies(browser):
+    """Map each ingest source to a ``(video) -> payload`` metadata builder.
+
+    Origenerator is a normal external content source whose metadata Evolver pulls
+    from its own gallery database (see :mod:`tasks.origenerator_metadata`), so it
+    needs no browser and is always available. Provider metadata is scraped from its
+    website, so it registers only when a headless browser was found.
+    """
+    strategies = {"origenerator": origenerator_metadata.build_metadata}
+    if browser is not None:
+        strategies["provider"] = lambda video: _scrape_provider_video(
+            video, _provider_image_url(video), browser
+        )
+    return strategies
 
 
 def _extract_prompt_text(panel: _Node) -> str:
