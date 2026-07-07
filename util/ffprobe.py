@@ -2,18 +2,28 @@ import subprocess
 from pathlib import Path
 
 
-def get_orientation(file: Path) -> str:
-    """Return 'landscape', 'portrait', or 'unknown' based on the first video stream."""
+def video_dimensions(file: Path) -> tuple[int, int] | None:
+    """The (width, height) of a file's first video stream, or None if unavailable.
+
+    Raw stored dimensions — rotation is not applied. Callers that need display
+    orientation (see :func:`get_orientation`) fold the rotate tag in themselves.
+    """
     w_str = _probe(file, "stream=width")
     h_str = _probe(file, "stream=height")
-
     if not w_str or not h_str:
-        return "unknown"
-
+        return None
     try:
-        w, h = int(w_str), int(h_str)
+        return int(w_str), int(h_str)
     except ValueError:
+        return None
+
+
+def get_orientation(file: Path) -> str:
+    """Return 'landscape', 'portrait', or 'unknown' based on the first video stream."""
+    dims = video_dimensions(file)
+    if dims is None:
         return "unknown"
+    w, h = dims
 
     rot_str = _probe(file, "stream_tags=rotate")
     try:
