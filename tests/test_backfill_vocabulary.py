@@ -27,6 +27,9 @@ class TestControls(unittest.TestCase):
         self.assertEqual(vocabulary.CONTROLS["weird"], vocabulary.WEIRD)
         self.assertEqual(vocabulary.CONTROLS["trash"], vocabulary.WEIRD)
 
+    def test_undo_takes_the_last_decision_back(self):
+        self.assertEqual(vocabulary.CONTROLS["undo"], vocabulary.UNDO)
+
     def test_no_phrase_is_both_an_action_and_a_control(self):
         self.assertEqual(set(vocabulary.ACTIONS) & set(vocabulary.CONTROLS), set())
 
