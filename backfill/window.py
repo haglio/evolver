@@ -55,12 +55,19 @@ class BackfillWindow(QWidget):
     def _play_current(self, outcome: str | None = None) -> None:
         clip = self._session.current
         if clip is None:
-            self._player.stop()
+            self._release()
             self._status.setText(_DONE)
             return
+        # Pointing the player at the next clip is also what makes it let go of the
+        # last one, which a background discard is racing to rename.
         self._player.setSource(QUrl.fromLocalFile(str(clip)))
         self._player.play()
         self._status.setText(self._status_text(clip.name, outcome))
+
+    def _release(self) -> None:
+        """Stop, and let go of the file the player has open."""
+        self._player.stop()
+        self._player.setSource(QUrl())
 
     def _status_text(self, clip_name: str, outcome: str | None) -> str:
         remaining = self._session.remaining
@@ -71,6 +78,5 @@ class BackfillWindow(QWidget):
         return "   ·   ".join(parts)
 
     def closeEvent(self, event):  # noqa: N802 — Qt override
-        self._player.stop()
-        self._player.setSource(QUrl())
+        self._release()
         super().closeEvent(event)
