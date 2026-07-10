@@ -36,6 +36,12 @@ def read(path: Path) -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
+def write(path: Path, payload: dict) -> None:
+    """Serialize *payload* to *path*, creating the mirrored directory if need be."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 def action_of(payload: dict) -> str:
     """The act a sidecar records, or ``""`` when it records none."""
     video = payload.get("video")
