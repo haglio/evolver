@@ -11,6 +11,7 @@ write, then mapping that path through :func:`sidecar_path`.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import config
@@ -24,3 +25,20 @@ def upscaled_video_path(source: str, orient: str, sorted_stem: str) -> Path:
 def sidecar_path(video: Path) -> Path:
     """The metadata JSON mirroring *video*'s path under ``METADATA_DIR``."""
     return (config.METADATA_DIR / video.relative_to(config.AI_DIR)).with_suffix(".json")
+
+
+def read(path: Path) -> dict:
+    """A sidecar's payload — empty when it is absent or unreadable."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def action_of(payload: dict) -> str:
+    """The act a sidecar records, or ``""`` when it records none."""
+    video = payload.get("video")
+    if not isinstance(video, dict):
+        return ""
+    return str(video.get("action") or "")
