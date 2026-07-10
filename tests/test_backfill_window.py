@@ -76,6 +76,17 @@ class TestBackfillWindow(unittest.TestCase):
 
         self.assertEqual(window._status.text(), "Nothing left to label.")
 
+    def test_emptying_the_queue_releases_the_last_clip(self):
+        """Otherwise the player still holds the file the background move is renaming."""
+        session = FakeSession([Path("a_topaz.mp4")], ["Weird"])
+        window = self._window(session)
+
+        with patch.object(window._player, "setSource") as set_source:
+            window.on_phrase("weird")
+
+        set_source.assert_called_once()
+        self.assertTrue(set_source.call_args[0][0].isEmpty())
+
     def test_an_empty_queue_opens_straight_to_the_finished_message(self):
         window = self._window(FakeSession([], []))
 
