@@ -8,13 +8,12 @@ from tests.temp_helpers import override_config, workspace_temp_dir
 
 
 class TestPromptScrape(unittest.TestCase):
+    def _ai_dir(self, root):
+        return root / "videos" / "videos" / "2D" / "AI"
+
     def _dirs(self, root):
-        ai = root / "videos" / "videos" / "2D" / "AI"
-        sorted_dir = ai / "1_sorted"
-        outbox_dir = ai / "2_outbox"
-        out_upscaled_dir = outbox_dir / "upscaled_by_orientation"
-        metadata_dir = root / "videos" / "metadata"
-        return sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir
+        """The two directories the tests themselves reach into."""
+        return self._ai_dir(root) / "1_sorted", root / "videos" / "metadata"
 
     def _make_video(self, sorted_dir, source, orient, name):
         video = sorted_dir / source / orient / name
@@ -22,9 +21,11 @@ class TestPromptScrape(unittest.TestCase):
         video.write_text("x", encoding="utf-8")
         return video
 
-    def _override(self, sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
-        return override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir,
-                               OUT_UPSCALED_DIR=out_upscaled_dir, METADATA_DIR=metadata_dir)
+    def _override(self, root):
+        ai = self._ai_dir(root)
+        sorted_dir, metadata_dir = self._dirs(root)
+        return override_config(AI_DIR=ai, SORTED_DIR=sorted_dir, METADATA_DIR=metadata_dir,
+                               OUT_UPSCALED_DIR=ai / "2_outbox" / "upscaled_by_orientation")
 
     def _mirror_path(self, metadata_dir, orient, source, stem):
         return (metadata_dir / "2_outbox" / "upscaled_by_orientation"
@@ -38,10 +39,10 @@ class TestPromptScrape(unittest.TestCase):
         from datetime import date
 
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider", "portrait", "abc.mp4")
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_with_source_image):
                         with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
@@ -74,10 +75,10 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_run_no_scrape_strat_for_unknown_source(self):
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider2", "portrait", "two.mp4")
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom") as fetch_dom:
                         result = prompt_scrape.run()
@@ -90,11 +91,11 @@ class TestPromptScrape(unittest.TestCase):
         """Origenerator metadata comes from its DB, so it needs no browser and
         lands at the same mirrored path Provider sidecars do."""
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "origenerator", "portrait", "wan22_i2v_00001_.mp4")
             payload = {"video": {"prompt": "a scene", "seed": "42"}}
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=None):
                     with patch("tasks.prompt_scrape.origenerator_metadata.build_metadata",
                                return_value=payload) as build:
@@ -108,11 +109,11 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_run_ignores_partial_video_files(self):
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider", "portrait", "one.mp4")
             self._make_video(sorted_dir, "provider", "portrait", "one.partial.deadbeef.mp4")
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
                         result = prompt_scrape.run()
@@ -123,10 +124,10 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_run_counts_error_and_reports_not_ok(self):
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider", "landscape", "fail.mp4")
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("network error")):
                         result = prompt_scrape.run()
@@ -137,10 +138,10 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_failed_scrape_writes_failure_marker(self):
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider", "landscape", "fail.mp4")
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("source gone")):
                         result = prompt_scrape.run()
@@ -150,13 +151,13 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_skips_video_that_already_has_json(self):
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider", "portrait", "abc.mp4")
             existing = self._mirror_path(metadata_dir, "portrait", "provider", "abc")
             existing.parent.mkdir(parents=True, exist_ok=True)
             existing.write_text("{}", encoding="utf-8")
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
@@ -167,13 +168,13 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_skips_video_with_failure_marker(self):
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider", "portrait", "abc.mp4")
             marker = self._marker_path(metadata_dir, "portrait", "provider", "abc")
             marker.parent.mkdir(parents=True, exist_ok=True)
             marker.write_text("previously failed", encoding="utf-8")
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
@@ -187,10 +188,10 @@ class TestPromptScrape(unittest.TestCase):
         from datetime import date
 
         with workspace_temp_dir() as root:
-            sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir = self._dirs(root)
+            sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider", "portrait", "abc.mp4")
 
-            with self._override(sorted_dir, outbox_dir, out_upscaled_dir, metadata_dir):
+            with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
                         with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):

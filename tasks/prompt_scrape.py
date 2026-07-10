@@ -17,6 +17,7 @@ import config
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
 from util.media_files import iter_finalized_videos
+from util.sidecar import sidecar_path, upscaled_video_path
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def run() -> PromptScrapeResult:
             if orient not in ("landscape", "portrait"):
                 continue
 
-            output_path = _metadata_output_path(source, orient, video.stem)
+            output_path = sidecar_path(upscaled_video_path(source, orient, video.stem))
             if output_path.exists():
                 result.already_scraped += 1
                 continue
@@ -122,18 +123,6 @@ def _iter_source_dirs(root: Path):
     for p in sorted(root.iterdir()):
         if p.is_dir():
             yield p
-
-
-def _metadata_output_path(source: str, orient: str, stem: str) -> Path:
-    """Compute the metadata JSON path for an inbox file.
-
-    Mirrors the 2_outbox/upscaled_by_orientation/<orient>/<source>/ structure
-    so that _is_t2v_provider in the upscale stage can find the metadata before
-    the upscaled file exists.
-    """
-    return (config.METADATA_DIR / config.OUTBOX_DIR.name
-            / config.OUT_UPSCALED_DIR.name / orient / source
-            / f"{stem}_topaz.json")
 
 
 def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> dict[str, str]:

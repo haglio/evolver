@@ -13,6 +13,7 @@ from pathlib import Path
 import config
 from util import system_resources
 from util.media_files import is_finalized_video_file, iter_finalized_videos, remove_partial_video_files
+from util.sidecar import sidecar_path, upscaled_video_path
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -80,13 +81,11 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
             log.warning("Stopping Stage 4 early due to low free disk space.")
             break
 
-        out_dir = config.OUT_UPSCALED_DIR / orient / source
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_name = f"{in_file.stem}_topaz.mp4"
-        out = out_dir / out_name
+        out = upscaled_video_path(source, orient, in_file.stem)
+        out.parent.mkdir(parents=True, exist_ok=True)
         tmp = out.with_name(f"{in_file.stem}.partial.{uuid.uuid4().hex}.mp4")
 
-        log.info("Process: %s -> %s  [%s/%s]", in_file.name, out_name, orient, source)
+        log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
 
         if _is_t2v_provider(source, orient, in_file.stem):
             filter_complex = config.UPSCALE_FILTER_T2V_provider
@@ -156,8 +155,7 @@ def collect_candidates(priority_files: list[Path] | None = None, limit: int | No
         if in_file in seen or not in_file.exists():
             return False
         seen.add(in_file)
-        out_name = f"{in_file.stem}_topaz.mp4"
-        if _already_processed(source, out_name):
+        if _already_processed(source, upscaled_video_path(source, orient, in_file.stem).name):
             return False
         candidates.append((in_file, source, orient))
         return True
@@ -231,7 +229,7 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoa
 def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:
     if source != "provider":
         return False
-    meta_path = config.METADATA_DIR / "2_outbox" / "upscaled_by_orientation" / orient / source / f"{stem}_topaz.json"
+    meta_path = sidecar_path(upscaled_video_path(source, orient, stem))
     if not meta_path.is_file():
         return False
     try:
