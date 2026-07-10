@@ -30,6 +30,14 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `check_correspondence.py` - Stage 7 integrity verification and one-time manual check
   - `util/ffprobe.py` - orientation probing
   - `util/media_files.py` - shared helpers for finalized-vs-partial video detection and stale partial cleanup
+  - `util/sidecar.py` - where a video's metadata JSON lives, and what the upscale stage names its output
+  - `backfill_app.py` - voice-driven metadata backfill tool (see below), launched from the tray
+  - `backfill/vocabulary.py` - the spoken phrases, and the `video.action` each one records
+  - `backfill/queue.py` - the clips still missing an action, shuffled
+  - `backfill/decisions.py` - writing a clip's action, or discarding it as weird
+  - `backfill/session.py` - what a heard phrase does to the queue
+  - `backfill/voice.py` - offline vosk recognition over the tool's grammar
+  - `backfill/window.py` - the looping player and its remaining-count status line
   - `gui/app.py` - tray application wiring and single-instance guard
   - `gui/tray.py` - system tray icon and context menu
   - `gui/main_window.py` - run history list and detail/progress panel
@@ -48,6 +56,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 - Topaz ffmpeg at `C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe`
 - Topaz model directory at `C:\ProgramData\Topaz Labs LLC\Topaz Video\models`
 - PyQt6 (`pip install PyQt6`)
+- `vosk` and `sounddevice`, for the backfill tool's voice commands (`pip install vosk sounddevice`). The speech model is downloaded and cached on first use.
 
 ## Run as tray app (recommended)
 
@@ -55,9 +64,40 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 pythonw.exe tray_app.py
 ```
 
-This starts a system tray icon. Right-click for the context menu (Run Now, Pause/Resume, Settings, Quit) or double-click to open the main window with run history and live progress. Configure the run interval and Windows startup registration from Settings.
+This starts a system tray icon. Right-click for the context menu (Run Now, Pause/Resume, Settings, Stats, Backfill Metadata, Quit) or double-click to open the main window with run history and live progress. Configure the run interval and Windows startup registration from Settings.
 
 Run history is stored as JSON files in `runs/` (gitignored). Settings are persisted to `gui_settings.json` (gitignored).
+
+## Metadata backfill tool
+
+Most sources publish nothing about what a clip actually shows. Provider exposes an action on its site and Origenerator has its gallery database, so Stage 5 fills those in on its own; a clip from Provider2, Provider3, Candy, ComfyUI or Provider4 arrives with no `video.action` at all, and Fun Time cannot group or filter it.
+
+**Backfill Metadata...** in the tray menu opens a separate window that plays every such clip — shuffled, looping, muted — until you say what it is. The clip changes the instant you speak, and the sidecar is written behind it.
+
+Say an act, optionally prefixed with a camera word (`side` or `pov`/`point of view`):
+
+| Say | Records |
+| --- | --- |
+| `alpha form` / `alpha` | `Alpha` |
+| `gamma` | `Gamma` |
+| `epsilon` | `Epsilon` |
+| `zeta` | `Zeta` |
+| `beta gamma` | `Beta Gamma` |
+| `delta` | `Delta` |
+| `delta` | `Delta` |
+| `dance` | `Dancing` (no camera word) |
+| `other` | `Other` (no camera word) |
+
+So "side gamma" records `Side Gamma`, and "pov delta" records `Pov Delta` — matching the `Pov Epsilon` form Provider already uses, so one Fun Time filter query reaches both.
+
+Two more phrases:
+
+- `skip` — not now; the clip goes to the back of the queue and comes round again
+- `weird` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "mark as weird" does. No metadata is written; Stage 2 later deletes it along with its `1_sorted` source
+
+The status line shows how many clips still need an action. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
+
+Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. Set `config.VOICE_DEVICE_INDEX` if the system default input is not the microphone you speak into (`python -m sounddevice` lists them).
 
 ## Run manually (CLI)
 
