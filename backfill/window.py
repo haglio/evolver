@@ -1,4 +1,4 @@
-"""The backfill tool's window: one looping clip, and how many are left after it."""
+"""The backfill tool's window: one looping clip, how many are left, and what you last said."""
 
 from __future__ import annotations
 
@@ -16,6 +16,9 @@ _DONE = "Nothing left to label."
 class BackfillWindow(QWidget):
     """Loops the clip awaiting an action, and moves on the moment one is spoken.
 
+    Two lines beneath the video: what is on screen now, and what the last thing you
+    said did — naming its own clip, which by then is not the one you are watching.
+
     Audio is muted: the microphone is open the whole time, and a clip's own
     soundtrack would be one more thing for the recognizer to mishear.
     """
@@ -27,12 +30,15 @@ class BackfillWindow(QWidget):
 
         self._video = QVideoWidget()
         self._status = QLabel()
-        self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._last = QLabel()
+        for label in (self._status, self._last):
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._video, stretch=1)
         layout.addWidget(self._status)
+        layout.addWidget(self._last)
 
         self._audio = QAudioOutput()
         self._audio.setMuted(True)
@@ -47,35 +53,40 @@ class BackfillWindow(QWidget):
 
     def on_phrase(self, phrase: str) -> None:
         """React to a phrase the listener heard."""
-        outcome = self._session.apply(phrase)
-        if outcome is None:
+        was_playing = self._session.current
+        note = self._session.apply(phrase)
+        if note is None:
             return
-        self._play_current(outcome)
+        # A skip with one clip left, and an undo with nothing to undo, both leave the
+        # same clip on screen — reloading it would restart it from the top for nothing.
+        if self._session.current != was_playing:
+            self._play_current()
+        else:
+            self._refresh_status()
+        self._last.setText(f"Last: {note}")
 
-    def _play_current(self, outcome: str | None = None) -> None:
+    def _play_current(self) -> None:
         clip = self._session.current
         if clip is None:
             self._release()
+        else:
+            # Pointing the player at the next clip is also what makes it let go of the
+            # last one, which a background discard is racing to rename.
+            self._player.setSource(QUrl.fromLocalFile(str(clip)))
+            self._player.play()
+        self._refresh_status()
+
+    def _refresh_status(self) -> None:
+        clip = self._session.current
+        if clip is None:
             self._status.setText(_DONE)
-            return
-        # Pointing the player at the next clip is also what makes it let go of the
-        # last one, which a background discard is racing to rename.
-        self._player.setSource(QUrl.fromLocalFile(str(clip)))
-        self._player.play()
-        self._status.setText(self._status_text(clip.name, outcome))
+        else:
+            self._status.setText(f"{self._session.remaining} remaining   ·   {clip.name}")
 
     def _release(self) -> None:
         """Stop, and let go of the file the player has open."""
         self._player.stop()
         self._player.setSource(QUrl())
-
-    def _status_text(self, clip_name: str, outcome: str | None) -> str:
-        remaining = self._session.remaining
-        parts = [f"{remaining} remaining"]
-        if outcome is not None:
-            parts.append(outcome)
-        parts.append(clip_name)
-        return "   ·   ".join(parts)
 
     def closeEvent(self, event):  # noqa: N802 — Qt override
         self._release()

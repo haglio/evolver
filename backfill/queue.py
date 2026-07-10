@@ -41,6 +41,9 @@ class BackfillQueue:
     The clip at the front is the one on screen.  :meth:`resolve` retires it —
     it has been labelled or discarded — while :meth:`defer` sends it to the
     back, unanswered, to come round again later.
+
+    :meth:`restore` and :meth:`undefer` are their exact inverses, so undoing a
+    run of decisions back to front rewinds the queue to the order it had.
     """
 
     def __init__(self, videos: list[Path], rng: random.Random | None = None) -> None:
@@ -67,3 +70,12 @@ class BackfillQueue:
         """Send the current clip to the back, still needing an action."""
         if self._pending:
             self._pending.rotate(-1)
+
+    def restore(self, clip: Path) -> None:
+        """Put a resolved *clip* back on screen — the inverse of :meth:`resolve`."""
+        self._pending.appendleft(clip)
+
+    def undefer(self) -> None:
+        """Bring the deferred clip back to the front — the inverse of :meth:`defer`."""
+        if self._pending:
+            self._pending.rotate(1)

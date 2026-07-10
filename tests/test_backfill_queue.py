@@ -123,6 +123,42 @@ class TestBackfillQueue(unittest.TestCase):
         self.assertIsNone(queue.current)
         self.assertEqual(queue.remaining, 0)
 
+    def test_restoring_puts_a_resolved_video_back_on_screen(self):
+        queue = self._queue(3)
+        first = queue.current
+        queue.resolve()
+
+        queue.restore(first)
+
+        self.assertEqual(queue.current, first)
+        self.assertEqual(queue.remaining, 3)
+
+    def test_undeferring_brings_a_skipped_video_back_to_the_front(self):
+        queue = self._queue(3)
+        first = queue.current
+        queue.defer()
+
+        queue.undefer()
+
+        self.assertEqual(queue.current, first)
+        self.assertEqual(queue.remaining, 3)
+
+    def test_undoing_a_run_of_decisions_rewinds_the_original_order(self):
+        queue = self._queue(4)
+        original = []
+        while queue.current is not None:
+            original.append(queue.current)
+            queue.resolve()
+
+        for clip in reversed(original):
+            queue.restore(clip)
+
+        rewound = []
+        while queue.current is not None:
+            rewound.append(queue.current)
+            queue.resolve()
+        self.assertEqual(rewound, original)
+
     def test_a_seeded_shuffle_reorders_the_videos(self):
         videos = [Path(f"clip{i}.mp4") for i in range(10)]
 
