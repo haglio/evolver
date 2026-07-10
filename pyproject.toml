@@ -9,7 +9,9 @@ requires-python = ">=3.10"
 dependencies = [
     "PyQt6",
     "qtawesome",
+    "sounddevice",
     "tzdata",
+    "vosk",
 ]
 
 [project.optional-dependencies]

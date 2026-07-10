@@ -1,5 +1,6 @@
 import json
 import unittest
+from unittest.mock import patch
 
 from backfill.decisions import discard_as_weird, record_action
 from tests.temp_helpers import override_config, workspace_temp_dir
@@ -94,6 +95,42 @@ class TestDiscardAsWeird(unittest.TestCase):
             self.assertEqual(destination.name, "a_topaz__dup1.mp4")
             self.assertEqual((weird_dir / "a_topaz.mp4").read_bytes(), b"earlier")
             self.assertEqual(destination.read_bytes(), b"video")
+
+    def test_waits_out_a_player_that_still_holds_the_clip_open(self):
+        with workspace_temp_dir() as root:
+            weird_dir = root / "kinda_weird"
+            video = self._make_video(root)
+            real_replace = type(video).replace
+            attempts = []
+
+            def replace_locked_once(self, target):
+                attempts.append(target)
+                if len(attempts) == 1:
+                    raise PermissionError(32, "The process cannot access the file")
+                return real_replace(self, target)
+
+            with override_config(WEIRD_DIR=weird_dir):
+                with patch.object(type(video), "replace", replace_locked_once), \
+                     patch("backfill.decisions.time.sleep") as sleep:
+                    destination = discard_as_weird(video)
+
+            self.assertEqual(len(attempts), 2)
+            sleep.assert_called_once()
+            self.assertTrue(destination.is_file())
+
+    def test_gives_up_on_a_clip_that_never_unlocks(self):
+        with workspace_temp_dir() as root:
+            weird_dir = root / "kinda_weird"
+            video = self._make_video(root)
+
+            def always_locked(_self, _target):
+                raise PermissionError(32, "The process cannot access the file")
+
+            with override_config(WEIRD_DIR=weird_dir):
+                with patch.object(type(video), "replace", always_locked), \
+                     patch("backfill.decisions.time.sleep"):
+                    with self.assertRaises(PermissionError):
+                        discard_as_weird(video)
 
 
 if __name__ == "__main__":
