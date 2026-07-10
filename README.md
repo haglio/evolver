@@ -34,10 +34,11 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `backfill_app.py` - voice-driven metadata backfill tool (see below), launched from the tray
   - `backfill/vocabulary.py` - the spoken phrases, and the `video.action` each one records
   - `backfill/queue.py` - the clips still missing an action, shuffled
-  - `backfill/decisions.py` - writing a clip's action, or discarding it as weird
-  - `backfill/session.py` - what a heard phrase does to the queue
+  - `backfill/decisions.py` - writing a clip's action or discarding it as weird, and taking either back
+  - `backfill/session.py` - what a heard phrase does to the queue, and the history "undo" walks back through
+  - `backfill/work.py` - the single thread the file work runs on, in the order it was spoken
   - `backfill/voice.py` - offline vosk recognition over the tool's grammar
-  - `backfill/window.py` - the looping player and its remaining-count status line
+  - `backfill/window.py` - the looping player, the remaining count, and the last decision
   - `gui/app.py` - tray application wiring and single-instance guard
   - `gui/tray.py` - system tray icon and context menu
   - `gui/main_window.py` - run history list and detail/progress panel
@@ -90,12 +91,15 @@ Say an act, optionally prefixed with a camera word (`side` or `pov`/`point of vi
 
 So "side gamma" records `Side Gamma`, and "pov delta" records `Pov Delta` — matching the `Pov Epsilon` form Provider already uses, so one Fun Time filter query reaches both.
 
-Two more phrases:
+Three more phrases:
 
 - `skip` — not now; the clip goes to the back of the queue and comes round again
 - `weird` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "mark as weird" does. No metadata is written; Stage 2 later deletes it along with its `1_sorted` source
+- `undo` — take the last decision back, and keep saying it to walk back through the whole run
 
-The status line shows how many clips still need an action. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
+Undo restores the clip to the screen and reverses what the decision did on disk: a sidecar it wrote is deleted (or, if the clip arrived carrying prompts, only the act is removed), and a clip sent to `kinda_weird/` is reclaimed from where it landed. Undoing every decision rewinds the queue to the order it had. It works after the last clip too, so a mislabelled final clip is still recoverable.
+
+Two lines sit beneath the video: what is on screen now and how many clips are left, and what your last phrase did — naming its own clip, which by then is not the one you are watching. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
 
 Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. Set `config.VOICE_DEVICE_INDEX` if the system default input is not the microphone you speak into (`python -m sounddevice` lists them).
 
