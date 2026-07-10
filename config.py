@@ -58,6 +58,15 @@ LOG_FILE = PROJECT_DIR / "evolver.log"
 RUNS_DIR = PROJECT_DIR / "runs"
 GUI_SETTINGS_FILE = PROJECT_DIR / "gui_settings.json"
 
+# Voice control for the metadata backfill tool. The model name is resolved and cached
+# by vosk under ~/.cache/vosk, the same small English model Fun Time listens with.
+# VOICE_DEVICE_INDEX of None takes the system default input; set it to an index from
+# `python -m sounddevice` when the default is not the microphone you speak into.
+VOICE_MODEL_NAME = "vosk-model-small-en-us-0.15"
+VOICE_DEVICE_INDEX = None
+VOICE_SAMPLE_RATE = 16000
+VOICE_CONFIDENCE_THRESHOLD = 0.7
+
 
 def active_outbox_dirs() -> list[Path]:
     return [OUTBOX_DIR]
