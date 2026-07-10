@@ -17,7 +17,7 @@ import config
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
 from util.media_files import iter_finalized_videos
-from util.sidecar import sidecar_path, upscaled_video_path
+from util.sidecar import sidecar_path, upscaled_video_path, write
 
 log = logging.getLogger(__name__)
 
@@ -77,8 +77,7 @@ def run() -> PromptScrapeResult:
                 log.exception("Metadata build failed for: %s", video)
                 continue
 
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            write(output_path, payload)
             result.newly_scraped += 1
             log.info("Wrote metadata: %s", output_path)
 
