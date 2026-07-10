@@ -79,6 +79,7 @@ class EvolverApp:
         self._tray.pause_action.triggered.connect(self._toggle_pause)
         self._tray.settings_action.triggered.connect(self._show_settings)
         self._tray.stats_action.triggered.connect(self._show_stats)
+        self._tray.backfill_action.triggered.connect(self._launch_backfill)
         self._tray.restart_action.triggered.connect(self._restart)
         self._tray.quit_action.triggered.connect(self._quit)
 
@@ -139,6 +140,18 @@ class EvolverApp:
         records = load_runs(config.RUNS_DIR)
         self._stats_window = StatsWindow(records, self._window)
         self._stats_window.show()
+
+    def _launch_backfill(self):
+        """Start the metadata backfill tool as its own process.
+
+        Detached rather than in-process: it holds the microphone open and drives a
+        media backend for as long as the user keeps labelling, and neither belongs
+        in the tray process that has to survive the whole session.
+        """
+        subprocess.Popen(
+            [sys.executable, str(config.PROJECT_DIR / "backfill_app.py")],
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
 
     def _update_status_display(self):
         """Push scheduling state to tray and window."""
