@@ -64,6 +64,9 @@ class EvolverTray(QSystemTrayIcon):
         self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats...", self._menu)
         self._menu.addAction(self.stats_action)
 
+        self.backfill_action = QAction(qta.icon("fa5s.microphone", color=_ICON_COLOR), "Backfill Metadata...", self._menu)
+        self._menu.addAction(self.backfill_action)
+
         self._menu.addSeparator()
 
         self.restart_action = QAction(qta.icon("fa5s.redo", color=_ICON_COLOR), "Restart", self._menu)
