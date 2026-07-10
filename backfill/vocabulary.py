@@ -34,13 +34,16 @@ _UNSCOPED_ACTS: dict[str, str] = {
     "other": "Other",
 }
 
-# Spoken camera word -> the prefix it adds to the action.  "pov" is in the vosk
-# lexicon, but a speaker who says the letters rather than the word is heard as
-# "point of view", so both reach the same action.
+# Spoken camera word -> the prefix it adds to the action.  "POV" is an initialism,
+# and the lexicon's one-word "pov" is a g2p guess at a single syllable — nothing
+# there sounds like "pee oh vee".  The letters themselves do: the lexicon prices
+# them as their names (P IY, OW, V IY), so spelling the initialism out across three
+# words is what actually catches a speaker saying it.  The one-word form stays too,
+# for whatever that g2p pronunciation turns out to be; both reach the same action.
 _CAMERAS: dict[str, str] = {
     "side": "Side",
+    "p o v": "Pov",
     "pov": "Pov",
-    "point of view": "Pov",
 }
 
 SKIP = "skip"

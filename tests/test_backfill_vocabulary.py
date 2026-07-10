@@ -11,8 +11,10 @@ class TestActions(unittest.TestCase):
         self.assertEqual(vocabulary.ACTIONS["side gamma"], "Side Gamma")
         self.assertEqual(vocabulary.ACTIONS["pov gamma"], "Pov Gamma")
 
-    def test_point_of_view_is_a_synonym_for_pov(self):
-        self.assertEqual(vocabulary.ACTIONS["point of view gamma"], "Pov Gamma")
+    def test_pov_is_heard_spelled_out_as_its_three_letters(self):
+        """"POV" is an initialism; the lexicon's one-word "pov" is not the letters."""
+        self.assertEqual(vocabulary.ACTIONS["p o v gamma"], "Pov Gamma")
+        self.assertEqual(vocabulary.ACTIONS["pov gamma"], "Pov Gamma")
 
     def test_dance_and_other_take_no_camera_word(self):
         self.assertEqual(vocabulary.ACTIONS["dance"], "Dancing")
