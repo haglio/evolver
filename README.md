@@ -75,7 +75,7 @@ Most sources publish nothing about what a clip actually shows. Provider exposes 
 
 **Backfill Metadata...** in the tray menu opens a separate window that plays every such clip — shuffled, looping, muted — until you say what it is. The clip changes the instant you speak, and the sidecar is written behind it.
 
-Say an act, optionally prefixed with a camera word (`side` or `pov`/`point of view`):
+Say an act, optionally prefixed with a camera word — `side`, or `POV` said as its three letters ("pee oh vee"):
 
 | Say | Records |
 | --- | --- |
@@ -89,7 +89,7 @@ Say an act, optionally prefixed with a camera word (`side` or `pov`/`point of vi
 | `dance` | `Dancing` (no camera word) |
 | `other` | `Other` (no camera word) |
 
-So "side gamma" records `Side Gamma`, and "pov delta" records `Pov Delta` — matching the `Pov Epsilon` form Provider already uses, so one Fun Time filter query reaches both.
+So "side gamma" records `Side Gamma`, and "P-O-V delta" records `Pov Delta` — matching the `Pov Epsilon` form Provider already uses, so one Fun Time filter query reaches both. The recognizer listens for the initialism spelled out (`p o v ...`), because the vosk lexicon prices each letter as its name; it also accepts a one-word "pov", whichever way you happen to say it.
 
 Three more phrases:
 
