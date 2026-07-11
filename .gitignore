@@ -25,6 +25,11 @@ htmlcov/
 # Regen-mode runtime state
 .regen-skip.txt
 
+# Non-AI upscale runtime state
+nonai_upscale_job.json
+nonai_upscale_attempts.json
+.nonai-upscale-skip.txt
+
 # GUI runtime state
 runs/
 gui_settings.json

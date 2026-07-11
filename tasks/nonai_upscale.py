@@ -303,7 +303,10 @@ def collect_candidates() -> list[Candidate]:
     for bucket in _buckets():
         processed_stems = _processed_stems(bucket)
         for triage_digit, triage_dir in _numbered_dirs(bucket, digits=(0, 1)):
-            for video in sorted(triage_dir.rglob("*")):
+            # Direct children only: a subfolder inside a triage dir stages manual
+            # pre-work (e.g. "1_originals_needing_trimming"), so its clips are
+            # not ready for an unattended multi-hour encode.
+            for video in sorted(triage_dir.iterdir()):
                 if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
                     continue
                 if is_processed_stem(video.stem) or video.stem in processed_stems:

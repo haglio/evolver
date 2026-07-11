@@ -50,6 +50,25 @@ class TestCollectCandidates(unittest.TestCase):
                 sorted(c.path for c in candidates), [flagged_video, unsorted_video]
             )
 
+    def test_ignores_videos_nested_in_triage_subfolders(self):
+        """A subfolder inside a triage dir stages manual pre-work (e.g. winston's
+        '1 could use work/1_originals_needing_trimming'); those clips are not
+        ready for an unattended multi-hour encode."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+
+            ready = make_video(non_ai / "winston" / "1 could use work" / "ready.mp4")
+            make_video(
+                non_ai / "winston" / "1 could use work"
+                / "1_originals_needing_trimming" / "not yet.mp4"
+            )
+
+            with override_config(**overrides):
+                candidates = nonai_upscale.collect_candidates()
+
+            self.assertEqual([c.path for c in candidates], [ready])
+
     def test_excludes_originals_that_already_have_a_processed_variant(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)

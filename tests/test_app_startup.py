@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 from PyQt6.QtWidgets import QApplication
 
-import gui.app
 from gui.app import EvolverApp, _APP_MODEL_ID, _acquire_single_instance_mutex
 
 _app = QApplication.instance() or QApplication([])

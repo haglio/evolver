@@ -8,8 +8,9 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 4. Prunes stale rows from `fun_time/favs.csv` when the `local_file` or `file` column points at a missing local file, while treating a `2_outbox` favorite as still valid if the matching file currently lives in `3_new_outbox` during regeneration. The CSV itself always keeps `2_outbox` paths, then the remaining `web_url` values are synced into a `Fun Time Favs` folder on the Chrome bookmarks bar for the Chrome profile whose visible name is `Blair`.
 5. Scrapes prompt metadata for AI videos in `1_sorted` into `videos/metadata`, mirroring the active outbox tree. The scan is idempotent — videos that already have a metadata JSON are skipped, and a video whose scrape fails is marked so it is not retried every run. Currently supports Provider prompt extraction with the video prompt plus optional source-image prompt keys.
 6. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
-7. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
-8. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
+7. Gradually upscales the `2D/non_AI` library too, with the recipe its already-processed clips carry in their `videoai` tags (see "Non-AI library upscaling" below). At most one detached encode runs at a time, and one only starts when the AI queue is drained.
+8. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
+9. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
@@ -26,11 +27,15 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `tasks/bookmarks_sync.py` - Stage 3.5 favorites -> Chrome bookmarks sync
   - `tasks/prompt_scrape.py` - Stage 4 prompt scraping into mirrored JSON files
   - `tasks/upscale.py` - Stage 5 Topaz processing
+  - `tasks/nonai_upscale.py` - the non-AI library's detached Topaz encodes, one at a time
   - `check_duplicate_sizes.py` - Stage 6 duplicate-size scan for likely source duplicates
   - `check_correspondence.py` - Stage 7 integrity verification and one-time manual check
   - `util/ffprobe.py` - orientation probing
   - `util/media_files.py` - shared helpers for finalized-vs-partial video detection and stale partial cleanup
   - `util/sidecar.py` - where a video's metadata JSON lives, and what the upscale stage names its output
+  - `util/topaz.py` - the Topaz ffmpeg invocation both upscale stages share
+  - `util/variants.py` - the `_apo8`/`_iris2`-style suffixes that pair originals with processed variants
+  - `util/processes.py` - liveness, identity, and termination of detached encodes
   - `backfill_app.py` - voice-driven metadata backfill tool (see below), launched from the tray
   - `backfill/vocabulary.py` - the spoken phrases, and the `video.action` each one records
   - `backfill/queue.py` - the clips still missing an action, shuffled
@@ -102,6 +107,23 @@ Undo restores the clip to the screen and reverses what the decision did on disk:
 Two lines sit beneath the video: what is on screen now and how many clips are left, and what your last phrase did — naming its own clip, which by then is not the one you are watching. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
 
 Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. Set `config.VOICE_DEVICE_INDEX` if the system default input is not the microphone you speak into (`python -m sounddevice` lists them).
+
+## Non-AI library upscaling
+
+The `2D/non_AI` buckets (`winston`, `other`, …) hold full-length real-footage scenes that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the recipe the already-processed clips record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), unlike the silent AI clips.
+
+It follows the bucket conventions already in use:
+
+- Candidates come from the triage folders whose names start with `0` or `1` — direct children only, since a nested folder like `1_originals_needing_trimming` stages manual pre-work that should happen first.
+- The output lands in the bucket's `3*/processed/` folder as `<stem>_apo8_iris2.mp4`, and the original then moves to the bucket's `2*` ("do not need work") folder.
+- A video is skipped when any processed variant of it already exists in the bucket (`_iris2`, `_apo8_prob4`, and friends — see `util/variants.py`), or when it already carries a `videoai` tag itself.
+- `actually_AI_but_funscripted/` is left alone; its contents are AI-pipeline outputs.
+
+**Order**: an explicit `1 could use work` flag goes first, then clips that have a funscript — the only per-video engagement signal the non-AI library has (Fun Time's watch stats cover just the AI outbox), and a fair proxy for the most-played videos since Nau drives the OSR2 with them — then everything else alphabetically.
+
+**Gradually** means: one video at a time. These encodes take hours, and the tray watchdog kills a pipeline run at eleven minutes, so the stage never waits on ffmpeg. It launches a single detached, below-normal-priority Topaz process and returns; each later scheduler tick checks on it. A finished encode (output duration ≥ 98% of the source's) is promoted and its original retired; an interrupted or failed one is retried once and then parked in `.nonai-upscale-skip.txt` (repo root, gitignored, one `path<TAB>reason` per line — delete a line to retry it). An encode still running after 24 hours is killed, but only after confirming the pid still belongs to Topaz ffmpeg. A new encode starts only when the AI upscale queue is drained, CPU is below the busy threshold, and free disk is above the safety floor.
+
+In-flight state lives in `nonai_upscale_job.json` (plus `nonai_upscale_attempts.json` for the retry counter), and the detached ffmpeg's stderr goes to `nonai_upscale_ffmpeg.log` — all in the repo root and gitignored. Quitting the tray app does not kill the encode; the next session picks it back up from the state file.
 
 ## Run manually (CLI)
 
@@ -180,6 +202,7 @@ What is covered:
 - Scheduler flow behavior, including always-running purge and pending-work-based Stage 3 decisions (`evolver.py`)
 - Already-processed detection (`tasks/upscale.py`)
 - Partial-file handling across upscale cleanup and downstream scanners (`tasks/upscale.py`, `check_correspondence.py`, `tasks/prompt_scrape.py`, `tasks/sort.py`)
+- Non-AI candidate discovery, priority order, and the detached-encode lifecycle: launch, in-flight, promote, retry, skip-manifest, and stuck-job kill (`tasks/nonai_upscale.py`)
 
 ## Output temp-file contract
 
@@ -202,7 +225,8 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 - Stage 6 is conservative by default: it processes at most `config.UPSCALE_BATCH_LIMIT` videos per run.
 - If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips Stage 6 for that scheduler tick instead of competing with other work.
 - If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops Stage 6 early and warns instead of continuing toward a full disk.
-- Stage 7 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
-- Stage 8 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
+- Stage 7 (non-AI upscale) always runs so it can check on its detached encode, but only launches a new one when the AI queue is drained and the box is otherwise quiet.
+- Stage 8 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
+- Stage 9 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
 - Errors are shown via Windows message box.
 - Existing output checks prevent duplicate processing.
