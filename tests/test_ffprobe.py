@@ -3,7 +3,32 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from util.ffprobe import get_orientation, video_dimensions, _probe
+from util.ffprobe import duration_seconds, get_orientation, video_dimensions, videoai_tag, _probe
+
+
+class TestDurationSeconds(unittest.TestCase):
+    @patch("util.ffprobe._probe_format")
+    def test_returns_float_duration(self, probe_mock):
+        probe_mock.return_value = "1434.877098"
+        self.assertAlmostEqual(duration_seconds(Path("x.mp4")), 1434.877098)
+
+    @patch("util.ffprobe._probe_format")
+    def test_none_when_unparseable(self, probe_mock):
+        probe_mock.return_value = "N/A"
+        self.assertIsNone(duration_seconds(Path("x.mp4")))
+
+
+class TestVideoaiTag(unittest.TestCase):
+    @patch("util.ffprobe._probe_format")
+    def test_returns_tag_text(self, probe_mock):
+        probe_mock.return_value = "Enhanced using iris-2"
+        self.assertEqual(videoai_tag(Path("x.mp4")), "Enhanced using iris-2")
+        probe_mock.assert_called_once_with(Path("x.mp4"), "format_tags=videoai")
+
+    @patch("util.ffprobe._probe_format")
+    def test_empty_when_untagged(self, probe_mock):
+        probe_mock.return_value = ""
+        self.assertEqual(videoai_tag(Path("x.mp4")), "")
 
 
 class TestFfprobeOrientation(unittest.TestCase):
