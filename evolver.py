@@ -10,7 +10,8 @@ Invoked by the tray app scheduler or directly via CLI. Stages:
   6. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
   7. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
   8. scripts         - align funscripts to mirror the video library tree
-  9. dupes           - scan non_AI for likely duplicate videos by exact filesize
+  9. group_non_ai   - record each non-AI clip's version family in a mirrored sidecar
+ 10. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -23,7 +24,16 @@ from dataclasses import dataclass, field
 import check_correspondence
 import check_duplicate_sizes
 import config
-from tasks import bookmarks_sync, nonai_upscale, prompt_scrape, purge_weird, scripts_sync, sort, upscale
+from tasks import (
+    bookmarks_sync,
+    nonai_group,
+    nonai_upscale,
+    prompt_scrape,
+    purge_weird,
+    scripts_sync,
+    sort,
+    upscale,
+)
 from util import system_resources
 
 
@@ -149,6 +159,7 @@ def run_pipeline(
 
     bookmarks_sync_result = _run_stage("bookmarks", bookmarks_sync.run)
     scripts_sync_result = _run_stage("scripts", scripts_sync.run, show_popup=True)
+    _run_stage("group_non_ai", nonai_group.run)
     duplicate_sizes_result = _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
 
     has_errors = (
