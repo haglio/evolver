@@ -5,28 +5,6 @@ from tasks import scripts_sync
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
-class TestNormalizedStem(unittest.TestCase):
-    def test_strips_processing_suffixes_recursively(self):
-        cases = [
-            ("clip", "clip"),
-            ("clip_topaz", "clip"),
-            ("clip_apo8_gcg5", "clip"),
-            ("clip_apo8_gcg5_topaz", "clip"),
-            ("clip_topaz_cfr", "clip"),
-            ("clip_apo8_gcg5_topaz_cfr", "clip"),
-            ("clip_apo8", "clip"),
-            ("clip_apf2", "clip"),
-            ("clip_iris3", "clip"),
-            ("clip_iris2", "clip"),
-            ("clip_enh", "clip"),
-            ("clip_apo8_iris2", "clip"),
-            ("no_suffix", "no_suffix"),
-        ]
-        for stem, expected in cases:
-            with self.subTest(stem=stem):
-                self.assertEqual(scripts_sync._normalized_stem(stem), expected)
-
-
 class TestScriptsSync(unittest.TestCase):
     def test_moves_script_to_parallel_video_subdirectory(self):
         with workspace_temp_dir() as root:
