@@ -12,11 +12,21 @@ def _touch(path: Path, body: str = "x") -> Path:
     return path
 
 
+def _library(root: Path) -> tuple[Path, Path, Path]:
+    """A (video_library, non_AI, metadata) triple mirroring the real layout."""
+    video_lib = root / "videos"
+    non_ai = video_lib / "2D" / "non_AI"
+    metadata = root / "metadata"
+    return video_lib, non_ai, metadata
+
+
 class TestNonAiGroup(unittest.TestCase):
     def test_writes_a_sidecar_per_clip_folding_variants(self):
         with workspace_temp_dir() as root:
-            non_ai, metadata = root / "non_AI", root / "metadata"
-            with override_config(NON_AI_DIR=non_ai, METADATA_DIR=metadata):
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
                 original = _touch(non_ai / "larkin" / "2 done" / "Jane Doe-lA0JUsAd.mp4")
                 variant = _touch(
                     non_ai / "larkin" / "3_good_to_go" / "processed"
@@ -26,9 +36,14 @@ class TestNonAiGroup(unittest.TestCase):
 
                 result = nonai_group.run()
 
-                orig = sidecar.read(sidecar.nonai_sidecar_path(original))
-                var = sidecar.read(sidecar.nonai_sidecar_path(variant))
-                distinct = sidecar.read(sidecar.nonai_sidecar_path(other))
+                # The sidecar mirrors the clip's full path under metadata/.
+                self.assertEqual(
+                    sidecar.sidecar_path(original),
+                    metadata / "2D" / "non_AI" / "larkin" / "2 done" / "Jane Doe-lA0JUsAd.json",
+                )
+                orig = sidecar.read(sidecar.sidecar_path(original))
+                var = sidecar.read(sidecar.sidecar_path(variant))
+                distinct = sidecar.read(sidecar.sidecar_path(other))
                 self.assertEqual(orig["version"]["group"], var["version"]["group"])
                 self.assertNotEqual(orig["version"]["group"], distinct["version"]["group"])
                 self.assertFalse(orig["version"]["processed"])
@@ -37,19 +52,21 @@ class TestNonAiGroup(unittest.TestCase):
 
     def test_leaves_the_excluded_bucket_alone(self):
         with workspace_temp_dir() as root:
-            non_ai, metadata = root / "non_AI", root / "metadata"
+            video_lib, non_ai, metadata = _library(root)
             with override_config(
-                NON_AI_DIR=non_ai, METADATA_DIR=metadata,
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata,
                 NONAI_EXCLUDED_BUCKETS={"actually_AI_but_funscripted"},
             ):
                 clip = _touch(non_ai / "actually_AI_but_funscripted" / "landscape" / "x_topaz.mp4")
                 nonai_group.run()
-                self.assertFalse(sidecar.nonai_sidecar_path(clip).exists())
+                self.assertFalse(sidecar.sidecar_path(clip).exists())
 
     def test_is_idempotent_then_prunes_a_removed_clips_sidecar(self):
         with workspace_temp_dir() as root:
-            non_ai, metadata = root / "non_AI", root / "metadata"
-            with override_config(NON_AI_DIR=non_ai, METADATA_DIR=metadata):
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
                 clip = _touch(non_ai / "larkin" / "0 unsorted" / "Scene-1.mp4")
                 self.assertEqual(nonai_group.run().written, 1)
                 self.assertEqual(nonai_group.run().written, 0)  # nothing changed
@@ -57,7 +74,7 @@ class TestNonAiGroup(unittest.TestCase):
                 clip.unlink()
                 result = nonai_group.run()
                 self.assertEqual(result.pruned, 1)
-                self.assertFalse(sidecar.nonai_sidecar_path(clip).exists())
+                self.assertFalse(sidecar.sidecar_path(clip).exists())
 
 
 if __name__ == "__main__":

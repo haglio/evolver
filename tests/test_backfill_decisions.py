@@ -29,7 +29,7 @@ class TestRecordAction(unittest.TestCase):
             ai, upscaled, metadata = self._tree(root)
             video = self._make_video(upscaled)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 record_action(video, "Side Gamma")
                 payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
@@ -40,7 +40,7 @@ class TestRecordAction(unittest.TestCase):
             ai, upscaled, metadata = self._tree(root)
             video = self._make_video(upscaled)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 path = sidecar_path(video)
                 path.parent.mkdir(parents=True)
                 path.write_text(
@@ -61,7 +61,7 @@ class TestRecordAction(unittest.TestCase):
             ai, upscaled, metadata = self._tree(root)
             video = self._make_video(upscaled)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 record_action(video, "Dancing")
                 record_action(video, "Pov Epsilon")
                 payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
@@ -85,7 +85,7 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
             ai, upscaled, metadata = self._tree(root)
             video = self._make_video(upscaled)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertIsNone(sidecar_snapshot(video))
 
     def test_restoring_nothing_deletes_the_sidecar_that_was_written(self):
@@ -93,7 +93,7 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
             ai, upscaled, metadata = self._tree(root)
             video = self._make_video(upscaled)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 snapshot = sidecar_snapshot(video)
                 record_action(video, "Dancing")
                 self.assertTrue(sidecar_path(video).is_file())
@@ -108,7 +108,7 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
             video = self._make_video(upscaled)
             earlier = {"video": {"prompt": "a prompt"}}
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 path = sidecar_path(video)
                 path.parent.mkdir(parents=True)
                 path.write_text(json.dumps(earlier), encoding="utf-8")
@@ -124,7 +124,7 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
             ai, upscaled, metadata = self._tree(root)
             video = self._make_video(upscaled)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 restore_sidecar(video, None)  # must not raise
 
 

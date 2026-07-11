@@ -274,7 +274,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
         with workspace_temp_dir() as root:
             ai, upscaled, metadata, weird, video = self._tree(root)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
                 session = self._session(video)
                 session.apply("pov delta")
                 self.assertTrue(sidecar_path(video).is_file())
@@ -288,7 +288,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
         with workspace_temp_dir() as root:
             ai, upscaled, metadata, weird, video = self._tree(root)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
                 path = sidecar_path(video)
                 path.parent.mkdir(parents=True)
                 path.write_text(json.dumps({"video": {"prompt": "a prompt"}}), encoding="utf-8")
@@ -305,7 +305,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
         with workspace_temp_dir() as root:
             ai, upscaled, metadata, weird, video = self._tree(root)
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
                 session = self._session(video)
                 session.apply("weird")
                 self.assertFalse(video.exists())
