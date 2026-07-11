@@ -11,6 +11,10 @@ class TestStageRegistry(unittest.TestCase):
         self.assertIn("upscale_non_ai", ALL_STAGES)
         self.assertEqual(ALL_STAGES.index("upscale_non_ai"), ALL_STAGES.index("upscale") + 1)
 
+    def test_gui_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
+        self.assertIn("group_non_ai", ALL_STAGES)
+        self.assertEqual(ALL_STAGES.index("group_non_ai"), ALL_STAGES.index("scripts") + 1)
+
     def test_every_stage_has_a_chart_color(self):
         for stage in ALL_STAGES:
             with self.subTest(stage=stage):

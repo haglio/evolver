@@ -9,6 +9,7 @@ STAGES = [
     ("verify",    "Correspondence Check", "Verify 1_sorted and 2_outbox are in 1-to-1 correspondence"),
     ("bookmarks", "Bookmarks Sync",       "Sync Fun Time favorites into a Chrome bookmarks folder"),
     ("scripts",   "Scripts Sync",         "Align funscripts to mirror the video library tree"),
+    ("group_non_ai", "Group non-AI",      "Record each 2D/non_AI clip's version family (original + processed variants) in a mirrored metadata sidecar"),
     ("dupes",     "Duplicate Check",      "Scan non_AI folder for likely duplicate videos, using exact filesize"),
 ]
 

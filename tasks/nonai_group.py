@@ -21,6 +21,7 @@ from pathlib import Path
 import config
 from util import sidecar
 from util.media_files import is_finalized_video_file
+from util.nonai_library import buckets
 from util.variants import is_processed_stem
 from util.version_groups import group_ids
 
@@ -48,7 +49,7 @@ def run() -> NonAiGroupResult:
     result = NonAiGroupResult()
     expected: set[Path] = set()
 
-    for bucket in _buckets():
+    for bucket in buckets():
         videos = [
             video
             for video in sorted(bucket.rglob("*"))
@@ -80,20 +81,10 @@ def run() -> NonAiGroupResult:
     return result
 
 
-def _buckets() -> list[Path]:
-    if not config.NON_AI_DIR.is_dir():
-        return []
-    return [
-        child
-        for child in sorted(config.NON_AI_DIR.iterdir())
-        if child.is_dir() and child.name not in config.NONAI_EXCLUDED_BUCKETS
-    ]
-
-
 def _prune_orphans(expected: set[Path]) -> int:
     """Delete non-AI sidecars no current clip maps to (moved or removed files)."""
     pruned = 0
-    for bucket in _buckets():
+    for bucket in buckets():
         bucket_metadata = config.METADATA_DIR / bucket.name
         if not bucket_metadata.is_dir():
             continue
