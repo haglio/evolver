@@ -9,6 +9,7 @@ from pathlib import Path
 
 import config
 from util.media_files import iter_finalized_videos, remove_empty_dirs
+from util.variants import strip_processing_suffixes
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -124,7 +125,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: Sc
     groups: dict[tuple[tuple[str, ...], str], list[Path]] = defaultdict(list)
     for matches in video_index.values():
         for video_path in matches:
-            key = (_variant_bucket(video_path), _normalized_stem(video_path.stem))
+            key = (_variant_bucket(video_path), strip_processing_suffixes(video_path.stem))
             groups[key].append(video_path)
 
     for (_, normalized_stem), videos in sorted(groups.items()):
@@ -224,32 +225,6 @@ def _video_match_bucket(video_path: Path) -> str | None:
     if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
         return parts[1]
     return None
-
-
-def _normalized_stem(stem: str) -> str:
-    normalized = stem
-    while True:
-        updated = _strip_processing_suffix_once(normalized)
-        if updated == normalized:
-            return normalized
-        normalized = updated
-
-
-def _strip_processing_suffix_once(stem: str) -> str:
-    for suffix in (
-        "_topaz_cfr",
-        "_apo8_gcg5_topaz",
-        "_topaz",
-        "_apo8_gcg5",
-        "_apo8",
-        "_apf2",
-        "_iris3",
-        "_iris2",
-        "_enh",
-    ):
-        if stem.endswith(suffix):
-            return stem[: -len(suffix)]
-    return stem
 
 
 def _popup_message(result: ScriptsSyncResult) -> str:
