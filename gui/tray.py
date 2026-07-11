@@ -56,6 +56,12 @@ class EvolverTray(QSystemTrayIcon):
         self.pause_action = QAction(qta.icon("fa5s.pause", color=_ICON_COLOR), "Pause Scheduling", self._menu)
         self._menu.addAction(self.pause_action)
 
+        # Opt-in: one non-AI encode monopolizes the GPU for hours, so this
+        # stays off until the user is stepping away from the machine.
+        self.nonai_action = QAction(qta.icon("fa5s.film", color=_ICON_COLOR), "Upscale Non-AI When Idle", self._menu)
+        self.nonai_action.setCheckable(True)
+        self._menu.addAction(self.nonai_action)
+
         self._menu.addSeparator()
 
         self.settings_action = QAction(qta.icon("fa5s.cog", color=_ICON_COLOR), "Settings...", self._menu)

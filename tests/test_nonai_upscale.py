@@ -236,6 +236,46 @@ class TestRunStartsAJob(unittest.TestCase):
             mocks["popen"].assert_not_called()
 
 
+class TestRunStopsAJob(unittest.TestCase):
+    def test_stop_kills_the_running_encode_without_penalizing_the_video(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            source, tmp, out = write_job(root, overrides)
+            overrides["NONAI_ATTEMPTS_FILE"].write_text(
+                json.dumps({"winston/0 unsorted/busy.mp4": 1}), encoding="utf-8"
+            )
+            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "next.mp4")
+
+            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True, stop=True)
+
+            mocks["terminate"].assert_called_once_with(4242)
+            mocks["popen"].assert_not_called()
+            self.assertEqual(result.stopped, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.failed, 0)
+            self.assertEqual(result.started, "")
+            self.assertFalse(tmp.exists())
+            self.assertFalse(out.exists())
+            self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
+            attempts = json.loads(overrides["NONAI_ATTEMPTS_FILE"].read_text(encoding="utf-8"))
+            self.assertNotIn("winston/0 unsorted/busy.mp4", attempts)
+            self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
+
+    def test_stop_still_promotes_an_encode_that_already_finished(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            source, tmp, out = write_job(root, overrides, expected=100.0)
+
+            stack, mocks = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, stop=True)
+
+            mocks["terminate"].assert_not_called()
+            self.assertEqual(result.promoted, "winston/0 unsorted/busy.mp4")
+            self.assertTrue(out.exists())
+
+
 class TestPortraitTargets(unittest.TestCase):
     def test_portrait_video_gets_swapped_target_edges(self):
         with workspace_temp_dir() as root:

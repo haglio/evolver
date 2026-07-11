@@ -14,6 +14,9 @@ class EvolverSettings:
     interval_minutes: int = 10
     start_with_windows: bool = False
     enable_toasts: bool = False
+    # Off by default: a non-AI encode monopolizes the GPU for hours, so the
+    # user opts in from the tray menu when stepping away from the machine.
+    nonai_upscale_enabled: bool = False
 
     def save(self, path: Path | None = None):
         path = path or config.GUI_SETTINGS_FILE

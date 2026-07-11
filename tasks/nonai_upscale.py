@@ -48,43 +48,63 @@ class NonAiUpscaleResult:
     started: str = ""
     in_flight: str = ""
     promoted: str = ""
+    stopped: str = ""
     failed: int = 0
     pending: int = 0
     deferred_low_disk: bool = False
 
 
-def run(allow_start: bool = True) -> NonAiUpscaleResult:
-    """Check on the in-flight encode, then start the next one if the box is free."""
+def run(allow_start: bool = True, stop: bool = False) -> NonAiUpscaleResult:
+    """Check on the in-flight encode, then start the next one if the box is free.
+
+    With *stop* (the tray toggle is off), a still-running encode is killed and
+    its video keeps its place in the queue; an already-finished one is still
+    promoted, and nothing new starts.
+    """
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
     job = _load_job()
     _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
     if job is not None:
-        _supervise(job, result)
+        _supervise(job, result, stop=stop)
 
-    if not result.in_flight and allow_start:
+    if not result.in_flight and allow_start and not stop:
         _start_next_candidate(result)
 
     result.pending = len(collect_candidates())
     log.info(
-        "Non-AI upscale: started=%s in_flight=%s promoted=%s failed=%d pending=%d",
+        "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s failed=%d pending=%d",
         result.started or "-", result.in_flight or "-", result.promoted or "-",
-        result.failed, result.pending,
+        result.stopped or "-", result.failed, result.pending,
     )
     return result
 
 
-def _supervise(job: dict, result: NonAiUpscaleResult) -> None:
+def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False) -> None:
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
+        if stop:
+            _stop_in_flight(job, result)
+            return
         if not _overran(job):
             result.in_flight = relpath(source)
             return
-        _kill_stuck_ffmpeg(pid)
+        _terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
     _conclude(job, result)
     _clear_job()
+
+
+def _stop_in_flight(job: dict, result: NonAiUpscaleResult) -> None:
+    """User turned the stage off: end the encode without penalizing its video."""
+    source = Path(job.get("source", ""))
+    _terminate_ffmpeg(job.get("pid", 0), "the non-AI upscale toggle is off")
+    _delete_tmp(Path(job.get("tmp", "")))
+    _clear_attempts(source)
+    _clear_job()
+    result.stopped = relpath(source)
+    log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
 
 
 def _overran(job: dict) -> bool:
@@ -92,15 +112,14 @@ def _overran(job: dict) -> bool:
     return runtime > config.NONAI_MAX_RUNTIME_HOURS * 3600
 
 
-def _kill_stuck_ffmpeg(pid: int) -> None:
+def _terminate_ffmpeg(pid: int, reason: str) -> None:
     image = processes.image_path(pid)
     if image and Path(image).name.lower() == config.FFMPEG.name.lower():
-        log.warning("Killing non-AI upscale ffmpeg (pid %d): exceeded %dh runtime.",
-                    pid, config.NONAI_MAX_RUNTIME_HOURS)
+        log.warning("Killing non-AI upscale ffmpeg (pid %d): %s.", pid, reason)
         processes.terminate(pid)
     else:
         # The pid was recycled by an unrelated process; our ffmpeg is already gone.
-        log.warning("Overrunning job's pid %d is no longer ffmpeg; treating it as ended.", pid)
+        log.warning("Job pid %d is no longer ffmpeg; treating the encode as ended.", pid)
 
 
 def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
@@ -121,13 +140,19 @@ def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
     result.failed += 1
     log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
-    try:
-        tmp.unlink(missing_ok=True)
-    except OSError:
-        log.exception("Could not delete incomplete output %s; will retry next run.", tmp)
+    _delete_tmp(tmp)
     if _attempts_of(source) >= config.NONAI_MAX_ATTEMPTS:
         _add_to_skip_manifest(source, f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
         _clear_attempts(source)
+
+
+def _delete_tmp(tmp: Path) -> None:
+    try:
+        tmp.unlink(missing_ok=True)
+    except OSError:
+        # A just-killed ffmpeg can briefly hold the file; the partial sweep
+        # removes it on a later tick.
+        log.exception("Could not delete partial output %s yet.", tmp)
 
 
 def _retire_original(source: Path) -> None:
