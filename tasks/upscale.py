@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 import subprocess
 import time
 import uuid
@@ -11,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import system_resources
+from util import system_resources, topaz
 from util.media_files import is_finalized_video_file, iter_finalized_videos, remove_partial_video_files
 from util.sidecar import sidecar_path, upscaled_video_path
 from util.windows_alert import show_error_window
@@ -49,7 +48,7 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
     if removed_partial_outputs:
         log.info("Removed %d stale partial output file(s) from %s", removed_partial_outputs, config.OUT_UPSCALED_DIR)
 
-    env = {**os.environ, "TVAI_MODEL_DIR": str(config.TVAI_MODEL_DIR), "TVAI_MODEL_DATA_DIR": str(config.TVAI_MODEL_DIR)}
+    env = topaz.environment()
     candidates = collect_candidates(priority_files=priority_files)
     total_pending = len(candidates)
     if max_items is not None:
@@ -187,40 +186,8 @@ def collect_candidates(priority_files: list[Path] | None = None, limit: int | No
 
 
 def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoai_tag: str, timeout: float | None = None) -> bool:
-    cmd = [
-        str(config.FFMPEG),
-        "-hide_banner", "-nostdin", "-y",
-        "-strict", "2",
-        "-hwaccel", "cuda",
-        "-i", str(in_file),
-        "-sws_flags", "spline+accurate_rnd+full_chroma_int",
-        "-filter_complex", filter_complex,
-        "-c:v", "hevc_nvenc",
-        "-profile:v", "main",
-        "-pix_fmt", "yuv420p",
-        "-b_ref_mode", "disabled",
-        "-tag:v", "hvc1",
-        "-g", "30",
-        "-preset", "p7",
-        "-tune", "hq",
-        "-rc", "constqp",
-        "-qp", "17",
-        "-rc-lookahead", "20",
-        "-spatial_aq", "1",
-        "-aq-strength", "15",
-        "-b:v", "0",
-        "-an",
-        "-map_metadata", "0",
-        "-map_metadata:s:v", "0:s:v",
-        "-fps_mode:v", "cfr",
-        "-movflags", "frag_keyframe+empty_moov+delay_moov+use_metadata_tags+write_colr",
-        "-bf", "0",
-        "-metadata", f"videoai={videoai_tag}",
-        "-f", "mp4",
-        str(tmp),
-    ]
     return subprocess.run(
-        cmd, env=env, timeout=timeout,
+        topaz.command(in_file, tmp, filter_complex, videoai_tag), env=env, timeout=timeout,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW,
     ).returncode == 0
