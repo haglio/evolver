@@ -42,12 +42,14 @@ class Candidate:
     bucket: Path
     triage_digit: int
     has_funscript: bool
+    watch_score: float
 
 
 @dataclass
 class NonAiUpscaleResult:
     started: str = ""
     in_flight: str = ""
+    in_flight_percent: int | None = None
     promoted: str = ""
     stopped: str = ""
     failed: int = 0
@@ -74,9 +76,12 @@ def run(allow_start: bool = True, stop: bool = False) -> NonAiUpscaleResult:
         _start_next_candidate(result)
 
     result.pending = len(collect_candidates())
+    in_flight = result.in_flight or "-"
+    if result.in_flight and result.in_flight_percent is not None:
+        in_flight = f"{result.in_flight} ({result.in_flight_percent}% encoded)"
     log.info(
         "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s failed=%d pending=%d",
-        result.started or "-", result.in_flight or "-", result.promoted or "-",
+        result.started or "-", in_flight, result.promoted or "-",
         result.stopped or "-", result.failed, result.pending,
     )
     return result
@@ -91,6 +96,7 @@ def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False) -> Non
             return
         if not _overran(job):
             result.in_flight = relpath(source)
+            result.in_flight_percent = _percent_encoded(job)
             return
         _terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
     _conclude(job, result)
@@ -111,6 +117,20 @@ def _stop_in_flight(job: dict, result: NonAiUpscaleResult) -> None:
 def _overran(job: dict) -> bool:
     runtime = time.time() - job.get("started_at", 0)
     return runtime > config.NONAI_MAX_RUNTIME_HOURS * 3600
+
+
+def _percent_encoded(job: dict) -> int | None:
+    """How far the running encode has gotten, read off its growing partial.
+
+    ffmpeg writes fragmented mp4, so the partial is probeable mid-write; its
+    duration over the source's is the encode's progress.
+    """
+    tmp = Path(job.get("tmp", ""))
+    expected = job.get("expected_duration") or 0.0
+    encoded = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
+    if not encoded or not expected:
+        return None
+    return min(100, round(encoded / expected * 100))
 
 
 def _terminate_ffmpeg(pid: int, reason: str) -> None:
@@ -326,6 +346,7 @@ def collect_candidates() -> list[Candidate]:
     """Unprocessed triage-folder videos, most-wanted first."""
     candidates: list[Candidate] = []
     skipped = _skip_manifest_entries()
+    watch_scores = _watch_scores()
     for bucket in buckets():
         processed_stems = _processed_stems(bucket)
         for triage_digit, triage_dir in _numbered_dirs(bucket, digits=(0, 1)):
@@ -339,12 +360,13 @@ def collect_candidates() -> list[Candidate]:
                     continue
                 if relpath(video) in skipped:
                     continue
-                candidates.append(
-                    Candidate(video, bucket, triage_digit, _has_funscript(video))
-                )
-    candidates.sort(
-        key=lambda c: (c.triage_digit != 1, not c.has_funscript, str(c.path).lower())
-    )
+                candidates.append(Candidate(
+                    video, bucket, triage_digit, _has_funscript(video),
+                    watch_scores.get(str(video).strip().lower(), 0.0),
+                ))
+    candidates.sort(key=lambda c: (
+        c.triage_digit != 1, -c.watch_score, not c.has_funscript, str(c.path).lower(),
+    ))
     return candidates
 
 
@@ -368,6 +390,27 @@ def _processed_stems(bucket: Path) -> set[str]:
         if is_finalized_video_file(video, config.VIDEO_EXTENSIONS) and is_processed_stem(video.stem):
             stems.add(strip_processing_suffixes(video.stem))
     return stems
+
+
+def _watch_scores() -> dict[str, float]:
+    """Fun Time's per-video watch score, keyed by its normalized path.
+
+    Mirrors the breeding score its playlist weighting uses: completions plus
+    three per lock, minus skips. Empty until Fun Time starts tracking primary
+    (Nau) plays; satellite entries all point at the AI outbox and simply never
+    match a non-AI candidate.
+    """
+    try:
+        payload = json.loads(config.FUN_TIME_WATCH_STATS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return {
+        key: entry.get("completions", 0) + 3 * entry.get("locks", 0) - entry.get("skips", 0)
+        for key, entry in payload.items()
+        if isinstance(entry, dict)
+    }
 
 
 def _has_funscript(video: Path) -> bool:

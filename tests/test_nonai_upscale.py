@@ -26,6 +26,7 @@ def library_overrides(root, **extra):
         NONAI_JOB_STATE_FILE=root / "job.json",
         NONAI_ATTEMPTS_FILE=root / "attempts.json",
         NONAI_FFMPEG_LOG=root / "ffmpeg.log",
+        FUN_TIME_WATCH_STATS_FILE=root / "watch_stats.json",
     )
     overrides.update(extra)
     return overrides
@@ -100,6 +101,32 @@ class TestCollectCandidates(unittest.TestCase):
                 candidates = nonai_upscale.collect_candidates()
 
             self.assertEqual([c.path for c in candidates], [fresh])
+
+    def test_watched_videos_outrank_funscripted_ones(self):
+        """Fun Time's watch stats (once its Nau tracking records them) are the
+        strongest popularity signal; funscripts break ties among the unwatched."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+
+            watched = make_video(non_ai / "larkin" / "0 unsorted" / "watched.mp4")
+            scripted = make_video(non_ai / "larkin" / "0 unsorted" / "scripted.mp4")
+            plain = make_video(non_ai / "larkin" / "0 unsorted" / "plain.mp4")
+            disliked = make_video(non_ai / "larkin" / "0 unsorted" / "disliked.mp4")
+            script = overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "larkin" / "0 unsorted" / "scripted.funscript"
+            script.parent.mkdir(parents=True)
+            script.write_text("{}", encoding="utf-8")
+            overrides["FUN_TIME_WATCH_STATS_FILE"].write_text(json.dumps({
+                str(watched).lower(): {"completions": 4, "skips": 0, "locks": 1},
+                str(disliked).lower(): {"completions": 0, "skips": 3, "locks": 0},
+            }), encoding="utf-8")
+
+            with override_config(**overrides):
+                candidates = nonai_upscale.collect_candidates()
+
+            self.assertEqual(
+                [c.path for c in candidates], [watched, scripted, plain, disliked]
+            )
 
     def test_orders_flagged_then_funscripted_then_the_rest(self):
         with workspace_temp_dir() as root:
@@ -307,6 +334,29 @@ class TestRunSupervisesAJob(unittest.TestCase):
             mocks["popen"].assert_not_called()
             self.assertTrue(tmp.exists())
             self.assertTrue(overrides["NONAI_JOB_STATE_FILE"].exists())
+
+    def test_live_job_reports_percent_encoded_so_far(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, expected=200.0)
+
+            stack, _ = probes(is_running=True, duration=75.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False)
+
+            self.assertEqual(result.in_flight_percent, 38)  # 75/200, rounded
+
+    def test_live_job_percent_is_none_when_the_partial_is_unreadable(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, expected=200.0)
+
+            stack, _ = probes(is_running=True, duration=None)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False)
+
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
+            self.assertIsNone(result.in_flight_percent)
 
     def test_finished_job_is_promoted_and_the_original_retired(self):
         with workspace_temp_dir() as root:

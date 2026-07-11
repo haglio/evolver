@@ -5,6 +5,10 @@ BASE_DIR     = Path(r"C:\path\to\suite-root")
 PROJECT_DIR  = BASE_DIR / "projects" / "evolver"
 FUN_TIME_PROJECT_DIR = BASE_DIR / "projects" / "fun_time"
 FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
+# Fun Time's per-video watch counts ("breeding" data), read-only. Satellite VLC
+# plays populate it today; Nau plays will land in the same file once Fun Time's
+# primary-library tracking exists. Keys are normalized as path.strip().lower().
+FUN_TIME_WATCH_STATS_FILE = FUN_TIME_PROJECT_DIR / "state" / "watch_stats.json"
 # Origenerator (a sibling video-generation app) is treated as a normal external
 # content source: for videos it drops in 0_inbox/origenerator/, Evolver pulls the
 # generation metadata straight from Origenerator's own gallery database, read-only
