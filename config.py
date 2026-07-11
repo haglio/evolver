@@ -54,6 +54,34 @@ UPSCALE_FILTER_T2V_provider = (
 VIDEOAI_TAG_DEFAULT = "Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale"
 VIDEOAI_TAG_T2V_provider = "Processed using apo-8 for 60 fps interpolation and prob-4 for 4x upscale (t2v provider)"
 
+# Non-AI library upscaling. The recipe replicates what the manually processed
+# clips under 2D/non_AI carry in their videoai tags: apo-8 60 fps interpolation,
+# then an iris-2 upscale in auto mode with recover-original-detail at 100
+# (blend=1), aimed at a 4K frame. These encodes run for hours, so the stage
+# launches one detached ffmpeg at a time and checks on it each scheduler tick.
+NONAI_EXCLUDED_BUCKETS = {"actually_AI_but_funscripted"}  # AI-pipeline outputs parked in non_AI
+NONAI_UPSCALE_FILTER_TEMPLATE = (
+    "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
+    "tvai_up=model=iris-2:scale=0:w={width}:h={height}:preblur=0:noise=0:details=0:"
+    "halo=0:blur=0:compression=0:estimate=20:blend=1:device=0:vram=1:instances=1"
+)
+NONAI_TARGET_LONG_EDGE = 3840
+NONAI_TARGET_SHORT_EDGE = 2160
+VIDEOAI_TAG_NONAI = (
+    "Processed using apo-8 for 60 fps interpolation and iris-2 in auto mode "
+    "with recover original detail at 100 for upscale toward 4K"
+)
+NONAI_OUTPUT_SUFFIX = "_apo8_iris2"
+NONAI_PROCESSED_DIR_NAME = "processed"
+NONAI_FALLBACK_DONE_DIR_NAME = "3_good_to_go"
+NONAI_JOB_STATE_FILE = PROJECT_DIR / "nonai_upscale_job.json"
+NONAI_ATTEMPTS_FILE = PROJECT_DIR / "nonai_upscale_attempts.json"
+NONAI_SKIP_MANIFEST = PROJECT_DIR / ".nonai-upscale-skip.txt"
+NONAI_FFMPEG_LOG = PROJECT_DIR / "nonai_upscale_ffmpeg.log"
+NONAI_MAX_RUNTIME_HOURS = 24
+NONAI_MAX_ATTEMPTS = 2
+NONAI_COMPLETE_DURATION_FRACTION = 0.98
+
 LOG_FILE = PROJECT_DIR / "evolver.log"
 RUNS_DIR = PROJECT_DIR / "runs"
 GUI_SETTINGS_FILE = PROJECT_DIR / "gui_settings.json"
