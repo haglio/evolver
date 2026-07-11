@@ -189,7 +189,7 @@ class TestIsT2vProvider(unittest.TestCase):
     def test_true_for_provider_without_source_image(self):
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
-            json_path = meta_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
+            json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
             json_path.parent.mkdir(parents=True)
             json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
 
@@ -199,7 +199,7 @@ class TestIsT2vProvider(unittest.TestCase):
     def test_false_for_provider_with_source_image(self):
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
-            json_path = meta_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
+            json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
             json_path.parent.mkdir(parents=True)
             json_path.write_text(json.dumps({"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}), encoding="utf-8")
 
@@ -365,10 +365,11 @@ class TestFfmpegWindowSuppression(unittest.TestCase):
 class TestFilterSelection(unittest.TestCase):
     def _run_capturing_ffmpeg_args(self, root, sidecar_payload):
         """Upscale one provider clip whose sidecar holds *sidecar_payload*, capturing the
-        ffmpeg args.  The video tree nests under an overridden AI_DIR because a
+        ffmpeg args.  The video tree nests under VIDEO_LIBRARY_DIR because a
         sidecar mirrors its clip's path relative to that root.
         """
-        ai_dir = root / "AI"
+        video_lib = root / "videos"
+        ai_dir = video_lib / "2D" / "AI"
         sorted_dir = ai_dir / "1_sorted"
         out_dir = ai_dir / "2_outbox" / "upscaled_by_orientation"
         weird_dir = root / "weird"
@@ -378,7 +379,10 @@ class TestFilterSelection(unittest.TestCase):
         in_file.parent.mkdir(parents=True)
         in_file.write_bytes(b"video")
 
-        json_path = meta_dir / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
+        json_path = (
+            meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation"
+            / "landscape" / "provider" / "clip_topaz.json"
+        )
         json_path.parent.mkdir(parents=True)
         json_path.write_text(json.dumps(sidecar_payload), encoding="utf-8")
 
@@ -390,8 +394,8 @@ class TestFilterSelection(unittest.TestCase):
             tmp.write_bytes(b"upscaled")
             return True
 
-        with override_config(AI_DIR=ai_dir, SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir,
-                             WEIRD_DIR=weird_dir, METADATA_DIR=meta_dir):
+        with override_config(VIDEO_LIBRARY_DIR=video_lib, AI_DIR=ai_dir, SORTED_DIR=sorted_dir,
+                             OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir, METADATA_DIR=meta_dir):
             with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                 upscale.run(max_items=1)

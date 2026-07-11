@@ -24,11 +24,12 @@ class TestPromptScrape(unittest.TestCase):
     def _override(self, root):
         ai = self._ai_dir(root)
         sorted_dir, metadata_dir = self._dirs(root)
-        return override_config(AI_DIR=ai, SORTED_DIR=sorted_dir, METADATA_DIR=metadata_dir,
+        return override_config(VIDEO_LIBRARY_DIR=root / "videos" / "videos",
+                               AI_DIR=ai, SORTED_DIR=sorted_dir, METADATA_DIR=metadata_dir,
                                OUT_UPSCALED_DIR=ai / "2_outbox" / "upscaled_by_orientation")
 
     def _mirror_path(self, metadata_dir, orient, source, stem):
-        return (metadata_dir / "2_outbox" / "upscaled_by_orientation"
+        return (metadata_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation"
                 / orient / source / f"{stem}_topaz.json")
 
     def _marker_path(self, metadata_dir, orient, source, stem):

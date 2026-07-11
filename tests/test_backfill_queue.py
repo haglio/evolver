@@ -19,7 +19,7 @@ class TestUnlabeledVideos(unittest.TestCase):
         return video
 
     def _make_sidecar(self, metadata, orient, source, stem, payload):
-        path = metadata / "2_outbox" / "upscaled_by_orientation" / orient / source / f"{stem}.json"
+        path = metadata / "AI" / "2_outbox" / "upscaled_by_orientation" / orient / source / f"{stem}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -28,7 +28,7 @@ class TestUnlabeledVideos(unittest.TestCase):
             ai, upscaled, metadata = self._tree(root)
             video = self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertEqual(unlabeled_videos(), [video])
 
     def test_a_sidecar_without_an_action_leaves_the_video_unlabeled(self):
@@ -37,7 +37,7 @@ class TestUnlabeledVideos(unittest.TestCase):
             video = self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
             self._make_sidecar(metadata, "portrait", "provider2", "a_topaz", {"video": {"prompt": "p"}})
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertEqual(unlabeled_videos(), [video])
 
     def test_a_sidecar_with_an_action_labels_the_video(self):
@@ -46,7 +46,7 @@ class TestUnlabeledVideos(unittest.TestCase):
             self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
             self._make_sidecar(metadata, "portrait", "provider2", "a_topaz", {"video": {"action": "Alpha"}})
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertEqual(unlabeled_videos(), [])
 
     def test_the_scraped_sources_are_never_offered(self):
@@ -55,7 +55,7 @@ class TestUnlabeledVideos(unittest.TestCase):
             self._make_video(upscaled, "portrait", "provider", "a_topaz.mp4")
             self._make_video(upscaled, "landscape", "origenerator", "b_topaz.mp4")
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertEqual(unlabeled_videos(), [])
 
     def test_a_half_written_upscale_is_never_offered(self):
@@ -63,7 +63,7 @@ class TestUnlabeledVideos(unittest.TestCase):
             ai, upscaled, metadata = self._tree(root)
             self._make_video(upscaled, "portrait", "provider2", "a.partial.deadbeef.mp4")
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertEqual(unlabeled_videos(), [])
 
     def test_both_orientations_are_swept(self):
@@ -72,7 +72,7 @@ class TestUnlabeledVideos(unittest.TestCase):
             portrait = self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
             landscape = self._make_video(upscaled, "landscape", "provider3", "b_topaz.mp4")
 
-            with override_config(AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertEqual(sorted(unlabeled_videos()), sorted([portrait, landscape]))
 
 

@@ -1,6 +1,6 @@
 """Where a video's metadata sidecar lives, and what the upscale stage names its output.
 
-The library keeps generation metadata out of the video tree: a clip under ``AI_DIR``
+The library keeps metadata out of the video tree: a clip under ``VIDEO_LIBRARY_DIR``
 has its JSON at the same relative path beneath ``METADATA_DIR``.  That mirroring is
 the contract the downstream browser reads by, so it is expressed here once.
 
@@ -23,18 +23,15 @@ def upscaled_video_path(source: str, orient: str, sorted_stem: str) -> Path:
 
 
 def sidecar_path(video: Path) -> Path:
-    """The metadata JSON mirroring an AI *video*'s path under ``METADATA_DIR``."""
-    return (config.METADATA_DIR / video.relative_to(config.AI_DIR)).with_suffix(".json")
+    """The metadata JSON mirroring *video*'s path under ``METADATA_DIR``.
 
-
-def nonai_sidecar_path(video: Path) -> Path:
-    """The metadata JSON mirroring a non-AI *video*'s path under ``METADATA_DIR``.
-
-    The non_AI tree gets the same mirrored-sidecar treatment as the AI tree, so
-    the version-grouping stage can record which family each real-footage clip
-    belongs to alongside the AI generation metadata.
+    The whole video library is mirrored: a clip's sidecar sits at the same path
+    beneath ``METADATA_DIR`` as the clip sits beneath ``VIDEO_LIBRARY_DIR``
+    (``2D/AI/2_outbox/x.mp4`` -> ``2D/AI/2_outbox/x.json``, ``2D/non_AI/winston/
+    y.mp4`` -> ``2D/non_AI/winston/y.json``), so AI generation metadata and
+    non-AI version families share one tree that parallels the video tree.
     """
-    return (config.METADATA_DIR / video.relative_to(config.NON_AI_DIR)).with_suffix(".json")
+    return (config.METADATA_DIR / video.relative_to(config.VIDEO_LIBRARY_DIR)).with_suffix(".json")
 
 
 def read(path: Path) -> dict:
