@@ -15,8 +15,9 @@ class TestPopupConstruction(unittest.TestCase):
     def tearDown(self):
         self.popup.close()
 
-    def test_has_eight_stage_bars(self):
-        self.assertEqual(len(self.popup._bars), 8)
+    def test_has_a_bar_per_pipeline_stage(self):
+        from gui.progress_popup import ALL_STAGES
+        self.assertEqual(len(self.popup._bars), len(ALL_STAGES))
 
     def test_has_total_bar(self):
         self.assertIsInstance(self.popup._total_bar, QProgressBar)
@@ -26,8 +27,9 @@ class TestPopupConstruction(unittest.TestCase):
             self.assertEqual(bar.value(), 0)
         self.assertEqual(self.popup._total_bar.value(), 0)
 
-    def test_total_bar_range_is_800(self):
-        self.assertEqual(self.popup._total_bar.maximum(), 800)
+    def test_total_bar_range_is_100_per_stage(self):
+        from gui.progress_popup import ALL_STAGES
+        self.assertEqual(self.popup._total_bar.maximum(), 100 * len(ALL_STAGES))
 
     def test_window_flags_include_tool_without_stay_on_top(self):
         flags = self.popup.windowFlags()
@@ -101,10 +103,10 @@ class TestPopupTotalBar(unittest.TestCase):
     def tearDown(self):
         self.popup.close()
 
-    def test_total_reaches_800_when_all_complete(self):
+    def test_total_reaches_its_maximum_when_all_complete(self):
         for stage in self._all_stages:
             self.popup.on_stage_completed(stage, None, 0.5, "completed")
-        self.assertEqual(self.popup._total_bar.value(), 800)
+        self.assertEqual(self.popup._total_bar.value(), 100 * len(self._all_stages))
 
     def test_skipped_stages_contribute_to_total(self):
         self.popup.on_stage_completed("sort", None, 0.0, "skipped")

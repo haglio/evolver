@@ -29,6 +29,7 @@ class TestEvolverMain(unittest.TestCase):
             "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
             "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
             "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
+            "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
             "has_pending_work": Mock(return_value=False),
             "should_skip_cpu": Mock(return_value=False),
             "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
@@ -44,6 +45,7 @@ class TestEvolverMain(unittest.TestCase):
             ("evolver.purge_weird.run", "purge_run"),
             ("evolver.scripts_sync.run", "scripts_sync_run"),
             ("evolver.upscale.run", "upscale_run"),
+            ("evolver.nonai_upscale.run", "nonai_run"),
             ("evolver.bookmarks_sync.run", "bookmarks_sync_run"),
             ("evolver.check_correspondence.run", "correspondence_run"),
             ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
@@ -113,6 +115,32 @@ class TestEvolverMain(unittest.TestCase):
         mocks["upscale_run"].assert_called_once_with(
             priority_files=["new-file"], max_items=config.UPSCALE_BATCH_LIMIT,
         )
+
+    # --- Non-AI upscale gating ---
+
+    def test_nonai_upscale_starts_when_ai_work_is_drained(self):
+        mocks = self._run_pipeline()
+        mocks["nonai_run"].assert_called_once_with(allow_start=True)
+
+    def test_nonai_upscale_never_starts_while_ai_work_remains(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+            upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=2)),
+        )
+        mocks["nonai_run"].assert_called_once_with(allow_start=False)
+
+    def test_nonai_upscale_never_starts_when_cpu_is_busy(self):
+        mocks = self._run_pipeline(
+            should_skip_cpu=Mock(return_value=True),
+        )
+        mocks["nonai_run"].assert_called_once_with(allow_start=False)
+
+    def test_exits_nonzero_on_nonai_upscale_failure(self):
+        mocks = self._run_pipeline(
+            nonai_run=Mock(return_value=Mock(failed=1, deferred_low_disk=False)),
+        )
+        self.assertEqual(mocks["exit_code"], 1)
 
     # --- Exit code propagation ---
 
@@ -196,6 +224,7 @@ class TestRunPipeline(unittest.TestCase):
             "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
             "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
             "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
+            "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
             "has_pending_work": Mock(return_value=False),
             "should_skip_cpu": Mock(return_value=False),
             "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
@@ -208,6 +237,7 @@ class TestRunPipeline(unittest.TestCase):
             ("evolver.purge_weird.run", "purge_run"),
             ("evolver.scripts_sync.run", "scripts_sync_run"),
             ("evolver.upscale.run", "upscale_run"),
+            ("evolver.nonai_upscale.run", "nonai_run"),
             ("evolver.bookmarks_sync.run", "bookmarks_sync_run"),
             ("evolver.check_correspondence.run", "correspondence_run"),
             ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
@@ -234,7 +264,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "verify", "bookmarks", "scripts", "dupes"])
+        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "bookmarks", "scripts", "dupes"])
 
     def test_skipped_stages_have_skip_status(self):
         stack, _ = self._patch_all_stages()
@@ -250,7 +280,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_start=on_start)
         started_names = [call.args[0] for call in on_start.call_args_list]
-        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "verify", "bookmarks", "scripts", "dupes"])
+        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "bookmarks", "scripts", "dupes"])
 
     def test_on_stage_complete_called_with_result_and_status(self):
         on_complete = Mock()

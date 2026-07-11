@@ -72,7 +72,7 @@ class ProgressPopup(QWidget):
         total_layout.addWidget(total_label)
 
         self._total_bar = QProgressBar()
-        self._total_bar.setRange(0, 800)
+        self._total_bar.setRange(0, 100 * len(ALL_STAGES))
         self._total_bar.setValue(0)
         self._total_bar.setFixedHeight(20)
         self._total_bar.setTextVisible(True)
