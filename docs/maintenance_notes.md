@@ -8,6 +8,7 @@ Evolver intentionally writes Topaz output to a temporary filename before promoti
 - These files are considered transient implementation details, not user-facing library entries.
 - Stages that scan for videos must ignore partial files.
 - Stage 5 (`tasks/upscale.py`) removes any stale partial outputs from the target outbox before starting new work.
+- The non-AI stage (`tasks/nonai_upscale.py`) does the same under each bucket's `3*/processed/` folder, sparing only the tmp file its live detached job is still writing.
 
 The shared helpers for this contract live in `util/media_files.py`:
 
