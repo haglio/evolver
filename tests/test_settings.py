@@ -46,6 +46,19 @@ class TestEvolverSettings(unittest.TestCase):
         s = EvolverSettings()
         self.assertFalse(s.enable_toasts)
 
+    def test_nonai_upscale_defaults_to_off(self):
+        s = EvolverSettings()
+        self.assertFalse(s.nonai_upscale_enabled)
+
+    def test_nonai_upscale_round_trip(self):
+        with workspace_temp_dir() as tmp:
+            path = tmp / "settings.json"
+            s = EvolverSettings(nonai_upscale_enabled=True)
+            s.save(path)
+
+            loaded = EvolverSettings.load(path)
+            self.assertTrue(loaded.nonai_upscale_enabled)
+
     def test_enable_toasts_round_trip(self):
         with workspace_temp_dir() as tmp:
             path = tmp / "settings.json"

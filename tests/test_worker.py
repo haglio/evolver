@@ -38,7 +38,7 @@ class TestPipelineWorker(unittest.TestCase):
         progress = []
 
         def fake_run_pipeline(on_stage_start=None, on_stage_complete=None,
-                              on_stage_progress=None):
+                              on_stage_progress=None, nonai_enabled=None):
             if pipeline_error:
                 raise pipeline_error
             for sr in pipeline_result.stages:
@@ -105,6 +105,17 @@ class TestPipelineWorker(unittest.TestCase):
         self.assertEqual(len(progress), 3)
         self.assertEqual(progress[0], ("upscale", 1, 3))
         self.assertEqual(progress[2], ("upscale", 3, 3))
+
+    def test_forwards_the_nonai_toggle_to_the_pipeline(self):
+        worker = PipelineWorker(trigger="scheduled", nonai_enabled=True)
+        with patch("gui.worker.evolver.setup_logging"), \
+             patch("gui.worker.evolver.check_dependencies"), \
+             patch("gui.worker.evolver.run_pipeline") as run_pipeline, \
+             patch("gui.worker.RunRecord"), \
+             patch("gui.worker.save_run"), \
+             patch("gui.worker.config"):
+            worker.run()
+        self.assertTrue(run_pipeline.call_args.kwargs["nonai_enabled"])
 
 
 if __name__ == "__main__":

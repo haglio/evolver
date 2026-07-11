@@ -26,9 +26,10 @@ class PipelineWorker(QThread):
     pipeline_finished = pyqtSignal(object)    # RunRecord
     pipeline_error = pyqtSignal(str)          # error message
 
-    def __init__(self, trigger: str = "scheduled", parent=None):
+    def __init__(self, trigger: str = "scheduled", nonai_enabled: bool = False, parent=None):
         super().__init__(parent)
         self._trigger = trigger
+        self._nonai_enabled = nonai_enabled
 
     def run(self):
         try:
@@ -38,6 +39,7 @@ class PipelineWorker(QThread):
                 on_stage_start=self._on_stage_start,
                 on_stage_complete=self._on_stage_complete,
                 on_stage_progress=self._on_stage_progress,
+                nonai_enabled=self._nonai_enabled,
             )
             record = RunRecord.from_pipeline_result(result, trigger=self._trigger)
             try:

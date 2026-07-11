@@ -37,6 +37,35 @@ class TestAppStartup(unittest.TestCase):
         mock_set_id.assert_called_once_with(_APP_MODEL_ID)
 
 
+class TestNonAiUpscaleToggle(unittest.TestCase):
+    """The tray menu's opt-in switch for the multi-hour non-AI encodes."""
+
+    def _app_with_fresh_settings(self):
+        from gui.settings import EvolverSettings
+        with patch("gui.app.QApplication", return_value=_app), \
+             patch("gui.app.EvolverSettings.load", return_value=EvolverSettings()):
+            return EvolverApp()
+
+    def test_tray_toggle_starts_unchecked_by_default(self):
+        app = self._app_with_fresh_settings()
+        self.assertTrue(app._tray.nonai_action.isCheckable())
+        self.assertFalse(app._tray.nonai_action.isChecked())
+
+    def test_toggling_flips_and_saves_the_setting(self):
+        app = self._app_with_fresh_settings()
+        with patch("gui.app.EvolverSettings.save") as mock_save:
+            app._tray.nonai_action.trigger()
+        self.assertTrue(app._settings.nonai_upscale_enabled)
+        mock_save.assert_called_once()
+
+    def test_worker_receives_the_toggle_state(self):
+        app = self._app_with_fresh_settings()
+        app._settings.nonai_upscale_enabled = True
+        with patch("gui.app.PipelineWorker") as mock_worker:
+            app._start_run("manual")
+        self.assertTrue(mock_worker.call_args.kwargs["nonai_enabled"])
+
+
 class TestSessionManagement(unittest.TestCase):
     """EvolverApp must log Windows session-management events that could kill it."""
 

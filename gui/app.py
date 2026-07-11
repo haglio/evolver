@@ -77,6 +77,8 @@ class EvolverApp:
         self._tray.open_action.triggered.connect(self._show_window)
         self._tray.run_now_action.triggered.connect(self._scheduler.run_now)
         self._tray.pause_action.triggered.connect(self._toggle_pause)
+        self._tray.nonai_action.setChecked(self._settings.nonai_upscale_enabled)
+        self._tray.nonai_action.toggled.connect(self._set_nonai_enabled)
         self._tray.settings_action.triggered.connect(self._show_settings)
         self._tray.stats_action.triggered.connect(self._show_stats)
         self._tray.backfill_action.triggered.connect(self._launch_backfill)
@@ -126,6 +128,11 @@ class EvolverApp:
             self._scheduler.pause()
             self._tray.set_paused(True)
 
+    def _set_nonai_enabled(self, enabled: bool):
+        """Persist the tray toggle; the next scheduler tick acts on it."""
+        self._settings.nonai_upscale_enabled = enabled
+        self._settings.save()
+
     def _show_settings(self):
         dialog = SettingsDialog(self._settings, self._window)
         if dialog.exec():
@@ -169,7 +176,9 @@ class EvolverApp:
         self._scheduler.mark_running()
         self._tray.set_running(True)
 
-        self._worker = PipelineWorker(trigger=trigger)
+        self._worker = PipelineWorker(
+            trigger=trigger, nonai_enabled=self._settings.nonai_upscale_enabled,
+        )
         self._worker.pipeline_finished.connect(self._on_finished)
         self._worker.pipeline_error.connect(self._on_error)
 

@@ -118,23 +118,9 @@ class TestEvolverMain(unittest.TestCase):
 
     # --- Non-AI upscale gating ---
 
-    def test_nonai_upscale_starts_when_ai_work_is_drained(self):
+    def test_cli_run_neither_starts_nor_stops_nonai_encodes(self):
         mocks = self._run_pipeline()
-        mocks["nonai_run"].assert_called_once_with(allow_start=True)
-
-    def test_nonai_upscale_never_starts_while_ai_work_remains(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-            upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=2)),
-        )
-        mocks["nonai_run"].assert_called_once_with(allow_start=False)
-
-    def test_nonai_upscale_never_starts_when_cpu_is_busy(self):
-        mocks = self._run_pipeline(
-            should_skip_cpu=Mock(return_value=True),
-        )
-        mocks["nonai_run"].assert_called_once_with(allow_start=False)
+        mocks["nonai_run"].assert_called_once_with(allow_start=False, stop=False)
 
     def test_exits_nonzero_on_nonai_upscale_failure(self):
         mocks = self._run_pipeline(
@@ -302,6 +288,36 @@ class TestRunPipeline(unittest.TestCase):
         upscale_call = next(c for c in on_complete.call_args_list if c.args[0] == "upscale")
         self.assertIsNone(upscale_call.args[1])  # no result
         self.assertEqual(upscale_call.args[3], "skipped")
+
+    def test_enabled_nonai_upscale_starts_when_ai_work_is_drained(self):
+        stack, mocks = self._patch_all_stages()
+        with stack:
+            evolver.run_pipeline(nonai_enabled=True)
+        mocks["nonai_run"].assert_called_once_with(allow_start=True, stop=False)
+
+    def test_enabled_nonai_upscale_never_starts_while_ai_work_remains(self):
+        stack, mocks = self._patch_all_stages(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+            upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=2)),
+        )
+        with stack:
+            evolver.run_pipeline(nonai_enabled=True)
+        mocks["nonai_run"].assert_called_once_with(allow_start=False, stop=False)
+
+    def test_enabled_nonai_upscale_never_starts_when_cpu_is_busy(self):
+        stack, mocks = self._patch_all_stages(
+            should_skip_cpu=Mock(return_value=True),
+        )
+        with stack:
+            evolver.run_pipeline(nonai_enabled=True)
+        mocks["nonai_run"].assert_called_once_with(allow_start=False, stop=False)
+
+    def test_disabled_nonai_upscale_stops_the_in_flight_encode(self):
+        stack, mocks = self._patch_all_stages()
+        with stack:
+            evolver.run_pipeline(nonai_enabled=False)
+        mocks["nonai_run"].assert_called_once_with(allow_start=False, stop=True)
 
     def test_has_errors_true_when_stage_fails(self):
         stack, _ = self._patch_all_stages(

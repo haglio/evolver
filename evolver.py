@@ -76,6 +76,7 @@ def run_pipeline(
     on_stage_start: Callable[[str], None] | None = None,
     on_stage_complete: Callable[[str, object | None, float, str], None] | None = None,
     on_stage_progress: Callable[[str, int, int], None] | None = None,
+    nonai_enabled: bool | None = None,
 ) -> PipelineResult:
     """Run the full evolver pipeline, optionally reporting progress via callbacks.
 
@@ -83,6 +84,10 @@ def run_pipeline(
         on_stage_start: Called with (stage_name) before each stage runs.
         on_stage_complete: Called with (stage_name, result, elapsed_seconds, status)
             after each stage. status is "completed", "skipped", or "error".
+        nonai_enabled: The tray's non-AI upscale toggle. True may start a new
+            detached encode, False stops an in-flight one, and None (headless
+            CLI, which has no toggle) leaves any in-flight encode alone and
+            starts nothing. Finished encodes are promoted in every mode.
 
     Returns:
         PipelineResult with per-stage records and aggregate status.
@@ -140,14 +145,17 @@ def run_pipeline(
     )
 
     # The non-AI stage always runs (it may have a detached encode to check on),
-    # but only starts a new multi-hour encode when the AI pipeline is drained
-    # and the box is otherwise quiet.
+    # but only starts a new multi-hour encode when the tray toggle is on, the
+    # AI pipeline is drained, and the box is otherwise quiet.
     ai_drained = not upscale_skipped and (
         upscale_result is None or upscale_result.pending_after_run == 0
     )
-    nonai_allow_start = ai_drained and not _should_skip_upscale_due_to_cpu(log)
+    nonai_allow_start = bool(
+        nonai_enabled and ai_drained and not _should_skip_upscale_due_to_cpu(log)
+    )
     upscale_nonai_result = _run_stage(
-        "upscale_non_ai", nonai_upscale.run, allow_start=nonai_allow_start,
+        "upscale_non_ai", nonai_upscale.run,
+        allow_start=nonai_allow_start, stop=nonai_enabled is False,
     )
 
     if upscale_still_pending:
