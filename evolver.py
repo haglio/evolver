@@ -2,14 +2,15 @@
 """evolver.py - video collection maintenance pipeline.
 
 Invoked by the tray app scheduler or directly via CLI. Stages:
-  1. purge      - remove weird outputs and their matching sources
-  2. metadata   - scrape AI prompt metadata into mirrored JSON files
-  3. sort       - move new videos from inbox into sorted folders by source/orientation
-  4. upscale    - apply Topaz frame interpolation + 4x upscale to sorted videos
-  5. verify     - check 1_sorted and 2_outbox are in 1-to-1 correspondence
-  6. bookmarks  - sync Fun Time favorites into a Chrome bookmarks folder
-  7. scripts    - align funscripts to mirror the video library tree
-  8. dupes      - scan non_AI for likely duplicate videos by exact filesize
+  1. purge           - remove weird outputs and their matching sources
+  2. metadata        - scrape AI prompt metadata into mirrored JSON files
+  3. sort            - move new videos from inbox into sorted folders by source/orientation
+  4. upscale         - apply Topaz frame interpolation + 4x upscale to sorted AI videos
+  5. upscale_non_ai  - supervise one detached Topaz encode of a non-AI library video
+  6. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
+  7. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
+  8. scripts         - align funscripts to mirror the video library tree
+  9. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -22,7 +23,7 @@ from dataclasses import dataclass, field
 import check_correspondence
 import check_duplicate_sizes
 import config
-from tasks import bookmarks_sync, prompt_scrape, purge_weird, scripts_sync, sort, upscale
+from tasks import bookmarks_sync, nonai_upscale, prompt_scrape, purge_weird, scripts_sync, sort, upscale
 from util import system_resources
 
 
@@ -127,6 +128,18 @@ def run_pipeline(
         upscale_skipped
         or (upscale_result is not None and upscale_result.pending_after_run > 0)
     )
+
+    # The non-AI stage always runs (it may have a detached encode to check on),
+    # but only starts a new multi-hour encode when the AI pipeline is drained
+    # and the box is otherwise quiet.
+    ai_drained = not upscale_skipped and (
+        upscale_result is None or upscale_result.pending_after_run == 0
+    )
+    nonai_allow_start = ai_drained and not _should_skip_upscale_due_to_cpu(log)
+    upscale_nonai_result = _run_stage(
+        "upscale_non_ai", nonai_upscale.run, allow_start=nonai_allow_start,
+    )
+
     if upscale_still_pending:
         log.info("Skipping correspondence check: upscale has unprocessed files that would cause a false mismatch.")
         correspondence_result = check_correspondence.CorrespondenceResult(sorted_count=0, outbox_count=0)
@@ -145,6 +158,8 @@ def run_pipeline(
         or not bookmarks_sync_result.ok
         or not scripts_sync_result.ok
         or not duplicate_sizes_result.ok
+        or upscale_nonai_result.failed > 0
+        or upscale_nonai_result.deferred_low_disk
     )
     if upscale_result is not None:
         has_errors = has_errors or upscale_result.failed > 0 or upscale_result.deferred_low_disk
