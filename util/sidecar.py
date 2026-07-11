@@ -23,8 +23,18 @@ def upscaled_video_path(source: str, orient: str, sorted_stem: str) -> Path:
 
 
 def sidecar_path(video: Path) -> Path:
-    """The metadata JSON mirroring *video*'s path under ``METADATA_DIR``."""
+    """The metadata JSON mirroring an AI *video*'s path under ``METADATA_DIR``."""
     return (config.METADATA_DIR / video.relative_to(config.AI_DIR)).with_suffix(".json")
+
+
+def nonai_sidecar_path(video: Path) -> Path:
+    """The metadata JSON mirroring a non-AI *video*'s path under ``METADATA_DIR``.
+
+    The non_AI tree gets the same mirrored-sidecar treatment as the AI tree, so
+    the version-grouping stage can record which family each real-footage clip
+    belongs to alongside the AI generation metadata.
+    """
+    return (config.METADATA_DIR / video.relative_to(config.NON_AI_DIR)).with_suffix(".json")
 
 
 def read(path: Path) -> dict:
