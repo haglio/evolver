@@ -40,15 +40,30 @@ def get_orientation(file: Path) -> str:
     return "landscape"  # square
 
 
+def duration_seconds(file: Path) -> float | None:
+    """The container duration of *file* in seconds, or None if unavailable."""
+    try:
+        return float(_probe_format(file, "format=duration"))
+    except ValueError:
+        return None
+
+
+def videoai_tag(file: Path) -> str:
+    """The Topaz ``videoai`` metadata tag of *file* — empty when untagged."""
+    return _probe_format(file, "format_tags=videoai")
+
+
 def _probe(file: Path, show_entries: str) -> str:
+    return _run_ffprobe(["-select_streams", "v:0", "-show_entries", show_entries, str(file)])
+
+
+def _probe_format(file: Path, show_entries: str) -> str:
+    return _run_ffprobe(["-show_entries", show_entries, str(file)])
+
+
+def _run_ffprobe(args: list[str]) -> str:
     result = subprocess.run(
-        [
-            "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", show_entries,
-            "-of", "csv=p=0",
-            str(file),
-        ],
+        ["ffprobe", "-v", "error", "-of", "csv=p=0", *args],
         capture_output=True,
         text=True,
         creationflags=subprocess.CREATE_NO_WINDOW,
