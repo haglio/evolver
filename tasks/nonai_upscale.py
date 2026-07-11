@@ -30,6 +30,7 @@ from pathlib import Path
 import config
 from util import ffprobe, processes, system_resources, topaz
 from util.media_files import is_finalized_video_file, is_partial_video_path
+from util.nonai_library import buckets
 from util.variants import is_processed_stem, strip_processing_suffixes
 
 log = logging.getLogger(__name__)
@@ -184,7 +185,7 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
     the live job's own tmp is exempt. A partial a lingering ffmpeg still has
     open just fails to unlink and gets swept on a later tick.
     """
-    for bucket in _buckets():
+    for bucket in buckets():
         for _, done_dir in _numbered_dirs(bucket, digits=(3,)):
             removed = 0
             for path in done_dir.rglob("*.partial.*"):
@@ -325,7 +326,7 @@ def collect_candidates() -> list[Candidate]:
     """Unprocessed triage-folder videos, most-wanted first."""
     candidates: list[Candidate] = []
     skipped = _skip_manifest_entries()
-    for bucket in _buckets():
+    for bucket in buckets():
         processed_stems = _processed_stems(bucket)
         for triage_digit, triage_dir in _numbered_dirs(bucket, digits=(0, 1)):
             # Direct children only: a subfolder inside a triage dir stages manual
@@ -349,16 +350,6 @@ def collect_candidates() -> list[Candidate]:
 
 def relpath(video: Path) -> str:
     return video.relative_to(config.NON_AI_DIR).as_posix()
-
-
-def _buckets() -> list[Path]:
-    if not config.NON_AI_DIR.is_dir():
-        return []
-    return [
-        child
-        for child in sorted(config.NON_AI_DIR.iterdir())
-        if child.is_dir() and child.name not in config.NONAI_EXCLUDED_BUCKETS
-    ]
 
 
 def _numbered_dirs(bucket: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
