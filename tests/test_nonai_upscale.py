@@ -1,4 +1,5 @@
 import json
+import subprocess
 import time
 import unittest
 from contextlib import ExitStack
@@ -25,6 +26,7 @@ def library_overrides(root, **extra):
         NONAI_SKIP_MANIFEST=root / "skip.txt",
         NONAI_JOB_STATE_FILE=root / "job.json",
         NONAI_ATTEMPTS_FILE=root / "attempts.json",
+        NONAI_COOLDOWN_FILE=root / "cooldown.json",
         NONAI_FFMPEG_LOG=root / "ffmpeg.log",
         FUN_TIME_WATCH_STATS_FILE=root / "watch_stats.json",
     )
@@ -170,7 +172,8 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
 
 
 def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**15,
-           popen=None, is_running=True, image="ffmpeg.exe", terminate=True):
+           popen=None, is_running=True, image="ffmpeg.exe", terminate=True,
+           topaz_pids=(), cmdline=None, available_ram=64.0):
     """An ExitStack patching every outside contact the stage makes."""
     stack = ExitStack()
     mocks = {
@@ -182,6 +185,8 @@ def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**1
             patch("tasks.nonai_upscale.ffprobe.duration_seconds", return_value=duration)),
         "free_bytes": stack.enter_context(
             patch("tasks.nonai_upscale.system_resources.free_bytes", return_value=free_bytes)),
+        "available_ram": stack.enter_context(
+            patch("tasks.nonai_upscale.system_resources.available_ram_gb", return_value=available_ram)),
         "popen": stack.enter_context(
             patch("tasks.nonai_upscale.subprocess.Popen", popen or Mock(return_value=Mock(pid=4242)))),
         "is_running": stack.enter_context(
@@ -190,6 +195,10 @@ def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**1
             patch("tasks.nonai_upscale.processes.image_path", return_value=image)),
         "terminate": stack.enter_context(
             patch("tasks.nonai_upscale.processes.terminate", return_value=terminate)),
+        "pids_of_image": stack.enter_context(
+            patch("tasks.nonai_upscale.processes.pids_of_image", return_value=list(topaz_pids))),
+        "command_line": stack.enter_context(
+            patch("tasks.nonai_upscale.processes.command_line", return_value=cmdline)),
     }
     return stack, mocks
 
@@ -263,6 +272,73 @@ class TestRunStartsAJob(unittest.TestCase):
             mocks["popen"].assert_not_called()
 
 
+class TestStartGuards(unittest.TestCase):
+    """A new multi-hour encode only starts on a machine with headroom."""
+
+    def _one_candidate(self, overrides):
+        return make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "a.mp4")
+
+    def test_a_running_topaz_process_defers_the_start(self):
+        """Any live Topaz ffmpeg — an orphaned encode, or the user's own GUI
+        export — means the GPU is taken; starting a second would stack encodes."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            self._one_candidate(overrides)
+
+            stack, mocks = probes(topaz_pids=(31337,))
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "")
+            self.assertEqual(result.start_deferred, "topaz_busy")
+            mocks["popen"].assert_not_called()
+
+    def test_low_available_ram_defers_the_start(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            self._one_candidate(overrides)
+
+            stack, mocks = probes(available_ram=2.5)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "")
+            self.assertEqual(result.start_deferred, "low_ram")
+            mocks["popen"].assert_not_called()
+
+    def test_a_recent_encode_imposes_a_cooldown(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            self._one_candidate(overrides)
+            overrides["NONAI_COOLDOWN_FILE"].write_text(
+                json.dumps({"ended_at": time.time() - 60}), encoding="utf-8"
+            )
+
+            stack, mocks = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "")
+            self.assertEqual(result.start_deferred, "cooldown")
+            mocks["popen"].assert_not_called()
+
+    def test_an_old_cooldown_stamp_does_not_block(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            self._one_candidate(overrides)
+            overrides["NONAI_COOLDOWN_FILE"].write_text(
+                json.dumps({"ended_at": time.time() - config.NONAI_COOLDOWN_MINUTES * 60 - 60}),
+                encoding="utf-8",
+            )
+
+            stack, mocks = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "winston/0 unsorted/a.mp4")
+            self.assertEqual(result.start_deferred, "")
+
+
 class TestRunStopsAJob(unittest.TestCase):
     def test_stop_kills_the_running_encode_without_penalizing_the_video(self):
         with workspace_temp_dir() as root:
@@ -301,6 +377,72 @@ class TestRunStopsAJob(unittest.TestCase):
             mocks["terminate"].assert_not_called()
             self.assertEqual(result.promoted, "winston/0 unsorted/busy.mp4")
             self.assertTrue(out.exists())
+
+
+class TestOrphanAdoption(unittest.TestCase):
+    """A lost job file must not orphan a live encode.
+
+    The file sync service covering the project tree renamed the in-flight job
+    file to '... [conflicted N].json' mid-run; the stage then saw no job, the
+    running ffmpeg went unsupervised, and fresh starts stacked encodes until
+    the machine crashed. With the state file gone, a lone Topaz process is
+    re-identified from its own command line and adopted back under supervision.
+    """
+
+    def test_a_lone_topaz_process_is_adopted_back_into_a_job(self):
+        from util import topaz
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            source = make_video(non_ai / "winston" / "0 unsorted" / "busy.mp4")
+            processed = non_ai / "winston" / "3_good_to_go" / "processed"
+            tmp = processed / "busy.partial.deadbeefcafe.mp4"
+            make_video(tmp)
+            cmdline = subprocess.list2cmdline(
+                topaz.command(source, tmp, "the-filter", "the-tag", keep_audio=True)
+            )
+
+            stack, mocks = probes(topaz_pids=(31337,), cmdline=cmdline, duration=581.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            mocks["popen"].assert_not_called()
+            job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertEqual(job["pid"], 31337)
+            self.assertEqual(job["source"], str(source))
+            self.assertEqual(job["tmp"], str(tmp))
+            self.assertEqual(job["out"], str(processed / "busy_apo8_iris2.mp4"))
+
+    def test_multiple_topaz_processes_are_not_adopted(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "a.mp4")
+
+            stack, mocks = probes(topaz_pids=(111, 222))
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
+            self.assertEqual(result.start_deferred, "topaz_busy")
+            mocks["popen"].assert_not_called()
+
+    def test_a_foreign_topaz_process_blocks_starts_but_is_not_adopted(self):
+        """The user's own Topaz GUI export writes outside the library."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "a.mp4")
+
+            stack, mocks = probes(
+                topaz_pids=(31337,),
+                cmdline=r'"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe" -i "D:\gui\in.mp4" "D:\gui\out.mp4"',
+            )
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
+            self.assertEqual(result.start_deferred, "topaz_busy")
+            mocks["popen"].assert_not_called()
 
 
 class TestPortraitTargets(unittest.TestCase):
@@ -443,6 +585,40 @@ class TestRunSupervisesAJob(unittest.TestCase):
             mocks["terminate"].assert_called_once_with(4242)
             self.assertEqual(result.failed, 1)
             self.assertEqual(result.in_flight, "")
+            self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
+
+    def test_a_concluded_encode_stamps_the_cooldown_but_a_user_stop_does_not(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, expected=100.0)
+
+            stack, _ = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=False)
+            self.assertTrue(overrides["NONAI_COOLDOWN_FILE"].exists())
+
+            overrides["NONAI_COOLDOWN_FILE"].unlink()
+            write_job(root, overrides)
+            stack, _ = probes(is_running=True, image=str(config.FFMPEG))
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=False, stop=True)
+            self.assertFalse(overrides["NONAI_COOLDOWN_FILE"].exists())
+
+    def test_low_disk_mid_flight_stops_the_encode_without_penalty(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            source, tmp, out = write_job(root, overrides)
+
+            stack, mocks = probes(is_running=True, image=str(config.FFMPEG), free_bytes=1)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            mocks["terminate"].assert_called_once_with(4242)
+            self.assertTrue(result.deferred_low_disk)
+            self.assertEqual(result.stopped, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.failed, 0)
+            self.assertFalse(tmp.exists())
+            self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
 
     def test_orphaned_partials_are_swept_but_the_live_jobs_tmp_survives(self):

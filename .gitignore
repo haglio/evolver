@@ -25,10 +25,13 @@ htmlcov/
 # Regen-mode runtime state
 .regen-skip.txt
 
-# Non-AI upscale runtime state
-nonai_upscale_job.json
-nonai_upscale_attempts.json
-.nonai-upscale-skip.txt
+# Non-AI upscale runtime state now lives under LOCALAPPDATA\Evolver; the globs
+# also cover leftover copies in the repo root, including the "[conflicted N]"
+# duplicates the file sync service used to make of the old in-repo state files.
+nonai_upscale_job*.json
+nonai_upscale_attempts*.json
+nonai_upscale_cooldown*.json
+.nonai-upscale-skip*.txt
 
 # GUI runtime state
 runs/
