@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import subprocess
 import time
 import uuid
@@ -52,6 +53,7 @@ class NonAiUpscaleResult:
     in_flight_percent: int | None = None
     promoted: str = ""
     stopped: str = ""
+    start_deferred: str = ""  # "topaz_busy" | "low_ram" | "cooldown" when a start was held back
     failed: int = 0
     pending: int = 0
     deferred_low_disk: bool = False
@@ -68,6 +70,8 @@ def run(allow_start: bool = True, stop: bool = False) -> NonAiUpscaleResult:
     log.info("=== Stage: upscale non-AI library ===")
 
     job = _load_job()
+    if job is None:
+        job = _adopt_orphan()
     _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
     if job is not None:
         _supervise(job, result, stop=stop)
@@ -80,11 +84,62 @@ def run(allow_start: bool = True, stop: bool = False) -> NonAiUpscaleResult:
     if result.in_flight and result.in_flight_percent is not None:
         in_flight = f"{result.in_flight} ({result.in_flight_percent}% encoded)"
     log.info(
-        "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s failed=%d pending=%d",
+        "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s failed=%d pending=%d",
         result.started or "-", in_flight, result.promoted or "-",
-        result.stopped or "-", result.failed, result.pending,
+        result.stopped or "-", result.start_deferred or "-", result.failed, result.pending,
     )
     return result
+
+
+def _adopt_orphan() -> dict | None:
+    """Rebuild the job record for a lone still-running encode of ours.
+
+    The job file can vanish out from under a live encode (the sync service
+    covering the project tree renamed it mid-run more than once). Losing it
+    used to orphan the encode — unsupervised, never promoted, and no longer
+    blocking new starts, so encodes stacked up. A single Topaz ffmpeg whose
+    output is one of our .partial files in the non-AI tree is unambiguously
+    ours, so it is adopted back under supervision.
+    """
+    pids = processes.pids_of_image(config.FFMPEG)
+    if len(pids) != 1:
+        return None
+    source, tmp = _parse_topaz_command(processes.command_line(pids[0]) or "")
+    if source is None or tmp is None or ".partial." not in tmp.name:
+        return None
+    try:
+        tmp.relative_to(config.NON_AI_DIR)
+    except ValueError:
+        return None  # some other Topaz run, e.g. a manual GUI export
+    stem = tmp.name.split(".partial.")[0]
+    job = {
+        "pid": pids[0],
+        "source": str(source),
+        "tmp": str(tmp),
+        "out": str(tmp.with_name(f"{stem}{config.NONAI_OUTPUT_SUFFIX}.mp4")),
+        "expected_duration": ffprobe.duration_seconds(source) or 0.0,
+        # The true start time is unknown; counting the runtime cap from
+        # adoption is the conservative reading.
+        "started_at": time.time(),
+    }
+    _save_job(job)
+    log.warning(
+        "Adopted an orphaned non-AI encode (pid %d) of %s; its job state had gone missing.",
+        pids[0], source,
+    )
+    return job
+
+
+def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
+    """The -i input and the trailing output of a Topaz ffmpeg command line."""
+    token = r'(?:"([^"]+)"|(\S+))'
+    source_match = re.search(rf"-i\s+{token}", cmdline)
+    output_match = re.search(rf"{token}\s*$", cmdline)
+    if not source_match or not output_match:
+        return None, None
+    source = source_match.group(1) or source_match.group(2)
+    output = output_match.group(1) or output_match.group(2)
+    return Path(source), Path(output)
 
 
 def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False) -> None:
@@ -92,7 +147,13 @@ def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False) -> Non
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
         if stop:
-            _stop_in_flight(job, result)
+            _stop_in_flight(job, result, "the non-AI upscale toggle is off")
+            return
+        if _is_low_disk():
+            # The 250 GB floor was clear at start, but a 4K60 output plus
+            # whatever else writes overnight can cross it mid-encode.
+            result.deferred_low_disk = True
+            _stop_in_flight(job, result, "free disk fell below the safety floor mid-encode")
             return
         if not _overran(job):
             result.in_flight = relpath(source)
@@ -103,10 +164,10 @@ def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False) -> Non
     _clear_job()
 
 
-def _stop_in_flight(job: dict, result: NonAiUpscaleResult) -> None:
-    """User turned the stage off: end the encode without penalizing its video."""
+def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str) -> None:
+    """End the encode through no fault of its video — no retry penalty."""
     source = Path(job.get("source", ""))
-    _terminate_ffmpeg(job.get("pid", 0), "the non-AI upscale toggle is off")
+    _terminate_ffmpeg(job.get("pid", 0), reason)
     _delete_tmp(Path(job.get("tmp", "")))
     _clear_attempts(source)
     _clear_job()
@@ -150,6 +211,7 @@ def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
     expected = job.get("expected_duration") or 0.0
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
 
+    _stamp_encode_ended()
     if actual and expected and actual >= config.NONAI_COMPLETE_DURATION_FRACTION * expected:
         tmp.replace(out)
         _retire_original(source)
@@ -223,11 +285,16 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
 
 
 def _start_next_candidate(result: NonAiUpscaleResult) -> None:
+    if _is_low_disk():
+        result.deferred_low_disk = True
+        log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
+        return
+    result.start_deferred = _machine_busy_reason()
+    if result.start_deferred:
+        log.info("Deferring non-AI upscale start: %s.", result.start_deferred)
+        return
+
     for candidate in collect_candidates():
-        if _is_low_disk():
-            result.deferred_low_disk = True
-            log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
-            return
         source = candidate.path
         expected_duration = ffprobe.duration_seconds(source)
         orientation = ffprobe.get_orientation(source)
@@ -288,6 +355,39 @@ def _output_path(candidate: Candidate) -> Path:
 def _is_low_disk() -> bool:
     free_gb = system_resources.free_bytes(config.NON_AI_DIR) / (1024 ** 3)
     return free_gb < config.LOW_DISK_WARNING_GB
+
+
+def _machine_busy_reason() -> str:
+    """Why the machine cannot take a new encode right now — "" when it can.
+
+    Any live Topaz ffmpeg — an orphaned encode or the user's own GUI export —
+    already owns the GPU; CPU sampling never sees that, which is how encodes
+    stacked up and crashed the machine. RAM and a post-encode cooldown keep an
+    unattended night from running the box flat out end to end.
+    """
+    if processes.pids_of_image(config.FFMPEG):
+        return "topaz_busy"
+    if system_resources.available_ram_gb() < config.NONAI_MIN_AVAILABLE_RAM_GB:
+        return "low_ram"
+    if time.time() - _last_encode_ended_at() < config.NONAI_COOLDOWN_MINUTES * 60:
+        return "cooldown"
+    return ""
+
+
+def _last_encode_ended_at() -> float:
+    try:
+        payload = json.loads(config.NONAI_COOLDOWN_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0.0
+    ended_at = payload.get("ended_at", 0.0) if isinstance(payload, dict) else 0.0
+    return ended_at if isinstance(ended_at, (int, float)) else 0.0
+
+
+def _stamp_encode_ended() -> None:
+    config.NONAI_COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    config.NONAI_COOLDOWN_FILE.write_text(
+        json.dumps({"ended_at": time.time()}), encoding="utf-8"
+    )
 
 
 def _load_job() -> dict | None:

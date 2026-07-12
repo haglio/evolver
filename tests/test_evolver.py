@@ -32,6 +32,7 @@ class TestEvolverMain(unittest.TestCase):
             "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
             "has_pending_work": Mock(return_value=False),
             "should_skip_cpu": Mock(return_value=False),
+            "count_running": Mock(return_value=0),
             "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
             "correspondence_run": Mock(return_value=Mock(ok=True)),
         }
@@ -51,6 +52,7 @@ class TestEvolverMain(unittest.TestCase):
             ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
             ("evolver.upscale.has_pending_work", "has_pending_work"),
             ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
+            ("evolver.processes.count_running", "count_running"),
             ("evolver.prompt_scrape.run", "prompt_scrape_run"),
         ]
 
@@ -117,6 +119,18 @@ class TestEvolverMain(unittest.TestCase):
         )
 
     # --- Non-AI upscale gating ---
+
+    def test_ai_upscale_waits_while_a_topaz_encode_is_running(self):
+        """A detached non-AI encode (or a manual GUI export) owns the GPU;
+        stacking the AI batch on top is what crashed the machine."""
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+            count_running=Mock(return_value=1),
+        )
+        self.assertEqual(mocks["exit_code"], 0)
+        mocks["upscale_run"].assert_not_called()
+        mocks["correspondence_run"].assert_not_called()
 
     def test_cli_run_neither_starts_nor_stops_nonai_encodes(self):
         mocks = self._run_pipeline()
@@ -213,6 +227,7 @@ class TestRunPipeline(unittest.TestCase):
             "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
             "has_pending_work": Mock(return_value=False),
             "should_skip_cpu": Mock(return_value=False),
+            "count_running": Mock(return_value=0),
             "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
             "correspondence_run": Mock(return_value=Mock(ok=True)),
         }
@@ -229,6 +244,7 @@ class TestRunPipeline(unittest.TestCase):
             ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
             ("evolver.upscale.has_pending_work", "has_pending_work"),
             ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
+            ("evolver.processes.count_running", "count_running"),
             ("evolver.prompt_scrape.run", "prompt_scrape_run"),
         ]
 

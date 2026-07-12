@@ -64,10 +64,14 @@ VIDEOAI_TAG_T2V_provider = "Processed using apo-8 for 60 fps interpolation and p
 # (blend=1), aimed at a 4K frame. These encodes run for hours, so the stage
 # launches one detached ffmpeg at a time and checks on it each scheduler tick.
 NONAI_EXCLUDED_BUCKETS = {"actually_AI_but_funscripted"}  # AI-pipeline outputs parked in non_AI
+# vram=0.5 and instances=0 (vs the AI stage's vram=1/instances=1): an unattended
+# multi-hour encode shares the machine with whatever else is running, so it gets
+# half the VRAM budget and no extra model instance — slower, but far harder to
+# push the box into memory exhaustion.
 NONAI_UPSCALE_FILTER_TEMPLATE = (
-    "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
+    "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=0.5:instances=0,"
     "tvai_up=model=iris-2:scale=0:w={width}:h={height}:preblur=0:noise=0:details=0:"
-    "halo=0:blur=0:compression=0:estimate=20:blend=1:device=0:vram=1:instances=1"
+    "halo=0:blur=0:compression=0:estimate=20:blend=1:device=0:vram=0.5:instances=0"
 )
 NONAI_TARGET_LONG_EDGE = 3840
 NONAI_TARGET_SHORT_EDGE = 2160
@@ -78,13 +82,21 @@ VIDEOAI_TAG_NONAI = (
 NONAI_OUTPUT_SUFFIX = "_apo8_iris2"
 NONAI_PROCESSED_DIR_NAME = "processed"
 NONAI_FALLBACK_DONE_DIR_NAME = "3_good_to_go"
-NONAI_JOB_STATE_FILE = PROJECT_DIR / "nonai_upscale_job.json"
-NONAI_ATTEMPTS_FILE = PROJECT_DIR / "nonai_upscale_attempts.json"
-NONAI_SKIP_MANIFEST = PROJECT_DIR / ".nonai-upscale-skip.txt"
-NONAI_FFMPEG_LOG = PROJECT_DIR / "nonai_upscale_ffmpeg.log"
+# Rewrite-heavy runtime state lives OUTSIDE the synced project tree: the file
+# sync service covering the project dir kept renaming the in-flight job file to
+# "nonai_upscale_job [conflicted N].json" mid-run, which orphaned live encodes
+# (they piled up unsupervised and crashed the machine). LOCALAPPDATA is local-only.
+NONAI_STATE_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver"
+NONAI_JOB_STATE_FILE = NONAI_STATE_DIR / "nonai_upscale_job.json"
+NONAI_ATTEMPTS_FILE = NONAI_STATE_DIR / "nonai_upscale_attempts.json"
+NONAI_COOLDOWN_FILE = NONAI_STATE_DIR / "nonai_upscale_cooldown.json"
+NONAI_FFMPEG_LOG = NONAI_STATE_DIR / "nonai_upscale_ffmpeg.log"
+NONAI_SKIP_MANIFEST = PROJECT_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
 NONAI_MAX_RUNTIME_HOURS = 24
 NONAI_MAX_ATTEMPTS = 2
 NONAI_COMPLETE_DURATION_FRACTION = 0.98
+NONAI_MIN_AVAILABLE_RAM_GB = 8.0
+NONAI_COOLDOWN_MINUTES = 30
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
 RUNS_DIR = PROJECT_DIR / "runs"

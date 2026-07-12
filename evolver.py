@@ -34,7 +34,7 @@ from tasks import (
     sort,
     upscale,
 )
-from util import system_resources
+from util import processes, system_resources
 
 
 @dataclass
@@ -127,6 +127,13 @@ def run_pipeline(
     if not upscale.has_pending_work(priority_files=priority_files):
         log.info("No pending upscale work found. Skipping upscale.")
         _skip_stage("upscale", "no_pending_work")
+    elif processes.count_running(config.FFMPEG) > 0:
+        # A detached non-AI encode (or a manual Topaz GUI export) already owns
+        # the GPU; running the AI batch alongside it stacks Topaz processes,
+        # which is what used to exhaust memory and crash the machine.
+        log.info("Skipping upscale: a Topaz ffmpeg encode is already running.")
+        upscale_skipped = True
+        _skip_stage("upscale", "topaz_busy")
     elif _should_skip_upscale_due_to_cpu(log):
         log.info("Skipping upscale because CPU usage is above the configured threshold.")
         upscale_skipped = True
