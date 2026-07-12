@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import unittest
+from pathlib import Path
 
 from util import processes
 
@@ -30,6 +31,38 @@ class TestImagePath(unittest.TestCase):
         )
         proc.wait()
         self.assertIsNone(processes.image_path(proc.pid))
+
+
+class TestPidsOfImage(unittest.TestCase):
+    def test_finds_the_current_interpreter_by_its_image(self):
+        pids = processes.pids_of_image(Path(sys.executable))
+        self.assertIn(os.getpid(), pids)
+
+    def test_empty_for_an_absent_executable(self):
+        pids = processes.pids_of_image(Path(r"C:\does\not\exist\nowhere.exe"))
+        self.assertEqual(pids, [])
+
+
+class TestCommandLine(unittest.TestCase):
+    def test_reads_a_child_processes_arguments(self):
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(60)"],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        try:
+            cmdline = processes.command_line(proc.pid)
+            self.assertIsNotNone(cmdline)
+            self.assertIn("time.sleep(60)", cmdline)
+        finally:
+            proc.kill()
+            proc.wait(timeout=10)
+
+    def test_none_for_dead_process(self):
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "pass"], creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        proc.wait()
+        self.assertIsNone(processes.command_line(proc.pid))
 
 
 class TestTerminate(unittest.TestCase):
