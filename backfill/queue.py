@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import random
 from collections import deque
 from pathlib import Path
 
@@ -36,7 +35,11 @@ def unlabeled_videos() -> list[Path]:
 
 
 class BackfillQueue:
-    """The clips awaiting an action, shuffled so a long session never drags.
+    """The clips awaiting an action, kept in the order they were found.
+
+    A stable order is what lets a reopened session pick up where the last left
+    off: labelled clips drop out, so the next open resumes at the first clip still
+    unlabelled rather than jumping to a fresh random one.
 
     The clip at the front is the one on screen.  :meth:`resolve` retires it —
     it has been labelled or discarded — while :meth:`defer` sends it to the
@@ -46,10 +49,8 @@ class BackfillQueue:
     run of decisions back to front rewinds the queue to the order it had.
     """
 
-    def __init__(self, videos: list[Path], rng: random.Random | None = None) -> None:
-        shuffled = list(videos)
-        (rng or random.Random()).shuffle(shuffled)
-        self._pending = deque(shuffled)
+    def __init__(self, videos: list[Path]) -> None:
+        self._pending = deque(videos)
 
     @property
     def remaining(self) -> int:
