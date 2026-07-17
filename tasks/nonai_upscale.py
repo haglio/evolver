@@ -360,11 +360,15 @@ def _is_low_disk() -> bool:
 def _machine_busy_reason() -> str:
     """Why the machine cannot take a new encode right now — "" when it can.
 
-    Any live Topaz ffmpeg — an orphaned encode or the user's own GUI export —
-    already owns the GPU; CPU sampling never sees that, which is how encodes
-    stacked up and crashed the machine. RAM and a post-encode cooldown keep an
-    unattended night from running the box flat out end to end.
+    A present user comes first: an unattended multi-hour encode has no business
+    starting while someone is at the keyboard. Any live Topaz ffmpeg — an
+    orphaned encode or the user's own GUI export — already owns the GPU; CPU
+    sampling never sees that, which is how encodes stacked up and crashed the
+    machine. RAM and a post-encode cooldown keep an unattended night from
+    running the box flat out end to end.
     """
+    if _user_present():
+        return "user_present"
     if processes.pids_of_image(config.FFMPEG):
         return "topaz_busy"
     if system_resources.available_ram_gb() < config.NONAI_MIN_AVAILABLE_RAM_GB:
@@ -372,6 +376,19 @@ def _machine_busy_reason() -> str:
     if time.time() - _last_encode_ended_at() < config.NONAI_COOLDOWN_MINUTES * 60:
         return "cooldown"
     return ""
+
+
+def _user_present() -> bool:
+    """Whether the user has touched the machine recently.
+
+    On any failure to read the idle time, err toward present: holding back an
+    unattended encode is always safer than hogging a machine someone is using.
+    """
+    try:
+        idle = system_resources.seconds_since_last_input()
+    except OSError:
+        return True
+    return idle < config.NONAI_USER_IDLE_THRESHOLD_SECONDS
 
 
 def _last_encode_ended_at() -> float:

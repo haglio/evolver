@@ -173,10 +173,17 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
 
 def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**15,
            popen=None, is_running=True, image="ffmpeg.exe", terminate=True,
-           topaz_pids=(), cmdline=None, available_ram=64.0):
-    """An ExitStack patching every outside contact the stage makes."""
+           topaz_pids=(), cmdline=None, available_ram=64.0, idle_seconds=10_000.0):
+    """An ExitStack patching every outside contact the stage makes.
+
+    idle_seconds defaults to a long idle (the user is away), so the presence
+    throttle lets encodes start unless a test says otherwise.
+    """
     stack = ExitStack()
     mocks = {
+        "idle_seconds": stack.enter_context(
+            patch("tasks.nonai_upscale.system_resources.seconds_since_last_input",
+                  return_value=idle_seconds)),
         "videoai": stack.enter_context(
             patch("tasks.nonai_upscale.ffprobe.videoai_tag", return_value=videoai)),
         "orientation": stack.enter_context(
@@ -305,6 +312,34 @@ class TestStartGuards(unittest.TestCase):
             self.assertEqual(result.started, "")
             self.assertEqual(result.start_deferred, "low_ram")
             mocks["popen"].assert_not_called()
+
+    def test_a_present_user_defers_the_start(self):
+        """Recent keyboard/mouse input means the user is at the machine; a
+        multi-hour encode waits until they step away."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            self._one_candidate(overrides)
+
+            stack, mocks = probes(idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "")
+            self.assertEqual(result.start_deferred, "user_present")
+            mocks["popen"].assert_not_called()
+
+    def test_an_idled_out_user_allows_the_start(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            self._one_candidate(overrides)
+
+            stack, mocks = probes(
+                idle_seconds=config.NONAI_USER_IDLE_THRESHOLD_SECONDS + 60)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "winston/0 unsorted/a.mp4")
+            self.assertEqual(result.start_deferred, "")
 
     def test_a_recent_encode_imposes_a_cooldown(self):
         with workspace_temp_dir() as root:

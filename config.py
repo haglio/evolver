@@ -97,6 +97,13 @@ NONAI_MAX_ATTEMPTS = 2
 NONAI_COMPLETE_DURATION_FRACTION = 0.98
 NONAI_MIN_AVAILABLE_RAM_GB = 8.0
 NONAI_COOLDOWN_MINUTES = 30
+# Presence throttle: once the toggle is on, Evolver auto-manages the encode by
+# how long the user has been away from the keyboard/mouse. Below this idle
+# threshold the user counts as present — no new encode starts and any in-flight
+# one is suspended (frozen, zero compute); past it the machine is "away" and an
+# encode may start or resume. Five minutes rides out ordinary reading/watching
+# pauses without treating them as the user leaving.
+NONAI_USER_IDLE_THRESHOLD_SECONDS = 300.0
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
 RUNS_DIR = PROJECT_DIR / "runs"
