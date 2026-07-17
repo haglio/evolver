@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QUrl, Qt
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtCore import QSize, QUrl, Qt
+from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import (
@@ -11,8 +11,8 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QScrollArea,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -22,6 +22,11 @@ from backfill.vocabulary import Command, control_commands, scoped_grid
 
 _DONE = "Nothing left to label."
 _SCROLLBAR_ALLOWANCE = 28
+_THUMBNAIL_SIZE = 96
+# Reserve the thumbnail's height on every tile up front so a row stays the same
+# height whether or not its acts have an example yet, and a late-arriving frame
+# drops into place instead of reflowing the grid.
+_TILE_HEIGHT = _THUMBNAIL_SIZE + 30
 
 
 class BackfillWindow(QWidget):
@@ -39,7 +44,9 @@ class BackfillWindow(QWidget):
     the way the vocabulary is — every act as a grid of Side/POV columns, then the
     controls. A tile is both the reference (what can I say?) and a fallback:
     clicking it drives the exact path a spoken phrase would, so a wedged
-    microphone never leaves the tool unusable.
+    microphone never leaves the tool unusable. Each act tile fills in with an
+    example frame from a clip already labelled that act, once
+    :meth:`on_thumbnail` delivers one, so the panel reads as a gallery.
 
     Audio is muted: the microphone is open the whole time, and a clip's own
     soundtrack would be one more thing for the recognizer to mishear.
@@ -48,7 +55,8 @@ class BackfillWindow(QWidget):
     def __init__(self, session: BackfillSession, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._session = session
-        self._command_buttons: dict[str, QPushButton] = {}
+        self._command_buttons: dict[str, QToolButton] = {}
+        self._tiles_by_action: dict[str, QToolButton] = {}
         self.setWindowTitle("Evolver - Backfill Metadata")
 
         self._video = QVideoWidget()
@@ -113,16 +121,37 @@ class BackfillWindow(QWidget):
         panel.setFixedWidth(inner.sizeHint().width() + _SCROLLBAR_ALLOWANCE)
         return panel
 
-    def _command_tile(self, command: Command) -> QPushButton:
-        """A button that hands *command*'s phrase to the same slot the mic feeds."""
-        tile = QPushButton(command.label)
+    def _command_tile(self, command: Command) -> QToolButton:
+        """A button that hands *command*'s phrase to the same slot the mic feeds.
+
+        Text-under-icon with the icon space reserved from the start, so an example
+        thumbnail arriving later fills that space instead of reflowing the grid.
+        """
+        tile = QToolButton()
+        tile.setText(command.label)
+        tile.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        tile.setIconSize(QSize(_THUMBNAIL_SIZE, _THUMBNAIL_SIZE))
+        tile.setMinimumHeight(_TILE_HEIGHT)
         tile.setToolTip(f'Say "{command.phrase}"')
         # Never take keyboard focus: the space bar must not re-fire the last tile,
         # and Esc must keep closing the window rather than being swallowed here.
         tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         tile.clicked.connect(lambda _checked=False, phrase=command.phrase: self.on_phrase(phrase))
         self._command_buttons[command.phrase] = tile
+        # Keyed by lower-cased label so an example clip stored under the library's
+        # older casing ("Pov Alpha") still lights the tile the vocabulary now
+        # writes ("POV Alpha").
+        self._tiles_by_action[command.label.lower()] = tile
         return tile
+
+    def on_thumbnail(self, action: str, path: str) -> None:
+        """Put an example frame on the tile for *action*, once one is ready."""
+        tile = self._tiles_by_action.get(action.lower())
+        if tile is None or not path:
+            return
+        icon = QIcon(path)
+        if not icon.isNull():
+            tile.setIcon(icon)
 
     def on_hearing(self, text: str) -> None:
         """Show the recognizer's live guess, or clear the line once it settles."""

@@ -1,8 +1,8 @@
 #!/usr/bin/env pythonw
 """Metadata backfill tool entry point, launched from Evolver's tray menu.
 
-Plays every clip that still lacks a ``video.action``, shuffled and looping, and
-records the act the viewer speaks.  Runs as its own process so an open
+Plays every clip that still lacks a ``video.action``, looping in a stable order,
+and records the act the viewer speaks.  Runs as its own process so an open
 microphone or a wedged media backend can never take the tray down with it.
 """
 
@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 import evolver
 from backfill.queue import BackfillQueue, unlabeled_videos
 from backfill.session import BackfillSession
+from backfill.thumbnails import ThumbnailLoader
 from backfill.vocabulary import grammar_phrases
 from backfill.voice import VoiceListener
 from backfill.window import BackfillWindow
@@ -44,11 +45,16 @@ def main() -> int:
     listener.hearing.connect(window.on_hearing)
     listener.start()
 
+    thumbnails = ThumbnailLoader(parent=window)
+    thumbnails.ready.connect(window.on_thumbnail)
+    thumbnails.start()
+
     window.show()
     try:
         return app.exec()
     finally:
         listener.stop()
+        thumbnails.stop()
         worker.shutdown()
 
 
