@@ -16,6 +16,7 @@ _PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 _PROCESS_QUERY_INFORMATION = 0x0400
 _PROCESS_VM_READ = 0x0010
 _PROCESS_TERMINATE = 0x0001
+_PROCESS_SUSPEND_RESUME = 0x0800
 _STILL_ACTIVE = 259
 _TH32CS_SNAPPROCESS = 0x00000002
 _INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
@@ -153,6 +154,36 @@ def terminate(pid: int) -> bool:
         return False
     try:
         return bool(_kernel32.TerminateProcess(handle, 1))
+    finally:
+        _kernel32.CloseHandle(handle)
+
+
+def suspend(pid: int) -> bool:
+    """Freeze *pid* in place. True when the suspend call was accepted.
+
+    Every thread stops; the process keeps its memory and (for an ffmpeg encode)
+    its GPU context but burns zero CPU/GPU, so an in-flight upscale can be
+    parked the moment the user returns and thawed later exactly where it left
+    off — no lost hours, unlike killing it.
+    """
+    return _set_frozen(pid, _ntdll.NtSuspendProcess)
+
+
+def resume(pid: int) -> bool:
+    """Thaw a process suspended earlier. True when the resume call was accepted.
+
+    Safe to call on a process that was never suspended (its suspend count is
+    already zero), which lets an adopted orphan be unconditionally un-frozen.
+    """
+    return _set_frozen(pid, _ntdll.NtResumeProcess)
+
+
+def _set_frozen(pid: int, nt_call) -> bool:
+    handle = _kernel32.OpenProcess(_PROCESS_SUSPEND_RESUME, False, pid)
+    if not handle:
+        return False
+    try:
+        return nt_call(handle) == 0  # 0 == STATUS_SUCCESS
     finally:
         _kernel32.CloseHandle(handle)
 

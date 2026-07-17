@@ -149,7 +149,8 @@ class TestCollectCandidates(unittest.TestCase):
 
 
 def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
-              source=None, tmp_bytes=b"partial"):
+              source=None, tmp_bytes=b"partial", suspended=False, suspended_at=0.0,
+              suspended_seconds=0.0):
     """A persisted in-flight job whose tmp file exists under the bucket."""
     non_ai = overrides["NON_AI_DIR"]
     source = source or make_video(non_ai / "winston" / "0 unsorted" / "busy.mp4")
@@ -165,6 +166,9 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
         "out": str(out),
         "expected_duration": expected,
         "started_at": time.time() - started_seconds_ago,
+        "suspended": suspended,
+        "suspended_at": suspended_at,
+        "suspended_seconds": suspended_seconds,
     }
     overrides["NONAI_JOB_STATE_FILE"].parent.mkdir(parents=True, exist_ok=True)
     overrides["NONAI_JOB_STATE_FILE"].write_text(json.dumps(job), encoding="utf-8")
@@ -184,6 +188,10 @@ def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**1
         "idle_seconds": stack.enter_context(
             patch("tasks.nonai_upscale.system_resources.seconds_since_last_input",
                   return_value=idle_seconds)),
+        "suspend": stack.enter_context(
+            patch("tasks.nonai_upscale.processes.suspend", return_value=True)),
+        "resume": stack.enter_context(
+            patch("tasks.nonai_upscale.processes.resume", return_value=True)),
         "videoai": stack.enter_context(
             patch("tasks.nonai_upscale.ffprobe.videoai_tag", return_value=videoai)),
         "orientation": stack.enter_context(
@@ -478,6 +486,90 @@ class TestOrphanAdoption(unittest.TestCase):
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
             self.assertEqual(result.start_deferred, "topaz_busy")
             mocks["popen"].assert_not_called()
+
+
+class TestPresenceThrottle(unittest.TestCase):
+    """With the toggle on (presence_managed), the in-flight encode follows the
+    user: frozen the moment they return, thawed once they idle out again."""
+
+    def test_a_present_user_suspends_the_in_flight_encode(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            source, tmp, _ = write_job(root, overrides)
+
+            stack, mocks = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True, presence_managed=True)
+
+            mocks["suspend"].assert_called_once_with(4242)
+            mocks["terminate"].assert_not_called()
+            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            self.assertTrue(result.suspended)
+            self.assertTrue(tmp.exists())
+            job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertTrue(job["suspended"])
+
+    def test_an_already_suspended_encode_is_not_suspended_again(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, suspended=True, suspended_at=time.time() - 30)
+
+            stack, mocks = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True, presence_managed=True)
+
+            mocks["suspend"].assert_not_called()
+            self.assertTrue(result.suspended)
+
+    def test_an_idle_user_resumes_a_suspended_encode(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, suspended=True, suspended_at=time.time() - 120,
+                      suspended_seconds=60.0)
+
+            stack, mocks = probes(is_running=True, idle_seconds=10_000.0, duration=None)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True, presence_managed=True)
+
+            mocks["resume"].assert_called_once_with(4242)
+            self.assertFalse(result.suspended)
+            job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertFalse(job["suspended"])
+            # The completed suspension is banked (60s prior + ~120s open interval).
+            self.assertGreater(job["suspended_seconds"], 170.0)
+
+    def test_suspended_time_is_not_charged_against_the_runtime_cap(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            # Wall-clock past the cap, but most of it spent frozen.
+            write_job(
+                root, overrides,
+                started_seconds_ago=config.NONAI_MAX_RUNTIME_HOURS * 3600 + 3600,
+                suspended_seconds=2 * 3600,
+            )
+
+            stack, mocks = probes(is_running=True, idle_seconds=10_000.0, duration=None,
+                                  image=str(config.FFMPEG))
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, presence_managed=True)
+
+            mocks["terminate"].assert_not_called()
+            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+
+    def test_headless_mode_leaves_a_present_users_encode_running(self):
+        """Without presence management (the CLI passes it off), an in-flight
+        encode is neither suspended nor started against — just supervised."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+
+            stack, mocks = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, presence_managed=False)
+
+            mocks["suspend"].assert_not_called()
+            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            self.assertFalse(result.suspended)
 
 
 class TestPortraitTargets(unittest.TestCase):

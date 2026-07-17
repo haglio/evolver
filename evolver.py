@@ -84,10 +84,12 @@ def run_pipeline(
         on_stage_start: Called with (stage_name) before each stage runs.
         on_stage_complete: Called with (stage_name, result, elapsed_seconds, status)
             after each stage. status is "completed", "skipped", or "error".
-        nonai_enabled: The tray's non-AI upscale toggle. True may start a new
-            detached encode, False stops an in-flight one, and None (headless
-            CLI, which has no toggle) leaves any in-flight encode alone and
-            starts nothing. Finished encodes are promoted in every mode.
+        nonai_enabled: The tray's non-AI upscale toggle. True lets Evolver
+            auto-manage an encode by user presence — starting or resuming it
+            while the user is away, suspending it the moment they return. False
+            stops an in-flight one, and None (headless CLI, which has no toggle)
+            leaves any in-flight encode alone and starts nothing. Finished
+            encodes are promoted in every mode.
 
     Returns:
         PipelineResult with per-stage records and aggregate status.
@@ -163,6 +165,9 @@ def run_pipeline(
     upscale_nonai_result = _run_stage(
         "upscale_non_ai", nonai_upscale.run,
         allow_start=nonai_allow_start, stop=nonai_enabled is False,
+        # Toggle on -> Evolver manages the encode by user presence: suspend it
+        # when someone's at the machine, resume it when they idle out.
+        presence_managed=nonai_enabled is True,
     )
 
     if upscale_still_pending:

@@ -51,20 +51,29 @@ class NonAiUpscaleResult:
     started: str = ""
     in_flight: str = ""
     in_flight_percent: int | None = None
+    suspended: bool = False  # the in-flight encode is frozen because the user is present
     promoted: str = ""
     stopped: str = ""
-    start_deferred: str = ""  # "topaz_busy" | "low_ram" | "cooldown" when a start was held back
+    # "user_present" | "topaz_busy" | "low_ram" | "cooldown" when a start was held back
+    start_deferred: str = ""
     failed: int = 0
     pending: int = 0
     deferred_low_disk: bool = False
 
 
-def run(allow_start: bool = True, stop: bool = False) -> NonAiUpscaleResult:
+def run(allow_start: bool = True, stop: bool = False,
+        presence_managed: bool = False) -> NonAiUpscaleResult:
     """Check on the in-flight encode, then start the next one if the box is free.
 
     With *stop* (the tray toggle is off), a still-running encode is killed and
     its video keeps its place in the queue; an already-finished one is still
     promoted, and nothing new starts.
+
+    With *presence_managed* (the toggle is on), the in-flight encode tracks the
+    user: it is suspended the moment they touch the machine and resumed once
+    they idle out again, so a day of intermittent use makes progress in the
+    gaps instead of throwing partial work away. The headless CLI leaves it off
+    and simply lets an in-flight encode run.
     """
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
@@ -74,7 +83,7 @@ def run(allow_start: bool = True, stop: bool = False) -> NonAiUpscaleResult:
         job = _adopt_orphan()
     _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
     if job is not None:
-        _supervise(job, result, stop=stop)
+        _supervise(job, result, stop=stop, presence_managed=presence_managed)
 
     if not result.in_flight and allow_start and not stop:
         _start_next_candidate(result)
@@ -83,6 +92,8 @@ def run(allow_start: bool = True, stop: bool = False) -> NonAiUpscaleResult:
     in_flight = result.in_flight or "-"
     if result.in_flight and result.in_flight_percent is not None:
         in_flight = f"{result.in_flight} ({result.in_flight_percent}% encoded)"
+    if result.in_flight and result.suspended:
+        in_flight = f"{in_flight} [suspended: user present]"
     log.info(
         "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s failed=%d pending=%d",
         result.started or "-", in_flight, result.promoted or "-",
@@ -121,7 +132,14 @@ def _adopt_orphan() -> dict | None:
         # The true start time is unknown; counting the runtime cap from
         # adoption is the conservative reading.
         "started_at": time.time(),
+        "suspended": False,
+        "suspended_at": 0.0,
+        "suspended_seconds": 0.0,
     }
+    # A crash could have left the encode frozen; thaw it so adoption never
+    # inherits a permanently-suspended process. resume() no-ops if it is
+    # already running.
+    processes.resume(pids[0])
     _save_job(job)
     log.warning(
         "Adopted an orphaned non-AI encode (pid %d) of %s; its job state had gone missing.",
@@ -142,7 +160,8 @@ def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
     return Path(source), Path(output)
 
 
-def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False) -> None:
+def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False,
+               presence_managed: bool = False) -> None:
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
@@ -155,6 +174,14 @@ def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False) -> Non
             result.deferred_low_disk = True
             _stop_in_flight(job, result, "free disk fell below the safety floor mid-encode")
             return
+        if presence_managed and _user_present():
+            _suspend_job(job)
+            result.in_flight = relpath(source)
+            result.in_flight_percent = _percent_encoded(job)
+            result.suspended = True
+            return
+        if presence_managed:
+            _resume_job(job)  # a no-op unless it was frozen
         if not _overran(job):
             result.in_flight = relpath(source)
             result.in_flight_percent = _percent_encoded(job)
@@ -162,6 +189,32 @@ def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False) -> Non
         _terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
     _conclude(job, result)
     _clear_job()
+
+
+def _suspend_job(job: dict) -> None:
+    """Freeze the encode and remember when, so the pause is not charged runtime."""
+    if job.get("suspended"):
+        return
+    processes.suspend(job.get("pid", 0))
+    job["suspended"] = True
+    job["suspended_at"] = time.time()
+    _save_job(job)
+    log.info("Suspended the non-AI encode of %s; the user is back at the machine.",
+             job.get("source"))
+
+
+def _resume_job(job: dict) -> None:
+    """Thaw the encode and bank the time it spent frozen."""
+    if not job.get("suspended"):
+        return
+    processes.resume(job.get("pid", 0))
+    paused_for = time.time() - job.get("suspended_at", time.time())
+    job["suspended_seconds"] = job.get("suspended_seconds", 0.0) + paused_for
+    job["suspended"] = False
+    job["suspended_at"] = 0.0
+    _save_job(job)
+    log.info("Resumed the non-AI encode of %s; the machine is idle again.",
+             job.get("source"))
 
 
 def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str) -> None:
@@ -176,8 +229,20 @@ def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str) -> None:
 
 
 def _overran(job: dict) -> bool:
-    runtime = time.time() - job.get("started_at", 0)
-    return runtime > config.NONAI_MAX_RUNTIME_HOURS * 3600
+    return _active_runtime(job) > config.NONAI_MAX_RUNTIME_HOURS * 3600
+
+
+def _active_runtime(job: dict) -> float:
+    """Wall-clock since the encode started, minus the time it spent suspended.
+
+    The runtime cap exists to catch a *stuck* encode; hours parked frozen while
+    the user was at the machine are not the encode's fault and must not count.
+    """
+    now = time.time()
+    suspended = job.get("suspended_seconds", 0.0)
+    if job.get("suspended") and job.get("suspended_at"):
+        suspended += now - job["suspended_at"]
+    return now - job.get("started_at", now) - suspended
 
 
 def _percent_encoded(job: dict) -> int | None:
