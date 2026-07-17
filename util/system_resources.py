@@ -70,3 +70,27 @@ def available_ram_gb() -> float:
     if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
         raise OSError("GlobalMemoryStatusEx failed")
     return status.ullAvailPhys / (1024 ** 3)
+
+
+class _LastInputInfo(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_uint),
+        ("dwTime", ctypes.c_ulong),
+    ]
+
+
+def seconds_since_last_input() -> float:
+    """Seconds since the session's last keyboard or mouse input.
+
+    The single presence signal the idle-upscale throttle needs: a long value
+    means the user has stepped away (run harder), a short one means they are at
+    the machine (back off). dwTime is a 32-bit GetTickCount stamp, so the
+    difference is taken in 32-bit space to survive the ~49.7-day wrap.
+    """
+    info = _LastInputInfo()
+    info.cbSize = ctypes.sizeof(_LastInputInfo)
+    if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+        raise OSError("GetLastInputInfo failed")
+    now_ticks = ctypes.windll.kernel32.GetTickCount() & 0xFFFFFFFF
+    elapsed_ms = (now_ticks - info.dwTime) & 0xFFFFFFFF
+    return elapsed_ms / 1000.0
