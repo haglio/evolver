@@ -109,7 +109,7 @@ Three lines sit beneath the video: what is on screen now and how many clips are 
 
 A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: every act as a grid of `Side` / `POV` columns, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records and names its spoken phrase on hover.
 
-Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. Set `config.VOICE_DEVICE_INDEX` if the system default input is not the microphone you speak into (`python -m sounddevice` lists them).
+Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. Set `config.VOICE_DEVICE_NAME` to a substring of your mic's name (from `python -m sounddevice`) to pin a specific one instead.
 
 ## Non-AI library upscaling
 
