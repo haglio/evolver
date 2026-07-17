@@ -114,13 +114,12 @@ GUI_SETTINGS_FILE = PROJECT_DIR / "gui_settings.json"
 
 # Voice control for the metadata backfill tool. The model name is resolved and cached
 # by vosk under ~/.cache/vosk, the same small English model Fun Time listens with.
-# The recognizer does not trust the system default input: Windows often makes a dead
-# virtual mic the default (a VR headset the Pimax update repointed to), which feeds
-# vosk silence, so it probes the real inputs and listens on the liveliest. Set
-# VOICE_DEVICE_NAME to a substring of your mic's name (from `python -m sounddevice`)
-# to pin a specific one instead.
+# VOICE_DEVICE_NAME pins the mic by a name-substring — set to "Brio" because a Pimax
+# update made a dead VR mic the Windows default, which would feed vosk silence. Set it
+# to None to instead auto-pick the liveliest live input (a brief probe that steps over
+# a silent default); `python -m sounddevice` lists the names.
 VOICE_MODEL_NAME = "vosk-model-small-en-us-0.15"
-VOICE_DEVICE_NAME = None
+VOICE_DEVICE_NAME = "Brio"
 VOICE_SAMPLE_RATE = 16000
 VOICE_CONFIDENCE_THRESHOLD = 0.7
 
