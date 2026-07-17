@@ -19,7 +19,9 @@ from backfill.window import BackfillWindow
 from backfill.work import SerialWorker
 
 _TITLE = "Backfill Metadata"
-_WINDOW_SIZE = (960, 720)
+# Wide enough to keep a roomy stage while the command panel (which sizes itself to
+# its grid) sits beside it; the stage has the stretch, so it grows with the window.
+_WINDOW_SIZE = (1360, 780)
 
 
 def main() -> int:

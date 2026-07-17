@@ -4,7 +4,13 @@ from unittest.mock import patch
 
 from PyQt6.QtWidgets import QApplication
 
+from backfill import vocabulary
 from backfill.window import BackfillWindow
+
+
+def _every_grid_phrase():
+    groups = [*vocabulary.scoped_grid(), vocabulary.unscoped_commands(), vocabulary.control_commands()]
+    return {command.phrase for group in groups for command in group}
 
 _app = QApplication.instance() or QApplication([])
 
@@ -159,6 +165,27 @@ class TestBackfillWindow(unittest.TestCase):
         self.assertIn("a_topaz.mp4", set_source.call_args[0][0].toLocalFile())
         self.assertIn("1 remaining", window._status.text())
         self.assertEqual(window._last.text(), "Last: undid a_topaz.mp4 → Dancing")
+
+    def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+
+        self.assertEqual(set(window._command_buttons), _every_grid_phrase())
+
+    def test_a_tile_is_labelled_with_the_action_it_records(self):
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+
+        self.assertEqual(window._command_buttons["side gamma"].text(), "Side Gamma")
+
+    def test_clicking_a_tile_applies_its_phrase_through_the_session(self):
+        session = FakeSession(
+            [Path("a_topaz.mp4"), Path("b_topaz.mp4")],
+            [("a_topaz.mp4 → skipped", None)],
+        )
+        window = self._window(session)
+
+        window._command_buttons["skip"].click()
+
+        self.assertEqual(session.applied, ["skip"])
 
     def test_closing_releases_the_clip_the_player_holds(self):
         session = FakeSession([Path("a_topaz.mp4")])
