@@ -11,6 +11,12 @@ minutes, so nothing here ever waits on ffmpeg: at most one detached encode is
 in flight, and each scheduler tick either checks on it (promote / fail / kill
 a stuck one) or starts the next candidate when the machine is otherwise idle.
 
+Once the tray toggle is on, the stage auto-manages that encode by user
+presence: it starts or resumes only while the user is away and suspends the
+detached ffmpeg the moment they return (frozen, zero compute, resumed exactly
+where it left off). A fast GUI poll — ``throttle_to_presence`` — parks and
+thaws it between ticks so returning to the machine takes effect in seconds.
+
 Candidates come from the buckets' triage folders (``0 unsorted``, ``1 could
 use work``), most-wanted first: an explicit ``1`` flag beats everything, then
 clips with a funscript — the only per-video engagement signal the non_AI
@@ -23,6 +29,7 @@ import json
 import logging
 import re
 import subprocess
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -35,6 +42,11 @@ from util.nonai_library import buckets
 from util.variants import is_processed_stem, strip_processing_suffixes
 
 log = logging.getLogger(__name__)
+
+# The full pipeline tick (worker thread) and the fast presence poll (GUI
+# thread) both touch the one job file and its ffmpeg. This serializes them so a
+# suspend/resume never races a supervise.
+_throttle_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -78,15 +90,16 @@ def run(allow_start: bool = True, stop: bool = False,
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
-    job = _load_job()
-    if job is None:
-        job = _adopt_orphan()
-    _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
-    if job is not None:
-        _supervise(job, result, stop=stop, presence_managed=presence_managed)
+    with _throttle_lock:
+        job = _load_job()
+        if job is None:
+            job = _adopt_orphan()
+        _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
+        if job is not None:
+            _supervise(job, result, stop=stop, presence_managed=presence_managed)
 
-    if not result.in_flight and allow_start and not stop:
-        _start_next_candidate(result)
+        if not result.in_flight and allow_start and not stop:
+            _start_next_candidate(result)
 
     result.pending = len(collect_candidates())
     in_flight = result.in_flight or "-"
@@ -100,6 +113,32 @@ def run(allow_start: bool = True, stop: bool = False,
         result.stopped or "-", result.start_deferred or "-", result.failed, result.pending,
     )
     return result
+
+
+def throttle_to_presence() -> str:
+    """Between full pipeline ticks, keep the in-flight encode in step with the
+    user: suspend it the moment they return, resume it once they idle out.
+
+    Cheap enough for a short GUI timer — it touches only the one live job, with
+    no candidate scan or disk work. Returns "suspended", "resumed", or "" when
+    nothing changed. Starting a new encode stays with the pipeline tick, which
+    has the candidate scan and resource checks; this only parks and thaws.
+    """
+    with _throttle_lock:
+        job = _load_job()
+        if job is None:
+            return ""
+        pid = job.get("pid", 0)
+        if not pid or not processes.is_running(pid):
+            return ""
+        present = _user_present()
+        if present and not job.get("suspended"):
+            _suspend_job(job)
+            return "suspended"
+        if not present and job.get("suspended"):
+            _resume_job(job)
+            return "resumed"
+        return ""
 
 
 def _adopt_orphan() -> dict | None:

@@ -66,6 +66,35 @@ class TestNonAiUpscaleToggle(unittest.TestCase):
         self.assertTrue(mock_worker.call_args.kwargs["nonai_enabled"])
 
 
+class TestPresenceMonitor(unittest.TestCase):
+    """A fast timer keeps the in-flight encode in step with the user between
+    the slow pipeline ticks."""
+
+    def _app_with_toggle(self, enabled):
+        from gui.settings import EvolverSettings
+        settings = EvolverSettings()
+        settings.nonai_upscale_enabled = enabled
+        with patch("gui.app.QApplication", return_value=_app), \
+             patch("gui.app.EvolverSettings.load", return_value=settings):
+            return EvolverApp()
+
+    def test_monitor_timer_is_running(self):
+        app = self._app_with_toggle(True)
+        self.assertTrue(app._presence_monitor.isActive())
+
+    def test_throttles_the_encode_while_the_toggle_is_on(self):
+        app = self._app_with_toggle(True)
+        with patch("gui.app.nonai_upscale.throttle_to_presence") as mock_throttle:
+            app._throttle_presence()
+        mock_throttle.assert_called_once_with()
+
+    def test_leaves_the_encode_alone_while_the_toggle_is_off(self):
+        app = self._app_with_toggle(False)
+        with patch("gui.app.nonai_upscale.throttle_to_presence") as mock_throttle:
+            app._throttle_presence()
+        mock_throttle.assert_not_called()
+
+
 class TestSessionManagement(unittest.TestCase):
     """EvolverApp must log Windows session-management events that could kill it."""
 

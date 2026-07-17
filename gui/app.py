@@ -23,6 +23,7 @@ from gui.stats_window import StatsWindow
 from gui.taskbar import set_taskbar_properties
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
+from tasks import nonai_upscale
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +68,14 @@ class EvolverApp:
         self._watchdog = QTimer()
         self._watchdog.setSingleShot(True)
         self._watchdog.timeout.connect(self._on_watchdog)
+
+        # Presence poll: parks/thaws the in-flight non-AI encode between the
+        # slow pipeline ticks, so returning to the machine suspends it in
+        # seconds. The handler no-ops unless the toggle is on.
+        self._presence_monitor = QTimer()
+        self._presence_monitor.setInterval(int(config.NONAI_PRESENCE_POLL_SECONDS * 1000))
+        self._presence_monitor.timeout.connect(self._throttle_presence)
+        self._presence_monitor.start()
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.run_requested.connect(self._start_run)
@@ -129,9 +138,19 @@ class EvolverApp:
             self._tray.set_paused(True)
 
     def _set_nonai_enabled(self, enabled: bool):
-        """Persist the tray toggle; the next scheduler tick acts on it."""
+        """Persist the one-time opt-in; presence polling and the next tick act on it."""
         self._settings.nonai_upscale_enabled = enabled
         self._settings.save()
+
+    def _throttle_presence(self):
+        """Suspend/resume the in-flight non-AI encode as the user comes and goes.
+
+        Fires far more often than the pipeline tick, so returning to the machine
+        freezes the encode within seconds. No-op unless the user has opted in.
+        """
+        if not self._settings.nonai_upscale_enabled:
+            return
+        nonai_upscale.throttle_to_presence()
 
     def _show_settings(self):
         dialog = SettingsDialog(self._settings, self._window)

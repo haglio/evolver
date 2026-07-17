@@ -572,6 +572,75 @@ class TestPresenceThrottle(unittest.TestCase):
             self.assertFalse(result.suspended)
 
 
+class TestThrottleToPresence(unittest.TestCase):
+    """The fast between-ticks responder: suspend/resume the live encode alone,
+    with no candidate scan or disk work, so a GUI timer can call it often."""
+
+    def test_suspends_a_running_encode_when_the_user_returns(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+
+            stack, mocks = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                changed = nonai_upscale.throttle_to_presence()
+
+            self.assertEqual(changed, "suspended")
+            mocks["suspend"].assert_called_once_with(4242)
+            job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertTrue(job["suspended"])
+
+    def test_resumes_a_suspended_encode_when_the_user_idles_out(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, suspended=True, suspended_at=time.time() - 30)
+
+            stack, mocks = probes(is_running=True, idle_seconds=10_000.0)
+            with override_config(**overrides), stack:
+                changed = nonai_upscale.throttle_to_presence()
+
+            self.assertEqual(changed, "resumed")
+            mocks["resume"].assert_called_once_with(4242)
+            job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertFalse(job["suspended"])
+
+    def test_no_change_when_presence_already_matches_state(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)  # running, not suspended
+
+            stack, mocks = probes(is_running=True, idle_seconds=10_000.0)
+            with override_config(**overrides), stack:
+                changed = nonai_upscale.throttle_to_presence()
+
+            self.assertEqual(changed, "")
+            mocks["suspend"].assert_not_called()
+            mocks["resume"].assert_not_called()
+
+    def test_does_nothing_without_a_live_job(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+
+            stack, mocks = probes(idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                changed = nonai_upscale.throttle_to_presence()
+
+            self.assertEqual(changed, "")
+            mocks["suspend"].assert_not_called()
+
+    def test_ignores_a_job_whose_process_has_died(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+
+            stack, mocks = probes(is_running=False, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                changed = nonai_upscale.throttle_to_presence()
+
+            self.assertEqual(changed, "")
+            mocks["suspend"].assert_not_called()
+
+
 class TestPortraitTargets(unittest.TestCase):
     def test_portrait_video_gets_swapped_target_edges(self):
         with workspace_temp_dir() as root:
