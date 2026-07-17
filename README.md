@@ -96,8 +96,9 @@ Say an act, optionally prefixed with a camera word — `side`, or `POV` said as 
 
 So "side gamma" records `Side Gamma`, and "P-O-V delta" records `Pov Delta` — matching the `Pov Epsilon` form Provider already uses, so one Fun Time filter query reaches both. The recognizer listens for the initialism spelled out (`p o v ...`), because the vosk lexicon prices each letter as its name; it also accepts a one-word "pov", whichever way you happen to say it.
 
-Three more phrases:
+Four more phrases:
 
+- `same` — record the last act again on the clip now on screen, for a run that all share one act. It reaches past any intervening `skip` to the last act actually spoken, and says "nothing to repeat" if you have not named one yet
 - `skip` — not now; the clip goes to the back of the queue and comes round again
 - `weird` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "mark as weird" does. No metadata is written; Stage 2 later deletes it along with its `1_sorted` source
 - `undo` — take the last decision back, and keep saying it to walk back through the whole run

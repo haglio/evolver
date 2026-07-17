@@ -256,6 +256,109 @@ class TestUndo(unittest.TestCase):
         self.assertEqual(rewound, original)
 
 
+class TestSame(unittest.TestCase):
+    def _session(self, count=3, worker=None):
+        videos = [Path(f"clip{i}.mp4") for i in range(count)]
+        queue = BackfillQueue(videos, rng=random.Random(0))
+        return BackfillSession(queue, worker or ImmediateWorker())
+
+    def test_same_records_the_last_action_against_the_clip_on_screen(self):
+        session = self._session()
+        first = session.current
+
+        with patch("backfill.session.record_action") as record, \
+             patch("backfill.session.sidecar_snapshot"):
+            session.apply("pov delta")
+            second = session.current
+            note = session.apply("same")
+
+        record.assert_any_call(second, "Pov Delta")
+        self.assertEqual(note, f"{second.name} → Pov Delta")
+        self.assertNotEqual(second, first)
+
+    def test_same_before_any_action_repeats_nothing(self):
+        session = self._session()
+        clip = session.current
+
+        with patch("backfill.session.record_action") as record:
+            note = session.apply("same")
+
+        record.assert_not_called()
+        self.assertEqual(note, "nothing to repeat")
+        self.assertEqual(session.current, clip)
+        self.assertEqual(session.remaining, 3)
+
+    def test_same_reaches_past_a_skip_to_the_last_action(self):
+        session = self._session()
+
+        with patch("backfill.session.record_action") as record, \
+             patch("backfill.session.sidecar_snapshot"):
+            session.apply("dance")
+            skipped = session.current
+            session.apply("skip")
+            after_skip = session.current
+            note = session.apply("same")
+
+        record.assert_any_call(after_skip, "Dancing")
+        self.assertEqual(note, f"{after_skip.name} → Dancing")
+        self.assertNotEqual(after_skip, skipped)
+
+    def test_undoing_a_same_puts_the_clip_back(self):
+        session = self._session()
+
+        with patch("backfill.session.record_action"), \
+             patch("backfill.session.sidecar_snapshot", return_value=None), \
+             patch("backfill.session.restore_sidecar"):
+            session.apply("dance")
+            same_clip = session.current
+            session.apply("same")
+            note = session.apply("undo")
+
+        self.assertEqual(note, f"undid {same_clip.name} → Dancing")
+        self.assertEqual(session.current, same_clip)
+        self.assertEqual(session.remaining, 2)
+
+    def test_same_after_undoing_the_only_action_repeats_nothing(self):
+        session = self._session()
+        clip = session.current
+
+        with patch("backfill.session.record_action") as record, \
+             patch("backfill.session.sidecar_snapshot", return_value=None), \
+             patch("backfill.session.restore_sidecar"):
+            session.apply("dance")
+            session.apply("undo")
+            self.assertEqual(session.current, clip)
+            record.reset_mock()
+            note = session.apply("same")
+
+        record.assert_not_called()
+        self.assertEqual(note, "nothing to repeat")
+        self.assertEqual(session.current, clip)
+
+    def test_consecutive_sames_keep_labelling_and_advancing(self):
+        session = self._session(count=4)
+
+        with patch("backfill.session.record_action") as record, \
+             patch("backfill.session.sidecar_snapshot"):
+            session.apply("gamma")
+            session.apply("same")
+            session.apply("same")
+
+        actions = [call.args[1] for call in record.call_args_list]
+        self.assertEqual(actions, ["Gamma", "Gamma", "Gamma"])
+        self.assertEqual(session.remaining, 1)
+
+    def test_same_after_the_last_clip_does_nothing(self):
+        session = self._session(count=1)
+
+        with patch("backfill.session.record_action"), patch("backfill.session.sidecar_snapshot"):
+            session.apply("dance")
+            note = session.apply("same")
+
+        self.assertIsNone(note)
+        self.assertIsNone(session.current)
+
+
 class TestUndoAgainstRealFiles(unittest.TestCase):
     """The two reversals that actually touch disk, driven end to end."""
 

@@ -21,10 +21,11 @@ from backfill.decisions import (
     sidecar_snapshot,
 )
 from backfill.queue import BackfillQueue
-from backfill.vocabulary import ACTIONS, CONTROLS, SKIP, UNDO
+from backfill.vocabulary import ACTIONS, CONTROLS, SAME, SKIP, UNDO
 from backfill.work import SerialWorker
 
 NOTHING_TO_UNDO = "nothing to undo"
+NOTHING_TO_REPEAT = "nothing to repeat"
 
 
 @dataclass
@@ -126,8 +127,11 @@ class BackfillSession:
 
     def apply(self, phrase: str) -> str | None:
         """React to *phrase*; returns what it did, or None if it meant nothing here."""
-        if CONTROLS.get(phrase) == UNDO:
+        control = CONTROLS.get(phrase)
+        if control == UNDO:
             return self._undo()
+        if control == SAME:
+            return self._repeat()
 
         clip = self._queue.current
         if clip is None:
@@ -135,11 +139,31 @@ class BackfillSession:
         step = self._step_for(phrase, clip)
         if step is None:
             return None
+        return self._commit(step)
 
+    def _repeat(self) -> str | None:
+        """Apply the most recent action again, to the clip now on screen."""
+        clip = self._queue.current
+        if clip is None:
+            return None
+        action = self._last_action()
+        if action is None:
+            return NOTHING_TO_REPEAT
+        return self._commit(_Labelled(clip, action))
+
+    def _commit(self, step) -> str:
+        """Land a decision: retire its clip, dispatch its file work, remember it."""
         step.take_effect(self._queue)
         self._worker.submit(step.commit)
         self._history.append(step)
         return step.note
+
+    def _last_action(self) -> str | None:
+        """The action of the most recent labelling, or None if none stands."""
+        for step in reversed(self._history):
+            if isinstance(step, _Labelled):
+                return step.action
+        return None
 
     def _step_for(self, phrase: str, clip: Path):
         action = ACTIONS.get(phrase)
