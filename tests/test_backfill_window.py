@@ -63,6 +63,33 @@ class TestBackfillWindow(unittest.TestCase):
         self.assertIn("1 remaining", window._status.text())
         self.assertIn("b_topaz.mp4", window._status.text())
 
+    def test_the_live_hypothesis_shows_what_the_recognizer_is_hearing(self):
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+
+        window.on_hearing("side delta")
+
+        self.assertIn("side delta", window._hearing.text())
+
+    def test_an_empty_hypothesis_clears_the_hearing_line(self):
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        window.on_hearing("side")
+
+        window.on_hearing("")
+
+        self.assertEqual(window._hearing.text(), "")
+
+    def test_a_landed_phrase_clears_the_stale_hearing_line(self):
+        session = FakeSession(
+            [Path("a_topaz.mp4"), Path("b_topaz.mp4")],
+            [("a_topaz.mp4 → Dancing", [Path("b_topaz.mp4")])],
+        )
+        window = self._window(session)
+        window.on_hearing("dance")
+
+        window.on_phrase("dance")
+
+        self.assertEqual(window._hearing.text(), "")
+
     def test_the_last_decision_names_its_own_clip_not_the_one_now_playing(self):
         session = FakeSession(
             [Path("a_topaz.mp4"), Path("b_topaz.mp4")],

@@ -16,8 +16,13 @@ _DONE = "Nothing left to label."
 class BackfillWindow(QWidget):
     """Loops the clip awaiting an action, and moves on the moment one is spoken.
 
-    Two lines beneath the video: what is on screen now, and what the last thing you
-    said did — naming its own clip, which by then is not the one you are watching.
+    Three lines beneath the video: what is on screen now, what the recognizer is
+    hearing right this moment, and what the last thing you said did — the last
+    naming its own clip, which by then is not the one you are watching.
+
+    The live "hearing" line is the answer to "is it even listening?": it fills in
+    as on-script words are recognized and stays blank when what you said is not a
+    command, so a phrase that never lands is visible rather than a silent nothing.
 
     Audio is muted: the microphone is open the whole time, and a clip's own
     soundtrack would be one more thing for the recognizer to mishear.
@@ -30,14 +35,16 @@ class BackfillWindow(QWidget):
 
         self._video = QVideoWidget()
         self._status = QLabel()
+        self._hearing = QLabel()
         self._last = QLabel()
-        for label in (self._status, self._last):
+        for label in (self._status, self._hearing, self._last):
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._video, stretch=1)
         layout.addWidget(self._status)
+        layout.addWidget(self._hearing)
         layout.addWidget(self._last)
 
         self._audio = QAudioOutput()
@@ -51,8 +58,14 @@ class BackfillWindow(QWidget):
 
         self._play_current()
 
+    def on_hearing(self, text: str) -> None:
+        """Show the recognizer's live guess, or clear the line once it settles."""
+        self._hearing.setText(f"Hearing: {text}" if text else "")
+
     def on_phrase(self, phrase: str) -> None:
         """React to a phrase the listener heard."""
+        # The phrase settled, so the live guess that led to it is spent.
+        self._hearing.setText("")
         was_playing = self._session.current
         note = self._session.apply(phrase)
         if note is None:

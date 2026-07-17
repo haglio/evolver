@@ -32,6 +32,21 @@ def build_grammar(phrases: list[str]) -> str:
     return json.dumps([*sorted(phrases), _UNKNOWN])
 
 
+def partial_text(raw_partial: str) -> str:
+    """The live, still-forming hypothesis a vosk partial carries.
+
+    Empty until the recognizer has settled on grammar words, so the window's
+    "hearing" line stays blank while nothing on-script is being said — which is
+    itself the signal that an off-grammar word ("bypass", "next") is not landing.
+    """
+    try:
+        payload = json.loads(raw_partial)
+    except json.JSONDecodeError:
+        return ""
+    text = str(payload.get("partial", "")).strip()
+    return "" if text == _UNKNOWN else text
+
+
 def recognized_phrase(raw_result: str, *, threshold: float) -> str | None:
     """The phrase a vosk result carries, or None if there is nothing to act on.
 
@@ -55,9 +70,15 @@ def recognized_phrase(raw_result: str, *, threshold: float) -> str | None:
 
 
 class VoiceListener(QObject):
-    """Listens on the microphone and emits each phrase from the grammar it hears."""
+    """Listens on the microphone, emitting both the live guess and each settled phrase.
+
+    ``hearing`` carries the still-forming hypothesis so the window can show what the
+    recognizer currently thinks it is being told; ``heard`` carries a phrase from the
+    grammar once the recognizer has committed to it.
+    """
 
     heard = pyqtSignal(str)
+    hearing = pyqtSignal(str)
 
     def __init__(self, phrases: list[str], parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -104,13 +125,22 @@ class VoiceListener(QObject):
                 device=config.VOICE_DEVICE_INDEX,
                 callback=on_audio,
             ):
+                last_partial = ""
                 while not self._stop.is_set():
                     try:
                         block = audio.get(timeout=0.5)
                     except queue.Empty:
                         continue
                     if not recognizer.AcceptWaveform(block):
+                        partial = partial_text(recognizer.PartialResult())
+                        if partial != last_partial:
+                            last_partial = partial
+                            self.hearing.emit(partial)
                         continue
+                    # The utterance ended: whatever the live guess was, it is stale now.
+                    if last_partial:
+                        last_partial = ""
+                        self.hearing.emit("")
                     phrase = recognized_phrase(
                         recognizer.Result(), threshold=config.VOICE_CONFIDENCE_THRESHOLD
                     )

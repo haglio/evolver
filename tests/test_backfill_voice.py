@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from backfill.voice import build_grammar, recognized_phrase
+from backfill.voice import build_grammar, partial_text, recognized_phrase
 
 
 class TestBuildGrammar(unittest.TestCase):
@@ -40,6 +40,21 @@ class TestRecognizedPhrase(unittest.TestCase):
     def test_accepts_a_phrase_vosk_gave_no_confidence_for(self):
         """Grammar mode routinely omits per-word confidences."""
         self.assertEqual(recognized_phrase(self._result("dance", []), threshold=0.7), "dance")
+
+
+class TestPartialText(unittest.TestCase):
+    def test_returns_the_live_hypothesis_the_partial_carries(self):
+        self.assertEqual(partial_text(json.dumps({"partial": "side delta"})), "side delta")
+
+    def test_empty_when_nothing_has_been_heard_yet(self):
+        self.assertEqual(partial_text(json.dumps({"partial": ""})), "")
+        self.assertEqual(partial_text(json.dumps({})), "")
+
+    def test_empty_for_the_unknown_token(self):
+        self.assertEqual(partial_text(json.dumps({"partial": "[unk]"})), "")
+
+    def test_empty_for_malformed_json(self):
+        self.assertEqual(partial_text("not json"), "")
 
 
 if __name__ == "__main__":

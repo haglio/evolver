@@ -105,7 +105,7 @@ Four more phrases:
 
 Undo restores the clip to the screen and reverses what the decision did on disk: a sidecar it wrote is deleted (or, if the clip arrived carrying prompts, only the act is removed), and a clip sent to `kinda_weird/` is reclaimed from where it landed. Undoing every decision rewinds the queue to the order it had. It works after the last clip too, so a mislabelled final clip is still recoverable.
 
-Two lines sit beneath the video: what is on screen now and how many clips are left, and what your last phrase did — naming its own clip, which by then is not the one you are watching. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
+Three lines sit beneath the video: what is on screen now and how many clips are left; what the recognizer is hearing this moment; and what your last phrase did — the last naming its own clip, which by then is not the one you are watching. The middle "hearing" line fills in as it recognizes on-script words and stays blank when what you said is not a command, so a phrase that never lands shows as a visible nothing rather than a silent one — the way to tell listening-but-unmatched from not-listening. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
 
 Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. Set `config.VOICE_DEVICE_INDEX` if the system default input is not the microphone you speak into (`python -m sounddevice` lists them).
 
