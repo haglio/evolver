@@ -16,6 +16,7 @@ import threading
 from PyQt6.QtCore import QObject, pyqtSignal
 
 import config
+from backfill.mic import resolve_input_device
 
 log = logging.getLogger(__name__)
 
@@ -115,14 +116,17 @@ class VoiceListener(QObject):
             recognizer = vosk.KaldiRecognizer(
                 model, config.VOICE_SAMPLE_RATE, build_grammar(self._phrases)
             )
-            log.info("Listening (model=%s, device=%s)", config.VOICE_MODEL_NAME, config.VOICE_DEVICE_INDEX)
+            # Pick a live mic, not the (possibly dead) system default — resolve logs
+            # which device it settled on.
+            device = resolve_input_device()
+            log.info("Listening (model=%s, device=%s)", config.VOICE_MODEL_NAME, device)
 
             with sounddevice.RawInputStream(
                 samplerate=config.VOICE_SAMPLE_RATE,
                 blocksize=_BLOCK_SIZE,
                 dtype="int16",
                 channels=1,
-                device=config.VOICE_DEVICE_INDEX,
+                device=device,
                 callback=on_audio,
             ):
                 last_partial = ""
