@@ -56,8 +56,9 @@ class EvolverTray(QSystemTrayIcon):
         self.pause_action = QAction(qta.icon("fa5s.pause", color=_ICON_COLOR), "Pause Scheduling", self._menu)
         self._menu.addAction(self.pause_action)
 
-        # Opt-in: one non-AI encode monopolizes the GPU for hours, so this
-        # stays off until the user is stepping away from the machine.
+        # A one-time opt-in, off by default because a non-AI encode owns the
+        # GPU for hours. Once on, Evolver runs it only while the user is idle
+        # and suspends it the moment they return — no manual flipping.
         self.nonai_action = QAction(qta.icon("fa5s.film", color=_ICON_COLOR), "Upscale Non-AI When Idle", self._menu)
         self.nonai_action.setCheckable(True)
         self._menu.addAction(self.nonai_action)
