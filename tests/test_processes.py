@@ -35,8 +35,13 @@ class TestImagePath(unittest.TestCase):
 
 class TestPidsOfImage(unittest.TestCase):
     def test_finds_the_current_interpreter_by_its_image(self):
-        pids = processes.pids_of_image(Path(sys.executable))
-        self.assertIn(os.getpid(), pids)
+        # Probe with the process's real image, not sys.executable: a Windows
+        # venv python.exe is a redirect stub whose backing image is the base
+        # interpreter (e.g. C:\Python314\python.exe), so QueryFullProcessImageName
+        # reports that, and pids_of_image(sys.executable) never matches us.
+        image = processes.image_path(os.getpid())
+        self.assertIsNotNone(image)
+        self.assertIn(os.getpid(), processes.pids_of_image(Path(image)))
 
     def test_empty_for_an_absent_executable(self):
         pids = processes.pids_of_image(Path(r"C:\does\not\exist\nowhere.exe"))
