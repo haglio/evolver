@@ -339,9 +339,18 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
         self.assertEqual(result.resolution, "1280x720")
         self.assertEqual(result.quality, "720p")
         self.assertEqual(result.created, "2026-03-13")
-        self.assertEqual(result.action, "Pov Gamma")
+        self.assertEqual(result.action, "POV Gamma")
         self.assertEqual(result.style, "")
         self.assertEqual(result.creativity, "7")
+
+
+class TestTitlecaseAction(unittest.TestCase):
+    def test_title_cases_each_word(self):
+        self.assertEqual(prompt_scrape._titlecase_action("beta_gamma"), "Beta Gamma")
+
+    def test_keeps_the_pov_initialism_fully_upper(self):
+        self.assertEqual(prompt_scrape._titlecase_action("pov_gamma"), "POV Gamma")
+        self.assertEqual(prompt_scrape._titlecase_action("side_pov_epsilon"), "Side POV Epsilon")
 
 
 class TestCssSelector(unittest.TestCase):

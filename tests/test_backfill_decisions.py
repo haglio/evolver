@@ -63,10 +63,10 @@ class TestRecordAction(unittest.TestCase):
 
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 record_action(video, "Dancing")
-                record_action(video, "Pov Epsilon")
+                record_action(video, "POV Epsilon")
                 payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
-            self.assertEqual(payload, {"video": {"action": "Pov Epsilon"}})
+            self.assertEqual(payload, {"video": {"action": "POV Epsilon"}})
 
 
 class TestSidecarSnapshotAndRestore(unittest.TestCase):

@@ -9,7 +9,7 @@ from backfill.window import BackfillWindow
 
 
 def _every_grid_phrase():
-    groups = [*vocabulary.scoped_grid(), vocabulary.unscoped_commands(), vocabulary.control_commands()]
+    groups = [*vocabulary.scoped_grid(), vocabulary.control_commands()]
     return {command.phrase for group in groups for command in group}
 
 _app = QApplication.instance() or QApplication([])

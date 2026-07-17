@@ -59,7 +59,7 @@ class TestBackfillSession(unittest.TestCase):
         clip = session.current
 
         with patch("backfill.session.record_action"), patch("backfill.session.sidecar_snapshot"):
-            session.apply("dance")
+            session.apply("side dance")
 
         self.assertEqual(session.remaining, 2)
         self.assertNotEqual(session.current, clip)
@@ -105,8 +105,8 @@ class TestBackfillSession(unittest.TestCase):
         session = self._session(count=1)
 
         with patch("backfill.session.record_action"), patch("backfill.session.sidecar_snapshot"):
-            session.apply("dance")
-            note = session.apply("dance")
+            session.apply("side dance")
+            note = session.apply("side dance")
 
         self.assertIsNone(note)
         self.assertIsNone(session.current)
@@ -118,13 +118,13 @@ class TestBackfillSession(unittest.TestCase):
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
-            session.apply("dance")
+            session.apply("side dance")
 
             record.assert_not_called()
             self.assertNotEqual(session.current, clip)
 
             worker.drain()
-            record.assert_called_once_with(clip, "Dancing")
+            record.assert_called_once_with(clip, "Side Dancing")
 
 
 class TestUndo(unittest.TestCase):
@@ -150,11 +150,11 @@ class TestUndo(unittest.TestCase):
         with patch("backfill.session.record_action"), \
              patch("backfill.session.sidecar_snapshot", return_value=None), \
              patch("backfill.session.restore_sidecar") as restore:
-            session.apply("dance")
+            session.apply("side dance")
             note = session.apply("undo")
 
         restore.assert_called_once_with(clip, None)
-        self.assertEqual(note, f"undid {clip.name} → Dancing")
+        self.assertEqual(note, f"undid {clip.name} → Side Dancing")
         self.assertEqual(session.current, clip)
         self.assertEqual(session.remaining, 3)
 
@@ -191,7 +191,7 @@ class TestUndo(unittest.TestCase):
         with patch("backfill.session.record_action"), \
              patch("backfill.session.sidecar_snapshot", return_value=None), \
              patch("backfill.session.restore_sidecar"):
-            session.apply("dance")
+            session.apply("side dance")
             self.assertIsNone(session.current)
             session.apply("undo")
 
@@ -206,7 +206,7 @@ class TestUndo(unittest.TestCase):
         with patch("backfill.session.record_action", side_effect=lambda *_: order.append("record")), \
              patch("backfill.session.sidecar_snapshot", return_value=None), \
              patch("backfill.session.restore_sidecar", side_effect=lambda *_: order.append("restore")):
-            session.apply("dance")
+            session.apply("side dance")
             session.apply("undo")
 
         self.assertEqual(order, ["record", "restore"])
@@ -219,7 +219,7 @@ class TestUndo(unittest.TestCase):
              patch("backfill.session.discard_as_weird", return_value=Path("w.mp4")), \
              patch("backfill.session.reclaim_from_weird"):
             first, second = session.current, None
-            session.apply("dance")
+            session.apply("side dance")
             second = session.current
             session.apply("weird")
             third = session.current
@@ -229,7 +229,7 @@ class TestUndo(unittest.TestCase):
             self.assertEqual(session.current, third)
             self.assertEqual(session.apply("undo"), f"undid {second.name} → weird")
             self.assertEqual(session.current, second)
-            self.assertEqual(session.apply("undo"), f"undid {first.name} → Dancing")
+            self.assertEqual(session.apply("undo"), f"undid {first.name} → Side Dancing")
             self.assertEqual(session.current, first)
             self.assertEqual(session.apply("undo"), "nothing to undo")
 
@@ -243,7 +243,7 @@ class TestUndo(unittest.TestCase):
             original = []
             while session.current is not None:
                 original.append(session.current)
-                session.apply("dance")
+                session.apply("side dance")
 
             for _ in original:
                 session.apply("undo")
@@ -251,7 +251,7 @@ class TestUndo(unittest.TestCase):
             rewound = []
             while session.current is not None:
                 rewound.append(session.current)
-                session.apply("dance")
+                session.apply("side dance")
 
         self.assertEqual(rewound, original)
 
@@ -272,8 +272,8 @@ class TestSame(unittest.TestCase):
             second = session.current
             note = session.apply("same")
 
-        record.assert_any_call(second, "Pov Delta")
-        self.assertEqual(note, f"{second.name} → Pov Delta")
+        record.assert_any_call(second, "POV Delta")
+        self.assertEqual(note, f"{second.name} → POV Delta")
         self.assertNotEqual(second, first)
 
     def test_same_before_any_action_repeats_nothing(self):
@@ -293,14 +293,14 @@ class TestSame(unittest.TestCase):
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
-            session.apply("dance")
+            session.apply("side dance")
             skipped = session.current
             session.apply("skip")
             after_skip = session.current
             note = session.apply("same")
 
-        record.assert_any_call(after_skip, "Dancing")
-        self.assertEqual(note, f"{after_skip.name} → Dancing")
+        record.assert_any_call(after_skip, "Side Dancing")
+        self.assertEqual(note, f"{after_skip.name} → Side Dancing")
         self.assertNotEqual(after_skip, skipped)
 
     def test_undoing_a_same_puts_the_clip_back(self):
@@ -309,12 +309,12 @@ class TestSame(unittest.TestCase):
         with patch("backfill.session.record_action"), \
              patch("backfill.session.sidecar_snapshot", return_value=None), \
              patch("backfill.session.restore_sidecar"):
-            session.apply("dance")
+            session.apply("side dance")
             same_clip = session.current
             session.apply("same")
             note = session.apply("undo")
 
-        self.assertEqual(note, f"undid {same_clip.name} → Dancing")
+        self.assertEqual(note, f"undid {same_clip.name} → Side Dancing")
         self.assertEqual(session.current, same_clip)
         self.assertEqual(session.remaining, 2)
 
@@ -325,7 +325,7 @@ class TestSame(unittest.TestCase):
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot", return_value=None), \
              patch("backfill.session.restore_sidecar"):
-            session.apply("dance")
+            session.apply("side dance")
             session.apply("undo")
             self.assertEqual(session.current, clip)
             record.reset_mock()
@@ -340,19 +340,19 @@ class TestSame(unittest.TestCase):
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
-            session.apply("gamma")
+            session.apply("side gamma")
             session.apply("same")
             session.apply("same")
 
         actions = [call.args[1] for call in record.call_args_list]
-        self.assertEqual(actions, ["Gamma", "Gamma", "Gamma"])
+        self.assertEqual(actions, ["Side Gamma", "Side Gamma", "Side Gamma"])
         self.assertEqual(session.remaining, 1)
 
     def test_same_after_the_last_clip_does_nothing(self):
         session = self._session(count=1)
 
         with patch("backfill.session.record_action"), patch("backfill.session.sidecar_snapshot"):
-            session.apply("dance")
+            session.apply("side dance")
             note = session.apply("same")
 
         self.assertIsNone(note)
@@ -397,7 +397,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
                 path.write_text(json.dumps({"video": {"prompt": "a prompt"}}), encoding="utf-8")
 
                 session = self._session(video)
-                session.apply("dance")
+                session.apply("side dance")
                 session.apply("undo")
 
                 self.assertEqual(
