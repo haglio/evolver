@@ -1,5 +1,4 @@
 import json
-import random
 import unittest
 from pathlib import Path
 
@@ -77,9 +76,9 @@ class TestUnlabeledVideos(unittest.TestCase):
 
 
 class TestBackfillQueue(unittest.TestCase):
-    def _queue(self, count, seed=0):
+    def _queue(self, count):
         videos = [Path(f"clip{i}.mp4") for i in range(count)]
-        return BackfillQueue(videos, rng=random.Random(seed))
+        return BackfillQueue(videos)
 
     def test_remaining_counts_every_video_still_needing_an_action(self):
         queue = self._queue(3)
@@ -159,17 +158,17 @@ class TestBackfillQueue(unittest.TestCase):
             queue.resolve()
         self.assertEqual(rewound, original)
 
-    def test_a_seeded_shuffle_reorders_the_videos(self):
+    def test_the_queue_keeps_the_order_it_was_given(self):
+        """Stable order is what lets a reopened session resume where it left off."""
         videos = [Path(f"clip{i}.mp4") for i in range(10)]
 
-        queue = BackfillQueue(videos, rng=random.Random(0))
+        queue = BackfillQueue(videos)
 
         drained = []
         while queue.current is not None:
             drained.append(queue.current)
             queue.resolve()
-        self.assertEqual(sorted(drained), sorted(videos))
-        self.assertNotEqual(drained, videos)
+        self.assertEqual(drained, videos)
 
 
 if __name__ == "__main__":

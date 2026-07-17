@@ -1,5 +1,4 @@
 import json
-import random
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -40,7 +39,7 @@ class DeferredWorker:
 class TestBackfillSession(unittest.TestCase):
     def _session(self, count=3, worker=None):
         videos = [Path(f"clip{i}.mp4") for i in range(count)]
-        queue = BackfillQueue(videos, rng=random.Random(0))
+        queue = BackfillQueue(videos)
         return BackfillSession(queue, worker or ImmediateWorker())
 
     def test_an_act_records_the_action_against_the_clip_on_screen(self):
@@ -130,7 +129,7 @@ class TestBackfillSession(unittest.TestCase):
 class TestUndo(unittest.TestCase):
     def _session(self, count=3, worker=None):
         videos = [Path(f"clip{i}.mp4") for i in range(count)]
-        queue = BackfillQueue(videos, rng=random.Random(0))
+        queue = BackfillQueue(videos)
         return BackfillSession(queue, worker or ImmediateWorker())
 
     def test_undo_with_nothing_decided_says_so_and_changes_nothing(self):
@@ -259,7 +258,7 @@ class TestUndo(unittest.TestCase):
 class TestSame(unittest.TestCase):
     def _session(self, count=3, worker=None):
         videos = [Path(f"clip{i}.mp4") for i in range(count)]
-        queue = BackfillQueue(videos, rng=random.Random(0))
+        queue = BackfillQueue(videos)
         return BackfillSession(queue, worker or ImmediateWorker())
 
     def test_same_records_the_last_action_against_the_clip_on_screen(self):
