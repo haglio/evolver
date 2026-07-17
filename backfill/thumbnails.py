@@ -1,17 +1,22 @@
 """Example thumbnails for the backfill window's clickable tiles.
 
-Each act tile can show a still from a clip the library already labels with that act,
-so the grid reads as a gallery you recognize at a glance rather than a wall of words.
-The clips already exist — every source the scrape stage or an earlier backfill run
-tagged is a candidate — so a thumbnail is one extracted frame, cached under
-``config.BACKFILL_THUMBNAIL_DIR`` and reused on every later open.
+Each act tile shows a still from a clip that illustrates that act, so the grid reads
+as a gallery you recognize at a glance rather than a wall of words. A thumbnail is one
+extracted frame, cached under ``config.BACKFILL_THUMBNAIL_DIR`` and reused on every
+later open, so the window only ever loads ready files — it never extracts on open.
 
-The work is off the GUI thread: scanning the whole library and shelling out to ffmpeg
-per act is seconds of latency, so :class:`ThumbnailLoader` runs it in a background
-thread and emits each thumbnail as it lands. The pure pieces —
-:func:`build_thumbnails`, :func:`example_clips`, :func:`thumbnail_cache_path` — take
-their effects as arguments or touch only the filesystem, so they are tested without
-ffmpeg or Qt; the loader is the thin thread around them, mirroring VoiceListener.
+A tile's example comes from one of two places, curated first:
+
+* :data:`CURATED_EXAMPLES` pins a specific clip to a tile by id. This is how the acts
+  the library never tags in a camera-scoped form get a picture — a side gamma, a POV
+  zeta — and how a clip mistagged (or tagged for a different act than it best shows)
+  is still put to use.
+* otherwise the first library clip whose ``video.action`` matches the tile, taken from
+  a single scan. A compound tag like ``Pov Epsilon, Alpha`` counts as each of its
+  comma-separated parts, so it can illustrate either tile.
+
+The pure pieces take their effects as arguments or touch only the filesystem, so they
+are tested without ffmpeg or Qt.
 """
 
 from __future__ import annotations
@@ -19,41 +24,79 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
-import threading
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, pyqtSignal
-
 import config
 from backfill.queue import iter_library_videos
+from backfill.vocabulary import scoped_grid
 from util.ffprobe import duration_seconds
 from util.sidecar import action_of, read, sidecar_path
 
 log = logging.getLogger(__name__)
 
 _THUMBNAIL_HEIGHT = 96
-# Sample the frame from a little way in, past a clip's title card or fade-in.
+# Sample the frame a little under halfway in: past a clip's title card or fade-in, and
+# far enough that the act — and the anchor — is actually in frame, not just beginning.
 _SAMPLE_FRACTION = 0.4
+
+# Tile action -> the id (clip stem, minus the "_topaz" suffix) of the clip that best
+# illustrates it. These are the acts the library has no camera-scoped clip for, hand
+# picked because the sidecar tags either miss the act or name a different one.
+CURATED_EXAMPLES: dict[str, str] = {
+    "Side Gamma": "036e8d4e-2f84-4178-89f2-541e4200452f",
+    "Side Epsilon": "Wve2uiuZKyP1RoJJFgri",
+    "Side Zeta": "ceb1cd47-a631-437f-9ff4-a773fac92e82",
+    "POV Zeta": "067f11ff-963f-4a40-b0b6-c43656d71bbf",
+    "Side Dancing": "59020ab7-57c3-4a1d-a91c-22cbe64231ea",
+    "POV Dancing": "243a79f8-6982-43b5-ae7a-512ed73c7076",
+}
+
+
+def _tile_actions() -> list[str]:
+    """Every act a tile is built for, in grid order — the labels a thumbnail fills."""
+    return [command.label for row in scoped_grid() for command in row]
+
+
+def _scan_library() -> tuple[dict[str, Path], dict[str, Path]]:
+    """One library pass, returning two lookups the examples are resolved through.
+
+    ``by_action`` maps each action (and each part of a compound tag), lower-cased, to
+    the first clip that carries it; ``by_id`` maps each clip's id — its stem without
+    the ``_topaz`` suffix — to the clip, for the curated pins.
+    """
+    by_action: dict[str, Path] = {}
+    by_id: dict[str, Path] = {}
+    for _source, video in iter_library_videos():
+        stem = video.stem
+        clip_id = stem[: -len("_topaz")] if stem.endswith("_topaz") else stem
+        by_id.setdefault(clip_id, video)
+        action = action_of(read(sidecar_path(video)))
+        if action:
+            for part in action.split(","):
+                part = part.strip().lower()
+                if part:
+                    by_action.setdefault(part, video)
+    return by_action, by_id
 
 
 def example_clips() -> dict[str, Path]:
-    """One representative labeled clip per act, as ``action -> clip``.
+    """One example clip per tile that has one, as ``tile action -> clip``.
 
-    Every source is fair game — including the scraped ones the work queue hides,
-    since a clip already tagged ``Side Gamma`` is exactly the example that tile
-    wants. The first clip found for an act (in the library's stable order) wins.
+    A curated pin wins; otherwise the tile takes the first library clip whose action
+    matches it. Tiles with neither are simply absent, and stay text-only.
     """
+    by_action, by_id = _scan_library()
     examples: dict[str, Path] = {}
-    for _source, video in iter_library_videos():
-        action = action_of(read(sidecar_path(video)))
-        if action and action not in examples:
-            examples[action] = video
+    for action in _tile_actions():
+        clip = by_id.get(CURATED_EXAMPLES.get(action, "")) or by_action.get(action.lower())
+        if clip is not None:
+            examples[action] = clip
     return examples
 
 
 def thumbnail_cache_path(action: str) -> Path:
-    """Where *action*'s cached thumbnail lives — one stable file name per act."""
+    """Where *action*'s cached thumbnail lives — one stable file name per tile."""
     slug = re.sub(r"[^a-z0-9]+", "_", action.lower()).strip("_") or "unnamed"
     return config.BACKFILL_THUMBNAIL_DIR / f"{slug}.jpg"
 
@@ -104,32 +147,3 @@ def build_thumbnails(
         dest = cache_path_for(action)
         if dest.is_file() or extract(clip, dest):
             yield action, dest
-
-
-class ThumbnailLoader(QObject):
-    """Builds the tiles' thumbnails off the GUI thread, emitting each as it lands."""
-
-    ready = pyqtSignal(str, str)  # action, thumbnail path
-
-    def __init__(self, parent: QObject | None = None) -> None:
-        super().__init__(parent)
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-
-    def start(self) -> None:
-        if self._thread is not None:
-            return
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stop.set()
-
-    def _run(self) -> None:
-        try:
-            for action, path in build_thumbnails(example_clips(), extract_frame, thumbnail_cache_path):
-                if self._stop.is_set():
-                    return
-                self.ready.emit(action, str(path))
-        except Exception:
-            log.exception("Thumbnail loader crashed")

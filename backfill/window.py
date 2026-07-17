@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize, QUrl, Qt
-from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
+from PyQt6.QtGui import QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import (
@@ -23,10 +23,31 @@ from backfill.vocabulary import Command, control_commands, scoped_grid
 _DONE = "Nothing left to label."
 _SCROLLBAR_ALLOWANCE = 28
 _THUMBNAIL_SIZE = 96
-# Reserve the thumbnail's height on every tile up front so a row stays the same
-# height whether or not its acts have an example yet, and a late-arriving frame
-# drops into place instead of reflowing the grid.
+# Reserve the thumbnail's height on every tile up front so every row is the same
+# height whether or not its act has an example.
 _TILE_HEIGHT = _THUMBNAIL_SIZE + 30
+
+
+def _aspect_locked_icon(path: str, box: int) -> QIcon:
+    """An icon of exactly *box*×*box* holding *path*'s frame at its true aspect.
+
+    The frame is scaled to fit the box keeping its ratio, then centred on a
+    transparent square canvas. Because the icon pixmap is already the icon size, no
+    platform button style can stretch it to fill — the fix for portrait/landscape
+    frames coming out squished to square on native Windows.
+    """
+    source = QPixmap(path)
+    if source.isNull():
+        return QIcon()
+    scaled = source.scaled(
+        box, box, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+    )
+    canvas = QPixmap(box, box)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(canvas)
+    painter.drawPixmap((box - scaled.width()) // 2, (box - scaled.height()) // 2, scaled)
+    painter.end()
+    return QIcon(canvas)
 
 
 class BackfillWindow(QWidget):
@@ -44,15 +65,20 @@ class BackfillWindow(QWidget):
     the way the vocabulary is — every act as a grid of Side/POV columns, then the
     controls. A tile is both the reference (what can I say?) and a fallback:
     clicking it drives the exact path a spoken phrase would, so a wedged
-    microphone never leaves the tool unusable. Each act tile fills in with an
-    example frame from a clip already labelled that act, once
-    :meth:`on_thumbnail` delivers one, so the panel reads as a gallery.
+    microphone never leaves the tool unusable. Each act tile carries an example
+    frame — passed in ready at construction, already cached — so the panel opens
+    as a gallery with nothing to load.
 
     Audio is muted: the microphone is open the whole time, and a clip's own
     soundtrack would be one more thing for the recognizer to mishear.
     """
 
-    def __init__(self, session: BackfillSession, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        session: BackfillSession,
+        thumbnails: dict[str, str] | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._session = session
         self._command_buttons: dict[str, QToolButton] = {}
@@ -77,6 +103,9 @@ class BackfillWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(stage, stretch=1)
         layout.addWidget(self._build_command_panel())
+
+        for action, path in (thumbnails or {}).items():
+            self.set_thumbnail(action, path)
 
         self._audio = QAudioOutput()
         self._audio.setMuted(True)
@@ -144,12 +173,12 @@ class BackfillWindow(QWidget):
         self._tiles_by_action[command.label.lower()] = tile
         return tile
 
-    def on_thumbnail(self, action: str, path: str) -> None:
-        """Put an example frame on the tile for *action*, once one is ready."""
+    def set_thumbnail(self, action: str, path: str) -> None:
+        """Put *action*'s example frame on its tile, aspect-locked so it never stretches."""
         tile = self._tiles_by_action.get(action.lower())
         if tile is None or not path:
             return
-        icon = QIcon(path)
+        icon = _aspect_locked_icon(path, _THUMBNAIL_SIZE)
         if not icon.isNull():
             tile.setIcon(icon)
 

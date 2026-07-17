@@ -62,6 +62,38 @@ class TestExampleClips(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertEqual(thumbnails.example_clips(), {"Side Alpha": first})
 
+    def test_a_compound_tag_illustrates_each_of_its_parts(self):
+        with workspace_temp_dir() as root:
+            ai, upscaled, metadata = self._tree(root)
+            video = self._video(upscaled, "portrait", "provider", "c_topaz.mp4")
+            self._sidecar(metadata, "portrait", "provider", "c_topaz", "POV Epsilon, Side Alpha")
+
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+                examples = thumbnails.example_clips()
+
+            self.assertEqual(examples["POV Epsilon"], video)
+            self.assertEqual(examples["Side Alpha"], video)
+
+    def test_a_curated_pin_supplies_a_tile_the_library_never_tags(self):
+        tile, clip_id = next(iter(thumbnails.CURATED_EXAMPLES.items()))
+        with workspace_temp_dir() as root:
+            ai, upscaled, metadata = self._tree(root)
+            pinned = self._video(upscaled, "portrait", "provider", f"{clip_id}_topaz.mp4")
+
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+                self.assertEqual(thumbnails.example_clips(), {tile: pinned})
+
+    def test_a_curated_pin_wins_over_an_auto_match(self):
+        tile, clip_id = next(iter(thumbnails.CURATED_EXAMPLES.items()))
+        with workspace_temp_dir() as root:
+            ai, upscaled, metadata = self._tree(root)
+            pinned = self._video(upscaled, "portrait", "provider", f"{clip_id}_topaz.mp4")
+            self._video(upscaled, "portrait", "provider2", "auto_topaz.mp4")
+            self._sidecar(metadata, "portrait", "provider2", "auto_topaz", tile)
+
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+                self.assertEqual(thumbnails.example_clips()[tile], pinned)
+
 
 class TestThumbnailCachePath(unittest.TestCase):
     def test_slugifies_the_action_into_a_stable_filename(self):
