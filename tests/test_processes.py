@@ -1,6 +1,8 @@
 import os
 import subprocess
 import sys
+import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -82,6 +84,59 @@ class TestTerminate(unittest.TestCase):
             self.assertFalse(processes.is_running(proc.pid))
         finally:
             proc.kill()
+
+
+# The base interpreter, spawned directly: a venv's python.exe is a launcher
+# that waits on a child doing the real work, and suspending the launcher would
+# leave that child running. Topaz's ffmpeg (the real target) is a plain exe, so
+# this only matters for the test.
+_BASE_PYTHON = processes.image_path(os.getpid())
+
+_GROWING_FILE = (
+    "import sys, time\n"
+    "f = open(sys.argv[1], 'ab', buffering=0)\n"
+    "while True:\n"
+    "    f.write(b'x')\n"
+    "    time.sleep(0.005)\n"
+)
+
+
+class TestSuspendResume(unittest.TestCase):
+    def test_suspend_freezes_a_process_and_resume_thaws_it(self):
+        with tempfile.TemporaryDirectory() as folder:
+            counter = Path(folder) / "count.bin"
+            proc = subprocess.Popen(
+                [_BASE_PYTHON, "-c", _GROWING_FILE, str(counter)],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            try:
+                deadline = time.time() + 5
+                while time.time() < deadline and (
+                    not counter.exists() or counter.stat().st_size < 3
+                ):
+                    time.sleep(0.02)
+                self.assertGreaterEqual(counter.stat().st_size, 3)
+
+                self.assertTrue(processes.suspend(proc.pid))
+                time.sleep(0.3)  # let any write already in flight finish
+                frozen = counter.stat().st_size
+                time.sleep(0.4)
+                self.assertEqual(counter.stat().st_size, frozen)  # no progress
+
+                self.assertTrue(processes.resume(proc.pid))
+                time.sleep(0.3)
+                self.assertGreater(counter.stat().st_size, frozen)  # advancing
+            finally:
+                proc.kill()
+                proc.wait(timeout=10)
+
+    def test_suspend_and_resume_return_false_for_a_dead_process(self):
+        proc = subprocess.Popen(
+            [_BASE_PYTHON, "-c", "pass"], creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        proc.wait()
+        self.assertFalse(processes.suspend(proc.pid))
+        self.assertFalse(processes.resume(proc.pid))
 
 
 if __name__ == "__main__":

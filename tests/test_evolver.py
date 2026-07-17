@@ -132,9 +132,10 @@ class TestEvolverMain(unittest.TestCase):
         mocks["upscale_run"].assert_not_called()
         mocks["correspondence_run"].assert_not_called()
 
-    def test_cli_run_neither_starts_nor_stops_nonai_encodes(self):
+    def test_cli_run_neither_starts_nor_stops_nor_manages_nonai_encodes(self):
         mocks = self._run_pipeline()
-        mocks["nonai_run"].assert_called_once_with(allow_start=False, stop=False)
+        mocks["nonai_run"].assert_called_once_with(
+            allow_start=False, stop=False, presence_managed=False)
 
     def test_exits_nonzero_on_nonai_upscale_failure(self):
         mocks = self._run_pipeline(
@@ -309,7 +310,8 @@ class TestRunPipeline(unittest.TestCase):
         stack, mocks = self._patch_all_stages()
         with stack:
             evolver.run_pipeline(nonai_enabled=True)
-        mocks["nonai_run"].assert_called_once_with(allow_start=True, stop=False)
+        mocks["nonai_run"].assert_called_once_with(
+            allow_start=True, stop=False, presence_managed=True)
 
     def test_enabled_nonai_upscale_never_starts_while_ai_work_remains(self):
         stack, mocks = self._patch_all_stages(
@@ -319,7 +321,8 @@ class TestRunPipeline(unittest.TestCase):
         )
         with stack:
             evolver.run_pipeline(nonai_enabled=True)
-        mocks["nonai_run"].assert_called_once_with(allow_start=False, stop=False)
+        mocks["nonai_run"].assert_called_once_with(
+            allow_start=False, stop=False, presence_managed=True)
 
     def test_enabled_nonai_upscale_never_starts_when_cpu_is_busy(self):
         stack, mocks = self._patch_all_stages(
@@ -327,13 +330,15 @@ class TestRunPipeline(unittest.TestCase):
         )
         with stack:
             evolver.run_pipeline(nonai_enabled=True)
-        mocks["nonai_run"].assert_called_once_with(allow_start=False, stop=False)
+        mocks["nonai_run"].assert_called_once_with(
+            allow_start=False, stop=False, presence_managed=True)
 
     def test_disabled_nonai_upscale_stops_the_in_flight_encode(self):
         stack, mocks = self._patch_all_stages()
         with stack:
             evolver.run_pipeline(nonai_enabled=False)
-        mocks["nonai_run"].assert_called_once_with(allow_start=False, stop=True)
+        mocks["nonai_run"].assert_called_once_with(
+            allow_start=False, stop=True, presence_managed=False)
 
     def test_has_errors_true_when_stage_fails(self):
         stack, _ = self._patch_all_stages(
