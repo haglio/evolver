@@ -14,8 +14,9 @@ class EvolverSettings:
     interval_minutes: int = 10
     start_with_windows: bool = False
     enable_toasts: bool = False
-    # Off by default: a non-AI encode monopolizes the GPU for hours, so the
-    # user opts in from the tray menu when stepping away from the machine.
+    # A one-time opt-in, off by default because a non-AI encode owns the GPU
+    # for hours. Once on, Evolver auto-manages it by user presence — running it
+    # while idle, suspending it the moment the user returns.
     nonai_upscale_enabled: bool = False
 
     def save(self, path: Path | None = None):
