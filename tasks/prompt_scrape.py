@@ -477,7 +477,7 @@ def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmb
             if not metadata.action:
                 raw_action = _extract_json_first_array_string(candidate, "action")
                 if raw_action:
-                    metadata.action = raw_action.replace("_", " ").title()
+                    metadata.action = _titlecase_action(raw_action)
             if not metadata.style:
                 metadata.style = _extract_nullable_json_string_field(candidate, "styleValue")
             if not metadata.creativity:
@@ -515,6 +515,17 @@ def _extract_json_first_array_string(blob: str, field_name: str) -> str:
     if not match:
         return ""
     return match.group(1)
+
+
+def _titlecase_action(raw_action: str) -> str:
+    """Title-case a Provider action, but keep the "pov" initialism fully upper.
+
+    A plain ``str.title()`` would render "pov_gamma" as "Pov Gamma"; the
+    library — and the backfill tool's spoken vocabulary — write it "POV Gamma",
+    so one Fun Time filter query still reaches both producers' clips.
+    """
+    words = raw_action.replace("_", " ").split()
+    return " ".join("POV" if word.lower() == "pov" else word.title() for word in words)
 
 
 def _parse_provider_created_at(value: str) -> str:

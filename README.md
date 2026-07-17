@@ -80,9 +80,9 @@ Most sources publish nothing about what a clip actually shows. Provider exposes 
 
 **Backfill Metadata...** in the tray menu opens a separate window that plays every such clip — shuffled, looping, muted — until you say what it is. The clip changes the instant you speak, and the sidecar is written behind it.
 
-Say an act, optionally prefixed with a camera word — `side`, or `POV` said as its three letters ("pee oh vee"):
+Say an act, always prefixed with a camera word — `side`, or `POV` said as its three letters ("pee oh vee"). Every clip is tagged Side or POV; no act has a bare, camera-less form:
 
-| Say | Records |
+| Say (act) | Act recorded |
 | --- | --- |
 | `alpha form` / `alpha` | `Alpha` |
 | `gamma` | `Gamma` |
@@ -91,10 +91,10 @@ Say an act, optionally prefixed with a camera word — `side`, or `POV` said as 
 | `beta gamma` | `Beta Gamma` |
 | `delta` | `Delta` |
 | `delta` | `Delta` |
-| `dance` | `Dancing` (no camera word) |
-| `other` | `Other` (no camera word) |
+| `dance` / `dancing` | `Dancing` |
+| `other` | `Other` |
 
-So "side gamma" records `Side Gamma`, and "P-O-V delta" records `Pov Delta` — matching the `Pov Epsilon` form Provider already uses, so one Fun Time filter query reaches both. The recognizer listens for the initialism spelled out (`p o v ...`), because the vosk lexicon prices each letter as its name; it also accepts a one-word "pov", whichever way you happen to say it.
+So "side gamma" records `Side Gamma`, and "P-O-V delta" records `POV Delta` — matching the `POV Epsilon` form the prompt scraper writes, so one Fun Time filter query reaches both. Even `dance` and `other` take a camera word: "side dance" records `Side Dancing`. The recognizer listens for the initialism spelled out (`p o v ...`), because the vosk lexicon prices each letter as its name; it also accepts a one-word "pov", whichever way you happen to say it.
 
 Four more phrases:
 
@@ -107,7 +107,7 @@ Undo restores the clip to the screen and reverses what the decision did on disk:
 
 Three lines sit beneath the video: what is on screen now and how many clips are left; what the recognizer is hearing this moment; and what your last phrase did — the last naming its own clip, which by then is not the one you are watching. The middle "hearing" line fills in as it recognizes on-script words and stays blank when what you said is not a command, so a phrase that never lands shows as a visible nothing rather than a silent one — the way to tell listening-but-unmatched from not-listening. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
 
-A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: the scopable acts as a grid of bare / `Side` / `POV` columns, then the unscoped acts, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records and names its spoken phrase on hover.
+A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: every act as a grid of `Side` / `POV` columns, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records and names its spoken phrase on hover.
 
 Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. Set `config.VOICE_DEVICE_INDEX` if the system default input is not the microphone you speak into (`python -m sounddevice` lists them).
 

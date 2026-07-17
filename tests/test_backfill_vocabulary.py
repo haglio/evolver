@@ -4,23 +4,24 @@ from backfill import vocabulary
 
 
 class TestActions(unittest.TestCase):
-    def test_a_bare_act_maps_to_its_canonical_action(self):
-        self.assertEqual(vocabulary.ACTIONS["gamma"], "Gamma")
-
-    def test_a_camera_word_prefixes_the_action(self):
+    def test_a_camera_word_scopes_every_act(self):
         self.assertEqual(vocabulary.ACTIONS["side gamma"], "Side Gamma")
-        self.assertEqual(vocabulary.ACTIONS["pov gamma"], "Pov Gamma")
+        self.assertEqual(vocabulary.ACTIONS["pov gamma"], "POV Gamma")
+
+    def test_no_act_has_a_bare_camera_less_form(self):
+        for bare in ("gamma", "delta", "delta", "dance", "other"):
+            self.assertNotIn(bare, vocabulary.ACTIONS)
 
     def test_pov_is_heard_spelled_out_as_its_three_letters(self):
         """"POV" is an initialism; the lexicon's one-word "pov" is not the letters."""
-        self.assertEqual(vocabulary.ACTIONS["p o v gamma"], "Pov Gamma")
-        self.assertEqual(vocabulary.ACTIONS["pov gamma"], "Pov Gamma")
+        self.assertEqual(vocabulary.ACTIONS["p o v gamma"], "POV Gamma")
+        self.assertEqual(vocabulary.ACTIONS["pov gamma"], "POV Gamma")
 
-    def test_dance_and_other_take_no_camera_word(self):
-        self.assertEqual(vocabulary.ACTIONS["dance"], "Dancing")
-        self.assertEqual(vocabulary.ACTIONS["other"], "Other")
-        self.assertNotIn("side dance", vocabulary.ACTIONS)
-        self.assertNotIn("pov other", vocabulary.ACTIONS)
+    def test_dance_and_other_are_scoped_by_a_camera_word_too(self):
+        self.assertEqual(vocabulary.ACTIONS["side dance"], "Side Dancing")
+        self.assertEqual(vocabulary.ACTIONS["pov dance"], "POV Dancing")
+        self.assertEqual(vocabulary.ACTIONS["side other"], "Side Other")
+        self.assertEqual(vocabulary.ACTIONS["p o v other"], "POV Other")
 
 
 class TestControls(unittest.TestCase):
@@ -41,33 +42,29 @@ class TestControls(unittest.TestCase):
 
 class TestCommandGrid(unittest.TestCase):
     def _row(self, action):
-        return next(row for row in vocabulary.scoped_grid() if row[0].label == action)
+        return next(row for row in vocabulary.scoped_grid() if row[0].label == f"Side {action}")
 
-    def test_the_bare_column_leads_the_camera_columns(self):
-        self.assertEqual(vocabulary.CAMERA_COLUMNS[0], "")
-        self.assertEqual(vocabulary.CAMERA_COLUMNS[1:], ("Side", "POV"))
+    def test_the_columns_are_side_then_pov_with_no_bare_column(self):
+        self.assertEqual(vocabulary.CAMERA_COLUMNS, ("Side", "POV"))
 
     def test_each_row_carries_one_command_per_camera_column(self):
         for row in vocabulary.scoped_grid():
             self.assertEqual(len(row), len(vocabulary.CAMERA_COLUMNS))
 
     def test_a_row_pairs_the_spoken_phrase_with_the_action_each_cell_records(self):
-        bare, side, pov = self._row("Gamma")
-        self.assertEqual(bare, vocabulary.Command("gamma", "Gamma"))
+        side, pov = self._row("Gamma")
         self.assertEqual(side, vocabulary.Command("side gamma", "Side Gamma"))
-        self.assertEqual(pov, vocabulary.Command("pov gamma", "Pov Gamma"))
+        self.assertEqual(pov, vocabulary.Command("pov gamma", "POV Gamma"))
 
     def test_an_act_with_alias_forms_shows_a_single_canonical_row(self):
         """Alpha is heard two ways ("alpha"/"alpha form") but is one tile."""
-        alpha_rows = [row for row in vocabulary.scoped_grid() if row[0].label == "Alpha"]
+        alpha_rows = [row for row in vocabulary.scoped_grid() if row[0].label == "Side Alpha"]
         self.assertEqual(len(alpha_rows), 1)
-        self.assertEqual(alpha_rows[0][0], vocabulary.Command("alpha", "Alpha"))
+        self.assertEqual(alpha_rows[0][0], vocabulary.Command("side alpha", "Side Alpha"))
 
-    def test_unscoped_acts_are_one_tile_each_taking_no_camera_word(self):
-        self.assertEqual(
-            vocabulary.unscoped_commands(),
-            [vocabulary.Command("dance", "Dancing"), vocabulary.Command("other", "Other")],
-        )
+    def test_dance_and_other_are_scoped_rows_in_the_grid_too(self):
+        self.assertEqual(self._row("Dancing")[1], vocabulary.Command("pov dance", "POV Dancing"))
+        self.assertEqual(self._row("Other")[0], vocabulary.Command("side other", "Side Other"))
 
     def test_controls_cover_skip_weird_undo_and_same(self):
         self.assertEqual(
@@ -82,8 +79,8 @@ class TestCommandGrid(unittest.TestCase):
 
     def test_every_grid_command_is_a_phrase_the_session_understands(self):
         known = set(vocabulary.ACTIONS) | set(vocabulary.CONTROLS)
-        rows = [*vocabulary.scoped_grid(), vocabulary.unscoped_commands(), vocabulary.control_commands()]
-        for group in rows:
+        groups = [*vocabulary.scoped_grid(), vocabulary.control_commands()]
+        for group in groups:
             for command in group:
                 self.assertIn(command.phrase, known)
 

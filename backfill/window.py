@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from backfill.session import BackfillSession
-from backfill.vocabulary import Command, control_commands, scoped_grid, unscoped_commands
+from backfill.vocabulary import Command, control_commands, scoped_grid
 
 _DONE = "Nothing left to label."
 _SCROLLBAR_ALLOWANCE = 28
@@ -36,10 +36,10 @@ class BackfillWindow(QWidget):
     command, so a phrase that never lands is visible rather than a silent nothing.
 
     A panel of every command sits on the right, one tile per possibility grouped
-    the way the vocabulary is — the scopable acts as a grid of bare/Side/POV
-    columns, then the unscoped acts, then the controls. A tile is both the
-    reference (what can I say?) and a fallback: clicking it drives the exact path a
-    spoken phrase would, so a wedged microphone never leaves the tool unusable.
+    the way the vocabulary is — every act as a grid of Side/POV columns, then the
+    controls. A tile is both the reference (what can I say?) and a fallback:
+    clicking it drives the exact path a spoken phrase would, so a wedged
+    microphone never leaves the tool unusable.
 
     Audio is muted: the microphone is open the whole time, and a clip's own
     soundtrack would be one more thing for the recognizer to mishear.
@@ -91,11 +91,6 @@ class BackfillWindow(QWidget):
                 acts.addWidget(self._command_tile(command), row, column)
         contents.addLayout(acts)
 
-        unscoped = QHBoxLayout()
-        for command in unscoped_commands():
-            unscoped.addWidget(self._command_tile(command))
-        contents.addLayout(unscoped)
-
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
         contents.addWidget(divider)
@@ -112,9 +107,9 @@ class BackfillWindow(QWidget):
         panel.setWidget(inner)
         panel.setWidgetResizable(True)
         panel.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Size to the grid's own width (three act columns at this machine's font)
-        # rather than a hardcoded guess, plus room for the vertical scrollbar, so
-        # no column is ever clipped off the right edge.
+        # Size to the grid's own width (the Side/POV columns at this machine's
+        # font) rather than a hardcoded guess, plus room for the vertical
+        # scrollbar, so no column is ever clipped off the right edge.
         panel.setFixedWidth(inner.sizeHint().width() + _SCROLLBAR_ALLOWANCE)
         return panel
 
