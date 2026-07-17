@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterator
 from pathlib import Path
 
 import config
@@ -18,20 +19,28 @@ _ORIENTATIONS = ("portrait", "landscape")
 SCRAPED_SOURCES = frozenset({"provider", "origenerator"})
 
 
-def unlabeled_videos() -> list[Path]:
-    """Every upscaled clip whose sidecar records no ``video.action``."""
-    videos: list[Path] = []
+def iter_library_videos() -> Iterator[tuple[str, Path]]:
+    """Every finalized upscaled clip as ``(source name, path)``, both orientations.
+
+    Walked in a stable order — orientation, then source, then filename — so both
+    the work queue and the example-clip scan see clips the same way each run.
+    """
     for orient in _ORIENTATIONS:
         orient_dir = config.OUT_UPSCALED_DIR / orient
         if not orient_dir.is_dir():
             continue
         for source_dir in sorted(p for p in orient_dir.iterdir() if p.is_dir()):
-            if source_dir.name in SCRAPED_SOURCES:
-                continue
             for video in sorted(iter_finalized_videos(source_dir, config.VIDEO_EXTENSIONS)):
-                if not action_of(read(sidecar_path(video))):
-                    videos.append(video)
-    return videos
+                yield source_dir.name, video
+
+
+def unlabeled_videos() -> list[Path]:
+    """Every upscaled clip whose sidecar records no ``video.action``."""
+    return [
+        video
+        for source, video in iter_library_videos()
+        if source not in SCRAPED_SOURCES and not action_of(read(sidecar_path(video)))
+    ]
 
 
 class BackfillQueue:

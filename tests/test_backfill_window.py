@@ -1,7 +1,9 @@
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QApplication
 
 from backfill import vocabulary
@@ -186,6 +188,40 @@ class TestBackfillWindow(unittest.TestCase):
         window._command_buttons["skip"].click()
 
         self.assertEqual(session.applied, ["skip"])
+
+    def _png(self, tmp):
+        png = Path(tmp) / "frame.png"
+        pixmap = QPixmap(20, 20)
+        pixmap.fill()
+        pixmap.save(str(png))
+        return png
+
+    def test_a_ready_thumbnail_appears_on_the_tile_for_its_action(self):
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        with tempfile.TemporaryDirectory() as tmp:
+            window.on_thumbnail("Side Gamma", str(self._png(tmp)))
+
+            self.assertFalse(window._tiles_by_action["side gamma"].icon().isNull())
+
+    def test_an_example_stored_under_older_casing_still_lights_its_tile(self):
+        """Library clips tagged "Pov ..." must reach the "POV ..." tile."""
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        with tempfile.TemporaryDirectory() as tmp:
+            window.on_thumbnail("Pov Gamma", str(self._png(tmp)))
+
+            self.assertFalse(window._tiles_by_action["pov gamma"].icon().isNull())
+
+    def test_a_thumbnail_for_an_action_with_no_tile_is_ignored(self):
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+
+        window.on_thumbnail("Not An Act", "whatever.png")  # must not raise
+
+    def test_an_empty_thumbnail_path_leaves_the_tile_iconless(self):
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+
+        window.on_thumbnail("Side Gamma", "")
+
+        self.assertTrue(window._tiles_by_action["side gamma"].icon().isNull())
 
     def test_closing_releases_the_clip_the_player_holds(self):
         session = FakeSession([Path("a_topaz.mp4")])
