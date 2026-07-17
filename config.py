@@ -104,6 +104,9 @@ NONAI_COOLDOWN_MINUTES = 30
 # encode may start or resume. Five minutes rides out ordinary reading/watching
 # pauses without treating them as the user leaving.
 NONAI_USER_IDLE_THRESHOLD_SECONDS = 300.0
+# The GUI polls presence far more often than the 10-minute pipeline tick, so a
+# returning user parks the encode within seconds instead of minutes.
+NONAI_PRESENCE_POLL_SECONDS = 20.0
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
 RUNS_DIR = PROJECT_DIR / "runs"
