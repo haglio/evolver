@@ -49,15 +49,18 @@ _CAMERAS: dict[str, str] = {
 SKIP = "skip"
 WEIRD = "weird"
 UNDO = "undo"
+SAME = "same"
 
 # Spoken phrase -> control.  "skip" defers the clip to the back of the queue;
 # "weird"/"trash" moves it to the weird folder, as Fun Time's "mark as weird" does;
-# "undo" takes back the last decision, and keeps stepping back through them.
+# "undo" takes back the last decision, and keeps stepping back through them;
+# "same" repeats the last action you spoke, for a run of clips that share one.
 CONTROLS: dict[str, str] = {
     "skip": SKIP,
     "weird": WEIRD,
     "trash": WEIRD,
     "undo": UNDO,
+    "same": SAME,
 }
 
 # Spoken phrase -> the ``video.action`` it records.

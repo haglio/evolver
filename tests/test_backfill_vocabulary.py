@@ -32,6 +32,9 @@ class TestControls(unittest.TestCase):
     def test_undo_takes_the_last_decision_back(self):
         self.assertEqual(vocabulary.CONTROLS["undo"], vocabulary.UNDO)
 
+    def test_same_repeats_the_last_action(self):
+        self.assertEqual(vocabulary.CONTROLS["same"], vocabulary.SAME)
+
     def test_no_phrase_is_both_an_action_and_a_control(self):
         self.assertEqual(set(vocabulary.ACTIONS) & set(vocabulary.CONTROLS), set())
 
