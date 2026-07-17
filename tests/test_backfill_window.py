@@ -199,7 +199,7 @@ class TestBackfillWindow(unittest.TestCase):
     def test_a_ready_thumbnail_appears_on_the_tile_for_its_action(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         with tempfile.TemporaryDirectory() as tmp:
-            window.on_thumbnail("Side Gamma", str(self._png(tmp)))
+            window.set_thumbnail("Side Gamma", str(self._png(tmp)))
 
             self.assertFalse(window._tiles_by_action["side gamma"].icon().isNull())
 
@@ -207,21 +207,31 @@ class TestBackfillWindow(unittest.TestCase):
         """Library clips tagged "Pov ..." must reach the "POV ..." tile."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         with tempfile.TemporaryDirectory() as tmp:
-            window.on_thumbnail("Pov Gamma", str(self._png(tmp)))
+            window.set_thumbnail("Pov Gamma", str(self._png(tmp)))
 
             self.assertFalse(window._tiles_by_action["pov gamma"].icon().isNull())
 
     def test_a_thumbnail_for_an_action_with_no_tile_is_ignored(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        window.on_thumbnail("Not An Act", "whatever.png")  # must not raise
+        window.set_thumbnail("Not An Act", "whatever.png")  # must not raise
 
     def test_an_empty_thumbnail_path_leaves_the_tile_iconless(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        window.on_thumbnail("Side Gamma", "")
+        window.set_thumbnail("Side Gamma", "")
 
         self.assertTrue(window._tiles_by_action["side gamma"].icon().isNull())
+
+    def test_thumbnails_passed_at_construction_land_on_their_tiles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            window = BackfillWindow(
+                FakeSession([Path("a_topaz.mp4")]), thumbnails={"Side Gamma": str(self._png(tmp))}
+            )
+            self.addCleanup(window.close)
+            self.addCleanup(window.deleteLater)
+
+            self.assertFalse(window._tiles_by_action["side gamma"].icon().isNull())
 
     def test_closing_releases_the_clip_the_player_holds(self):
         session = FakeSession([Path("a_topaz.mp4")])
