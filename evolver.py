@@ -189,7 +189,7 @@ def run_pipeline(
         or not bookmarks_sync_result.ok
         or not scripts_sync_result.ok
         or not duplicate_sizes_result.ok
-        or upscale_nonai_result.failed > 0
+        or bool(upscale_nonai_result.failed)
         or upscale_nonai_result.deferred_low_disk
     )
     if upscale_result is not None:
