@@ -63,6 +63,78 @@ class TestSummarizeResult(unittest.TestCase):
         self.assertEqual(summary, "Reason: upscale_pending")
 
 
+class TestNonAiUpscaleSummary(unittest.TestCase):
+    """The non-AI row should read as prose: which video, how far, what happened.
+
+    Its result is mostly strings, which the generic numeric dump drops entirely
+    — leaving a bare "suspended=True" and no way to tell which clip was encoding
+    or why an in-flight percent vanished between runs.
+    """
+
+    def _result(self, **overrides):
+        result = {
+            "started": "", "in_flight": "", "in_flight_percent": None,
+            "suspended": False, "promoted": "", "stopped": "",
+            "start_deferred": "", "failed": "", "pending": 395,
+            "deferred_low_disk": False,
+        }
+        result.update(overrides)
+        return _summarize_result(result, None, "upscale_non_ai")
+
+    def test_names_the_video_being_encoded(self):
+        summary = self._result(in_flight="larkin/1 clips/Delia Moss.mp4",
+                               in_flight_percent=72)
+        self.assertIn("larkin/1 clips/Delia Moss.mp4", summary)
+        self.assertIn("72%", summary)
+
+    def test_a_frozen_encode_says_it_is_paused_and_why(self):
+        summary = self._result(in_flight="larkin/1 clips/Delia Moss.mp4",
+                               in_flight_percent=72, suspended=True)
+        self.assertIn("paused", summary)
+        self.assertIn("you're at the machine", summary)
+        self.assertNotIn("suspended=True", summary)
+
+    def test_a_finished_encode_names_what_it_promoted(self):
+        """Why an in-flight percent vanishes between runs: the encode landed."""
+        summary = self._result(promoted="larkin/1 clips/POV Scene 3.mp4",
+                               start_deferred="user_present", pending=394)
+        self.assertIn("finished", summary)
+        self.assertIn("larkin/1 clips/POV Scene 3.mp4", summary)
+
+    def test_a_died_encode_names_what_failed(self):
+        """The other way a percent vanishes: ffmpeg died partway through."""
+        summary = self._result(failed="larkin/1 clips/redacted Overload 1.mp4",
+                               start_deferred="cooldown", pending=399)
+        self.assertIn("failed", summary)
+        self.assertIn("larkin/1 clips/redacted Overload 1.mp4", summary)
+
+    def test_a_fresh_start_names_the_video_it_kicked_off(self):
+        summary = self._result(started="larkin/1 clips/redacted It Dry 9.mp4")
+        self.assertIn("started", summary)
+        self.assertIn("larkin/1 clips/redacted It Dry 9.mp4", summary)
+
+    def test_an_idle_stage_says_why_nothing_is_running(self):
+        summary = self._result(start_deferred="cooldown")
+        self.assertIn("cooldown", summary)
+
+    def test_always_reports_how_many_clips_are_left(self):
+        self.assertIn("395 queued", self._result())
+        self.assertIn("395 queued",
+                      self._result(in_flight="larkin/1 clips/Delia Moss.mp4",
+                                   in_flight_percent=72))
+
+    def test_a_stopped_encode_says_the_clip_keeps_its_place(self):
+        """Stopping is no fault of the video, unlike failing — it stays queued."""
+        summary = self._result(stopped="larkin/1 clips/redacted redacted 4.mp4")
+        self.assertIn("stopped", summary)
+        self.assertIn("larkin/1 clips/redacted redacted 4.mp4", summary)
+        self.assertIn("still queued", summary)
+
+    def test_a_low_disk_hold_is_called_out(self):
+        summary = self._result(deferred_low_disk=True, start_deferred="")
+        self.assertIn("low disk", summary)
+
+
 class TestMainWindowToolbarExists(unittest.TestCase):
     """The main window should have a toolbar with all tray-equivalent controls."""
 
