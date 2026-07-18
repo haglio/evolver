@@ -10,6 +10,7 @@ STAGES = [
     ("bookmarks", "Bookmarks Sync",       "Sync Fun Time favorites into a Chrome bookmarks folder"),
     ("scripts",   "Scripts Sync",         "Align funscripts to mirror the video library tree"),
     ("group_non_ai", "Group non-AI",      "Record each 2D/non_AI clip's version family (original + processed variants) in a mirrored metadata sidecar"),
+    ("references", "Follow Moved Videos", "Repoint the suite's saved video paths — Clipper sessions, Scripture projects, Fun Time favorites and watch counts — at videos that have since moved"),
     ("dupes",     "Duplicate Check",      "Scan non_AI folder for likely duplicate videos, using exact filesize"),
 ]
 

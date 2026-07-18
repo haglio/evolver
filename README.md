@@ -9,8 +9,9 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 5. Scrapes prompt metadata for AI videos in `1_sorted` into `videos/metadata`, mirroring the active outbox tree. The scan is idempotent — videos that already have a metadata JSON are skipped, and a video whose scrape fails is marked so it is not retried every run. Currently supports Provider prompt extraction with the video prompt plus optional source-image prompt keys.
 6. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
 7. Gradually upscales the `2D/non_AI` library too, with the recipe its already-processed clips carry in their `videoai` tags (see "Non-AI library upscaling" below). Off by default — a one-time opt-in from the tray menu, after which Evolver runs at most one detached encode while you're idle (AI queue drained) and suspends it the moment you return to the machine.
-8. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
-9. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
+8. Repoints the suite's saved video paths at videos that have since moved, so a Clipper session or a Fun Time favorite survives the library being rearranged (see "Following videos that moved" below).
+9. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
+10. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
@@ -28,6 +29,9 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `tasks/prompt_scrape.py` - Stage 4 prompt scraping into mirrored JSON files
   - `tasks/upscale.py` - Stage 5 Topaz processing
   - `tasks/nonai_upscale.py` - the non-AI library's detached Topaz encodes, one at a time
+  - `tasks/reference_sync.py` - repointing the suite's saved video paths at videos that moved
+  - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
+  - `util/video_locator.py` - where a video a reference has lost track of now lives
   - `check_duplicate_sizes.py` - Stage 6 duplicate-size scan for likely source duplicates
   - `check_correspondence.py` - Stage 7 integrity verification and one-time manual check
   - `util/ffprobe.py` - orientation probing
@@ -133,6 +137,22 @@ A new encode starts only when *all* of these hold: the toggle is on, the user ha
 **Watching it**: every tick appends one line to `evolver.log` — `Non-AI upscale: started=... in_flight=... promoted=... stopped=... failed=... pending=...` — so a `grep "Non-AI"` over the log is the quickest status. While an encode runs, `in_flight` carries its progress, e.g. `in_flight=other/0 unsorted/clip.mp4 (37% encoded)`, measured by probing the duration written to the growing partial so far (the first minute or two may show no percentage while the file's header lands); a frozen encode reads `… [suspended: user present]`. What's encoding right now (source, output, pid, start time, and how long it has spent suspended) sits in `nonai_upscale_job.json`, and the encode's own stderr streams to `nonai_upscale_ffmpeg.log`. The same per-tick summary — including `in_flight_percent` — lands in each run's record, visible in the main window's run history under the **Upscale non-AI** stage row.
 
 In-flight state lives in `%LOCALAPPDATA%\Evolver\` (`nonai_upscale_job.json`, `nonai_upscale_attempts.json`, `nonai_upscale_cooldown.json`, plus the encode's `nonai_upscale_ffmpeg.log`) — deliberately *outside* the project tree, because the file sync service covering it kept renaming the in-flight job file to `nonai_upscale_job [conflicted N].json` mid-run, which orphaned live encodes and let new ones stack on top. As a backstop, if the job file is ever lost while a lone Topaz encode of ours is still running, the stage re-identifies it from the process's own command line and adopts it back under supervision instead of starting another. Quitting the tray app does not kill the encode; the next session picks it back up from the state file.
+
+## Following videos that moved
+
+Moving a video is Evolver's whole job, and every move silently breaks whatever else in the suite had written that video's path down. Clipper stores a session's `video_path` absolutely, so a scene you clipped last month stops opening — "Could not open video" — the moment its folder is rearranged. Evolver owns that breakage, so it owns repairing it.
+
+Each run, after every stage that could have moved something, Evolver walks the suite's saved references and follows the moves:
+
+| Store | What it holds |
+| --- | --- |
+| `clipper/sessions/*.json` | a session's `video_path` — the clip bounds you set by hand |
+
+A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder like `_winston_compilations_archive/` is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Clipper session's frame numbers only mean anything against the exact file they were set on.
+
+Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`, because "the video is genuinely gone" and "the video was renamed" are indistinguishable from here and only you can tell them apart. Videos sitting in `kinda_weird/` are excluded from the search — the purge stage is about to delete them, so pointing anything at one would only re-break it.
+
+`grep "REPOINT\|UNRESOLVED" evolver.log` is the quickest way to see what moved and what still needs a human.
 
 ## Run manually (CLI)
 

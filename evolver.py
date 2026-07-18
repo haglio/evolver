@@ -11,7 +11,8 @@ Invoked by the tray app scheduler or directly via CLI. Stages:
   7. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
   8. scripts         - align funscripts to mirror the video library tree
   9. group_non_ai   - record each non-AI clip's version family in a mirrored sidecar
- 10. dupes           - scan non_AI for likely duplicate videos by exact filesize
+ 10. references      - repoint the suite's saved video paths at videos that moved
+ 11. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -30,6 +31,7 @@ from tasks import (
     nonai_upscale,
     prompt_scrape,
     purge_weird,
+    reference_sync,
     scripts_sync,
     sort,
     upscale,
@@ -180,6 +182,9 @@ def run_pipeline(
     bookmarks_sync_result = _run_stage("bookmarks", bookmarks_sync.run)
     scripts_sync_result = _run_stage("scripts", scripts_sync.run, show_popup=True)
     _run_stage("group_non_ai", nonai_group.run)
+    # Last of the stages that touch the library, so every move this run made has
+    # already landed by the time the suite's saved paths are chased after.
+    reference_sync_result = _run_stage("references", reference_sync.run)
     duplicate_sizes_result = _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
 
     has_errors = (
@@ -188,6 +193,7 @@ def run_pipeline(
         or not correspondence_result.ok
         or not bookmarks_sync_result.ok
         or not scripts_sync_result.ok
+        or not reference_sync_result.ok
         or not duplicate_sizes_result.ok
         or bool(upscale_nonai_result.failed)
         or upscale_nonai_result.deferred_low_disk
