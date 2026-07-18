@@ -22,7 +22,7 @@ import config
 from util import sidecar
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
-from util.variants import is_processed_stem
+from util.variants import is_processed_stem, strip_processing_suffixes
 from util.version_groups import group_ids
 
 log = logging.getLogger(__name__)
@@ -58,25 +58,28 @@ def run() -> NonAiGroupResult:
         if not videos:
             continue
         ids = group_ids([video.stem for video in videos])
-        # A `clip` object (compilation, source, performer) belongs to the whole
-        # version family, not one file: the split writes it onto the original,
-        # and an upscaled variant must inherit it so Nau still treats the enhanced
-        # file as a navigable short. Gather it per family, then stamp every member.
+        # A `clip` object (compilation, source, performer) describes one carved
+        # scene, and its re-encodes are the same scene — so an upscaled variant
+        # inherits it and stays a navigable short. Keying that on the *family*
+        # would be too broad: a family is name-derived, so a full scene the user
+        # already owned can share it with a clip carved from the same movie, and
+        # would wrongly be marked a clip. Key on the stripped stem instead, which
+        # only ever matches genuine re-encodes of that one file.
         existing_by_video = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
-        clip_by_family: dict[str, dict] = {}
+        clip_by_origin: dict[str, dict] = {}
         for video in videos:
             clip = existing_by_video[video].get("clip")
             if isinstance(clip, dict):
-                clip_by_family.setdefault(ids[video.stem], clip)
+                clip_by_origin.setdefault(strip_processing_suffixes(video.stem), clip)
         for video in videos:
             payload = dict(existing_by_video[video])
             payload["version"] = {
                 "group": ids[video.stem],
                 "processed": is_processed_stem(video.stem),
             }
-            family_clip = clip_by_family.get(ids[video.stem])
-            if family_clip is not None:
-                payload["clip"] = family_clip
+            origin_clip = clip_by_origin.get(strip_processing_suffixes(video.stem))
+            if origin_clip is not None:
+                payload["clip"] = origin_clip
             path = sidecar.sidecar_path(video)
             expected.add(path)
             if existing_by_video[video] != payload:

@@ -106,6 +106,31 @@ class TestNonAiGroup(unittest.TestCase):
                 var = sidecar.read(sidecar.sidecar_path(variant))
                 self.assertEqual(var["clip"], {"compilation": "Vol6", "index": 1})
 
+    def test_does_not_tag_a_name_neighbour_as_a_clip(self):
+        """A family is name-derived, so a full scene the user already owned can
+        share one with a clip carved from the same movie. Only true re-encodes of
+        the clip inherit its `clip` object — never the neighbour."""
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                clip = _touch(non_ai / "winston" / "1 clips" / "Kim Lee - POV Scene 2.mp4")
+                upscaled = _touch(
+                    non_ai / "winston" / "3_good_to_go" / "processed"
+                    / "Kim Lee - POV Scene 2_apo8_iris2.mp4"
+                )
+                neighbour = _touch(
+                    non_ai / "winston" / "0 unsorted"
+                    / "Kim Lee - POV Scene 2 (2009) Enhanced.mp4"
+                )
+                sidecar.write(sidecar.sidecar_path(clip), {"clip": {"compilation": "Vol6", "index": 9}})
+
+                nonai_group.run()
+
+                self.assertIn("clip", sidecar.read(sidecar.sidecar_path(upscaled)))
+                self.assertNotIn("clip", sidecar.read(sidecar.sidecar_path(neighbour)))
+
     def test_is_idempotent_then_prunes_a_removed_clips_sidecar(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
