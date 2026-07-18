@@ -156,6 +156,8 @@ def _summarize_result(
         return f"Reason: {skip_reason}"
     if not result:
         return ""
+    if stage_key == "upscale_non_ai":
+        return _summarize_nonai_upscale(result)
     headline = _HEADLINE_FIELDS.get(stage_key, ())
     parts = [f"{key}={result[key]}" for key in headline
              if isinstance(result.get(key), (int, float))]
@@ -166,6 +168,43 @@ def _summarize_result(
         if isinstance(value, (int, float)) and value and not key.startswith("_"):
             parts.append(f"{key}={value}")
     return ", ".join(parts[:5])
+
+
+def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
+    """Say which non-AI clip is in hand and what just happened to it.
+
+    This stage reports its outcomes as clip names — strings the generic numeric
+    dump drops entirely, leaving a bare "suspended=True" and no way to tell
+    which video was encoding or why its percent vanished between runs. Several
+    of these can land on one tick (an encode finishes, then the next start is
+    held back), so they read as a list rather than a single verdict.
+    """
+    parts = []
+    if result.get("started"):
+        parts.append(f"started {result['started']}")
+    if result.get("in_flight"):
+        parts.append(f"encoding {result['in_flight']} ({_encode_state(result)})")
+    if result.get("promoted"):
+        parts.append(f"finished {result['promoted']}")
+    if result.get("stopped"):
+        parts.append(f"stopped {result['stopped']} (still queued)")
+    if result.get("failed"):
+        parts.append(f"failed {result['failed']}")
+    if result.get("deferred_low_disk"):
+        parts.append("held back: low disk")
+    elif result.get("start_deferred") and not result.get("in_flight"):
+        parts.append(f"waiting ({result['start_deferred']})")
+    parts.append(f"{result.get('pending', 0)} queued")
+    return ", ".join(parts)
+
+
+def _encode_state(result: dict[str, Any]) -> str:
+    """How far the in-flight encode has gotten, and whether it is frozen."""
+    percent = result.get("in_flight_percent")
+    state = "progress unknown" if percent is None else f"{percent}%"
+    if result.get("suspended"):
+        state += ", paused: you're at the machine"
+    return state
 
 
 class EvolverMainWindow(QMainWindow):
