@@ -38,11 +38,10 @@ class _Act:
 
 @dataclass(frozen=True)
 class _Camera:
-    """A camera word: how it is shown, how it is said, and the prefix it adds."""
+    """A camera word: how it is said, and the prefix it adds."""
 
-    label: str  # the grid column header, e.g. "POV"
     spoken: str  # the canonical phrase a click re-emits, e.g. "pov"
-    prefix: str  # the prefix it prepends to the action, e.g. "POV"
+    prefix: str  # the prefix it prepends to the action, and the grid's column header
     aliases: tuple[str, ...] = ()  # extra phrases the recognizer also accepts
 
     def forms(self) -> tuple[str, ...]:
@@ -94,8 +93,8 @@ _ACTS: tuple[_Act, ...] = (
 )
 
 _CAMERAS: tuple[_Camera, ...] = (
-    _Camera(label="Side", spoken="side", prefix="Side"),
-    _Camera(label="POV", spoken="pov", prefix="POV", aliases=("p o v",)),
+    _Camera(spoken="side", prefix="Side"),
+    _Camera(spoken="pov", prefix="POV", aliases=("p o v",)),
 )
 
 SKIP = "skip"
@@ -113,10 +112,6 @@ _CONTROLS: tuple[_Control, ...] = (
     _Control("undo", "Undo", UNDO),
     _Control("same", "Same", SAME),
 )
-
-# The grid's columns, one per camera word.  Every act is scoped, so there is no
-# bare column: a clip is only ever tagged Side or POV.
-CAMERA_COLUMNS: tuple[str, ...] = tuple(camera.label for camera in _CAMERAS)
 
 
 def _build_actions() -> dict[str, str]:
@@ -148,10 +143,10 @@ CONTROLS: dict[str, str] = _build_controls()
 def scoped_grid() -> list[list[Command]]:
     """A row of :class:`Command` per act, one cell per camera word.
 
-    Each cell prepends a camera word, in the column order :data:`CAMERA_COLUMNS`
-    names; there is no bare column, so an act is only ever Side or POV.  Every
-    cell's ``phrase`` is the canonical spoken form, so a click reaches the same
-    action the spoken phrase would.
+    Each cell prepends a camera word, one column per camera in the order
+    :data:`_CAMERAS` lists them; there is no bare column, so an act is only ever
+    Side or POV.  Every cell's ``phrase`` is the canonical spoken form, so a
+    click reaches the same action the spoken phrase would.
     """
     rows: list[list[Command]] = []
     for act in _ACTS:

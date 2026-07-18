@@ -44,12 +44,9 @@ class TestCommandGrid(unittest.TestCase):
     def _row(self, action):
         return next(row for row in vocabulary.scoped_grid() if row[0].label == f"Side {action}")
 
-    def test_the_columns_are_side_then_pov_with_no_bare_column(self):
-        self.assertEqual(vocabulary.CAMERA_COLUMNS, ("Side", "POV"))
-
-    def test_each_row_carries_one_command_per_camera_column(self):
+    def test_every_row_is_the_columns_side_then_pov_with_no_bare_column(self):
         for row in vocabulary.scoped_grid():
-            self.assertEqual(len(row), len(vocabulary.CAMERA_COLUMNS))
+            self.assertEqual([command.label.split()[0] for command in row], ["Side", "POV"])
 
     def test_a_row_pairs_the_spoken_phrase_with_the_action_each_cell_records(self):
         side, pov = self._row("Gamma")

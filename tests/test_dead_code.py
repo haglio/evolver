@@ -1,17 +1,75 @@
 """Dead-code detection — fails if vulture finds unreferenced code."""
 
+import os
 import subprocess
 import sys
+import unittest
 from pathlib import Path
+
+from tests.temp_helpers import workspace_temp_dir
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def test_no_dead_code():
-    result = subprocess.run(
-        [sys.executable, "-m", "vulture", ".", "--exclude", ".venv,tests,.claude"],
+def _source_files(root: Path) -> list[str]:
+    """Every product ``.py`` file under *root*, as root-relative paths.
+
+    The tests are left out: they name everything the product exports, so
+    scanning them would mark all of it used.  So are the trees that hold no
+    product code of this checkout's own — hidden ones (``.venv``, ``.git``, and
+    ``.claude``, which in the primary checkout holds whole worktree copies) and
+    generated ones (``__pycache__``).
+    """
+    found: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name != "tests" and not name.startswith((".", "__"))
+        ]
+        found += [
+            str(Path(dirpath, name).relative_to(root))
+            for name in filenames
+            if name.endswith(".py")
+        ]
+    return sorted(found)
+
+
+def _run_vulture(root: Path) -> subprocess.CompletedProcess:
+    """Scan *root*'s sources, naming each file rather than excluding the rest.
+
+    Vulture matches ``--exclude`` patterns against *absolute* paths, so a
+    checkout whose own path contains an excluded word had every one of its files
+    excluded — and agents work in worktrees under ``<repo>/.claude/``.  Handing
+    vulture the files outright leaves no pattern left to misfire, and the assert
+    keeps a scan that reached nothing from reading as a clean bill of health.
+    """
+    sources = _source_files(root)
+    assert sources, f"no Python sources found under {root} — nothing would be checked"
+    return subprocess.run(
+        [sys.executable, "-m", "vulture", *sources],
         capture_output=True,
         text=True,
-        cwd=str(PROJECT_ROOT),
+        cwd=str(root),
     )
-    assert result.returncode == 0, f"Vulture found dead code:\n{result.stdout}"
+
+
+class TestDeadCode(unittest.TestCase):
+    def test_no_dead_code(self):
+        result = _run_vulture(PROJECT_ROOT)
+        self.assertEqual(result.returncode, 0, f"Vulture found dead code:\n{result.stdout}")
+
+    def test_a_checkout_under_dot_claude_is_still_scanned(self):
+        """Agents work in worktrees at ``<repo>/.claude/worktrees/<name>/``."""
+        with workspace_temp_dir() as temp:
+            root = temp / ".claude" / "worktrees" / "some_agent"
+            (root / "pkg").mkdir(parents=True)
+            (root / "pkg" / "mod.py").write_text("UNREAD = 'nothing reads this'\n")
+
+            result = _run_vulture(root)
+
+        self.assertIn("unused variable 'UNREAD'", result.stdout)
+
+
+if __name__ == "__main__":
+    unittest.main()
