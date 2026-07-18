@@ -61,6 +61,51 @@ class TestNonAiGroup(unittest.TestCase):
                 nonai_group.run()
                 self.assertFalse(sidecar.sidecar_path(clip).exists())
 
+    def test_merges_version_into_an_existing_clip_sidecar(self):
+        """A clip carved from a compilation carries a `clip` object; grouping must
+        add `version` alongside it, never clobber it."""
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                clip = _touch(non_ai / "winston" / "1 clips" / "Kim Lee - POV.mp4")
+                sidecar.write(
+                    sidecar.sidecar_path(clip),
+                    {"video": {"action": "Alpha"},
+                     "clip": {"compilation": "Vol6", "index": 9}},
+                )
+
+                nonai_group.run()
+
+                got = sidecar.read(sidecar.sidecar_path(clip))
+                self.assertEqual(got["clip"], {"compilation": "Vol6", "index": 9})
+                self.assertEqual(got["video"], {"action": "Alpha"})
+                self.assertIn("group", got["version"])
+
+    def test_propagates_clip_across_the_version_family(self):
+        """The upscaled variant of a clip inherits the original's `clip` metadata,
+        so Nau still treats the enhanced file as a navigable short."""
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                original = _touch(non_ai / "winston" / "2 done" / "Amia-Miley.mp4")
+                variant = _touch(
+                    non_ai / "winston" / "3_good_to_go" / "processed"
+                    / "Amia-Miley_apo8_iris2.mp4"
+                )
+                sidecar.write(
+                    sidecar.sidecar_path(original),
+                    {"clip": {"compilation": "Vol6", "index": 1}},
+                )
+
+                nonai_group.run()
+
+                var = sidecar.read(sidecar.sidecar_path(variant))
+                self.assertEqual(var["clip"], {"compilation": "Vol6", "index": 1})
+
     def test_is_idempotent_then_prunes_a_removed_clips_sidecar(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)

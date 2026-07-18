@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import ffprobe, processes, system_resources, topaz
+from util import ffprobe, processes, sidecar, system_resources, topaz
 from util.media_files import is_finalized_video_file, is_partial_video_path
 from util.nonai_library import buckets
 from util.variants import is_processed_stem, strip_processing_suffixes
@@ -355,7 +355,24 @@ def _retire_original(source: Path) -> None:
         log.warning("Original collides with %s; leaving it at %s.", dest, source)
         return
     source.replace(dest)
+    _move_sidecar(source, dest)
     log.info("Retired original: %s -> %s", source, dest)
+
+
+def _move_sidecar(source: Path, dest: Path) -> None:
+    """Carry a retired original's sidecar to its new path.
+
+    The metadata tree mirrors the video tree, so a moved video's sidecar must
+    move with it — otherwise the old one is orphaned and pruned, losing the
+    ``clip`` family metadata Nau navigates by. The grouping stage re-stamps
+    ``version`` on the next run; this keeps ``clip``/``video`` from vanishing.
+    """
+    src_side = sidecar.sidecar_path(source)
+    if not src_side.exists():
+        return
+    dst_side = sidecar.sidecar_path(dest)
+    dst_side.parent.mkdir(parents=True, exist_ok=True)
+    src_side.replace(dst_side)
 
 
 def _bucket_of(source: Path) -> Path | None:
