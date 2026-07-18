@@ -399,7 +399,7 @@ class TestRunStopsAJob(unittest.TestCase):
             mocks["terminate"].assert_called_once_with(4242)
             mocks["popen"].assert_not_called()
             self.assertEqual(result.stopped, "larkin/0 unsorted/busy.mp4")
-            self.assertEqual(result.failed, 0)
+            self.assertEqual(result.failed, "")
             self.assertEqual(result.started, "")
             self.assertFalse(tmp.exists())
             self.assertFalse(out.exists())
@@ -709,7 +709,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
                 result = nonai_upscale.run(allow_start=False)
 
             self.assertEqual(result.promoted, "larkin/0 unsorted/busy.mp4")
-            self.assertEqual(result.failed, 0)
+            self.assertEqual(result.failed, "")
             self.assertTrue(out.exists())
             self.assertFalse(tmp.exists())
             self.assertFalse(source.exists())
@@ -738,7 +738,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
-            self.assertEqual(result.failed, 1)
+            self.assertEqual(result.failed, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.promoted, "")
             self.assertFalse(out.exists())
             self.assertFalse(tmp.exists())
@@ -759,7 +759,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
-            self.assertEqual(result.failed, 1)
+            self.assertEqual(result.failed, "larkin/0 unsorted/busy.mp4")
             manifest = overrides["NONAI_SKIP_MANIFEST"].read_text(encoding="utf-8")
             self.assertIn("larkin/0 unsorted/busy.mp4\t", manifest)
             attempts = json.loads(overrides["NONAI_ATTEMPTS_FILE"].read_text(encoding="utf-8"))
@@ -779,7 +779,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
                 result = nonai_upscale.run(allow_start=False)
 
             mocks["terminate"].assert_called_once_with(4242)
-            self.assertEqual(result.failed, 1)
+            self.assertEqual(result.failed, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.in_flight, "")
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
 
@@ -812,7 +812,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             mocks["terminate"].assert_called_once_with(4242)
             self.assertTrue(result.deferred_low_disk)
             self.assertEqual(result.stopped, "larkin/0 unsorted/busy.mp4")
-            self.assertEqual(result.failed, 0)
+            self.assertEqual(result.failed, "")
             self.assertFalse(tmp.exists())
             self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())

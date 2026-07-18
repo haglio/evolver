@@ -68,7 +68,7 @@ class NonAiUpscaleResult:
     stopped: str = ""
     # "user_present" | "topaz_busy" | "low_ram" | "cooldown" when a start was held back
     start_deferred: str = ""
-    failed: int = 0
+    failed: str = ""  # the clip whose encode died or came up short, if any
     pending: int = 0
     deferred_low_disk: bool = False
 
@@ -108,9 +108,10 @@ def run(allow_start: bool = True, stop: bool = False,
     if result.in_flight and result.suspended:
         in_flight = f"{in_flight} [suspended: user present]"
     log.info(
-        "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s failed=%d pending=%d",
+        "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s failed=%s pending=%d",
         result.started or "-", in_flight, result.promoted or "-",
-        result.stopped or "-", result.start_deferred or "-", result.failed, result.pending,
+        result.stopped or "-", result.start_deferred or "-",
+        result.failed or "-", result.pending,
     )
     return result
 
@@ -324,7 +325,7 @@ def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
         log.info("Promoted finished non-AI upscale: %s", out)
         return
 
-    result.failed += 1
+    result.failed = relpath(source)
     log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
     _delete_tmp(tmp)
