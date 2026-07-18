@@ -849,5 +849,35 @@ class TestRunSupervisesAJob(unittest.TestCase):
             mocks["terminate"].assert_not_called()
 
 
+class TestRetireOriginal(unittest.TestCase):
+    def test_carries_the_sidecar_to_the_retire_folder(self):
+        """A clip's `clip` metadata must follow the file when it is retired, or
+        it is orphaned and pruned — losing Nau's navigation data."""
+        from util import sidecar
+
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee Poe.mp4")
+            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
+
+            with override_config(**overrides):
+                sidecar.write(
+                    sidecar.sidecar_path(source),
+                    {"clip": {"compilation": "Vol6", "index": 1}},
+                )
+
+                nonai_upscale._retire_original(source)
+
+                dest = non_ai / "larkin" / "2 do not need work" / "Lee Poe.mp4"
+                self.assertTrue(dest.exists())
+                self.assertFalse(source.exists())
+                self.assertFalse(sidecar.sidecar_path(source).exists())
+                self.assertEqual(
+                    sidecar.read(sidecar.sidecar_path(dest))["clip"],
+                    {"compilation": "Vol6", "index": 1},
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

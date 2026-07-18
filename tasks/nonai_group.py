@@ -58,16 +58,28 @@ def run() -> NonAiGroupResult:
         if not videos:
             continue
         ids = group_ids([video.stem for video in videos])
+        # A `clip` object (compilation, source, performer) belongs to the whole
+        # version family, not one file: the split writes it onto the original,
+        # and an upscaled variant must inherit it so Nau still treats the enhanced
+        # file as a navigable short. Gather it per family, then stamp every member.
+        existing_by_video = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
+        clip_by_family: dict[str, dict] = {}
         for video in videos:
-            payload = {
-                "version": {
-                    "group": ids[video.stem],
-                    "processed": is_processed_stem(video.stem),
-                }
+            clip = existing_by_video[video].get("clip")
+            if isinstance(clip, dict):
+                clip_by_family.setdefault(ids[video.stem], clip)
+        for video in videos:
+            payload = dict(existing_by_video[video])
+            payload["version"] = {
+                "group": ids[video.stem],
+                "processed": is_processed_stem(video.stem),
             }
+            family_clip = clip_by_family.get(ids[video.stem])
+            if family_clip is not None:
+                payload["clip"] = family_clip
             path = sidecar.sidecar_path(video)
             expected.add(path)
-            if sidecar.read(path) != payload:
+            if existing_by_video[video] != payload:
                 sidecar.write(path, payload)
                 result.written += 1
         result.grouped += len(videos)
