@@ -7,6 +7,57 @@ import config
 import evolver
 
 
+def _stage_mocks() -> dict:
+    """A stand-in for every stage the pipeline calls.
+
+    One list, used by both helpers below, so a newly added stage is stubbed
+    everywhere at once. A stage left off it runs for real against the live
+    library and the sibling apps' saved state, which turns a unit test into a
+    maintenance run.
+    """
+    return {
+        "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
+        "purge_run": Mock(return_value=Mock(missing_sorted=[])),
+        "scripts_sync_run": Mock(return_value=Mock(ok=True)),
+        "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
+        "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
+        "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
+        "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
+        "nonai_group_run": Mock(),
+        "reference_sync_run": Mock(return_value=Mock(ok=True)),
+        "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
+        "correspondence_run": Mock(return_value=Mock(ok=True)),
+        "has_pending_work": Mock(return_value=False),
+        "should_skip_cpu": Mock(return_value=False),
+        "count_running": Mock(return_value=0),
+    }
+
+
+_STAGE_PATCHES = [
+    ("evolver.sort.run", "sort_run"),
+    ("evolver.purge_weird.run", "purge_run"),
+    ("evolver.scripts_sync.run", "scripts_sync_run"),
+    ("evolver.upscale.run", "upscale_run"),
+    ("evolver.nonai_upscale.run", "nonai_run"),
+    ("evolver.nonai_group.run", "nonai_group_run"),
+    ("evolver.reference_sync.run", "reference_sync_run"),
+    ("evolver.bookmarks_sync.run", "bookmarks_sync_run"),
+    ("evolver.check_correspondence.run", "correspondence_run"),
+    ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
+    ("evolver.upscale.has_pending_work", "has_pending_work"),
+    ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
+    ("evolver.processes.count_running", "count_running"),
+    ("evolver.prompt_scrape.run", "prompt_scrape_run"),
+]
+
+
+def _patched_stages(mocks: dict) -> ExitStack:
+    stack = ExitStack()
+    for target, key in _STAGE_PATCHES:
+        stack.enter_context(patch(target, mocks[key]))
+    return stack
+
+
 class TestEvolverMain(unittest.TestCase):
     """Tests for the evolver.main() pipeline orchestration."""
 
@@ -20,45 +71,12 @@ class TestEvolverMain(unittest.TestCase):
                 correspondence_run=Mock(return_value=Mock(ok=False)),
             )
         """
-        defaults = {
-            "setup_logging": Mock(),
-            "check_dependencies": Mock(),
-            "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
-            "purge_run": Mock(return_value=Mock(missing_sorted=[])),
-            "scripts_sync_run": Mock(return_value=Mock(ok=True)),
-            "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
-            "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
-            "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
-            "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
-            "has_pending_work": Mock(return_value=False),
-            "should_skip_cpu": Mock(return_value=False),
-            "count_running": Mock(return_value=0),
-            "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
-            "correspondence_run": Mock(return_value=Mock(ok=True)),
-        }
-        defaults.update(overrides)
-        mocks = defaults
+        mocks = _stage_mocks() | {"setup_logging": Mock(), "check_dependencies": Mock()}
+        mocks.update(overrides)
 
-        patch_map = [
-            ("evolver.setup_logging", "setup_logging"),
-            ("evolver.check_dependencies", "check_dependencies"),
-            ("evolver.sort.run", "sort_run"),
-            ("evolver.purge_weird.run", "purge_run"),
-            ("evolver.scripts_sync.run", "scripts_sync_run"),
-            ("evolver.upscale.run", "upscale_run"),
-            ("evolver.nonai_upscale.run", "nonai_run"),
-            ("evolver.bookmarks_sync.run", "bookmarks_sync_run"),
-            ("evolver.check_correspondence.run", "correspondence_run"),
-            ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
-            ("evolver.upscale.has_pending_work", "has_pending_work"),
-            ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
-            ("evolver.processes.count_running", "count_running"),
-            ("evolver.prompt_scrape.run", "prompt_scrape_run"),
-        ]
-
-        with ExitStack() as stack:
-            for target, key in patch_map:
-                stack.enter_context(patch(target, mocks[key]))
+        with _patched_stages(mocks) as stack:
+            stack.enter_context(patch("evolver.setup_logging", mocks["setup_logging"]))
+            stack.enter_context(patch("evolver.check_dependencies", mocks["check_dependencies"]))
             with self.assertRaises(SystemExit) as exc:
                 evolver.main()
 
@@ -216,43 +234,9 @@ class TestRunPipeline(unittest.TestCase):
 
     def _patch_all_stages(self, **overrides):
         """Return an ExitStack context that patches all stages for run_pipeline()."""
-        defaults = {
-            "setup_logging": Mock(),
-            "check_dependencies": Mock(),
-            "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
-            "purge_run": Mock(return_value=Mock(missing_sorted=[])),
-            "scripts_sync_run": Mock(return_value=Mock(ok=True)),
-            "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
-            "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
-            "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
-            "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
-            "has_pending_work": Mock(return_value=False),
-            "should_skip_cpu": Mock(return_value=False),
-            "count_running": Mock(return_value=0),
-            "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
-            "correspondence_run": Mock(return_value=Mock(ok=True)),
-        }
+        defaults = _stage_mocks()
         defaults.update(overrides)
-
-        patch_map = [
-            ("evolver.sort.run", "sort_run"),
-            ("evolver.purge_weird.run", "purge_run"),
-            ("evolver.scripts_sync.run", "scripts_sync_run"),
-            ("evolver.upscale.run", "upscale_run"),
-            ("evolver.nonai_upscale.run", "nonai_run"),
-            ("evolver.bookmarks_sync.run", "bookmarks_sync_run"),
-            ("evolver.check_correspondence.run", "correspondence_run"),
-            ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
-            ("evolver.upscale.has_pending_work", "has_pending_work"),
-            ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
-            ("evolver.processes.count_running", "count_running"),
-            ("evolver.prompt_scrape.run", "prompt_scrape_run"),
-        ]
-
-        stack = ExitStack()
-        for target, key in patch_map:
-            stack.enter_context(patch(target, defaults[key]))
-        return stack, defaults
+        return _patched_stages(defaults), defaults
 
     def test_returns_pipeline_result(self):
         stack, _ = self._patch_all_stages()
@@ -267,7 +251,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "bookmarks", "scripts", "group_non_ai", "dupes"])
+        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "bookmarks", "scripts", "group_non_ai", "references", "dupes"])
 
     def test_skipped_stages_have_skip_status(self):
         stack, _ = self._patch_all_stages()
@@ -283,7 +267,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_start=on_start)
         started_names = [call.args[0] for call in on_start.call_args_list]
-        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "bookmarks", "scripts", "group_non_ai", "dupes"])
+        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "bookmarks", "scripts", "group_non_ai", "references", "dupes"])
 
     def test_on_stage_complete_called_with_result_and_status(self):
         on_complete = Mock()

@@ -14,7 +14,17 @@ FUN_TIME_WATCH_STATS_FILE = FUN_TIME_PROJECT_DIR / "state" / "watch_stats.json"
 # generation metadata straight from Origenerator's own gallery database, read-only
 # (see tasks/origenerator_metadata.py). Origenerator never reaches into Evolver.
 ORIGENERATOR_DB_PATH = BASE_DIR / "projects" / "origenerator" / "state" / "origenerator.db"
+# Sibling apps that record a video's path in their own saved work. Evolver moves
+# videos, so it owns keeping these pointed at the right file (see
+# tasks/reference_sync.py); left alone they strand hand-made clip bounds,
+# transcript splits, and favorites on paths that no longer exist.
+CLIPPER_SESSIONS_DIR = BASE_DIR / "projects" / "clipper" / "sessions"
 VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
+# Where to hunt for a video a stored reference has lost track of. Wider than the
+# library itself, because videos also get parked in sibling folders such as
+# _winston_compilations_archive/ — a reference into one of those still deserves
+# to be followed rather than dropped.
+VIDEO_SEARCH_ROOT = BASE_DIR / "videos"
 METADATA_DIR = BASE_DIR / "videos" / "metadata"
 SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
