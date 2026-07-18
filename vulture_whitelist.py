@@ -25,6 +25,7 @@ _.vt  # noqa: F821  — _PROPVARIANT.vt (VARTYPE tag)
 _.pwszVal  # noqa: F821  — _PROPVARIANT.pwszVal (wide string value)
 _.dwSize  # noqa: F821  — _PROCESSENTRY32W.dwSize (required by Process32FirstW)
 _.dwLength  # noqa: F821  — _MemoryStatusEx.dwLength (required by GlobalMemoryStatusEx)
+_.cbSize  # noqa: F821  — _LastInputInfo.cbSize (required by GetLastInputInfo)
 
 # -- Dataclass fields consumed via dataclasses.asdict() --
 _.timed_out  # noqa: F821  — UpscaleResult.timed_out, serialized to run records
