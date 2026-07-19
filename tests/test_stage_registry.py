@@ -15,6 +15,10 @@ class TestStageRegistry(unittest.TestCase):
         self.assertIn("group_non_ai", ALL_STAGES)
         self.assertEqual(ALL_STAGES.index("group_non_ai"), ALL_STAGES.index("scripts") + 1)
 
+    def test_gui_lists_clip_scripts_before_the_sync_that_aligns_what_it_writes(self):
+        self.assertIn("clip_scripts", ALL_STAGES)
+        self.assertEqual(ALL_STAGES.index("clip_scripts"), ALL_STAGES.index("scripts") - 1)
+
     def test_every_stage_has_a_chart_color(self):
         for stage in ALL_STAGES:
             with self.subTest(stage=stage):

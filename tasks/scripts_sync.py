@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
+from util.funscript import script_path_for_video
 from util.media_files import iter_finalized_videos, remove_empty_dirs
 from util.variants import strip_processing_suffixes
 from util.windows_alert import show_error_window
@@ -57,7 +58,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
             result.ambiguous += 1
             continue
 
-        dest = _script_path_for_video(matches[0])
+        dest = script_path_for_video(matches[0])
         if script_path == dest:
             result.already_aligned += 1
             continue
@@ -116,11 +117,6 @@ def _matching_videos_for_script(script_path: Path, video_index: dict[str, list[P
     return [video_path for video_path in matches if _video_match_bucket(video_path) == bucket]
 
 
-def _script_path_for_video(video_path: Path) -> Path:
-    rel = video_path.relative_to(config.VIDEO_LIBRARY_DIR)
-    return (config.SCRIPT_LIBRARY_DIR / rel).with_suffix(config.FUNSCRIPT_EXTENSION)
-
-
 def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: ScriptsSyncResult) -> None:
     groups: dict[tuple[tuple[str, ...], str], list[Path]] = defaultdict(list)
     for matches in video_index.values():
@@ -132,11 +128,11 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: Sc
         if len(videos) < 2:
             continue
 
-        missing_targets = [video for video in videos if not _script_path_for_video(video).exists()]
+        missing_targets = [video for video in videos if not script_path_for_video(video).exists()]
         if not missing_targets:
             continue
 
-        existing_sources = [video for video in videos if _script_path_for_video(video).exists()]
+        existing_sources = [video for video in videos if script_path_for_video(video).exists()]
         if not existing_sources:
             continue
 
@@ -146,13 +142,13 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: Sc
                 log.warning(
                     "AMBIGUOUS VARIANT SCRIPT GROUP for stem %s: %s",
                     normalized_stem,
-                    ", ".join(str(_script_path_for_video(video)) for video in sorted(existing_sources)),
+                    ", ".join(str(script_path_for_video(video)) for video in sorted(existing_sources)),
                 )
                 result.ambiguous_variant_groups += 1
                 continue
 
-            source_script = _script_path_for_video(source_video)
-            dest_script = _script_path_for_video(target_video)
+            source_script = script_path_for_video(source_video)
+            dest_script = script_path_for_video(target_video)
             try:
                 dest_script.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_script, dest_script)
@@ -178,9 +174,9 @@ def _pick_variant_source(target_video: Path, existing_sources: list[Path]) -> Pa
     if len(ordered) == 1:
         return ordered[0]
 
-    first_script = _script_path_for_video(ordered[0])
+    first_script = script_path_for_video(ordered[0])
     for candidate in ordered[1:]:
-        if not filecmp.cmp(first_script, _script_path_for_video(candidate), shallow=False):
+        if not filecmp.cmp(first_script, script_path_for_video(candidate), shallow=False):
             return None
     return ordered[0]
 
