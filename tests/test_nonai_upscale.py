@@ -53,8 +53,8 @@ class TestCollectCandidates(unittest.TestCase):
                 sorted(c.path for c in candidates), [flagged_video, unsorted_video]
             )
 
-    def test_ignores_videos_nested_in_triage_subfolders(self):
-        """A subfolder inside a triage dir stages manual pre-work (e.g. larkin
+    def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
+        """A triage dir's first sub-stage holds manual pre-work (e.g. larkin
         '1 could use work/1_originals_needing_trimming'); those clips are not
         ready for an unattended multi-hour encode."""
         with workspace_temp_dir() as root:
@@ -71,6 +71,27 @@ class TestCollectCandidates(unittest.TestCase):
                 candidates = nonai_upscale.collect_candidates()
 
             self.assertEqual([c.path for c in candidates], [ready])
+
+    def test_finds_videos_in_a_triage_dirs_upscale_ready_substages(self):
+        """Past the manual-pre-work one, a triage dir's sub-stages say in their
+        own names that the only thing left is the encode, so they queue too."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            work = non_ai / "larkin" / "1 could use work"
+
+            good = make_video(
+                work / "2_originals_good_trimwise_but_need_upscaling" / "good.mp4"
+            )
+            trimmed = make_video(
+                work / "3_trimmed_from_originals_but_still_need_upscaling" / "trimmed.mp4"
+            )
+            make_video(work / "1_originals_needing_trimming" / "not yet.mp4")
+
+            with override_config(**overrides):
+                candidates = nonai_upscale.collect_candidates()
+
+            self.assertEqual(sorted(c.path for c in candidates), [good, trimmed])
 
     def test_excludes_originals_that_already_have_a_processed_variant(self):
         with workspace_temp_dir() as root:
