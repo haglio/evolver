@@ -10,9 +10,10 @@ Invoked by the tray app scheduler or directly via CLI. Stages:
   6. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
   7. references      - repoint the suite's saved video paths at videos that moved
   8. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
-  9. scripts         - align funscripts to mirror the video library tree
- 10. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
- 11. dupes           - scan non_AI for likely duplicate videos by exact filesize
+  9. clip_scripts    - cut a carved clip's funscript out of its source scene's
+ 10. scripts         - align funscripts to mirror the video library tree
+ 11. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
+ 12. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -27,6 +28,7 @@ import check_duplicate_sizes
 import config
 from tasks import (
     bookmarks_sync,
+    clip_scripts,
     nonai_group,
     nonai_upscale,
     prompt_scrape,
@@ -184,6 +186,9 @@ def run_pipeline(
     # favorite has to be repointed before it can be mistaken for a dead one.
     reference_sync_result = _run_stage("references", reference_sync.run)
     bookmarks_sync_result = _run_stage("bookmarks", bookmarks_sync.run)
+    # Before the scripts sync: this writes new funscripts into the tree, and the
+    # sync is what settles them across a clip's version family.
+    _run_stage("clip_scripts", clip_scripts.run)
     scripts_sync_result = _run_stage("scripts", scripts_sync.run, show_popup=True)
     _run_stage("group_non_ai", nonai_group.run)
     duplicate_sizes_result = _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
