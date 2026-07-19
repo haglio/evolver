@@ -18,9 +18,11 @@ where it left off). A fast GUI poll — ``throttle_to_presence`` — parks and
 thaws it between ticks so returning to the machine takes effect in seconds.
 
 Candidates come from the buckets' triage folders (``0 unsorted``, ``1 could
-use work``), most-wanted first: an explicit ``1`` flag beats everything, then
-clips with a funscript — the only per-video engagement signal the non_AI
-library has, since Fun Time's watch stats cover only the AI outbox.
+use work``), most-wanted first: a pin in ``.nonai-upscale-next.txt`` beats
+everything and also re-queues a video whose only processed variant came from an
+older recipe, then an explicit ``1`` flag, then clips with a funscript — the
+only per-video engagement signal the non_AI library has, since Fun Time's watch
+stats cover only the AI outbox.
 """
 
 from __future__ import annotations
@@ -585,6 +587,7 @@ def collect_candidates() -> list[Candidate]:
     """Unprocessed triage-folder videos, most-wanted first."""
     candidates: list[Candidate] = []
     skipped = _skip_manifest_entries()
+    pinned = _pin_manifest_entries()
     watch_scores = _watch_scores()
     for bucket in buckets():
         processed_stems = _processed_stems(bucket)
@@ -593,15 +596,22 @@ def collect_candidates() -> list[Candidate]:
                 for video in sorted(scan_dir.iterdir()):
                     if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
                         continue
-                    if is_processed_stem(video.stem) or video.stem in processed_stems:
+                    rel = relpath(video)
+                    if is_processed_stem(video.stem):
                         continue
-                    if relpath(video) in skipped:
+                    # A variant of this video already existing normally means
+                    # there is nothing to do. A pin overrides that: the variant
+                    # is an older recipe, and the redo is the whole point.
+                    if video.stem in processed_stems and rel not in pinned:
+                        continue
+                    if rel in skipped:
                         continue
                     candidates.append(Candidate(
                         video, bucket, triage_digit, _has_funscript(video),
                         watch_scores.get(str(video).strip().lower(), 0.0),
                     ))
     candidates.sort(key=lambda c: (
+        _pin_rank(pinned, c.path),
         c.triage_digit != 1, -c.watch_score, not c.has_funscript, str(c.path).lower(),
     ))
     return candidates
@@ -672,8 +682,29 @@ def _has_funscript(video: Path) -> bool:
 
 
 def _skip_manifest_entries() -> set[str]:
+    return set(_manifest_entries(config.NONAI_SKIP_MANIFEST))
+
+
+def _pin_manifest_entries() -> list[str]:
+    """Relative paths the user wants encoded next, in the order listed."""
+    return _manifest_entries(config.NONAI_PRIORITY_MANIFEST)
+
+
+def _pin_rank(pinned: list[str], video: Path) -> int:
+    """Where *video* sits in the pin list — past the end when it is not pinned."""
     try:
-        lines = config.NONAI_SKIP_MANIFEST.read_text(encoding="utf-8").splitlines()
+        return pinned.index(relpath(video))
+    except ValueError:
+        return len(pinned)
+
+
+def _manifest_entries(path: Path) -> list[str]:
+    """A hand-edited manifest's relative paths, in file order.
+
+    One path per line; anything past a tab is the user's own note about why.
+    """
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
-        return set()
-    return {line.split("\t", 1)[0].strip() for line in lines if line.strip()}
+        return []
+    return [line.split("\t", 1)[0].strip() for line in lines if line.strip()]

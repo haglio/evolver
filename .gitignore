@@ -32,6 +32,7 @@ nonai_upscale_job*.json
 nonai_upscale_attempts*.json
 nonai_upscale_cooldown*.json
 .nonai-upscale-skip*.txt
+.nonai-upscale-next*.txt
 
 # GUI runtime state
 runs/
