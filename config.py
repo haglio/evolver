@@ -103,6 +103,11 @@ NONAI_ATTEMPTS_FILE = NONAI_STATE_DIR / "nonai_upscale_attempts.json"
 NONAI_COOLDOWN_FILE = NONAI_STATE_DIR / "nonai_upscale_cooldown.json"
 NONAI_FFMPEG_LOG = NONAI_STATE_DIR / "nonai_upscale_ffmpeg.log"
 NONAI_SKIP_MANIFEST = PROJECT_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
+# The counterpart to the skip list: videos to encode next, in the order listed.
+# A pin outranks every ordering heuristic and re-queues a video the bucket
+# already holds an older processed variant of, which is the only way to ask for
+# a redo under a newer recipe.
+NONAI_PRIORITY_MANIFEST = PROJECT_DIR / ".nonai-upscale-next.txt"
 NONAI_MAX_RUNTIME_HOURS = 24
 NONAI_MAX_ATTEMPTS = 2
 NONAI_COMPLETE_DURATION_FRACTION = 0.98

@@ -93,6 +93,45 @@ class TestCollectCandidates(unittest.TestCase):
 
             self.assertEqual(sorted(c.path for c in candidates), [good, trimmed])
 
+    def test_pinned_videos_lead_the_queue_in_the_order_listed(self):
+        """The pin manifest is how the user says "encode this one next", so it
+        outranks the triage digit and every other ordering heuristic."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_PRIORITY_MANIFEST=root / "next.txt")
+            non_ai = overrides["NON_AI_DIR"]
+
+            make_video(non_ai / "winston" / "1 could use work" / "a.mp4")
+            second = make_video(non_ai / "other" / "0 unsorted" / "y.mp4")
+            first = make_video(non_ai / "winston" / "0 unsorted" / "z.mp4")
+            (root / "next.txt").write_text(
+                "winston/0 unsorted/z.mp4\nother/0 unsorted/y.mp4\n", encoding="utf-8"
+            )
+
+            with override_config(**overrides):
+                candidates = nonai_upscale.collect_candidates()
+
+            self.assertEqual([c.path for c in candidates][:2], [first, second])
+
+    def test_a_pin_re_queues_a_video_that_already_has_a_processed_variant(self):
+        """An existing variant normally reads as "already done". When it came
+        from an older recipe, pinning is how the user asks for the redo."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_PRIORITY_MANIFEST=root / "next.txt")
+            non_ai = overrides["NON_AI_DIR"]
+
+            original = make_video(non_ai / "winston" / "1 could use work" / "scene.mp4")
+            make_video(
+                non_ai / "winston" / "3_good_to_go" / "processed" / "scene_topaz.mp4"
+            )
+            (root / "next.txt").write_text(
+                "winston/1 could use work/scene.mp4\n", encoding="utf-8"
+            )
+
+            with override_config(**overrides):
+                candidates = nonai_upscale.collect_candidates()
+
+            self.assertEqual([c.path for c in candidates], [original])
+
     def test_excludes_originals_that_already_have_a_processed_variant(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
