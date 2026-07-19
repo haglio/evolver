@@ -122,7 +122,7 @@ The `2D/non_AI` buckets (`winston`, `other`, …) hold full-length real-footage 
 
 It follows the bucket conventions already in use:
 
-- Candidates come from the triage folders whose names start with `0` or `1` — direct children only, since a nested folder like `1_originals_needing_trimming` stages manual pre-work that should happen first.
+- Candidates come from the triage folders whose names start with `0` or `1`, plus the sub-stages those split into whose names start with `2` or `3` (`2_originals_good_trimwise_but_need_upscaling`, `3_trimmed_from_originals_but_still_need_upscaling`) — trimming is settled there and only the encode is left. Sub-stage `1_originals_needing_trimming` is skipped: it stages manual pre-work that should happen first.
 - The output lands in the bucket's `3*/processed/` folder as `<stem>_apo8_iris2.mp4`, and the original then moves to the bucket's `2*` ("do not need work") folder.
 - A video is skipped when any processed variant of it already exists in the bucket (`_iris2`, `_apo8_prob4`, and friends — see `util/variants.py`), or when it already carries a `videoai` tag itself.
 - `actually_AI_but_funscripted/` is left alone; its contents are AI-pipeline outputs.

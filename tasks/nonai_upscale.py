@@ -589,20 +589,18 @@ def collect_candidates() -> list[Candidate]:
     for bucket in buckets():
         processed_stems = _processed_stems(bucket)
         for triage_digit, triage_dir in _numbered_dirs(bucket, digits=(0, 1)):
-            # Direct children only: a subfolder inside a triage dir stages manual
-            # pre-work (e.g. "1_originals_needing_trimming"), so its clips are
-            # not ready for an unattended multi-hour encode.
-            for video in sorted(triage_dir.iterdir()):
-                if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
-                    continue
-                if is_processed_stem(video.stem) or video.stem in processed_stems:
-                    continue
-                if relpath(video) in skipped:
-                    continue
-                candidates.append(Candidate(
-                    video, bucket, triage_digit, _has_funscript(video),
-                    watch_scores.get(str(video).strip().lower(), 0.0),
-                ))
+            for scan_dir in _upscale_ready_dirs(triage_dir):
+                for video in sorted(scan_dir.iterdir()):
+                    if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
+                        continue
+                    if is_processed_stem(video.stem) or video.stem in processed_stems:
+                        continue
+                    if relpath(video) in skipped:
+                        continue
+                    candidates.append(Candidate(
+                        video, bucket, triage_digit, _has_funscript(video),
+                        watch_scores.get(str(video).strip().lower(), 0.0),
+                    ))
     candidates.sort(key=lambda c: (
         c.triage_digit != 1, -c.watch_score, not c.has_funscript, str(c.path).lower(),
     ))
@@ -613,10 +611,26 @@ def relpath(video: Path) -> str:
     return video.relative_to(config.NON_AI_DIR).as_posix()
 
 
-def _numbered_dirs(bucket: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
-    """The bucket's triage/stage folders whose names start with one of *digits*."""
+def _upscale_ready_dirs(triage_dir: Path) -> list[Path]:
+    """*triage_dir* plus the sub-stages of it whose clips need only the encode.
+
+    A triage dir can split into numbered sub-stages. The first is manual
+    pre-work — "1_originals_needing_trimming" still wants a human with a
+    trimmer, so an unattended multi-hour encode would bake in the untrimmed
+    footage. The later ones say in their own names that trimming is settled and
+    upscaling is all that's left, so their clips queue like direct children do.
+    """
+    return [triage_dir] + [d for _, d in _numbered_dirs(triage_dir, digits=(2, 3))]
+
+
+def _numbered_dirs(parent: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
+    """*parent*'s numbered stage folders whose names start with one of *digits*.
+
+    Serves both levels of the convention: a bucket's triage/stage folders, and
+    the sub-stages a triage folder splits into.
+    """
     found = []
-    for child in sorted(bucket.iterdir()):
+    for child in sorted(parent.iterdir()):
         if child.is_dir() and child.name[:1].isdigit() and int(child.name[:1]) in digits:
             found.append((int(child.name[:1]), child))
     return found
