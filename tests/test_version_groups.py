@@ -36,6 +36,17 @@ class TestGroupIds(unittest.TestCase):
     def test_singleton_maps_to_its_own_id(self):
         self.assertEqual(group_ids(["solo"]), {"solo": "solo"})
 
+    def test_an_override_folds_a_stem_the_name_rule_cannot_reach(self):
+        """A hand-renamed trim shares no name prefix with the video it came from
+        — "redacted POV BJ 4k 60fps" against "redacted_540-hash" —
+        so the only way to call them one video is to say so."""
+        stems = ["redacted_540-pacI21CK", "redacted POV BJ 4k 60fps"]
+
+        ids = group_ids(stems, {"redacted POV BJ 4k 60fps": "redacted_540-pacI21CK"})
+
+        self.assertEqual(ids["redacted POV BJ 4k 60fps"], ids["redacted_540-pacI21CK"])
+        self.assertEqual(ids["redacted_540-pacI21CK"], "redacted_540-pacI21CK")
+
     def test_three_scenes_each_with_a_variant_form_three_families(self):
         stems = []
         for n in (1, 2, 3):
