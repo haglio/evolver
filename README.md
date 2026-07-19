@@ -5,7 +5,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 1. Sorts videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`
 2. Purges `kinda_weird/` outputs from the active outbox set — normally `2_outbox`, and both `2_outbox` plus `3_new_outbox` while regeneration mode is enabled. It also deletes each weird file's corresponding source from `1_sorted/`. A Windows error dialog pops up if any source file cannot be found.
 3. Rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match in the same library lane; scripts under `2D/AI` only consider `2D/AI` videos, and scripts under `2D/non_AI` only consider `2D/non_AI` videos. Unmatched or ambiguous names are logged and left alone. After that, Evolver also copies missing funscripts across matching processed/original video variants, including `1_sorted` <-> `2_outbox` / `3_new_outbox` `_topaz` pairs and matching `processed` <-> non-processed variants within the same source bucket.
-4. Prunes stale rows from `fun_time/favs.csv` when the `local_file` or `file` column points at a missing local file, while treating a `2_outbox` favorite as still valid if the matching file currently lives in `3_new_outbox` during regeneration. The CSV itself always keeps `2_outbox` paths, then the remaining `web_url` values are synced into a `Fun Time Favs` folder on the Chrome bookmarks bar for the Chrome profile whose visible name is `Blair`.
+4. Prunes stale rows from `fun_time/favs.csv` when the `local_file` or `file` column points at a missing local file — but only after step 8 has already repointed every favorite whose video merely moved, so a row is dropped only when its video is genuinely gone. The remaining `web_url` values are then synced into a `Fun Time Favs` folder on the Chrome bookmarks bar for the Chrome profile whose visible name is `Blair`.
 5. Scrapes prompt metadata for AI videos in `1_sorted` into `videos/metadata`, mirroring the active outbox tree. The scan is idempotent — videos that already have a metadata JSON are skipped, and a video whose scrape fails is marked so it is not retried every run. Currently supports Provider prompt extraction with the video prompt plus optional source-image prompt keys.
 6. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
 7. Gradually upscales the `2D/non_AI` library too, with the recipe its already-processed clips carry in their `videoai` tags (see "Non-AI library upscaling" below). Off by default — a one-time opt-in from the tray menu, after which Evolver runs at most one detached encode while you're idle (AI queue drained) and suspends it the moment you return to the machine.
@@ -31,6 +31,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `tasks/nonai_upscale.py` - the non-AI library's detached Topaz encodes, one at a time
   - `tasks/reference_sync.py` - repointing the suite's saved video paths at videos that moved
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
+  - `util/favs_csv.py` - Fun Time's favorites CSV: its rows, and the local path each cell links to
   - `util/video_locator.py` - where a video a reference has lost track of now lives
   - `check_duplicate_sizes.py` - Stage 6 duplicate-size scan for likely source duplicates
   - `check_correspondence.py` - Stage 7 integrity verification and one-time manual check
@@ -147,6 +148,13 @@ Each run, after every stage that could have moved something, Evolver walks the s
 | Store | What it holds |
 | --- | --- |
 | `clipper/sessions/*.json` | a session's `video_path` — the clip bounds you set by hand |
+| `scripture/sessions/*.scripture` | a project's `video_path` — its splits, tracking and ground truth |
+| `fun_time/favs.csv` | the `local_file` hyperlink on every favorite, URL and label alike |
+| `fun_time/state/watch_stats.json` | the completions/skips/locks keyed by video path, re-keyed in Fun Time's own lowercased form |
+
+Those four are the stores that hold something you cannot get back: clip bounds and splits made by hand, a curated favorites list, and watch counts accumulated over months. Playlists, HUD state, duration caches and thumbnail caches are all regenerated from the library on demand, so a stale entry in one costs a rebuild rather than the data, and Evolver leaves them alone.
+
+The stage runs *before* the bookmarks sync on purpose: that stage drops favorites whose file is missing, so a favorite whose video merely moved has to be repointed first or it gets deleted on the very run that could have saved it.
 
 A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder like `_winston_compilations_archive/` is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Clipper session's frame numbers only mean anything against the exact file they were set on.
 

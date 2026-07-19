@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import json
 import logging
 import re
@@ -10,9 +9,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 
 import config
+from util import favs_csv
 
 log = logging.getLogger(__name__)
 
@@ -110,88 +110,31 @@ def _read_urls(result: BookmarksSyncResult) -> list[str]:
         urls.append(url)
 
     if result.pruned:
-        _write_rows(path, fieldnames, rows)
+        favs_csv.write_rows(path, fieldnames, rows)
         log.info("Removed %d stale favorite row(s) whose source file is gone.", result.pruned)
     return urls
 
 
 def _load_and_prune_rows(path: Path, result: BookmarksSyncResult) -> tuple[list[str], list[dict[str, str]]]:
-    with path.open("r", encoding="utf-8-sig", newline="") as fh:
-        reader = csv.DictReader(fh)
-        fieldnames = list(reader.fieldnames or [])
-        file_column = _file_column_name(fieldnames)
-        kept_rows: list[dict[str, str]] = []
-        for row in reader:
-            if file_column and _prune_or_rewire_row(row, file_column, path.parent, result):
-                result.pruned += 1
-                continue
-            kept_rows.append(row)
+    """Read the favorites, dropping rows whose local file is really gone.
+
+    "Really" gone: the references stage runs first and has already followed
+    every favorite it could to the video's new home, so anything still missing
+    here has no counterpart left in the library.
+    """
+    fieldnames, rows = favs_csv.read_rows(path)
+    file_column = favs_csv.file_column_name(fieldnames)
+    if file_column is None:
+        return fieldnames, rows
+
+    kept_rows: list[dict[str, str]] = []
+    for row in rows:
+        local = favs_csv.local_path((row.get(file_column) or "").strip(), path.parent)
+        if local is not None and not local.exists():
+            result.pruned += 1
+            continue
+        kept_rows.append(row)
     return fieldnames, kept_rows
-
-
-def _file_column_name(fieldnames: list[str]) -> str | None:
-    normalized = {name.lstrip("\ufeff"): name for name in fieldnames}
-    for candidate in ("file", "local_file"):
-        match = normalized.get(candidate)
-        if match is not None:
-            return match
-    return None
-
-
-def _prune_or_rewire_row(
-    row: dict[str, str],
-    file_column: str,
-    base_dir: Path,
-    result: BookmarksSyncResult,
-) -> bool:
-    raw_value = (row.get(file_column) or "").strip()
-    if not raw_value:
-        return False
-    normalized_column = file_column.lstrip("\ufeff")
-    if normalized_column == "local_file" and not _looks_like_filesystem_reference(raw_value):
-        return False
-
-    candidate = _extract_local_path(raw_value, base_dir)
-    return not candidate.exists()
-
-
-def _extract_local_path(value: str, base_dir: Path) -> Path:
-    match = _HYPERLINK_URL_RE.match(value)
-    candidate = match.group(1) if match else value
-    parsed = urlparse(candidate)
-    if parsed.scheme == "file":
-        return Path(unquote(parsed.path.lstrip("/")))
-
-    path = Path(candidate)
-    if not path.is_absolute():
-        path = base_dir / path
-    return path
-
-
-def _looks_like_filesystem_reference(value: str) -> bool:
-    match = _HYPERLINK_URL_RE.match(value)
-    candidate = match.group(1) if match else value
-    parsed = urlparse(candidate)
-    if parsed.scheme in {"http", "https"}:
-        return False
-    if parsed.scheme == "file":
-        return True
-    if re.match(r"^[A-Za-z]:[\\/]", candidate):
-        return True
-    if candidate.startswith(("\\\\", "/", "./", "../")):
-        return True
-    return "\\" in candidate or "/" in candidate
-
-
-
-
-def _write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
-    temp_path = path.with_name(path.name + ".tmp")
-    with temp_path.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-    temp_path.replace(path)
 
 
 def _extract_url(value: str) -> str | None:
