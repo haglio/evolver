@@ -3,7 +3,26 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from util.ffprobe import duration_seconds, get_orientation, video_dimensions, videoai_tag, _probe
+from util.ffprobe import (
+    duration_seconds,
+    frame_fingerprint,
+    get_orientation,
+    video_dimensions,
+    videoai_tag,
+    _probe,
+)
+
+
+class TestFrameFingerprint(unittest.TestCase):
+    @patch("util.ffprobe._probe")
+    def test_divides_out_the_rational_frame_rate(self, probe_mock):
+        probe_mock.return_value = "30000/1001,40561"
+        self.assertEqual(frame_fingerprint(Path("x.mp4")), (29.97002997002997, 40561))
+
+    @patch("util.ffprobe._probe")
+    def test_none_when_the_container_counts_no_frames(self, probe_mock):
+        probe_mock.return_value = "19001/317,N/A"
+        self.assertIsNone(frame_fingerprint(Path("x.mkv")))
 
 
 class TestDurationSeconds(unittest.TestCase):

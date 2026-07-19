@@ -2,6 +2,7 @@ import json
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 from tasks import reference_sync
 from tests.temp_helpers import override_config, workspace_temp_dir
@@ -55,6 +56,25 @@ class TestClipperSessions(unittest.TestCase):
 
             payload = json.loads(session.read_text(encoding="utf-8"))
             self.assertEqual(payload["video_path"], str(moved_to))
+            self.assertEqual(result.relocated, 1)
+
+    def test_follows_a_video_that_was_renamed_where_it_stood(self):
+        """No name left to match on — but the session records the footage's shape."""
+        with workspace_temp_dir() as temp:
+            folder = temp / "videos" / "winston" / "0 unsorted"
+            renamed_to = _write_video(folder / "Clip_topaz.mp4")
+            session = _write_json(
+                temp / "sessions" / "Clip.json",
+                {"video_path": str(folder / "clip-1080p_60fps.mp4"), "fps": 60.0, "total_frames": 70296},
+            )
+
+            with (
+                _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"),
+                patch("util.video_locator.ffprobe.frame_fingerprint", lambda _: (60.0, 70296)),
+            ):
+                result = reference_sync.run()
+
+            self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], str(renamed_to))
             self.assertEqual(result.relocated, 1)
 
     def test_leaves_a_session_alone_when_the_video_is_nowhere(self):

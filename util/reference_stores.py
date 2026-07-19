@@ -17,12 +17,20 @@ import config
 from util import favs_csv
 
 
+def _no_fingerprint(path: Path) -> tuple[float, int] | None:
+    """Most stores record only a path, so a renamed video is beyond their reach."""
+    return None
+
+
 @dataclass(frozen=True)
 class ReferenceStore:
     label: str
     path: Path
     read: Callable[[Path], list[str]]
     rewrite: Callable[[Path, dict[str, str]], None]
+    # (fps, frame count) of the video this file references, when it records one —
+    # the only handle left once a rename has taken the filename away.
+    fingerprint: Callable[[Path], tuple[float, int] | None] = _no_fingerprint
 
 
 def discover() -> Iterator[ReferenceStore]:
@@ -49,7 +57,9 @@ def _session_files(directory: Path, pattern: str, label: str) -> Iterator[Refere
     if not directory.is_dir():
         return
     for path in sorted(directory.glob(pattern)):
-        yield ReferenceStore(label, path, _read_video_path_field, _rewrite_video_path_field)
+        yield ReferenceStore(
+            label, path, _read_video_path_field, _rewrite_video_path_field, _session_fingerprint
+        )
 
 
 _VIDEO_PATH_FIELD = "video_path"
@@ -64,6 +74,15 @@ def _rewrite_video_path_field(path: Path, moves: dict[str, str]) -> None:
     payload = _load_json(path)
     payload[_VIDEO_PATH_FIELD] = moves[payload[_VIDEO_PATH_FIELD]]
     _write_json(path, payload)
+
+
+def _session_fingerprint(path: Path) -> tuple[float, int] | None:
+    """A session's own record of the footage it was cut against."""
+    payload = _load_json(path)
+    fps, total_frames = payload.get("fps"), payload.get("total_frames")
+    if isinstance(fps, int | float) and isinstance(total_frames, int) and fps > 0 and total_frames > 0:
+        return float(fps), total_frames
+    return None
 
 
 def _read_json_object_keys(path: Path) -> list[str]:
