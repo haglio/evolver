@@ -64,7 +64,7 @@ class TestTrim(unittest.TestCase):
             "actions": [{"at": 10_000, "pos": 20}],
             "metadata": {
                 "bookmarks": [{"name": "", "time": "00:25:54.503"}],
-                "chapters": [{"name": "Gamma", "startTime": "00:06:28.266", "endTime": "00:14:58.666"}],
+                "chapters": [{"name": "Beta", "startTime": "00:06:28.266", "endTime": "00:14:58.666"}],
                 "title": "kept",
             },
         }

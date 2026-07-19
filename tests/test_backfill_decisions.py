@@ -30,10 +30,10 @@ class TestRecordAction(unittest.TestCase):
             video = self._make_video(upscaled)
 
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                record_action(video, "Side Gamma")
+                record_action(video, "Side Beta")
                 payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
-            self.assertEqual(payload, {"video": {"action": "Side Gamma"}})
+            self.assertEqual(payload, {"video": {"action": "Side Beta"}})
 
     def test_keeps_the_metadata_an_existing_sidecar_already_holds(self):
         with workspace_temp_dir() as root:
@@ -63,10 +63,10 @@ class TestRecordAction(unittest.TestCase):
 
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 record_action(video, "Dancing")
-                record_action(video, "POV Epsilon")
+                record_action(video, "POV Gamma")
                 payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
-            self.assertEqual(payload, {"video": {"action": "POV Epsilon"}})
+            self.assertEqual(payload, {"video": {"action": "POV Gamma"}})
 
 
 class TestSidecarSnapshotAndRestore(unittest.TestCase):

@@ -15,17 +15,19 @@ def _source_files(root: Path) -> list[str]:
     """Every product ``.py`` file under *root*, as root-relative paths.
 
     The tests are left out: they name everything the product exports, so
-    scanning them would mark all of it used.  So are the trees that hold no
-    product code of this checkout's own — hidden ones (``.venv``, ``.git``, and
-    ``.claude``, which in the primary checkout holds whole worktree copies) and
-    generated ones (``__pycache__``).
+    scanning them would mark all of it used.  ``tools`` is left out for the
+    opposite reason — it is developer tooling the suite drives (the sanitize
+    guard), never reached from the app, so vulture would call all of it dead.
+    So are the trees that hold no product code of this checkout's own — hidden
+    ones (``.venv``, ``.git``, and ``.claude``, which in the primary checkout
+    holds whole worktree copies) and generated ones (``__pycache__``).
     """
     found: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [
             name
             for name in dirnames
-            if name != "tests" and not name.startswith((".", "__"))
+            if name not in ("tests", "tools") and not name.startswith((".", "__"))
         ]
         found += [
             str(Path(dirpath, name).relative_to(root))

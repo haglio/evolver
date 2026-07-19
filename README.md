@@ -90,16 +90,16 @@ Say an act, always prefixed with a camera word — `side`, or `POV` said as its 
 | Say (act) | Act recorded |
 | --- | --- |
 | `alpha form` / `alpha` | `Alpha` |
+| `beta` | `Beta` |
 | `gamma` | `Gamma` |
+| `delta` | `Delta` |
 | `epsilon` | `Epsilon` |
+| `eta` | `Eta` |
 | `zeta` | `Zeta` |
-| `beta gamma` | `Beta Gamma` |
-| `delta` | `Delta` |
-| `delta` | `Delta` |
 | `dance` / `dancing` | `Dancing` |
 | `other` | `Other` |
 
-So "side gamma" records `Side Gamma`, and "P-O-V delta" records `POV Delta` — matching the `POV Epsilon` form the prompt scraper writes, so one Fun Time filter query reaches both. Even `dance` and `other` take a camera word: "side dance" records `Side Dancing`. The recognizer listens for the initialism spelled out (`p o v ...`), because the vosk lexicon prices each letter as its name; it also accepts a one-word "pov", whichever way you happen to say it.
+So "side beta" records `Side Beta`, and "P-O-V zeta" records `POV Zeta` — matching the `POV Gamma` form the prompt scraper writes, so one Fun Time filter query reaches both. Even `dance` and `other` take a camera word: "side dance" records `Side Dancing`. The recognizer listens for the initialism spelled out (`p o v ...`), because the vosk lexicon prices each letter as its name; it also accepts a one-word "pov", whichever way you happen to say it.
 
 Four more phrases:
 
@@ -112,7 +112,7 @@ Undo restores the clip to the screen and reverses what the decision did on disk:
 
 Three lines sit beneath the video: what is on screen now and how many clips are left; what the recognizer is hearing this moment; and what your last phrase did — the last naming its own clip, which by then is not the one you are watching. The middle "hearing" line fills in as it recognizes on-script words and stays blank when what you said is not a command, so a phrase that never lands shows as a visible nothing rather than a silent one — the way to tell listening-but-unmatched from not-listening. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
 
-A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: every act as a grid of `Side` / `POV` columns, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records, names its spoken phrase on hover, and carries an example frame so the grid reads as a gallery you recognize at a glance. Most tiles take that frame from the first clip the library already labels with the act — a compound tag like `Pov Epsilon, Alpha` counts for either part — while the acts the library never tags in a camera-scoped form (a side gamma, a POV zeta) are pinned to a hand-picked clip in `CURATED_EXAMPLES`. Frames are sampled a little way into the clip (past the intro, with the act actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
+A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: every act as a grid of `Side` / `POV` columns, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records, names its spoken phrase on hover, and carries an example frame so the grid reads as a gallery you recognize at a glance. Most tiles take that frame from the first clip the library already labels with the act — a compound tag like `Pov Gamma, Alpha` counts for either part — while the acts the library never tags in a camera-scoped form (a side beta, a POV delta) are pinned to a hand-picked clip in `CURATED_EXAMPLES`. Frames are sampled a little way into the clip (past the intro, with the act actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
 
 Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. Set `config.VOICE_DEVICE_NAME` to a substring of your mic's name (from `python -m sounddevice`) to pin a specific one instead.
 

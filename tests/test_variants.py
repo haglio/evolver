@@ -16,8 +16,8 @@ class TestStripProcessingSuffixes(unittest.TestCase):
 
     def test_plain_stem_unchanged(self):
         self.assertEqual(
-            strip_processing_suffixes("Corin Waverly - POV Gamma (1080)"),
-            "Corin Waverly - POV Gamma (1080)",
+            strip_processing_suffixes("Corin Waverly - POV Beta (1080)"),
+            "Corin Waverly - POV Beta (1080)",
         )
 
     def test_mid_name_tokens_are_not_suffixes(self):

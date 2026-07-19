@@ -1,0 +1,60 @@
+{
+  "_comment": "Placeholder content overlay. The real copy lives in content.local.json (git-ignored). Each act pairs the canonical spoken phrase the recognizer listens for with the Title Case video.action it records; aliases are extra phrases that record the same action, for words the small speech model hears differently. library_root, chrome_profile and scrape_provider are the machine-specific values the app needs at runtime.",
+  "acts": [
+    {
+      "spoken": "alpha",
+      "action": "Alpha",
+      "aliases": [
+        "alpha form"
+      ]
+    },
+    {
+      "spoken": "beta",
+      "action": "Beta",
+      "aliases": []
+    },
+    {
+      "spoken": "gamma",
+      "action": "Gamma",
+      "aliases": []
+    },
+    {
+      "spoken": "delta",
+      "action": "Delta",
+      "aliases": []
+    },
+    {
+      "spoken": "epsilon",
+      "action": "Epsilon",
+      "aliases": []
+    },
+    {
+      "spoken": "zeta",
+      "action": "Zeta",
+      "aliases": []
+    },
+    {
+      "spoken": "eta",
+      "action": "Eta",
+      "aliases": []
+    },
+    {
+      "spoken": "dance",
+      "action": "Dancing",
+      "aliases": [
+        "dancing"
+      ]
+    },
+    {
+      "spoken": "other",
+      "action": "Other",
+      "aliases": []
+    }
+  ],
+  "library_root": "C:/path/to/library-root",
+  "chrome_profile": "Default",
+  "scrape_provider": {
+    "source": "provider",
+    "base_url": "https://example.com"
+  }
+}

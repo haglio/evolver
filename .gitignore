@@ -42,3 +42,10 @@ tray_crash.log
 # Claude Code local config
 .claude/
 .regen-complete
+
+# Private overlays — real values live here and never get published. Each has a
+# committed *.example.* template that documents its shape.
+#   the real blocklist is itself a catalogue of excluded terms
+/sanitize/blocklist.local.txt
+#   real copy — spoken act vocabulary and provider details
+/content.local.json
