@@ -7,10 +7,10 @@ STAGES = [
     ("upscale",   "Upscale",              "Apply Topaz 60fps frame interpolation + 4x upscale + various AI enhancements to 1_sorted AI videos, placing them in 2_outbox"),
     ("upscale_non_ai", "Upscale non-AI",  "Supervise one detached Topaz encode of a 2D/non_AI video (apo-8 60fps + iris-2 toward 4K); with the toggle on, run it while the user is idle and the AI queue is drained, suspending it the moment they return"),
     ("verify",    "Correspondence Check", "Verify 1_sorted and 2_outbox are in 1-to-1 correspondence"),
+    ("references", "Follow Moved Videos", "Repoint the suite's saved video paths — Clipper sessions, Scripture projects, Fun Time favorites and watch counts — at videos that have since moved"),
     ("bookmarks", "Bookmarks Sync",       "Sync Fun Time favorites into a Chrome bookmarks folder"),
     ("scripts",   "Scripts Sync",         "Align funscripts to mirror the video library tree"),
     ("group_non_ai", "Group non-AI",      "Record each 2D/non_AI clip's version family (original + processed variants) in a mirrored metadata sidecar"),
-    ("references", "Follow Moved Videos", "Repoint the suite's saved video paths — Clipper sessions, Scripture projects, Fun Time favorites and watch counts — at videos that have since moved"),
     ("dupes",     "Duplicate Check",      "Scan non_AI folder for likely duplicate videos, using exact filesize"),
 ]
 

@@ -8,10 +8,10 @@ Invoked by the tray app scheduler or directly via CLI. Stages:
   4. upscale         - apply Topaz frame interpolation + 4x upscale to sorted AI videos
   5. upscale_non_ai  - supervise one detached Topaz encode of a non-AI library video
   6. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
-  7. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
-  8. scripts         - align funscripts to mirror the video library tree
-  9. group_non_ai   - record each non-AI clip's version family in a mirrored sidecar
- 10. references      - repoint the suite's saved video paths at videos that moved
+  7. references      - repoint the suite's saved video paths at videos that moved
+  8. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
+  9. scripts         - align funscripts to mirror the video library tree
+ 10. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
  11. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
@@ -179,12 +179,13 @@ def run_pipeline(
     else:
         correspondence_result = _run_stage("verify", check_correspondence.run, show_popup=True)
 
+    # After every stage that moves a video, and before bookmarks: both stages
+    # touch favs.csv, and bookmarks drops the rows whose file is missing, so a
+    # favorite has to be repointed before it can be mistaken for a dead one.
+    reference_sync_result = _run_stage("references", reference_sync.run)
     bookmarks_sync_result = _run_stage("bookmarks", bookmarks_sync.run)
     scripts_sync_result = _run_stage("scripts", scripts_sync.run, show_popup=True)
     _run_stage("group_non_ai", nonai_group.run)
-    # Last of the stages that touch the library, so every move this run made has
-    # already landed by the time the suite's saved paths are chased after.
-    reference_sync_result = _run_stage("references", reference_sync.run)
     duplicate_sizes_result = _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
 
     has_errors = (

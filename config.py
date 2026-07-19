@@ -19,6 +19,7 @@ ORIGENERATOR_DB_PATH = BASE_DIR / "projects" / "origenerator" / "state" / "orige
 # tasks/reference_sync.py); left alone they strand hand-made clip bounds,
 # transcript splits, and favorites on paths that no longer exist.
 CLIPPER_SESSIONS_DIR = BASE_DIR / "projects" / "clipper" / "sessions"
+SCRIPTURE_SESSIONS_DIR = BASE_DIR / "projects" / "scripture" / "sessions"
 VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
 # Where to hunt for a video a stored reference has lost track of. Wider than the
 # library itself, because videos also get parked in sibling folders such as

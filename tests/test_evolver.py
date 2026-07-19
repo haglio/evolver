@@ -251,7 +251,19 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "bookmarks", "scripts", "group_non_ai", "references", "dupes"])
+        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "references", "bookmarks", "scripts", "group_non_ai", "dupes"])
+
+    def test_references_run_before_bookmarks_prunes_the_favorites(self):
+        """Both stages touch favs.csv, and bookmarks drops rows whose file is gone.
+
+        Repointing has to come first, or a favorite whose video merely moved is
+        deleted on the very run that could have saved it.
+        """
+        stack, _ = self._patch_all_stages()
+        with stack:
+            result = evolver.run_pipeline()
+        names = [s.name for s in result.stages]
+        self.assertLess(names.index("references"), names.index("bookmarks"))
 
     def test_skipped_stages_have_skip_status(self):
         stack, _ = self._patch_all_stages()
@@ -267,7 +279,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_start=on_start)
         started_names = [call.args[0] for call in on_start.call_args_list]
-        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "bookmarks", "scripts", "group_non_ai", "references", "dupes"])
+        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "upscale_non_ai", "verify", "references", "bookmarks", "scripts", "group_non_ai", "dupes"])
 
     def test_on_stage_complete_called_with_result_and_status(self):
         on_complete = Mock()
