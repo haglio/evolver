@@ -115,14 +115,14 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                clip = _touch(non_ai / "larkin" / "1 clips" / "Ann Bly - POV Scene 2.mp4")
+                clip = _touch(non_ai / "larkin" / "1 clips" / "Ann Bly - POV Scene Two.mp4")
                 upscaled = _touch(
                     non_ai / "larkin" / "3_good_to_go" / "processed"
-                    / "Ann Bly - POV Scene 2_apo8_iris2.mp4"
+                    / "Ann Bly - POV Scene Two_apo8_iris2.mp4"
                 )
                 neighbour = _touch(
                     non_ai / "larkin" / "0 unsorted"
-                    / "Ann Bly - POV Scene 2 (2009) Enhanced.mp4"
+                    / "Ann Bly - POV Scene Two (2009) Enhanced.mp4"
                 )
                 sidecar.write(sidecar.sidecar_path(clip), {"clip": {"compilation": "Vol6", "index": 9}})
 
