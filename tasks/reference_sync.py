@@ -62,7 +62,7 @@ def _reconcile(
         was_at = Path(reference)
         if was_at.exists():
             continue
-        now_at = video_locator.relocate(was_at, index)
+        now_at = video_locator.relocate(was_at, index) or _renamed(store, was_at)
         if now_at is None:
             result.unresolved += 1
             result.unresolved_paths.append(reference)
@@ -75,3 +75,11 @@ def _reconcile(
         return
     store.rewrite(store.path, moves)
     result.relocated += len(moves)
+
+
+def _renamed(store: reference_stores.ReferenceStore, was_at: Path) -> Path | None:
+    """Last resort: the video is still where it was, under a name it no longer has."""
+    fingerprint = store.fingerprint(store.path)
+    if fingerprint is None or not was_at.parent.is_dir():
+        return None
+    return video_locator.renamed_in_place(was_at, fingerprint)

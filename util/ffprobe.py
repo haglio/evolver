@@ -48,6 +48,23 @@ def duration_seconds(file: Path) -> float | None:
         return None
 
 
+def frame_fingerprint(file: Path) -> tuple[float, int] | None:
+    """The (fps, frame count) of *file*, or None when the container counts no frames.
+
+    Enough to tell one cut of footage from another: a re-encode that changes
+    either number is a different video as far as anything holding frame indices
+    is concerned.
+    """
+    fields = _probe(file, "stream=r_frame_rate,nb_frames").split(",")
+    if len(fields) != 2:
+        return None
+    numerator, _, denominator = fields[0].partition("/")
+    try:
+        return int(numerator) / int(denominator or 1), int(fields[1])
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
 def videoai_tag(file: Path) -> str:
     """The Topaz ``videoai`` metadata tag of *file* — empty when untagged."""
     return _probe_format(file, "format_tags=videoai")
