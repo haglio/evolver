@@ -1,8 +1,16 @@
 from pathlib import Path
 import os
 
-BASE_DIR     = Path(r"C:\path\to\suite-root")
-PROJECT_DIR  = BASE_DIR / "projects" / "evolver"
+from content import load_content
+
+# Machine-specific and private: the library root and the browser profile come
+# from the git-ignored content overlay (content.example.json shows the shape).
+_CONTENT = load_content()
+
+BASE_DIR     = Path(_CONTENT["library_root"])
+# This repo, located from the source file rather than the library root: the
+# app's own assets travel with the code, not with the media.
+PROJECT_DIR  = Path(__file__).resolve().parent
 FUN_TIME_PROJECT_DIR = BASE_DIR / "projects" / "fun_time"
 FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
 # Fun Time's per-video watch counts ("breeding" data), read-only. Satellite VLC
@@ -31,7 +39,7 @@ SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
 CHROME_USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"
-CHROME_PROFILE_NAME = "Blair"
+CHROME_PROFILE_NAME = _CONTENT["chrome_profile"]
 CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
 
 INBOX_DIR    = AI_DIR / "0_inbox"

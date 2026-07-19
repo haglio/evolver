@@ -5,17 +5,17 @@ from backfill import vocabulary
 
 class TestActions(unittest.TestCase):
     def test_a_camera_word_scopes_every_act(self):
-        self.assertEqual(vocabulary.ACTIONS["side gamma"], "Side Gamma")
-        self.assertEqual(vocabulary.ACTIONS["pov gamma"], "POV Gamma")
+        self.assertEqual(vocabulary.ACTIONS["side beta"], "Side Beta")
+        self.assertEqual(vocabulary.ACTIONS["pov beta"], "POV Beta")
 
     def test_no_act_has_a_bare_camera_less_form(self):
-        for bare in ("gamma", "delta", "delta", "dance", "other"):
+        for bare in ("beta", "zeta", "eta", "dance", "other"):
             self.assertNotIn(bare, vocabulary.ACTIONS)
 
     def test_pov_is_heard_spelled_out_as_its_three_letters(self):
         """"POV" is an initialism; the lexicon's one-word "pov" is not the letters."""
-        self.assertEqual(vocabulary.ACTIONS["p o v gamma"], "POV Gamma")
-        self.assertEqual(vocabulary.ACTIONS["pov gamma"], "POV Gamma")
+        self.assertEqual(vocabulary.ACTIONS["p o v beta"], "POV Beta")
+        self.assertEqual(vocabulary.ACTIONS["pov beta"], "POV Beta")
 
     def test_dance_and_other_are_scoped_by_a_camera_word_too(self):
         self.assertEqual(vocabulary.ACTIONS["side dance"], "Side Dancing")
@@ -50,9 +50,9 @@ class TestCommandGrid(unittest.TestCase):
             self.assertTrue(pov.label.startswith("POV "), pov.label)
 
     def test_a_row_pairs_the_spoken_phrase_with_the_action_each_cell_records(self):
-        side, pov = self._row("Gamma")
-        self.assertEqual(side, vocabulary.Command("side gamma", "Side Gamma"))
-        self.assertEqual(pov, vocabulary.Command("pov gamma", "POV Gamma"))
+        side, pov = self._row("Beta")
+        self.assertEqual(side, vocabulary.Command("side beta", "Side Beta"))
+        self.assertEqual(pov, vocabulary.Command("pov beta", "POV Beta"))
 
     def test_an_act_with_alias_forms_shows_a_single_canonical_row(self):
         """Alpha is heard two ways ("alpha"/"alpha form") but is one tile."""
@@ -92,9 +92,12 @@ class TestGrammarPhrases(unittest.TestCase):
 
     def test_spells_every_act_in_words_the_vosk_lexicon_knows(self):
         """The compounds live in the written action, never in a spoken phrase."""
-        spoken = " ".join(vocabulary.grammar_phrases())
-        for compound in ("alpha", "gamma", "zeta", "epsilon", "delta"):
-            self.assertNotIn(compound, spoken)
+        spoken_words = set(" ".join(vocabulary.grammar_phrases()).split())
+        for act in vocabulary._ACTS:
+            compound = act.action.replace(" ", "").lower()
+            if compound in spoken_words:
+                # Only allowed when that IS how the act is said, e.g. "other".
+                self.assertIn(compound, {form.lower() for form in act.forms()})
 
 
 if __name__ == "__main__":

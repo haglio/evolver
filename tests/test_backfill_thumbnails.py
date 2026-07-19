@@ -28,10 +28,10 @@ class TestExampleClips(unittest.TestCase):
         with workspace_temp_dir() as root:
             ai, upscaled, metadata = self._tree(root)
             video = self._video(upscaled, "portrait", "provider2", "a_topaz.mp4")
-            self._sidecar(metadata, "portrait", "provider2", "a_topaz", "Side Gamma")
+            self._sidecar(metadata, "portrait", "provider2", "a_topaz", "Side Beta")
 
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(thumbnails.example_clips(), {"Side Gamma": video})
+                self.assertEqual(thumbnails.example_clips(), {"Side Beta": video})
 
     def test_an_unlabeled_clip_contributes_no_example(self):
         with workspace_temp_dir() as root:
@@ -46,10 +46,10 @@ class TestExampleClips(unittest.TestCase):
         with workspace_temp_dir() as root:
             ai, upscaled, metadata = self._tree(root)
             video = self._video(upscaled, "landscape", "provider", "b_topaz.mp4")
-            self._sidecar(metadata, "landscape", "provider", "b_topaz", "POV Epsilon")
+            self._sidecar(metadata, "landscape", "provider", "b_topaz", "POV Gamma")
 
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(thumbnails.example_clips(), {"POV Epsilon": video})
+                self.assertEqual(thumbnails.example_clips(), {"POV Gamma": video})
 
     def test_the_first_clip_found_wins_for_an_action(self):
         with workspace_temp_dir() as root:
@@ -66,12 +66,12 @@ class TestExampleClips(unittest.TestCase):
         with workspace_temp_dir() as root:
             ai, upscaled, metadata = self._tree(root)
             video = self._video(upscaled, "portrait", "provider", "c_topaz.mp4")
-            self._sidecar(metadata, "portrait", "provider", "c_topaz", "POV Epsilon, Side Alpha")
+            self._sidecar(metadata, "portrait", "provider", "c_topaz", "POV Gamma, Side Alpha")
 
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 examples = thumbnails.example_clips()
 
-            self.assertEqual(examples["POV Epsilon"], video)
+            self.assertEqual(examples["POV Gamma"], video)
             self.assertEqual(examples["Side Alpha"], video)
 
     def test_a_curated_pin_supplies_a_tile_the_library_never_tags(self):
@@ -98,19 +98,19 @@ class TestExampleClips(unittest.TestCase):
 class TestThumbnailCachePath(unittest.TestCase):
     def test_slugifies_the_action_into_a_stable_filename(self):
         with override_config(BACKFILL_THUMBNAIL_DIR=Path("/cache")):
-            self.assertEqual(thumbnails.thumbnail_cache_path("POV Gamma"), Path("/cache/pov_gamma.jpg"))
+            self.assertEqual(thumbnails.thumbnail_cache_path("POV Beta"), Path("/cache/pov_beta.jpg"))
 
     def test_the_same_action_always_maps_to_the_same_file(self):
         with override_config(BACKFILL_THUMBNAIL_DIR=Path("/cache")):
             self.assertEqual(
-                thumbnails.thumbnail_cache_path("Side Beta Gamma"),
-                thumbnails.thumbnail_cache_path("Side Beta Gamma"),
+                thumbnails.thumbnail_cache_path("Side Epsilon"),
+                thumbnails.thumbnail_cache_path("Side Epsilon"),
             )
 
 
 class TestBuildThumbnails(unittest.TestCase):
     def test_extracts_and_yields_each_example(self):
-        examples = {"Side Gamma": Path("a.mp4"), "POV Alpha": Path("b.mp4")}
+        examples = {"Side Beta": Path("a.mp4"), "POV Alpha": Path("b.mp4")}
         calls = []
 
         def extract(clip, dest):
@@ -121,25 +121,25 @@ class TestBuildThumbnails(unittest.TestCase):
 
         self.assertEqual(
             result,
-            [("Side Gamma", Path("/c/Side Gamma.jpg")), ("POV Alpha", Path("/c/POV Alpha.jpg"))],
+            [("Side Beta", Path("/c/Side Beta.jpg")), ("POV Alpha", Path("/c/POV Alpha.jpg"))],
         )
-        self.assertEqual(calls[0], (Path("a.mp4"), Path("/c/Side Gamma.jpg")))
+        self.assertEqual(calls[0], (Path("a.mp4"), Path("/c/Side Beta.jpg")))
 
     def test_a_cached_thumbnail_is_reused_without_extracting(self):
         with workspace_temp_dir() as root:
-            cached = root / "side_gamma.jpg"
+            cached = root / "side_beta.jpg"
             cached.write_bytes(b"img")
             extracted = []
 
             result = list(
                 thumbnails.build_thumbnails(
-                    {"Side Gamma": Path("a.mp4")},
+                    {"Side Beta": Path("a.mp4")},
                     lambda clip, dest: extracted.append(dest) or True,
                     lambda action: cached,
                 )
             )
 
-            self.assertEqual(result, [("Side Gamma", cached)])
+            self.assertEqual(result, [("Side Beta", cached)])
             self.assertEqual(extracted, [])  # a cache hit never shells out to ffmpeg
 
     def test_an_extraction_failure_skips_that_action(self):

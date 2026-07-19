@@ -48,10 +48,10 @@ class TestBackfillSession(unittest.TestCase):
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
-            note = session.apply("side gamma")
+            note = session.apply("side beta")
 
-        record.assert_called_once_with(clip, "Side Gamma")
-        self.assertEqual(note, f"{clip.name} → Side Gamma")
+        record.assert_called_once_with(clip, "Side Beta")
+        self.assertEqual(note, f"{clip.name} → Side Beta")
 
     def test_an_act_retires_the_clip(self):
         session = self._session()
@@ -267,12 +267,12 @@ class TestSame(unittest.TestCase):
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
-            session.apply("pov delta")
+            session.apply("pov zeta")
             second = session.current
             note = session.apply("same")
 
-        record.assert_any_call(second, "POV Delta")
-        self.assertEqual(note, f"{second.name} → POV Delta")
+        record.assert_any_call(second, "POV Zeta")
+        self.assertEqual(note, f"{second.name} → POV Zeta")
         self.assertNotEqual(second, first)
 
     def test_same_before_any_action_repeats_nothing(self):
@@ -339,12 +339,12 @@ class TestSame(unittest.TestCase):
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
-            session.apply("side gamma")
+            session.apply("side beta")
             session.apply("same")
             session.apply("same")
 
         actions = [call.args[1] for call in record.call_args_list]
-        self.assertEqual(actions, ["Side Gamma", "Side Gamma", "Side Gamma"])
+        self.assertEqual(actions, ["Side Beta", "Side Beta", "Side Beta"])
         self.assertEqual(session.remaining, 1)
 
     def test_same_after_the_last_clip_does_nothing(self):
@@ -378,7 +378,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
 
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
                 session = self._session(video)
-                session.apply("pov delta")
+                session.apply("pov zeta")
                 self.assertTrue(sidecar_path(video).is_file())
 
                 session.apply("undo")

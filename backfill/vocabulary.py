@@ -5,23 +5,29 @@ Fun Time's metadata filter matches against.  Kept free of the vosk runtime so th
 tests import it without an audio backend, the same split Fun Time draws between
 its voice_commands and voice_control.
 
-The vosk small model's lexicon has none of the generated-specific compounds
-("alpha", "gamma", "delta"...), and a word missing from the lexicon is
-silently dropped from a grammar.  Every phrase below is therefore voiced in
-words the model knows, and the compound survives only in the action it writes.
+The vosk small model's lexicon has none of the domain-specific compounds the
+library records as actions, and a word missing from the lexicon is silently
+dropped from a grammar.  Every phrase is therefore voiced in words the model
+knows, and the compound survives only in the action it writes.
+
+The act table itself is content, not logic, so it lives in a JSON overlay
+(``content.local.json``, git-ignored) with a committed ``content.example.json``
+placeholder; the grammar and the grid behave the same whichever is loaded.
 
 The typed tables here are the single source of truth for two consumers: the
 recognizer grammar (:data:`ACTIONS`, :data:`CONTROLS`) and the window's clickable
 reference grid (:func:`scoped_grid`, :func:`control_commands`).  An act voiced
-more than one way — "alpha" and "alpha form" both record ``Alpha`` — is one
-``spoken`` form plus its ``aliases``, so the grammar hears every form while the
-grid shows one tile.  Every act is scoped by a camera word: a clip is always
+more than one way is one ``spoken`` form plus its ``aliases``, so the grammar
+hears every form while the grid shows one tile.  Every act is scoped by a camera word: a clip is always
 tagged Side or POV, never bare.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+
+from content import EXAMPLE_CONTENT, LOCAL_CONTENT, load_content
 
 
 @dataclass(frozen=True)
@@ -74,24 +80,32 @@ class Command:
     label: str
 
 
-# Every act, each scoped by a camera word — "Dancing" and "Other" included, so
-# none stands bare.  The written actions match the library's existing Title Case
-# ("Alpha", "Beta Gamma") so one Fun Time query reaches new clips and old.
+def load_acts(
+    local_path: Path = LOCAL_CONTENT,
+    example_path: Path = EXAMPLE_CONTENT,
+) -> tuple[_Act, ...]:
+    """Every act, from the content overlay — the local copy, else the example.
+
+    Each is scoped by a camera word so none stands bare, and the written actions
+    keep the library's existing Title Case, so one Fun Time query reaches new
+    clips and old.
+    """
+    data = load_content(local_path, example_path)
+    return tuple(
+        _Act(
+            spoken=entry["spoken"],
+            action=entry["action"],
+            aliases=tuple(entry.get("aliases", ())),
+        )
+        for entry in data["acts"]
+    )
+
+
+_ACTS: tuple[_Act, ...] = load_acts()
+
 # "POV" is an initialism: the lexicon's one-word "pov" is a g2p guess at a single
 # syllable, while the three letters are priced as their names (P IY, OW, V IY), so
 # the spelled-out form is what actually catches a speaker.
-_ACTS: tuple[_Act, ...] = (
-    _Act("alpha", "Alpha", aliases=("alpha form",)),
-    _Act("gamma", "Gamma"),
-    _Act("epsilon", "Epsilon"),
-    _Act("zeta", "Zeta"),
-    _Act("beta gamma", "Beta Gamma"),
-    _Act("delta", "Delta"),
-    _Act("delta", "Delta"),
-    _Act("dance", "Dancing", aliases=("dancing",)),
-    _Act("other", "Other"),
-)
-
 _CAMERAS: tuple[_Camera, ...] = (
     _Camera(spoken="side", prefix="Side"),
     _Camera(spoken="pov", prefix="POV", aliases=("p o v",)),

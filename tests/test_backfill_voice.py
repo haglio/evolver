@@ -33,8 +33,8 @@ class TestRecognizedPhrase(unittest.TestCase):
 
     def test_averages_confidence_across_the_words_of_a_phrase(self):
         self.assertEqual(
-            recognized_phrase(self._result("side gamma", [0.9, 0.9, 0.3]), threshold=0.7),
-            "side gamma",
+            recognized_phrase(self._result("side beta", [0.9, 0.9, 0.3]), threshold=0.7),
+            "side beta",
         )
 
     def test_accepts_a_phrase_vosk_gave_no_confidence_for(self):
@@ -44,7 +44,7 @@ class TestRecognizedPhrase(unittest.TestCase):
 
 class TestPartialText(unittest.TestCase):
     def test_returns_the_live_hypothesis_the_partial_carries(self):
-        self.assertEqual(partial_text(json.dumps({"partial": "side delta"})), "side delta")
+        self.assertEqual(partial_text(json.dumps({"partial": "side eta"})), "side eta")
 
     def test_empty_when_nothing_has_been_heard_yet(self):
         self.assertEqual(partial_text(json.dumps({"partial": ""})), "")

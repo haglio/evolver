@@ -14,6 +14,13 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import config
+from content import load_content
+
+# The scraped provider's ingest-source folder and site root are private, so
+# they come from the git-ignored content overlay rather than the source.
+_PROVIDER = load_content()["scrape_provider"]
+PROVIDER_SOURCE = _PROVIDER["source"]
+PROVIDER_BASE_URL = _PROVIDER["base_url"]
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
 from util.media_files import iter_finalized_videos
@@ -109,7 +116,7 @@ def _write_failure_marker(output_path: Path, video: Path, error: BaseException) 
 
 def _provider_image_url(video: Path) -> str:
     """The Provider image-page URL a video's stem maps to — its scrape entry point."""
-    return f"https://example.com/image/{source_stem(video.stem)}"
+    return f"{PROVIDER_BASE_URL}/image/{source_stem(video.stem)}"
 
 
 def _iter_video_files(root: Path):
@@ -128,9 +135,9 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
     image_id = image_url.rstrip("/").split("/")[-1]
     candidate_urls = [
         image_url,
-        f"https://example.com/video/{image_id}",
-        f"https://example.com/text-to-video/{image_id}",
-        f"https://example.com/image-to-video/{image_id}",
+        f"{PROVIDER_BASE_URL}/video/{image_id}",
+        f"{PROVIDER_BASE_URL}/text-to-video/{image_id}",
+        f"{PROVIDER_BASE_URL}/image-to-video/{image_id}",
     ]
 
     video_prompt = ""
@@ -151,7 +158,7 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
                 if not video_metadata:
                     video_metadata = _embedded_to_video_metadata(embedded)
                 if embedded.parent_image_id and not source_image_url:
-                    source_image_url = f"https://example.com/image/{embedded.parent_image_id}"
+                    source_image_url = f"{PROVIDER_BASE_URL}/image/{embedded.parent_image_id}"
         if video_prompt:
             break
     if not video_prompt:
@@ -196,7 +203,7 @@ def _build_strategies(browser):
     """
     strategies = {"origenerator": origenerator_metadata.build_metadata}
     if browser is not None:
-        strategies["provider"] = lambda video: _scrape_provider_video(
+        strategies[PROVIDER_SOURCE] = lambda video: _scrape_provider_video(
             video, _provider_image_url(video), browser
         )
     return strategies
@@ -252,7 +259,7 @@ def _image_page_url_from_src(src: str) -> str:
     image_id = parsed.path.strip("/").split("/")[-1]
     if not image_id:
         return ""
-    return f"https://example.com/image/{image_id}"
+    return f"{PROVIDER_BASE_URL}/image/{image_id}"
 
 
 def _fetch_dom(url: str, browser: Path) -> str:
