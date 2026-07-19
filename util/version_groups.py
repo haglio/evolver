@@ -6,10 +6,14 @@ stem (``foo`` -> ``foo_apo8_iris2``), so stripping those suffixes (see
 original with its variants — even when a hand-made variant keeps an extra
 manual tag the plain strip leaves behind (``foo_3_apf2_iris2`` -> ``foo_3``,
 still a token-prefix match for ``foo``).
+
+A version renamed rather than suffixed keeps no such thread back to its
+original, so those pairs are declared instead (``config.NONAI_VERSION_OVERRIDES``).
 """
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 
 from util.variants import strip_processing_suffixes
 
@@ -26,13 +30,19 @@ def _is_prefix(shorter: tuple[str, ...], longer: tuple[str, ...]) -> bool:
     return len(shorter) <= len(longer) and longer[: len(shorter)] == shorter
 
 
-def group_ids(stems: list[str]) -> dict[str, str]:
+def group_ids(stems: list[str], overrides: Mapping[str, str] | None = None) -> dict[str, str]:
     """Map each stem to its family's group id — the original's stripped stem.
 
     Stems are matched shortest-family-first, so an original anchors the family
     its longer-named variants join; a variant joins the family whose tokens are
     a prefix of its own. The id is the anchor's suffix-stripped stem, so every
     variant of one scene shares a single stable, readable id.
+
+    *overrides* names the pairs the rule cannot see: a version renamed by hand
+    shares no prefix with its original (a 4K upscale of the best eight minutes,
+    saved as "Performer POV BJ 4k 60fps"), so it has to be declared. Each entry
+    maps such a stem to the stem of the video it is a version of; with three
+    versions, point them all at the same one rather than at each other.
     """
     order = {stem: i for i, stem in enumerate(stems)}
     tokens = {stem: group_key_tokens(stem) for stem in stems}
@@ -53,4 +63,10 @@ def group_ids(stems: list[str]) -> dict[str, str]:
             group_of[stem] = strip_processing_suffixes(stem)
         else:
             group_of[stem] = group_of[joined]
+    for stem, anchor in (overrides or {}).items():
+        # Only within one bucket: group_ids sees a bucket at a time, and a
+        # declared pair split across two of them is not a family Evolver can
+        # record anyway.
+        if stem in group_of and anchor in group_of:
+            group_of[stem] = group_of[anchor]
     return group_of

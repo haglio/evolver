@@ -131,6 +131,30 @@ class TestNonAiGroup(unittest.TestCase):
                 self.assertIn("clip", sidecar.read(sidecar.sidecar_path(upscaled)))
                 self.assertNotIn("clip", sidecar.read(sidecar.sidecar_path(neighbour)))
 
+    def test_a_declared_pair_gets_one_group_the_names_never_would(self):
+        """The stage rewrites `version.group` every run, so a hand edit to a
+        sidecar lasts ten minutes. Declaring the pair is what makes it stick."""
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata,
+                NONAI_VERSION_OVERRIDES={
+                    "redacted POV BJ 4k 60fps": "redacted_540-pacI21CK",
+                },
+            ):
+                original = _touch(non_ai / "winston" / "0 unsorted" / "redacted_540-pacI21CK.mp4")
+                upscale = _touch(
+                    non_ai / "winston" / "3_good_to_go" / "processed"
+                    / "redacted POV BJ 4k 60fps.mp4"
+                )
+
+                nonai_group.run()
+
+                self.assertEqual(
+                    sidecar.read(sidecar.sidecar_path(upscale))["version"]["group"],
+                    sidecar.read(sidecar.sidecar_path(original))["version"]["group"],
+                )
+
     def test_is_idempotent_then_prunes_a_removed_clips_sidecar(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)

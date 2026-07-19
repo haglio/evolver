@@ -3,9 +3,13 @@
 Real-footage clips carry no generation metadata, but Fun Time's Nau player
 still wants to fold an original together with its Topaz-enhanced variants into
 one rotation slot. This stage is the source of truth for that grouping: it
-scans every non_AI bucket, families the clips by name (:mod:`util.version_groups`),
-and writes each a sidecar — mirrored under ``METADATA_DIR`` exactly like the AI
-tree — recording its family id and whether it is a processed variant.
+scans every non_AI bucket, families the clips by name (:mod:`util.version_groups`)
+plus the pairs ``config.NONAI_VERSION_OVERRIDES`` declares, and writes each a
+sidecar — mirrored under ``METADATA_DIR`` exactly like the AI tree — recording
+its family id and whether it is a processed variant.
+
+Being the source of truth means it rewrites ``version.group`` on every run, so
+editing a sidecar by hand does not hold: an override is the way to correct one.
 
 New clips get grouped on the next run; sidecars for clips that have since moved
 or been deleted are pruned, so the metadata tree stays a faithful record of the
@@ -57,7 +61,7 @@ def run() -> NonAiGroupResult:
         ]
         if not videos:
             continue
-        ids = group_ids([video.stem for video in videos])
+        ids = group_ids([video.stem for video in videos], config.NONAI_VERSION_OVERRIDES)
         # A `clip` object (compilation, source, performer) describes one carved
         # scene, and its re-encodes are the same scene — so an upscaled variant
         # inherits it and stays a navigable short. Keying that on the *family*
