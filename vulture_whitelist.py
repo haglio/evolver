@@ -30,5 +30,8 @@ _.cbSize  # noqa: F821  — _LastInputInfo.cbSize (required by GetLastInputInfo)
 # -- Dataclass fields consumed via dataclasses.asdict() --
 _.timed_out  # noqa: F821  — UpscaleResult.timed_out, serialized to run records
 
+# -- Written-but-never-read on purpose: the reference IS the job --
+_._show_requests  # noqa: F821  — anchors the QLocalServer; collecting it closes the pipe
+
 # -- Script entry points (invoked by __main__ guard) --
 _.main  # noqa: F821

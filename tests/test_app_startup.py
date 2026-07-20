@@ -1,13 +1,11 @@
 """Smoke test: verify the tray app can be constructed without crashing."""
 
-import ctypes
-import os
 import unittest
 from unittest.mock import patch
 
 from PyQt6.QtWidgets import QApplication
 
-from gui.app import EvolverApp, _APP_MODEL_ID, _acquire_single_instance_mutex
+from gui.app import EvolverApp, _APP_MODEL_ID
 
 _app = QApplication.instance() or QApplication([])
 
@@ -108,13 +106,11 @@ class TestSessionManagement(unittest.TestCase):
         )
 
     def test_session_end_logs_to_crash_log(self):
-        import tray_app
-
         with patch("gui.app.QApplication", return_value=_app):
             app = EvolverApp()
 
         mock_manager = unittest.mock.MagicMock()
-        with patch.object(tray_app, "_write_info") as mock_write:
+        with patch("gui.app.crash_log.write_info") as mock_write:
             app._on_session_end(mock_manager)
 
         mock_write.assert_called_once()
@@ -127,7 +123,7 @@ class TestSessionManagement(unittest.TestCase):
 
         mock_manager = unittest.mock.MagicMock()
         with patch.object(app, "_quit") as mock_quit, \
-             patch("gui.app.tray_app._write_info"):
+             patch("gui.app.crash_log.write_info"):
             app._on_session_end(mock_manager)
 
         mock_quit.assert_called_once()
@@ -206,23 +202,90 @@ class TestRestart(unittest.TestCase):
             mock_allow.assert_not_called()
 
 
-class TestDuplicateInstanceLogging(unittest.TestCase):
-    """When a second instance is rejected by the mutex, the log must say so."""
+class TestDuplicateLaunchHandoff(unittest.TestCase):
+    """A second launch is the user clicking Evolver, whose window is hidden in
+    the tray — so it must open the running instance's window, not exit."""
 
-    def test_duplicate_instance_logs_specific_message(self):
-        import tray_app
-
+    def _duplicate_launch(self, handoff_taken):
         with patch("gui.app.QApplication", return_value=_app):
             app = EvolverApp()
 
-        with patch("gui.app._acquire_single_instance_mutex", return_value=False), \
-             patch.object(app._tray, "showMessage"), \
-             patch.object(tray_app, "_write_crash") as mock_write:
+        with patch("gui.app.single_instance.is_first_instance", return_value=False), \
+             patch("gui.app.single_instance.request_show", return_value=handoff_taken) as request, \
+             patch("gui.app.show_error_window") as alert, \
+             patch("gui.app.crash_log.write_info") as logged:
+            exit_code = app.run()
+
+        return exit_code, request, alert, logged
+
+    def test_duplicate_asks_the_running_instance_to_show_its_window(self):
+        exit_code, request, _, _ = self._duplicate_launch(handoff_taken=True)
+
+        request.assert_called_once_with()
+        self.assertEqual(exit_code, 0)
+
+    def test_a_taken_handoff_needs_no_dialog(self):
+        _, _, alert, _ = self._duplicate_launch(handoff_taken=True)
+
+        alert.assert_not_called()
+
+    def test_a_handoff_the_running_instance_never_answered_is_visible(self):
+        """Exiting into silence here is the whole bug: the user clicked Evolver
+        and nothing at all happened."""
+        _, _, alert, _ = self._duplicate_launch(handoff_taken=False)
+
+        alert.assert_called_once()
+        self.assertIn("evolver", " ".join(alert.call_args[0]).lower())
+
+    def test_the_launch_is_logged_as_the_ordinary_event_it_is(self):
+        """A click on a running app is not a crash, and must not suppress the
+        atexit line that says how this process really ended."""
+        _, _, _, logged = self._duplicate_launch(handoff_taken=True)
+
+        logged.assert_called_once()
+        self.assertIn("already running", logged.call_args[0][0].lower())
+
+
+class TestServingDuplicateLaunches(unittest.TestCase):
+    """The other half of the handoff: without a listener, every duplicate launch
+    falls through to the error dialog and the window still never opens."""
+
+    def _run_as_first_instance(self):
+        with patch("gui.app.QApplication", return_value=_app):
+            app = EvolverApp()
+
+        with patch("gui.app.single_instance.is_first_instance", return_value=True), \
+             patch("gui.app.single_instance.serve_show_requests") as serve, \
+             patch.object(app._tray, "show"), \
+             patch.object(app._scheduler, "start"), \
+             patch.object(app._app, "exec", return_value=0), \
+             patch("gui.app.sys") as mock_sys:
+            mock_sys.argv = ["tray_app.py"]
             app.run()
 
-        mock_write.assert_called_once()
-        header = mock_write.call_args[0][0]
-        self.assertIn("already running", header.lower())
+        return app, serve
+
+    def test_first_instance_listens_for_them(self):
+        _, serve = self._run_as_first_instance()
+
+        serve.assert_called_once()
+
+    def test_what_it_registered_opens_the_window(self):
+        app, serve = self._run_as_first_instance()
+
+        with patch.object(app._window, "show") as mock_show, \
+             patch.object(app._window, "raise_"), \
+             patch.object(app._window, "activateWindow"):
+            serve.call_args[0][0]()
+
+        mock_show.assert_called_once()
+
+    def test_the_listener_is_held_past_the_call_that_made_it(self):
+        """A QLocalServer nothing refers to is collected, and the pipe closes
+        with it — the handoff would then fail for reasons no log would show."""
+        app, serve = self._run_as_first_instance()
+
+        self.assertIs(app._show_requests, serve.return_value)
 
 
 class TestShowWindowFlag(unittest.TestCase):
@@ -233,7 +296,7 @@ class TestShowWindowFlag(unittest.TestCase):
             app = EvolverApp()
 
         with patch.object(app, "_show_window") as mock_show, \
-             patch("gui.app._acquire_single_instance_mutex", return_value=True), \
+             patch("gui.app.single_instance.is_first_instance", return_value=True), \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \
@@ -247,7 +310,7 @@ class TestShowWindowFlag(unittest.TestCase):
             app = EvolverApp()
 
         with patch.object(app, "_show_window") as mock_show, \
-             patch("gui.app._acquire_single_instance_mutex", return_value=True), \
+             patch("gui.app.single_instance.is_first_instance", return_value=True), \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \
@@ -255,32 +318,6 @@ class TestShowWindowFlag(unittest.TestCase):
             mock_sys.argv = ["tray_app.py"]
             app.run()
             mock_show.assert_not_called()
-
-
-class TestSingleInstanceMutex(unittest.TestCase):
-    """Verify the single-instance mutex works correctly and is immune to
-    GetLastError clobbering by injected DLLs (e.g. Windhawk)."""
-
-    def test_first_instance_returns_true(self):
-        unique = f"TestMutex_{os.getpid()}"
-        with patch("gui.app._MUTEX_NAME", unique):
-            self.assertTrue(_acquire_single_instance_mutex())
-
-    def test_second_instance_returns_false(self):
-        unique = f"TestMutex_Dup_{os.getpid()}"
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
-        kernel32.CreateMutexW.restype = ctypes.c_void_p
-        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-        kernel32.CloseHandle.restype = ctypes.c_int
-        h = kernel32.CreateMutexW(None, False, unique)
-        self.assertTrue(h, "Setup: CreateMutexW should succeed")
-        try:
-            with patch("gui.app._MUTEX_NAME", unique):
-                self.assertFalse(_acquire_single_instance_mutex())
-        finally:
-            kernel32.CloseHandle(h)
-
 
 
 if __name__ == "__main__":

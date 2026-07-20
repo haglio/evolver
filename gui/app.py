@@ -8,14 +8,14 @@ import subprocess
 import sys
 
 from PyQt6.QtCore import QTimer
+from PyQt6.QtNetwork import QLocalServer
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import config
-import tray_app
-from gui.run_record import load_runs
-
+from gui import single_instance
 from gui.main_window import EvolverMainWindow
 from gui.progress_popup import ProgressPopup
+from gui.run_record import load_runs
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
@@ -24,31 +24,12 @@ from gui.taskbar import set_taskbar_properties
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
 from tasks import nonai_upscale
+from util import crash_log
+from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
-_MUTEX_NAME = "EvolverTrayApp_SingleInstance"
 _APP_MODEL_ID = "Evolver.TrayApp"
-
-
-_kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-_CreateMutexW = _kernel32.CreateMutexW
-_CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
-_CreateMutexW.restype = ctypes.c_void_p
-
-
-def _acquire_single_instance_mutex() -> bool:
-    """Try to acquire a named mutex. Returns True if this is the first instance.
-
-    Uses use_last_error=True + ctypes.get_last_error() so the error code is
-    captured atomically at the C level, immune to clobbering by injected DLLs
-    (e.g. Windhawk) that may call Win32 functions inside CreateMutexW hooks.
-    """
-    _ERROR_ALREADY_EXISTS = 183
-    handle = _CreateMutexW(None, False, _MUTEX_NAME)
-    if not handle:
-        return True  # CreateMutex failed entirely; proceed anyway
-    return ctypes.get_last_error() != _ERROR_ALREADY_EXISTS
 
 
 class EvolverApp:
@@ -64,6 +45,7 @@ class EvolverApp:
         self._worker: PipelineWorker | None = None
         self._stats_window: StatsWindow | None = None
         self._progress_popup: ProgressPopup | None = None
+        self._show_requests: QLocalServer | None = None
 
         self._watchdog = QTimer()
         self._watchdog.setSingleShot(True)
@@ -113,10 +95,22 @@ class EvolverApp:
         self._window.refresh_history()
 
     def run(self) -> int:
-        if not _acquire_single_instance_mutex():
-            tray_app._write_crash("Already running:", "duplicate instance rejected by mutex\n")
-            self._tray.showMessage("Evolver", "Already running.", self._tray.MessageIcon.Information, 3000)
+        if not single_instance.is_first_instance():
+            crash_log.write_info(
+                "Already running:", "duplicate launch handed to the running instance\n",
+            )
+            if not single_instance.request_show():
+                show_error_window(
+                    "Evolver",
+                    "Evolver is already running but did not respond, so its window "
+                    "could not be opened.\n\nQuit it from the tray icon, or end the "
+                    "pythonw.exe process, then start Evolver again.",
+                )
             return 0
+
+        # Held for the process's life: if this is collected the pipe closes with
+        # it, and every later launch fails the handoff instead of taking it.
+        self._show_requests = single_instance.serve_show_requests(self._show_window)
 
         self._tray.show()
         self._scheduler.start()
@@ -277,7 +271,7 @@ class EvolverApp:
         worker thread, and any running subprocesses are cleaned up before
         Windows force-kills the process.
         """
-        tray_app._write_info(
+        crash_log.write_info(
             "Windows session end requested:",
             f"allowsInteraction={manager.allowsInteraction()}\n",
         )

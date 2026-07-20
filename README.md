@@ -49,7 +49,9 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `backfill/work.py` - the single thread the file work runs on, in the order it was spoken
   - `backfill/voice.py` - offline vosk recognition over the tool's grammar
   - `backfill/window.py` - the looping player, the remaining count, and the last decision
-  - `gui/app.py` - tray application wiring and single-instance guard
+  - `gui/app.py` - tray application wiring
+  - `gui/single_instance.py` - who owns the one instance, and where a second launch goes
+  - `util/crash_log.py` - what the tray app records about the way it died
   - `gui/tray.py` - system tray icon and context menu
   - `gui/main_window.py` - run history list and detail/progress panel
   - `gui/progress.py` - live per-stage progress widget
@@ -78,6 +80,12 @@ pythonw.exe tray_app.py
 This starts a system tray icon. Right-click for the context menu (Run Now, Pause/Resume, Settings, Stats, Backfill Metadata, Quit) or double-click to open the main window with run history and live progress. Configure the run interval and Windows startup registration from Settings.
 
 Run history is stored as JSON files in `runs/` (gitignored). Settings are persisted to `gui_settings.json` (gitignored).
+
+### Launching it again
+
+Only one Evolver ever runs — two schedulers would mean two pipelines and stacked Topaz encodes. But its window lives in the tray, so *launching* Evolver while it is already running is how you ask to see it: the shortcut, the Start menu entry, and the taskbar pin (whose relaunch command Windows re-runs verbatim) all start a second process whose real job is to open the first one's window. That process hands the request over a named pipe and exits.
+
+A launch never ends without telling you why. If the running instance holds the mutex but does not answer the pipe, or if startup fails before there is any window to report into — a missing dependency, say, which under `pythonw.exe` has neither a console nor stderr — you get a Windows dialog naming the cause and pointing at `tray_crash.log`, instead of a launcher that appeared to do nothing.
 
 ## Metadata backfill tool
 
@@ -242,6 +250,8 @@ What is covered:
 - Already-processed detection (`tasks/upscale.py`)
 - Partial-file handling across upscale cleanup and downstream scanners (`tasks/upscale.py`, `check_correspondence.py`, `tasks/prompt_scrape.py`, `tasks/sort.py`)
 - Non-AI candidate discovery, priority order, and the detached-encode lifecycle: launch, in-flight, promote, retry, skip-manifest, and stuck-job kill (`tasks/nonai_upscale.py`)
+- Single-instance ownership and the duplicate-launch handoff, both halves of it: that a second launch opens the running instance's window, and that the running instance is listening for one (`gui/single_instance.py`, `gui/app.py`)
+- That no launch ends without saying why, whether it fails the handoff or crashes before there is a window (`gui/app.py`, `tray_app.py`)
 
 ## Output temp-file contract
 

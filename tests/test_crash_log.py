@@ -1,14 +1,17 @@
-"""Tests for tray_app crash handling: excepthook, BaseException, exit logging."""
+"""Tests for the crash log, and for the entry point that has to surface one."""
 
 import sys
+import tempfile
 import unittest
-from unittest.mock import patch, MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import tray_app
+from util import crash_log
 
 
 class TestInstallExcepthook(unittest.TestCase):
-    """_install_excepthook must set sys.excepthook to a handler that logs and exits."""
+    """install_excepthook must set sys.excepthook to a handler that logs and exits."""
 
     def setUp(self):
         self._original_hook = sys.excepthook
@@ -17,17 +20,17 @@ class TestInstallExcepthook(unittest.TestCase):
         sys.excepthook = self._original_hook
 
     def test_sets_sys_excepthook(self):
-        tray_app._install_excepthook()
+        crash_log.install_excepthook()
         self.assertIsNot(sys.excepthook, self._original_hook)
 
     def test_hook_writes_crash_log(self):
-        tray_app._install_excepthook()
+        crash_log.install_excepthook()
         try:
             raise ValueError("slot went boom")
         except ValueError:
             exc_type, exc_value, exc_tb = sys.exc_info()
 
-        with patch.object(tray_app, "_write_crash") as mock_write, \
+        with patch.object(crash_log, "write_crash") as mock_write, \
              self.assertRaises(SystemExit):
             sys.excepthook(exc_type, exc_value, exc_tb)
 
@@ -37,13 +40,13 @@ class TestInstallExcepthook(unittest.TestCase):
         self.assertIn("slot went boom", detail)
 
     def test_hook_exits_with_code_1(self):
-        tray_app._install_excepthook()
+        crash_log.install_excepthook()
         try:
             raise RuntimeError("kaboom")
         except RuntimeError:
             exc_type, exc_value, exc_tb = sys.exc_info()
 
-        with patch.object(tray_app, "_write_crash"), \
+        with patch.object(crash_log, "write_crash"), \
              self.assertRaises(SystemExit) as cm:
             sys.excepthook(exc_type, exc_value, exc_tb)
 
@@ -51,19 +54,16 @@ class TestInstallExcepthook(unittest.TestCase):
 
 
 class TestWriteCrash(unittest.TestCase):
-    """_write_crash must write a timestamped entry to CRASH_LOG."""
+    """write_crash must write a timestamped entry to CRASH_LOG."""
 
     def test_writes_header_and_detail(self):
-        import tempfile
-        from pathlib import Path
-
         with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
             tmp = Path(f.name)
 
         try:
-            with patch.object(tray_app, "CRASH_LOG", tmp):
-                tray_app._crash_logged = False
-                tray_app._write_crash("Test header:", "some detail")
+            with patch.object(crash_log, "CRASH_LOG", tmp):
+                crash_log._crash_logged = False
+                crash_log.write_crash("Test header:", "some detail")
 
             text = tmp.read_text(encoding="utf-8")
             self.assertIn("Test header:", text)
@@ -74,17 +74,14 @@ class TestWriteCrash(unittest.TestCase):
 
     def test_appends_to_existing_content(self):
         """Crash entries must append, not overwrite, so we don't lose evidence."""
-        import tempfile
-        from pathlib import Path
-
         with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
             f.write("[2026-03-31 10:00:00] Previous entry\n")
             tmp = Path(f.name)
 
         try:
-            with patch.object(tray_app, "CRASH_LOG", tmp):
-                tray_app._crash_logged = False
-                tray_app._write_crash("New crash:", "details here")
+            with patch.object(crash_log, "CRASH_LOG", tmp):
+                crash_log._crash_logged = False
+                crash_log.write_crash("New crash:", "details here")
 
             content = tmp.read_text(encoding="utf-8")
             self.assertIn("Previous entry", content)
@@ -94,16 +91,16 @@ class TestWriteCrash(unittest.TestCase):
 
 
 class TestAtexitHandler(unittest.TestCase):
-    """_install_atexit registers a handler that logs clean exits."""
+    """on_exit logs clean exits, unless a crash already explained the ending."""
 
     def setUp(self):
-        tray_app._crash_logged = False
+        crash_log._crash_logged = False
 
     def test_atexit_writes_when_no_crash(self):
         mock_path = MagicMock()
         mock_path.open = unittest.mock.mock_open()
-        with patch.object(tray_app, "CRASH_LOG", mock_path):
-            tray_app._on_exit()
+        with patch.object(crash_log, "CRASH_LOG", mock_path):
+            crash_log.on_exit()
 
         mock_path.open.assert_called_once()
         handle = mock_path.open()
@@ -112,85 +109,87 @@ class TestAtexitHandler(unittest.TestCase):
 
     def test_atexit_includes_stack_trace(self):
         """Clean exit must log a stack trace so we can diagnose what triggered it."""
-        import tempfile
-        from pathlib import Path
-
         with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
             tmp = Path(f.name)
 
         try:
-            with patch.object(tray_app, "CRASH_LOG", tmp):
-                tray_app._on_exit()
+            with patch.object(crash_log, "CRASH_LOG", tmp):
+                crash_log.on_exit()
 
             content = tmp.read_text(encoding="utf-8")
             self.assertIn("Clean exit", content)
             # Must contain stack frames showing the call chain
-            self.assertIn("_on_exit", content)
-        finally:
-            tmp.unlink()
-
-    def test_atexit_appends_to_existing_content(self):
-        import tempfile
-        from pathlib import Path
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
-            f.write("[2026-03-31 10:00:00] Previous crash entry\n")
-            tmp = Path(f.name)
-
-        try:
-            with patch.object(tray_app, "CRASH_LOG", tmp):
-                tray_app._on_exit()
-
-            content = tmp.read_text(encoding="utf-8")
-            self.assertIn("Previous crash entry", content)
-            self.assertIn("Clean exit", content)
+            self.assertIn("on_exit", content)
         finally:
             tmp.unlink()
 
     def test_atexit_skips_when_crash_already_logged(self):
-        tray_app._crash_logged = True
+        crash_log._crash_logged = True
         mock_path = MagicMock()
-        with patch.object(tray_app, "CRASH_LOG", mock_path):
-            tray_app._on_exit()
+        with patch.object(crash_log, "CRASH_LOG", mock_path):
+            crash_log.on_exit()
 
-        mock_path.write_text.assert_not_called()
+        mock_path.open.assert_not_called()
 
     def test_write_crash_sets_flag(self):
-        tray_app._crash_logged = False
+        crash_log._crash_logged = False
         mock_path = MagicMock()
-        with patch.object(tray_app, "CRASH_LOG", mock_path):
-            tray_app._write_crash("test:", "detail")
-        self.assertTrue(tray_app._crash_logged)
+        with patch.object(crash_log, "CRASH_LOG", mock_path):
+            crash_log.write_crash("test:", "detail")
+        self.assertTrue(crash_log._crash_logged)
 
 
 class TestWriteInfo(unittest.TestCase):
-    """_write_info logs without suppressing the atexit handler."""
+    """write_info logs without suppressing the atexit handler."""
 
     def setUp(self):
-        tray_app._crash_logged = False
+        crash_log._crash_logged = False
 
     def test_write_info_does_not_set_crash_flag(self):
         mock_path = MagicMock()
-        with patch.object(tray_app, "CRASH_LOG", mock_path):
-            tray_app._write_info("Session end:", "detail\n")
-        self.assertFalse(tray_app._crash_logged)
+        with patch.object(crash_log, "CRASH_LOG", mock_path):
+            crash_log.write_info("Session end:", "detail\n")
+        self.assertFalse(crash_log._crash_logged)
 
     def test_write_info_writes_timestamped_entry(self):
-        import tempfile
-        from pathlib import Path
-
         with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
             tmp = Path(f.name)
 
         try:
-            with patch.object(tray_app, "CRASH_LOG", tmp):
-                tray_app._write_info("Session end:", "detail\n")
+            with patch.object(crash_log, "CRASH_LOG", tmp):
+                crash_log.write_info("Session end:", "detail\n")
 
             text = tmp.read_text(encoding="utf-8")
             self.assertIn("Session end:", text)
             self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
         finally:
             tmp.unlink()
+
+
+class TestStartupCrashIsVisible(unittest.TestCase):
+    """A crash before the tray icon exists has no window and no stderr to land
+    in, so the log alone leaves the user staring at a launcher that did nothing."""
+
+    def test_startup_crash_is_written_to_the_log(self):
+        with patch.object(crash_log, "write_crash") as mock_write, \
+             patch("tray_app.show_error_window"):
+            tray_app.report_startup_crash("Traceback...\nValueError: no module named x\n")
+
+        mock_write.assert_called_once()
+        self.assertIn("startup crash", mock_write.call_args[0][0].lower())
+
+    def test_startup_crash_opens_a_dialog_naming_the_error(self):
+        with patch.object(crash_log, "write_crash"), \
+             patch("tray_app.show_error_window") as mock_alert:
+            tray_app.report_startup_crash(
+                "Traceback...\nModuleNotFoundError: No module named 'qtawesome'\n"
+            )
+
+        mock_alert.assert_called_once()
+        title, body = mock_alert.call_args[0]
+        self.assertIn("evolver", title.lower())
+        self.assertIn("qtawesome", body)
+        self.assertIn(str(crash_log.CRASH_LOG), body)
 
 
 if __name__ == "__main__":
