@@ -6,58 +6,31 @@ Launch with: pythonw.exe tray_app.py
 
 import atexit
 import sys
-import traceback as _traceback
-from datetime import datetime
-from pathlib import Path
+import traceback
 
-CRASH_LOG = Path(__file__).resolve().parent / "tray_crash.log"
-
-_crash_logged = False
-
-
-def _write_crash(header: str, detail: str):
-    """Append a timestamped crash entry to the crash log and suppress the atexit 'Clean exit' line."""
-    global _crash_logged
-    _crash_logged = True
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with CRASH_LOG.open("a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] {header}\n{detail}")
-
-
-def _write_info(header: str, detail: str):
-    """Append a timestamped informational entry without suppressing the atexit handler."""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with CRASH_LOG.open("a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] {header}\n{detail}")
-
-
-def _on_exit():
-    """Log clean exits so we can distinguish them from external kills."""
-    if not _crash_logged:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        stack = "".join(_traceback.format_stack())
-        with CRASH_LOG.open("a", encoding="utf-8") as f:
-            f.write(f"[{timestamp}] Clean exit\n{stack}")
-
-
-def _install_excepthook():
-    """Intercept unhandled exceptions before they reach PyQt6's qFatal/abort path.
-
-    Without this, exceptions in Qt slots cause a silent C-level abort() with
-    no Python traceback — especially under pythonw.exe which has no stderr.
-    """
-    def _hook(exc_type, exc_value, exc_tb):
-        text = "".join(_traceback.format_exception(exc_type, exc_value, exc_tb))
-        _write_crash("Unhandled exception in Qt callback:", text)
-        sys.exit(1)
-    sys.excepthook = _hook
+from util import crash_log
+from util.windows_alert import show_error_window
 
 
 def main():
-    _install_excepthook()
-    atexit.register(_on_exit)
+    crash_log.install_excepthook()
+    atexit.register(crash_log.on_exit)
     from gui.app import EvolverApp
     sys.exit(EvolverApp().run())
+
+
+def report_startup_crash(detail: str) -> None:
+    """Record a failed startup, and put it somewhere the user will actually see.
+
+    Nothing is on screen yet and pythonw.exe has no stderr, so a log entry alone
+    leaves them looking at a launcher that did nothing at all — which is how a
+    missing dependency once went unnoticed for a day.
+    """
+    crash_log.write_crash("Startup crash:", detail)
+    show_error_window(
+        "Evolver failed to start",
+        f"{detail.strip().splitlines()[-1]}\n\nFull details: {crash_log.CRASH_LOG}",
+    )
 
 
 if __name__ == "__main__":
@@ -66,5 +39,5 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except BaseException:
-        _write_crash("Startup crash:", _traceback.format_exc())
+        report_startup_crash(traceback.format_exc())
         sys.exit(1)
