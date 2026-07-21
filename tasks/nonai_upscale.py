@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import ffprobe, processes, sidecar, system_resources, topaz
+from util import ffprobe, funscript, processes, sidecar, system_resources, topaz
 from util.media_files import is_finalized_video_file, is_partial_video_path
 from util.nonai_library import buckets
 from util.variants import is_processed_stem, strip_processing_suffixes
@@ -357,24 +357,29 @@ def _retire_original(source: Path) -> None:
         log.warning("Original collides with %s; leaving it at %s.", dest, source)
         return
     source.replace(dest)
-    _move_sidecar(source, dest)
+    _move_mirrored_files(source, dest)
     log.info("Retired original: %s -> %s", source, dest)
 
 
-def _move_sidecar(source: Path, dest: Path) -> None:
-    """Carry a retired original's sidecar to its new path.
+def _move_mirrored_files(source: Path, dest: Path) -> None:
+    """Carry a retired original's sidecar and funscript to its new path.
 
-    The metadata tree mirrors the video tree, so a moved video's sidecar must
-    move with it — otherwise the old one is orphaned and pruned, losing the
-    ``clip`` family metadata Nau navigates by. The grouping stage re-stamps
-    ``version`` on the next run; this keeps ``clip``/``video`` from vanishing.
+    The metadata and script trees both mirror the video tree, so both of a
+    moved video's files must move with it. A left-behind sidecar is orphaned
+    and pruned, losing the ``clip`` family metadata Nau navigates by (the
+    grouping stage re-stamps ``version`` on the next run; this keeps
+    ``clip``/``video`` from vanishing). A left-behind funscript is worse than
+    orphaned: the scripts sync would relocate it, but the clip-scripts stage
+    runs first and writes the clip a fresh script at the new path, so the sync
+    finds its destination taken and fails the run on an unresolvable collision.
     """
-    src_side = sidecar.sidecar_path(source)
-    if not src_side.exists():
-        return
-    dst_side = sidecar.sidecar_path(dest)
-    dst_side.parent.mkdir(parents=True, exist_ok=True)
-    src_side.replace(dst_side)
+    for mirrored_path in (sidecar.sidecar_path, funscript.script_path_for_video):
+        src = mirrored_path(source)
+        if not src.exists():
+            continue
+        dst = mirrored_path(dest)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.replace(dst)
 
 
 def _bucket_of(source: Path) -> Path | None:
@@ -677,8 +682,7 @@ def _watch_scores() -> dict[str, float]:
 
 
 def _has_funscript(video: Path) -> bool:
-    mirrored = config.SCRIPT_LIBRARY_DIR / video.relative_to(config.VIDEO_LIBRARY_DIR)
-    return mirrored.with_suffix(config.FUNSCRIPT_EXTENSION).is_file()
+    return funscript.script_path_for_video(video).is_file()
 
 
 def _skip_manifest_entries() -> set[str]:
