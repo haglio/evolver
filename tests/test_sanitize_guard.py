@@ -21,7 +21,7 @@ class TestFindViolations(unittest.TestCase):
         self.assertTrue(find_violations("FORBIDDENTERM", ["forbiddenterm"]))
 
     def test_word_boundary_prevents_substring_false_positive(self):
-        self.assertEqual(find_violations("a class of objects", ["redacted"]), [])
+        self.assertEqual(find_violations("a concatenated list", ["cat"]), [])
 
     def test_matches_a_multi_word_term_across_flexible_whitespace(self):
         self.assertTrue(find_violations("a two   word phrase", ["two word"]))

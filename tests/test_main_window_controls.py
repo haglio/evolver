@@ -103,15 +103,15 @@ class TestNonAiUpscaleSummary(unittest.TestCase):
 
     def test_a_died_encode_names_what_failed(self):
         """The other way a percent vanishes: ffmpeg died partway through."""
-        summary = self._result(failed="larkin/1 clips/redacted Overload 1.mp4",
+        summary = self._result(failed="larkin/1 clips/Scene Five 1.mp4",
                                start_deferred="cooldown", pending=399)
         self.assertIn("failed", summary)
-        self.assertIn("larkin/1 clips/redacted Overload 1.mp4", summary)
+        self.assertIn("larkin/1 clips/Scene Five 1.mp4", summary)
 
     def test_a_fresh_start_names_the_video_it_kicked_off(self):
-        summary = self._result(started="larkin/1 clips/redacted It Dry 9.mp4")
+        summary = self._result(started="larkin/1 clips/Scene Three 9.mp4")
         self.assertIn("started", summary)
-        self.assertIn("larkin/1 clips/redacted It Dry 9.mp4", summary)
+        self.assertIn("larkin/1 clips/Scene Three 9.mp4", summary)
 
     def test_an_idle_stage_says_why_nothing_is_running(self):
         summary = self._result(start_deferred="cooldown")
@@ -125,9 +125,9 @@ class TestNonAiUpscaleSummary(unittest.TestCase):
 
     def test_a_stopped_encode_says_the_clip_keeps_its_place(self):
         """Stopping is no fault of the video, unlike failing — it stays queued."""
-        summary = self._result(stopped="larkin/1 clips/redacted redacted 4.mp4")
+        summary = self._result(stopped="larkin/1 clips/Scene Four 4.mp4")
         self.assertIn("stopped", summary)
-        self.assertIn("larkin/1 clips/redacted redacted 4.mp4", summary)
+        self.assertIn("larkin/1 clips/Scene Four 4.mp4", summary)
         self.assertIn("still queued", summary)
 
     def test_a_low_disk_hold_is_called_out(self):
