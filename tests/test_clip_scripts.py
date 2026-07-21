@@ -126,7 +126,7 @@ class TestClipScripts(ClipScriptsCase):
 
     def test_passes_over_a_clip_not_yet_matched_to_its_scene(self):
         scene = self.make_scene(actions=[{"at": 10_500, "pos": 90}, {"at": 11_000, "pos": 10}])
-        self.make_clip(scene, clip={"source": "redacted It Dry 9", "start": "27:46"})
+        self.make_clip(scene, clip={"source": "Scene Three 9", "start": "27:46"})
 
         result = self.run_stage()
 
