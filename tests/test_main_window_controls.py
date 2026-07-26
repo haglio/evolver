@@ -45,7 +45,7 @@ class TestRunDetailRendering(unittest.TestCase):
 
 
 class TestRunHistoryMarks(unittest.TestCase):
-    """A run's verdict is its mark's colour, never the whole line's."""
+    """A run's verdict is its mark's color, never the whole line's."""
 
     def _item(self, status):
         record = RunRecord(
@@ -58,7 +58,7 @@ class TestRunHistoryMarks(unittest.TestCase):
             self.window.refresh_history()
         return self.window._history_list.item(0)
 
-    def test_a_failed_run_leaves_its_timestamp_the_default_colour(self):
+    def test_a_failed_run_leaves_its_timestamp_the_default_color(self):
         """Reddening the timestamp too made the line shout without saying why."""
         item = self._item("error")
         self.assertEqual(item.foreground().style(), Qt.BrushStyle.NoBrush)
@@ -71,7 +71,7 @@ class TestRunHistoryMarks(unittest.TestCase):
 
 
 class TestStageStatusColumn(unittest.TestCase):
-    """The Status column is a symbol, and only the symbol carries the colour."""
+    """The Status column is a symbol, and only the symbol carries the color."""
 
     def _status_cell(self, status):
         record = RunRecord(
@@ -129,14 +129,14 @@ class TestRunVerdictInDetailPane(unittest.TestCase):
         self.assertIn("✔", text)
         self.assertIn("#30a030", text)
 
-    def test_qt_binds_the_colour_to_the_mark_and_to_nothing_else(self):
+    def test_qt_binds_the_color_to_the_mark_and_to_nothing_else(self):
         """The markup is only a promise until Qt's text engine has read it.
 
-        The label carries a coloured ``<span>``; left on AutoText, Qt decides
+        The label carries a colored ``<span>``; left on AutoText, Qt decides
         rich-versus-plain by a heuristic on the string, and a wrong guess would
-        show the user a literal ``<span style=…>`` and no colour anywhere. So
+        show the user a literal ``<span style=…>`` and no color anywhere. So
         parse the label's text the way the label does and ask the resulting
-        document what colour it gave each run of characters.
+        document what color it gave each run of characters.
 
         Not by rendering it: the drawn pixels also depend on the platform's font
         having a ✘ at all, which a headless runner's does not — it draws the rest
@@ -144,16 +144,16 @@ class TestRunVerdictInDetailPane(unittest.TestCase):
         """
         document = QTextDocument()
         document.setHtml(self._info_text("error"))
-        coloured = {}
+        colored = {}
         block = document.firstBlock()
         iterator = block.begin()
         while not iterator.atEnd():
             fragment = iterator.fragment()
-            colour = fragment.charFormat().foreground()
-            if colour.style() != Qt.BrushStyle.NoBrush:
-                coloured[fragment.text()] = colour.color().name()
+            color = fragment.charFormat().foreground()
+            if color.style() != Qt.BrushStyle.NoBrush:
+                colored[fragment.text()] = color.color().name()
             iterator += 1
-        self.assertEqual(coloured, {"✘": "#ff3c3c"})
+        self.assertEqual(colored, {"✘": "#ff3c3c"})
 
 
 class TestSummarizeResult(unittest.TestCase):

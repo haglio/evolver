@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
 import config
 from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
 from gui.run_record import RunRecord, load_runs, format_run_label
-from gui.status_symbols import GREY, mark_for, mark_icon
+from gui.status_symbols import GRAY, mark_for, mark_icon
 from gui.toggle_switch import ToggleSwitch
 
 _ICON_COLOR = "#ddd"
@@ -61,7 +61,7 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._header)
 
         self._info_label = QLabel("")
-        # Explicit, not AutoText: the run's mark is a coloured <span>, and
+        # Explicit, not AutoText: the run's mark is a colored <span>, and
         # leaving the format to Qt's guess-from-the-string heuristic risks the
         # line being drawn as literal markup.
         self._info_label.setTextFormat(Qt.TextFormat.RichText)
@@ -83,12 +83,12 @@ class RunDetailWidget(QWidget):
 
     def show_record(self, record: RunRecord):
         self._header.setText(f"Run: {record.started_at}")
-        glyph, colour = mark_for(record.status)
-        # Rich text so the mark alone is coloured; the rest of the line stays
-        # the label's own colour, matching the history list beside it.
+        glyph, color = mark_for(record.status)
+        # Rich text so the mark alone is colored; the rest of the line stays
+        # the label's own color, matching the history list beside it.
         self._info_label.setText(
             f"Trigger: {record.trigger}  |  Duration: {record.duration_seconds:.1f}s"
-            f'  |  Status: <span style="color: {colour.name()}">{glyph}</span>'
+            f'  |  Status: <span style="color: {color.name()}">{glyph}</span>'
         )
         self._info_label.setToolTip(record.status)
 
@@ -102,7 +102,7 @@ class RunDetailWidget(QWidget):
             num = STAGE_NUMBER.get(stage_key, i + 1)
             num_item = QTableWidgetItem(str(num))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            num_item.setForeground(GREY)
+            num_item.setForeground(GRAY)
             num_item.setFlags(no_edit)
             self._table.setItem(i, 0, num_item)
 
@@ -113,11 +113,11 @@ class RunDetailWidget(QWidget):
             self._table.setItem(i, 1, name_item)
 
             # Column 2: status, as its symbol — the word is the tooltip, so the
-            # colour lands on a glyph rather than on a block of text.
+            # color lands on a glyph rather than on a block of text.
             status = stage.get("status", "")
-            glyph, colour = mark_for(status)
+            glyph, color = mark_for(status)
             status_item = QTableWidgetItem(glyph)
-            status_item.setForeground(colour)
+            status_item.setForeground(color)
             status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             status_item.setToolTip(status)
             status_item.setFlags(no_edit)
