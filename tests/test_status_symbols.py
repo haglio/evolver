@@ -1,4 +1,4 @@
-"""A status is drawn as one coloured symbol, the same one wherever it appears."""
+"""A status is drawn as one colored symbol, the same one wherever it appears."""
 
 import unittest
 
@@ -12,19 +12,19 @@ _app = QApplication.instance() or QApplication([])
 class TestMarkFor(unittest.TestCase):
 
     def test_a_completed_stage_is_a_green_check(self):
-        glyph, colour = mark_for("completed")
+        glyph, color = mark_for("completed")
         self.assertEqual(glyph, "✔")
-        self.assertEqual(colour.name(), "#30a030")
+        self.assertEqual(color.name(), "#30a030")
 
-    def test_a_skipped_stage_is_an_empty_grey_circle(self):
-        glyph, colour = mark_for("skipped")
+    def test_a_skipped_stage_is_an_empty_gray_circle(self):
+        glyph, color = mark_for("skipped")
         self.assertEqual(glyph, "○")
-        self.assertEqual(colour.name(), "#808080")
+        self.assertEqual(color.name(), "#808080")
 
     def test_an_errored_stage_is_a_red_cross(self):
-        glyph, colour = mark_for("error")
+        glyph, color = mark_for("error")
         self.assertEqual(glyph, "✘")
-        self.assertEqual(colour.name(), "#ff3c3c")
+        self.assertEqual(color.name(), "#ff3c3c")
 
     def test_a_successful_run_draws_the_same_mark_as_a_completed_stage(self):
         """A run says "success" where a stage says "completed" — one verdict,
