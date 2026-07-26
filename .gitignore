@@ -40,7 +40,6 @@ gui_settings.json
 tray_crash.log
 
 # Claude Code local config
-.claude/
 .regen-complete
 
 # Private overlays — real values live here and never get published. Each has a
