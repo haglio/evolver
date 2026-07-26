@@ -1,3 +1,4 @@
+import itertools
 import subprocess
 import unittest
 from contextlib import ExitStack
@@ -348,8 +349,14 @@ class TestRunPipeline(unittest.TestCase):
         self.assertTrue(result.has_errors)
 
     def test_duration_seconds_is_positive(self):
+        # duration_seconds is time.monotonic() end-minus-start. On a fast runner
+        # an all-mocked pipeline can finish inside the clock's resolution, so the
+        # real clock reads the same value twice and the span is 0.0 -- a genuine
+        # flake, not a bug in the code. Drive the clock so it advances on every
+        # read, making the measured span deterministically positive.
+        ticks = itertools.count(start=1.0, step=1.0)
         stack, _ = self._patch_all_stages()
-        with stack:
+        with stack, patch("evolver.time.monotonic", lambda: next(ticks)):
             result = evolver.run_pipeline()
         self.assertGreater(result.duration_seconds, 0.0)
 
