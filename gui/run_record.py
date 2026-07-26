@@ -56,16 +56,17 @@ class RunRecord:
 _PACIFIC = ZoneInfo("America/Los_Angeles")
 
 
-def format_run_label(started_at: str, duration_seconds: float, status: str) -> str:
-    """Format a run record for display in the history list.
+def format_run_label(started_at: str, duration_seconds: float) -> str:
+    """When a run started and how long it took, e.g. "2026/03/30 22:20 (5s)".
 
-    Converts UTC started_at to Pacific time, e.g. "✔  2026/03/30 22:20 (5s)"
+    Converts UTC *started_at* to Pacific time. The verdict is deliberately not
+    in here: it rides beside this text as a coloured mark (see
+    :mod:`gui.status_symbols`), so colouring the verdict cannot colour the
+    timestamp along with it.
     """
-    icon = "\u2714" if status == "success" else "\u2718"
     utc_dt = datetime.fromisoformat(started_at).replace(tzinfo=timezone.utc)
     pacific_dt = utc_dt.astimezone(_PACIFIC)
-    ts = pacific_dt.strftime("%Y/%m/%d %H:%M")
-    return f"{icon}  {ts} ({duration_seconds:.0f}s)"
+    return f"{pacific_dt.strftime('%Y/%m/%d %H:%M')} ({duration_seconds:.0f}s)"
 
 
 def result_to_dict(result: Any) -> dict[str, Any] | None:
