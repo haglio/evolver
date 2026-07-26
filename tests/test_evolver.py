@@ -348,6 +348,56 @@ class TestRunPipeline(unittest.TestCase):
             result = evolver.run_pipeline()
         self.assertTrue(result.has_errors)
 
+    def test_the_failing_stage_is_the_one_marked_error(self):
+        """A run's verdict has to be legible in the stage list it ships with.
+
+        Every stage used to record "completed" the moment its function returned,
+        while the run's verdict was computed separately from the result payloads
+        — so a run read "error" with twelve stages all reading "completed" and
+        nothing anywhere saying which one went wrong.
+        """
+        stack, _ = self._patch_all_stages(
+            purge_run=Mock(return_value=Mock(missing_sorted=["file.mp4"])),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+        errored = [s.name for s in result.stages if s.status == "error"]
+        self.assertEqual(errored, ["purge"])
+
+    def test_a_low_disk_hold_marks_the_non_ai_stage_error(self):
+        """The condition that reddened almost every run for a day, unexplained.
+
+        Free space fell under the floor, the non-AI stage held its encode back,
+        and the run was flagged an error — but the stage itself still said
+        "completed", so the reason lived only in the row's details text.
+        """
+        stack, _ = self._patch_all_stages(
+            nonai_run=Mock(return_value=Mock(failed="", deferred_low_disk=True)),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+        errored = [s.name for s in result.stages if s.status == "error"]
+        self.assertEqual(errored, ["upscale_non_ai"])
+
+    def test_skips_alone_do_not_make_a_run_a_failure(self):
+        """Skipping is how the pipeline stays out of the way, not how it fails.
+
+        A Topaz encode already owning the GPU parks the AI upscale, which parks
+        the correspondence check behind it — two skipped stages on a run where
+        nothing at all went wrong.
+        """
+        stack, _ = self._patch_all_stages(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+            count_running=Mock(return_value=1),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+        statuses = {s.name: s.status for s in result.stages}
+        self.assertEqual(statuses["upscale"], "skipped")
+        self.assertEqual(statuses["verify"], "skipped")
+        self.assertFalse(result.has_errors)
+
     def test_duration_seconds_is_positive(self):
         # duration_seconds is time.monotonic() end-minus-start. On a fast runner
         # an all-mocked pipeline can finish inside the clock's resolution, so the
