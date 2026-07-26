@@ -1,5 +1,5 @@
 {
-  "_comment": "Placeholder content overlay. The real copy lives in content.local.json (git-ignored). Each act pairs the canonical spoken phrase the recognizer listens for with the Title Case video.action it records; aliases are extra phrases that record the same action, for words the small speech model hears differently. library_root, chrome_profile and scrape_provider are the machine-specific values the app needs at runtime.",
+  "_comment": "Placeholder content overlay. The real copy lives in content.local.json (git-ignored). Each act pairs the canonical spoken phrase the recognizer listens for with the Title Case video.action it records; aliases are extra phrases that record the same action, for words the small speech model hears differently. library_root, chrome_profile and scrape_provider are the machine-specific values the app needs at runtime. project_roots is optional: the folders holding the suite's sibling app checkouts (fun_time, origenerator, clipper, scripture), searched in order, for when those repos do not live under library_root/projects; omit it and that is exactly where they are looked for.",
   "acts": [
     {
       "spoken": "alpha",
