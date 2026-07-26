@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+from typing import Any
 
 from content import load_content
 
@@ -8,10 +9,46 @@ from content import load_content
 _CONTENT = load_content()
 
 BASE_DIR     = Path(_CONTENT["library_root"])
+
+
+def project_roots(content: dict[str, Any], base_dir: Path) -> tuple[Path, ...]:
+    """The folders that hold the suite's sibling app checkouts, in search order.
+
+    The siblings used to be assumed to live at ``library_root/projects``, and an
+    overlay that says nothing still means exactly that. They need their own
+    setting because the two roots came apart: the repos were moved out of the
+    file-synced tree the media library still sits in. A *list* rather than one
+    path so a part-finished move resolves — each checkout is found wherever it
+    actually is right now, with no window where half the suite is unreachable.
+    """
+    roots = content.get("project_roots")
+    if not roots:
+        return (base_dir / "projects",)
+    return tuple(Path(root) for root in roots)
+
+
+PROJECT_ROOTS = project_roots(_CONTENT, BASE_DIR)
+
+
+def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
+    """The sibling checkout *name*, from the first root that actually holds it.
+
+    Falls back to a path under the first root when no root does: a sibling that
+    isn't installed is every consumer's ordinary case (they all guard on
+    existence), so it must not be an import-time crash.
+    """
+    roots = PROJECT_ROOTS if roots is None else roots
+    for root in roots:
+        candidate = root / name
+        if candidate.is_dir():
+            return candidate
+    return roots[0] / name
+
+
 # This repo, located from the source file rather than the library root: the
 # app's own assets travel with the code, not with the media.
 PROJECT_DIR  = Path(__file__).resolve().parent
-FUN_TIME_PROJECT_DIR = BASE_DIR / "projects" / "fun_time"
+FUN_TIME_PROJECT_DIR = project_dir("fun_time")
 FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
 # Fun Time's per-video watch counts ("breeding" data), read-only. Satellite VLC
 # plays populate it today; Nau plays will land in the same file once Fun Time's
@@ -21,13 +58,13 @@ FUN_TIME_WATCH_STATS_FILE = FUN_TIME_PROJECT_DIR / "state" / "watch_stats.json"
 # content source: for videos it drops in 0_inbox/origenerator/, Evolver pulls the
 # generation metadata straight from Origenerator's own gallery database, read-only
 # (see tasks/origenerator_metadata.py). Origenerator never reaches into Evolver.
-ORIGENERATOR_DB_PATH = BASE_DIR / "projects" / "origenerator" / "state" / "origenerator.db"
+ORIGENERATOR_DB_PATH = project_dir("origenerator") / "state" / "origenerator.db"
 # Sibling apps that record a video's path in their own saved work. Evolver moves
 # videos, so it owns keeping these pointed at the right file (see
 # tasks/reference_sync.py); left alone they strand hand-made clip bounds,
 # transcript splits, and favorites on paths that no longer exist.
-CLIPPER_SESSIONS_DIR = BASE_DIR / "projects" / "clipper" / "sessions"
-SCRIPTURE_SESSIONS_DIR = BASE_DIR / "projects" / "scripture" / "sessions"
+CLIPPER_SESSIONS_DIR = project_dir("clipper") / "sessions"
+SCRIPTURE_SESSIONS_DIR = project_dir("scripture") / "sessions"
 VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
 # Where to hunt for a video a stored reference has lost track of. Wider than the
 # library itself, because videos also get parked in sibling folders such as
