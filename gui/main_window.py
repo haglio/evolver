@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import qtawesome as qta
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QColor, QFont
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -24,6 +25,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+import config
+from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
+from gui.run_record import RunRecord, load_runs, format_run_label
+from gui.status_symbols import GREY, mark_for, mark_icon
+from gui.toggle_switch import ToggleSwitch
+
+_ICON_COLOR = "#ddd"
+
 
 class _NoFocusRectDelegate(QItemDelegate):
     """QItemDelegate subclass that suppresses the focus rectangle.
@@ -34,21 +43,6 @@ class _NoFocusRectDelegate(QItemDelegate):
 
     def drawFocus(self, painter, option, rect):
         pass  # Don't draw the focus rectangle
-
-
-import qtawesome as qta
-
-import config
-from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
-from gui.run_record import RunRecord, load_runs, format_run_label
-from gui.toggle_switch import ToggleSwitch
-
-GREEN = QColor(0x30, 0xA0, 0x30)
-RED = QColor(255, 60, 60)
-STATUS_NUMBER = QColor(0x80, 0x80, 0x80)
-STATUS_SKIP = QColor(0x80, 0x80, 0x80)
-
-_ICON_COLOR = "#ddd"
 
 
 class RunDetailWidget(QWidget):
@@ -67,6 +61,10 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._header)
 
         self._info_label = QLabel("")
+        # Explicit, not AutoText: the run's mark is a coloured <span>, and
+        # leaving the format to Qt's guess-from-the-string heuristic risks the
+        # line being drawn as literal markup.
+        self._info_label.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(self._info_label)
 
         self._table = QTableWidget()
@@ -85,10 +83,14 @@ class RunDetailWidget(QWidget):
 
     def show_record(self, record: RunRecord):
         self._header.setText(f"Run: {record.started_at}")
-        status_text = "Success" if record.status == "success" else "Errors"
+        glyph, colour = mark_for(record.status)
+        # Rich text so the mark alone is coloured; the rest of the line stays
+        # the label's own colour, matching the history list beside it.
         self._info_label.setText(
-            f"Trigger: {record.trigger}  |  Duration: {record.duration_seconds:.1f}s  |  Status: {status_text}"
+            f"Trigger: {record.trigger}  |  Duration: {record.duration_seconds:.1f}s"
+            f'  |  Status: <span style="color: {colour.name()}">{glyph}</span>'
         )
+        self._info_label.setToolTip(record.status)
 
         self._table.setRowCount(len(record.stages))
         for i, stage in enumerate(record.stages):
@@ -100,7 +102,7 @@ class RunDetailWidget(QWidget):
             num = STAGE_NUMBER.get(stage_key, i + 1)
             num_item = QTableWidgetItem(str(num))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            num_item.setForeground(STATUS_NUMBER)
+            num_item.setForeground(GREY)
             num_item.setFlags(no_edit)
             self._table.setItem(i, 0, num_item)
 
@@ -110,15 +112,14 @@ class RunDetailWidget(QWidget):
             name_item.setFlags(no_edit)
             self._table.setItem(i, 1, name_item)
 
-            # Column 2: status
-            status_item = QTableWidgetItem(stage.get("status", ""))
+            # Column 2: status, as its symbol — the word is the tooltip, so the
+            # colour lands on a glyph rather than on a block of text.
             status = stage.get("status", "")
-            if status == "completed":
-                status_item.setForeground(GREEN)
-            elif status == "skipped":
-                status_item.setForeground(STATUS_SKIP)
-            elif status == "error":
-                status_item.setForeground(RED)
+            glyph, colour = mark_for(status)
+            status_item = QTableWidgetItem(glyph)
+            status_item.setForeground(colour)
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            status_item.setToolTip(status)
             status_item.setFlags(no_edit)
             self._table.setItem(i, 2, status_item)
 
@@ -305,10 +306,11 @@ class EvolverMainWindow(QMainWindow):
         self._records = load_runs(config.RUNS_DIR)
         self._history_list.clear()
         for record in self._records:
-            text = format_run_label(record.started_at, record.duration_seconds, record.status)
-            item = QListWidgetItem(text)
-            if record.status != "success":
-                item.setForeground(RED)
+            item = QListWidgetItem(
+                mark_icon(record.status),
+                format_run_label(record.started_at, record.duration_seconds),
+            )
+            item.setToolTip(record.status)
             self._history_list.addItem(item)
 
         if self._records:

@@ -1,0 +1,43 @@
+"""A status is drawn as one coloured symbol, the same one wherever it appears."""
+
+import unittest
+
+from PyQt6.QtWidgets import QApplication
+
+from gui.status_symbols import mark_for
+
+_app = QApplication.instance() or QApplication([])
+
+
+class TestMarkFor(unittest.TestCase):
+
+    def test_a_completed_stage_is_a_green_check(self):
+        glyph, colour = mark_for("completed")
+        self.assertEqual(glyph, "✔")
+        self.assertEqual(colour.name(), "#30a030")
+
+    def test_a_skipped_stage_is_an_empty_grey_circle(self):
+        glyph, colour = mark_for("skipped")
+        self.assertEqual(glyph, "○")
+        self.assertEqual(colour.name(), "#808080")
+
+    def test_an_errored_stage_is_a_red_cross(self):
+        glyph, colour = mark_for("error")
+        self.assertEqual(glyph, "✘")
+        self.assertEqual(colour.name(), "#ff3c3c")
+
+    def test_a_successful_run_draws_the_same_mark_as_a_completed_stage(self):
+        """A run says "success" where a stage says "completed" — one verdict,
+        two spellings, and no reason for the history list and the stage table to
+        disagree about how it looks."""
+        self.assertEqual(mark_for("success"), mark_for("completed"))
+
+    def test_an_unknown_status_draws_nothing_rather_than_crashing(self):
+        """Run records go back months; a status this build never wrote should
+        leave the cell blank, not take the window down."""
+        glyph, _ = mark_for("something_new")
+        self.assertEqual(glyph, "")
+
+
+if __name__ == "__main__":
+    unittest.main()
