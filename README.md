@@ -224,19 +224,20 @@ During regeneration mode, Evolver may write `.regen-skip.txt` in the repo root.
 
 ## Test suite
 
-This repo includes a basic `unittest` suite with no external dependencies.
+The suite runs under `pytest` (configured in `pyproject.toml`) and is enforced in
+CI: the **merge gate (full suite)** workflow runs every test on windows-latest for
+each pull request and is a required check on the merge queue, so a red tree cannot
+land on `main`.
 
-Run from repo root:
-
-```bash
-powershell.exe -File run-tests.ps1
-```
-
-Alternative (direct Python command):
+Install the dev extras once, then run from repo root:
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py" -v
+pip install -e ".[dev]"
+python -m pytest -q
 ```
+
+The tests are `unittest.TestCase`-based, so `run-tests.ps1` (a `unittest discover`
+wrapper) still works for a quick local run without pytest.
 
 What is covered:
 
