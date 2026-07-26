@@ -4,6 +4,8 @@ import unittest
 from datetime import datetime
 from unittest.mock import patch
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QTextDocument
 from PyQt6.QtWidgets import QApplication, QMessageBox, QToolBar
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
@@ -40,6 +42,118 @@ class TestRunDetailRendering(unittest.TestCase):
         details = self._row_details(widget, "metadata")
         self.assertIn("newly_scraped=0", details)
         self.assertIn("errors=58", details)
+
+
+class TestRunHistoryMarks(unittest.TestCase):
+    """A run's verdict is its mark's colour, never the whole line's."""
+
+    def _item(self, status):
+        record = RunRecord(
+            id="2026-07-25T15-20-02", started_at="2026-07-25T15:20:02",
+            finished_at="2026-07-25T15:20:02", duration_seconds=12.0,
+            trigger="scheduled", status=status, stages=[],
+        )
+        self.window = EvolverMainWindow()
+        with patch("gui.main_window.load_runs", return_value=[record]):
+            self.window.refresh_history()
+        return self.window._history_list.item(0)
+
+    def test_a_failed_run_leaves_its_timestamp_the_default_colour(self):
+        """Reddening the timestamp too made the line shout without saying why."""
+        item = self._item("error")
+        self.assertEqual(item.foreground().style(), Qt.BrushStyle.NoBrush)
+
+    def test_a_failed_run_carries_the_cross_as_its_icon(self):
+        self.assertFalse(self._item("error").icon().isNull())
+
+    def test_the_label_itself_is_just_the_time_and_duration(self):
+        self.assertEqual(self._item("success").text(), "2026/07/25 08:20 (12s)")
+
+
+class TestStageStatusColumn(unittest.TestCase):
+    """The Status column is a symbol, and only the symbol carries the colour."""
+
+    def _status_cell(self, status):
+        record = RunRecord(
+            id="2026-07-25T15-20-02", started_at="2026-07-25T15:20:02",
+            finished_at="2026-07-25T15:20:02", duration_seconds=12.0,
+            trigger="scheduled", status="error",
+            stages=[{"name": "upscale_non_ai", "status": status,
+                     "duration_seconds": 1.0, "result": None}],
+        )
+        # Held on self: a local would be collected, taking the table's C++
+        # items with it before the assertions can read them.
+        self.widget = RunDetailWidget()
+        self.widget.show_record(record)
+        return self.widget._table.item(0, 2)
+
+    def test_a_completed_stage_shows_a_green_check(self):
+        cell = self._status_cell("completed")
+        self.assertEqual(cell.text(), "✔")
+        self.assertEqual(cell.foreground().color().name(), "#30a030")
+
+    def test_an_errored_stage_shows_a_red_cross(self):
+        """The row a low-disk hold now produces, which no run record had before."""
+        cell = self._status_cell("error")
+        self.assertEqual(cell.text(), "✘")
+        self.assertEqual(cell.foreground().color().name(), "#ff3c3c")
+
+    def test_the_word_survives_as_the_cell_tooltip(self):
+        self.assertEqual(self._status_cell("skipped").toolTip(), "skipped")
+
+
+class TestRunVerdictInDetailPane(unittest.TestCase):
+    """The run's own verdict is marked the same way its stages' are.
+
+    It used to be spelled a third way again — "Success" or "Errors" in the info
+    line, over a column of "completed"s, under a history list of ✔ and ✘.
+    """
+
+    def _info_text(self, status):
+        record = RunRecord(
+            id="2026-07-25T15-20-02", started_at="2026-07-25T15:20:02",
+            finished_at="2026-07-25T15:20:02", duration_seconds=12.0,
+            trigger="scheduled", status=status, stages=[],
+        )
+        self.widget = RunDetailWidget()
+        self.widget.show_record(record)
+        return self.widget._info_label.text()
+
+    def test_a_failed_run_is_marked_with_the_red_cross(self):
+        text = self._info_text("error")
+        self.assertIn("✘", text)
+        self.assertIn("#ff3c3c", text)
+
+    def test_a_successful_run_is_marked_with_the_green_check(self):
+        text = self._info_text("success")
+        self.assertIn("✔", text)
+        self.assertIn("#30a030", text)
+
+    def test_qt_binds_the_colour_to_the_mark_and_to_nothing_else(self):
+        """The markup is only a promise until Qt's text engine has read it.
+
+        The label carries a coloured ``<span>``; left on AutoText, Qt decides
+        rich-versus-plain by a heuristic on the string, and a wrong guess would
+        show the user a literal ``<span style=…>`` and no colour anywhere. So
+        parse the label's text the way the label does and ask the resulting
+        document what colour it gave each run of characters.
+
+        Not by rendering it: the drawn pixels also depend on the platform's font
+        having a ✘ at all, which a headless runner's does not — it draws the rest
+        of the line and simply omits the glyph.
+        """
+        document = QTextDocument()
+        document.setHtml(self._info_text("error"))
+        coloured = {}
+        block = document.firstBlock()
+        iterator = block.begin()
+        while not iterator.atEnd():
+            fragment = iterator.fragment()
+            colour = fragment.charFormat().foreground()
+            if colour.style() != Qt.BrushStyle.NoBrush:
+                coloured[fragment.text()] = colour.color().name()
+            iterator += 1
+        self.assertEqual(coloured, {"✘": "#ff3c3c"})
 
 
 class TestSummarizeResult(unittest.TestCase):
