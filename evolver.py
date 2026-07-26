@@ -51,6 +51,33 @@ class StageRecord:
     skip_reason: str | None = None
 
 
+# What counts as a failure for each stage, read off that stage's own result. A
+# stage absent here cannot fail. The run's verdict is then nothing more than its
+# stages' verdicts (see ``run_pipeline``), which is what keeps the two legible
+# together: a run used to read "error" while every stage it listed read
+# "completed", because the verdict was computed from the result payloads and the
+# stage status only ever recorded that the function had returned.
+_STAGE_FAILED: dict[str, Callable[[object], bool]] = {
+    "purge": lambda r: bool(r.missing_sorted),
+    "metadata": lambda r: not r.ok,
+    # A low-disk hold is a failure, not a quiet wait: nothing upscales again
+    # until someone frees space, so the run has to say so.
+    "upscale": lambda r: bool(r.failed) or r.deferred_low_disk,
+    "upscale_non_ai": lambda r: bool(r.failed) or r.deferred_low_disk,
+    "verify": lambda r: not r.ok,
+    "references": lambda r: not r.ok,
+    "bookmarks": lambda r: not r.ok,
+    "scripts": lambda r: not r.ok,
+    "dupes": lambda r: not r.ok,
+}
+
+
+def _stage_status(name: str, result: object) -> str:
+    """"error" when *result* says the stage failed, else "completed"."""
+    failed = _STAGE_FAILED.get(name)
+    return "error" if failed is not None and failed(result) else "completed"
+
+
 @dataclass
 class PipelineResult:
     """Aggregate result of all pipeline stages."""
@@ -108,10 +135,11 @@ def run_pipeline(
         t0 = time.monotonic()
         result = fn(**kwargs)
         elapsed = time.monotonic() - t0
-        record = StageRecord(name, "completed", elapsed, result)
+        status = _stage_status(name, result)
+        record = StageRecord(name, status, elapsed, result)
         stages.append(record)
         if on_stage_complete:
-            on_stage_complete(name, result, elapsed, "completed")
+            on_stage_complete(name, result, elapsed, status)
         log.info("")
         return result
 
@@ -123,8 +151,8 @@ def run_pipeline(
         if on_stage_complete:
             on_stage_complete(name, None, 0.0, "skipped")
 
-    purge_result = _run_stage("purge", purge_weird.run)
-    prompt_scrape_result = _run_stage("metadata", prompt_scrape.run)
+    _run_stage("purge", purge_weird.run)
+    _run_stage("metadata", prompt_scrape.run)
     sort_result = _run_stage("sort", sort.run)
 
     priority_files = getattr(sort_result, "moved_files", [])
@@ -166,7 +194,7 @@ def run_pipeline(
     nonai_allow_start = bool(
         nonai_enabled and ai_drained and not _should_skip_upscale_due_to_cpu(log)
     )
-    upscale_nonai_result = _run_stage(
+    _run_stage(
         "upscale_non_ai", nonai_upscale.run,
         allow_start=nonai_allow_start, stop=nonai_enabled is False,
         # Toggle on -> Evolver manages the encode by user presence: suspend it
@@ -176,40 +204,25 @@ def run_pipeline(
 
     if upscale_still_pending:
         log.info("Skipping correspondence check: upscale has unprocessed files that would cause a false mismatch.")
-        correspondence_result = check_correspondence.CorrespondenceResult(sorted_count=0, outbox_count=0)
         _skip_stage("verify", "upscale_pending")
     else:
-        correspondence_result = _run_stage("verify", check_correspondence.run, show_popup=True)
+        _run_stage("verify", check_correspondence.run, show_popup=True)
 
     # After every stage that moves a video, and before bookmarks: both stages
     # touch favs.csv, and bookmarks drops the rows whose file is missing, so a
     # favorite has to be repointed before it can be mistaken for a dead one.
-    reference_sync_result = _run_stage("references", reference_sync.run)
-    bookmarks_sync_result = _run_stage("bookmarks", bookmarks_sync.run)
+    _run_stage("references", reference_sync.run)
+    _run_stage("bookmarks", bookmarks_sync.run)
     # Before the scripts sync: this writes new funscripts into the tree, and the
     # sync is what settles them across a clip's version family.
     _run_stage("clip_scripts", clip_scripts.run)
-    scripts_sync_result = _run_stage("scripts", scripts_sync.run, show_popup=True)
+    _run_stage("scripts", scripts_sync.run, show_popup=True)
     _run_stage("group_non_ai", nonai_group.run)
-    duplicate_sizes_result = _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
-
-    has_errors = (
-        bool(purge_result.missing_sorted)
-        or not prompt_scrape_result.ok
-        or not correspondence_result.ok
-        or not bookmarks_sync_result.ok
-        or not scripts_sync_result.ok
-        or not reference_sync_result.ok
-        or not duplicate_sizes_result.ok
-        or bool(upscale_nonai_result.failed)
-        or upscale_nonai_result.deferred_low_disk
-    )
-    if upscale_result is not None:
-        has_errors = has_errors or upscale_result.failed > 0 or upscale_result.deferred_low_disk
+    _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
 
     return PipelineResult(
         stages=stages,
-        has_errors=has_errors,
+        has_errors=any(stage.status == "error" for stage in stages),
         duration_seconds=time.monotonic() - pipeline_t0,
     )
 
