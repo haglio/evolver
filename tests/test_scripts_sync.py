@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from tasks import scripts_sync
@@ -187,6 +188,20 @@ class TestScriptsSync(unittest.TestCase):
             self.assertTrue(original_script.exists())
             self.assertEqual(original_script.read_text(encoding="utf-8"), processed_script.read_text(encoding="utf-8"))
 
+    def test_records_which_scripts_went_unmatched(self):
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            script_path = script_root / "unsorted" / "clip.funscript"
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            script_path.write_text("{}", encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=None):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.unmatched_paths, [str(Path("unsorted", "clip.funscript"))])
+
     def test_reports_variant_copy_error_without_crashing(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
@@ -211,3 +226,157 @@ class TestScriptsSync(unittest.TestCase):
             self.assertFalse(result.ok)
             self.assertFalse(outbox_script.exists())
 
+
+class TestFollowRetiredVideos(unittest.TestCase):
+    """A script whose video was archived should follow it out, not fail forever.
+
+    Retiring an original moves it out of the library, and the script tree mirrors
+    only the library — so a funscript left behind matches no video on every run
+    from then on, and the stage can never go green again by itself.
+    """
+
+    def _tree(self, root):
+        video_root = root / "videos"
+        script_root = root / "scripts"
+        archive_root = root / "archive"
+        for path in (video_root, script_root, archive_root):
+            path.mkdir(parents=True, exist_ok=True)
+        return video_root, script_root, archive_root
+
+    def test_moves_script_beside_its_archived_video(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = self._tree(root)
+            archived_video = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"
+            script_path = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
+            archived_video.parent.mkdir(parents=True, exist_ok=True)
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            archived_video.write_bytes(b"video")
+            script_path.write_text('{"actions":[1]}', encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=archive_root):
+                result = scripts_sync.run()
+
+            followed = archived_video.with_suffix(".funscript")
+            self.assertTrue(result.ok)
+            self.assertEqual(result.unmatched, 0)
+            self.assertEqual(result.followed_to_archive, 1)
+            self.assertFalse(script_path.exists())
+            self.assertEqual(followed.read_text(encoding="utf-8"), '{"actions":[1]}')
+
+    def test_discards_the_identical_duplicate_left_under_another_folder(self):
+        """Two library folders can hold the same script for one archived video."""
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = self._tree(root)
+            archived_video = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"
+            first = script_root / "2D" / "non_AI" / "studio" / "1 to do" / "scene one.funscript"
+            second = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
+            archived_video.parent.mkdir(parents=True, exist_ok=True)
+            archived_video.write_bytes(b"video")
+            for path in (first, second):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('{"actions":[1]}', encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=archive_root):
+                result = scripts_sync.run()
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.followed_to_archive, 1)
+            self.assertEqual(result.discarded_duplicates, 1)
+            self.assertFalse(first.exists())
+            self.assertFalse(second.exists())
+            self.assertTrue(archived_video.with_suffix(".funscript").exists())
+
+    def test_keeps_a_differing_duplicate_and_calls_it_a_collision(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = self._tree(root)
+            archived_video = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"
+            archived_script = archived_video.with_suffix(".funscript")
+            script_path = script_root / "2D" / "non_AI" / "studio" / "1 to do" / "scene one.funscript"
+            archived_video.parent.mkdir(parents=True, exist_ok=True)
+            archived_video.write_bytes(b"video")
+            archived_script.write_text('{"actions":[9]}', encoding="utf-8")
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            script_path.write_text('{"actions":[1]}', encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=archive_root):
+                result = scripts_sync.run()
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.collisions, 1)
+            self.assertEqual(result.followed_to_archive, 0)
+            self.assertTrue(script_path.exists())
+            self.assertEqual(archived_script.read_text(encoding="utf-8"), '{"actions":[9]}')
+
+    def test_leaves_the_script_when_two_archived_videos_share_its_name(self):
+        """Which video it belongs to is a guess, so it stays for a person."""
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = self._tree(root)
+            script_path = script_root / "2D" / "non_AI" / "studio" / "scene one.funscript"
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            script_path.write_text("{}", encoding="utf-8")
+            for bucket in ("alpha", "beta"):
+                video = archive_root / bucket / "scene one.mp4"
+                video.parent.mkdir(parents=True, exist_ok=True)
+                video.write_bytes(b"video")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=archive_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.unmatched, 1)
+            self.assertEqual(result.followed_to_archive, 0)
+            self.assertTrue(script_path.exists())
+
+    def test_a_failed_move_leaves_the_script_unmatched_rather_than_crashing(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = self._tree(root)
+            archived_video = archive_root / "scene one.mp4"
+            script_path = script_root / "2D" / "non_AI" / "studio" / "scene one.funscript"
+            archived_video.write_bytes(b"video")
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            script_path.write_text("{}", encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=archive_root):
+                with patch("tasks.scripts_sync.shutil.move", side_effect=OSError("denied")):
+                    result = scripts_sync.run()
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.unmatched, 1)
+            self.assertTrue(script_path.exists())
+
+    def test_does_not_walk_the_archive_when_every_script_matched(self):
+        """An ordinary run must not touch the archive drive at all."""
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = self._tree(root)
+            video_path = video_root / "2D" / "AI" / "clip.mp4"
+            script_path = script_root / "2D" / "AI" / "clip.funscript"
+            video_path.parent.mkdir(parents=True, exist_ok=True)
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            video_path.write_bytes(b"video")
+            script_path.write_text("{}", encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=archive_root):
+                with patch("tasks.scripts_sync._index_archived_videos") as index_archived:
+                    result = scripts_sync.run()
+
+            self.assertEqual(result.already_aligned, 1)
+            index_archived.assert_not_called()
+
+    def test_unset_archive_keeps_the_script_unmatched(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, _ = self._tree(root)
+            script_path = script_root / "2D" / "non_AI" / "studio" / "scene one.funscript"
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            script_path.write_text("{}", encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=None):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.unmatched, 1)
+            self.assertTrue(script_path.exists())
