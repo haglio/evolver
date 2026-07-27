@@ -30,6 +30,21 @@ def project_roots(content: dict[str, Any], base_dir: Path) -> tuple[Path, ...]:
 PROJECT_ROOTS = project_roots(_CONTENT, BASE_DIR)
 
 
+def retired_root(content: dict[str, Any]) -> Path | None:
+    """Where a non-AI original goes once its upscale is made — None to keep it.
+
+    None means the bucket's ``2*`` folder, which is the convention the user
+    established by hand and what a public checkout gets. A path means the
+    original leaves the library for that archive instead, sidecar and funscript
+    beside it. The setting exists because those ``2*`` folders sit on the drive
+    the encodes write to: each finished encode parked roughly another gigabyte
+    of superseded source there until the drive hit its free-space floor and the
+    whole stage started holding itself back.
+    """
+    configured = content.get("retired_root")
+    return Path(configured) if configured else None
+
+
 def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     """The sibling checkout *name*, from the first root that actually holds it.
 
@@ -149,6 +164,7 @@ VIDEOAI_TAG_NONAI = (
 NONAI_OUTPUT_SUFFIX = "_apo8_iris2"
 NONAI_PROCESSED_DIR_NAME = "processed"
 NONAI_FALLBACK_DONE_DIR_NAME = "3_good_to_go"
+NONAI_RETIRED_ROOT = retired_root(_CONTENT)
 # Rewrite-heavy runtime state lives OUTSIDE the synced project tree: the file
 # sync service covering the project dir kept renaming the in-flight job file to
 # "nonai_upscale_job [conflicted N].json" mid-run, which orphaned live encodes
