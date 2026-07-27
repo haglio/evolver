@@ -177,6 +177,64 @@ class TestSummarizeResult(unittest.TestCase):
         self.assertEqual(summary, "Reason: upscale_pending")
 
 
+class TestScriptsSyncSummary(unittest.TestCase):
+    """A red scripts row should say what is wrong and which scripts are at fault.
+
+    The generic numeric dump renders the failure as one bland tally among
+    several ("already_aligned=53, unmatched=15"), with nothing marking which is
+    the problem — and it keeps only the first five counters, so a late one can
+    be dropped from a failing row entirely.
+    """
+
+    def _result(self, **overrides):
+        result = {
+            "moved": 0, "already_aligned": 0, "unmatched": 0, "ambiguous": 0,
+            "collisions": 0, "copied_variants": 0, "ambiguous_variant_groups": 0,
+            "variant_copy_errors": 0, "followed_to_archive": 0,
+            "discarded_duplicates": 0, "copied_variant_paths": [],
+            "unmatched_paths": [],
+        }
+        result.update(overrides)
+        return _summarize_result(result, None, "scripts")
+
+    def test_says_what_is_wrong_in_words(self):
+        summary = self._result(already_aligned=53, unmatched=15)
+        self.assertIn("15 match no video", summary)
+        self.assertNotIn("unmatched=15", summary)
+
+    def test_names_the_scripts_that_matched_no_video(self):
+        summary = self._result(
+            unmatched=2,
+            unmatched_paths=["2D/non_AI/studio/scene one.funscript",
+                             "2D/non_AI/studio/scene two.funscript"],
+        )
+        self.assertIn("scene one.funscript", summary)
+        self.assertIn("scene two.funscript", summary)
+
+    def test_stands_in_a_count_for_the_names_it_cannot_fit(self):
+        summary = self._result(unmatched=5, unmatched_paths=[f"clip {i}.funscript" for i in range(5)])
+        self.assertIn("clip 0.funscript", summary)
+        self.assertIn("+2 more", summary)
+        self.assertNotIn("clip 4.funscript", summary)
+
+    def test_a_late_counter_still_reaches_a_failing_row(self):
+        """Six non-zero counters: the five-field truncation dropped the last."""
+        summary = self._result(moved=3, already_aligned=53, collisions=1, copied_variants=2,
+                               ambiguous_variant_groups=1, variant_copy_errors=1)
+        self.assertIn("1 failed to copy to a variant", summary)
+        self.assertIn("1 cannot move", summary)
+
+    def test_a_clean_run_reads_as_the_work_it_did(self):
+        summary = self._result(already_aligned=53, followed_to_archive=14,
+                               discarded_duplicates=1)
+        self.assertIn("14 followed a retired video out of the library", summary)
+        self.assertIn("53 already aligned", summary)
+
+    def test_an_old_record_without_the_paths_still_summarizes(self):
+        summary = _summarize_result({"already_aligned": 53, "unmatched": 15}, None, "scripts")
+        self.assertIn("15 match no video", summary)
+
+
 class TestNonAiUpscaleSummary(unittest.TestCase):
     """The non-AI row should read as prose: which video, how far, what happened.
 
