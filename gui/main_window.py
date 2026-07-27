@@ -159,6 +159,8 @@ def _summarize_result(
         return ""
     if stage_key == "upscale_non_ai":
         return _summarize_nonai_upscale(result)
+    if stage_key == "scripts":
+        return _summarize_scripts_sync(result)
     headline = _HEADLINE_FIELDS.get(stage_key, ())
     parts = [f"{key}={result[key]}" for key in headline
              if isinstance(result.get(key), (int, float))]
@@ -169,6 +171,55 @@ def _summarize_result(
         if isinstance(value, (int, float)) and value and not key.startswith("_"):
             parts.append(f"{key}={value}")
     return ", ".join(parts[:5])
+
+
+# What each scripts-sync counter means, in words. The first group is what makes
+# the stage red; the second is the work it got done.
+_SCRIPTS_PROBLEMS = (
+    ("unmatched", "match no video"),
+    ("ambiguous", "match more than one video"),
+    ("collisions", "cannot move — a different script holds the destination"),
+    ("variant_copy_errors", "failed to copy to a variant"),
+)
+_SCRIPTS_ROUTINE = (
+    ("moved", "moved into place"),
+    ("copied_variants", "copied to a variant"),
+    ("followed_to_archive", "followed a retired video out of the library"),
+    ("discarded_duplicates", "duplicate discarded"),
+    ("already_aligned", "already aligned"),
+)
+_SCRIPTS_NAMES_SHOWN = 3
+
+
+def _summarize_scripts_sync(result: dict[str, Any]) -> str:
+    """Say what made this stage red, in words, and name the scripts at fault.
+
+    The generic numeric dump lists the counters in dataclass order and keeps the
+    first five, which read as bland tallies — an "unmatched=15" sitting beside
+    an "already_aligned=53" with nothing marking which one is the failure, and a
+    counter as late as variant_copy_errors dropped off the line entirely.
+    Naming the offending scripts is the difference between knowing the stage
+    failed and knowing what to go fix.
+    """
+    problems = [f"{result[key]} {label}" for key, label in _SCRIPTS_PROBLEMS
+                if isinstance(result.get(key), int) and result[key]]
+    if not problems:
+        routine = [f"{result[key]} {label}" for key, label in _SCRIPTS_ROUTINE
+                   if isinstance(result.get(key), int) and result[key]]
+        return ", ".join(routine) if routine else "no funscripts"
+
+    summary = "; ".join(problems)
+    names = result.get("unmatched_paths") or []
+    if names:
+        summary += f" — {_name_sample(names)}"
+    return summary
+
+
+def _name_sample(names: list[str]) -> str:
+    """The first few names, with a count standing in for the rest."""
+    shown = ", ".join(names[:_SCRIPTS_NAMES_SHOWN])
+    remainder = len(names) - _SCRIPTS_NAMES_SHOWN
+    return f"{shown} +{remainder} more" if remainder > 0 else shown
 
 
 def _summarize_nonai_upscale(result: dict[str, Any]) -> str:

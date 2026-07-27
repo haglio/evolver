@@ -26,11 +26,16 @@ class ScriptsSyncResult:
     copied_variants: int = 0
     ambiguous_variant_groups: int = 0
     variant_copy_errors: int = 0
+    followed_to_archive: int = 0
+    discarded_duplicates: int = 0
     copied_variant_paths: list[str] | None = None
+    unmatched_paths: list[str] | None = None
 
     def __post_init__(self) -> None:
         if self.copied_variant_paths is None:
             self.copied_variant_paths = []
+        if self.unmatched_paths is None:
+            self.unmatched_paths = []
 
     @property
     def ok(self) -> bool:
@@ -47,11 +52,11 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
 
     video_index = _index_videos(config.VIDEO_LIBRARY_DIR)
 
+    orphans: list[Path] = []
     for script_path in _iter_funscripts(config.SCRIPT_LIBRARY_DIR):
         matches = _matching_videos_for_script(script_path, video_index)
         if not matches:
-            log.info("UNMATCHED script (no video basename match): %s", script_path)
-            result.unmatched += 1
+            orphans.append(script_path)
             continue
         if len(matches) > 1:
             log.warning("AMBIGUOUS script match for %s: %s", script_path, ", ".join(str(p) for p in matches))
@@ -72,10 +77,11 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
         script_path.rename(dest)
         result.moved += 1
 
+    _follow_retired_videos(orphans, result)
     remove_empty_dirs(config.SCRIPT_LIBRARY_DIR)
     _copy_missing_variant_scripts(video_index, result)
     log.info(
-        "Stage 7 done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d",
+        "Stage 7 done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d, Followed to archive: %d, Discarded duplicates: %d",
         result.moved,
         result.already_aligned,
         result.unmatched,
@@ -84,6 +90,8 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
         result.copied_variants,
         result.ambiguous_variant_groups,
         result.variant_copy_errors,
+        result.followed_to_archive,
+        result.discarded_duplicates,
     )
     if not result.ok:
         log.error("Stage 7 failed. See log entries above for unresolved funscript alignment issues.")
@@ -92,6 +100,85 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
             show_error_window("Evolver - Funscript Match Error", _popup_message(result))
             log.info("Error popup dismissed")
     return result
+
+
+def _follow_retired_videos(orphans: list[Path], result: ScriptsSyncResult) -> None:
+    """Send each script whose video left the library for the archive after it.
+
+    A retired original is moved out of the library entirely (see
+    :func:`tasks.nonai_upscale._archive_original`) and its funscript goes with
+    it, because the script tree mirrors only the library: a video outside it has
+    to describe itself, script beside it rather than in a tree that no longer
+    covers it. This stage follows rather than trusting the retiring to have done
+    it, because the archive also fills by hand — 129 originals were swept into
+    it at once, and the funscripts they left behind matched no video, failed
+    this stage, and would have failed it identically on every run afterward. A
+    stage that can never go green again on its own is the failure to prevent,
+    not the sweep.
+
+    Only a stem that names exactly one archived video is followed. Two of them
+    is a guess about which video the script belongs to, and no archived video at
+    all is the real unmatched case this stage exists to report.
+    """
+    archived = _index_archived_videos() if orphans else {}
+    for script_path in orphans:
+        videos = archived.get(script_path.stem, [])
+        if len(videos) != 1:
+            log.info("UNMATCHED script (no video basename match): %s", script_path)
+            result.unmatched += 1
+            result.unmatched_paths.append(str(script_path.relative_to(config.SCRIPT_LIBRARY_DIR)))
+            continue
+
+        dest = videos[0].with_suffix(config.FUNSCRIPT_EXTENSION)
+        if dest.exists():
+            _discard_or_keep_duplicate(script_path, dest, result)
+            continue
+
+        try:
+            # shutil, not Path.rename: the archive is a different drive from the
+            # library — the whole point of it — and os.rename cannot cross one.
+            shutil.move(str(script_path), str(dest))
+        except OSError:
+            log.exception("FAILED TO FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
+            result.unmatched += 1
+            result.unmatched_paths.append(str(script_path.relative_to(config.SCRIPT_LIBRARY_DIR)))
+            continue
+        result.followed_to_archive += 1
+        log.info("FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
+
+
+def _discard_or_keep_duplicate(script_path: Path, dest: Path, result: ScriptsSyncResult) -> None:
+    """Delete the left-behind script when the archived video already has its own.
+
+    Two library scripts can name the same archived video — the same funscript
+    filed under both a "1 could use work" and a "2 do not need work" folder, say
+    — so the second one arrives to find the destination taken by the first.
+    Byte-identical means nothing is lost by dropping it: the content is already
+    sitting beside the video. Anything else is a genuine conflict, and the two
+    versions are left for a person to judge.
+    """
+    if filecmp.cmp(str(script_path), str(dest), shallow=False):
+        script_path.unlink()
+        result.discarded_duplicates += 1
+        log.info("DISCARD DUPLICATE SCRIPT (archive already has it)  %s", script_path)
+        return
+    log.warning("ARCHIVED SCRIPT COLLISION (destination exists and differs): %s -> %s", script_path, dest)
+    result.collisions += 1
+
+
+def _index_archived_videos() -> dict[str, list[Path]]:
+    """Archived videos by basename — empty when no archive is configured.
+
+    Built only when some script went unmatched, so an ordinary run never walks
+    the archive drive.
+    """
+    root = config.NONAI_RETIRED_ROOT
+    if root is None or not root.is_dir():
+        return {}
+    index: dict[str, list[Path]] = defaultdict(list)
+    for video_path in iter_finalized_videos(root, config.VIDEO_EXTENSIONS):
+        index[video_path.stem].append(video_path)
+    return index
 
 
 def _index_videos(root: Path) -> dict[str, list[Path]]:
