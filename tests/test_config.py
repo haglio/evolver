@@ -35,6 +35,24 @@ class TestProjectRoots(unittest.TestCase):
         self.assertEqual(roots, (Path("W:/workspace/suite"), Path("L:/library/projects")))
 
 
+class TestRetiredRoot(unittest.TestCase):
+    """Where a superseded original goes once its upscale exists."""
+
+    def test_unset_means_keep_it_in_the_library(self):
+        """A public checkout gets the user's own convention: the bucket's "2*"
+        folder, which is what None tells the upscale stage to use."""
+        self.assertIsNone(config.retired_root({}))
+
+    def test_an_empty_value_counts_as_unset(self):
+        self.assertIsNone(config.retired_root({"retired_root": ""}))
+
+    def test_reads_the_archive_from_the_overlay(self):
+        self.assertEqual(
+            config.retired_root({"retired_root": "A:/cold storage"}),
+            Path("A:/cold storage"),
+        )
+
+
 class TestProjectDir(unittest.TestCase):
     def test_finds_a_checkout_in_the_only_root(self):
         with workspace_temp_dir() as temp:
