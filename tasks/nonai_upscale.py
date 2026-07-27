@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -346,7 +347,15 @@ def _delete_tmp(tmp: Path) -> None:
 
 
 def _retire_original(source: Path) -> None:
-    """Move the processed original into its bucket's ``2*`` folder, as the user does."""
+    """Move the superseded original out of the way, now that its upscale exists.
+
+    Into the bucket's ``2*`` folder, as the user does by hand — or, when
+    ``config.NONAI_RETIRED_ROOT`` names an archive, out of the library
+    altogether, because that folder is on the drive the encodes fill.
+    """
+    if config.NONAI_RETIRED_ROOT is not None:
+        _archive_original(source)
+        return
     bucket = _bucket_of(source)
     retire_dirs = _numbered_dirs(bucket, digits=(2,)) if bucket else []
     if not retire_dirs:
@@ -359,6 +368,29 @@ def _retire_original(source: Path) -> None:
     source.replace(dest)
     _move_mirrored_files(source, dest)
     log.info("Retired original: %s -> %s", source, dest)
+
+
+def _archive_original(source: Path) -> None:
+    """Move *source* out of the library, under the archive at its library path.
+
+    Its sidecar and funscript come along and sit beside it rather than in the
+    mirrored trees, which only cover the library: an archived video is a cold
+    copy that has to describe itself. Leaving the funscript behind is the worse
+    half — it still matches the video by name, so the scripts sync would try to
+    relocate it onto a destination the clip-scripts stage has already written,
+    and fail the run on a collision nothing can resolve.
+    """
+    dest = config.NONAI_RETIRED_ROOT / source.relative_to(config.NON_AI_DIR)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    for mirrored_path, suffix in (
+        (sidecar.sidecar_path, ".json"),
+        (funscript.script_path_for_video, config.FUNSCRIPT_EXTENSION),
+    ):
+        src = mirrored_path(source)
+        if src.exists():
+            shutil.move(str(src), str(dest.with_suffix(suffix)))
+    shutil.move(str(source), str(dest))
+    log.info("Archived original: %s -> %s", source, dest)
 
 
 def _move_mirrored_files(source: Path, dest: Path) -> None:
