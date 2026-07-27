@@ -43,10 +43,18 @@ This repo is public at `github.com/haglio/evolver` with a merge-queue ruleset on
   `main`, runs the required check, and merges it when green. Don't ff-merge into
   the primary checkout, don't push `main` directly, and never force-push `main`.
 - **The `.git/agent-merge.lock` is retired here** — the GitHub queue serializes.
-- **Sync local checkouts by pulling.** `main` advances only on origin (via the
+- **Pull the primary checkout once your PR merges — that is the last step of
+  landing, not an optional extra.** `main` advances only on origin (via the
   queue), so the primary checkout and worktrees update with
-  `git pull --ff-only origin main`; the running app self-updates the same way.
-  The primary is only ever fast-forwarded — never reset or merged-into.
+  `git pull --ff-only origin main`. Nothing does this for you: the merge gate
+  runs on a GitHub-hosted runner that cannot reach this machine, and the app
+  does NOT self-update — this file used to claim it did, and no such code has
+  ever existed. The primary is only ever fast-forwarded — never reset or
+  merged-into.
+- **Then say the app needs restarting.** Evolver is a long-running tray process
+  holding the modules it imported at startup, so a pull alone changes nothing
+  it executes. The user restarts it from **Restart** in the tray menu or the
+  main window's toolbar.
 - **A red required check** (`.github/workflows/merge-gate.yml`) can't land.
 
 Everything else in the global CLAUDE.md — work in a worktree, green tests before
