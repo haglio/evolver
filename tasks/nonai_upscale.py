@@ -41,7 +41,7 @@ from pathlib import Path
 import config
 from util import ffprobe, funscript, processes, sidecar, system_resources, topaz
 from util.media_files import is_finalized_video_file, is_partial_video_path
-from util.nonai_library import buckets
+from util.nonai_library import bucket_of, buckets
 from util.variants import is_processed_stem, strip_processing_suffixes
 
 log = logging.getLogger(__name__)
@@ -356,7 +356,7 @@ def _retire_original(source: Path) -> None:
     if config.NONAI_RETIRED_ROOT is not None:
         _archive_original(source)
         return
-    bucket = _bucket_of(source)
+    bucket = bucket_of(source)
     retire_dirs = _numbered_dirs(bucket, digits=(2,)) if bucket else []
     if not retire_dirs:
         log.warning("No '2*' folder in %s; leaving the original at %s.", bucket, source)
@@ -412,13 +412,6 @@ def _move_mirrored_files(source: Path, dest: Path) -> None:
         dst = mirrored_path(dest)
         dst.parent.mkdir(parents=True, exist_ok=True)
         src.replace(dst)
-
-
-def _bucket_of(source: Path) -> Path | None:
-    try:
-        return config.NON_AI_DIR / source.relative_to(config.NON_AI_DIR).parts[0]
-    except ValueError:
-        return None
 
 
 def _sweep_orphaned_partials(keep: Path | None) -> None:
