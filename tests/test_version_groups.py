@@ -47,6 +47,39 @@ class TestGroupIds(unittest.TestCase):
         self.assertEqual(ids["redacted POV BJ 4k 60fps"], ids["redacted_540-pacI21CK"])
         self.assertEqual(ids["redacted_540-pacI21CK"], "redacted_540-pacI21CK")
 
+    def test_a_scene_named_past_another_is_not_a_version_of_it(self):
+        """Every scene of a performer starts with her name, so a stem that is
+        only her name would anchor all of them — and did: three unrelated scenes
+        went into one family, which is then one rotation slot and one answer to
+        "what was this clip cut from". A variant appends a marker to its
+        original's name, never more of a title."""
+        stems = ["Jane Doe", "Jane Doe - Cut to Length", "Jane-Doe-&-Ada-Roe-b4t7k1qz"]
+
+        ids = group_ids(stems)
+
+        self.assertEqual(len(set(ids.values())), 3)
+
+    def test_a_second_download_of_one_video_keeps_its_family(self):
+        """Saving a file that is already there names the copy "name (2)", so a
+        parenthesized counter is a marker like the bare one, and the copies —
+        and anything the pipeline makes of them — are one video."""
+        stems = ["Jane Doe - Scene Two", "Jane Doe - Scene Two (2)",
+                 "Jane Doe - Scene Two (3)_apo8_iris2"]
+
+        ids = group_ids(stems)
+
+        self.assertEqual(len(set(ids.values())), 1)
+
+    def test_a_hand_trimmed_cut_stays_with_the_video_it_came_from(self):
+        """A trim kept beside the whole scene is marked in the name, and then the
+        pipeline upscales the trim. It is the same video — the marker says so,
+        where the same tail made of title words would have said the opposite."""
+        stems = ["Jane Doe 4471_720p", "Jane Doe 4471_720p - trimmed_2_apo8_iris2"]
+
+        ids = group_ids(stems)
+
+        self.assertEqual(len(set(ids.values())), 1)
+
     def test_three_scenes_each_with_a_variant_form_three_families(self):
         stems = []
         for n in (1, 2, 3):
