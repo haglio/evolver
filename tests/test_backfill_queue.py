@@ -65,6 +65,36 @@ class TestUnlabeledVideos(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 self.assertEqual(unlabeled_videos(), [])
 
+    def test_a_clip_whose_act_was_called_wrong_is_asked_about_first(self):
+        """Fun Time strikes a mislabeled act out of the sidecar and leaves
+        ``wrong_action`` behind.  Someone said that clip is wrong *just now*, so
+        it goes to the head of the queue rather than the back of a library walk
+        they may never reach."""
+        with workspace_temp_dir() as root:
+            ai, upscaled, metadata = self._tree(root)
+            # The rejected clip sits last in the library walk (portrait sweeps
+            # before landscape), so only a reordering can bring it to the front.
+            plain = self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
+            rejected = self._make_video(upscaled, "landscape", "provider2", "b_topaz.mp4")
+            self._make_sidecar(metadata, "landscape", "provider2", "b_topaz",
+                               {"video": {"prompt": "p", "wrong_action": "Alpha"}})
+
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+                self.assertEqual(unlabeled_videos(), [rejected, plain])
+
+    def test_a_scraped_clip_whose_act_was_called_wrong_is_offered_anyway(self):
+        """A scraped act is skipped because the scrape stage knows what the clip
+        shows — which is exactly the claim a viewer has just contradicted, and
+        the stage cannot correct itself."""
+        with workspace_temp_dir() as root:
+            ai, upscaled, metadata = self._tree(root)
+            rejected = self._make_video(upscaled, "portrait", "origenerator", "a_topaz.mp4")
+            self._make_sidecar(metadata, "portrait", "origenerator", "a_topaz",
+                               {"video": {"wrong_action": "Alpha"}})
+
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+                self.assertEqual(unlabeled_videos(), [rejected])
+
     def test_both_orientations_are_swept(self):
         with workspace_temp_dir() as root:
             ai, upscaled, metadata = self._tree(root)

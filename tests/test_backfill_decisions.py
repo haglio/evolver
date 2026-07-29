@@ -35,6 +35,26 @@ class TestRecordAction(unittest.TestCase):
 
             self.assertEqual(payload, {"video": {"action": "Side Beta"}})
 
+    def test_naming_the_act_answers_a_viewers_rejection_of_the_old_one(self):
+        """``wrong_action`` is a standing question — "this clip is mislabeled,
+        ask me again" — and recording an act is the answer, so the marker goes
+        with it.  Left behind it would jump the queue on every future open."""
+        with workspace_temp_dir() as root:
+            ai, upscaled, metadata = self._tree(root)
+            video = self._make_video(upscaled)
+
+            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
+                path = sidecar_path(video)
+                path.parent.mkdir(parents=True)
+                path.write_text(
+                    json.dumps({"video": {"prompt": "p", "wrong_action": "Alpha"}}), encoding="utf-8"
+                )
+
+                record_action(video, "Side Beta")
+                payload = json.loads(path.read_text(encoding="utf-8"))
+
+            self.assertEqual(payload, {"video": {"prompt": "p", "action": "Side Beta"}})
+
     def test_keeps_the_metadata_an_existing_sidecar_already_holds(self):
         with workspace_temp_dir() as root:
             ai, upscaled, metadata = self._tree(root)
