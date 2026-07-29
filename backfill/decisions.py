@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 import config
-from util.sidecar import read, sidecar_path, write
+from util.sidecar import WRONG_ACTION_FIELD, read, sidecar_path, write
 
 # The window moves to the next clip the instant a phrase lands, so the media player
 # can still be letting go of the old file when the move runs. Windows refuses to
@@ -21,10 +21,18 @@ _UNLOCK_DELAY_SECONDS = 0.2
 
 
 def record_action(video: Path, action: str) -> None:
-    """Record *action* as *video*'s act, leaving any other metadata it has intact."""
+    """Record *action* as *video*'s act, leaving any other metadata it has intact.
+
+    A ``wrong_action`` marker is the exception: it is the standing question this
+    answers — a viewer's "that label is wrong, ask me again" — so naming the act
+    retires it.  Left in place it would send the clip to the head of this queue
+    every time the tool opened.
+    """
     path = sidecar_path(video)
     payload = read(path)
-    payload.setdefault("video", {})["action"] = action
+    block = payload.setdefault("video", {})
+    block["action"] = action
+    block.pop(WRONG_ACTION_FIELD, None)
     write(path, payload)
 
 
