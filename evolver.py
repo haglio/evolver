@@ -45,7 +45,7 @@ from util import processes, system_resources
 class StageRecord:
     """Result of a single pipeline stage."""
     name: str
-    status: str  # "completed", "skipped", "error"
+    status: str  # "completed", "warning", "skipped", "error"
     duration_seconds: float
     result: object | None = None
     skip_reason: str | None = None
@@ -60,10 +60,8 @@ class StageRecord:
 _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "purge": lambda r: bool(r.missing_sorted),
     "metadata": lambda r: not r.ok,
-    # A low-disk hold is a failure, not a quiet wait: nothing upscales again
-    # until someone frees space, so the run has to say so.
-    "upscale": lambda r: bool(r.failed) or r.deferred_low_disk,
-    "upscale_non_ai": lambda r: bool(r.failed) or r.deferred_low_disk,
+    "upscale": lambda r: bool(r.failed),
+    "upscale_non_ai": lambda r: bool(r.failed),
     "verify": lambda r: not r.ok,
     "references": lambda r: not r.ok,
     "bookmarks": lambda r: not r.ok,
@@ -71,11 +69,31 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "dupes": lambda r: not r.ok,
 }
 
+# What counts as work held back rather than work gone wrong. Nothing broke and
+# nothing is owed to anyone: there is no room to write another upscale, so the
+# stage parks the queue and picks it up again the moment space frees up. This
+# used to read as an outright failure, and because free space stays low for days
+# at a stretch it turned the whole run history into a wall of red — a standing
+# alarm for a condition with nothing in it to fix.
+_STAGE_HELD_BACK: dict[str, Callable[[object], bool]] = {
+    "upscale": lambda r: r.deferred_low_disk,
+    "upscale_non_ai": lambda r: r.deferred_low_disk,
+}
+
 
 def _stage_status(name: str, result: object) -> str:
-    """"error" when *result* says the stage failed, else "completed"."""
+    """What *result* says about the stage, worst verdict first.
+
+    A stage that both lost an encode and held the rest back reads "error": the
+    dead encode wants a person, where the hold only wants disk space.
+    """
     failed = _STAGE_FAILED.get(name)
-    return "error" if failed is not None and failed(result) else "completed"
+    if failed is not None and failed(result):
+        return "error"
+    held_back = _STAGE_HELD_BACK.get(name)
+    if held_back is not None and held_back(result):
+        return "warning"
+    return "completed"
 
 
 @dataclass
@@ -114,7 +132,8 @@ def run_pipeline(
     Args:
         on_stage_start: Called with (stage_name) before each stage runs.
         on_stage_complete: Called with (stage_name, result, elapsed_seconds, status)
-            after each stage. status is "completed", "skipped", or "error".
+            after each stage. status is "completed", "warning", "skipped", or
+            "error".
         nonai_enabled: The tray's non-AI upscale toggle. True lets Evolver
             auto-manage an encode by user presence — starting or resuming it
             while the user is away, suspending it the moment they return. False

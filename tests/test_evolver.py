@@ -200,13 +200,14 @@ class TestEvolverMain(unittest.TestCase):
         )
         self.assertEqual(mocks["exit_code"], 1)
 
-    def test_exits_nonzero_on_upscale_deferred_low_disk(self):
+    def test_exits_zero_when_upscale_only_held_back_for_low_disk(self):
+        """A hold is not a failure: nothing broke, there is just no room yet."""
         mocks = self._run_pipeline(
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
             upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=True, pending_after_run=3)),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        self.assertEqual(mocks["exit_code"], 0)
 
     def test_exits_nonzero_on_prompt_scrape_failure(self):
         mocks = self._run_pipeline(
@@ -364,20 +365,35 @@ class TestRunPipeline(unittest.TestCase):
         errored = [s.name for s in result.stages if s.status == "error"]
         self.assertEqual(errored, ["purge"])
 
-    def test_a_low_disk_hold_marks_the_non_ai_stage_error(self):
-        """The condition that reddened almost every run for a day, unexplained.
+    def test_a_low_disk_hold_warns_on_the_non_ai_stage_instead_of_failing_it(self):
+        """The condition that reddened almost every run for days on end.
 
         Free space fell under the floor, the non-AI stage held its encode back,
-        and the run was flagged an error — but the stage itself still said
-        "completed", so the reason lived only in the row's details text.
+        and the run was flagged an error. Space stays low for days at a stretch,
+        so that verdict left the history a wall of red crosses standing over a
+        condition nobody has to act on. The stage names the hold itself now, and
+        names it in gray.
         """
         stack, _ = self._patch_all_stages(
             nonai_run=Mock(return_value=Mock(failed="", deferred_low_disk=True)),
         )
         with stack:
             result = evolver.run_pipeline()
-        errored = [s.name for s in result.stages if s.status == "error"]
-        self.assertEqual(errored, ["upscale_non_ai"])
+        statuses = {s.name: s.status for s in result.stages}
+        self.assertEqual(statuses["upscale_non_ai"], "warning")
+        self.assertFalse(result.has_errors)
+
+    def test_a_dead_encode_outranks_a_hold_on_the_same_stage(self):
+        """One tick can lose an encode and then find no room for the next. The
+        lost encode wants a person; the hold only wants disk space."""
+        stack, _ = self._patch_all_stages(
+            nonai_run=Mock(return_value=Mock(failed="example/clip one.mp4",
+                                             deferred_low_disk=True)),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+        statuses = {s.name: s.status for s in result.stages}
+        self.assertEqual(statuses["upscale_non_ai"], "error")
 
     def test_skips_alone_do_not_make_a_run_a_failure(self):
         """Skipping is how the pipeline stays out of the way, not how it fails.
