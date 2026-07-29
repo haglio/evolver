@@ -21,6 +21,15 @@ class TestMarkFor(unittest.TestCase):
         self.assertEqual(glyph, "○")
         self.assertEqual(color.name(), "#808080")
 
+    def test_a_held_back_stage_is_an_empty_gray_circle(self):
+        """A low-disk hold must not draw the failure's mark. Free space stays
+        low for days at a time, so a red ✘ for it puts a standing alarm on every
+        run of those days over a condition with nothing in it to fix."""
+        glyph, color = mark_for("warning")
+        self.assertEqual(glyph, "○")
+        self.assertEqual(color.name(), "#808080")
+        self.assertEqual(mark_for("warning"), mark_for("skipped"))
+
     def test_an_errored_stage_is_a_red_cross(self):
         glyph, color = mark_for("error")
         self.assertEqual(glyph, "✘")
