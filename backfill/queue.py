@@ -8,7 +8,7 @@ from pathlib import Path
 
 import config
 from util.media_files import iter_finalized_videos
-from util.sidecar import action_of, read, sidecar_path
+from util.sidecar import action_of, read, sidecar_path, wrong_action_of
 
 _ORIENTATIONS = ("portrait", "landscape")
 
@@ -35,12 +35,28 @@ def iter_library_videos() -> Iterator[tuple[str, Path]]:
 
 
 def unlabeled_videos() -> list[Path]:
-    """Every upscaled clip whose sidecar records no ``video.action``."""
-    return [
-        video
-        for source, video in iter_library_videos()
-        if source not in SCRAPED_SOURCES and not action_of(read(sidecar_path(video)))
-    ]
+    """Every upscaled clip whose sidecar records no ``video.action``.
+
+    The ones a viewer *rejected* come first.  Fun Time's "wrong action" empties
+    ``video.action`` and leaves ``video.wrong_action`` behind, which says a
+    person just looked at that clip and told us its label was wrong: they are
+    owed an answer now, not at whatever depth of the library walk the clip
+    happens to sit at.  For the same reason a rejection overrides the
+    scraped-source skip below — the scrape's claim about the clip is the very
+    thing being contradicted, and re-running the scrape would only assert it
+    again.
+    """
+    rejected: list[Path] = []
+    never_labeled: list[Path] = []
+    for source, video in iter_library_videos():
+        payload = read(sidecar_path(video))
+        if action_of(payload):
+            continue
+        if wrong_action_of(payload):
+            rejected.append(video)
+        elif source not in SCRAPED_SOURCES:
+            never_labeled.append(video)
+    return rejected + never_labeled
 
 
 class BackfillQueue:

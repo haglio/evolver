@@ -49,9 +49,30 @@ def write(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def action_of(payload: dict) -> str:
-    """The act a sidecar records, or ``""`` when it records none."""
+def _video_field(payload: dict, field: str) -> str:
     video = payload.get("video")
     if not isinstance(video, dict):
         return ""
-    return str(video.get("action") or "")
+    return str(video.get(field) or "")
+
+
+def action_of(payload: dict) -> str:
+    """The act a sidecar records, or ``""`` when it records none."""
+    return _video_field(payload, "action")
+
+
+# The key Fun Time leaves behind when its "wrong action" command empties
+# ``video.action`` (see ``fun_time/media_metadata.py``).  It is written by that
+# app and read by this one; only :func:`backfill.decisions.record_action` clears
+# it, once the viewer has finally named the act.
+WRONG_ACTION_FIELD = "wrong_action"
+
+
+def wrong_action_of(payload: dict) -> str:
+    """The act a viewer struck out as wrong, or ``""`` when none was.
+
+    A clip that has this reads as unlabeled — the act is gone — but is not
+    merely *unlabeled*: someone looked at it and said the label it had was
+    wrong.  The backfill queue asks about those first.
+    """
+    return _video_field(payload, WRONG_ACTION_FIELD)

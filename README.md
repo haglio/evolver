@@ -93,6 +93,8 @@ Most sources publish nothing about what a clip actually shows. Provider exposes 
 
 **Backfill Metadata...** in the tray menu opens a separate window that plays every such clip — looping and muted, in the stable order it found them so a reopened session resumes where the last left off — until you say what it is. The clip changes the instant you speak, and the sidecar is written behind it.
 
+Clips whose act was **rejected** jump that order and are asked about first. Fun Time's "wrong action" command empties a mislabeled clip's `video.action` and leaves `video.wrong_action` holding what it said, which is how this tool tells a clip someone just looked at and corrected from one nobody ever labeled — and why a rejection also overrides the scraped-source skip above, since re-scraping would only assert the wrong act again. Naming the act retires the marker along with the question it stands for.
+
 Say an act, always prefixed with a camera word — `side`, or `POV` said as its three letters ("pee oh vee"). Every clip is tagged Side or POV; no act has a bare, camera-less form:
 
 | Say (act) | Act recorded |
