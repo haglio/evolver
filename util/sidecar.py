@@ -27,8 +27,8 @@ def sidecar_path(video: Path) -> Path:
 
     The whole video library is mirrored: a clip's sidecar sits at the same path
     beneath ``METADATA_DIR`` as the clip sits beneath ``VIDEO_LIBRARY_DIR``
-    (``2D/AI/2_outbox/x.mp4`` -> ``2D/AI/2_outbox/x.json``, ``2D/non_AI/winston/
-    y.mp4`` -> ``2D/non_AI/winston/y.json``), so AI generation metadata and
+    (``2D/AI/2_outbox/x.mp4`` -> ``2D/AI/2_outbox/x.json``, ``2D/non_AI/larkin/
+    y.mp4`` -> ``2D/non_AI/larkin/y.json``), so AI generation metadata and
     non-AI version families share one tree that parallels the video tree.
     """
     return (config.METADATA_DIR / video.relative_to(config.VIDEO_LIBRARY_DIR)).with_suffix(".json")

@@ -7,7 +7,7 @@ from tasks import clip_scripts
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
-WINSTON = Path("2D") / "non_AI" / "winston"
+LARKIN = Path("2D") / "non_AI" / "larkin"
 
 
 class ClipScriptsCase(unittest.TestCase):
@@ -22,7 +22,7 @@ class ClipScriptsCase(unittest.TestCase):
         self.metadata = self.root / "metadata"
 
     def make_scene(self, name="scene", actions=None):
-        scene = self.videos / WINSTON / "scenes" / f"{name}.mp4"
+        scene = self.videos / LARKIN / "scenes" / f"{name}.mp4"
         scene.parent.mkdir(parents=True, exist_ok=True)
         scene.write_bytes(b"scene")
         if actions is not None:
@@ -30,16 +30,16 @@ class ClipScriptsCase(unittest.TestCase):
         return scene
 
     def write_scene_script(self, scene, actions, **extra):
-        script = self.scripts / WINSTON / "scenes" / f"{scene.stem}.funscript"
+        script = self.scripts / LARKIN / "scenes" / f"{scene.stem}.funscript"
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text(json.dumps({"actions": actions, **extra}), encoding="utf-8")
         return script
 
     def make_clip(self, scene, name="clip", scene_offset=10.0, clip=None):
-        video = self.videos / WINSTON / "clips" / f"{name}.mp4"
+        video = self.videos / LARKIN / "clips" / f"{name}.mp4"
         video.parent.mkdir(parents=True, exist_ok=True)
         video.write_bytes(b"clip")
-        sidecar = self.metadata / WINSTON / "clips" / f"{name}.json"
+        sidecar = self.metadata / LARKIN / "clips" / f"{name}.json"
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         payload = {"clip": {"full_video": str(scene), "scene_offset": scene_offset}}
         if clip is not None:
@@ -48,7 +48,7 @@ class ClipScriptsCase(unittest.TestCase):
         return video
 
     def clip_script(self, name="clip"):
-        return self.scripts / WINSTON / "clips" / f"{name}.funscript"
+        return self.scripts / LARKIN / "clips" / f"{name}.funscript"
 
     def run_stage(self, duration=2.0):
         with override_config(

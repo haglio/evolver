@@ -41,30 +41,33 @@ class TestCollectCandidates(unittest.TestCase):
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
-            unsorted_video = make_video(non_ai / "winston" / "0 unsorted" / "a.mp4")
+            unsorted_video = make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
             flagged_video = make_video(non_ai / "other" / "1 could use work" / "b.mp4")
-            make_video(non_ai / "winston" / "2 do not need work" / "retired.mp4")
-            make_video(non_ai / "winston" / "3_good_to_go" / "processed" / "done_iris2.mp4")
+            make_video(non_ai / "larkin" / "2 do not need work" / "retired.mp4")
+            make_video(non_ai / "larkin" / "3_good_to_go" / "processed" / "done_iris2.mp4")
             make_video(non_ai / "actually_AI_but_funscripted" / "0 unsorted" / "ai.mp4")
 
             with override_config(**overrides):
                 candidates = nonai_upscale.collect_candidates()
 
+            # Sort both sides: which bucket name sorts first is an accident of
+            # the fixture's spelling, not something this test is about.
             self.assertEqual(
-                sorted(c.path for c in candidates), [flagged_video, unsorted_video]
+                sorted(c.path for c in candidates),
+                sorted([flagged_video, unsorted_video]),
             )
 
     def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
-        """A triage dir's first sub-stage holds manual pre-work (e.g. winston's
+        """A triage dir's first sub-stage holds manual pre-work (e.g. larkin's
         '1 could use work/1_originals_needing_trimming'); those clips are not
         ready for an unattended multi-hour encode."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
-            ready = make_video(non_ai / "winston" / "1 could use work" / "ready.mp4")
+            ready = make_video(non_ai / "larkin" / "1 could use work" / "ready.mp4")
             make_video(
-                non_ai / "winston" / "1 could use work"
+                non_ai / "larkin" / "1 could use work"
                 / "1_originals_needing_trimming" / "not yet.mp4"
             )
 
@@ -79,7 +82,7 @@ class TestCollectCandidates(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            work = non_ai / "winston" / "1 could use work"
+            work = non_ai / "larkin" / "1 could use work"
 
             good = make_video(
                 work / "2_originals_good_trimwise_but_need_upscaling" / "good.mp4"
@@ -101,11 +104,11 @@ class TestCollectCandidates(unittest.TestCase):
             overrides = library_overrides(root, NONAI_PRIORITY_MANIFEST=root / "next.txt")
             non_ai = overrides["NON_AI_DIR"]
 
-            make_video(non_ai / "winston" / "1 could use work" / "a.mp4")
+            make_video(non_ai / "larkin" / "1 could use work" / "a.mp4")
             second = make_video(non_ai / "other" / "0 unsorted" / "y.mp4")
-            first = make_video(non_ai / "winston" / "0 unsorted" / "z.mp4")
+            first = make_video(non_ai / "larkin" / "0 unsorted" / "z.mp4")
             (root / "next.txt").write_text(
-                "winston/0 unsorted/z.mp4\nother/0 unsorted/y.mp4\n", encoding="utf-8"
+                "larkin/0 unsorted/z.mp4\nother/0 unsorted/y.mp4\n", encoding="utf-8"
             )
 
             with override_config(**overrides):
@@ -120,12 +123,12 @@ class TestCollectCandidates(unittest.TestCase):
             overrides = library_overrides(root, NONAI_PRIORITY_MANIFEST=root / "next.txt")
             non_ai = overrides["NON_AI_DIR"]
 
-            original = make_video(non_ai / "winston" / "1 could use work" / "scene.mp4")
+            original = make_video(non_ai / "larkin" / "1 could use work" / "scene.mp4")
             make_video(
-                non_ai / "winston" / "3_good_to_go" / "processed" / "scene_topaz.mp4"
+                non_ai / "larkin" / "3_good_to_go" / "processed" / "scene_topaz.mp4"
             )
             (root / "next.txt").write_text(
-                "winston/1 could use work/scene.mp4\n", encoding="utf-8"
+                "larkin/1 could use work/scene.mp4\n", encoding="utf-8"
             )
 
             with override_config(**overrides):
@@ -172,11 +175,11 @@ class TestCollectCandidates(unittest.TestCase):
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
-            watched = make_video(non_ai / "winston" / "0 unsorted" / "watched.mp4")
-            scripted = make_video(non_ai / "winston" / "0 unsorted" / "scripted.mp4")
-            plain = make_video(non_ai / "winston" / "0 unsorted" / "plain.mp4")
-            disliked = make_video(non_ai / "winston" / "0 unsorted" / "disliked.mp4")
-            script = overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "winston" / "0 unsorted" / "scripted.funscript"
+            watched = make_video(non_ai / "larkin" / "0 unsorted" / "watched.mp4")
+            scripted = make_video(non_ai / "larkin" / "0 unsorted" / "scripted.mp4")
+            plain = make_video(non_ai / "larkin" / "0 unsorted" / "plain.mp4")
+            disliked = make_video(non_ai / "larkin" / "0 unsorted" / "disliked.mp4")
+            script = overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "larkin" / "0 unsorted" / "scripted.funscript"
             script.parent.mkdir(parents=True)
             script.write_text("{}", encoding="utf-8")
             overrides["FUN_TIME_WATCH_STATS_FILE"].write_text(json.dumps({
@@ -196,10 +199,10 @@ class TestCollectCandidates(unittest.TestCase):
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
-            plain = make_video(non_ai / "winston" / "0 unsorted" / "aaa plain.mp4")
-            scripted = make_video(non_ai / "winston" / "0 unsorted" / "zzz scripted.mp4")
-            flagged = make_video(non_ai / "winston" / "1 could use work" / "flagged.mp4")
-            script = overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "winston" / "0 unsorted" / "zzz scripted.funscript"
+            plain = make_video(non_ai / "larkin" / "0 unsorted" / "aaa plain.mp4")
+            scripted = make_video(non_ai / "larkin" / "0 unsorted" / "zzz scripted.mp4")
+            flagged = make_video(non_ai / "larkin" / "1 could use work" / "flagged.mp4")
+            script = overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "larkin" / "0 unsorted" / "zzz scripted.funscript"
             script.parent.mkdir(parents=True)
             script.write_text("{}", encoding="utf-8")
 
@@ -214,8 +217,8 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
               suspended_seconds=0.0):
     """A persisted in-flight job whose tmp file exists under the bucket."""
     non_ai = overrides["NON_AI_DIR"]
-    source = source or make_video(non_ai / "winston" / "0 unsorted" / "busy.mp4")
-    out = non_ai / "winston" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
+    source = source or make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
+    out = non_ai / "larkin" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
     tmp = out.with_name(f"{source.stem}.partial.abc123.mp4")
     if tmp_bytes is not None:
         tmp.parent.mkdir(parents=True, exist_ok=True)
@@ -284,13 +287,13 @@ class TestRunStartsAJob(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            video = make_video(non_ai / "winston" / "0 unsorted" / "a.mp4")
+            video = make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
 
-            self.assertEqual(result.started, "winston/0 unsorted/a.mp4")
+            self.assertEqual(result.started, "larkin/0 unsorted/a.mp4")
             cmd = mocks["popen"].call_args.args[0]
             self.assertIn(str(video), cmd)
             self.assertNotIn("-an", cmd)
@@ -308,23 +311,23 @@ class TestRunStartsAJob(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            make_video(non_ai / "winston" / "0 unsorted" / "a tagged.mp4")
-            fresh = make_video(non_ai / "winston" / "0 unsorted" / "b fresh.mp4")
+            make_video(non_ai / "larkin" / "0 unsorted" / "a tagged.mp4")
+            fresh = make_video(non_ai / "larkin" / "0 unsorted" / "b fresh.mp4")
 
             stack, mocks = probes()
             mocks["videoai"].side_effect = ["Enhanced using iris-2", ""]
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
 
-            self.assertEqual(result.started, "winston/0 unsorted/b fresh.mp4")
+            self.assertEqual(result.started, "larkin/0 unsorted/b fresh.mp4")
             self.assertIn(str(fresh), mocks["popen"].call_args.args[0])
             manifest = overrides["NONAI_SKIP_MANIFEST"].read_text(encoding="utf-8")
-            self.assertIn("winston/0 unsorted/a tagged.mp4\t", manifest)
+            self.assertIn("larkin/0 unsorted/a tagged.mp4\t", manifest)
 
     def test_allow_start_false_starts_nothing(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
@@ -337,7 +340,7 @@ class TestRunStartsAJob(unittest.TestCase):
     def test_low_disk_defers_the_start(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
 
             stack, mocks = probes(free_bytes=1)
             with override_config(**overrides), stack:
@@ -352,7 +355,7 @@ class TestStartGuards(unittest.TestCase):
     """A new multi-hour encode only starts on a machine with headroom."""
 
     def _one_candidate(self, overrides):
-        return make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "a.mp4")
+        return make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
 
     def test_a_running_topaz_process_defers_the_start(self):
         """Any live Topaz ffmpeg — an orphaned encode, or the user's own GUI
@@ -407,7 +410,7 @@ class TestStartGuards(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
 
-            self.assertEqual(result.started, "winston/0 unsorted/a.mp4")
+            self.assertEqual(result.started, "larkin/0 unsorted/a.mp4")
             self.assertEqual(result.start_deferred, "")
 
     def test_a_recent_encode_imposes_a_cooldown(self):
@@ -439,7 +442,7 @@ class TestStartGuards(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
 
-            self.assertEqual(result.started, "winston/0 unsorted/a.mp4")
+            self.assertEqual(result.started, "larkin/0 unsorted/a.mp4")
             self.assertEqual(result.start_deferred, "")
 
 
@@ -449,9 +452,9 @@ class TestRunStopsAJob(unittest.TestCase):
             overrides = library_overrides(root)
             source, tmp, out = write_job(root, overrides)
             overrides["NONAI_ATTEMPTS_FILE"].write_text(
-                json.dumps({"winston/0 unsorted/busy.mp4": 1}), encoding="utf-8"
+                json.dumps({"larkin/0 unsorted/busy.mp4": 1}), encoding="utf-8"
             )
-            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "next.mp4")
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "next.mp4")
 
             stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
             with override_config(**overrides), stack:
@@ -459,14 +462,14 @@ class TestRunStopsAJob(unittest.TestCase):
 
             mocks["terminate"].assert_called_once_with(4242)
             mocks["popen"].assert_not_called()
-            self.assertEqual(result.stopped, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.stopped, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.failed, "")
             self.assertEqual(result.started, "")
             self.assertFalse(tmp.exists())
             self.assertFalse(out.exists())
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
             attempts = json.loads(overrides["NONAI_ATTEMPTS_FILE"].read_text(encoding="utf-8"))
-            self.assertNotIn("winston/0 unsorted/busy.mp4", attempts)
+            self.assertNotIn("larkin/0 unsorted/busy.mp4", attempts)
             self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
 
     def test_stop_still_promotes_an_encode_that_already_finished(self):
@@ -479,7 +482,7 @@ class TestRunStopsAJob(unittest.TestCase):
                 result = nonai_upscale.run(allow_start=False, stop=True)
 
             mocks["terminate"].assert_not_called()
-            self.assertEqual(result.promoted, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.promoted, "larkin/0 unsorted/busy.mp4")
             self.assertTrue(out.exists())
 
 
@@ -498,8 +501,8 @@ class TestOrphanAdoption(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "winston" / "0 unsorted" / "busy.mp4")
-            processed = non_ai / "winston" / "3_good_to_go" / "processed"
+            source = make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
+            processed = non_ai / "larkin" / "3_good_to_go" / "processed"
             tmp = processed / "busy.partial.deadbeefcafe.mp4"
             make_video(tmp)
             cmdline = subprocess.list2cmdline(
@@ -510,7 +513,7 @@ class TestOrphanAdoption(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
 
-            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
             mocks["popen"].assert_not_called()
             job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
             self.assertEqual(job["pid"], 31337)
@@ -521,7 +524,7 @@ class TestOrphanAdoption(unittest.TestCase):
     def test_multiple_topaz_processes_are_not_adopted(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
 
             stack, mocks = probes(topaz_pids=(111, 222))
             with override_config(**overrides), stack:
@@ -535,7 +538,7 @@ class TestOrphanAdoption(unittest.TestCase):
         """The user's own Topaz GUI export writes outside the library."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
 
             stack, mocks = probes(
                 topaz_pids=(31337,),
@@ -564,7 +567,7 @@ class TestPresenceThrottle(unittest.TestCase):
 
             mocks["suspend"].assert_called_once_with(4242)
             mocks["terminate"].assert_not_called()
-            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
             self.assertTrue(result.suspended)
             self.assertTrue(tmp.exists())
             job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
@@ -615,7 +618,7 @@ class TestPresenceThrottle(unittest.TestCase):
                 result = nonai_upscale.run(allow_start=False, presence_managed=True)
 
             mocks["terminate"].assert_not_called()
-            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
 
     def test_headless_mode_leaves_a_present_users_encode_running(self):
         """Without presence management (the CLI passes it off), an in-flight
@@ -629,7 +632,7 @@ class TestPresenceThrottle(unittest.TestCase):
                 result = nonai_upscale.run(allow_start=False, presence_managed=False)
 
             mocks["suspend"].assert_not_called()
-            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
             self.assertFalse(result.suspended)
 
 
@@ -706,7 +709,7 @@ class TestPortraitTargets(unittest.TestCase):
     def test_portrait_video_gets_swapped_target_edges(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "tall.mp4")
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "tall.mp4")
 
             stack, mocks = probes(orientation="portrait")
             with override_config(**overrides), stack:
@@ -722,13 +725,13 @@ class TestRunSupervisesAJob(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             source, tmp, _ = write_job(root, overrides)
-            make_video(overrides["NON_AI_DIR"] / "winston" / "0 unsorted" / "next.mp4")
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "next.mp4")
 
             stack, mocks = probes(is_running=True)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
 
-            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.started, "")
             mocks["popen"].assert_not_called()
             self.assertTrue(tmp.exists())
@@ -754,14 +757,14 @@ class TestRunSupervisesAJob(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
-            self.assertEqual(result.in_flight, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
             self.assertIsNone(result.in_flight_percent)
 
     def test_finished_job_is_promoted_and_the_original_retired(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            retire_dir = non_ai / "winston" / "2 do not need work"
+            retire_dir = non_ai / "larkin" / "2 do not need work"
             retire_dir.mkdir(parents=True)
             source, tmp, out = write_job(root, overrides, expected=100.0)
 
@@ -769,7 +772,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
-            self.assertEqual(result.promoted, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.promoted, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.failed, "")
             self.assertTrue(out.exists())
             self.assertFalse(tmp.exists())
@@ -786,7 +789,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
-            self.assertEqual(result.promoted, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.promoted, "larkin/0 unsorted/busy.mp4")
             self.assertTrue(out.exists())
             self.assertTrue(source.exists())
 
@@ -799,7 +802,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
-            self.assertEqual(result.failed, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.failed, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.promoted, "")
             self.assertFalse(out.exists())
             self.assertFalse(tmp.exists())
@@ -812,7 +815,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             overrides = library_overrides(root)
             source, tmp, out = write_job(root, overrides, expected=100.0)
             overrides["NONAI_ATTEMPTS_FILE"].write_text(
-                json.dumps({"winston/0 unsorted/busy.mp4": config.NONAI_MAX_ATTEMPTS}),
+                json.dumps({"larkin/0 unsorted/busy.mp4": config.NONAI_MAX_ATTEMPTS}),
                 encoding="utf-8",
             )
 
@@ -820,11 +823,11 @@ class TestRunSupervisesAJob(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
-            self.assertEqual(result.failed, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.failed, "larkin/0 unsorted/busy.mp4")
             manifest = overrides["NONAI_SKIP_MANIFEST"].read_text(encoding="utf-8")
-            self.assertIn("winston/0 unsorted/busy.mp4\t", manifest)
+            self.assertIn("larkin/0 unsorted/busy.mp4\t", manifest)
             attempts = json.loads(overrides["NONAI_ATTEMPTS_FILE"].read_text(encoding="utf-8"))
-            self.assertNotIn("winston/0 unsorted/busy.mp4", attempts)
+            self.assertNotIn("larkin/0 unsorted/busy.mp4", attempts)
 
     def test_overrunning_ffmpeg_is_terminated_and_concluded(self):
         with workspace_temp_dir() as root:
@@ -840,7 +843,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
                 result = nonai_upscale.run(allow_start=False)
 
             mocks["terminate"].assert_called_once_with(4242)
-            self.assertEqual(result.failed, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.failed, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.in_flight, "")
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
 
@@ -872,7 +875,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             mocks["terminate"].assert_called_once_with(4242)
             self.assertTrue(result.deferred_low_disk)
-            self.assertEqual(result.stopped, "winston/0 unsorted/busy.mp4")
+            self.assertEqual(result.stopped, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.failed, "")
             self.assertFalse(tmp.exists())
             self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
@@ -884,7 +887,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             non_ai = overrides["NON_AI_DIR"]
             source, tmp, _ = write_job(root, overrides)
             orphan = make_video(
-                non_ai / "winston" / "3_good_to_go" / "processed" / "old.partial.dead.mp4"
+                non_ai / "larkin" / "3_good_to_go" / "processed" / "old.partial.dead.mp4"
             )
 
             stack, _ = probes(is_running=True)
@@ -917,8 +920,8 @@ class TestRetireOriginal(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "winston" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "winston" / "2 do not need work" / "placeholder.mp4")
+            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
+            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
                 sidecar.write(
@@ -928,7 +931,7 @@ class TestRetireOriginal(unittest.TestCase):
 
                 nonai_upscale._retire_original(source)
 
-                dest = non_ai / "winston" / "2 do not need work" / "Lee-Poe.mp4"
+                dest = non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4"
                 self.assertTrue(dest.exists())
                 self.assertFalse(source.exists())
                 self.assertFalse(sidecar.sidecar_path(source).exists())
@@ -945,8 +948,8 @@ class TestRetireOriginal(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "winston" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "winston" / "2 do not need work" / "placeholder.mp4")
+            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
+            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
                 script = funscript.script_path_for_video(source)
@@ -954,7 +957,7 @@ class TestRetireOriginal(unittest.TestCase):
 
                 nonai_upscale._retire_original(source)
 
-                dest = non_ai / "winston" / "2 do not need work" / "Lee-Poe.mp4"
+                dest = non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4"
                 self.assertFalse(script.exists())
                 self.assertEqual(
                     funscript.read(funscript.script_path_for_video(dest)),
@@ -977,15 +980,15 @@ class TestRetireToAnArchive(unittest.TestCase):
             archive = root / "archive"
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "winston" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "winston" / "2 do not need work" / "placeholder.mp4")
+            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
+            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
                 nonai_upscale._retire_original(source)
 
             self.assertFalse(source.exists())
             self.assertTrue(
-                (archive / "winston" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
+                (archive / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
             )
 
     def test_the_funscript_goes_with_it_rather_than_being_left_behind(self):
@@ -997,7 +1000,7 @@ class TestRetireToAnArchive(unittest.TestCase):
             archive = root / "archive"
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "winston" / "1 clips to upscale" / "Lee-Poe.mp4")
+            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
 
             with override_config(**overrides):
                 script = funscript.script_path_for_video(source)
@@ -1006,7 +1009,7 @@ class TestRetireToAnArchive(unittest.TestCase):
                 nonai_upscale._retire_original(source)
 
                 self.assertFalse(script.exists())
-            archived = archive / "winston" / "1 clips to upscale" / "Lee-Poe.funscript"
+            archived = archive / "larkin" / "1 clips to upscale" / "Lee-Poe.funscript"
             self.assertEqual(
                 json.loads(archived.read_text(encoding="utf-8")),
                 {"actions": [{"at": 0, "pos": 20}]},
@@ -1020,7 +1023,7 @@ class TestRetireToAnArchive(unittest.TestCase):
             archive = root / "archive"
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "winston" / "1 clips to upscale" / "Lee-Poe.mp4")
+            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
 
             with override_config(**overrides):
                 sidecar.write(
@@ -1031,7 +1034,7 @@ class TestRetireToAnArchive(unittest.TestCase):
                 nonai_upscale._retire_original(source)
 
                 self.assertFalse(sidecar.sidecar_path(source).exists())
-            archived = archive / "winston" / "1 clips to upscale" / "Lee-Poe.json"
+            archived = archive / "larkin" / "1 clips to upscale" / "Lee-Poe.json"
             self.assertEqual(
                 json.loads(archived.read_text(encoding="utf-8"))["clip"],
                 {"compilation": "Volume One", "index": 1},
@@ -1043,14 +1046,14 @@ class TestRetireToAnArchive(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=None)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "winston" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "winston" / "2 do not need work" / "placeholder.mp4")
+            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
+            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
                 nonai_upscale._retire_original(source)
 
             self.assertTrue(
-                (non_ai / "winston" / "2 do not need work" / "Lee-Poe.mp4").exists()
+                (non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4").exists()
             )
 
 

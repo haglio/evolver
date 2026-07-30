@@ -128,7 +128,7 @@ Acts are voiced in plain-English words because the vosk lexicon has none of the 
 
 ## Non-AI library upscaling
 
-The `2D/non_AI` buckets (`winston`, `other`, …) hold full-length real-footage scenes that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the recipe the already-processed clips record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), unlike the silent AI clips. The encode runs at half the AI stage's Topaz memory budget (`vram=0.5`, no extra model instance) — slower, but a background job never gets to push the box toward memory exhaustion.
+The `2D/non_AI` buckets (`larkin`, `other`, …) hold full-length real-footage scenes that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the recipe the already-processed clips record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), unlike the silent AI clips. The encode runs at half the AI stage's Topaz memory budget (`vram=0.5`, no extra model instance) — slower, but a background job never gets to push the box toward memory exhaustion.
 
 It follows the bucket conventions already in use:
 
@@ -166,7 +166,7 @@ Those four are the stores that hold something you cannot get back: clip bounds a
 
 The stage runs *before* the bookmarks sync on purpose: that stage drops favorites whose file is missing, so a favorite whose video merely moved has to be repointed first or it gets deleted on the very run that could have saved it.
 
-A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder like `_winston_compilations_archive/` is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Clipper session's frame numbers only mean anything against the exact file they were set on.
+A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder like `_larkin_compilations_archive/` is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Clipper session's frame numbers only mean anything against the exact file they were set on.
 
 Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`. Videos sitting in `kinda_weird/` are excluded from the search — the purge stage is about to delete them, so pointing anything at one would only re-break it.
 

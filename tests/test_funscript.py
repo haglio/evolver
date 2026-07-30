@@ -82,9 +82,9 @@ class TestScriptPathForVideo(unittest.TestCase):
         scripts = Path("C:/lib/scripts")
 
         with override_config(VIDEO_LIBRARY_DIR=videos, SCRIPT_LIBRARY_DIR=scripts):
-            path = funscript.script_path_for_video(videos / "2D" / "non_AI" / "winston" / "clip.mkv")
+            path = funscript.script_path_for_video(videos / "2D" / "non_AI" / "larkin" / "clip.mkv")
 
-        self.assertEqual(path, scripts / "2D" / "non_AI" / "winston" / "clip.funscript")
+        self.assertEqual(path, scripts / "2D" / "non_AI" / "larkin" / "clip.funscript")
 
 
 if __name__ == "__main__":
