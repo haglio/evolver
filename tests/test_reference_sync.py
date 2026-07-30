@@ -61,7 +61,7 @@ class TestClipperSessions(unittest.TestCase):
     def test_follows_a_video_that_was_renamed_where_it_stood(self):
         """No name left to match on — but the session records the footage's shape."""
         with workspace_temp_dir() as temp:
-            folder = temp / "videos" / "winston" / "0 unsorted"
+            folder = temp / "videos" / "larkin" / "0 unsorted"
             renamed_to = _write_video(folder / "Clip_topaz.mp4")
             session = _write_json(
                 temp / "sessions" / "Clip.json",
@@ -105,11 +105,11 @@ class TestClipperSessions(unittest.TestCase):
 class TestScriptureProjects(unittest.TestCase):
     def test_repoints_a_project_at_the_video_that_moved(self):
         with workspace_temp_dir() as temp:
-            moved_to = _write_video(temp / "videos" / "non_AI" / "winston" / "clip.mp4")
+            moved_to = _write_video(temp / "videos" / "non_AI" / "larkin" / "clip.mp4")
             project = _write_json(
                 temp / "projects" / "Clip.scripture",
                 {
-                    "video_path": str(temp / "videos" / "winston" / "clip.mp4").replace("\\", "/"),
+                    "video_path": str(temp / "videos" / "larkin" / "clip.mp4").replace("\\", "/"),
                     "splits": [12, 340],
                 },
             )

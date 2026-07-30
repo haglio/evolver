@@ -3,7 +3,7 @@
 A bucket is whatever folder holds the numbered stage folders, because that is
 the only thing every stage does with one: retire an original into its ``2*``,
 publish an upscale into its ``3*``, scan its ``0*``/``1*`` for work.  Usually
-that is a top-level folder like ``winston`` or ``other`` — except the ones
+that is a top-level folder like ``larkin`` or ``other`` — except the ones
 config excludes (``actually_AI_but_funscripted`` holds AI-pipeline outputs).
 
 A top-level folder can also be split into sub-libraries that each keep their own

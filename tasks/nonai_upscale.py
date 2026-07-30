@@ -1,6 +1,6 @@
 """Stage: gradually upscale the 2D/non_AI library with its own established recipe.
 
-The non_AI buckets (``winston``, ``other``, …) hold full-length real-footage
+The non_AI buckets (``larkin``, ``other``, …) hold full-length real-footage
 scenes the user has been enhancing by hand in the Topaz GUI: apo-8 60 fps
 interpolation plus an iris-2 auto upscale, outputs named ``<stem>_apo8_iris2``
 under the bucket's ``3*/processed/`` folder, originals retired to its ``2*``

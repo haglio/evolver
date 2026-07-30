@@ -83,7 +83,7 @@ SCRIPTURE_SESSIONS_DIR = project_dir("scripture") / "sessions"
 VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
 # Where to hunt for a video a stored reference has lost track of. Wider than the
 # library itself, because videos also get parked in sibling folders such as
-# _winston_compilations_archive/ — a reference into one of those still deserves
+# _larkin_compilations_archive/ — a reference into one of those still deserves
 # to be followed rather than dropped.
 VIDEO_SEARCH_ROOT = BASE_DIR / "videos"
 METADATA_DIR = BASE_DIR / "videos" / "metadata"
