@@ -138,6 +138,106 @@ class TestBlocklistPath(unittest.TestCase):
             self.assertFalse(blocklist_path(clone).exists())
 
 
+class TestHookEntryPoint(unittest.TestCase):
+    """The CLI the git hooks call. Each case builds a throwaway repo and drives
+    the real hooks through ``git commit``, because what matters is not that
+    ``main()`` returns 1 -- it is that git refuses the commit.
+    """
+
+    # A nonce, because the fixture repo stages a copy of the guard's own source
+    # and that source spells `badterm` in its docstrings -- using `badterm` here
+    # would make every case turn on the guard file rather than on the fixture.
+    TERM = "nonceterm"
+
+    def _repo(self, tmp: str, terms=None) -> Path:
+        repo = Path(tmp) / "repo"
+        (repo / "sanitize").mkdir(parents=True)
+        # Ignored here exactly as in the real repos. It matters to the fixture:
+        # the blocklist necessarily contains every term, so a staged copy of it
+        # trips the hook -- the right answer for a real repo, the wrong setup
+        # for a test.
+        (repo / ".gitignore").write_text(
+            "sanitize/blocklist.local.txt\n", encoding="utf-8")
+        if terms is not None:
+            (repo / "sanitize" / "blocklist.local.txt").write_text(
+                terms, encoding="utf-8")
+        for rel in ("tools/__init__.py", "tools/sanitize_guard.py",
+                    "tools/githooks/pre-commit", "tools/githooks/commit-msg"):
+            dest = repo / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes((REPO / rel).read_bytes())
+        _git(repo, "init", "-b", "main")
+        _git(repo, "config", "user.email", "guard@example.test")
+        _git(repo, "config", "user.name", "Guard Test")
+        _git(repo, "config", "core.hooksPath", "tools/githooks")
+        return repo
+
+    def _commit(self, repo: Path, message: str = "seed"):
+        return subprocess.run(
+            ["git", "-C", str(repo), "commit", "-m", message],
+            capture_output=True, text=True,
+        )
+
+    def test_the_hook_refuses_a_staged_banned_term(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, f"{self.TERM}\n")
+            (repo / "notes.md").write_text(
+                f"this has {self.TERM} in it\n", encoding="utf-8")
+            _git(repo, "add", ".")
+            done = self._commit(repo)
+            self.assertNotEqual(done.returncode, 0)
+            self.assertIn("blocked term", done.stderr)
+            self.assertNotIn(self.TERM, done.stderr)  # redacted, never echoed
+
+    def test_the_hook_refuses_a_banned_term_in_the_message(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, f"{self.TERM}\n")
+            (repo / "notes.md").write_text("clean\n", encoding="utf-8")
+            _git(repo, "add", ".")
+            done = self._commit(repo, f"drop the {self.TERM} fixture")
+            self.assertNotEqual(done.returncode, 0)
+
+    def test_it_judges_the_staged_half_not_the_working_copy(self):
+        """A file staged clean and then dirtied must still commit: the index is
+        what becomes the commit, so reading disk would block the wrong thing.
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, f"{self.TERM}\n")
+            f = repo / "notes.md"
+            f.write_text("clean\n", encoding="utf-8")
+            _git(repo, "add", ".")
+            f.write_text(f"now with {self.TERM}\n", encoding="utf-8")
+            self.assertEqual(self._commit(repo).returncode, 0)
+
+    def test_a_clean_commit_passes(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, f"{self.TERM}\n")
+            (repo / "notes.md").write_text("perfectly clean\n", encoding="utf-8")
+            _git(repo, "add", ".")
+            self.assertEqual(self._commit(repo).returncode, 0)
+
+    def test_no_blocklist_means_no_enforcement(self):
+        """A public clone has no overlay. It must commit normally, not be told
+        the guard cannot run.
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, None)
+            (repo / "notes.md").write_text(
+                f"this has {self.TERM} in it\n", encoding="utf-8")
+            _git(repo, "add", ".")
+            self.assertEqual(self._commit(repo).returncode, 0)
+
+
 class TestTrackedTree(unittest.TestCase):
     def test_no_blocklisted_terms_in_the_tracked_tree(self):
         """With the real (git-ignored) blocklist present, no tracked file may
