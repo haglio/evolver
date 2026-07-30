@@ -254,13 +254,13 @@ class TestNonAiUpscaleSummary(unittest.TestCase):
         return _summarize_result(result, None, "upscale_non_ai")
 
     def test_names_the_video_being_encoded(self):
-        summary = self._result(in_flight="winston/1 clips/Alanah Rae.mp4",
+        summary = self._result(in_flight="winston/1 clips/Delia Moss.mp4",
                                in_flight_percent=72)
-        self.assertIn("winston/1 clips/Alanah Rae.mp4", summary)
+        self.assertIn("winston/1 clips/Delia Moss.mp4", summary)
         self.assertIn("72%", summary)
 
     def test_a_frozen_encode_says_it_is_paused_and_why(self):
-        summary = self._result(in_flight="winston/1 clips/Alanah Rae.mp4",
+        summary = self._result(in_flight="winston/1 clips/Delia Moss.mp4",
                                in_flight_percent=72, suspended=True)
         self.assertIn("paused", summary)
         self.assertIn("you're at the machine", summary)
@@ -292,7 +292,7 @@ class TestNonAiUpscaleSummary(unittest.TestCase):
     def test_always_reports_how_many_clips_are_left(self):
         self.assertIn("395 queued", self._result())
         self.assertIn("395 queued",
-                      self._result(in_flight="winston/1 clips/Alanah Rae.mp4",
+                      self._result(in_flight="winston/1 clips/Delia Moss.mp4",
                                    in_flight_percent=72))
 
     def test_a_stopped_encode_says_the_clip_keeps_its_place(self):
