@@ -27,19 +27,19 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                original = _touch(non_ai / "larkin" / "2 done" / "Jane Doe-lA0JUsAd.mp4")
+                original = _touch(non_ai / "larkin" / "2 done" / "Jane-Doe-lA0JUsAd.mp4")
                 variant = _touch(
                     non_ai / "larkin" / "3_good_to_go" / "processed"
-                    / "Jane Doe-lA0JUsAd_3_apf2_iris2.mp4"
+                    / "Jane-Doe-lA0JUsAd_3_apf2_iris2.mp4"
                 )
-                other = _touch(non_ai / "larkin" / "0 unsorted" / "Ada Roe-1.mp4")
+                other = _touch(non_ai / "larkin" / "0 unsorted" / "Ada-Roe-1.mp4")
 
                 result = nonai_group.run()
 
                 # The sidecar mirrors the clip's full path under metadata/.
                 self.assertEqual(
                     sidecar.sidecar_path(original),
-                    metadata / "2D" / "non_AI" / "larkin" / "2 done" / "Jane Doe-lA0JUsAd.json",
+                    metadata / "2D" / "non_AI" / "larkin" / "2 done" / "Jane-Doe-lA0JUsAd.json",
                 )
                 orig = sidecar.read(sidecar.sidecar_path(original))
                 var = sidecar.read(sidecar.sidecar_path(variant))
@@ -91,10 +91,10 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                original = _touch(non_ai / "larkin" / "2 done" / "Lee Poe.mp4")
+                original = _touch(non_ai / "larkin" / "2 done" / "Lee-Poe.mp4")
                 variant = _touch(
                     non_ai / "larkin" / "3_good_to_go" / "processed"
-                    / "Amia-Miley_apo8_iris2.mp4"
+                    / "Lee-Poe_apo8_iris2.mp4"
                 )
                 sidecar.write(
                     sidecar.sidecar_path(original),
