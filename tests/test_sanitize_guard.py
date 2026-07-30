@@ -7,9 +7,18 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tools.sanitize_guard import find_violations, load_blocklist, scan_files
+from tools.sanitize_guard import (
+    blocklist_path,
+    find_violations,
+    load_blocklist,
+    scan_files,
+)
 
 REPO = Path(__file__).resolve().parent.parent
+
+
+def _git(cwd: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
 
 
 class TestFindViolations(unittest.TestCase):
@@ -49,13 +58,66 @@ class TestLoadBlocklist(unittest.TestCase):
             self.assertEqual(load_blocklist(f), ["alpha", "beta gamma"])
 
 
+class TestBlocklistPath(unittest.TestCase):
+    """The blocklist is git-ignored, so only its resolution keeps the guard alive."""
+
+    def test_uses_this_checkout_when_the_blocklist_is_here(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "sanitize").mkdir()
+            here = root / "sanitize" / "blocklist.local.txt"
+            here.write_text("alpha\n", encoding="utf-8")
+            self.assertEqual(blocklist_path(root), here)
+
+    def test_falls_back_to_the_primary_checkout_from_a_worktree(self):
+        """The regression this whole helper exists for: a worktree never has the
+        git-ignored overlay, so resolving it locally left the guard toothless
+        wherever the work actually happens.
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            primary = Path(tmp) / "primary"
+            primary.mkdir()
+            _git(primary, "init", "-b", "main")
+            _git(primary, "config", "user.email", "guard@example.test")
+            _git(primary, "config", "user.name", "Guard Test")
+            (primary / "sanitize").mkdir()
+            real = primary / "sanitize" / "blocklist.local.txt"
+            real.write_text("alpha\n", encoding="utf-8")
+            (primary / "README.md").write_text("hi\n", encoding="utf-8")
+            _git(primary, "add", "README.md")
+            _git(primary, "commit", "-m", "seed")
+
+            tree = Path(tmp) / "tree"
+            _git(primary, "worktree", "add", str(tree), "-b", "side")
+            self.assertFalse((tree / "sanitize" / "blocklist.local.txt").exists())
+            self.assertEqual(blocklist_path(tree), real.resolve())
+
+    def test_returns_a_missing_path_when_no_checkout_has_one(self):
+        """The public-clone case: no blocklist here, none in the primary either.
+        Absence must read as "nothing to enforce" — a returned path that simply
+        does not exist — never a crash. Same outcome when git is missing entirely,
+        which the helper swallows for the benefit of a source tree with no repo.
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            clone = Path(tmp) / "clone"
+            clone.mkdir()
+            _git(clone, "init", "-b", "main")
+            self.assertFalse(blocklist_path(clone).exists())
+
+
 class TestTrackedTree(unittest.TestCase):
     def test_no_blocklisted_terms_in_the_tracked_tree(self):
         """With the real (git-ignored) blocklist present, no tracked file may
         contain a banned term — reintroducing one fails the suite. A public
         checkout has no blocklist, so the check is a no-op rather than a skip.
         """
-        blocklist = REPO / "sanitize" / "blocklist.local.txt"
+        blocklist = blocklist_path(REPO)
         terms = load_blocklist(blocklist) if blocklist.exists() else []
         if not terms:
             return
