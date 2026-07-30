@@ -50,12 +50,15 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 candidates = nonai_upscale.collect_candidates()
 
+            # Sort both sides: which bucket name sorts first is an accident of
+            # the fixture's spelling, not something this test is about.
             self.assertEqual(
-                sorted(c.path for c in candidates), [flagged_video, unsorted_video]
+                sorted(c.path for c in candidates),
+                sorted([flagged_video, unsorted_video]),
             )
 
     def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
-        """A triage dir's first sub-stage holds manual pre-work (e.g. larkin
+        """A triage dir's first sub-stage holds manual pre-work (e.g. larkin's
         '1 could use work/1_originals_needing_trimming'); those clips are not
         ready for an unattended multi-hour encode."""
         with workspace_temp_dir() as root:
