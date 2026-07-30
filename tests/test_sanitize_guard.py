@@ -35,6 +35,33 @@ class TestFindViolations(unittest.TestCase):
     def test_matches_a_multi_word_term_across_flexible_whitespace(self):
         self.assertTrue(find_violations("a two   word phrase", ["two word"]))
 
+    def test_matches_a_multi_word_term_joined_the_way_a_filename_joins_it(self):
+        """The list is written in prose; the leak arrives as a filename. Real
+        names sat on a public `main` in exactly these shapes, unflagged, because
+        the matcher allowed only whitespace between a term's words.
+        """
+        for slug in ("two-word", "two_word", "two.word", "twoword"):
+            with self.subTest(slug=slug):
+                self.assertTrue(
+                    find_violations(f"clip-{slug}-scene-a.mp4", ["two word"])
+                )
+
+    def test_matches_an_inflected_form(self):
+        """`badterm` on the list did not catch `badterms` in prose: the trailing
+        word boundary refused the plural.
+        """
+        for form in ("badterms", "badterm's", "badtermed", "badterming"):
+            with self.subTest(form=form):
+                self.assertTrue(find_violations(f"the {form} here", ["badterm"]))
+
+    def test_widening_still_refuses_an_unrelated_longer_word(self):
+        """Separator and inflection slack must not decay into a substring match:
+        `cat` may reach `cat-s`, never `concatenated`.
+        """
+        self.assertEqual(find_violations("a concatenated list", ["cat"]), [])
+        self.assertEqual(find_violations("scatter the words", ["cat"]), [])
+        self.assertEqual(find_violations("a category error", ["cat"]), [])
+
     def test_reports_the_line_number(self):
         found = find_violations("clean\nclean\nbadterm here", ["badterm"])
         self.assertEqual([v.line for v in found], [3])
