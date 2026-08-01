@@ -46,6 +46,7 @@ tray_crash.log
 # committed *.example.* template that documents its shape.
 #   the real blocklist is itself a catalogue of excluded terms
 /sanitize/blocklist.local.txt
+/sanitize/library_roots.local.txt
 #   real copy — spoken act vocabulary and provider details
 /content.local.json
 
