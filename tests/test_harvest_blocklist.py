@@ -18,10 +18,15 @@ from tools.harvest_blocklist import (
     hours_since_harvest,
     merge,
     normalize,
+    primary_of,
     read_roots,
     siblings_of,
     stamp_path,
 )
+
+
+def _git(cwd: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
 
 
 class TestNormalize(unittest.TestCase):
@@ -276,14 +281,54 @@ class TestStaleness(unittest.TestCase):
 
 
 class TestSiblings(unittest.TestCase):
+    def _family(self, tmp: str) -> Path:
+        """Three neighbouring checkouts, two of which keep a blocklist.
+
+        ``here`` is a real repo: without that, resolving its primary walks up
+        into whatever repo the test itself is running inside, and the assertion
+        is about the wrong family entirely.
+        """
+        root = Path(tmp)
+        for name in ("here", "kin", "stranger"):
+            (root / name).mkdir()
+        for name in ("here", "kin"):
+            (root / name / "sanitize").mkdir()
+        here = root / "here"
+        _git(here, "init", "-b", "main")
+        _git(here, "config", "user.email", "h@e.test")
+        _git(here, "config", "user.name", "H")
+        return here
+
     def test_finds_checkouts_that_keep_a_blocklist(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for name in ("here", "kin", "stranger"):
-                (root / name).mkdir()
-            for name in ("here", "kin"):
-                (root / name / "sanitize").mkdir()
-            self.assertEqual([p.name for p in siblings_of(root / "here")], ["kin"])
+            self.assertEqual(
+                [p.name for p in siblings_of(self._family(tmp))], ["kin"])
+
+    def test_from_a_worktree_it_still_finds_the_real_siblings(self):
+        """The whole point. A worktree's own neighbours are other worktrees, so
+        anchoring on it hid most of the family -- and the collision check that
+        keeps ordinary words off the list is only as good as the checkouts it
+        can see. Three project words got through exactly this way.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            here = self._family(tmp)
+            (here / "README.md").write_text("hi\n", encoding="utf-8")
+            _git(here, "add", "README.md")
+            _git(here, "commit", "-m", "seed", "--no-verify")
+            tree = here / ".claude" / "worktrees" / "wt"
+            tree.parent.mkdir(parents=True)
+            _git(here, "worktree", "add", str(tree), "-b", "side")
+
+            self.assertEqual([p.name for p in siblings_of(tree)], ["kin"])
+            self.assertEqual(primary_of(tree), here.resolve())
+
+    def test_a_primary_is_its_own_primary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(primary_of(self._family(tmp)), (Path(tmp) / "here").resolve())
+
+    def test_outside_git_it_falls_back_to_the_path_given(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(primary_of(Path(tmp) / "nowhere"), Path(tmp) / "nowhere")
 
 
 if __name__ == "__main__":
