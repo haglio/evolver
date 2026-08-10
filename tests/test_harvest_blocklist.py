@@ -11,13 +11,16 @@ from pathlib import Path
 
 from tools.harvest_blocklist import (
     EXCLUDED,
+    _stale_hours,
     already_in_code,
     candidates_from,
     harvest,
+    hours_since_harvest,
     merge,
     normalize,
     read_roots,
     siblings_of,
+    stamp_path,
 )
 
 
@@ -213,6 +216,63 @@ class TestRoots(unittest.TestCase):
             (root / "sanitize" / "blocklist.local.txt").write_text(
                 "x\n", encoding="utf-8")
             self.assertEqual(read_roots(root), [])
+
+
+class TestStaleness(unittest.TestCase):
+    """The throttle that makes this safe to fire from anything that starts.
+
+    A harvest walks the whole library and takes the best part of a minute, so a
+    startup caller has to be able to ask "is there anything to do?" and get an
+    answer instantly on the runs where there is not.
+    """
+
+    def _repo(self, tmp: str) -> Path:
+        root = Path(tmp)
+        (root / "sanitize").mkdir()
+        (root / "sanitize" / "blocklist.local.txt").write_text("x\n", encoding="utf-8")
+        return root
+
+    def test_no_stamp_reads_as_never_harvested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(hours_since_harvest(self._repo(tmp)))
+
+    def test_a_fresh_stamp_reads_as_hours_ago(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp)
+            stamp_path(repo).write_text("", encoding="utf-8")
+            age = hours_since_harvest(repo)
+            self.assertIsNotNone(age)
+            self.assertLess(age, 0.1)
+
+    def test_an_old_stamp_reads_its_age(self):
+        import os
+        import time
+
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp)
+            stamp = stamp_path(repo)
+            stamp.write_text("", encoding="utf-8")
+            long_ago = time.time() - 30 * 3600
+            os.utime(stamp, (long_ago, long_ago))
+            self.assertTrue(29 < hours_since_harvest(repo) < 31)
+
+    def test_the_stamp_sits_beside_the_blocklist(self):
+        """So it is found from a worktree the same way, and ignored the same way."""
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp)
+            self.assertEqual(stamp_path(repo).parent, repo / "sanitize")
+            self.assertTrue(stamp_path(repo).name.endswith(".local.txt"))
+
+    def test_the_threshold_is_read_from_the_flag(self):
+        self.assertEqual(_stale_hours(["--if-stale", "6", "--sync"]), 6.0)
+
+    def test_absent_flag_means_no_throttle(self):
+        self.assertIsNone(_stale_hours(["--sync"]))
+
+    def test_a_malformed_threshold_falls_back_rather_than_crashing(self):
+        """Fired from a startup path, so a typo must not take the caller down."""
+        self.assertEqual(_stale_hours(["--if-stale"]), 24.0)
+        self.assertEqual(_stale_hours(["--if-stale", "soon"]), 24.0)
 
 
 class TestSiblings(unittest.TestCase):
