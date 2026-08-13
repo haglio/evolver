@@ -74,6 +74,9 @@ class NonAiUpscaleResult:
     failed: str = ""  # the clip whose encode died or came up short, if any
     pending: int = 0
     deferred_low_disk: bool = False
+    # Upscales promoted before their sidecar was carried across, handed it back
+    # off the retired original — see :func:`repair_retired_metadata`.
+    repaired_sidecars: int = 0
 
 
 def run(allow_start: bool = True, stop: bool = False,
@@ -93,6 +96,8 @@ def run(allow_start: bool = True, stop: bool = False,
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
+    repair_retired_metadata(result)
+
     with _throttle_lock:
         job = _load_job()
         if job is None:
@@ -111,10 +116,11 @@ def run(allow_start: bool = True, stop: bool = False,
     if result.in_flight and result.suspended:
         in_flight = f"{in_flight} [suspended: user present]"
     log.info(
-        "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s failed=%s pending=%d",
+        "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s "
+        "failed=%s pending=%d repaired=%d sidecar(s)",
         result.started or "-", in_flight, result.promoted or "-",
         result.stopped or "-", result.start_deferred or "-",
-        result.failed or "-", result.pending,
+        result.failed or "-", result.pending, result.repaired_sidecars,
     )
     return result
 
@@ -322,6 +328,8 @@ def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
     _stamp_encode_ended()
     if actual and expected and actual >= config.NONAI_COMPLETE_DURATION_FRACTION * expected:
         tmp.replace(out)
+        # Before the original leaves, and it takes its sidecar with it.
+        _carry_metadata(source, out)
         _retire_original(source)
         _clear_attempts(source)
         result.promoted = relpath(source)
@@ -344,6 +352,122 @@ def _delete_tmp(tmp: Path) -> None:
         # A just-killed ffmpeg can briefly hold the file; the partial sweep
         # removes it on a later tick.
         log.exception("Could not delete partial output %s yet.", tmp)
+
+
+# The one part of a sidecar that describes the FILE rather than the footage in
+# it: which family it belongs to and whether it is a processed variant.  An
+# upscale's is its own, and the grouping stage stamps it on the same pass.
+_FILE_SCOPED_SIDECAR_KEYS = frozenset({"version"})
+
+
+def _sidecar_beside_or_mirrored(video: Path) -> Path:
+    """Where *video*'s sidecar lives: mirrored under ``METADATA_DIR``, or beside it.
+
+    The metadata tree mirrors the library and nothing else, so a retired original
+    that has left the library keeps its own copy next to the video instead (see
+    :func:`_archive_original`).  Asking the mirror where that is computes a path
+    under a tree the video is not in, which is the ``ValueError`` here — the
+    archive is the only thing outside the library this stage ever reads.
+    """
+    try:
+        return sidecar.sidecar_path(video)
+    except ValueError:
+        return video.with_suffix(".json")
+
+
+def _carry_metadata(source: Path, out: Path) -> bool:
+    """Give *out* what *source*'s sidecar says about the footage they share.
+
+    An upscale IS its original's footage, so the ``clip`` object naming which
+    compilation the video was carved out of, and the act recorded on it,
+    describe the upscale exactly as well.  They lived only on the original,
+    though, and retirement takes its sidecar out of the library — so unless the
+    upscale is handed its own copy first, promoting it is what loses them.
+
+    Nothing downstream puts them back.  The grouping stage would copy a ``clip``
+    across from an in-library original, but it runs later in the same pass and
+    by then there is none.  So an upscaled cut arrived in the library with
+    nothing to say it was ever a cut — which is how 33 of one folder's came to
+    sit among the very scenes they were carved from.
+
+    Funscripts are deliberately not carried: :mod:`tasks.scripts_sync` already
+    copies an original's script onto its processed variants, and a second thing
+    writing scripts is a second thing to disagree with it.
+    """
+    payload = sidecar.read(_sidecar_beside_or_mirrored(source))
+    carried = {
+        key: value for key, value in payload.items()
+        if key not in _FILE_SCOPED_SIDECAR_KEYS
+    }
+    if not carried:
+        return False
+    destination = _sidecar_beside_or_mirrored(out)
+    existing = sidecar.read(destination)
+    merged = {**existing, **carried}
+    if merged == existing:
+        return False
+    sidecar.write(destination, merged)
+    log.info("Carried metadata onto upscale: %s -> %s", source.name, out.name)
+    return True
+
+
+def repair_retired_metadata(result: NonAiUpscaleResult) -> None:
+    """Hand back what upscales promoted before :func:`_carry_metadata` existed lost.
+
+    Their originals were archived whole — video and sidecar together — so
+    nothing was destroyed, only moved out of reach: this finds each stranded
+    upscale's original in the archive and carries the record across now, as
+    promotion would have.  Idempotent, so it costs a scan and nothing else once
+    the library is whole; it runs ahead of the clip-scripts stage, which needs
+    the record restored to cut a clip its own funscript.
+
+    Only an upscale with no ``clip`` record is a candidate.  A cut is the only
+    kind of video that carries one, so a whole video that never had a record has
+    nothing here to be missing, and one that has its record is already sound.
+    """
+    if config.NONAI_RETIRED_ROOT is None or not config.NONAI_RETIRED_ROOT.is_dir():
+        return
+    for bucket in buckets():
+        archived = config.NONAI_RETIRED_ROOT / bucket.relative_to(config.NON_AI_DIR)
+        if not archived.is_dir():
+            continue
+        for video in sorted(bucket.rglob("*")):
+            if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
+                continue
+            if not is_processed_stem(video.stem):
+                continue
+            if isinstance(sidecar.read(sidecar.sidecar_path(video)).get("clip"), dict):
+                continue
+            original = _archived_original(archived, strip_processing_suffixes(video.stem))
+            if original is None:
+                continue
+            result.repaired_sidecars += int(_carry_metadata(original, video))
+
+
+def _archived_original(archived: Path, stem: str) -> Path | None:
+    """The retired original named *stem* under *archived*, if exactly one is.
+
+    The archive mirrors the library path an original was retired FROM, which is
+    a triage folder rather than the ``3*/processed/`` the upscale now sits in,
+    so it is found by name within the bucket rather than at a computed path.
+    Two of a name is not a tie to break: nothing here can say which of them the
+    upscale came from, and guessing would write one clip's provenance onto
+    another's footage.
+
+    Matched by comparing stems rather than by globbing one: a title is free to
+    hold the characters a glob reserves, and ``[Studio] scene one`` read as a
+    pattern is a character class that matches none of its own name.
+    """
+    matches = sorted(
+        path for path in archived.rglob("*")
+        if path.stem == stem and is_finalized_video_file(path, config.VIDEO_EXTENSIONS)
+    )
+    if len(matches) == 1:
+        return matches[0]
+    if matches:
+        log.warning("Ambiguous archived original for %s: %d matches, leaving it alone.",
+                    stem, len(matches))
+    return None
 
 
 def _retire_original(source: Path) -> None:

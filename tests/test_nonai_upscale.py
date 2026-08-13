@@ -18,11 +18,20 @@ def make_video(path):
 
 
 def library_overrides(root, **extra):
-    """Config overrides mapping a temp tree shaped like the real library."""
+    """Config overrides mapping a temp tree shaped like the real library.
+
+    METADATA_DIR belongs here with the rest: a sidecar's path is the metadata
+    root joined to the video's path *within the library*, so pointing only the
+    library at the temp tree sends every sidecar a test writes to whatever
+    metadata root the checkout is configured with — the real one, on a machine
+    that has a real one. Tests then also share that tree with each other, and
+    two of them naming a clip the same way read back one another's fixtures.
+    """
     video_lib = root / "videos"
     overrides = dict(
         VIDEO_LIBRARY_DIR=video_lib,
         NON_AI_DIR=video_lib / "2D" / "non_AI",
+        METADATA_DIR=root / "metadata",
         SCRIPT_LIBRARY_DIR=root / "scripts",
         NONAI_SKIP_MANIFEST=root / "skip.txt",
         NONAI_JOB_STATE_FILE=root / "job.json",
@@ -1040,6 +1049,213 @@ class TestRetireToAnArchive(unittest.TestCase):
                 {"compilation": "Volume One", "index": 1},
             )
 
+    def test_the_upscale_keeps_the_clip_record_the_original_takes_away(self):
+        """Promotion must hand the upscale its own copy first, or the record goes.
+
+        The `clip` object naming which compilation a video was carved out of is
+        what marks it a cut at all, and it lived only on the original — which
+        retirement moves out of the library. The grouping stage would copy one
+        across from an in-library original, but it runs later in the same pass
+        and by then there is none, so an upscaled cut arrived in the library as
+        an anonymous whole video, filed among the very scenes it was cut from.
+        """
+        with workspace_temp_dir() as root:
+            archive = root / "archive"
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
+            source, tmp, out = write_job(
+                root, overrides, expected=100.0,
+                source=make_video(
+                    overrides["NON_AI_DIR"] / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4"
+                ),
+            )
+
+            stack, _mocks = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                sidecar.write(sidecar.sidecar_path(source), {
+                    "version": {"group": "Lee-Poe", "processed": False},
+                    "video": {"action": "alpha"},
+                    "clip": {"compilation": "Volume One", "index": 1, "count": 4},
+                })
+
+                nonai_upscale.run(allow_start=False)
+
+                carried = sidecar.read(sidecar.sidecar_path(out))
+            self.assertEqual(carried["clip"],
+                             {"compilation": "Volume One", "index": 1, "count": 4})
+            self.assertEqual(carried["video"], {"action": "alpha"})
+
+    def test_the_carried_sidecar_leaves_the_version_block_alone(self):
+        """`version` describes the file, not the footage — the original is not a
+        processed variant and the upscale is, and the grouping stage is the one
+        thing that gets to say so."""
+        with workspace_temp_dir() as root:
+            archive = root / "archive"
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
+            source, tmp, out = write_job(
+                root, overrides, expected=100.0,
+                source=make_video(
+                    overrides["NON_AI_DIR"] / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4"
+                ),
+            )
+
+            stack, _mocks = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                sidecar.write(sidecar.sidecar_path(source), {
+                    "version": {"group": "Lee-Poe", "processed": False},
+                    "clip": {"compilation": "Volume One", "index": 1},
+                })
+
+                nonai_upscale.run(allow_start=False)
+
+                self.assertNotIn("version", sidecar.read(sidecar.sidecar_path(out)))
+
+
+class TestRepairRetiredMetadata(unittest.TestCase):
+    """Upscales promoted before the carry existed are still recoverable.
+
+    Their originals were archived whole — video and sidecar together — so
+    nothing was destroyed, only moved out of reach.  Every pipeline pass reaches
+    back for it.
+    """
+
+    def _stranded(self, overrides):
+        """An upscale in the library with only a version block, and its original
+        archived with the record that belongs to it."""
+        non_ai = overrides["NON_AI_DIR"]
+        out = make_video(
+            non_ai / "larkin" / "3_good_to_go" / "processed" / "Lee-Poe_apo8_iris2.mp4"
+        )
+        archived = overrides["NONAI_RETIRED_ROOT"] / "larkin" / "1 clips to upscale"
+        archived.mkdir(parents=True, exist_ok=True)
+        (archived / "Lee-Poe.mp4").write_bytes(b"video")
+        (archived / "Lee-Poe.json").write_text(json.dumps({
+            "version": {"group": "Lee-Poe", "processed": False},
+            "video": {"action": "alpha"},
+            "clip": {"compilation": "Volume One", "index": 1, "count": 4},
+        }), encoding="utf-8")
+        return out
+
+    def test_a_stranded_upscale_gets_its_record_and_script_back(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=root / "archive")
+            out = self._stranded(overrides)
+
+            with override_config(**overrides):
+                sidecar.write(sidecar.sidecar_path(out),
+                              {"version": {"group": "Lee-Poe", "processed": True}})
+                result = nonai_upscale.NonAiUpscaleResult()
+
+                nonai_upscale.repair_retired_metadata(result)
+
+                restored = sidecar.read(sidecar.sidecar_path(out))
+                self.assertEqual(restored["clip"],
+                                 {"compilation": "Volume One", "index": 1, "count": 4})
+                self.assertEqual(restored["video"], {"action": "alpha"})
+                self.assertEqual(restored["version"], {"group": "Lee-Poe", "processed": True},
+                                 "the upscale's own version block is not the original's")
+                self.assertFalse(
+                    funscript.script_path_for_video(out).exists(),
+                    "scripts_sync owns funscripts; nothing here writes one",
+                )
+            self.assertEqual(result.repaired_sidecars, 1)
+
+    def test_a_second_pass_repairs_nothing(self):
+        """Idempotent: once the library is whole this costs a scan and no writes."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=root / "archive")
+            out = self._stranded(overrides)
+
+            with override_config(**overrides):
+                sidecar.write(sidecar.sidecar_path(out),
+                              {"version": {"group": "Lee-Poe", "processed": True}})
+                nonai_upscale.repair_retired_metadata(nonai_upscale.NonAiUpscaleResult())
+                again = nonai_upscale.NonAiUpscaleResult()
+
+                nonai_upscale.repair_retired_metadata(again)
+
+            self.assertEqual(again.repaired_sidecars, 0)
+
+    def test_an_upscale_that_already_has_its_record_is_left_alone(self):
+        """Only a missing record is a candidate — this never overwrites a sound
+        one, so a hand-corrected sidecar is not undone by the next pass."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=root / "archive")
+            out = self._stranded(overrides)
+
+            with override_config(**overrides):
+                sidecar.write(sidecar.sidecar_path(out), {
+                    "version": {"group": "Lee-Poe", "processed": True},
+                    "clip": {"compilation": "Corrected By Hand", "index": 9},
+                })
+                result = nonai_upscale.NonAiUpscaleResult()
+
+                nonai_upscale.repair_retired_metadata(result)
+
+                self.assertEqual(sidecar.read(sidecar.sidecar_path(out))["clip"],
+                                 {"compilation": "Corrected By Hand", "index": 9})
+            self.assertEqual(result.repaired_sidecars, 0)
+
+    def test_two_archived_originals_of_one_name_repair_neither(self):
+        """Nothing here can say which of them the upscale came from, and guessing
+        writes one clip's provenance onto another's footage."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=root / "archive")
+            out = self._stranded(overrides)
+            twin = overrides["NONAI_RETIRED_ROOT"] / "larkin" / "0 unsorted"
+            twin.mkdir(parents=True, exist_ok=True)
+            (twin / "Lee-Poe.mp4").write_bytes(b"video")
+
+            with override_config(**overrides):
+                sidecar.write(sidecar.sidecar_path(out),
+                              {"version": {"group": "Lee-Poe", "processed": True}})
+                result = nonai_upscale.NonAiUpscaleResult()
+
+                nonai_upscale.repair_retired_metadata(result)
+
+                self.assertNotIn("clip", sidecar.read(sidecar.sidecar_path(out)))
+            self.assertEqual(result.repaired_sidecars, 0)
+
+    def test_an_unprocessed_video_is_never_a_candidate(self):
+        """An original still in the library is not something an upscale stranded
+        — it is where a record comes FROM, not somewhere one has to be put."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=root / "archive")
+            self._stranded(overrides)
+            plain = make_video(
+                overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "Lee-Poe-Two.mp4"
+            )
+            archived = overrides["NONAI_RETIRED_ROOT"] / "larkin" / "1 clips to upscale"
+            (archived / "Lee-Poe-Two.mp4").write_bytes(b"video")
+            (archived / "Lee-Poe-Two.json").write_text(
+                json.dumps({"clip": {"compilation": "Volume Two", "index": 2}}),
+                encoding="utf-8")
+
+            with override_config(**overrides):
+                result = nonai_upscale.NonAiUpscaleResult()
+
+                nonai_upscale.repair_retired_metadata(result)
+
+                self.assertEqual(sidecar.read(sidecar.sidecar_path(plain)), {})
+
+    def test_no_archive_configured_repairs_nothing(self):
+        """A public checkout, and any machine that has not configured one."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=None)
+            out = make_video(
+                overrides["NON_AI_DIR"] / "larkin" / "3_good_to_go" / "processed"
+                / "Lee-Poe_apo8_iris2.mp4"
+            )
+
+            with override_config(**overrides):
+                result = nonai_upscale.NonAiUpscaleResult()
+
+                nonai_upscale.repair_retired_metadata(result)
+
+                self.assertEqual(sidecar.read(sidecar.sidecar_path(out)), {})
+            self.assertEqual(result.repaired_sidecars, 0)
+
+
+class TestUnsetArchive(unittest.TestCase):
     def test_an_unset_archive_keeps_the_user_s_own_retire_folder(self):
         """A public checkout, and any machine that has not configured one, must
         go on behaving exactly as before."""
