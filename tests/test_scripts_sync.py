@@ -243,6 +243,58 @@ class TestFollowRetiredVideos(unittest.TestCase):
             path.mkdir(parents=True, exist_ok=True)
         return video_root, script_root, archive_root
 
+    def test_orphan_script_rehomes_to_surviving_upscaled_variant(self):
+        """An upscaled sibling still in the library inherits the retired
+        original's script — one funscript serves every variant of a video, so
+        upscaling must never strand the surviving copy scriptless."""
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = self._tree(root)
+            variant = video_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.mp4"
+            archived = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"
+            orphan = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
+            for path in (variant, archived):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"video")
+            orphan.parent.mkdir(parents=True, exist_ok=True)
+            orphan.write_text('{"actions":[1]}', encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=archive_root):
+                result = scripts_sync.run()
+
+            rehomed = script_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.funscript"
+            self.assertTrue(result.ok)
+            self.assertEqual(result.rehomed_to_variants, 1)
+            self.assertEqual(result.followed_to_archive, 1)
+            self.assertFalse(orphan.exists())
+            self.assertEqual(rehomed.read_text(encoding="utf-8"), '{"actions":[1]}')
+            self.assertEqual(archived.with_suffix(".funscript").read_text(encoding="utf-8"),
+                             '{"actions":[1]}')
+
+    def test_orphan_follows_archive_when_variant_already_scripted(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = self._tree(root)
+            variant = video_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.mp4"
+            variant_script = script_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.funscript"
+            archived = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"
+            orphan = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
+            for path in (variant, archived):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"video")
+            variant_script.parent.mkdir(parents=True, exist_ok=True)
+            variant_script.write_text('{"actions":[7]}', encoding="utf-8")
+            orphan.parent.mkdir(parents=True, exist_ok=True)
+            orphan.write_text('{"actions":[1]}', encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                                 NONAI_RETIRED_ROOT=archive_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.rehomed_to_variants, 0)
+            self.assertEqual(result.followed_to_archive, 1)
+            self.assertEqual(variant_script.read_text(encoding="utf-8"), '{"actions":[7]}')
+            self.assertFalse(orphan.exists())
+
     def test_moves_script_beside_its_archived_video(self):
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
