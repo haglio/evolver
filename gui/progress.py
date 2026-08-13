@@ -10,6 +10,7 @@ STAGES = [
     ("references", "Follow Moved Videos", "Repoint the suite's saved video paths — Clipper sessions, Scripture projects, Fun Time favorites and watch counts — at videos that have since moved"),
     ("bookmarks", "Bookmarks Sync",       "Sync Fun Time favorites into a Chrome bookmarks folder"),
     ("clip_scripts", "Clip Scripts",      "Cut each carved clip's funscript out of its source scene's, using the offset the clip was matched at"),
+    ("scene_scripts", "Scene Scripts",    "Give an unscripted source scene a mostly-blank funscript holding its carved clip's, placed where the clip sits in it"),
     ("scripts",   "Scripts Sync",         "Align funscripts to mirror the video library tree"),
     ("group_non_ai", "Group non-AI",      "Record each 2D/non_AI clip's version family (original + processed variants) in a mirrored metadata sidecar"),
     ("dupes",     "Duplicate Check",      "Scan non_AI folder for likely duplicate videos, using exact filesize"),

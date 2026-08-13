@@ -11,9 +11,10 @@ Invoked by the tray app scheduler or directly via CLI. Stages:
   7. references      - repoint the suite's saved video paths at videos that moved
   8. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
   9. clip_scripts    - cut a carved clip's funscript out of its source scene's
- 10. scripts         - align funscripts to mirror the video library tree
- 11. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
- 12. dupes           - scan non_AI for likely duplicate videos by exact filesize
+ 10. scene_scripts   - place a carved clip's funscript back into its unscripted scene's
+ 11. scripts         - align funscripts to mirror the video library tree
+ 12. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
+ 13. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -34,6 +35,7 @@ from tasks import (
     prompt_scrape,
     purge_weird,
     reference_sync,
+    scene_scripts,
     scripts_sync,
     sort,
     upscale,
@@ -232,9 +234,12 @@ def run_pipeline(
     # favorite has to be repointed before it can be mistaken for a dead one.
     _run_stage("references", reference_sync.run)
     _run_stage("bookmarks", bookmarks_sync.run)
-    # Before the scripts sync: this writes new funscripts into the tree, and the
-    # sync is what settles them across a clip's version family.
+    # Before the scripts sync: these write new funscripts into the tree, and the
+    # sync is what settles them across a clip's version family. The two carry a
+    # script between a clip and its scene in opposite directions, and each
+    # leaves an existing script alone, so neither can undo the other.
     _run_stage("clip_scripts", clip_scripts.run)
+    _run_stage("scene_scripts", scene_scripts.run)
     _run_stage("scripts", scripts_sync.run, show_popup=True)
     _run_stage("group_non_ai", nonai_group.run)
     _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
