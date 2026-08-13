@@ -1,4 +1,5 @@
-"""What a funscript is, where it lives, and how to cut a clip's out of its scene's."""
+"""What a funscript is, where it lives, and how to carry one between a clip and
+its scene — cut out of the scene's, or placed back into the scene's timeline."""
 
 from __future__ import annotations
 
@@ -60,12 +61,34 @@ def trim(script: dict, start_seconds: float, duration_seconds: float) -> dict:
     return trimmed
 
 
-def _retime_metadata(metadata: dict, duration_seconds: float) -> dict:
-    """*metadata* with everything the scene's timeline dated made clip-relative.
+def place(script: dict, start_seconds: float, duration_seconds: float) -> dict:
+    """*script* moved to begin *start_seconds* into a *duration_seconds* timeline.
 
-    Bookmarks and chapters are wall-clock strings into the scene, so a clip
-    inherits none of them: cut loose from their timeline they would point at
-    minutes the clip does not contain.
+    The reverse of :func:`trim`: where that cuts a clip's script out of its
+    scene's, this puts a clip's script back where the clip sits in the scene.
+    Nothing is invented for the rest of the scene — a script that says nothing
+    over a stretch leaves the device still, which is the truth about a stretch
+    nobody has scripted.
+    """
+    start_ms = round(start_seconds * 1000)
+    actions = [
+        {**action, "at": action["at"] + start_ms}
+        for action in sorted(script.get("actions", []), key=lambda action: action["at"])
+    ]
+    placed = {**script, "actions": actions}
+
+    metadata = script.get("metadata")
+    if isinstance(metadata, dict):
+        placed["metadata"] = _retime_metadata(metadata, duration_seconds)
+    return placed
+
+
+def _retime_metadata(metadata: dict, duration_seconds: float) -> dict:
+    """*metadata* re-dated for a timeline of *duration_seconds*.
+
+    Bookmarks and chapters are wall-clock strings into the video they were
+    written for, so neither a clip nor a scene inherits the other's: cut loose
+    from their timeline they would point at minutes that are not there.
     """
     retimed = dict(metadata)
     if "duration" in retimed:

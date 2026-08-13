@@ -15,9 +15,14 @@ class TestStageRegistry(unittest.TestCase):
         self.assertIn("group_non_ai", ALL_STAGES)
         self.assertEqual(ALL_STAGES.index("group_non_ai"), ALL_STAGES.index("scripts") + 1)
 
-    def test_gui_lists_clip_scripts_before_the_sync_that_aligns_what_it_writes(self):
+    def test_gui_lists_the_script_writing_stages_before_the_sync_that_aligns_them(self):
+        """Both stages carry a funscript between a clip and its scene, and the
+        sync is what settles a new one across a video's version family — so
+        neither can come after it."""
         self.assertIn("clip_scripts", ALL_STAGES)
-        self.assertEqual(ALL_STAGES.index("clip_scripts"), ALL_STAGES.index("scripts") - 1)
+        self.assertIn("scene_scripts", ALL_STAGES)
+        self.assertEqual(ALL_STAGES.index("scene_scripts"), ALL_STAGES.index("clip_scripts") + 1)
+        self.assertEqual(ALL_STAGES.index("scene_scripts"), ALL_STAGES.index("scripts") - 1)
 
     def test_every_stage_has_a_chart_color(self):
         for stage in ALL_STAGES:
