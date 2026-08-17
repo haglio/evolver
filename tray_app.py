@@ -12,8 +12,34 @@ from util import crash_log
 from util.windows_alert import show_error_window
 
 
+def _name_this_process() -> None:
+    """Leave the shortcut an interpreter that says "Evolver" next time.
+
+    Windows takes what it shows about a process from the file it was started
+    from -- the Details tab's name, the Processes tab's description, the icon
+    beside it -- so a plain ``pythonw.exe`` puts Evolver in the task list as one
+    more anonymous "Python".  That costs nothing until something strands a
+    process, and then the task list is the only way back and cannot say which
+    row is safe to end.
+
+    Naming this process on the way in is the one thing that cannot be done:
+    writing the copy takes the very interpreter being named.  So each run makes
+    it for the run after, and its pinned shortcut points at it once it exists.
+    """
+    try:
+        from pathlib import Path as _Path
+
+        from app_support.process_identity import ProcessNamer
+
+        icon = _Path(__file__).resolve().parent / "icon.ico"
+        ProcessNamer("Evolver", icon=icon).prepare_launcher("Evolver")
+    except Exception:
+        pass  # Cosmetic: costs a name in the task list, never a launch.
+
+
 def main():
     crash_log.install_excepthook()
+    _name_this_process()
     atexit.register(crash_log.on_exit)
     from gui.app import EvolverApp
     sys.exit(EvolverApp().run())
