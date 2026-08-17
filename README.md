@@ -12,6 +12,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 8. Repoints the suite's saved video paths at videos that have since moved, so a Clipper session or a Fun Time favorite survives the library being rearranged (see "Following videos that moved" below).
 9. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
 10. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
+11. Delivers the `origenerator_genau` source — Origenerator's looping single-stroke clips — out of the outbox into `videos/genau/clips/`, the one folder Genau plays from, retiring the `1_sorted` copy along with it. Those clips come through the pipeline only to be upscaled: a loop straight out of the graph is visibly softer than the clips already in that folder, which came from upscaled library video. Both halves have to leave together — the upscale stage decides what still needs doing by looking for the output beside its source, and step 10 requires each sorted video to have a `_topaz` counterpart.
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
@@ -28,6 +29,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `tasks/bookmarks_sync.py` - Stage 3.5 favorites -> Chrome bookmarks sync
   - `tasks/prompt_scrape.py` - Stage 4 prompt scraping into mirrored JSON files
   - `tasks/upscale.py` - Stage 5 Topaz processing
+  - `tasks/genau_deliver.py` - the Genau lane's last step: an upscaled loop leaves for Genau's clips folder
   - `tasks/nonai_upscale.py` - the non-AI library's detached Topaz encodes, one at a time
   - `tasks/reference_sync.py` - repointing the suite's saved video paths at videos that moved
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
