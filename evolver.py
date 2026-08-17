@@ -6,15 +6,16 @@ Invoked by the tray app scheduler or directly via CLI. Stages:
   2. metadata        - scrape AI prompt metadata into mirrored JSON files
   3. sort            - move new videos from inbox into sorted folders by source/orientation
   4. upscale         - apply Topaz frame interpolation + 4x upscale to sorted AI videos
-  5. upscale_non_ai  - supervise one detached Topaz encode of a non-AI library video
-  6. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
-  7. references      - repoint the suite's saved video paths at videos that moved
-  8. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
-  9. clip_scripts    - cut a carved clip's funscript out of its source scene's
- 10. scene_scripts   - place a carved clip's funscript back into its unscripted scene's
- 11. scripts         - align funscripts to mirror the video library tree
- 12. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
- 13. dupes           - scan non_AI for likely duplicate videos by exact filesize
+  5. genau_deliver   - hand finished Genau clips to the folder Genau plays from
+  6. upscale_non_ai  - supervise one detached Topaz encode of a non-AI library video
+  7. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
+  8. references      - repoint the suite's saved video paths at videos that moved
+  9. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
+ 10. clip_scripts    - cut a carved clip's funscript out of its source scene's
+ 11. scene_scripts   - place a carved clip's funscript back into its unscripted scene's
+ 12. scripts         - align funscripts to mirror the video library tree
+ 13. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
+ 14. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -30,6 +31,7 @@ import config
 from tasks import (
     bookmarks_sync,
     clip_scripts,
+    genau_deliver,
     nonai_group,
     nonai_upscale,
     prompt_scrape,
@@ -64,6 +66,11 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "metadata": lambda r: not r.ok,
     "upscale": lambda r: bool(r.failed),
     "upscale_non_ai": lambda r: bool(r.failed),
+    # A clip that could not be delivered is almost always one Genau has open right
+    # now, and the next run gets it — but it stays visible rather than silent,
+    # because the alternative failure (a folder that cannot be written at all)
+    # looks identical from here and would otherwise never be noticed.
+    "genau_deliver": lambda r: bool(r.failed),
     "verify": lambda r: not r.ok,
     "references": lambda r: not r.ok,
     "bookmarks": lambda r: not r.ok,
@@ -200,6 +207,11 @@ def run_pipeline(
         if on_stage_progress is not None:
             upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
         upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
+
+    # Straight after the upscale, so a clip made this run reaches Genau this run —
+    # and before the correspondence check, which would otherwise see the delivered
+    # clip's source still sitting in 1_sorted with nothing beside it in the outbox.
+    _run_stage("genau_deliver", genau_deliver.run)
 
     upscale_still_pending = (
         upscale_skipped

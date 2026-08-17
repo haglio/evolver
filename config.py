@@ -101,6 +101,15 @@ OUTBOX_DIR   = AI_DIR / "2_outbox"
 OUT_UPSCALED_DIR = OUTBOX_DIR / "upscaled_by_orientation"
 WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 
+# The Genau lane. Origenerator drops a looping clip under this inbox source name
+# rather than its usual one, and the name is the whole signal: the clip is sorted
+# and upscaled like everything else, then delivered to the folder Genau plays from
+# instead of staying in the outbox. It has to leave — Genau reads that one folder
+# and nothing else, and a clip left in the outbox would be a library video nobody
+# ever plays.
+GENAU_SOURCE    = "origenerator_genau"
+GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
+
 FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")
 TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
 
