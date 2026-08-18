@@ -11,6 +11,8 @@ import qtawesome as qta
 
 import config
 
+from gui.icons import restart_icon
+
 _ICON_COLOR = "#333"
 
 
@@ -76,7 +78,7 @@ class EvolverTray(QSystemTrayIcon):
 
         self._menu.addSeparator()
 
-        self.restart_action = QAction(qta.icon("fa5s.redo", color=_ICON_COLOR), "Restart", self._menu)
+        self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self._menu)
         self._menu.addAction(self.restart_action)
 
         self.quit_action = QAction(qta.icon("fa5s.power-off", color=_ICON_COLOR), "Quit", self._menu)
