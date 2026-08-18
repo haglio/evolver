@@ -1,7 +1,8 @@
 """Deliver upscaled Genau clips to the folder Genau plays from.
 
 Origenerator makes a Genau clip — one complete stroke, looping end to end — and
-drops it in ``0_inbox/origenerator_genau/``. From there it is an ordinary AI
+drops it in the inbox under its own source folder (``config.GENAU_SOURCE``,
+which the content overlay names). From there it is an ordinary AI
 video: sorted by orientation, then upscaled by the Topaz stage like everything
 else, which is the whole reason it comes through here rather than being copied
 straight to Genau. A loop fresh out of the graph is visibly softer than the clips

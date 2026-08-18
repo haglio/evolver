@@ -1,5 +1,5 @@
 {
-  "_comment": "Placeholder content overlay. The real copy lives in content.local.json (git-ignored). Each act pairs the canonical spoken phrase the recognizer listens for with the Title Case video.action it records; aliases are extra phrases that record the same action, for words the small speech model hears differently. library_root, chrome_profile and scrape_provider are the machine-specific values the app needs at runtime. project_roots is optional: the folders holding the suite's sibling app checkouts (fun_time, origenerator, clipper, scripture), searched in order, for when those repos do not live under library_root/projects; omit it and that is exactly where they are looked for. retired_root is optional too: where a non-AI original goes once its upscale is made, with its sidecar and funscript beside it. Omit it and the original stays in the library, in its bucket's '2*' folder, which is what the user does by hand; set it to somewhere off the working drive when those folders would otherwise fill it.",
+  "_comment": "Placeholder content overlay. The real copy lives in content.local.json (git-ignored). Each act pairs the canonical spoken phrase the recognizer listens for with the Title Case video.action it records; aliases are extra phrases that record the same action, for words the small speech model hears differently. library_root, chrome_profile and scrape_provider are the machine-specific values the app needs at runtime. project_roots is optional: the folders holding the suite's sibling app checkouts (fun_time, origenerator, clipper, scripture), searched in order, for when those repos do not live under library_root/projects; omit it and that is exactly where they are looked for. retired_root is optional too: where a non-AI original goes once its upscale is made, with its sidecar and funscript beside it. Omit it and the original stays in the library, in its bucket's '2*' folder, which is what the user does by hand; set it to somewhere off the working drive when those folders would otherwise fill it. genau_source names the 0_inbox folder Origenerator drops a looping Genau clip in; it lives here rather than in source because naming a folder inside the library makes that name library vocabulary, which the sanitize harvester then blocks. Origenerator reads the same key from its own overlay and the two must agree.",
   "acts": [
     {
       "spoken": "alpha",
@@ -52,6 +52,7 @@
     }
   ],
   "library_root": "C:/path/to/library-root",
+  "genau_source": "example-loop-clips",
   "chrome_profile": "Default",
   "scrape_provider": {
     "source": "provider",
