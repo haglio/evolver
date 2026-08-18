@@ -31,6 +31,8 @@ from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from gui.toggle_switch import ToggleSwitch
 
+from gui.icons import restart_icon
+
 _ICON_COLOR = "#ddd"
 
 
@@ -345,7 +347,7 @@ class EvolverMainWindow(QMainWindow):
         toolbar.addAction(self.stats_action)
 
         # Restart
-        self.restart_action = QAction(qta.icon("fa5s.redo", color=_ICON_COLOR), "Restart", self)
+        self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self)
         toolbar.addAction(self.restart_action)
 
         # Quit
