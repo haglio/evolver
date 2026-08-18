@@ -107,7 +107,12 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 # instead of staying in the outbox. It has to leave — Genau reads that one folder
 # and nothing else, and a clip left in the outbox would be a library video nobody
 # ever plays.
-GENAU_SOURCE    = "origenerator_genau"
+# From the overlay, not from source: this names a folder inside the library, and
+# the sanitize harvester reads the library's folder names into its blocklist — so
+# a name hardcoded here comes back and fails the guard on the line that made it.
+# Origenerator reads the same key from its own overlay; the two must agree, the
+# folder being the only thing that passes between them.
+GENAU_SOURCE    = _CONTENT["genau_source"]
 GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
 
 FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")

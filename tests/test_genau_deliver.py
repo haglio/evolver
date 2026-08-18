@@ -5,7 +5,9 @@ import unittest
 from tasks import genau_deliver
 from tests.temp_helpers import override_config, workspace_temp_dir
 
-GENAU_SOURCE = "origenerator_genau"
+# Fabricated: the real folder name is library vocabulary and lives in the
+# overlay, so a test names its own and overrides the config with it.
+GENAU_SOURCE = "example-loop-clips"
 
 
 def _lane(root):
