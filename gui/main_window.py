@@ -31,7 +31,7 @@ from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from gui.toggle_switch import ToggleSwitch
 
-from gui.icons import restart_icon
+from gui.icons import quit_icon, restart_icon, run_now_icon
 
 _ICON_COLOR = "#ddd"
 
@@ -333,7 +333,7 @@ class EvolverMainWindow(QMainWindow):
         toolbar.addWidget(spacer)
 
         # Run Now
-        self.run_now_action = QAction(qta.icon("fa5s.play", color=_ICON_COLOR), "Run Now", self)
+        self.run_now_action = QAction(run_now_icon(_ICON_COLOR), "Run Now", self)
         toolbar.addAction(self.run_now_action)
 
         toolbar.addSeparator()
@@ -351,7 +351,7 @@ class EvolverMainWindow(QMainWindow):
         toolbar.addAction(self.restart_action)
 
         # Quit
-        self.quit_action = QAction(qta.icon("fa5s.power-off", color=_ICON_COLOR), "Quit", self)
+        self.quit_action = QAction(quit_icon(_ICON_COLOR), "Quit", self)
         toolbar.addAction(self.quit_action)
 
     def refresh_history(self):

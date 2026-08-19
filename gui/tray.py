@@ -11,7 +11,7 @@ import qtawesome as qta
 
 import config
 
-from gui.icons import restart_icon
+from gui.icons import quit_icon, restart_icon, run_now_icon
 
 _ICON_COLOR = "#333"
 
@@ -52,7 +52,7 @@ class EvolverTray(QSystemTrayIcon):
         self.open_action.setFont(font)
         self._menu.addAction(self.open_action)
 
-        self.run_now_action = QAction(qta.icon("fa5s.play", color=_ICON_COLOR), "Run Now", self._menu)
+        self.run_now_action = QAction(run_now_icon(_ICON_COLOR), "Run Now", self._menu)
         self._menu.addAction(self.run_now_action)
 
         self.pause_action = QAction(qta.icon("fa5s.pause", color=_ICON_COLOR), "Pause Scheduling", self._menu)
@@ -81,7 +81,7 @@ class EvolverTray(QSystemTrayIcon):
         self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self._menu)
         self._menu.addAction(self.restart_action)
 
-        self.quit_action = QAction(qta.icon("fa5s.power-off", color=_ICON_COLOR), "Quit", self._menu)
+        self.quit_action = QAction(quit_icon(_ICON_COLOR), "Quit", self._menu)
         self._menu.addAction(self.quit_action)
 
         self.setContextMenu(self._menu)
