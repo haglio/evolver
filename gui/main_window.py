@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 import qtawesome as qta
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -32,6 +32,7 @@ from gui.status_symbols import GRAY, mark_for, mark_icon
 from gui.toggle_switch import ToggleSwitch
 
 from gui.icons import quit_icon, restart_icon, run_now_icon
+from shared_ui.spacing import BUTTON_ICON
 
 _ICON_COLOR = "#ddd"
 
@@ -310,6 +311,9 @@ class EvolverMainWindow(QMainWindow):
         toolbar.setMovable(False)
         toolbar.setFloatable(False)
         toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        # The family's icon size, so a mark here is the size a mark in any
+        # other app's row of buttons is.
+        toolbar.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
         self.addToolBar(toolbar)
 
         # Small left pad so the toggle isn't flush with the window edge
