@@ -1,14 +1,17 @@
 """Evolver's icons.
 
-Nearly everything on the toolbar and in the tray menu is a Font Awesome glyph,
-which suits the ordinary verbs -- play, pause, a cog for settings.  Restart is
-not ordinary: it is the one control that takes the whole app down and brings it
-back, and Font Awesome's "redo" is a plain circular arrow, which is what an undo
-looks like everywhere else in this family.
+Most of the toolbar and the tray menu is still Font Awesome, which suits the
+verbs nothing else in the family draws -- a cog for settings, a chart, a film
+strip.  Three marks are not left to it, because the family draws them and the
+apps sit open side by side:
 
-So that one comes out of :mod:`shared_ui.icons` -- a power symbol whose ring
-runs on into an arrowhead -- and it is the same mark wherever the family offers
-the same act.
+* quit, the power symbol -- Fun Time paints this same one on its bar,
+* restart, that power symbol with its ring running on into an arrowhead, so the
+  two sit together in a menu as obvious relatives rather than as an unrelated
+  pair (Font Awesome's "redo" is a plain circular arrow, which is what an undo
+  looks like everywhere else here),
+* run now, the play triangle, whose corners are rounded the way an icon font's
+  transport controls are.
 """
 
 from __future__ import annotations
@@ -25,3 +28,15 @@ def restart_icon(color: str) -> QIcon:
     different inks for the same drawing.
     """
     return glyph_icon("restart", color=color)
+
+
+def quit_icon(color: str) -> QIcon:
+    """The family's power mark -- and restart is built from its ring and stroke,
+    so the two read as relatives where they sit beside each other."""
+    return glyph_icon("power", color=color)
+
+
+def run_now_icon(color: str) -> QIcon:
+    """The family's play triangle, corners rounded like the transport marks it
+    replaces."""
+    return glyph_icon("play", color=color)
