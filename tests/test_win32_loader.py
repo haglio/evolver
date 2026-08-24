@@ -34,6 +34,14 @@ class TestAStandInDll(unittest.TestCase):
 
         self.assertIn("kernel32.OpenProcess", str(caught.exception))
 
+    def test_an_error_saving_handle_stands_in_the_same_way(self):
+        kernel32 = win32_loader.load_dll("kernel32", use_last_error=True)
+
+        with self.assertRaises(win32_loader.Win32Unavailable) as caught:
+            kernel32.CreateMutexW(None, False, "a name")
+
+        self.assertIn("kernel32.CreateMutexW", str(caught.exception))
+
     def test_an_unbound_entry_point_still_takes_the_argtypes_declared_on_it(self):
         """Modules declare argtypes at import; that has to survive too."""
         kernel32 = win32_loader.load_dll("kernel32")

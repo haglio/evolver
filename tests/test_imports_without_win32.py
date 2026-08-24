@@ -52,6 +52,7 @@ def run_without_the_win32_ctypes_surface(body):
 _MUST_IMPORT_WITHOUT_WIN32 = (
     "util.processes",
     "tests.test_processes",
+    "gui.single_instance",
 )
 
 

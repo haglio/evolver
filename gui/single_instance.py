@@ -22,6 +22,8 @@ from collections.abc import Callable
 
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
+from util.win32_loader import load_dll
+
 log = logging.getLogger(__name__)
 
 _MUTEX_NAME = "EvolverTrayApp_SingleInstance"
@@ -29,7 +31,7 @@ _PIPE_NAME = "EvolverTrayApp_ShowWindow"
 
 _CONNECT_TIMEOUT_MS = 3000
 
-_kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+_kernel32 = load_dll("kernel32", use_last_error=True)
 _CreateMutexW = _kernel32.CreateMutexW
 _CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
 _CreateMutexW.restype = ctypes.c_void_p
