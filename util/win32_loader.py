@@ -24,6 +24,13 @@ from typing import Any
 
 WIN32_AVAILABLE = hasattr(ctypes, "windll")
 
+#: The COM result type.  Where it cannot be had, a plain signed 32-bit int of
+#: the same width — ``c_long`` would be eight bytes wide off Windows and four on
+#: it.  Nothing is ever marshalled through the stand-in: off Windows it only
+#: types prototypes that refuse to be made and a handle that refuses to be
+#: called.
+HRESULT = getattr(ctypes, "HRESULT", ctypes.c_int32)
+
 
 class Win32Unavailable(RuntimeError):
     """A Win32 entry point was called in a process that could not bind it."""
@@ -62,6 +69,13 @@ class _UnavailableDll:
         return stand_in
 
 
+class _UnavailableCallbackType:
+    """A callback prototype, on a machine with no stdcall calling convention."""
+
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        raise Win32Unavailable("a Win32 callback prototype needs a Windows ctypes; this process has none")
+
+
 def load_dll(name: str, *, use_last_error: bool = False) -> Any:
     """The handle for the *name* DLL, or a stand-in that refuses to be called.
 
@@ -76,3 +90,10 @@ def load_dll(name: str, *, use_last_error: bool = False) -> Any:
     if use_last_error:
         return ctypes.WinDLL(name, use_last_error=True)  # type: ignore[attr-defined]
     return getattr(ctypes.windll, name)  # type: ignore[attr-defined]
+
+
+def win_functype(restype: Any, *argtypes: Any) -> Any:
+    """The prototype for a stdcall call, or a type that refuses to be made."""
+    if not WIN32_AVAILABLE:
+        return _UnavailableCallbackType
+    return ctypes.WINFUNCTYPE(restype, *argtypes)  # type: ignore[attr-defined]

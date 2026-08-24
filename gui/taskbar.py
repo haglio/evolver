@@ -12,6 +12,8 @@ import ctypes.wintypes as wt
 import logging
 import struct
 
+from util.win32_loader import HRESULT, load_dll, win_functype
+
 log = logging.getLogger(__name__)
 
 
@@ -69,15 +71,15 @@ _RELEASE = 2
 _SETVALUE = 6
 _COMMIT = 7
 
-_SetValueType = ctypes.WINFUNCTYPE(
-    ctypes.HRESULT, ctypes.c_void_p, ctypes.POINTER(_PROPERTYKEY), ctypes.POINTER(_PROPVARIANT),
+_SetValueType = win_functype(
+    HRESULT, ctypes.c_void_p, ctypes.POINTER(_PROPERTYKEY), ctypes.POINTER(_PROPVARIANT),
 )
-_CommitType = ctypes.WINFUNCTYPE(ctypes.HRESULT, ctypes.c_void_p)
-_ReleaseType = ctypes.WINFUNCTYPE(wt.ULONG, ctypes.c_void_p)
+_CommitType = win_functype(HRESULT, ctypes.c_void_p)
+_ReleaseType = win_functype(wt.ULONG, ctypes.c_void_p)
 
-_SHGetPropertyStoreForWindow = ctypes.windll.shell32.SHGetPropertyStoreForWindow
+_SHGetPropertyStoreForWindow = load_dll("shell32").SHGetPropertyStoreForWindow
 _SHGetPropertyStoreForWindow.argtypes = [wt.HWND, ctypes.POINTER(_GUID), ctypes.POINTER(ctypes.c_void_p)]
-_SHGetPropertyStoreForWindow.restype = ctypes.HRESULT
+_SHGetPropertyStoreForWindow.restype = HRESULT
 
 
 # ---------------------------------------------------------------------------

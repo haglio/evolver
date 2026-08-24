@@ -53,6 +53,7 @@ _MUST_IMPORT_WITHOUT_WIN32 = (
     "util.processes",
     "tests.test_processes",
     "gui.single_instance",
+    "gui.taskbar",
 )
 
 
