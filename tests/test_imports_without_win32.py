@@ -26,8 +26,23 @@ _WIN32_CTYPES_NAMES = (
     "get_last_error", "set_last_error",
 )
 
+# Third-party packages that reach that surface while THEY are being imported,
+# on Windows.  Taking it away leaves a machine that cannot exist -- one whose
+# sys.platform still says win32, so platform-branching code takes the Windows
+# branch with the Windows half gone.  That is the point for this repo's own
+# modules, which is what the question is about; it is only noise for a
+# dependency, so a dependency is imported while the surface is still there and
+# is served from sys.modules afterwards.  A new one announces itself here, as a
+# collection error naming its own file.
+_DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT = ("qtawesome",)
+
 _STRIP_WIN32_FROM_CTYPES = f"""
 import ctypes, ctypes.wintypes
+for _name in {_DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT!r}:
+    try:
+        __import__(_name)
+    except ImportError:
+        pass
 for _name in {_WIN32_CTYPES_NAMES!r}:
     if hasattr(ctypes, _name):
         delattr(ctypes, _name)
