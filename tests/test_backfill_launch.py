@@ -5,13 +5,12 @@ import sys
 import unittest
 from unittest.mock import patch
 
-from PyQt6.QtWidgets import QApplication
 
 import config
 from gui.app import EvolverApp
 from gui.tray import EvolverTray
+from tests.gui_support import build_evolver_app
 
-_app = QApplication.instance() or QApplication([])
 
 
 class TestTrayMenu(unittest.TestCase):
@@ -23,8 +22,7 @@ class TestTrayMenu(unittest.TestCase):
 
 class TestLaunch(unittest.TestCase):
     def _app(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            return EvolverApp()
+        return build_evolver_app(self)
 
     def test_triggering_the_action_spawns_the_backfill_process(self):
         app = self._app()

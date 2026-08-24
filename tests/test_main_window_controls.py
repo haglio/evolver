@@ -6,13 +6,13 @@ from unittest.mock import patch
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
-from PyQt6.QtWidgets import QApplication, QMessageBox, QToolBar
+from PyQt6.QtWidgets import QMessageBox, QToolBar
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
 from gui.run_record import RunRecord
 from gui.toggle_switch import ToggleSwitch
+from tests.gui_support import build_evolver_app
 
-_app = QApplication.instance() or QApplication([])
 
 
 class TestRunDetailRendering(unittest.TestCase):
@@ -405,8 +405,7 @@ class TestQuitConfirmation(unittest.TestCase):
     def test_quit_proceeds_on_accept(self):
         from gui.app import EvolverApp
 
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.QMessageBox") as mock_box:
             mock_box.StandardButton.Yes = QMessageBox.StandardButton.Yes
@@ -419,8 +418,7 @@ class TestQuitConfirmation(unittest.TestCase):
     def test_quit_cancelled_on_reject(self):
         from gui.app import EvolverApp
 
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.QMessageBox") as mock_box:
             mock_box.StandardButton.Yes = QMessageBox.StandardButton.Yes
@@ -437,8 +435,7 @@ class TestToolbarAppWiring(unittest.TestCase):
     def test_app_connects_window_toolbar_actions(self):
         from gui.app import EvolverApp
 
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         self.assertTrue(app._window.quit_action.receivers(app._window.quit_action.triggered) > 0)
         self.assertTrue(app._window.run_now_action.receivers(app._window.run_now_action.triggered) > 0)
@@ -448,16 +445,14 @@ class TestToolbarAppWiring(unittest.TestCase):
     def test_app_connects_window_restart_action(self):
         from gui.app import EvolverApp
 
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         self.assertTrue(app._window.restart_action.receivers(app._window.restart_action.triggered) > 0)
 
     def test_app_connects_tray_restart_action(self):
         from gui.app import EvolverApp
 
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         self.assertTrue(app._tray.restart_action.receivers(app._tray.restart_action.triggered) > 0)
 

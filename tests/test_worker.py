@@ -1,14 +1,11 @@
 import unittest
 from unittest.mock import Mock, patch, MagicMock
 
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QEventLoop, QTimer
 
 from evolver import PipelineResult, StageRecord
 from gui.worker import PipelineWorker
 
-# QApplication must exist for signal/slot to work
-_app = QApplication.instance() or QApplication([])
 
 
 class TestPipelineWorker(unittest.TestCase):

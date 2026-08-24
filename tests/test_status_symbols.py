@@ -2,11 +2,9 @@
 
 import unittest
 
-from PyQt6.QtWidgets import QApplication
 
 from gui.status_symbols import mark_for
 
-_app = QApplication.instance() or QApplication([])
 
 
 class TestMarkFor(unittest.TestCase):

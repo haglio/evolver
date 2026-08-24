@@ -2,9 +2,8 @@ import unittest
 from unittest.mock import patch, Mock
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QProgressBar
+from PyQt6.QtWidgets import QProgressBar
 
-_app = QApplication.instance() or QApplication([])
 
 
 class TestPopupConstruction(unittest.TestCase):

@@ -3,12 +3,11 @@
 import unittest
 from unittest.mock import patch
 
-from PyQt6.QtWidgets import QApplication
 
 from gui.run_record import RunRecord
 from gui.stats_window import StackedAreaChart, StatsWindow, _pick_y_ticks
+from tests.gui_support import build_evolver_app
 
-_app = QApplication.instance() or QApplication([])
 
 
 def _make_record(stage_durations: dict[str, float]) -> RunRecord:
@@ -191,8 +190,7 @@ class TestStatsActionExists(unittest.TestCase):
 
     def test_app_connects_stats_actions(self):
         from gui.app import EvolverApp
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
         self.assertTrue(
             app._window.stats_action.receivers(app._window.stats_action.triggered) > 0
         )

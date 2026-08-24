@@ -3,35 +3,30 @@
 import unittest
 from unittest.mock import patch
 
-from PyQt6.QtWidgets import QApplication
 
 from gui.app import EvolverApp, _APP_MODEL_ID
+from tests.gui_support import build_evolver_app
 
-_app = QApplication.instance() or QApplication([])
 
 
 class TestAppStartup(unittest.TestCase):
 
     def test_evolver_app_constructs_without_error(self):
-        # Patch QApplication creation since we already have one
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
         # Tray, window, and scheduler should all exist
         self.assertIsNotNone(app._tray)
         self.assertIsNotNone(app._window)
         self.assertIsNotNone(app._scheduler)
 
     def test_app_window_icon_matches_tray_icon(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
         # Taskbar icon should be set to the same icon as the tray
         app_icon = app._app.windowIcon()
         self.assertFalse(app_icon.isNull(), "Application window icon should be set")
 
     @patch("gui.app.ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID")
     def test_app_sets_appusermodelid(self, mock_set_id):
-        with patch("gui.app.QApplication", return_value=_app):
-            EvolverApp()
+        build_evolver_app(self)
         mock_set_id.assert_called_once_with(_APP_MODEL_ID)
 
 
@@ -40,9 +35,8 @@ class TestNonAiUpscaleToggle(unittest.TestCase):
 
     def _app_with_fresh_settings(self):
         from gui.settings import EvolverSettings
-        with patch("gui.app.QApplication", return_value=_app), \
-             patch("gui.app.EvolverSettings.load", return_value=EvolverSettings()):
-            return EvolverApp()
+        with patch("gui.app.EvolverSettings.load", return_value=EvolverSettings()):
+            return build_evolver_app(self)
 
     def test_tray_toggle_starts_unchecked_by_default(self):
         app = self._app_with_fresh_settings()
@@ -72,9 +66,8 @@ class TestPresenceMonitor(unittest.TestCase):
         from gui.settings import EvolverSettings
         settings = EvolverSettings()
         settings.nonai_upscale_enabled = enabled
-        with patch("gui.app.QApplication", return_value=_app), \
-             patch("gui.app.EvolverSettings.load", return_value=settings):
-            return EvolverApp()
+        with patch("gui.app.EvolverSettings.load", return_value=settings):
+            return build_evolver_app(self)
 
     def test_monitor_timer_is_running(self):
         app = self._app_with_toggle(True)
@@ -97,8 +90,7 @@ class TestSessionManagement(unittest.TestCase):
     """EvolverApp must log Windows session-management events that could kill it."""
 
     def test_connects_to_commit_data_request(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
         # The commitDataRequest signal should have our handler connected
         self.assertTrue(
             hasattr(app, "_on_session_end"),
@@ -106,8 +98,7 @@ class TestSessionManagement(unittest.TestCase):
         )
 
     def test_session_end_logs_to_crash_log(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         mock_manager = unittest.mock.MagicMock()
         with patch("gui.app.crash_log.write_info") as mock_write:
@@ -118,8 +109,7 @@ class TestSessionManagement(unittest.TestCase):
         self.assertIn("session", header.lower())
 
     def test_session_end_quits_app(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         mock_manager = unittest.mock.MagicMock()
         with patch.object(app, "_quit") as mock_quit, \
@@ -133,8 +123,7 @@ class TestRestart(unittest.TestCase):
     """_restart() should spawn a new process and quit the current one."""
 
     def test_restart_spawns_process_and_quits(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
              patch.object(app, "_quit") as mock_quit:
@@ -145,8 +134,7 @@ class TestRestart(unittest.TestCase):
     def test_restart_launches_tray_app(self):
         import config
 
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
              patch.object(app, "_quit"):
@@ -155,8 +143,7 @@ class TestRestart(unittest.TestCase):
             self.assertEqual(args[1], str(config.PROJECT_DIR / "tray_app.py"))
 
     def test_restart_passes_show_window_when_window_visible(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
              patch.object(app, "_quit"), \
@@ -167,8 +154,7 @@ class TestRestart(unittest.TestCase):
             self.assertIn("--show-window", args)
 
     def test_restart_omits_show_window_when_window_hidden(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
              patch.object(app, "_quit"), \
@@ -178,8 +164,7 @@ class TestRestart(unittest.TestCase):
             self.assertNotIn("--show-window", args)
 
     def test_restart_grants_foreground_to_child_when_window_visible(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         mock_proc = unittest.mock.MagicMock()
         mock_proc.pid = 12345
@@ -191,8 +176,7 @@ class TestRestart(unittest.TestCase):
             mock_allow.assert_called_once_with(12345)
 
     def test_restart_skips_foreground_grant_when_window_hidden(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.subprocess.Popen"), \
              patch.object(app, "_quit"), \
@@ -207,8 +191,7 @@ class TestDuplicateLaunchHandoff(unittest.TestCase):
     the tray — so it must open the running instance's window, not exit."""
 
     def _duplicate_launch(self, handoff_taken):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.single_instance.is_first_instance", return_value=False), \
              patch("gui.app.single_instance.request_show", return_value=handoff_taken) as request, \
@@ -251,8 +234,7 @@ class TestServingDuplicateLaunches(unittest.TestCase):
     falls through to the error dialog and the window still never opens."""
 
     def _run_as_first_instance(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch("gui.app.single_instance.is_first_instance", return_value=True), \
              patch("gui.app.single_instance.serve_show_requests") as serve, \
@@ -292,8 +274,7 @@ class TestShowWindowFlag(unittest.TestCase):
     """--show-window should open the main window on startup."""
 
     def test_run_shows_window_when_flag_present(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch.object(app, "_show_window") as mock_show, \
              patch("gui.app.single_instance.is_first_instance", return_value=True), \
@@ -306,8 +287,7 @@ class TestShowWindowFlag(unittest.TestCase):
             mock_show.assert_called_once()
 
     def test_run_does_not_show_window_without_flag(self):
-        with patch("gui.app.QApplication", return_value=_app):
-            app = EvolverApp()
+        app = build_evolver_app(self)
 
         with patch.object(app, "_show_window") as mock_show, \
              patch("gui.app.single_instance.is_first_instance", return_value=True), \
