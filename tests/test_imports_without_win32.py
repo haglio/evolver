@@ -1,14 +1,14 @@
 """What this suite does on a machine that has no Win32.
 
 Evolver binds Win32 while its modules are being imported, and the test package
-itself resolves a dotted name through ``ctypes.windll`` before any test module
-runs.  On an interpreter whose ``ctypes`` has no Windows half that is not a
-handful of Windows tests failing -- it is nothing collected at all, so the suite
-cannot say anything about the code that has no platform in it.
+itself resolved a dotted name through ``ctypes.windll`` before any test module
+ran.  On an interpreter whose ``ctypes`` has no Windows half that was not a
+handful of Windows tests failing -- it was nothing collected at all, so the
+suite could say nothing about the code that has no platform in it.
 
-These cases pin the other outcome.  The child interpreters below delete the
-Windows half of ``ctypes`` before importing anything, so each case asks the same
-question on Windows as it does anywhere else.
+This pins the other outcome.  The child interpreter below deletes the Windows
+half of ``ctypes`` and then collects the suite, so it asks the same question on
+Windows as it does anywhere else.
 """
 
 import os
@@ -47,35 +47,23 @@ def run_without_the_win32_ctypes_surface(body):
     )
 
 
-# The modules that reach Win32 while they are being imported, and so decide for
-# every test module that reaches them whether it can be collected at all.
-_MUST_IMPORT_WITHOUT_WIN32 = (
-    "util.processes",
-    "tests.test_processes",
-    "gui.single_instance",
-    "gui.taskbar",
-)
+class TestTheWholeSuite(unittest.TestCase):
+    def test_it_collects_where_ctypes_has_no_windll(self):
+        """Asked of the suite as a whole, and of pytest rather than of a list.
 
-
-class TestTheModulesThatBindWin32(unittest.TestCase):
-    def test_they_import_where_ctypes_has_no_windll(self):
-        for module in _MUST_IMPORT_WITHOUT_WIN32:
-            with self.subTest(module=module):
-                result = run_without_the_win32_ctypes_surface(f"import {module}\n")
-
-                self.assertEqual(result.returncode, 0, result.stderr)
-
-
-class TestTheTestPackageItself(unittest.TestCase):
-    def test_it_imports_where_ctypes_has_no_windll(self):
-        """Every test module in this repo runs ``tests/__init__.py`` first.
-
-        So a name it resolves through ``ctypes.windll`` is not one file's
-        problem: it is every collected test in the run, at once.
+        A list of the modules that bind Win32 would only ever hold the ones
+        somebody remembered to add, and the cost of forgetting one is not that
+        module's tests -- it is every test module that reaches it, dropped from
+        the run as a collection error nobody reads.  Collecting the suite is the
+        question itself: the next module to bind Win32 at import fails here, on
+        the commit that adds it.
         """
-        result = run_without_the_win32_ctypes_surface("import tests\n")
+        result = run_without_the_win32_ctypes_surface(
+            "import sys, pytest\n"
+            "sys.exit(pytest.main(['--collect-only', '-q']))\n"
+        )
 
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout[-4000:])
 
 
 if __name__ == "__main__":
