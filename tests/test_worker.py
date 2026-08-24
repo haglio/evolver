@@ -38,7 +38,8 @@ class TestPipelineWorker(unittest.TestCase):
         progress = []
 
         def fake_run_pipeline(on_stage_start=None, on_stage_complete=None,
-                              on_stage_progress=None, nonai_enabled=None):
+                              on_stage_progress=None, nonai_enabled=None,
+                              should_stop=None):
             if pipeline_error:
                 raise pipeline_error
             for sr in pipeline_result.stages:
@@ -116,6 +117,21 @@ class TestPipelineWorker(unittest.TestCase):
              patch("gui.worker.config"):
             worker.run()
         self.assertTrue(run_pipeline.call_args.kwargs["nonai_enabled"])
+
+    def test_hands_its_own_interruption_state_to_the_pipeline(self):
+        """The watchdog's requestInterruption() must reach run_pipeline's
+        between-stage check, or an overrun pipeline can never be stopped."""
+        worker = PipelineWorker(trigger="scheduled")
+        with patch("gui.worker.evolver.setup_logging"), \
+             patch("gui.worker.evolver.check_dependencies"), \
+             patch("gui.worker.evolver.run_pipeline") as run_pipeline, \
+             patch("gui.worker.RunRecord"), \
+             patch("gui.worker.save_run"), \
+             patch("gui.worker.config"):
+            worker.run()
+        should_stop = run_pipeline.call_args.kwargs["should_stop"]
+        self.assertIs(should_stop.__self__, worker)
+        self.assertEqual(should_stop.__name__, "isInterruptionRequested")
 
 
 if __name__ == "__main__":

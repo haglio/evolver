@@ -477,6 +477,26 @@ class TestRunPipeline(unittest.TestCase):
         self.assertEqual(progress_calls, [("upscale", 1, 5), ("upscale", 2, 5)])
 
 
+class TestCooperativeStop(unittest.TestCase):
+    """The watchdog's stop request: honored between stages, never mid-stage."""
+
+    def test_stops_between_stages_once_asked(self):
+        mocks = _stage_mocks()
+        with _patched_stages(mocks):
+            result = evolver.run_pipeline(should_stop=lambda: mocks["purge_run"].called)
+
+        self.assertEqual([s.name for s in result.stages], ["purge"])
+        mocks["prompt_scrape_run"].assert_not_called()
+        mocks["sort_run"].assert_not_called()
+
+    def test_a_stop_that_is_never_requested_changes_nothing(self):
+        mocks = _stage_mocks()
+        with _patched_stages(mocks):
+            result = evolver.run_pipeline(should_stop=lambda: False)
+
+        self.assertEqual(len(result.stages), 14)
+
+
 class TestCheckDependenciesWindowSuppression(unittest.TestCase):
     def test_ffprobe_check_passes_create_no_window(self):
         """ffprobe version check must not spawn a visible console window."""

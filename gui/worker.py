@@ -40,6 +40,9 @@ class PipelineWorker(QThread):
                 on_stage_complete=self._on_stage_complete,
                 on_stage_progress=self._on_stage_progress,
                 nonai_enabled=self._nonai_enabled,
+                # The watchdog's requestInterruption() lands here: the pipeline
+                # checks it between stages and drops the rest of the run.
+                should_stop=self.isInterruptionRequested,
             )
             record = RunRecord.from_pipeline_result(result, trigger=self._trigger)
             try:

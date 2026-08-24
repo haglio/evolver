@@ -113,6 +113,10 @@ class PipelineResult:
     duration_seconds: float = 0.0
 
 
+class _StopRequested(Exception):
+    """Raised at a stage boundary once the caller's should_stop turns true."""
+
+
 def setup_logging():
     config.LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
@@ -135,6 +139,7 @@ def run_pipeline(
     on_stage_complete: Callable[[str, object | None, float, str], None] | None = None,
     on_stage_progress: Callable[[str, int, int], None] | None = None,
     nonai_enabled: bool | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> PipelineResult:
     """Run the full evolver pipeline, optionally reporting progress via callbacks.
 
@@ -149,6 +154,10 @@ def run_pipeline(
             stops an in-flight one, and None (headless CLI, which has no toggle)
             leaves any in-flight encode alone and starts nothing. Finished
             encodes are promoted in every mode.
+        should_stop: Checked at every stage boundary; once it returns True the
+            remaining stages are dropped and the result covers what ran. Only
+            between stages — a stage mid-move must finish its current file, so
+            nothing interrupts one in flight.
 
     Returns:
         PipelineResult with per-stage records and aggregate status.
@@ -158,6 +167,8 @@ def run_pipeline(
     stages: list[StageRecord] = []
 
     def _run_stage(name, fn, **kwargs):
+        if should_stop is not None and should_stop():
+            raise _StopRequested
         if on_stage_start:
             on_stage_start(name)
         t0 = time.monotonic()
@@ -172,6 +183,8 @@ def run_pipeline(
         return result
 
     def _skip_stage(name, reason):
+        if should_stop is not None and should_stop():
+            raise _StopRequested
         if on_stage_start:
             on_stage_start(name)
         record = StageRecord(name, "skipped", 0.0, skip_reason=reason)
@@ -179,82 +192,87 @@ def run_pipeline(
         if on_stage_complete:
             on_stage_complete(name, None, 0.0, "skipped")
 
-    _run_stage("purge", purge_weird.run)
-    _run_stage("metadata", prompt_scrape.run)
-    sort_result = _run_stage("sort", sort.run)
+    try:
+        _run_stage("purge", purge_weird.run)
+        _run_stage("metadata", prompt_scrape.run)
+        sort_result = _run_stage("sort", sort.run)
 
-    priority_files = getattr(sort_result, "moved_files", [])
-    upscale_result = None
-    upscale_skipped = False
-    if not upscale.has_pending_work(priority_files=priority_files):
-        log.info("No pending upscale work found. Skipping upscale.")
-        _skip_stage("upscale", "no_pending_work")
-    elif processes.count_running(config.FFMPEG) > 0:
-        # A detached non-AI encode (or a manual Topaz GUI export) already owns
-        # the GPU; running the AI batch alongside it stacks Topaz processes,
-        # which is what used to exhaust memory and crash the machine.
-        log.info("Skipping upscale: a Topaz ffmpeg encode is already running.")
-        upscale_skipped = True
-        _skip_stage("upscale", "topaz_busy")
-    elif _should_skip_upscale_due_to_cpu(log):
-        log.info("Skipping upscale because CPU usage is above the configured threshold.")
-        upscale_skipped = True
-        _skip_stage("upscale", "cpu_busy")
-    else:
-        upscale_kwargs: dict = dict(
-            priority_files=priority_files, max_items=config.UPSCALE_BATCH_LIMIT,
+        priority_files = getattr(sort_result, "moved_files", [])
+        upscale_result = None
+        upscale_skipped = False
+        if not upscale.has_pending_work(priority_files=priority_files):
+            log.info("No pending upscale work found. Skipping upscale.")
+            _skip_stage("upscale", "no_pending_work")
+        elif processes.count_running(config.FFMPEG) > 0:
+            # A detached non-AI encode (or a manual Topaz GUI export) already owns
+            # the GPU; running the AI batch alongside it stacks Topaz processes,
+            # which is what used to exhaust memory and crash the machine.
+            log.info("Skipping upscale: a Topaz ffmpeg encode is already running.")
+            upscale_skipped = True
+            _skip_stage("upscale", "topaz_busy")
+        elif _should_skip_upscale_due_to_cpu(log):
+            log.info("Skipping upscale because CPU usage is above the configured threshold.")
+            upscale_skipped = True
+            _skip_stage("upscale", "cpu_busy")
+        else:
+            upscale_kwargs: dict = dict(
+                priority_files=priority_files, max_items=config.UPSCALE_BATCH_LIMIT,
+            )
+            if on_stage_progress is not None:
+                upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
+            upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
+
+        # Straight after the upscale, so a clip made this run reaches Genau this run —
+        # and before the correspondence check, which would otherwise see the delivered
+        # clip's source still sitting in 1_sorted with nothing beside it in the outbox.
+        _run_stage("genau_deliver", genau_deliver.run)
+
+        upscale_still_pending = (
+            upscale_skipped
+            or (upscale_result is not None and upscale_result.pending_after_run > 0)
         )
-        if on_stage_progress is not None:
-            upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
-        upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
 
-    # Straight after the upscale, so a clip made this run reaches Genau this run —
-    # and before the correspondence check, which would otherwise see the delivered
-    # clip's source still sitting in 1_sorted with nothing beside it in the outbox.
-    _run_stage("genau_deliver", genau_deliver.run)
+        # The non-AI stage always runs (it may have a detached encode to check on),
+        # but only starts a new multi-hour encode when the tray toggle is on, the
+        # AI pipeline is drained, and the box is otherwise quiet.
+        ai_drained = not upscale_skipped and (
+            upscale_result is None or upscale_result.pending_after_run == 0
+        )
+        nonai_allow_start = bool(
+            nonai_enabled and ai_drained and not _should_skip_upscale_due_to_cpu(log)
+        )
+        _run_stage(
+            "upscale_non_ai", nonai_upscale.run,
+            allow_start=nonai_allow_start, stop=nonai_enabled is False,
+            # Toggle on -> Evolver manages the encode by user presence: suspend it
+            # when someone's at the machine, resume it when they idle out.
+            presence_managed=nonai_enabled is True,
+        )
 
-    upscale_still_pending = (
-        upscale_skipped
-        or (upscale_result is not None and upscale_result.pending_after_run > 0)
-    )
+        if upscale_still_pending:
+            log.info("Skipping correspondence check: upscale has unprocessed files that would cause a false mismatch.")
+            _skip_stage("verify", "upscale_pending")
+        else:
+            _run_stage("verify", check_correspondence.run, show_popup=True)
 
-    # The non-AI stage always runs (it may have a detached encode to check on),
-    # but only starts a new multi-hour encode when the tray toggle is on, the
-    # AI pipeline is drained, and the box is otherwise quiet.
-    ai_drained = not upscale_skipped and (
-        upscale_result is None or upscale_result.pending_after_run == 0
-    )
-    nonai_allow_start = bool(
-        nonai_enabled and ai_drained and not _should_skip_upscale_due_to_cpu(log)
-    )
-    _run_stage(
-        "upscale_non_ai", nonai_upscale.run,
-        allow_start=nonai_allow_start, stop=nonai_enabled is False,
-        # Toggle on -> Evolver manages the encode by user presence: suspend it
-        # when someone's at the machine, resume it when they idle out.
-        presence_managed=nonai_enabled is True,
-    )
-
-    if upscale_still_pending:
-        log.info("Skipping correspondence check: upscale has unprocessed files that would cause a false mismatch.")
-        _skip_stage("verify", "upscale_pending")
-    else:
-        _run_stage("verify", check_correspondence.run, show_popup=True)
-
-    # After every stage that moves a video, and before bookmarks: both stages
-    # touch favs.csv, and bookmarks drops the rows whose file is missing, so a
-    # favorite has to be repointed before it can be mistaken for a dead one.
-    _run_stage("references", reference_sync.run)
-    _run_stage("bookmarks", bookmarks_sync.run)
-    # Before the scripts sync: these write new funscripts into the tree, and the
-    # sync is what settles them across a clip's version family. The two carry a
-    # script between a clip and its scene in opposite directions, and each
-    # leaves an existing script alone, so neither can undo the other.
-    _run_stage("clip_scripts", clip_scripts.run)
-    _run_stage("scene_scripts", scene_scripts.run)
-    _run_stage("scripts", scripts_sync.run, show_popup=True)
-    _run_stage("group_non_ai", nonai_group.run)
-    _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
+        # After every stage that moves a video, and before bookmarks: both stages
+        # touch favs.csv, and bookmarks drops the rows whose file is missing, so a
+        # favorite has to be repointed before it can be mistaken for a dead one.
+        _run_stage("references", reference_sync.run)
+        _run_stage("bookmarks", bookmarks_sync.run)
+        # Before the scripts sync: these write new funscripts into the tree, and the
+        # sync is what settles them across a clip's version family. The two carry a
+        # script between a clip and its scene in opposite directions, and each
+        # leaves an existing script alone, so neither can undo the other.
+        _run_stage("clip_scripts", clip_scripts.run)
+        _run_stage("scene_scripts", scene_scripts.run)
+        _run_stage("scripts", scripts_sync.run, show_popup=True)
+        _run_stage("group_non_ai", nonai_group.run)
+        _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
+    except _StopRequested:
+        log.warning(
+            "Stop requested; dropping the remaining stages after %d ran.", len(stages),
+        )
 
     return PipelineResult(
         stages=stages,
