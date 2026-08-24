@@ -1,13 +1,29 @@
 """Tests for the crash log, and for the entry point that has to surface one."""
 
 import sys
-import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 import tray_app
+from tests.temp_helpers import workspace_temp_dir
 from util import crash_log
+
+
+@pytest.fixture(autouse=True)
+def _the_crash_flag_is_put_back():
+    """Give `crash_log._crash_logged` back at the end of every test here.
+
+    Six tests assign that module global directly, and none of them put it back --
+    so whatever the last one left was what the rest of the session saw. The
+    workaround was visible in the file: `TestWriteCrash` set it to False inline
+    before each write, because a neighbour might have left it True. The tests
+    still say what they need; nothing now carries it to the next one.
+    """
+    before = crash_log._crash_logged
+    yield
+    crash_log._crash_logged = before
 
 
 class TestInstallExcepthook(unittest.TestCase):
@@ -57,10 +73,8 @@ class TestWriteCrash(unittest.TestCase):
     """write_crash must write a timestamped entry to CRASH_LOG."""
 
     def test_writes_header_and_detail(self):
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
-            tmp = Path(f.name)
-
-        try:
+        with workspace_temp_dir() as tmp_dir:
+            tmp = tmp_dir / "tray_crash.log"
             with patch.object(crash_log, "CRASH_LOG", tmp):
                 crash_log._crash_logged = False
                 crash_log.write_crash("Test header:", "some detail")
@@ -69,16 +83,12 @@ class TestWriteCrash(unittest.TestCase):
             self.assertIn("Test header:", text)
             self.assertIn("some detail", text)
             self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
-        finally:
-            tmp.unlink()
 
     def test_appends_to_existing_content(self):
         """Crash entries must append, not overwrite, so we don't lose evidence."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
-            f.write("[2026-03-31 10:00:00] Previous entry\n")
-            tmp = Path(f.name)
-
-        try:
+        with workspace_temp_dir() as tmp_dir:
+            tmp = tmp_dir / "tray_crash.log"
+            tmp.write_text("[2026-03-31 10:00:00] Previous entry\n", encoding="utf-8")
             with patch.object(crash_log, "CRASH_LOG", tmp):
                 crash_log._crash_logged = False
                 crash_log.write_crash("New crash:", "details here")
@@ -86,8 +96,6 @@ class TestWriteCrash(unittest.TestCase):
             content = tmp.read_text(encoding="utf-8")
             self.assertIn("Previous entry", content)
             self.assertIn("New crash:", content)
-        finally:
-            tmp.unlink()
 
 
 class TestAtexitHandler(unittest.TestCase):
@@ -109,10 +117,8 @@ class TestAtexitHandler(unittest.TestCase):
 
     def test_atexit_includes_stack_trace(self):
         """Clean exit must log a stack trace so we can diagnose what triggered it."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
-            tmp = Path(f.name)
-
-        try:
+        with workspace_temp_dir() as tmp_dir:
+            tmp = tmp_dir / "tray_crash.log"
             with patch.object(crash_log, "CRASH_LOG", tmp):
                 crash_log.on_exit()
 
@@ -120,8 +126,6 @@ class TestAtexitHandler(unittest.TestCase):
             self.assertIn("Clean exit", content)
             # Must contain stack frames showing the call chain
             self.assertIn("on_exit", content)
-        finally:
-            tmp.unlink()
 
     def test_atexit_skips_when_crash_already_logged(self):
         crash_log._crash_logged = True
@@ -152,18 +156,14 @@ class TestWriteInfo(unittest.TestCase):
         self.assertFalse(crash_log._crash_logged)
 
     def test_write_info_writes_timestamped_entry(self):
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:
-            tmp = Path(f.name)
-
-        try:
+        with workspace_temp_dir() as tmp_dir:
+            tmp = tmp_dir / "tray_crash.log"
             with patch.object(crash_log, "CRASH_LOG", tmp):
                 crash_log.write_info("Session end:", "detail\n")
 
             text = tmp.read_text(encoding="utf-8")
             self.assertIn("Session end:", text)
             self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
-        finally:
-            tmp.unlink()
 
 
 class TestStartupCrashIsVisible(unittest.TestCase):
