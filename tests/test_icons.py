@@ -4,12 +4,10 @@ import unittest
 
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QIcon, QImage, QPainter, QPixmap, QColor
-from PyQt6.QtWidgets import QApplication
 
 from gui.icons import quit_icon, restart_icon, run_now_icon
 from shared_ui.icons import glyph_pixmap
 
-_app = QApplication.instance() or QApplication([])
 
 _SIZE = QSize(48, 48)
 

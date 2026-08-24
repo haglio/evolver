@@ -10,12 +10,11 @@ showing a run in flight, and the pipeline is asked to stop cooperatively.
 import unittest
 from unittest.mock import Mock, patch
 
-from PyQt6.QtWidgets import QApplication
 
 from gui.app import EvolverApp
 from gui.settings import EvolverSettings
+from tests.gui_support import build_evolver_app
 
-_app = QApplication.instance() or QApplication([])
 
 
 class TestWatchdog(unittest.TestCase):
@@ -24,9 +23,8 @@ class TestWatchdog(unittest.TestCase):
         """An EvolverApp whose run has overrun the watchdog: the stubbed
         worker still reports isRunning() True when the timer fires."""
         settings = EvolverSettings(**settings_overrides)
-        with patch("gui.app.QApplication", return_value=_app), \
-             patch("gui.app.EvolverSettings.load", return_value=settings):
-            app = EvolverApp()
+        with patch("gui.app.EvolverSettings.load", return_value=settings):
+            app = build_evolver_app(self)
 
         worker = Mock()
         worker.isRunning.return_value = True

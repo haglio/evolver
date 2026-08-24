@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from gui.taskbar import set_taskbar_properties
+from tests.gui_support import build_evolver_app
 
 
 class TestSetTaskbarProperties(unittest.TestCase):
@@ -16,14 +17,10 @@ class TestSetTaskbarProperties(unittest.TestCase):
 class TestAppSetsTaskbarProperties(unittest.TestCase):
 
     def test_evolver_app_sets_taskbar_pin_properties(self):
-        from PyQt6.QtWidgets import QApplication
-        from gui.app import EvolverApp, _APP_MODEL_ID
+        from gui.app import _APP_MODEL_ID
 
-        _app = QApplication.instance() or QApplication([])
-
-        with patch("gui.app.QApplication", return_value=_app), \
-             patch("gui.app.set_taskbar_properties") as mock_set:
-            app = EvolverApp()
+        with patch("gui.app.set_taskbar_properties") as mock_set:
+            build_evolver_app(self)
 
         mock_set.assert_called_once()
         args = mock_set.call_args

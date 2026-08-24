@@ -1,13 +1,11 @@
 import unittest
 from datetime import datetime
 
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QEventLoop, QTimer
 from PyQt6.QtTest import QSignalSpy
 
 from gui.scheduler import PipelineScheduler
 
-_app = QApplication.instance() or QApplication([])
 
 
 class TestPipelineScheduler(unittest.TestCase):

@@ -5,11 +5,10 @@ import os
 import unittest
 from unittest.mock import patch
 
-from PyQt6.QtWidgets import QApplication
+from tests.gui_support import QAPP
 
 from gui import single_instance
 
-_app = QApplication.instance() or QApplication([])
 
 
 class TestIsFirstInstance(unittest.TestCase):
@@ -54,7 +53,7 @@ class TestRequestShow(unittest.TestCase):
             server = single_instance.serve_show_requests(lambda: shown.append(True))
             try:
                 self.assertTrue(single_instance.request_show())
-                _app.processEvents()
+                QAPP.processEvents()
             finally:
                 server.close()
 
