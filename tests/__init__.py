@@ -15,6 +15,9 @@ content.LOCAL_CONTENT = content.EXAMPLE_CONTENT
 # it, so one unguarded call hangs an unattended suite forever instead of failing
 # it. Tests that assert on an alert patch it themselves; this defuses the ones
 # that reach it by accident. Never stopped — it is an invariant, not a fixture.
-patch(
-    "util.windows_alert.ctypes.windll.user32.MessageBoxW", create=True, return_value=1,
-).start()
+# Gagged at the one name in this repo that reaches MessageBoxW rather than at
+# ctypes.windll.user32: this line runs before any test module is read, and the
+# dotted path through ctypes.windll cannot be resolved on an interpreter that
+# has no Windows — which made this gag, not the platform, the thing that decided
+# whether the suite collected at all.
+patch("util.windows_alert._message_box_w", return_value=1).start()
