@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QApplication
 
 from backfill import vocabulary
 from backfill.window import BackfillWindow
@@ -14,7 +13,6 @@ def _every_grid_phrase():
     groups = [*vocabulary.scoped_grid(), vocabulary.control_commands()]
     return {command.phrase for group in groups for command in group}
 
-_app = QApplication.instance() or QApplication([])
 
 
 class FakeSession:
@@ -235,7 +233,13 @@ class TestBackfillWindow(unittest.TestCase):
 
     def test_closing_releases_the_clip_the_player_holds(self):
         session = FakeSession([Path("a_topaz.mp4")])
-        window = BackfillWindow(session)
+        # Through the helper, for its cleanups: closing the window inside the
+        # patch below is what this test is about, but the window itself still has
+        # to be deleted afterwards. Left to Python's collector it went at some
+        # unpredictable later moment, and the media player's queued callback
+        # arrived at a half-collected slot -- "TypeError: 'NoneType' object is
+        # not callable" out of the Qt event loop, in five teardowns out of ten.
+        window = self._window(session)
 
         with patch.object(window._player, "setSource") as set_source:
             window.close()
