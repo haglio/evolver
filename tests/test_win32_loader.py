@@ -58,6 +58,12 @@ class TestAStandInDll(unittest.TestCase):
 
         self.assertIs(ntdll.NtSuspendProcess, ntdll.NtSuspendProcess)
 
+    def test_an_unbound_callback_prototype_refuses_to_be_made(self):
+        prototype = win32_loader.win_functype(win32_loader.HRESULT, ctypes.c_void_p)
+
+        with self.assertRaises(win32_loader.Win32Unavailable):
+            prototype(0x1234)
+
 
 if __name__ == "__main__":
     unittest.main()
