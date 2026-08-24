@@ -47,10 +47,11 @@ def run_without_the_win32_ctypes_surface(body):
     )
 
 
-# The modules that bind Win32 while they are being imported, and so decide for
+# The modules that reach Win32 while they are being imported, and so decide for
 # every test module that reaches them whether it can be collected at all.
 _MUST_IMPORT_WITHOUT_WIN32 = (
     "util.processes",
+    "tests.test_processes",
 )
 
 
