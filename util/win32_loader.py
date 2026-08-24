@@ -32,16 +32,12 @@ class Win32Unavailable(RuntimeError):
 class _UnavailableEntryPoint:
     """One exported function, on a machine that has no such export.
 
-    Carries the ``argtypes``/``restype``/``errcheck`` attributes a real ctypes
-    function pointer carries, because the modules declare those at import time
-    and that declaration must survive the same way the import does.
+    Takes the ``argtypes``/``restype`` the modules declare at import the way any
+    object takes an attribute, so that declaration survives as the import does.
     """
 
     def __init__(self, name: str) -> None:
         self._name = name
-        self.argtypes: Any = None
-        self.restype: Any = None
-        self.errcheck: Any = None
 
     def __call__(self, *_args: Any, **_kwargs: Any) -> Any:
         raise Win32Unavailable(f"{self._name} needs a Windows ctypes; this process has none")
@@ -58,9 +54,6 @@ class _UnavailableDll:
     def __init__(self, name: str) -> None:
         self._name = name
 
-    def __repr__(self) -> str:
-        return f"<unavailable DLL {self._name!r}>"
-
     def __getattr__(self, entry_point: str) -> _UnavailableEntryPoint:
         if entry_point.startswith("__"):
             raise AttributeError(entry_point)
@@ -69,8 +62,17 @@ class _UnavailableDll:
         return stand_in
 
 
-def load_dll(name: str) -> Any:
-    """The handle for the *name* DLL, or a stand-in that refuses to be called."""
+def load_dll(name: str, *, use_last_error: bool = False) -> Any:
+    """The handle for the *name* DLL, or a stand-in that refuses to be called.
+
+    *use_last_error* asks ctypes to save and restore the per-thread error code
+    around each call into this handle, which is the only way ``GetLastError``
+    survives to be read from Python.  It also means a handle of this module's
+    own rather than the process-wide one ``ctypes.windll`` caches — so the
+    saving stays with the caller that asked for it.
+    """
     if not WIN32_AVAILABLE:
         return _UnavailableDll(name)
+    if use_last_error:
+        return ctypes.WinDLL(name, use_last_error=True)  # type: ignore[attr-defined]
     return getattr(ctypes.windll, name)  # type: ignore[attr-defined]
