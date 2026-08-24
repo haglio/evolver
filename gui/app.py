@@ -239,27 +239,25 @@ class EvolverApp:
             return  # Run finished just before the timer fired
 
         log.critical(
-            "Watchdog fired: pipeline exceeded %d-second wall-clock limit",
+            "Watchdog fired: pipeline exceeded %d-second wall-clock limit; "
+            "asking it to stop after the current stage",
             config.PIPELINE_WALL_TIMEOUT_SECONDS,
         )
 
-        try:
-            self._worker.pipeline_finished.disconnect(self._on_finished)
-            self._worker.pipeline_error.disconnect(self._on_error)
-        except TypeError:
-            pass
-        self._worker = None
-
-        self._scheduler.mark_idle()
-        self._tray.set_running(False)
-        if self._progress_popup is not None:
-            self._progress_popup.on_pipeline_finished()
-        self._window.refresh_history()
+        # The run really is still going, so nothing here may pretend otherwise.
+        # The worker stays referenced and its signals stay connected: it is the
+        # re-entry guard in _start_run (dropping a running QThread's last
+        # reference can abort the process), and its eventual finish is what
+        # tears down and re-opens scheduling. The stop is cooperative —
+        # run_pipeline checks between stages, so a stage mid-move finishes its
+        # current file rather than being cut.
+        self._worker.requestInterruption()
 
         if self._settings.enable_toasts:
             self._tray.showMessage(
                 "Evolver",
-                f"Pipeline killed: exceeded {config.PIPELINE_WALL_TIMEOUT_SECONDS // 60}-minute wall-clock limit",
+                f"Pipeline still running past the {config.PIPELINE_WALL_TIMEOUT_SECONDS // 60}-minute "
+                "limit; stopping after the current stage. New runs wait until it exits.",
                 self._tray.MessageIcon.Critical,
                 8000,
             )
