@@ -86,11 +86,19 @@ class TestTerminate(unittest.TestCase):
             proc.kill()
 
 
-# The base interpreter, spawned directly: a venv's python.exe is a launcher
-# that waits on a child doing the real work, and suspending the launcher would
-# leave that child running. Topaz's ffmpeg (the real target) is a plain exe, so
-# this only matters for the test.
-_BASE_PYTHON = processes.image_path(os.getpid())
+def _base_python():
+    """The base interpreter, spawned directly.
+
+    A venv's python.exe is a launcher that waits on a child doing the real work,
+    and suspending the launcher would leave that child running. Topaz's ffmpeg
+    (the real target) is a plain exe, so this only matters for the test.
+
+    Asked for when a test needs it rather than while this module is imported:
+    it is a Win32 call, and one made at import decides whether this file can be
+    collected at all.
+    """
+    return processes.image_path(os.getpid())
+
 
 _GROWING_FILE = (
     "import sys, time\n"
@@ -106,7 +114,7 @@ class TestSuspendResume(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             counter = Path(folder) / "count.bin"
             proc = subprocess.Popen(
-                [_BASE_PYTHON, "-c", _GROWING_FILE, str(counter)],
+                [_base_python(), "-c", _GROWING_FILE, str(counter)],
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
             try:
@@ -132,7 +140,7 @@ class TestSuspendResume(unittest.TestCase):
 
     def test_suspend_and_resume_return_false_for_a_dead_process(self):
         proc = subprocess.Popen(
-            [_BASE_PYTHON, "-c", "pass"], creationflags=subprocess.CREATE_NO_WINDOW
+            [_base_python(), "-c", "pass"], creationflags=subprocess.CREATE_NO_WINDOW
         )
         proc.wait()
         self.assertFalse(processes.suspend(proc.pid))
