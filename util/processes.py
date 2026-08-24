@@ -12,6 +12,8 @@ import ctypes
 import ctypes.wintypes
 from pathlib import Path
 
+from util.win32_loader import load_dll
+
 _PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 _PROCESS_QUERY_INFORMATION = 0x0400
 _PROCESS_VM_READ = 0x0010
@@ -21,8 +23,8 @@ _STILL_ACTIVE = 259
 _TH32CS_SNAPPROCESS = 0x00000002
 _INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 
-_kernel32 = ctypes.windll.kernel32
-_ntdll = ctypes.windll.ntdll
+_kernel32 = load_dll("kernel32")
+_ntdll = load_dll("ntdll")
 
 
 class _PROCESSENTRY32W(ctypes.Structure):

@@ -47,6 +47,22 @@ def run_without_the_win32_ctypes_surface(body):
     )
 
 
+# The modules that bind Win32 while they are being imported, and so decide for
+# every test module that reaches them whether it can be collected at all.
+_MUST_IMPORT_WITHOUT_WIN32 = (
+    "util.processes",
+)
+
+
+class TestTheModulesThatBindWin32(unittest.TestCase):
+    def test_they_import_where_ctypes_has_no_windll(self):
+        for module in _MUST_IMPORT_WITHOUT_WIN32:
+            with self.subTest(module=module):
+                result = run_without_the_win32_ctypes_surface(f"import {module}\n")
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+
 class TestTheTestPackageItself(unittest.TestCase):
     def test_it_imports_where_ctypes_has_no_windll(self):
         """Every test module in this repo runs ``tests/__init__.py`` first.
