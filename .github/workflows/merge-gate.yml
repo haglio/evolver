@@ -49,3 +49,15 @@ jobs:
           pip install -e ".[dev]" --config-settings editable_mode=compat
       - name: Run the suite
         run: python -m pytest -q
+      # Again, back to front. Twelve modules used to stand a QApplication up
+      # themselves, twenty-five EvolverApps were built and never taken down, and
+      # a module global was assigned with no restore -- every shape that makes a
+      # result depend on what ran first. Reversing inverts every "this runs
+      # before that" the suite has, so the next such lean goes red on the commit
+      # that introduces it. TEST_COLLECTION_ORDER=shuffle with
+      # TEST_COLLECTION_SEED is the deeper local check (see tests/conftest.py);
+      # the gate takes the deterministic one.
+      - name: Run the suite back to front
+        env:
+          TEST_COLLECTION_ORDER: reverse
+        run: python -m pytest -q
