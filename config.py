@@ -108,8 +108,8 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 # and nothing else, and a clip left in the outbox would be a library video nobody
 # ever plays.
 # From the overlay, not from source: this names a folder inside the library, and
-# the sanitize harvester reads the library's folder names into its blocklist — so
-# a name hardcoded here comes back and fails the guard on the line that made it.
+# a library folder name is exactly what the sanitize blocklist exists to keep out
+# of a public commit — so hardcoding one here writes it into the tracked tree.
 # Origenerator reads the same key from its own overlay; the two must agree, the
 # folder being the only thing that passes between them.
 GENAU_SOURCE    = _CONTENT["genau_source"]
