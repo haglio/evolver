@@ -28,7 +28,6 @@ import config
 from util import sidecar, video_type
 from util.ffprobe import duration_seconds
 from util.media_files import is_finalized_video_file, iter_finalized_videos
-from util.nonai_library import buckets
 from util.sidecar import upscaled_video_path
 
 log = logging.getLogger(__name__)
@@ -118,11 +117,16 @@ def _non_ai_videos():
     An excerpt is known by the ``clip`` record something wrote when it carved
     it — and, for the batches that arrived with no record at all, by sitting in
     a folder the overlay declares holds nothing else.
+
+    The whole tree, including the buckets the other non-AI stages exclude: those
+    exclusions are about what to group and what to re-encode, and Nau plays
+    every one of these, so every one of them is asked what it is.
     """
-    for bucket in buckets():
-        for video in sorted(iter_finalized_videos(bucket, config.VIDEO_EXTENSIONS)):
-            path = sidecar.sidecar_path(video)
-            yield video, path, False, _is_excerpt(video, sidecar.read(path))
+    if not config.NON_AI_DIR.is_dir():
+        return
+    for video in sorted(iter_finalized_videos(config.NON_AI_DIR, config.VIDEO_EXTENSIONS)):
+        path = sidecar.sidecar_path(video)
+        yield video, path, False, _is_excerpt(video, sidecar.read(path))
 
 
 def _is_excerpt(video: Path, payload: dict) -> bool:

@@ -209,3 +209,20 @@ class TestWhatItRefusesToGuess(unittest.TestCase):
 
                 self.assertEqual(video_type.type_of(sidecar.read(path)), "")
             self.assertEqual((result.recorded, result.skipped), (0, 1))
+
+
+class TestReachingEveryVideoNauPlays(unittest.TestCase):
+    def test_a_bucket_the_non_ai_stages_skip_still_gets_its_kind(self):
+        """The exclusion keeps pipeline-output videos out of the grouping and
+        the encoder, but Nau plays them, so they are asked what they are too."""
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config(NONAI_EXCLUDED_BUCKETS={"parked_ai"}):
+                video = _touch(lib.non_ai / "parked_ai" / "landscape" / "clip_f_topaz.mp4")
+
+                video_types.run(probe=_probe({video.stem: 4.0}))
+
+                self.assertEqual(
+                    video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
+                    video_type.SHORT,
+                )
