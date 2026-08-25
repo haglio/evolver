@@ -226,3 +226,37 @@ class TestReachingEveryVideoNauPlays(unittest.TestCase):
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
                     video_type.SHORT,
                 )
+
+
+class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
+    """A run measures only so many videos; the library converges over several.
+
+    The first run over a library that has never been asked is one ffprobe per
+    video, and the pipeline it runs inside has a wall clock.
+    """
+
+    def test_a_run_measures_no_more_than_the_batch_limit(self):
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config(VIDEO_TYPE_BATCH_LIMIT=2):
+                for index in range(5):
+                    _touch(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
+                measured = []
+
+                first = video_types.run(probe=lambda video: measured.append(video) or 4.0)
+                second = video_types.run(probe=lambda video: measured.append(video) or 4.0)
+                third = video_types.run(probe=lambda video: measured.append(video) or 4.0)
+
+            self.assertEqual([first.recorded, second.recorded, third.recorded], [2, 2, 1])
+            self.assertEqual(len(measured), 5)
+
+    def test_the_ones_it_did_not_reach_are_not_counted_as_known(self):
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config(VIDEO_TYPE_BATCH_LIMIT=1):
+                for index in range(3):
+                    _touch(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
+
+                result = video_types.run(probe=_probe({f"clip_{i}": 4.0 for i in range(3)}))
+
+            self.assertEqual((result.recorded, result.already, result.deferred), (1, 0, 2))

@@ -11,6 +11,12 @@ library and the ones that arrive tomorrow are answered by the same code.  A
 video whose kind is already on file is left alone — the answer does not change
 under a video, and re-deriving it would mean an ffprobe per video per run.
 
+Which also means the first run over a library that has never been asked is the
+expensive one, and it runs inside a pipeline with a wall clock.  So a run
+measures at most ``config.VIDEO_TYPE_BATCH_LIMIT`` videos and leaves the rest
+to the next one: a library arrives at a complete answer over a few runs rather
+than holding one run up until it has the whole thing.
+
 What it will not do is guess.  A video whose running time is what decides its
 kind, and which nothing could measure — a file Topaz still has open, most
 often — is skipped rather than written down as full-length because nothing
@@ -38,6 +44,7 @@ class VideoTypesResult:
     recorded: int = 0
     already: int = 0
     skipped: int = 0
+    deferred: int = 0
 
 
 def run(probe=duration_seconds) -> VideoTypesResult:
@@ -53,6 +60,9 @@ def run(probe=duration_seconds) -> VideoTypesResult:
         if video_type.type_of(payload):
             result.already += 1
             continue
+        if result.recorded >= config.VIDEO_TYPE_BATCH_LIMIT:
+            result.deferred += 1
+            continue
         seconds = None
         if not (genau or excerpt):
             # The only lane whose answer costs anything to reach, and the only
@@ -66,8 +76,8 @@ def run(probe=duration_seconds) -> VideoTypesResult:
         sidecar.write(path, video_type.stamped(payload, kind))
         result.recorded += 1
     log.info(
-        "Video kinds: recorded %d, already known %d, skipped %d.",
-        result.recorded, result.already, result.skipped,
+        "Video kinds: recorded %d, already known %d, skipped %d, deferred %d.",
+        result.recorded, result.already, result.skipped, result.deferred,
     )
     return result
 

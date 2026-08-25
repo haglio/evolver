@@ -135,6 +135,10 @@ FUNSCRIPT_EXTENSION = ".funscript"
 CLEAN_EMPTY_INBOX_DIRS = True
 
 UPSCALE_BATCH_LIMIT = 5
+# How many videos one run of the video-kinds stage will measure. Only videos
+# whose kind is not yet recorded cost anything, so this bounds the first runs
+# over a library that has never been asked and is never reached again after.
+VIDEO_TYPE_BATCH_LIMIT = 400
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
 PIPELINE_WALL_TIMEOUT_SECONDS = UPSCALE_RUN_BUDGET_SECONDS + 3 * 60  # 11 min
