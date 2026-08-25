@@ -14,6 +14,8 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 10. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
 11. Delivers the Genau lane — Origenerator's looping single-stroke clips, which arrive under their own `0_inbox` source folder (`config.GENAU_SOURCE`, named by the content overlay) — out of the outbox into `videos/genau/clips/`, the one folder Genau plays from, retiring the `1_sorted` copy along with it. Those clips come through the pipeline only to be upscaled: a loop straight out of the graph is visibly softer than the clips already in that folder, which came from upscaled library video. Both halves have to leave together — the upscale stage decides what still needs doing by looking for the output beside its source, and step 10 requires each sorted video to have a `_topaz` counterpart.
 
+12. Records what kind every video in the library is — `genau_clip`, `excerpt`, `short` or `full_length` — on its metadata sidecar, as `video.type`. One field, written here and read by Fun Time, Nau and Warm Gun in place of the several tests each of them used to run (a running time against a threshold each picked separately, the folder the Genau loops are delivered to, the presence of a `clip` record, and "everything else"). The stage walks the whole library every run and records only what has no kind yet, so it backfills a library that has never been asked and keeps up with the ones arriving, out of the same code; it measures at most `VIDEO_TYPE_BATCH_LIMIT` videos per run, so the first passes over a big library spread over a few runs instead of holding one up. A video whose running time decides its kind and which ffprobe cannot read is left for the next run rather than guessed at. Excerpts — scenes carved out of longer videos — are known by the `clip` record on their sidecar, and for the batches split before anything wrote one, by the folders `excerpt_folders` names in the content overlay.
+
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
 ## Current architecture
@@ -40,6 +42,8 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `util/ffprobe.py` - orientation probing
   - `util/media_files.py` - shared helpers for finalized-vs-partial video detection and stale partial cleanup
   - `util/sidecar.py` - where a video's metadata JSON lives, and what the upscale stage names its output
+  - `util/video_type.py` - the four kinds a video can be, and which one a video is
+  - `tasks/video_types.py` - recording that kind on every library video's sidecar
   - `util/topaz.py` - the Topaz ffmpeg invocation both upscale stages share
   - `util/variants.py` - the `_apo8`/`_iris2`-style suffixes that pair originals with processed variants
   - `util/processes.py` - liveness, identity, and termination of detached encodes
