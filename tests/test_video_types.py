@@ -353,3 +353,57 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 again = video_types.run(probe=_refuses_to_be_called)
 
             self.assertEqual((again.recorded, again.already), (0, 1))
+
+
+class TestFindingTheExcerptFoldersItself(unittest.TestCase):
+    """Where the librarian filed a batch's cuts into a folder of their own,
+    that folder is visible in the library and needs no declaring.
+
+    The overlay's `excerpt_folders` stays the way to say so outright, for the
+    batches whose folder was never separated.
+    """
+
+    def _batch(self, lib, folder, name, carved=False):
+        video = _touch(lib.non_ai / "alpha" / folder / "0 unsorted" / name)
+        if carved:
+            with lib.config():
+                sidecar.write(sidecar.sidecar_path(video), {"clip": {"index": 1}})
+        return video
+
+    def test_a_folder_holding_the_batchs_carved_scenes_takes_the_rest_with_it(self):
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config():
+                carved = [self._batch(lib, "cuts", f"carved-{i}.mp4", carved=True) for i in range(2)]
+                unrecorded = self._batch(lib, "cuts", "carved-3.mp4")
+                wholes = [self._batch(lib, "wholes", f"whole-{i}.mp4") for i in range(3)]
+
+                video_types.run(probe=_probe({v.stem: 900.0 for v in [*carved, unrecorded, *wholes]}))
+
+                kinds = {
+                    v.name: video_type.type_of(sidecar.read(sidecar.sidecar_path(v)))
+                    for v in [*carved, unrecorded, *wholes]
+                }
+            self.assertEqual(kinds["carved-3.mp4"], video_type.EXCERPT)
+            self.assertEqual(kinds["whole-0.mp4"], video_type.FULL_LENGTH)
+
+    def test_a_batch_that_never_separated_its_cuts_keeps_every_whole_video(self):
+        """The pipeline's own stage folders can never stand in for a division
+        of the library, so a batch with one carved scene among its scenes says
+        nothing about the rest."""
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config():
+                carved = self._batch(lib, "batch", "carved-1.mp4", carved=True)
+                wholes = [self._batch(lib, "batch", f"whole-{i}.mp4") for i in range(3)]
+
+                video_types.run(probe=_probe({v.stem: 900.0 for v in [carved, *wholes]}))
+
+                kinds = {
+                    v.name: video_type.type_of(sidecar.read(sidecar.sidecar_path(v)))
+                    for v in [carved, *wholes]
+                }
+            self.assertEqual(kinds["carved-1.mp4"], video_type.EXCERPT)
+            self.assertEqual(
+                [kinds[f"whole-{i}.mp4"] for i in range(3)], [video_type.FULL_LENGTH] * 3
+            )
