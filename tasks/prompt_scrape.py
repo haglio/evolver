@@ -23,6 +23,7 @@ PROVIDER_SOURCE = _PROVIDER["source"]
 PROVIDER_BASE_URL = _PROVIDER["base_url"]
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
+from util import sidecar, video_type
 from util.media_files import iter_finalized_videos
 from util.sidecar import sidecar_path, upscaled_video_path, write
 
@@ -69,7 +70,7 @@ def run() -> PromptScrapeResult:
                 continue
 
             output_path = sidecar_path(upscaled_video_path(source, orient, video.stem))
-            if output_path.exists():
+            if _already_scraped(output_path):
                 result.already_scraped += 1
                 continue
             if _failure_marker_path(output_path).exists():
@@ -84,7 +85,11 @@ def run() -> PromptScrapeResult:
                 log.exception("Metadata build failed for: %s", video)
                 continue
 
-            write(output_path, payload)
+            # A kind recorded before the scrape landed stays on: the sidecar is
+            # replaced wholesale here, and dropping it would cost another
+            # ffprobe to learn the same thing again.
+            recorded = video_type.type_of(sidecar.read(output_path))
+            write(output_path, video_type.stamped(payload, recorded) if recorded else payload)
             result.newly_scraped += 1
             log.info("Wrote metadata: %s", output_path)
 
@@ -97,6 +102,25 @@ def run() -> PromptScrapeResult:
         result.errors,
     )
     return result
+
+
+def _already_scraped(output_path: Path) -> bool:
+    """Whether the sidecar at *output_path* already holds what this stage writes.
+
+    The test used to be the file's existence, and that stopped being the same
+    question when ``tasks.video_types`` began recording a kind on every library
+    video — including the ones nothing has scraped yet.  A sidecar holding
+    nothing but that kind is not a scrape, and reading it as one would lose the
+    prompts for good: a video this stage has skipped once is never looked at
+    again.
+    """
+    if not output_path.exists():
+        return False
+    payload = sidecar.read(output_path)
+    if set(payload) != {video_type.BLOCK}:
+        return True
+    block = payload[video_type.BLOCK]
+    return not (isinstance(block, dict) and set(block) == {video_type.FIELD})
 
 
 def _failure_marker_path(output_path: Path) -> Path:
