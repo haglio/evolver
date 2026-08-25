@@ -53,6 +53,22 @@ BLOCK = "video"
 FIELD = "type"
 
 
+def free_kind(*, genau: bool, excerpt: bool) -> str:
+    """The kind the signals that cost nothing already settle, or ``""``.
+
+    Where a video *sits* and what its sidecar already says are both free to
+    read, and both outrank a running time — so the two kinds they name can be
+    re-derived on every run, and an answer recorded before something was known
+    (a folder of excerpts the overlay had not been told about yet, a ``clip``
+    record written after the split) corrects itself rather than standing.
+    """
+    if genau:
+        return GENAU_CLIP
+    if excerpt:
+        return EXCERPT
+    return ""
+
+
 def classify(*, genau: bool, excerpt: bool, duration_seconds: float | None) -> str:
     """Which kind a video is, from the three signals that can identify one.
 
@@ -60,10 +76,9 @@ def classify(*, genau: bool, excerpt: bool, duration_seconds: float | None) -> s
     something carved it out of a longer video, and *duration_seconds* its
     running time — ``None`` when it could not be measured.
     """
-    if genau:
-        return GENAU_CLIP
-    if excerpt:
-        return EXCERPT
+    free = free_kind(genau=genau, excerpt=excerpt)
+    if free:
+        return free
     if duration_seconds is not None and duration_seconds <= SHORT_MAX_SECONDS:
         return SHORT
     return FULL_LENGTH
