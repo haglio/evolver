@@ -109,16 +109,19 @@ def _move_sidecar(upscaled: Path, destination: Path) -> None:
     written down somewhere for the apps that ask.  A clip delivered with no
     record at all still gets one, holding that one answer.
 
-    ``sidecar_path`` raises for a video under neither library root; a clip that
-    somehow sits outside them simply has nowhere to keep a record, which is not
-    a reason to abandon the delivery.
+    Neither half is a reason to abandon a delivery that has already happened:
+    ``sidecar_path`` raises for a video under neither library root, and a clip
+    that somehow sits outside them simply has nowhere to keep a record, while a
+    metadata tree that cannot be written costs the generation record but not the
+    kind — ``tasks.video_types`` finds the delivered clip with none and writes
+    one on its next run.
     """
     try:
         was, now = sidecar.sidecar_path(upscaled), sidecar.sidecar_path(destination)
-    except ValueError:
-        return
-    sidecar.write(now, video_type.stamped(sidecar.read(was), video_type.GENAU_CLIP))
-    was.unlink(missing_ok=True)
+        sidecar.write(now, video_type.stamped(sidecar.read(was), video_type.GENAU_CLIP))
+        was.unlink(missing_ok=True)
+    except (ValueError, OSError):
+        log.warning("Could not re-file the metadata for %s", upscaled.name, exc_info=True)
 
 
 def _retire_source(upscaled: Path) -> None:

@@ -260,3 +260,19 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
                 result = video_types.run(probe=_probe({f"clip_{i}": 4.0 for i in range(3)}))
 
             self.assertEqual((result.recorded, result.already, result.deferred), (1, 0, 2))
+
+    def test_the_free_answers_are_not_held_back_by_it(self):
+        """Only measuring costs anything, so only measuring is counted."""
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config(VIDEO_TYPE_BATCH_LIMIT=0):
+                clip = _touch(lib.genau_clips / "loop_3_topaz.mp4")
+                _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_g.mp4")
+
+                result = video_types.run(probe=_refuses_to_be_called)
+
+                self.assertEqual(
+                    video_type.type_of(sidecar.read(sidecar.sidecar_path(clip))),
+                    video_type.GENAU_CLIP,
+                )
+            self.assertEqual((result.recorded, result.deferred), (1, 1))

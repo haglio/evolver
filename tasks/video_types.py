@@ -55,18 +55,21 @@ def run(probe=duration_seconds) -> VideoTypesResult:
     """
     log.info("=== Stage: record video kinds ===")
     result = VideoTypesResult()
+    measured = 0
     for video, path, genau, excerpt in _library_videos():
         payload = sidecar.read(path)
         if video_type.type_of(payload):
             result.already += 1
             continue
-        if result.recorded >= config.VIDEO_TYPE_BATCH_LIMIT:
-            result.deferred += 1
-            continue
         seconds = None
         if not (genau or excerpt):
-            # The only lane whose answer costs anything to reach, and the only
-            # one that can fail to reach it.
+            # The one lane whose answer costs anything to reach, so the only
+            # one the batch limit is counting — and the only one that can fail
+            # to reach an answer at all.
+            if measured >= config.VIDEO_TYPE_BATCH_LIMIT:
+                result.deferred += 1
+                continue
+            measured += 1
             seconds = probe(video)
             if seconds is None:
                 log.info("Could not measure %s; leaving it for the next run", video)
