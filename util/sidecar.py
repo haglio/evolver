@@ -30,8 +30,23 @@ def sidecar_path(video: Path) -> Path:
     (``2D/AI/2_outbox/x.mp4`` -> ``2D/AI/2_outbox/x.json``, ``2D/non_AI/larkin/
     y.mp4`` -> ``2D/non_AI/larkin/y.json``), so AI generation metadata and
     non-AI version families share one tree that parallels the video tree.
+
+    A video that is *beside* that tree rather than inside it — Genau's delivered
+    clips, which live at ``videos/genau/clips`` while the library is
+    ``videos/videos`` — mirrors from the folder holding both, landing at
+    ``metadata/genau/clips/y.json``.  Their kind (:mod:`util.video_type`) has to
+    be recorded somewhere, and a delivered clip keeps the generation metadata it
+    was made with rather than losing it at the door.
+
+    Raises ``ValueError`` for a video under neither.
     """
-    return (config.METADATA_DIR / video.relative_to(config.VIDEO_LIBRARY_DIR)).with_suffix(".json")
+    for root in (config.VIDEO_LIBRARY_DIR, config.VIDEO_SEARCH_ROOT):
+        try:
+            relative = video.relative_to(root)
+        except ValueError:
+            continue
+        return (config.METADATA_DIR / relative).with_suffix(".json")
+    raise ValueError(f"{video} is not in the video library")
 
 
 def read(path: Path) -> dict:

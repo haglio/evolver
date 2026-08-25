@@ -4,6 +4,7 @@ import unittest
 
 from tasks import genau_deliver
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util import sidecar, video_type
 
 # Fabricated: the real folder name is library vocabulary and lives in the
 # overlay, so a test names its own and overrides the config with it.
@@ -48,6 +49,43 @@ class TestGenauDeliver(unittest.TestCase):
             # this clip every run and the correspondence check would call it a
             # mismatch (see the module docstring).
             self.assertFalse(original.exists())
+
+    def test_the_clips_metadata_travels_with_it_and_says_what_it_is(self):
+        """A delivered loop keeps the generation record it was made with, and
+        carries the one thing every app asks a video: what kind it is."""
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, clips = _lane(root)
+            upscaled, _original = _stage_clip(outbox, sorted_dir)
+            metadata = root / "metadata"
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
+                                 METADATA_DIR=metadata):
+                sidecar.write(sidecar.sidecar_path(upscaled),
+                              {"video": {"prompt": "a prompt", "seed": "1"}})
+
+                genau_deliver.run()
+
+                delivered = sidecar.read(sidecar.sidecar_path(clips / "loop_1_topaz.mp4"))
+            self.assertEqual(delivered["video"]["prompt"], "a prompt")
+            self.assertEqual(video_type.type_of(delivered), video_type.GENAU_CLIP)
+            # The outbox path it mirrored is gone, so the record must not stay there.
+            self.assertFalse(
+                (metadata / "landscape" / GENAU_SOURCE / "loop_1_topaz.json").exists()
+            )
+
+    def test_a_clip_delivered_without_any_metadata_still_gets_a_record(self):
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, clips = _lane(root)
+            _stage_clip(outbox, sorted_dir)
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
+                                 METADATA_DIR=root / "metadata"):
+                genau_deliver.run()
+
+                delivered = sidecar.read(sidecar.sidecar_path(clips / "loop_1_topaz.mp4"))
+            self.assertEqual(video_type.type_of(delivered), video_type.GENAU_CLIP)
 
     def test_only_the_genau_source_is_delivered(self):
         with workspace_temp_dir() as root:

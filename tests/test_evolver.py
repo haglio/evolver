@@ -25,6 +25,7 @@ def _stage_mocks() -> dict:
         "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
         "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
         "nonai_group_run": Mock(),
+        "video_types_run": Mock(),
         "clip_scripts_run": Mock(),
         "scene_scripts_run": Mock(),
         "reference_sync_run": Mock(return_value=Mock(ok=True)),
@@ -38,6 +39,7 @@ def _stage_mocks() -> dict:
 
 _STAGE_PATCHES = [
     ("evolver.sort.run", "sort_run"),
+    ("evolver.video_types.run", "video_types_run"),
     ("evolver.purge_weird.run", "purge_run"),
     ("evolver.clip_scripts.run", "clip_scripts_run"),
     ("evolver.scene_scripts.run", "scene_scripts_run"),
@@ -258,7 +260,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "dupes"])
+        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "video_types", "dupes"])
 
     def test_references_run_before_bookmarks_prunes_the_favorites(self):
         """Both stages touch favs.csv, and bookmarks drops rows whose file is gone.
@@ -286,7 +288,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_start=on_start)
         started_names = [call.args[0] for call in on_start.call_args_list]
-        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "dupes"])
+        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "video_types", "dupes"])
 
     def test_on_stage_complete_called_with_result_and_status(self):
         on_complete = Mock()
@@ -494,7 +496,7 @@ class TestCooperativeStop(unittest.TestCase):
         with _patched_stages(mocks):
             result = evolver.run_pipeline(should_stop=lambda: False)
 
-        self.assertEqual(len(result.stages), 14)
+        self.assertEqual(len(result.stages), 15)
 
 
 class TestCheckDependenciesWindowSuppression(unittest.TestCase):

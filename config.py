@@ -115,6 +115,17 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 GENAU_SOURCE    = _CONTENT["genau_source"]
 GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
 
+# Non-AI folders holding scenes carved out of longer videos and nothing else,
+# as paths relative to the video library ("2D/non_AI/<bucket>/<folder>").
+# ``tasks.video_types`` reads them as excerpts whether or not each one carries
+# the ``clip`` record that normally says so: the batches that were split before
+# anything wrote that record are excerpts all the same, and the folder they were
+# filed into is the only thing left that knows it. From the overlay, not from
+# source, for the same reason ``GENAU_SOURCE`` is — these are folder names, and
+# folder names are library vocabulary. Optional; absent means the ``clip``
+# record is the only test.
+EXCERPT_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
+
 FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")
 TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
 

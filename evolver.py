@@ -15,7 +15,8 @@ Invoked by the tray app scheduler or directly via CLI. Stages:
  11. scene_scripts   - place a carved clip's funscript back into its unscripted scene's
  12. scripts         - align funscripts to mirror the video library tree
  13. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
- 14. dupes           - scan non_AI for likely duplicate videos by exact filesize
+ 14. video_types     - record what kind each library video is on its sidecar
+ 15. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -41,6 +42,7 @@ from tasks import (
     scripts_sync,
     sort,
     upscale,
+    video_types,
 )
 from util import processes, system_resources
 
@@ -268,6 +270,10 @@ def run_pipeline(
         _run_stage("scene_scripts", scene_scripts.run)
         _run_stage("scripts", scripts_sync.run, show_popup=True)
         _run_stage("group_non_ai", nonai_group.run)
+        # After the grouping, which is what creates a new non-AI video's sidecar:
+        # the kind then joins a record that is already there rather than making a
+        # second one for the same video in the same run.
+        _run_stage("video_types", video_types.run)
         _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
     except _StopRequested:
         log.warning(

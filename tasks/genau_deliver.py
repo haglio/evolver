@@ -29,8 +29,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util import sidecar, video_type
 from util.media_files import iter_finalized_videos, remove_empty_dirs
-from util.sidecar import sidecar_path
 
 log = logging.getLogger(__name__)
 
@@ -100,30 +100,36 @@ def _deliver(upscaled: Path) -> Path:
     return destination
 
 
-def _retire_sidecar(upscaled: Path) -> None:
-    """Drop the metadata JSON mirroring the outbox path the clip has just left.
+def _move_sidecar(upscaled: Path, destination: Path) -> None:
+    """Re-file the clip's metadata under where it now lives, saying what it is.
 
-    ``sidecar_path`` can only answer for a video inside the library tree, and
-    raises for anything else; a clip that somehow sits outside it simply has no
-    sidecar to retire, which is not a reason to abandon the delivery.
+    The record travels with the clip rather than dying at the door: what a loop
+    was generated from is worth as much in Genau's folder as it was in the
+    outbox, and the kind Genau's clips *are* (:mod:`util.video_type`) has to be
+    written down somewhere for the apps that ask.  A clip delivered with no
+    record at all still gets one, holding that one answer.
+
+    ``sidecar_path`` raises for a video under neither library root; a clip that
+    somehow sits outside them simply has nowhere to keep a record, which is not
+    a reason to abandon the delivery.
     """
     try:
-        sidecar_path(upscaled).unlink(missing_ok=True)
+        was, now = sidecar.sidecar_path(upscaled), sidecar.sidecar_path(destination)
     except ValueError:
-        pass
+        return
+    sidecar.write(now, video_type.stamped(sidecar.read(was), video_type.GENAU_CLIP))
+    was.unlink(missing_ok=True)
 
 
 def _retire_source(upscaled: Path) -> None:
-    """Remove the ``1_sorted`` copy the delivered clip was made from, and its sidecar.
+    """Remove the ``1_sorted`` copy the delivered clip was made from.
 
-    See the module docstring for why this is not optional. The sidecar mirrors the
-    outbox path the clip no longer occupies, so it would otherwise describe nothing.
+    See the module docstring for why this is not optional.
     """
     original = _sorted_original(upscaled)
     if original is not None:
         original.unlink(missing_ok=True)
         remove_empty_dirs(config.SORTED_DIR / config.GENAU_SOURCE)
-    _retire_sidecar(upscaled)
 
 
 def run() -> GenauDeliverResult:
@@ -134,6 +140,7 @@ def run() -> GenauDeliverResult:
     for upscaled in _upscaled_genau_clips():
         try:
             destination = _deliver(upscaled)
+            _move_sidecar(upscaled, destination)
             _retire_source(upscaled)
         except OSError:
             # A clip Genau is playing right now is locked on Windows. Leaving it
