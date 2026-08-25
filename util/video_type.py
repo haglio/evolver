@@ -82,6 +82,21 @@ def type_of(payload: dict) -> str:
     return recorded if recorded in TYPES else ""
 
 
+def only_the_kind(payload: dict) -> bool:
+    """Whether *payload* holds a kind and nothing else.
+
+    A sidecar :mod:`tasks.video_types` created for a video nothing else has
+    recorded anything about.  It exists, and that is all it says — so the two
+    stages that used to read a sidecar's mere existence as evidence of
+    something else ("this clip has been scraped", "this clip is
+    text-to-video") ask this first.
+    """
+    if set(payload) != {BLOCK}:
+        return False
+    block = payload[BLOCK]
+    return isinstance(block, dict) and set(block) == {FIELD}
+
+
 def stamped(payload: dict, video_type: str) -> dict:
     """*payload* with *video_type* recorded on it — a copy, leaving the original.
 

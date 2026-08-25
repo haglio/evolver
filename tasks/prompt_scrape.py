@@ -114,13 +114,7 @@ def _already_scraped(output_path: Path) -> bool:
     prompts for good: a video this stage has skipped once is never looked at
     again.
     """
-    if not output_path.exists():
-        return False
-    payload = sidecar.read(output_path)
-    if set(payload) != {video_type.BLOCK}:
-        return True
-    block = payload[video_type.BLOCK]
-    return not (isinstance(block, dict) and set(block) == {video_type.FIELD})
+    return output_path.exists() and not video_type.only_the_kind(sidecar.read(output_path))
 
 
 def _failure_marker_path(output_path: Path) -> Path:

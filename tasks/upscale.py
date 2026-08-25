@@ -1,6 +1,5 @@
 """Stage 4: Upscale videos from 1_sorted/<source>/<orientation>/ using Topaz."""
 
-import json
 import logging
 import subprocess
 import time
@@ -10,8 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import system_resources, topaz
-from util.media_files import is_finalized_video_file, iter_finalized_videos, remove_partial_video_files
+from util import sidecar, system_resources, topaz, video_type
+from util.media_files import (
+    is_finalized_video_file,
+    iter_finalized_videos,
+    remove_partial_video_files,
+)
 from util.sidecar import sidecar_path, upscaled_video_path
 from util.windows_alert import show_error_window
 
@@ -194,16 +197,20 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoa
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:
+    """Whether this clip was generated from text rather than from an image.
+
+    Read off the absence of a ``source_image`` block, which only says that
+    about a sidecar that records a generation at all: one holding nothing but
+    the video's kind (:func:`util.video_type.only_the_kind`) has no
+    ``source_image`` because it has nothing, and reading it as text-to-video
+    would put the wrong filter chain on the clip.
+    """
     if source != "provider":
         return False
-    meta_path = sidecar_path(upscaled_video_path(source, orient, stem))
-    if not meta_path.is_file():
+    payload = sidecar.read(sidecar_path(upscaled_video_path(source, orient, stem)))
+    if not payload or video_type.only_the_kind(payload):
         return False
-    try:
-        payload = json.loads(meta_path.read_text(encoding="utf-8"))
-        return "source_image" not in payload
-    except Exception:
-        return False
+    return "source_image" not in payload
 
 
 def _already_processed(source: str, fname: str) -> bool:
