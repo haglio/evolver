@@ -85,7 +85,6 @@ class StackedAreaChart(QWidget):
         In normal mode the values are raw durations.  In averages mode
         each value is the running cumulative mean up to that run.
         """
-        n = len(self._records)
         series: list[list[float]] = []
         for stage_key in ALL_STAGES:
             raw = []
