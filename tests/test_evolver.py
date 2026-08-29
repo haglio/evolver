@@ -1,8 +1,9 @@
 import itertools
 import subprocess
-import unittest
 from contextlib import ExitStack
 from unittest.mock import Mock, patch
+
+import pytest
 
 import config
 import evolver
@@ -18,7 +19,6 @@ def _stage_mocks() -> dict:
     """
     return {
         "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
-        "stray_files_run": Mock(return_value=Mock(ok=True)),
         "purge_run": Mock(return_value=Mock(missing_sorted=[])),
         "scripts_sync_run": Mock(return_value=Mock(ok=True)),
         "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
@@ -40,7 +40,6 @@ def _stage_mocks() -> dict:
 
 _STAGE_PATCHES = [
     ("evolver.sort.run", "sort_run"),
-    ("evolver.stray_files.run", "stray_files_run"),
     ("evolver.purge_weird.run", "purge_run"),
     ("evolver.clip_scripts.run", "clip_scripts_run"),
     ("evolver.scene_scripts.run", "scene_scripts_run"),
@@ -60,16 +59,6 @@ _STAGE_PATCHES = [
 ]
 
 
-# The stages run_pipeline emits, in order. One list rather than a copy per
-# assertion: three of them said the same thing, so adding a stage meant finding
-# every place that had spelled the order out.
-_EXPECTED_STAGES = [
-    "strays", "purge", "metadata", "sort", "upscale", "genau_deliver",
-    "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts",
-    "scene_scripts", "scripts", "group_non_ai", "dupes",
-]
-
-
 def _patched_stages(mocks: dict) -> ExitStack:
     stack = ExitStack()
     for target, key in _STAGE_PATCHES:
@@ -77,7 +66,7 @@ def _patched_stages(mocks: dict) -> ExitStack:
     return stack
 
 
-class TestEvolverMain(unittest.TestCase):
+class TestEvolverMain:
     """Tests for the evolver.main() pipeline orchestration."""
 
     def _run_pipeline(self, **overrides):
@@ -96,10 +85,10 @@ class TestEvolverMain(unittest.TestCase):
         with _patched_stages(mocks) as stack:
             stack.enter_context(patch("evolver.setup_logging", mocks["setup_logging"]))
             stack.enter_context(patch("evolver.check_dependencies", mocks["check_dependencies"]))
-            with self.assertRaises(SystemExit) as exc:
+            with pytest.raises(SystemExit) as exc:
                 evolver.main()
 
-        mocks["exit_code"] = exc.exception.code
+        mocks["exit_code"] = exc.value.code
         return mocks
 
     # --- Dependency check ---
@@ -108,20 +97,20 @@ class TestEvolverMain(unittest.TestCase):
         mocks = self._run_pipeline(
             check_dependencies=Mock(side_effect=RuntimeError("ffprobe not found")),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
         mocks["sort_run"].assert_not_called()
 
     def test_exits_nonzero_on_purge_missing_sorted(self):
         mocks = self._run_pipeline(
             purge_run=Mock(return_value=Mock(missing_sorted=["file.mp4"])),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
 
     # --- Stage sequencing ---
 
     def test_skips_upscale_when_no_pending_work(self):
         mocks = self._run_pipeline()
-        self.assertEqual(mocks["exit_code"], 0)
+        assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_not_called()
         mocks["correspondence_run"].assert_called_once_with(show_popup=True)
 
@@ -131,7 +120,7 @@ class TestEvolverMain(unittest.TestCase):
             has_pending_work=Mock(return_value=True),
             upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=1)),
         )
-        self.assertEqual(mocks["exit_code"], 0)
+        assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_called_once()
         mocks["correspondence_run"].assert_not_called()
 
@@ -141,7 +130,7 @@ class TestEvolverMain(unittest.TestCase):
             has_pending_work=Mock(return_value=True),
             should_skip_cpu=Mock(return_value=True),
         )
-        self.assertEqual(mocks["exit_code"], 0)
+        assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_not_called()
         mocks["correspondence_run"].assert_not_called()
 
@@ -150,7 +139,7 @@ class TestEvolverMain(unittest.TestCase):
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
             has_pending_work=Mock(return_value=True),
         )
-        self.assertEqual(mocks["exit_code"], 0)
+        assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_called_once_with(
             priority_files=["new-file"], max_items=config.UPSCALE_BATCH_LIMIT,
         )
@@ -165,7 +154,7 @@ class TestEvolverMain(unittest.TestCase):
             has_pending_work=Mock(return_value=True),
             count_running=Mock(return_value=1),
         )
-        self.assertEqual(mocks["exit_code"], 0)
+        assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_not_called()
         mocks["correspondence_run"].assert_not_called()
 
@@ -178,7 +167,7 @@ class TestEvolverMain(unittest.TestCase):
         mocks = self._run_pipeline(
             nonai_run=Mock(return_value=Mock(failed=1, deferred_low_disk=False)),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
 
     # --- Exit code propagation ---
 
@@ -188,25 +177,25 @@ class TestEvolverMain(unittest.TestCase):
             has_pending_work=Mock(return_value=True),
             correspondence_run=Mock(return_value=Mock(ok=False)),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
 
     def test_exits_nonzero_on_duplicate_size_failure(self):
         mocks = self._run_pipeline(
             duplicate_sizes_run=Mock(return_value=Mock(ok=False)),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
 
     def test_exits_nonzero_on_scripts_sync_failure(self):
         mocks = self._run_pipeline(
             scripts_sync_run=Mock(return_value=Mock(ok=False)),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
 
     def test_exits_nonzero_on_bookmarks_sync_failure(self):
         mocks = self._run_pipeline(
             bookmarks_sync_run=Mock(return_value=Mock(ok=False)),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
 
     def test_exits_nonzero_on_upscale_failure(self):
         mocks = self._run_pipeline(
@@ -214,7 +203,7 @@ class TestEvolverMain(unittest.TestCase):
             has_pending_work=Mock(return_value=True),
             upscale_run=Mock(return_value=Mock(failed=2, deferred_low_disk=False, pending_after_run=0)),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
 
     def test_exits_zero_when_upscale_only_held_back_for_low_disk(self):
         """A hold is not a failure: nothing broke, there is just no room yet."""
@@ -223,13 +212,13 @@ class TestEvolverMain(unittest.TestCase):
             has_pending_work=Mock(return_value=True),
             upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=True, pending_after_run=3)),
         )
-        self.assertEqual(mocks["exit_code"], 0)
+        assert mocks["exit_code"] == 0
 
     def test_exits_nonzero_on_prompt_scrape_failure(self):
         mocks = self._run_pipeline(
             prompt_scrape_run=Mock(return_value=Mock(ok=False)),
         )
-        self.assertEqual(mocks["exit_code"], 1)
+        assert mocks["exit_code"] == 1
 
     # --- All stages called on clean run ---
 
@@ -238,7 +227,7 @@ class TestEvolverMain(unittest.TestCase):
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
         )
-        self.assertEqual(mocks["exit_code"], 0)
+        assert mocks["exit_code"] == 0
         mocks["sort_run"].assert_called_once()
         mocks["purge_run"].assert_called_once()
         mocks["clip_scripts_run"].assert_called_once()
@@ -250,7 +239,7 @@ class TestEvolverMain(unittest.TestCase):
         mocks["correspondence_run"].assert_called_once_with(show_popup=True)
 
 
-class TestRunPipeline(unittest.TestCase):
+class TestRunPipeline:
     """Tests for evolver.run_pipeline() and its callback protocol."""
 
     def _patch_all_stages(self, **overrides):
@@ -274,45 +263,29 @@ class TestRunPipeline(unittest.TestCase):
         )
         with stack:
             result = evolver.run_pipeline()
-        self.assertEqual(len(result.stages), 14)
+        assert len(result.stages) == 14
         for stage in result.stages:
-            with self.subTest(stage=stage.name):
-                self.assertNotEqual(stage.status, "skipped",
-                                    "every stage must actually run in this test")
-                self.assertIsInstance(
-                    stage.result, Mock,
-                    f"stage {stage.name!r} ran its real function -- add it to "
-                    "_stage_mocks and _STAGE_PATCHES",
-                )
+            assert stage.status != "skipped", \
+                f"stage {stage.name!r} must actually run in this test"
+            assert isinstance(stage.result, Mock), (
+                f"stage {stage.name!r} ran its real function -- add it to "
+                "_stage_mocks and _STAGE_PATCHES"
+            )
 
     def test_returns_pipeline_result(self):
         stack, _ = self._patch_all_stages()
         with stack:
             result = evolver.run_pipeline()
-        self.assertIsInstance(result, evolver.PipelineResult)
-        self.assertFalse(result.has_errors)
-        self.assertGreater(len(result.stages), 0)
+        assert isinstance(result, evolver.PipelineResult)
+        assert not result.has_errors
+        assert len(result.stages) > 0
 
     def test_stage_records_have_correct_names(self):
         stack, _ = self._patch_all_stages()
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        self.assertEqual(names, _EXPECTED_STAGES)
-
-    def test_a_reported_stray_warns_without_failing_the_run(self):
-        """Reporting a file it cannot name is the stage working, not breaking —
-        and a foreign file can sit in the library for months while its owner
-        decides, so an error every ten minutes would be an alarm about nothing."""
-        stack, _ = self._patch_all_stages(
-            stray_files_run=Mock(return_value=Mock(ok=False)),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-
-        stage = next(s for s in result.stages if s.name == "strays")
-        self.assertEqual(stage.status, "warning")
-        self.assertFalse(result.has_errors)
+        assert names == ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "dupes"]
 
     def test_references_run_before_bookmarks_prunes_the_favorites(self):
         """Both stages touch favs.csv, and bookmarks drops rows whose file is gone.
@@ -324,15 +297,15 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        self.assertLess(names.index("references"), names.index("bookmarks"))
+        assert names.index("references") < names.index("bookmarks")
 
     def test_skipped_stages_have_skip_status(self):
         stack, _ = self._patch_all_stages()
         with stack:
             result = evolver.run_pipeline()
         upscale_stage = next(s for s in result.stages if s.name == "upscale")
-        self.assertEqual(upscale_stage.status, "skipped")
-        self.assertEqual(upscale_stage.skip_reason, "no_pending_work")
+        assert upscale_stage.status == "skipped"
+        assert upscale_stage.skip_reason == "no_pending_work"
 
     def test_on_stage_start_called_for_each_stage(self):
         on_start = Mock()
@@ -340,18 +313,19 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_start=on_start)
         started_names = [call.args[0] for call in on_start.call_args_list]
-        self.assertEqual(started_names, _EXPECTED_STAGES)
+        assert started_names == ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "dupes"]
 
     def test_on_stage_complete_called_with_result_and_status(self):
         on_complete = Mock()
         stack, mocks = self._patch_all_stages()
         with stack:
             evolver.run_pipeline(on_stage_complete=on_complete)
-        purge_call = on_complete.call_args_list[_EXPECTED_STAGES.index("purge")]
-        self.assertEqual(purge_call.args[0], "purge")
-        self.assertEqual(purge_call.args[1], mocks["purge_run"].return_value)
-        self.assertIsInstance(purge_call.args[2], float)  # elapsed
-        self.assertEqual(purge_call.args[3], "completed")
+        # Check purge stage callback (first stage)
+        purge_call = on_complete.call_args_list[0]
+        assert purge_call.args[0] == "purge"
+        assert purge_call.args[1] == mocks["purge_run"].return_value
+        assert isinstance(purge_call.args[2], float)  # elapsed
+        assert purge_call.args[3] == "completed"
 
     def test_on_stage_complete_reports_skipped_for_upscale(self):
         on_complete = Mock()
@@ -359,8 +333,8 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_complete=on_complete)
         upscale_call = next(c for c in on_complete.call_args_list if c.args[0] == "upscale")
-        self.assertIsNone(upscale_call.args[1])  # no result
-        self.assertEqual(upscale_call.args[3], "skipped")
+        assert upscale_call.args[1] is None  # no result
+        assert upscale_call.args[3] == "skipped"
 
     def test_enabled_nonai_upscale_starts_when_ai_work_is_drained(self):
         stack, mocks = self._patch_all_stages()
@@ -402,7 +376,7 @@ class TestRunPipeline(unittest.TestCase):
         )
         with stack:
             result = evolver.run_pipeline()
-        self.assertTrue(result.has_errors)
+        assert result.has_errors
 
     def test_the_failing_stage_is_the_one_marked_error(self):
         """A run's verdict has to be legible in the stage list it ships with.
@@ -418,7 +392,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         errored = [s.name for s in result.stages if s.status == "error"]
-        self.assertEqual(errored, ["purge"])
+        assert errored == ["purge"]
 
     def test_a_low_disk_hold_warns_on_the_non_ai_stage_instead_of_failing_it(self):
         """The condition that reddened almost every run for days on end.
@@ -435,8 +409,8 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         statuses = {s.name: s.status for s in result.stages}
-        self.assertEqual(statuses["upscale_non_ai"], "warning")
-        self.assertFalse(result.has_errors)
+        assert statuses["upscale_non_ai"] == "warning"
+        assert not result.has_errors
 
     def test_a_dead_encode_outranks_a_hold_on_the_same_stage(self):
         """One tick can lose an encode and then find no room for the next. The
@@ -448,7 +422,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         statuses = {s.name: s.status for s in result.stages}
-        self.assertEqual(statuses["upscale_non_ai"], "error")
+        assert statuses["upscale_non_ai"] == "error"
 
     def test_skips_alone_do_not_make_a_run_a_failure(self):
         """Skipping is how the pipeline stays out of the way, not how it fails.
@@ -465,9 +439,9 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         statuses = {s.name: s.status for s in result.stages}
-        self.assertEqual(statuses["upscale"], "skipped")
-        self.assertEqual(statuses["verify"], "skipped")
-        self.assertFalse(result.has_errors)
+        assert statuses["upscale"] == "skipped"
+        assert statuses["verify"] == "skipped"
+        assert not result.has_errors
 
     def test_duration_seconds_is_positive(self):
         # duration_seconds is time.monotonic() end-minus-start. On a fast runner
@@ -479,7 +453,7 @@ class TestRunPipeline(unittest.TestCase):
         stack, _ = self._patch_all_stages()
         with stack, patch("evolver.time.monotonic", lambda: next(ticks)):
             result = evolver.run_pipeline()
-        self.assertGreater(result.duration_seconds, 0.0)
+        assert result.duration_seconds > 0.0
 
     def test_on_stage_progress_forwarded_to_upscale(self):
         """When on_stage_progress is provided, upscale.run receives on_progress."""
@@ -492,8 +466,8 @@ class TestRunPipeline(unittest.TestCase):
             evolver.run_pipeline(on_stage_progress=on_progress)
         # upscale.run should have been called with on_progress kwarg
         call_kwargs = mocks["upscale_run"].call_args.kwargs
-        self.assertIn("on_progress", call_kwargs)
-        self.assertIsNotNone(call_kwargs["on_progress"])
+        assert "on_progress" in call_kwargs
+        assert call_kwargs["on_progress"] is not None
 
     def test_on_stage_progress_not_passed_when_none(self):
         """When on_stage_progress is None, upscale.run does not receive on_progress."""
@@ -504,7 +478,7 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_progress=None)
         call_kwargs = mocks["upscale_run"].call_args.kwargs
-        self.assertNotIn("on_progress", call_kwargs)
+        assert "on_progress" not in call_kwargs
 
     def test_on_stage_progress_callback_binds_stage_name(self):
         """The on_progress closure passed to upscale.run calls on_stage_progress with stage name."""
@@ -527,10 +501,10 @@ class TestRunPipeline(unittest.TestCase):
             evolver.run_pipeline(
                 on_stage_progress=lambda name, cur, tot: progress_calls.append((name, cur, tot)),
             )
-        self.assertEqual(progress_calls, [("upscale", 1, 5), ("upscale", 2, 5)])
+        assert progress_calls == [("upscale", 1, 5), ("upscale", 2, 5)]
 
 
-class TestCooperativeStop(unittest.TestCase):
+class TestCooperativeStop:
     """The watchdog's stop request: honored between stages, never mid-stage."""
 
     def test_stops_between_stages_once_asked(self):
@@ -538,7 +512,7 @@ class TestCooperativeStop(unittest.TestCase):
         with _patched_stages(mocks):
             result = evolver.run_pipeline(should_stop=lambda: mocks["purge_run"].called)
 
-        self.assertEqual([s.name for s in result.stages], ["strays", "purge"])
+        assert [s.name for s in result.stages] == ["purge"]
         mocks["prompt_scrape_run"].assert_not_called()
         mocks["sort_run"].assert_not_called()
 
@@ -547,10 +521,10 @@ class TestCooperativeStop(unittest.TestCase):
         with _patched_stages(mocks):
             result = evolver.run_pipeline(should_stop=lambda: False)
 
-        self.assertEqual(len(result.stages), len(_EXPECTED_STAGES))
+        assert len(result.stages) == 14
 
 
-class TestCheckDependenciesWindowSuppression(unittest.TestCase):
+class TestCheckDependenciesWindowSuppression:
     def test_ffprobe_check_passes_create_no_window(self):
         """ffprobe version check must not spawn a visible console window."""
         with patch("evolver.subprocess.run") as mock_run, \
@@ -558,9 +532,5 @@ class TestCheckDependenciesWindowSuppression(unittest.TestCase):
             mock_run.return_value = Mock(returncode=0)
             evolver.check_dependencies()
             kwargs = mock_run.call_args.kwargs
-            self.assertIn("creationflags", kwargs)
-            self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert "creationflags" in kwargs
+            assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
