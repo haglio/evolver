@@ -6,7 +6,6 @@ from PyQt6.QtGui import QImage
 
 from gui.run_record import RunRecord
 from gui.stats_window import STAGE_COLORS, StackedAreaChart, StatsWindow, _pick_y_ticks
-from tests.gui_support import build_evolver_app
 
 
 def _make_record(
@@ -318,7 +317,6 @@ class TestStatsActionExists:
         window = EvolverMainWindow()
         assert window.stats_action is not None
 
-    def test_app_connects_stats_actions(self, request):
-        app = build_evolver_app(request)
-        assert app._window.stats_action.receivers(app._window.stats_action.triggered) > 0
-        assert app._tray.stats_action.receivers(app._tray.stats_action.triggered) > 0
+    # The receivers()-count wiring assertion that used to live here is replaced
+    # by TestToolbarAppWiring's stats tests in test_main_window_controls.py,
+    # which trigger the real actions and assert a StatsWindow opens.
