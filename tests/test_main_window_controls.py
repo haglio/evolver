@@ -69,6 +69,36 @@ class TestRunHistoryMarks:
     def test_the_label_itself_is_just_the_time_and_duration(self):
         assert self._item("success").text() == "2026/07/25 08:20 (12s)"
 
+    def test_refreshing_selects_the_newest_run_and_shows_its_detail(self):
+        """This selection is what populates the detail pane when the window
+        opens; without it the right half of the window is simply empty."""
+        def record(run_id, duration):
+            return RunRecord(
+                id=run_id, started_at="2026-07-25T15:20:02",
+                finished_at="2026-07-25T15:20:02", duration_seconds=duration,
+                trigger="scheduled", status="success", stages=[],
+            )
+
+        self.window = EvolverMainWindow()
+        newest = record("2026-07-25T15-20-02", 34.0)
+        older = record("2026-07-25T15-10-02", 99.0)
+        with patch("gui.main_window.load_runs", return_value=[newest, older]):
+            self.window.refresh_history()
+        assert self.window._history_list.currentRow() == 0
+        info = self.window._detail_widget._info_label.text()
+        assert "34" in info
+        assert "99" not in info
+
+    def test_closing_the_window_hides_it_to_the_tray_instead(self):
+        """The X must not quit the app: the tray icon keeps it alive, and the
+        ignored close event is the whole difference."""
+        self.window = EvolverMainWindow()
+        self.window.show()
+        assert self.window.isVisible()
+        closed = self.window.close()
+        assert closed is False  # the close event was ignored
+        assert not self.window.isVisible()  # ...and the window hid itself
+
 
 class TestStageStatusColumn:
     """The Status column is a symbol, and only the symbol carries the color."""
@@ -305,6 +335,12 @@ class TestNonAiUpscaleSummary:
     def test_a_low_disk_hold_is_called_out(self):
         summary = self._result(deferred_low_disk=True, start_deferred="")
         assert "low disk" in summary
+
+    def test_an_encode_that_has_not_reported_yet_reads_progress_unknown(self):
+        """A non-AI encode reports no percent until ffmpeg's first progress
+        line; the row must say so rather than render a blank or a crash."""
+        summary = self._result(in_flight="larkin/1 clips/Delia Moss.mp4")
+        assert "progress unknown" in summary
 
 
 @pytest.fixture
