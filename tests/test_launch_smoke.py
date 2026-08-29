@@ -195,11 +195,6 @@ def test_a_launch_import_that_cannot_resolve_fails_here():
     assert "NoSuchSymbol" in result.stderr
 
 
-def test_the_app_relaunches_itself_the_same_way_the_shortcut_does():
-    """Restart is how the user picks up a new version, from the tray menu or the
-    toolbar, so it is a launch too -- and it runs the same script this test
-    covers, on the interpreter already running."""
-    text = (REPO_ROOT / "gui" / "app.py").read_text(encoding="utf-8")
-
-    assert 'config.PROJECT_DIR / "tray_app.py"' in text
-    assert "sys.executable" in text
+# Restart being a launch of the same script on the same interpreter is pinned
+# behaviourally in test_app_startup.py's TestRestart (the Popen argv), not by
+# grepping gui/app.py's source, which broke on any reformat.
