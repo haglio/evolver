@@ -414,7 +414,7 @@ class TestStartGuards(unittest.TestCase):
             overrides = library_overrides(root)
             self._one_candidate(overrides)
 
-            stack, mocks = probes(
+            stack, _mocks = probes(
                 idle_seconds=config.NONAI_USER_IDLE_THRESHOLD_SECONDS + 60)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
@@ -447,7 +447,7 @@ class TestStartGuards(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            stack, mocks = probes()
+            stack, _mocks = probes()
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
 
@@ -459,7 +459,7 @@ class TestRunStopsAJob(unittest.TestCase):
     def test_stop_kills_the_running_encode_without_penalizing_the_video(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            source, tmp, out = write_job(root, overrides)
+            _source, tmp, out = write_job(root, overrides)
             overrides["NONAI_ATTEMPTS_FILE"].write_text(
                 json.dumps({"larkin/0 unsorted/busy.mp4": 1}), encoding="utf-8"
             )
@@ -484,7 +484,7 @@ class TestRunStopsAJob(unittest.TestCase):
     def test_stop_still_promotes_an_encode_that_already_finished(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            source, tmp, out = write_job(root, overrides, expected=100.0)
+            _source, _tmp, out = write_job(root, overrides, expected=100.0)
 
             stack, mocks = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
@@ -568,7 +568,7 @@ class TestPresenceThrottle(unittest.TestCase):
     def test_a_present_user_suspends_the_in_flight_encode(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            source, tmp, _ = write_job(root, overrides)
+            _source, tmp, _ = write_job(root, overrides)
 
             stack, mocks = probes(is_running=True, idle_seconds=5.0)
             with override_config(**overrides), stack:
@@ -733,7 +733,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
     def test_live_job_reports_in_flight_and_blocks_new_starts(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            source, tmp, _ = write_job(root, overrides)
+            _source, tmp, _ = write_job(root, overrides)
             make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "next.mp4")
 
             stack, mocks = probes(is_running=True)
@@ -777,7 +777,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             retire_dir.mkdir(parents=True)
             source, tmp, out = write_job(root, overrides, expected=100.0)
 
-            stack, mocks = probes(is_running=False, duration=99.5)
+            stack, _mocks = probes(is_running=False, duration=99.5)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
@@ -792,7 +792,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
     def test_promote_without_a_retire_dir_leaves_the_original_in_place(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            source, tmp, out = write_job(root, overrides, expected=100.0)
+            source, _tmp, out = write_job(root, overrides, expected=100.0)
 
             stack, _ = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
@@ -807,7 +807,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             overrides = library_overrides(root)
             source, tmp, out = write_job(root, overrides, expected=100.0)
 
-            stack, mocks = probes(is_running=False, duration=42.0)
+            stack, _mocks = probes(is_running=False, duration=42.0)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
@@ -822,13 +822,13 @@ class TestRunSupervisesAJob(unittest.TestCase):
     def test_final_failed_attempt_lands_in_the_skip_manifest(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            source, tmp, out = write_job(root, overrides, expected=100.0)
+            _source, _tmp, _out = write_job(root, overrides, expected=100.0)
             overrides["NONAI_ATTEMPTS_FILE"].write_text(
                 json.dumps({"larkin/0 unsorted/busy.mp4": config.NONAI_MAX_ATTEMPTS}),
                 encoding="utf-8",
             )
 
-            stack, mocks = probes(is_running=False, duration=None)
+            stack, _mocks = probes(is_running=False, duration=None)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
@@ -841,7 +841,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
     def test_overrunning_ffmpeg_is_terminated_and_concluded(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            source, tmp, out = write_job(
+            _source, _tmp, _out = write_job(
                 root, overrides,
                 started_seconds_ago=config.NONAI_MAX_RUNTIME_HOURS * 3600 + 60,
             )
@@ -876,7 +876,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
     def test_low_disk_mid_flight_stops_the_encode_without_penalty(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            source, tmp, out = write_job(root, overrides)
+            _source, tmp, _out = write_job(root, overrides)
 
             stack, mocks = probes(is_running=True, image=str(config.FFMPEG), free_bytes=1)
             with override_config(**overrides), stack:
@@ -894,7 +894,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source, tmp, _ = write_job(root, overrides)
+            _source, tmp, _ = write_job(root, overrides)
             orphan = make_video(
                 non_ai / "larkin" / "3_good_to_go" / "processed" / "old.partial.dead.mp4"
             )
@@ -1062,7 +1062,7 @@ class TestRetireToAnArchive(unittest.TestCase):
         with workspace_temp_dir() as root:
             archive = root / "archive"
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
-            source, tmp, out = write_job(
+            source, _tmp, out = write_job(
                 root, overrides, expected=100.0,
                 source=make_video(
                     overrides["NON_AI_DIR"] / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4"
@@ -1091,7 +1091,7 @@ class TestRetireToAnArchive(unittest.TestCase):
         with workspace_temp_dir() as root:
             archive = root / "archive"
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
-            source, tmp, out = write_job(
+            source, _tmp, out = write_job(
                 root, overrides, expected=100.0,
                 source=make_video(
                     overrides["NON_AI_DIR"] / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4"
