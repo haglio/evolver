@@ -8,9 +8,17 @@ from tests.gui_support import build_evolver_app
 
 class TestSetTaskbarProperties:
 
-    def test_does_not_raise_on_invalid_hwnd(self):
-        # An invalid HWND should be caught and logged, not raised
-        set_taskbar_properties(0, "Test.App", "test.exe", "Test", "test.ico")
+    def test_an_invalid_hwnd_is_logged_not_raised(self, caplog):
+        """Taskbar cosmetics must never crash the app, but must not fail
+        silently either -- the warning is the observable outcome, and asserting
+        it is what separates 'the error path ran' from 'the call returned'."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="gui.taskbar"):
+            set_taskbar_properties(0, "Test.App", "test.exe", "Test", "test.ico")
+        assert any(
+            "taskbar" in record.message.lower() for record in caplog.records
+        ), "no warning was logged for the invalid HWND"
 
 
 class TestAppSetsTaskbarProperties:
