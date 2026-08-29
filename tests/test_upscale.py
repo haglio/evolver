@@ -25,8 +25,15 @@ class TestUpscaleHelpers(unittest.TestCase):
                 self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4"))
 
                 p1.unlink()
-                p2 = weird / "a_topaz.mp4"
+                # The portrait arm on its own -- narrowing the loop to
+                # ('landscape',) used to leave this test green (audit probe P3).
+                p2 = out / "portrait" / "provider" / "a_topaz.mp4"
                 p2.write_bytes(b"1")
+                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4"))
+
+                p2.unlink()
+                p3 = weird / "a_topaz.mp4"
+                p3.write_bytes(b"1")
                 self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4"))
 
     def test_run_processes_dynamic_source_and_creates_out_dir(self):
@@ -207,8 +214,17 @@ class TestIsT2vProvider(unittest.TestCase):
                 self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip"))
 
     def test_false_for_non_provider_source(self):
+        # The sidecar is a valid t2v one, so only the source-name guard can
+        # answer False here -- with no sidecar on disk the second check
+        # answered False anyway and the guard could be deleted unseen (audit
+        # probe P4b). Pins the current hardcoded "provider" comparison as it
+        # behaves (bug 7, held for sign-off -- not fixed here).
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
+            json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider2" / "clip_topaz.json"
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
+
             with override_config(METADATA_DIR=meta_dir):
                 self.assertFalse(upscale._is_t2v_provider("provider2", "landscape", "clip"))
 
