@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from backfill.queue import BackfillQueue
 from backfill.session import BackfillSession
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import library_tree
 from util.sidecar import sidecar_path
 
 
@@ -432,64 +432,50 @@ class TestSame(unittest.TestCase):
 class TestUndoAgainstRealFiles(unittest.TestCase):
     """The two reversals that actually touch disk, driven end to end."""
 
-    def _tree(self, root):
-        ai = root / "AI"
-        upscaled = ai / "2_outbox" / "upscaled_by_orientation"
-        video = upscaled / "portrait" / "provider2" / "a_topaz.mp4"
-        video.parent.mkdir(parents=True)
-        video.write_bytes(b"video")
-        return ai, upscaled, root / "metadata", root / "kinda_weird", video
-
     def _session(self, video):
         return BackfillSession(BackfillQueue([video]), ImmediateWorker())
 
     def test_undoing_an_act_deletes_the_sidecar_it_wrote(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata, weird, video = self._tree(root)
+        with library_tree() as lib:
+            video = lib.video()
+            session = self._session(video)
+            session.apply("pov zeta")
+            self.assertTrue(sidecar_path(video).is_file())
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
-                session = self._session(video)
-                session.apply("pov zeta")
-                self.assertTrue(sidecar_path(video).is_file())
+            session.apply("undo")
 
-                session.apply("undo")
-
-                self.assertFalse(sidecar_path(video).exists())
-                self.assertEqual(session.current, video)
+            self.assertFalse(sidecar_path(video).exists())
+            self.assertEqual(session.current, video)
 
     def test_undoing_an_act_keeps_metadata_the_clip_already_had(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata, weird, video = self._tree(root)
+        with library_tree() as lib:
+            video = lib.video()
+            path = sidecar_path(video)
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps({"video": {"prompt": "a prompt"}}), encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
-                path = sidecar_path(video)
-                path.parent.mkdir(parents=True)
-                path.write_text(json.dumps({"video": {"prompt": "a prompt"}}), encoding="utf-8")
+            session = self._session(video)
+            session.apply("side dance")
+            session.apply("undo")
 
-                session = self._session(video)
-                session.apply("side dance")
-                session.apply("undo")
-
-                self.assertEqual(
-                    json.loads(path.read_text(encoding="utf-8")), {"video": {"prompt": "a prompt"}}
-                )
+            self.assertEqual(
+                json.loads(path.read_text(encoding="utf-8")), {"video": {"prompt": "a prompt"}}
+            )
 
     def test_undoing_a_discard_brings_the_file_back(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata, weird, video = self._tree(root)
+        with library_tree() as lib:
+            video = lib.video()
+            session = self._session(video)
+            session.apply("weird")
+            self.assertFalse(video.exists())
+            self.assertTrue((lib.weird / video.name).is_file())
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata, WEIRD_DIR=weird):
-                session = self._session(video)
-                session.apply("weird")
-                self.assertFalse(video.exists())
-                self.assertTrue((weird / video.name).is_file())
+            session.apply("undo")
 
-                session.apply("undo")
-
-                self.assertTrue(video.is_file())
-                self.assertEqual(video.read_bytes(), b"video")
-                self.assertEqual(list(weird.iterdir()), [])
-                self.assertEqual(session.current, video)
+            self.assertTrue(video.is_file())
+            self.assertEqual(video.read_bytes(), b"video")
+            self.assertEqual(list(lib.weird.iterdir()), [])
+            self.assertEqual(session.current, video)
 
 
 if __name__ == "__main__":
