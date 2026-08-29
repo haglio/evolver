@@ -34,6 +34,53 @@ def override_config(**overrides):
         yield
 
 
+class _LibraryTree:
+    """Paths into one temp AI-library tree, plus builders for its files."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        self.ai = root / "AI"
+        self.upscaled = self.ai / "2_outbox" / "upscaled_by_orientation"
+        self.metadata = root / "metadata"
+        self.weird = root / "kinda_weird"
+
+    def video(self, orient="portrait", source="provider2", name="a_topaz.mp4") -> Path:
+        video = self.upscaled / orient / source / name
+        video.parent.mkdir(parents=True, exist_ok=True)
+        video.write_bytes(b"video")
+        return video
+
+    def sidecar(self, orient, source, stem, payload) -> Path:
+        path = (self.metadata / "AI" / "2_outbox" / "upscaled_by_orientation"
+                / orient / source / f"{stem}.json")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
+
+@contextmanager
+def library_tree(**config_extra):
+    """The AI-library temp tree and the config pointing at it, together.
+
+    The layout is a real contract (config.py mirrors it, and genau and
+    fun_time read the same shape); it used to be re-implemented by hand in
+    four test files with 26 copies of the same four-key override_config line.
+    Extra config keys (e.g. WEIRD_DIR) ride along per test.
+    """
+    with workspace_temp_dir() as root:
+        tree = _LibraryTree(root)
+        overrides = dict(
+            VIDEO_LIBRARY_DIR=tree.root,
+            AI_DIR=tree.ai,
+            OUT_UPSCALED_DIR=tree.upscaled,
+            METADATA_DIR=tree.metadata,
+            WEIRD_DIR=tree.weird,
+        )
+        overrides.update(config_extra)
+        with override_config(**overrides):
+            yield tree
+
+
 LARKIN = Path("2D") / "non_AI" / "larkin"
 
 

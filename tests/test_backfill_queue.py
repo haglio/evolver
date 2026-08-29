@@ -1,108 +1,76 @@
-import json
 import unittest
 from pathlib import Path
 
 from backfill.queue import BackfillQueue, unlabeled_videos
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import library_tree
 
 
 class TestUnlabeledVideos(unittest.TestCase):
-    def _tree(self, root):
-        ai = root / "AI"
-        return ai, ai / "2_outbox" / "upscaled_by_orientation", root / "metadata"
-
-    def _make_video(self, upscaled, orient, source, name):
-        video = upscaled / orient / source / name
-        video.parent.mkdir(parents=True, exist_ok=True)
-        video.write_bytes(b"video")
-        return video
-
-    def _make_sidecar(self, metadata, orient, source, stem, payload):
-        path = metadata / "AI" / "2_outbox" / "upscaled_by_orientation" / orient / source / f"{stem}.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload), encoding="utf-8")
-
     def test_a_video_with_no_sidecar_is_unlabeled(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
+        with library_tree() as lib:
+            video = lib.video("portrait", "provider2", "a_topaz.mp4")
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(unlabeled_videos(), [video])
+            self.assertEqual(unlabeled_videos(), [video])
 
     def test_a_sidecar_without_an_action_leaves_the_video_unlabeled(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
-            self._make_sidecar(metadata, "portrait", "provider2", "a_topaz", {"video": {"prompt": "p"}})
+        with library_tree() as lib:
+            video = lib.video("portrait", "provider2", "a_topaz.mp4")
+            lib.sidecar("portrait", "provider2", "a_topaz", {"video": {"prompt": "p"}})
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(unlabeled_videos(), [video])
+            self.assertEqual(unlabeled_videos(), [video])
 
     def test_a_sidecar_with_an_action_labels_the_video(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
-            self._make_sidecar(metadata, "portrait", "provider2", "a_topaz", {"video": {"action": "Alpha"}})
+        with library_tree() as lib:
+            lib.video("portrait", "provider2", "a_topaz.mp4")
+            lib.sidecar("portrait", "provider2", "a_topaz", {"video": {"action": "Alpha"}})
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(unlabeled_videos(), [])
+            self.assertEqual(unlabeled_videos(), [])
 
     def test_the_scraped_sources_are_never_offered(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            self._make_video(upscaled, "portrait", "provider", "a_topaz.mp4")
-            self._make_video(upscaled, "landscape", "origenerator", "b_topaz.mp4")
+        with library_tree() as lib:
+            lib.video("portrait", "provider", "a_topaz.mp4")
+            lib.video("landscape", "origenerator", "b_topaz.mp4")
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(unlabeled_videos(), [])
+            self.assertEqual(unlabeled_videos(), [])
 
     def test_a_half_written_upscale_is_never_offered(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            self._make_video(upscaled, "portrait", "provider2", "a.partial.deadbeef.mp4")
+        with library_tree() as lib:
+            lib.video("portrait", "provider2", "a.partial.deadbeef.mp4")
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(unlabeled_videos(), [])
+            self.assertEqual(unlabeled_videos(), [])
 
     def test_a_clip_whose_act_was_called_wrong_is_asked_about_first(self):
         """Fun Time strikes a mislabeled act out of the sidecar and leaves
         ``wrong_action`` behind.  Someone said that clip is wrong *just now*, so
         it goes to the head of the queue rather than the back of a library walk
         they may never reach."""
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
+        with library_tree() as lib:
             # The rejected clip sits last in the library walk (portrait sweeps
             # before landscape), so only a reordering can bring it to the front.
-            plain = self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
-            rejected = self._make_video(upscaled, "landscape", "provider2", "b_topaz.mp4")
-            self._make_sidecar(metadata, "landscape", "provider2", "b_topaz",
+            plain = lib.video("portrait", "provider2", "a_topaz.mp4")
+            rejected = lib.video("landscape", "provider2", "b_topaz.mp4")
+            lib.sidecar("landscape", "provider2", "b_topaz",
                                {"video": {"prompt": "p", "wrong_action": "Alpha"}})
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(unlabeled_videos(), [rejected, plain])
+            self.assertEqual(unlabeled_videos(), [rejected, plain])
 
     def test_a_scraped_clip_whose_act_was_called_wrong_is_offered_anyway(self):
         """A scraped act is skipped because the scrape stage knows what the clip
         shows — which is exactly the claim a viewer has just contradicted, and
         the stage cannot correct itself."""
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            rejected = self._make_video(upscaled, "portrait", "origenerator", "a_topaz.mp4")
-            self._make_sidecar(metadata, "portrait", "origenerator", "a_topaz",
+        with library_tree() as lib:
+            rejected = lib.video("portrait", "origenerator", "a_topaz.mp4")
+            lib.sidecar("portrait", "origenerator", "a_topaz",
                                {"video": {"wrong_action": "Alpha"}})
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(unlabeled_videos(), [rejected])
+            self.assertEqual(unlabeled_videos(), [rejected])
 
     def test_both_orientations_are_swept(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            portrait = self._make_video(upscaled, "portrait", "provider2", "a_topaz.mp4")
-            landscape = self._make_video(upscaled, "landscape", "provider3", "b_topaz.mp4")
+        with library_tree() as lib:
+            portrait = lib.video("portrait", "provider2", "a_topaz.mp4")
+            landscape = lib.video("landscape", "provider3", "b_topaz.mp4")
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertEqual(sorted(unlabeled_videos()), sorted([portrait, landscape]))
+            self.assertEqual(sorted(unlabeled_videos()), sorted([portrait, landscape]))
 
 
 class TestBackfillQueue(unittest.TestCase):
