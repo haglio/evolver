@@ -39,10 +39,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # them against.
 PACKAGE = ""
 
-# The two files the shortcut runs: the script, and the module holding the app.
+# The files a launch runs: the tray script and the module holding the app --
+# and the second entry point, the backfill tool the tray spawns DETACHED, whose
+# ImportError otherwise writes its traceback nowhere while the menu item
+# simply does nothing.
 LAUNCH_FILES = (
     REPO_ROOT / "tray_app.py",
     REPO_ROOT / "gui" / "app.py",
+    REPO_ROOT / "backfill_app.py",
 )
 
 # Reached only from inside main(), so a module-level import test never saw it.
