@@ -25,7 +25,7 @@ class PipelineScheduler(QObject):
         self._next_run_at: datetime | None = None
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self._on_tick)
+        self._timer.timeout.connect(self.tick)
 
     def start(self):
         if not self._paused:
@@ -110,7 +110,12 @@ class PipelineScheduler(QObject):
         self._timer.start(ms_until)
         self.status_changed.emit()
 
-    def _on_tick(self):
+    def tick(self):
+        """What one firing of the interval timer does.
+
+        Public so tests can drive a tick deterministically instead of waiting
+        on the wall clock; the timer connects here and nothing else calls it.
+        """
         if not self._running:
             self.run_requested.emit("scheduled")
         # Always schedule the next tick (if the run is in progress, mark_idle
