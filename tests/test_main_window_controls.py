@@ -10,16 +10,16 @@ from PyQt6.QtGui import QTextDocument
 from PyQt6.QtWidgets import QMessageBox, QToolBar
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
-from gui.run_record import RunRecord
 from gui.toggle_switch import ToggleSwitch
 from tests.gui_support import build_evolver_app
+from tests.temp_helpers import make_run_record
 
 
 class TestRunDetailRendering:
     """RunDetailWidget should surface scrape successes alongside errors."""
 
     def _record(self):
-        return RunRecord(
+        return make_run_record(
             id="2026-06-27T22-18-46", started_at="2026-06-27T22:18:46",
             finished_at="2026-06-27T22:18:46", duration_seconds=699.7,
             trigger="manual", status="error",
@@ -48,11 +48,7 @@ class TestRunHistoryMarks:
     """A run's verdict is its mark's color, never the whole line's."""
 
     def _item(self, status):
-        record = RunRecord(
-            id="2026-07-25T15-20-02", started_at="2026-07-25T15:20:02",
-            finished_at="2026-07-25T15:20:02", duration_seconds=12.0,
-            trigger="scheduled", status=status, stages=[],
-        )
+        record = make_run_record(status=status)
         self.window = EvolverMainWindow()
         with patch("gui.main_window.load_runs", return_value=[record]):
             self.window.refresh_history()
@@ -72,16 +68,9 @@ class TestRunHistoryMarks:
     def test_refreshing_selects_the_newest_run_and_shows_its_detail(self):
         """This selection is what populates the detail pane when the window
         opens; without it the right half of the window is simply empty."""
-        def record(run_id, duration):
-            return RunRecord(
-                id=run_id, started_at="2026-07-25T15:20:02",
-                finished_at="2026-07-25T15:20:02", duration_seconds=duration,
-                trigger="scheduled", status="success", stages=[],
-            )
-
         self.window = EvolverMainWindow()
-        newest = record("2026-07-25T15-20-02", 34.0)
-        older = record("2026-07-25T15-10-02", 99.0)
+        newest = make_run_record(id="2026-07-25T15-20-02", duration_seconds=34.0)
+        older = make_run_record(id="2026-07-25T15-10-02", duration_seconds=99.0)
         with patch("gui.main_window.load_runs", return_value=[newest, older]):
             self.window.refresh_history()
         assert self.window._history_list.currentRow() == 0
@@ -104,10 +93,8 @@ class TestStageStatusColumn:
     """The Status column is a symbol, and only the symbol carries the color."""
 
     def _status_cell(self, status):
-        record = RunRecord(
-            id="2026-07-25T15-20-02", started_at="2026-07-25T15:20:02",
-            finished_at="2026-07-25T15:20:02", duration_seconds=12.0,
-            trigger="scheduled", status="error",
+        record = make_run_record(
+            status="error",
             stages=[{"name": "upscale_non_ai", "status": status,
                      "duration_seconds": 1.0, "result": None}],
         )
@@ -140,11 +127,7 @@ class TestRunVerdictInDetailPane:
     """
 
     def _info_text(self, status):
-        record = RunRecord(
-            id="2026-07-25T15-20-02", started_at="2026-07-25T15:20:02",
-            finished_at="2026-07-25T15:20:02", duration_seconds=12.0,
-            trigger="scheduled", status=status, stages=[],
-        )
+        record = make_run_record(status=status)
         self.widget = RunDetailWidget()
         self.widget.show_record(record)
         return self.widget._info_label.text()
