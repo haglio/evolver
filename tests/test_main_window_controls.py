@@ -380,21 +380,52 @@ class TestToolbarStateUpdates:
 
 
 class TestToggleSwitch:
-    """ToggleSwitch custom widget basics."""
+    """The pause control: what a click does, and what the user sees.
 
-    def test_defaults_to_unchecked(self):
+    mousePressEvent and paintEvent were both entirely uncovered -- 'clicking
+    Active pauses the pipeline' had no test at any level while three tests
+    exercised the two trivial accessors.
+    """
+
+    def test_starts_unchecked_and_set_checked_round_trips(self):
         toggle = ToggleSwitch()
         assert not toggle.isChecked()
-
-    def test_set_checked(self):
-        toggle = ToggleSwitch()
         toggle.setChecked(True)
         assert toggle.isChecked()
-
-    def test_set_checked_false(self):
-        toggle = ToggleSwitch(checked=True)
         toggle.setChecked(False)
         assert not toggle.isChecked()
+
+    def test_a_click_flips_the_state_and_announces_the_new_value(self):
+        from PyQt6.QtTest import QTest
+
+        toggle = ToggleSwitch()
+        announced = []
+        toggle.clicked.connect(announced.append)
+        QTest.mouseClick(toggle, Qt.MouseButton.LeftButton)
+        assert toggle.isChecked()
+        assert announced == [True]
+        QTest.mouseClick(toggle, Qt.MouseButton.LeftButton)
+        assert not toggle.isChecked()
+        assert announced == [True, False]
+
+    def test_the_knob_and_track_show_which_state_it_is_in(self):
+        """The paint is the only thing that tells the user the pipeline runs:
+        on is a blue track with the knob right, off a gray track, knob left."""
+        from PyQt6.QtGui import QImage
+
+        def rendered(toggle):
+            image = QImage(44, 22, QImage.Format.Format_ARGB32)
+            image.fill(0xFFFF00FF)
+            toggle.render(image)
+            return image
+
+        off = rendered(ToggleSwitch())
+        assert off.pixelColor(11, 11).getRgb()[:3] == (255, 255, 255)  # knob left
+        assert off.pixelColor(33, 11).getRgb()[:3] == (176, 176, 176)  # gray track
+
+        on = rendered(ToggleSwitch(checked=True))
+        assert on.pixelColor(11, 11).getRgb()[:3] == (48, 128, 224)  # blue track
+        assert on.pixelColor(33, 11).getRgb()[:3] == (255, 255, 255)  # knob right
 
 
 class TestToolbarAppWiring:
