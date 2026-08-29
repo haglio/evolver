@@ -8,6 +8,18 @@ from tasks import upscale
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
+def library_dirs(root):
+    """The three trees every upscale test builds: 1_sorted, the outbox, weird."""
+    return root / "sorted", root / "out", root / "weird"
+
+
+def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
+    """A successful encode: writes the temp output the stage promotes."""
+    tmp.write_bytes(b"upscaled")
+    return True
+
+
+
 class TestUpscaleHelpers(unittest.TestCase):
     def test_already_processed_checks_all_locations(self):
         with workspace_temp_dir() as root:
@@ -38,17 +50,11 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_processes_dynamic_source_and_creates_out_dir(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             source = "brandnew"
             in_file = sorted_dir / source / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
-
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
-                tmp.write_bytes(b"upscaled")
-                return True
 
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
@@ -62,9 +68,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_collect_candidates_prioritizes_newly_sorted_files(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
 
             priority = sorted_dir / "sourceB" / "portrait" / "priority.mp4"
             backlog = sorted_dir / "sourceA" / "landscape" / "backlog.mp4"
@@ -81,9 +85,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_removes_stale_partial_outputs_before_processing(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             source = "provider2"
             in_file = sorted_dir / source / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
@@ -92,10 +94,6 @@ class TestUpscaleHelpers(unittest.TestCase):
             stale_partial = out_dir / "landscape" / source / "clip.partial.deadbeef.mp4"
             stale_partial.parent.mkdir(parents=True)
             stale_partial.write_bytes(b"partial")
-
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
-                tmp.write_bytes(b"upscaled")
-                return True
 
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
@@ -109,9 +107,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_records_failure_when_ffmpeg_returns_false(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -126,17 +122,11 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_stops_early_when_budget_exceeded(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
-
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
-                tmp.write_bytes(b"upscaled")
-                return True
 
             # Set a tiny budget so after the first item, remaining < min_start
             with override_config(
@@ -153,9 +143,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_stops_early_on_low_disk(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -172,9 +160,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_records_failure_when_output_is_empty(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -238,17 +224,11 @@ class TestIsT2vProvider(unittest.TestCase):
 class TestOnProgressCallback(unittest.TestCase):
     def test_on_progress_called_per_item(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             for name in ("a", "b", "c"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
-
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
-                tmp.write_bytes(b"upscaled")
-                return True
 
             progress_calls = []
 
@@ -264,9 +244,7 @@ class TestOnProgressCallback(unittest.TestCase):
 
     def test_on_progress_counts_failures(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -285,16 +263,10 @@ class TestOnProgressCallback(unittest.TestCase):
     def test_on_progress_not_required(self):
         """Existing callers without on_progress still work."""
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             f = sorted_dir / "src" / "landscape" / "clip.mp4"
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(b"video")
-
-            def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
-                tmp.write_bytes(b"upscaled")
-                return True
 
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
@@ -307,9 +279,7 @@ class TestOnProgressCallback(unittest.TestCase):
 class TestSubprocessTimeout(unittest.TestCase):
     def test_run_records_timeout_when_ffmpeg_times_out(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -326,9 +296,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
     def test_run_breaks_loop_after_timeout(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -346,9 +314,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
     def test_on_progress_called_for_timed_out_item(self):
         with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            out_dir = root / "out"
-            weird_dir = root / "weird"
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
