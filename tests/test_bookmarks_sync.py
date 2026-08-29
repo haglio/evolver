@@ -100,9 +100,9 @@ class TestBookmarksSync(unittest.TestCase):
                 "local_file,web_url\n"
                 '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/keep\n'
                 '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/drop\n'.format(
-                    existing_media.as_posix().replace(":", ":"),
+                    existing_media.as_posix(),
                     str(existing_media),
-                    missing_media.as_posix().replace(":", ":"),
+                    missing_media.as_posix(),
                     str(missing_media),
                 ),
                 encoding="utf-8",
