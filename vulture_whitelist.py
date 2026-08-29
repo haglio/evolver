@@ -35,3 +35,11 @@ _._show_requests  # noqa: F821  — anchors the QLocalServer; collecting it clos
 
 # -- Script entry points (invoked by __main__ guard) --
 _.main  # noqa: F821
+
+# -- BackfillWindow's read surface: reached from the tests, which the vulture
+#    scan deliberately excludes. The accessors exist so assertions about the
+#    window go through a public seam instead of six private attributes. --
+_.status_text  # noqa: F821
+_.hearing_text  # noqa: F821
+_.last_text  # noqa: F821
+_.tile_for  # noqa: F821
