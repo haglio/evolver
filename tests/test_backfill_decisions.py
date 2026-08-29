@@ -147,6 +147,9 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
                 restore_sidecar(video, None)  # must not raise
 
+                # ...and must not have conjured a sidecar out of the nothing
+                self.assertFalse(sidecar_path(video).exists())
+
 
 class TestReclaimFromWeird(unittest.TestCase):
     def test_a_discarded_clip_goes_back_where_it_came_from(self):

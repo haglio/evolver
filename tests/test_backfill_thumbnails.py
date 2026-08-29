@@ -100,13 +100,6 @@ class TestThumbnailCachePath(unittest.TestCase):
         with override_config(BACKFILL_THUMBNAIL_DIR=Path("/cache")):
             self.assertEqual(thumbnails.thumbnail_cache_path("POV Beta"), Path("/cache/pov_beta.jpg"))
 
-    def test_the_same_action_always_maps_to_the_same_file(self):
-        with override_config(BACKFILL_THUMBNAIL_DIR=Path("/cache")):
-            self.assertEqual(
-                thumbnails.thumbnail_cache_path("Side Epsilon"),
-                thumbnails.thumbnail_cache_path("Side Epsilon"),
-            )
-
 
 class TestBuildThumbnails(unittest.TestCase):
     def test_extracts_and_yields_each_example(self):
