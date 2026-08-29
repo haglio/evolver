@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import prompt_scrape
+from util import html_query
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
@@ -375,31 +376,32 @@ class TestTitlecaseAction(unittest.TestCase):
 
 
 class TestCssSelector(unittest.TestCase):
+    """The DOM engine's public surface, in util.html_query."""
     def test_query_selector_finds_nested_element(self):
         html = '<body><div class="outer"><div class="inner">found</div></div></body>'
-        doc = prompt_scrape._parse_html_document(html)
-        node = prompt_scrape._query_selector(doc, "body > div.outer > div.inner")
+        doc = html_query.parse_document(html)
+        node = html_query.query_selector(doc, "body > div.outer > div.inner")
         self.assertIsNotNone(node)
-        self.assertEqual(prompt_scrape._text_content(node).strip(), "found")
+        self.assertEqual(html_query.text_content(node).strip(), "found")
 
     def test_query_selector_returns_none_for_no_match(self):
         html = '<body><div class="other">text</div></body>'
-        doc = prompt_scrape._parse_html_document(html)
-        self.assertIsNone(prompt_scrape._query_selector(doc, "body > div.missing"))
+        doc = html_query.parse_document(html)
+        self.assertIsNone(html_query.query_selector(doc, "body > div.missing"))
 
     def test_query_selector_nth_child(self):
         html = '<body><div><span>first</span><span>second</span><span>third</span></div></body>'
-        doc = prompt_scrape._parse_html_document(html)
-        node = prompt_scrape._query_selector(doc, "body > div > span:nth-child(2)")
+        doc = html_query.parse_document(html)
+        node = html_query.query_selector(doc, "body > div > span:nth-child(2)")
         self.assertIsNotNone(node)
-        self.assertEqual(prompt_scrape._text_content(node).strip(), "second")
+        self.assertEqual(html_query.text_content(node).strip(), "second")
 
     def test_query_selector_escaped_class_names(self):
         html = '<body><div class="text-[#fefefe]">styled</div></body>'
-        doc = prompt_scrape._parse_html_document(html)
-        node = prompt_scrape._query_selector(doc, r"body > div.text-\[\#fefefe\]")
+        doc = html_query.parse_document(html)
+        node = html_query.query_selector(doc, r"body > div.text-\[\#fefefe\]")
         self.assertIsNotNone(node)
-        self.assertEqual(prompt_scrape._text_content(node).strip(), "styled")
+        self.assertEqual(html_query.text_content(node).strip(), "styled")
 
     def test_image_page_url_from_src(self):
         self.assertEqual(
@@ -424,7 +426,7 @@ class TestExtractMetadataFields(unittest.TestCase):
           <div><h2>Style</h2><h1>Default</h1></div>
         </div>
         """
-        doc = prompt_scrape._parse_html_document(html)
+        doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
         self.assertEqual(result["model"], "Video v3")
         self.assertEqual(result["seed"], "12345")
@@ -439,7 +441,7 @@ class TestExtractMetadataFields(unittest.TestCase):
           </div>
         </div>
         """
-        doc = prompt_scrape._parse_html_document(html)
+        doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
         self.assertEqual(result["model"], "X Dream")
         self.assertEqual(result["creativity"], "Balance")
@@ -447,21 +449,21 @@ class TestExtractMetadataFields(unittest.TestCase):
     def test_converts_created_to_date(self):
         from datetime import date
         html = '<div><h2>Created</h2><h1>2w ago</h1></div>'
-        doc = prompt_scrape._parse_html_document(html)
+        doc = html_query.parse_document(html)
         with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
             result = prompt_scrape._extract_metadata_fields(doc)
         self.assertEqual(result["created"], "2026-03-14")
 
     def test_ignores_unknown_labels(self):
         html = '<div><h2>Inpainted</h2><h1>No</h1><h2>Model</h2><h1>v3</h1></div>'
-        doc = prompt_scrape._parse_html_document(html)
+        doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
         self.assertNotIn("inpainted", result)
         self.assertEqual(result["model"], "v3")
 
     def test_returns_empty_dict_when_no_fields(self):
         html = '<div><p>Hello world</p></div>'
-        doc = prompt_scrape._parse_html_document(html)
+        doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
         self.assertEqual(result, {})
 
@@ -515,6 +517,13 @@ class TestParseRelativeDate(unittest.TestCase):
         from datetime import date
         with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
             self.assertEqual(prompt_scrape._parse_relative_date("3mo ago"), "2025-12-28")
+
+    def test_minutes_ago(self):
+        # The 'm' unit had no case at all: collapsing the minutes branch into
+        # the hours one survived the whole file (audit probe P8).
+        from datetime import date
+        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+            self.assertEqual(prompt_scrape._parse_relative_date("5m ago"), "2026-03-28")
 
     def test_hours_ago(self):
         from datetime import date
