@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
 import unittest
 import uuid
 from contextlib import ExitStack, contextmanager
@@ -11,7 +12,12 @@ from unittest.mock import patch
 import config
 
 
-ROOT = Path(__file__).resolve().parent.parent / ".tmp-test" / "unittest"
+# The system temp dir, not a directory inside the checkout: the suite must not
+# write into the tree it is testing (a killed run left case directories in the
+# repo, a read-only checkout could not run at all, and fixture paths were bound
+# to wherever the repo happened to live, so a second worktree behaved
+# differently from the primary one).
+ROOT = Path(tempfile.gettempdir()) / "evolver-tests" / "unittest"
 
 
 @contextmanager
@@ -22,6 +28,10 @@ def workspace_temp_dir():
     try:
         yield path
     finally:
+        # ignore_errors stays for now: on Windows a file a media backend still
+        # holds open makes rmtree raise, and whether any test leans on that
+        # silence can only be proven on windows-latest, which the publication
+        # freeze keeps out of reach. Dropping it is recorded in the changelog.
         shutil.rmtree(path, ignore_errors=True)
 
 
