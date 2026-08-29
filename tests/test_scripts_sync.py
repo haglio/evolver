@@ -188,6 +188,32 @@ class TestScriptsSync(unittest.TestCase):
             self.assertTrue(original_script.exists())
             self.assertEqual(original_script.read_text(encoding="utf-8"), processed_script.read_text(encoding="utf-8"))
 
+    def test_two_differing_sibling_scripts_leave_the_variant_unscripted(self):
+        """The guard against copying one clip's funscript onto another variant:
+        when two siblings hold DIFFERING scripts there is no right source, so
+        the stage must refuse and count the group -- dropping the filecmp
+        comparison entirely used to change nothing (audit probe P19), and the
+        counter was asserted nowhere."""
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            studio = video_root / "2D" / "non_AI" / "studio"
+            studio.mkdir(parents=True)
+            (studio / "clip.mp4").write_bytes(b"original")
+            (studio / "clip_apo8_iris2.mp4").write_bytes(b"variant")
+            (studio / "clip_topaz.mp4").write_bytes(b"unscripted variant")
+            scripts = script_root / "2D" / "non_AI" / "studio"
+            scripts.mkdir(parents=True)
+            (scripts / "clip.funscript").write_text('{"actions":[1]}', encoding="utf-8")
+            (scripts / "clip_apo8_iris2.funscript").write_text('{"actions":[2]}', encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.ambiguous_variant_groups, 1)
+            self.assertEqual(result.copied_variants, 0)
+            self.assertFalse((scripts / "clip_topaz.funscript").exists())
+
     def test_records_which_scripts_went_unmatched(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
