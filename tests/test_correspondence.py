@@ -137,3 +137,46 @@ class TestCorrespondence:
             assert result.ok
             assert result.sorted_count == 1
             assert result.outbox_count == 1
+
+
+class TestMain:
+    """The standalone entry point: the exit code is the contract a shell or a
+    scheduled task reads, and the printed report is how the check is run by
+    hand. Neither had a single test (66% file coverage, main() all missing)."""
+
+    def test_a_clean_tree_reports_ok_and_exits_zero(self, capsys):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            outbox_dir = root / "outbox"
+            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
+            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA").mkdir(parents=True)
+            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"a")
+            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-a_topaz.mp4").write_bytes(b"a")
+
+            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
+                exit_code = check_correspondence.main()
+
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "[OK] Counts match: 1 files each" in out
+        assert "perfect 1-to-1 correspondence" in out
+
+    def test_a_mismatched_tree_names_the_orphans_and_exits_one(self, capsys):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            outbox_dir = root / "outbox"
+            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
+            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA").mkdir(parents=True)
+            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"a")
+            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-b_topaz.mp4").write_bytes(b"b")
+
+            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
+                exit_code = check_correspondence.main()
+
+        out = capsys.readouterr().out
+        assert exit_code == 1
+        assert "[MISMATCH]" not in out  # counts match at 1 vs 1
+        assert "[ORPHAN-OUTBOX]" in out
+        assert "clip-b_topaz.mp4" in out
+        assert "[ORPHAN-SORTED]" in out
+        assert "[FAIL]" in out
