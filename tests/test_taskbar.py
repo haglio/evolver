@@ -23,7 +23,11 @@ class TestAppSetsTaskbarProperties:
 
         mock_set.assert_called_once()
         args = mock_set.call_args
-        # First arg is HWND (int), second is the app model ID
+        # The AppUserModelID is a Windows identity contract: it is what makes a
+        # pinned taskbar shortcut belong to Evolver rather than to pythonw, so
+        # the literal is pinned here, beside the display name -- comparing the
+        # call against the imported constant accepted any value at all.
+        assert args[0][1] == "Evolver.TrayApp"
         assert args[0][1] == _APP_MODEL_ID
         # Display name should be "Evolver"
         assert args[0][3] == "Evolver"
