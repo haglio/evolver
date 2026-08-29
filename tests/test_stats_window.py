@@ -6,6 +6,7 @@ from PyQt6.QtGui import QImage
 
 from gui.run_record import RunRecord
 from gui.stats_window import STAGE_COLORS, StackedAreaChart, StatsWindow, _pick_y_ticks
+from tests.temp_helpers import make_run_record
 
 
 def _make_record(
@@ -16,13 +17,12 @@ def _make_record(
         {"name": name, "status": "completed", "duration_seconds": dur}
         for name, dur in stage_durations.items()
     ]
-    return RunRecord(
+    return make_run_record(
         id="test",
         started_at=started_at,
         finished_at="2026-03-30T00:00:01",
         duration_seconds=sum(stage_durations.values()),
         trigger="manual",
-        status="success",
         stages=stages,
     )
 
