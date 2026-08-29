@@ -74,6 +74,27 @@ class TestPromptScrape(unittest.TestCase):
                 },
             )
 
+    def test_a_video_outside_an_orientation_folder_is_never_scraped(self):
+        """The guard against a stray sub-folder: a video not under
+        landscape/ or portrait/ has no derivable mirror path, so scraping it
+        would write its sidecar somewhere wrong -- deleting the skip used to
+        change nothing (audit probe P9)."""
+        with workspace_temp_dir() as root:
+            sorted_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "extras", "stray.mp4")
+
+            with self._override(root):
+                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
+                    # A real (empty) document, so if the skip is ever removed
+                    # the scrape fails loudly instead of chewing on a Mock.
+                    with patch("tasks.prompt_scrape._fetch_dom", return_value="<html></html>") as fetch_dom:
+                        result = prompt_scrape.run()
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.newly_scraped, 0)
+            fetch_dom.assert_not_called()
+            self.assertEqual(list(metadata_dir.rglob("*.json")), [])
+
     def test_run_no_scrape_strat_for_unknown_source(self):
         with workspace_temp_dir() as root:
             sorted_dir, _metadata_dir = self._dirs(root)

@@ -103,6 +103,32 @@ class TestPurgeWeird(unittest.TestCase):
             show_error_window.assert_called_once()
             self.assertFalse(weird_file.exists())
 
+    def test_run_deletes_every_sorted_copy_matching_the_source_name(self):
+        """Pinned as it behaves today: one weird file whose source basename
+        lives under two source folders loses BOTH copies -- rglob matches by
+        name alone, and every match is unlinked (audit probe P13 narrowed the
+        loop to one match with the suite unchanged). Whether deleting both is
+        the intended behaviour is recorded in the changelog as a question,
+        not answered here."""
+        with workspace_temp_dir() as root:
+            weird_dir = root / "weird"
+            sorted_dir = root / "sorted"
+            weird_dir.mkdir(parents=True)
+            copy_a = sorted_dir / "sourceA" / "landscape" / "clip.mp4"
+            copy_b = sorted_dir / "sourceB" / "portrait" / "clip.mp4"
+            for copy in (copy_a, copy_b):
+                copy.parent.mkdir(parents=True)
+                copy.write_bytes(b"sorted")
+            (weird_dir / "clip_topaz.mp4").write_bytes(b"weird")
+
+            with override_config(SORTED_DIR=sorted_dir, WEIRD_DIR=weird_dir):
+                result = purge_weird.run()
+
+            self.assertEqual(result.deleted_sorted, 2)
+            self.assertEqual(result.missing_sorted, [])
+            self.assertFalse(copy_a.exists())
+            self.assertFalse(copy_b.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
