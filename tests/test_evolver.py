@@ -24,6 +24,7 @@ def _stage_mocks() -> dict:
         "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
         "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
         "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
+        "genau_deliver_run": Mock(return_value=Mock(failed=0)),
         "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
         "nonai_group_run": Mock(),
         "clip_scripts_run": Mock(),
@@ -45,6 +46,7 @@ _STAGE_PATCHES = [
     ("evolver.scene_scripts.run", "scene_scripts_run"),
     ("evolver.scripts_sync.run", "scripts_sync_run"),
     ("evolver.upscale.run", "upscale_run"),
+    ("evolver.genau_deliver.run", "genau_deliver_run"),
     ("evolver.nonai_upscale.run", "nonai_run"),
     ("evolver.nonai_group.run", "nonai_group_run"),
     ("evolver.reference_sync.run", "reference_sync_run"),
@@ -256,6 +258,32 @@ class TestRunPipeline(unittest.TestCase):
         defaults = _stage_mocks()
         defaults.update(overrides)
         return _patched_stages(defaults), defaults
+
+    def test_every_stage_the_pipeline_runs_is_a_stub_from_the_mock_table(self):
+        """The invariant _stage_mocks' docstring states, made enforceable.
+
+        A stage missing from the table runs for real against whatever library
+        the overlay resolves to — genau_deliver was missing for months and 38
+        tests ran a real move-and-delete stage, kept inert only by the example
+        overlay's placeholder path. Driving every stage to actually run and
+        demanding a Mock result catches the next stage added without a stub.
+        """
+        stack, _ = self._patch_all_stages(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+        self.assertEqual(len(result.stages), 14)
+        for stage in result.stages:
+            with self.subTest(stage=stage.name):
+                self.assertNotEqual(stage.status, "skipped",
+                                    "every stage must actually run in this test")
+                self.assertIsInstance(
+                    stage.result, Mock,
+                    f"stage {stage.name!r} ran its real function -- add it to "
+                    "_stage_mocks and _STAGE_PATCHES",
+                )
 
     def test_returns_pipeline_result(self):
         stack, _ = self._patch_all_stages()
