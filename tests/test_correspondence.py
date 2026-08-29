@@ -89,6 +89,36 @@ class TestCorrespondence:
             assert result.duplicates == {}
             show_error_window.assert_called_once()
 
+    def test_run_detects_two_outbox_files_sharing_a_basename(self):
+        """The duplicate map is a named failure mode of the stage -- it fails
+        the run and names both paths in the popup -- yet the detection ran under
+        no test at all: relaxing `len(paths) > 1` to `> 99` changed nothing
+        (audit probe P24). Two orientations of one clip both upscaled produce
+        exactly this: same basename, two outbox folders, every file matched."""
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            outbox_dir = root / "outbox"
+
+            for orient in ("landscape", "portrait"):
+                (sorted_dir / "sourceA" / orient).mkdir(parents=True)
+                (outbox_dir / "upscaled_by_orientation" / orient / "sourceA").mkdir(parents=True)
+                (sorted_dir / "sourceA" / orient / "clip-a.mp4").write_bytes(b"a")
+                (outbox_dir / "upscaled_by_orientation" / orient / "sourceA" / "clip-a_topaz.mp4").write_bytes(b"a")
+
+            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
+                result = check_correspondence.run(show_popup=False)
+
+            assert not result.ok
+            assert list(result.duplicates) == ["clip-a_topaz.mp4"]
+            paths = result.duplicates["clip-a_topaz.mp4"]
+            assert len(paths) == 2
+            assert any("landscape" in p for p in paths)
+            assert any("portrait" in p for p in paths)
+            # the duplicate pair is fully matched, so it is only the
+            # duplication that fails the run
+            assert result.orphan_outbox == []
+            assert result.orphan_sorted == []
+
     def test_run_ignores_partial_outbox_files(self):
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
