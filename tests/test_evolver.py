@@ -66,6 +66,16 @@ def _patched_stages(mocks: dict) -> ExitStack:
     return stack
 
 
+# The pipeline's stage order, in one place. gui/progress.ALL_STAGES cannot be
+# the source yet: it is missing genau_deliver (bug 5, held for sign-off), so
+# deriving from it would encode the bug into these tests.
+_EXPECTED_STAGE_ORDER = [
+    "purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai",
+    "verify", "references", "bookmarks", "clip_scripts", "scene_scripts",
+    "scripts", "group_non_ai", "dupes",
+]
+
+
 class TestEvolverMain:
     """Tests for the evolver.main() pipeline orchestration."""
 
@@ -99,12 +109,6 @@ class TestEvolverMain:
         )
         assert mocks["exit_code"] == 1
         mocks["sort_run"].assert_not_called()
-
-    def test_exits_nonzero_on_purge_missing_sorted(self):
-        mocks = self._run_pipeline(
-            purge_run=Mock(return_value=Mock(missing_sorted=["file.mp4"])),
-        )
-        assert mocks["exit_code"] == 1
 
     # --- Stage sequencing ---
 
@@ -163,46 +167,40 @@ class TestEvolverMain:
         mocks["nonai_run"].assert_called_once_with(
             allow_start=False, stop=False, presence_managed=False)
 
-    def test_exits_nonzero_on_nonai_upscale_failure(self):
-        mocks = self._run_pipeline(
-            nonai_run=Mock(return_value=Mock(failed=1, deferred_low_disk=False)),
-        )
-        assert mocks["exit_code"] == 1
-
     # --- Exit code propagation ---
 
-    def test_exits_nonzero_on_correspondence_failure(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
-            has_pending_work=Mock(return_value=True),
-            correspondence_run=Mock(return_value=Mock(ok=False)),
-        )
-        assert mocks["exit_code"] == 1
+    @pytest.mark.parametrize(
+        "failing_overrides",
+        [
+            pytest.param(lambda: dict(
+                purge_run=Mock(return_value=Mock(missing_sorted=["file.mp4"]))), id="purge"),
+            pytest.param(lambda: dict(
+                nonai_run=Mock(return_value=Mock(failed=1, deferred_low_disk=False))), id="upscale_non_ai"),
+            pytest.param(lambda: dict(
+                sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
+                has_pending_work=Mock(return_value=True),
+                correspondence_run=Mock(return_value=Mock(ok=False))), id="verify"),
+            pytest.param(lambda: dict(
+                duplicate_sizes_run=Mock(return_value=Mock(ok=False))), id="dupes"),
+            pytest.param(lambda: dict(
+                scripts_sync_run=Mock(return_value=Mock(ok=False))), id="scripts"),
+            pytest.param(lambda: dict(
+                bookmarks_sync_run=Mock(return_value=Mock(ok=False))), id="bookmarks"),
+            pytest.param(lambda: dict(
+                sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+                has_pending_work=Mock(return_value=True),
+                upscale_run=Mock(return_value=Mock(
+                    failed=2, deferred_low_disk=False, pending_after_run=0))), id="upscale"),
+            pytest.param(lambda: dict(
+                prompt_scrape_run=Mock(return_value=Mock(ok=False))), id="metadata"),
+        ],
+    )
+    def test_a_failing_stage_exits_nonzero(self, failing_overrides):
+        """Eight longhand tests differing only in which mock failed, as a table.
 
-    def test_exits_nonzero_on_duplicate_size_failure(self):
-        mocks = self._run_pipeline(
-            duplicate_sizes_run=Mock(return_value=Mock(ok=False)),
-        )
-        assert mocks["exit_code"] == 1
-
-    def test_exits_nonzero_on_scripts_sync_failure(self):
-        mocks = self._run_pipeline(
-            scripts_sync_run=Mock(return_value=Mock(ok=False)),
-        )
-        assert mocks["exit_code"] == 1
-
-    def test_exits_nonzero_on_bookmarks_sync_failure(self):
-        mocks = self._run_pipeline(
-            bookmarks_sync_run=Mock(return_value=Mock(ok=False)),
-        )
-        assert mocks["exit_code"] == 1
-
-    def test_exits_nonzero_on_upscale_failure(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-            upscale_run=Mock(return_value=Mock(failed=2, deferred_low_disk=False, pending_after_run=0)),
-        )
+        The overrides come from factories so each case gets fresh Mocks.
+        """
+        mocks = self._run_pipeline(**failing_overrides())
         assert mocks["exit_code"] == 1
 
     def test_exits_zero_when_upscale_only_held_back_for_low_disk(self):
@@ -213,12 +211,6 @@ class TestEvolverMain:
             upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=True, pending_after_run=3)),
         )
         assert mocks["exit_code"] == 0
-
-    def test_exits_nonzero_on_prompt_scrape_failure(self):
-        mocks = self._run_pipeline(
-            prompt_scrape_run=Mock(return_value=Mock(ok=False)),
-        )
-        assert mocks["exit_code"] == 1
 
     # --- All stages called on clean run ---
 
@@ -285,7 +277,7 @@ class TestRunPipeline:
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        assert names == ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "dupes"]
+        assert names == _EXPECTED_STAGE_ORDER
 
     def test_references_run_before_bookmarks_prunes_the_favorites(self):
         """Both stages touch favs.csv, and bookmarks drops rows whose file is gone.
@@ -313,7 +305,7 @@ class TestRunPipeline:
         with stack:
             evolver.run_pipeline(on_stage_start=on_start)
         started_names = [call.args[0] for call in on_start.call_args_list]
-        assert started_names == ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "dupes"]
+        assert started_names == _EXPECTED_STAGE_ORDER
 
     def test_on_stage_complete_called_with_result_and_status(self):
         on_complete = Mock()
