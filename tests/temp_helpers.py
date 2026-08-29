@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import shutil
+import unittest
 import uuid
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
@@ -30,6 +32,69 @@ def override_config(**overrides):
         for key, value in overrides.items():
             stack.enter_context(patch.object(config, key, value))
         yield
+
+
+LARKIN = Path("2D") / "non_AI" / "larkin"
+
+
+class CarvedClipLibraryCase(unittest.TestCase):
+    """A carved clip, its source scene, and their scripts, in a temp library.
+
+    The shared half of the clip_scripts and scene_scripts fixtures: the two
+    stages carry a funscript between a clip and its scene in opposite
+    directions, so the tree is one shape with the script on either end. Each
+    test file used to carry its own byte-near-identical copy of this class.
+    """
+
+    def setUp(self):
+        self._workspace = workspace_temp_dir()
+        self.root = self._workspace.__enter__()
+        self.addCleanup(self._workspace.__exit__, None, None, None)
+        self.videos = self.root / "videos"
+        self.scripts = self.root / "scripts"
+        self.metadata = self.root / "metadata"
+
+    def make_scene(self, name="scene", actions=None):
+        scene = self.videos / LARKIN / "scenes" / f"{name}.mp4"
+        scene.parent.mkdir(parents=True, exist_ok=True)
+        scene.write_bytes(b"scene")
+        if actions is not None:
+            self.write_scene_script(scene, actions)
+        return scene
+
+    def write_scene_script(self, scene, actions, **extra):
+        script = self.scene_script(scene.stem)
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text(json.dumps({"actions": actions, **extra}), encoding="utf-8")
+        return script
+
+    def make_clip(self, scene, name="clip", scene_offset=10.0, clip=None, actions=None):
+        video = self.videos / LARKIN / "clips" / f"{name}.mp4"
+        video.parent.mkdir(parents=True, exist_ok=True)
+        video.write_bytes(b"clip")
+        sidecar = self.metadata / LARKIN / "clips" / f"{name}.json"
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        if clip is None:
+            clip = {"full_video": str(scene), "scene_offset": scene_offset}
+        sidecar.write_text(json.dumps({"clip": clip}), encoding="utf-8")
+        if actions is not None:
+            script = self.clip_script(name)
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text(json.dumps({"actions": actions}), encoding="utf-8")
+        return video
+
+    def scene_script(self, name="scene"):
+        return self.scripts / LARKIN / "scenes" / f"{name}.funscript"
+
+    def clip_script(self, name="clip"):
+        return self.scripts / LARKIN / "clips" / f"{name}.funscript"
+
+    def library_overrides(self):
+        return override_config(
+            VIDEO_LIBRARY_DIR=self.videos,
+            SCRIPT_LIBRARY_DIR=self.scripts,
+            METADATA_DIR=self.metadata,
+        )
 
 
 def make_run_record(**overrides):
