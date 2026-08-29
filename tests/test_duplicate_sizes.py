@@ -61,3 +61,38 @@ class TestDuplicateSizes:
 
             assert result.ok
             assert result.scanned_count == 2
+
+
+class TestMain:
+    """The standalone entry point's report and exit code, previously untested
+    (main() was the whole of the file's missing coverage)."""
+
+    def test_a_clean_tree_reports_ok_and_exits_zero(self, capsys):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
+            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"a")
+
+            with override_config(NON_AI_DIR=sorted_dir):
+                exit_code = check_duplicate_sizes.main()
+
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "[OK]" in out
+
+    def test_a_duplicate_pair_is_named_and_exits_one(self, capsys):
+        with workspace_temp_dir() as root:
+            sorted_dir = root / "sorted"
+            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
+            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"same-size")
+            (sorted_dir / "sourceA" / "landscape" / "clip-b.mp4").write_bytes(b"same-size")
+
+            with override_config(NON_AI_DIR=sorted_dir):
+                exit_code = check_duplicate_sizes.main()
+
+        out = capsys.readouterr().out
+        assert exit_code == 1
+        assert "[DUPLICATE] 1 exact-size duplicate group(s) found:" in out
+        assert "clip-a.mp4" in out
+        assert "clip-b.mp4" in out
+        assert "[FAIL]" in out
