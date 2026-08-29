@@ -397,49 +397,126 @@ class TestToggleSwitch:
         assert not toggle.isChecked()
 
 
-class TestQuitConfirmation:
-    """Quit button in the window toolbar should prompt for confirmation."""
-
-    def test_quit_proceeds_on_accept(self, request):
-        app = build_evolver_app(request)
-
-        with patch("gui.app.QMessageBox") as mock_box:
-            mock_box.StandardButton.Yes = QMessageBox.StandardButton.Yes
-            mock_box.StandardButton.No = QMessageBox.StandardButton.No
-            mock_box.question.return_value = QMessageBox.StandardButton.Yes
-            with patch.object(app, "_quit") as mock_quit:
-                app._confirm_quit()
-                mock_quit.assert_called_once()
-
-    def test_quit_cancelled_on_reject(self, request):
-        app = build_evolver_app(request)
-
-        with patch("gui.app.QMessageBox") as mock_box:
-            mock_box.StandardButton.Yes = QMessageBox.StandardButton.Yes
-            mock_box.StandardButton.No = QMessageBox.StandardButton.No
-            mock_box.question.return_value = QMessageBox.StandardButton.No
-            with patch.object(app, "_quit") as mock_quit:
-                app._confirm_quit()
-                mock_quit.assert_not_called()
-
-
 class TestToolbarAppWiring:
-    """EvolverApp should wire window toolbar actions the same as tray actions."""
+    """Triggering each control produces that control's effect.
 
-    def test_app_connects_window_toolbar_actions(self, request):
-        app = build_evolver_app(request)
+    These used to assert ``action.receivers(action.triggered) > 0``, which is
+    true for a connection to anything at all — rewiring Quit, Run Now and
+    Settings all to _show_window left the whole suite green (audit probe P8).
+    Every test here fires the real action and asserts what the user gets, with
+    the collaborator patched at the gui.app boundary.
+    """
 
-        assert app._window.quit_action.receivers(app._window.quit_action.triggered) > 0
-        assert app._window.run_now_action.receivers(app._window.run_now_action.triggered) > 0
-        assert app._window.settings_action.receivers(app._window.settings_action.triggered) > 0
-        assert app._window.active_toggle.receivers(app._window.active_toggle.clicked) > 0
+    @pytest.fixture
+    def app(self, request):
+        return build_evolver_app(request)
 
-    def test_app_connects_window_restart_action(self, request):
-        app = build_evolver_app(request)
+    def _quit_confirmation(self, answer):
+        box = patch("gui.app.QMessageBox")
+        mock_box = box.start()
+        mock_box.StandardButton.Yes = QMessageBox.StandardButton.Yes
+        mock_box.StandardButton.No = QMessageBox.StandardButton.No
+        mock_box.question.return_value = answer
+        return box, mock_box
 
-        assert app._window.restart_action.receivers(app._window.restart_action.triggered) > 0
+    def test_the_quit_button_asks_first_and_a_yes_quits(self, app):
+        box, mock_box = self._quit_confirmation(QMessageBox.StandardButton.Yes)
+        try:
+            with patch.object(app, "_quit") as mock_quit:
+                app._window.quit_action.trigger()
+        finally:
+            box.stop()
+        mock_box.question.assert_called_once()
+        mock_quit.assert_called_once()
 
-    def test_app_connects_tray_restart_action(self, request):
-        app = build_evolver_app(request)
+    def test_a_no_to_the_quit_confirmation_changes_nothing(self, app):
+        box, _ = self._quit_confirmation(QMessageBox.StandardButton.No)
+        try:
+            with patch.object(app, "_quit") as mock_quit:
+                app._window.quit_action.trigger()
+        finally:
+            box.stop()
+        mock_quit.assert_not_called()
 
-        assert app._tray.restart_action.receivers(app._tray.restart_action.triggered) > 0
+    def test_run_now_starts_a_manual_pipeline_run(self, app):
+        with patch("gui.app.PipelineWorker") as mock_worker:
+            app._window.run_now_action.trigger()
+        assert mock_worker.call_args.kwargs["trigger"] == "manual"
+        mock_worker.return_value.start.assert_called_once()
+
+    def test_the_trays_run_now_starts_a_manual_run_too(self, app):
+        with patch("gui.app.PipelineWorker") as mock_worker:
+            app._tray.run_now_action.trigger()
+        assert mock_worker.call_args.kwargs["trigger"] == "manual"
+        mock_worker.return_value.start.assert_called_once()
+
+    def test_the_settings_button_opens_the_settings_dialog(self, app):
+        with patch("gui.app.SettingsDialog") as mock_dialog:
+            mock_dialog.return_value.exec.return_value = False
+            app._window.settings_action.trigger()
+        mock_dialog.assert_called_once_with(app._settings, app._window)
+        mock_dialog.return_value.exec.assert_called_once()
+
+    def test_the_trays_settings_item_opens_the_same_dialog(self, app):
+        with patch("gui.app.SettingsDialog") as mock_dialog:
+            mock_dialog.return_value.exec.return_value = False
+            app._tray.settings_action.trigger()
+        mock_dialog.assert_called_once_with(app._settings, app._window)
+
+    def test_the_stats_button_opens_the_stats_window(self, app):
+        with patch("gui.app.StatsWindow") as mock_stats, \
+             patch("gui.app.load_runs", return_value=[]) as mock_load:
+            app._window.stats_action.trigger()
+        mock_stats.assert_called_once_with([], app._window)
+        mock_stats.return_value.show.assert_called_once()
+        mock_load.assert_called_once()
+
+    def test_the_trays_stats_item_opens_the_stats_window_too(self, app):
+        with patch("gui.app.StatsWindow") as mock_stats, \
+             patch("gui.app.load_runs", return_value=[]):
+            app._tray.stats_action.trigger()
+        mock_stats.return_value.show.assert_called_once()
+
+    def test_the_active_toggle_pauses_and_resumes_the_scheduler(self, app):
+        assert not app._scheduler.is_paused
+        app._window.active_toggle.clicked.emit(False)
+        assert app._scheduler.is_paused
+        app._window.active_toggle.clicked.emit(True)
+        assert not app._scheduler.is_paused
+
+    def test_the_trays_pause_item_toggles_the_scheduler_too(self, app):
+        app._tray.pause_action.trigger()
+        assert app._scheduler.is_paused
+        app._tray.pause_action.trigger()
+        assert not app._scheduler.is_paused
+
+    def test_the_restart_button_relaunches_the_app_and_quits_this_one(self, app):
+        with patch("gui.app.subprocess.Popen") as mock_popen, \
+             patch.object(app, "_quit") as mock_quit:
+            app._window.restart_action.trigger()
+        argv = mock_popen.call_args.args[0]
+        assert any("tray_app.py" in str(part) for part in argv)
+        mock_quit.assert_called_once()
+
+    def test_the_trays_restart_item_relaunches_too(self, app):
+        with patch("gui.app.subprocess.Popen") as mock_popen, \
+             patch.object(app, "_quit") as mock_quit:
+            app._tray.restart_action.trigger()
+        argv = mock_popen.call_args.args[0]
+        assert any("tray_app.py" in str(part) for part in argv)
+        mock_quit.assert_called_once()
+
+    def test_the_trays_open_item_shows_the_window(self, app):
+        assert not app._window.isVisible()
+        app._tray.open_action.trigger()
+        assert app._window.isVisible()
+
+    def test_the_trays_quit_item_quits_without_asking(self, app):
+        # The tray connects straight to the bound _quit, so patching the
+        # attribute cannot intercept it; the observable end of _quit is the
+        # QApplication being asked to exit.
+        with patch.object(app._app, "quit") as mock_app_quit, \
+             patch("gui.app.QMessageBox") as mock_box:
+            app._tray.quit_action.trigger()
+        mock_app_quit.assert_called_once()
+        mock_box.question.assert_not_called()
