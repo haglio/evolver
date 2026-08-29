@@ -111,8 +111,31 @@ class TestBackfillSession(unittest.TestCase):
         self.assertIsNone(session.current)
 
     def test_the_clip_advances_before_the_file_work_runs(self):
-        worker = DeferredWorker()
+        """The session's headline promise, observed at the dispatch itself.
+
+        A worker that merely held every task could not see the ordering:
+        swapping take_effect and submit in _commit left the whole suite green
+        (audit probe 19), because record_action was unrun under either order.
+        This worker looks at the queue the moment submit is called, so the
+        order of the two statements is the thing under test.
+        """
+        class QueueWatchingWorker:
+            def __init__(self):
+                self.pending = []
+                self.on_screen_at_submit = []
+                self.session = None
+
+            def submit(self, task):
+                self.on_screen_at_submit.append(self.session.current)
+                self.pending.append(task)
+
+            def drain(self):
+                while self.pending:
+                    self.pending.pop(0)()
+
+        worker = QueueWatchingWorker()
         session = self._session(worker=worker)
+        worker.session = session
         clip = session.current
 
         with patch("backfill.session.record_action") as record, \
@@ -121,6 +144,8 @@ class TestBackfillSession(unittest.TestCase):
 
             record.assert_not_called()
             self.assertNotEqual(session.current, clip)
+            # the clip had already left the screen when its work was dispatched
+            self.assertEqual(worker.on_screen_at_submit, [session.current])
 
             worker.drain()
             record.assert_called_once_with(clip, "Side Dancing")
@@ -274,6 +299,24 @@ class TestSame(unittest.TestCase):
         record.assert_any_call(second, "POV Zeta")
         self.assertEqual(note, f"{second.name} → POV Zeta")
         self.assertNotEqual(second, first)
+
+    def test_same_repeats_the_most_recent_act_not_the_first(self):
+        """No other test ever speaks two DIFFERENT acts before "same", so the
+        direction of _last_action's walk was invisible: reversing it -- making
+        "same" repeat the session's first act -- left all 149 tests green
+        (audit probe 9). In use that writes the wrong action into every clip
+        of a run, and fun_time and genau read the sidecar it lands in."""
+        session = self._session(count=4)
+
+        with patch("backfill.session.record_action") as record, \
+             patch("backfill.session.sidecar_snapshot"):
+            session.apply("side dance")
+            session.apply("pov zeta")
+            third = session.current
+            note = session.apply("same")
+
+        record.assert_any_call(third, "POV Zeta")
+        self.assertEqual(note, f"{third.name} → POV Zeta")
 
     def test_same_before_any_action_repeats_nothing(self):
         session = self._session()
