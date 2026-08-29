@@ -9,8 +9,16 @@ import re
 import subprocess
 from dataclasses import dataclass
 from email.utils import parsedate
-from html.parser import HTMLParser
 from pathlib import Path
+
+from util.html_query import (
+    Node,
+    extract_label_values,
+    find_all_by_tag,
+    parse_document,
+    query_selector,
+    text_content,
+)
 from urllib.parse import urlparse
 
 import config
@@ -145,8 +153,8 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
     video_metadata: dict[str, str] = {}
     for candidate in candidate_urls:
         html = _fetch_dom(candidate, browser)
-        document = _parse_html_document(html)
-        panel = _query_selector(document, _CONTENT_PANEL_SELECTOR)
+        document = parse_document(html)
+        panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
         if panel is not None:
             video_prompt = _extract_prompt_text(panel)
             source_image_url = _extract_source_image_url(panel)
@@ -169,8 +177,8 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
 
     if source_image_url:
         image_html = _fetch_dom(source_image_url, browser)
-        image_document = _parse_html_document(image_html)
-        image_panel = _query_selector(image_document, _CONTENT_PANEL_SELECTOR)
+        image_document = parse_document(image_html)
+        image_panel = query_selector(image_document, _CONTENT_PANEL_SELECTOR)
         image_data: dict[str, str] = {}
         if image_panel is not None:
             pos = _extract_prompt_text(image_panel)
@@ -209,7 +217,7 @@ def _build_strategies(browser):
     return strategies
 
 
-def _extract_prompt_text(panel: _Node) -> str:
+def _extract_prompt_text(panel: Node) -> str:
     """Extract the positive prompt text from a content panel.
 
     The prompt is the first text block inside a div > div structure that
@@ -220,14 +228,14 @@ def _extract_prompt_text(panel: _Node) -> str:
             continue
         inner_divs = [c for c in child.children if c.tag == "div"]
         if len(inner_divs) == 1:
-            text = _text_content(inner_divs[0]).strip()
-            has_h2 = any(True for _ in _find_all_by_tag(inner_divs[0], "h2"))
+            text = text_content(inner_divs[0]).strip()
+            has_h2 = any(True for _ in find_all_by_tag(inner_divs[0], "h2"))
             if text and not has_h2:
                 return text
     return ""
 
 
-def _extract_negative_prompt_text(panel: _Node) -> str:
+def _extract_negative_prompt_text(panel: Node) -> str:
     """Extract the negative prompt text from a content panel.
 
     The negative prompt is in a div with class 'max-h-80' that appears after
@@ -236,18 +244,18 @@ def _extract_negative_prompt_text(panel: _Node) -> str:
     found_label = False
     for child in panel.children:
         if not found_label:
-            text = _text_content(child).strip().lower()
+            text = text_content(child).strip().lower()
             if "negative prompt" in text and "max-h-80" not in child.attrs.get("class", ""):
                 found_label = True
                 continue
         if found_label and "max-h-80" in child.attrs.get("class", ""):
-            return _text_content(child).strip()
+            return text_content(child).strip()
     return ""
 
 
-def _extract_source_image_url(panel: _Node) -> str:
+def _extract_source_image_url(panel: Node) -> str:
     """Find the source image thumbnail img and derive the image page URL."""
-    for img in _find_all_by_tag(panel, "img"):
+    for img in find_all_by_tag(panel, "img"):
         src = img.attrs.get("src", "")
         if src:
             return _image_page_url_from_src(src)
@@ -303,45 +311,6 @@ def _find_browser_executable() -> Path | None:
     return None
 
 
-class _Node:
-    def __init__(self, tag: str, attrs: dict[str, str], parent: "_Node | None" = None):
-        self.tag = tag
-        self.attrs = attrs
-        self.parent = parent
-        self.children: list[_Node] = []
-        self.text_chunks: list[str] = []
-
-
-class _DocumentParser(HTMLParser):
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.root = _Node("document", {})
-        self.stack = [self.root]
-
-    def handle_starttag(self, tag: str, attrs):
-        node = _Node(tag, {key: value or "" for key, value in attrs}, self.stack[-1])
-        self.stack[-1].children.append(node)
-        self.stack.append(node)
-
-    def handle_endtag(self, tag: str):
-        if len(self.stack) > 1:
-            self.stack.pop()
-
-    def handle_startendtag(self, tag: str, attrs):
-        node = _Node(tag, {key: value or "" for key, value in attrs}, self.stack[-1])
-        self.stack[-1].children.append(node)
-
-    def handle_data(self, data: str):
-        self.stack[-1].text_chunks.append(data)
-
-
-@dataclass
-class _SelectorPart:
-    tag: str
-    classes: list[str]
-    nth_child: int | None = None
-
-
 @dataclass
 class _ProviderEmbeddedMetadata:
     prompt: str = ""
@@ -357,96 +326,6 @@ class _ProviderEmbeddedMetadata:
     action: str = ""
     style: str = ""
     creativity: str = ""
-
-
-def _parse_html_document(html: str) -> _Node:
-    parser = _DocumentParser()
-    parser.feed(html)
-    return parser.root
-
-
-def _query_selector(root: _Node, selector: str) -> _Node | None:
-    parts = [_parse_selector_part(part.strip()) for part in selector.split(">")]
-    current = [root]
-    for index, part in enumerate(parts):
-        next_nodes: list[_Node] = []
-        for node in current:
-            candidates = _descendants(node) if index == 0 else node.children
-            for candidate in candidates:
-                if _matches_selector_part(candidate, part):
-                    next_nodes.append(candidate)
-        if not next_nodes:
-            return None
-        current = next_nodes
-    return current[0]
-
-
-def _descendants(node: _Node):
-    for child in node.children:
-        yield child
-        yield from _descendants(child)
-
-
-def _parse_selector_part(raw: str) -> _SelectorPart:
-    nth_child = None
-    match = re.search(r":nth-child\((\d+)\)", raw)
-    if match:
-        nth_child = int(match.group(1))
-        raw = raw[:match.start()] + raw[match.end():]
-
-    bits = _split_selector_token(raw)
-    tag = bits[0] or "*"
-    classes = [_unescape_css_name(bit) for bit in bits[1:] if bit]
-    return _SelectorPart(tag=tag, classes=classes, nth_child=nth_child)
-
-
-def _unescape_css_name(value: str) -> str:
-    return re.sub(r"\\(.)", r"\1", value)
-
-
-def _split_selector_token(raw: str) -> list[str]:
-    parts: list[str] = []
-    current: list[str] = []
-    escaped = False
-    for char in raw:
-        if escaped:
-            current.append(char)
-            escaped = False
-            continue
-        if char == "\\":
-            current.append(char)
-            escaped = True
-            continue
-        if char == ".":
-            parts.append("".join(current))
-            current = []
-            continue
-        current.append(char)
-    parts.append("".join(current))
-    return parts
-
-
-def _matches_selector_part(node: _Node, part: _SelectorPart) -> bool:
-    if part.tag != "*" and node.tag != part.tag:
-        return False
-    classes = set(node.attrs.get("class", "").split())
-    if any(required not in classes for required in part.classes):
-        return False
-    if part.nth_child is not None:
-        parent = node.parent
-        if parent is None:
-            return False
-        position = parent.children.index(node) + 1
-        if position != part.nth_child:
-            return False
-    return True
-
-
-def _text_content(node: _Node) -> str:
-    parts = list(node.text_chunks)
-    for child in node.children:
-        parts.append(_text_content(child))
-    return "".join(parts)
 
 
 def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmbeddedMetadata:
@@ -590,36 +469,14 @@ _METADATA_LABELS = {
 }
 
 
-def _extract_metadata_fields(root: _Node) -> dict[str, str]:
+def _extract_metadata_fields(root: Node) -> dict[str, str]:
     fields: dict[str, str] = {}
-    for h2 in _find_all_by_tag(root, "h2"):
-        label = _text_content(h2).strip().lower()
-        if label not in _METADATA_LABELS:
-            continue
-        parent = h2.parent
-        if parent is None:
-            continue
-        siblings = parent.children
-        try:
-            h2_index = siblings.index(h2)
-        except ValueError:
-            continue
-        h1 = next((c for c in siblings[h2_index + 1:] if c.tag == "h1"), None)
-        if h1 is None:
-            continue
+    for label, value in extract_label_values(root, _METADATA_LABELS).items():
         key = label.replace(" ", "_")
-        value = _text_content(h1).strip()
         if key == "created":
             value = _parse_relative_date(value)
         fields[key] = value
     return fields
-
-
-def _find_all_by_tag(node: _Node, tag: str):
-    if node.tag == tag:
-        yield node
-    for child in node.children:
-        yield from _find_all_by_tag(child, tag)
 
 
 def _today() -> datetime.date:
