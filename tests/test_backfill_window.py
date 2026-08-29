@@ -236,6 +236,80 @@ class TestBackfillWindow(unittest.TestCase):
 
             self.assertFalse(window._tiles_by_action["side beta"].icon().isNull())
 
+    def test_the_clips_own_soundtrack_is_muted(self):
+        """The microphone is open the whole session; a clip's audio would be
+        one more thing for the recognizer to mishear. Unmuting survived the
+        whole suite before (audit probe 23)."""
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        self.assertTrue(window._audio.isMuted())
+
+    def test_the_clip_loops_until_a_decision_lands(self):
+        from PyQt6.QtMultimedia import QMediaPlayer
+
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        self.assertEqual(window._player.loops(), QMediaPlayer.Loops.Infinite)
+
+    def test_releasing_the_last_clip_also_stops_the_player(self):
+        """Dropping the source without stop() left playback tearing at a file
+        the background discard is renaming (audit probe 25 deleted the stop
+        with the suite green)."""
+        session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → weird", [])])
+        window = self._window(session)
+
+        with patch.object(window._player, "stop") as stop, \
+             patch.object(window._player, "setSource"):
+            window.on_phrase("weird")
+
+        stop.assert_called_once()
+
+    def test_escape_closes_the_window(self):
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtGui import QKeySequence, QShortcut
+
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        escapes = [
+            s for s in window.findChildren(QShortcut)
+            if s.key() == QKeySequence(Qt.Key.Key_Escape)
+        ]
+        self.assertEqual(len(escapes), 1)
+
+        window.show()
+        self.assertTrue(window.isVisible())
+        escapes[0].activated.emit()
+        self.assertFalse(window.isVisible())
+
+    def test_no_tile_ever_takes_keyboard_focus(self):
+        """The space bar must not re-fire the last clicked tile, and Esc must
+        keep closing the window rather than being swallowed by a button."""
+        from PyQt6.QtCore import Qt
+
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        self.assertTrue(window._command_buttons)
+        for tile in window._command_buttons.values():
+            self.assertEqual(tile.focusPolicy(), Qt.FocusPolicy.NoFocus)
+
+    def test_a_portrait_frame_lands_unsquished_on_a_square_icon(self):
+        """The fix for portrait/landscape frames coming out squished to square
+        on native Windows: the icon pixmap is already the icon size, scaled to
+        fit with its ratio kept and centred on transparent margins."""
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        with tempfile.TemporaryDirectory() as tmp:
+            png = Path(tmp) / "portrait.png"
+            pixmap = QPixmap(20, 40)
+            pixmap.fill()  # opaque white
+            pixmap.save(str(png))
+            window.set_thumbnail("Side Beta", str(png))
+
+            icon = window._tiles_by_action["side beta"].icon()
+            rendered = icon.pixmap(96, 96)
+            self.assertEqual((rendered.width(), rendered.height()), (96, 96))
+            image = rendered.toImage()
+            # a 20x40 frame fits 96x96 as 48x96: opaque centre, transparent
+            # margins on the short axis
+            self.assertEqual(image.pixelColor(48, 48).alpha(), 255)
+            self.assertEqual(image.pixelColor(5, 48).alpha(), 0)
+            self.assertEqual(image.pixelColor(90, 48).alpha(), 0)
+
     def test_closing_releases_the_clip_the_player_holds(self):
         session = FakeSession([Path("a_topaz.mp4")])
         # Through the helper, for its cleanups: closing the window inside the
