@@ -1,60 +1,17 @@
 import json
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 from tasks import scene_scripts
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import LARKIN, CarvedClipLibraryCase
 
 
-LARKIN = Path("2D") / "non_AI" / "larkin"
-
-
-class SceneScriptsCase(unittest.TestCase):
+class SceneScriptsCase(CarvedClipLibraryCase):
     """A carved clip with a script, and the scene it came out of, in a temp library."""
 
-    def setUp(self):
-        self._workspace = workspace_temp_dir()
-        self.root = self._workspace.__enter__()
-        self.addCleanup(self._workspace.__exit__, None, None, None)
-        self.videos = self.root / "videos"
-        self.scripts = self.root / "scripts"
-        self.metadata = self.root / "metadata"
-
-    def make_scene(self, name="scene", actions=None):
-        scene = self.videos / LARKIN / "scenes" / f"{name}.mp4"
-        scene.parent.mkdir(parents=True, exist_ok=True)
-        scene.write_bytes(b"scene")
-        if actions is not None:
-            script = self.scene_script(name)
-            script.parent.mkdir(parents=True, exist_ok=True)
-            script.write_text(json.dumps({"actions": actions}), encoding="utf-8")
-        return scene
-
-    def make_clip(self, scene, name="clip", scene_offset=10.0, actions=None, **extra):
-        video = self.videos / LARKIN / "clips" / f"{name}.mp4"
-        video.parent.mkdir(parents=True, exist_ok=True)
-        video.write_bytes(b"clip")
-        sidecar = self.metadata / LARKIN / "clips" / f"{name}.json"
-        sidecar.parent.mkdir(parents=True, exist_ok=True)
-        clip = {"full_video": str(scene), "scene_offset": scene_offset}
-        clip.update(extra)
-        sidecar.write_text(json.dumps({"clip": clip}), encoding="utf-8")
-        if actions is not None:
-            script = self.scripts / LARKIN / "clips" / f"{name}.funscript"
-            script.parent.mkdir(parents=True, exist_ok=True)
-            script.write_text(json.dumps({"actions": actions}), encoding="utf-8")
-        return video
-
-    def scene_script(self, name="scene"):
-        return self.scripts / LARKIN / "scenes" / f"{name}.funscript"
-
     def run_stage(self, duration=600.0):
-        with override_config(
-            VIDEO_LIBRARY_DIR=self.videos,
-            SCRIPT_LIBRARY_DIR=self.scripts,
-            METADATA_DIR=self.metadata,
-        ), patch.object(scene_scripts.ffprobe, "duration_seconds", return_value=duration):
+        with self.library_overrides(), \
+             patch.object(scene_scripts.ffprobe, "duration_seconds", return_value=duration):
             return scene_scripts.run()
 
 
