@@ -173,6 +173,29 @@ class BackfillWindow(QWidget):
         self._tiles_by_action[command.label.lower()] = tile
         return tile
 
+    # The window's read surface: what the three lines say and which tile a
+    # phrase or an action owns. One-liners over the same widgets, so the
+    # internals -- label fields, the media backend, how tiles are keyed -- can
+    # move without breaking every assertion made about the window (31 reads of
+    # six private attributes before these existed).
+
+    def status_text(self) -> str:
+        return self._status.text()
+
+    def hearing_text(self) -> str:
+        return self._hearing.text()
+
+    def last_text(self) -> str:
+        return self._last.text()
+
+    def tile_for(self, key: str) -> QToolButton | None:
+        """The tile for a spoken *key* -- a command phrase, or an act label in
+        any casing."""
+        tile = self._command_buttons.get(key)
+        if tile is not None:
+            return tile
+        return self._tiles_by_action.get(key.lower())
+
     def set_thumbnail(self, action: str, path: str) -> None:
         """Put *action*'s example frame on its tile, aspect-locked so it never stretches."""
         tile = self._tiles_by_action.get(action.lower())
