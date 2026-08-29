@@ -284,19 +284,27 @@ class TestStatsWindow:
 
 
 class TestPickYTicks:
+    """The tick rule: a handful of round values, not a wall of gridlines."""
+
+    _NICE_STEPS = (1, 2, 5, 10, 15, 30, 60, 120, 180, 300, 600)
+
+    def _assert_readable(self, ticks, y_max):
+        assert 3 <= len(ticks) <= 7, f"{len(ticks)} ticks is not a readable axis"
+        assert all(0 < t <= y_max for t in ticks)
+        steps = {b - a for a, b in zip(ticks, ticks[1:])}
+        assert len(steps) == 1, f"uneven tick spacing {sorted(steps)}"
+        assert steps <= set(self._NICE_STEPS)
+
     def test_full_scale(self):
         ticks = _pick_y_ticks(700.0)
         assert 600 in ticks
-        assert 0 not in ticks
+        self._assert_readable(ticks, 700.0)
 
     def test_small_scale(self):
-        ticks = _pick_y_ticks(10.0)
-        assert all(t <= 10.0 for t in ticks)
-        assert len(ticks) >= 2
+        self._assert_readable(_pick_y_ticks(10.0), 10.0)
 
     def test_medium_scale(self):
-        ticks = _pick_y_ticks(45.0)
-        assert all(t <= 45.0 for t in ticks)
+        self._assert_readable(_pick_y_ticks(45.0), 45.0)
 
 
 class TestStatsActionExists:
