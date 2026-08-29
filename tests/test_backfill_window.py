@@ -214,6 +214,11 @@ class TestBackfillWindow(unittest.TestCase):
 
         window.set_thumbnail("Not An Act", "whatever.png")  # must not raise
 
+        # ...and must not have decorated some other act's tile with it either
+        self.assertTrue(
+            all(tile.icon().isNull() for tile in window._tiles_by_action.values())
+        )
+
     def test_an_empty_thumbnail_path_leaves_the_tile_iconless(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 

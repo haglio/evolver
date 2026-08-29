@@ -41,7 +41,9 @@ class TestSerialWorker(unittest.TestCase):
         self.assertEqual(done, ["slow"])
 
     def test_draining_with_nothing_submitted_returns(self):
-        self._worker().drain()
+        worker = self._worker()
+        worker.drain()
+        self.assertIsNone(worker._latest)  # nothing was ever waited on
 
     def test_a_failing_task_is_logged_and_never_reaches_the_caller(self):
         worker = self._worker()
