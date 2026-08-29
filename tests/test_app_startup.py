@@ -87,11 +87,23 @@ class TestSessionManagement:
     """EvolverApp must log Windows session-management events that could kill it."""
 
     def test_connects_to_commit_data_request(self, request):
+        """The session-end handler is wired to the signal, not merely defined.
+
+        This used to assert ``hasattr(app, "_on_session_end")``, which stays
+        true with the connect line deleted — and then Windows shutdown
+        force-kills the tray with a running pipeline behind it. The signal
+        cannot be emitted from a test (QSessionManager is not constructible),
+        so pin the connection itself: disconnect names the exact receiver and
+        raises TypeError when it was never connected.
+        """
         app = build_evolver_app(request)
-        # The commitDataRequest signal should have our handler connected
-        assert hasattr(app, "_on_session_end"), (
-            "EvolverApp must have a _on_session_end handler"
-        )
+        try:
+            app._app.commitDataRequest.disconnect(app._on_session_end)
+        except TypeError:
+            raise AssertionError(
+                "commitDataRequest is not connected to _on_session_end"
+            ) from None
+        app._app.commitDataRequest.connect(app._on_session_end)
 
     def test_session_end_logs_to_crash_log(self, request):
         app = build_evolver_app(request)
