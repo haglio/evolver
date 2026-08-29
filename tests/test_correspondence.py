@@ -1,46 +1,48 @@
-import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 import check_correspondence
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
-class TestSortedToOutboxName(unittest.TestCase):
-    def test_appends_topaz_before_extension(self):
-        cases = [
+class TestSortedToOutboxName:
+    @pytest.mark.parametrize(
+        ("sorted_file", "expected"),
+        [
             (Path("clip.mp4"), "clip_topaz.mp4"),
             (Path("clip_apo8_gcg5.mp4"), "clip_apo8_gcg5_topaz.mp4"),
             (Path("a.mkv"), "a_topaz.mkv"),
-        ]
-        for sorted_file, expected in cases:
-            with self.subTest(sorted_file=sorted_file):
-                self.assertEqual(check_correspondence.sorted_to_outbox_name(sorted_file), expected)
+        ],
+    )
+    def test_appends_topaz_before_extension(self, sorted_file, expected):
+        assert check_correspondence.sorted_to_outbox_name(sorted_file) == expected
 
 
-class TestCorrespondenceResult(unittest.TestCase):
+class TestCorrespondenceResult:
     def test_ok_requires_matching_counts_and_no_orphans(self):
         result = check_correspondence.CorrespondenceResult(sorted_count=5, outbox_count=5)
-        self.assertTrue(result.ok)
+        assert result.ok
 
     def test_not_ok_on_count_mismatch(self):
         result = check_correspondence.CorrespondenceResult(sorted_count=5, outbox_count=3)
-        self.assertFalse(result.ok)
+        assert not result.ok
 
     def test_not_ok_on_orphan_outbox(self):
         result = check_correspondence.CorrespondenceResult(
             sorted_count=1, outbox_count=1, orphan_outbox=["stray.mp4"],
         )
-        self.assertFalse(result.ok)
+        assert not result.ok
 
     def test_not_ok_on_duplicates(self):
         result = check_correspondence.CorrespondenceResult(
             sorted_count=2, outbox_count=2, duplicates={"clip_topaz.mp4": ["a", "b"]},
         )
-        self.assertFalse(result.ok)
+        assert not result.ok
 
 
-class TestCorrespondence(unittest.TestCase):
+class TestCorrespondence:
     def test_run_accepts_outbox_names_as_sorted_plus_topaz(self):
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
@@ -59,9 +61,9 @@ class TestCorrespondence(unittest.TestCase):
             with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
                 result = check_correspondence.run(show_popup=False)
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.sorted_count, 2)
-            self.assertEqual(result.outbox_count, 2)
+            assert result.ok
+            assert result.sorted_count == 2
+            assert result.outbox_count == 2
 
     def test_run_reports_mismatches_and_can_show_popup(self):
         with workspace_temp_dir() as root:
@@ -79,12 +81,12 @@ class TestCorrespondence(unittest.TestCase):
                 with patch("check_correspondence.show_error_window") as show_error_window:
                     result = check_correspondence.run(show_popup=True)
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.sorted_count, 1)
-            self.assertEqual(result.outbox_count, 2)
-            self.assertEqual(len(result.orphan_outbox), 2)
-            self.assertEqual(len(result.orphan_sorted), 1)
-            self.assertEqual(result.duplicates, {})
+            assert not result.ok
+            assert result.sorted_count == 1
+            assert result.outbox_count == 2
+            assert len(result.orphan_outbox) == 2
+            assert len(result.orphan_sorted) == 1
+            assert result.duplicates == {}
             show_error_window.assert_called_once()
 
     def test_run_ignores_partial_outbox_files(self):
@@ -102,10 +104,6 @@ class TestCorrespondence(unittest.TestCase):
             with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
                 result = check_correspondence.run(show_popup=False)
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.sorted_count, 1)
-            self.assertEqual(result.outbox_count, 1)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            assert result.ok
+            assert result.sorted_count == 1
+            assert result.outbox_count == 1
