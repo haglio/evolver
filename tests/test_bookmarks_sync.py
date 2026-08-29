@@ -5,6 +5,49 @@ from tasks import bookmarks_sync
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
+def chrome_profile(root, profile="Profile 2", name="Blair"):
+    """A User Data tree with one named profile; the shape every sync test built
+    by hand. Returns (user_data_dir, bookmarks_path)."""
+    user_data_dir = root / "User Data"
+    profile_dir = user_data_dir / profile
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    (user_data_dir / "Local State").write_text(
+        json.dumps({"profile": {"info_cache": {profile: {"name": name}}}}),
+        encoding="utf-8",
+    )
+    return user_data_dir, profile_dir / "Bookmarks"
+
+
+def _folder(guid, node_id, name, children):
+    return {
+        "children": children,
+        "date_added": "1",
+        "date_last_used": "0",
+        "date_modified": "1",
+        "guid": guid,
+        "id": node_id,
+        "name": name,
+        "type": "folder",
+    }
+
+
+def chrome_bookmarks_payload(favs_children=()):
+    """A minimal Chrome Bookmarks file: the bar holding one Fun Time Favs
+    folder with *favs_children*, plus the empty other/synced roots."""
+    return {
+        "checksum": "",
+        "roots": {
+            "bookmark_bar": _folder(
+                "bar-guid", "1", "Bookmarks bar",
+                [_folder("folder-guid", "10", "Fun Time Favs", list(favs_children))],
+            ),
+            "other": _folder("other-guid", "2", "Other bookmarks", []),
+            "synced": _folder("synced-guid", "3", "Mobile bookmarks", []),
+        },
+        "version": 1,
+    }
+
+
 class TestExtractUrl(unittest.TestCase):
     def test_extracts_plain_urls(self):
         cases = [
@@ -47,18 +90,11 @@ class TestBookmarksSync(unittest.TestCase):
             existing_media.write_text("x", encoding="utf-8")
             missing_media = root / "clips" / "missing.mp4"
             favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
+            user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "file,web_url\n"
                 f"{existing_media.relative_to(root)},https://example.com/keep\n"
                 f"{missing_media.relative_to(root)},https://example.com/drop\n",
-                encoding="utf-8",
-            )
-            (user_data_dir / "Local State").write_text(
-                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
 
@@ -70,7 +106,6 @@ class TestBookmarksSync(unittest.TestCase):
             ):
                 result = bookmarks_sync.run()
 
-            bookmarks_path = profile_dir / "Bookmarks"
             self.assertTrue(result.ok)
             self.assertEqual(result.pruned, 1)
             self.assertEqual(result.synced, 1)
@@ -92,10 +127,7 @@ class TestBookmarksSync(unittest.TestCase):
             existing_media.write_text("x", encoding="utf-8")
             missing_media = root / "clips" / "missing clip.mp4"
             favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
+            user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "local_file,web_url\n"
                 '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/keep\n'
@@ -105,10 +137,6 @@ class TestBookmarksSync(unittest.TestCase):
                     missing_media.as_posix(),
                     str(missing_media),
                 ),
-                encoding="utf-8",
-            )
-            (user_data_dir / "Local State").write_text(
-                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
 
@@ -125,7 +153,6 @@ class TestBookmarksSync(unittest.TestCase):
             self.assertEqual(result.synced, 1)
             self.assertIn("https://example.com/keep", favs_path.read_text(encoding="utf-8"))
             self.assertNotIn("https://example.com/drop", favs_path.read_text(encoding="utf-8"))
-            bookmarks_path = profile_dir / "Bookmarks"
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
             self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/keep"])
@@ -133,11 +160,7 @@ class TestBookmarksSync(unittest.TestCase):
     def test_run_syncs_web_urls_into_named_profile_folder(self):
         with workspace_temp_dir() as root:
             favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            bookmarks_path = profile_dir / "Bookmarks"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
+            user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "local_file,web_url\n"
                 'one,"=HYPERLINK(""https://example.net/image/abc"";""https://example.net/image/abc"")"\n'
@@ -145,67 +168,10 @@ class TestBookmarksSync(unittest.TestCase):
                 "three,\n",
                 encoding="utf-8",
             )
-            (user_data_dir / "Local State").write_text(
-                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
-                encoding="utf-8",
-            )
             bookmarks_path.write_text(
-                json.dumps(
-                    {
-                        "checksum": "",
-                        "roots": {
-                            "bookmark_bar": {
-                                "children": [
-                                    {
-                                        "children": [
-                                            {
-                                                "id": "20",
-                                                "name": "old",
-                                                "type": "url",
-                                                "url": "https://old.example/",
-                                            }
-                                        ],
-                                        "date_added": "1",
-                                        "date_last_used": "0",
-                                        "date_modified": "1",
-                                        "guid": "folder-guid",
-                                        "id": "10",
-                                        "name": "Fun Time Favs",
-                                        "type": "folder",
-                                    }
-                                ],
-                                "date_added": "1",
-                                "date_last_used": "0",
-                                "date_modified": "1",
-                                "guid": "bar-guid",
-                                "id": "1",
-                                "name": "Bookmarks bar",
-                                "type": "folder",
-                            },
-                            "other": {
-                                "children": [],
-                                "date_added": "1",
-                                "date_last_used": "0",
-                                "date_modified": "1",
-                                "guid": "other-guid",
-                                "id": "2",
-                                "name": "Other bookmarks",
-                                "type": "folder",
-                            },
-                            "synced": {
-                                "children": [],
-                                "date_added": "1",
-                                "date_last_used": "0",
-                                "date_modified": "1",
-                                "guid": "synced-guid",
-                                "id": "3",
-                                "name": "Mobile bookmarks",
-                                "type": "folder",
-                            },
-                        },
-                        "version": 1,
-                    }
-                ),
+                json.dumps(chrome_bookmarks_payload([
+                    {"id": "20", "name": "old", "type": "url", "url": "https://old.example/"},
+                ])),
                 encoding="utf-8",
             )
 
@@ -234,20 +200,12 @@ class TestBookmarksSync(unittest.TestCase):
     def test_run_deduplicates_identical_urls(self):
         with workspace_temp_dir() as root:
             favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            bookmarks_path = profile_dir / "Bookmarks"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
+            user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "local_file,web_url\n"
                 "one,https://example.com/same\n"
                 "two,https://example.com/same\n"
                 "three,https://example.com/different\n",
-                encoding="utf-8",
-            )
-            (user_data_dir / "Local State").write_text(
-                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
 
