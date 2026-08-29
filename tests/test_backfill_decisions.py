@@ -223,6 +223,38 @@ class TestDiscardAsWeird(unittest.TestCase):
             sleep.assert_called_once()
             self.assertTrue(destination.is_file())
 
+    def test_the_player_gets_ten_short_chances_to_let_go(self):
+        """The retry budget in numbers: nine 0.2 s waits, then the tenth try.
+
+        Both constants could drift freely before (audit probes 13/14 took the
+        attempts to 2 and the delay to 30 s with the suite green) -- and
+        together they are the difference between 'undo works while the player
+        still holds the clip' and a two-second UI hang or an instant failure.
+        """
+        with workspace_temp_dir() as root:
+            weird_dir = root / "kinda_weird"
+            video = self._make_video(root)
+            real_replace = type(video).replace
+            attempts = []
+
+            def locked_until_the_last_chance(self, target):
+                attempts.append(target)
+                if len(attempts) < 10:
+                    raise PermissionError(32, "The process cannot access the file")
+                return real_replace(self, target)
+
+            with override_config(WEIRD_DIR=weird_dir):
+                with patch.object(type(video), "replace", locked_until_the_last_chance), \
+                     patch("backfill.decisions.time.sleep") as sleep:
+                    destination = discard_as_weird(video)
+
+            self.assertEqual(len(attempts), 10)
+            self.assertEqual(sleep.call_count, 9)
+            self.assertEqual(
+                {call.args[0] for call in sleep.call_args_list}, {0.2},
+            )
+            self.assertTrue(destination.is_file())
+
     def test_gives_up_on_a_clip_that_never_unlocks(self):
         with workspace_temp_dir() as root:
             weird_dir = root / "kinda_weird"

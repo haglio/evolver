@@ -158,7 +158,11 @@ class TestExtractFrame(unittest.TestCase):
 
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
                  patch("backfill.thumbnails.subprocess.run", side_effect=fake_run) as run:
-                ok = thumbnails.extract_frame(Path("clip.mp4"), dest, at_fraction=0.4)
+                # No at_fraction: the default IS the tuned value, chosen to
+                # sample past a clip's title card, and passing it explicitly
+                # left the constant free to drift (audit probe 28 moved it to
+                # 0.9 with the suite green).
+                ok = thumbnails.extract_frame(Path("clip.mp4"), dest)
 
             self.assertTrue(ok)
             argv = run.call_args[0][0]

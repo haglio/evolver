@@ -197,6 +197,34 @@ class TestUndo(unittest.TestCase):
         self.assertEqual(session.current, clip)
         self.assertEqual(session.remaining, 3)
 
+    def test_undoing_a_discard_whose_move_failed_reclaims_nothing(self):
+        """A discard can die on a clip the player never releases; its file work
+        raised and nothing landed in the weird folder. Undo must not then try
+        to reclaim from where nothing is -- the None-guard in roll_back was
+        deletable with the suite green (audit probe 18)."""
+        class SwallowingWorker(ImmediateWorker):
+            """SerialWorker's real contract: a failing task never reaches the
+            caller."""
+
+            def submit(self, task):
+                try:
+                    task()
+                except Exception:
+                    pass
+
+        session = self._session(worker=SwallowingWorker())
+        clip = session.current
+
+        with patch("backfill.session.discard_as_weird",
+                   side_effect=PermissionError(32, "still playing")), \
+             patch("backfill.session.reclaim_from_weird") as reclaim:
+            session.apply("weird")
+            note = session.apply("undo")
+
+        reclaim.assert_not_called()
+        self.assertEqual(note, f"undid {clip.name} → weird")
+        self.assertEqual(session.current, clip)
+
     def test_undoing_a_skip_brings_the_deferred_clip_back(self):
         session = self._session()
         clip = session.current
