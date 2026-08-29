@@ -31,17 +31,21 @@ from PyQt6.QtWidgets import QApplication  # noqa: E402  -- after the platform is
 QAPP = QApplication.instance() or QApplication([])
 
 
-def build_evolver_app(test_case):
+def build_evolver_app(owner):
     """An ``EvolverApp`` on the shared QApplication, retired when the test ends.
 
-    Wrap any other patches the test needs around the call; this owns only the
-    QApplication substitution and the teardown.
+    ``owner`` is whatever can register the teardown: a ``unittest.TestCase`` or
+    a pytest ``request`` fixture. Wrap any other patches the test needs around
+    the call; this owns only the QApplication substitution and the teardown.
     """
     from gui.app import EvolverApp
 
     with patch("gui.app.QApplication", return_value=QAPP):
         app = EvolverApp()
-    test_case.addCleanup(retire_evolver_app, app)
+    if hasattr(owner, "addCleanup"):
+        owner.addCleanup(retire_evolver_app, app)
+    else:
+        owner.addfinalizer(lambda: retire_evolver_app(app))
     return app
 
 
