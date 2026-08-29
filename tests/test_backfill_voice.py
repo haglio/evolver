@@ -28,6 +28,12 @@ class TestRecognizedPhrase(unittest.TestCase):
     def test_rejects_a_phrase_heard_too_faintly(self):
         self.assertIsNone(recognized_phrase(self._result("dance", [0.4]), threshold=0.7))
 
+    def test_a_phrase_exactly_at_the_threshold_is_trusted(self):
+        # The comparison is strictly-below: at the boundary the phrase passes.
+        # Nothing exercised the boundary before, so < could become <= unseen
+        # (audit probe 20).
+        self.assertEqual(recognized_phrase(self._result("dance", [0.7]), threshold=0.7), "dance")
+
     def test_accepts_a_phrase_heard_clearly(self):
         self.assertEqual(recognized_phrase(self._result("dance", [0.9]), threshold=0.7), "dance")
 
