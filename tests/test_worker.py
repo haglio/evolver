@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from PyQt6.QtCore import QEventLoop, QTimer
 

@@ -2,7 +2,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import config
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import video_locator
 

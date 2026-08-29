@@ -1,5 +1,4 @@
 import unittest
-from datetime import datetime
 
 from PyQt6.QtCore import QEventLoop, QTimer
 from PyQt6.QtTest import QSignalSpy

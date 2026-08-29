@@ -76,7 +76,7 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_run_no_scrape_strat_for_unknown_source(self):
         with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
+            sorted_dir, _metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider2", "portrait", "two.mp4")
 
             with self._override(root):
@@ -125,7 +125,7 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_run_counts_error_and_reports_not_ok(self):
         with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
+            sorted_dir, _metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "landscape", "fail.mp4")
 
             with self._override(root):
