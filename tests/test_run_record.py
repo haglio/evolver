@@ -1,4 +1,4 @@
-import unittest
+from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -7,22 +7,42 @@ from tests.temp_helpers import workspace_temp_dir
 from gui.run_record import RunRecord, result_to_dict, save_run, load_runs, format_run_label
 
 
-class TestResultToDict(unittest.TestCase):
+@dataclass
+class _StageOutcome:
+    """A stand-in stage result shaped like the real ones: counters plus paths.
 
-    def test_converts_dataclass_with_path_fields(self):
-        result = Mock()
-        result.__dataclass_fields__ = True
-        result.moved = 3
-        result.moved_files = [Path("C:/videos/a.mp4"), Path("C:/videos/b.mp4")]
-        # dataclasses.asdict won't work on a Mock, so test the Path conversion
+    A real dataclass, not a Mock -- asdict() raises on a Mock, so the old test
+    only ever exercised the repr fallback while claiming to pin the Path
+    conversion.
+    """
+    moved: int = 0
+    moved_files: list[Path] = dataclass_field(default_factory=list)
+
+
+class TestResultToDict:
+
+    def test_converts_a_dataclasss_path_fields_to_strings(self):
+        result = _StageOutcome(
+            moved=2, moved_files=[Path("C:/videos/a.mp4"), Path("C:/videos/b.mp4")],
+        )
         d = result_to_dict(result)
-        self.assertIsInstance(d, dict)
+        assert d == {
+            "moved": 2,
+            "moved_files": [str(Path("C:/videos/a.mp4")), str(Path("C:/videos/b.mp4"))],
+        }
+
+    def test_an_unconvertible_result_falls_back_to_its_repr(self):
+        # The safety net the old Mock-based test was actually exercising:
+        # a bare object() has no __dict__ and is no dataclass, so both
+        # conversion strategies raise and the repr fallback answers.
+        d = result_to_dict(object())
+        assert list(d) == ["repr"]
 
     def test_returns_none_for_none(self):
-        self.assertIsNone(result_to_dict(None))
+        assert result_to_dict(None) is None
 
 
-class TestRunRecordRoundTrip(unittest.TestCase):
+class TestRunRecordRoundTrip:
 
     def test_save_and_load_round_trip(self):
         with workspace_temp_dir() as tmp:
@@ -57,15 +77,38 @@ class TestRunRecordRoundTrip(unittest.TestCase):
 
             # File exists
             expected_path = runs_dir / "2026-03-29T14-30-00.json"
-            self.assertTrue(expected_path.exists())
+            assert expected_path.exists()
 
             # Round-trip
             loaded = load_runs(runs_dir)
-            self.assertEqual(len(loaded), 1)
-            self.assertEqual(loaded[0].id, record.id)
-            self.assertEqual(loaded[0].trigger, "manual")
-            self.assertEqual(loaded[0].stages[0]["name"], "sort")
-            self.assertEqual(loaded[0].stages[1]["status"], "skipped")
+            assert len(loaded) == 1
+            assert loaded[0].id == record.id
+            assert loaded[0].trigger == "manual"
+            assert loaded[0].stages[0]["name"] == "sort"
+            assert loaded[0].stages[1]["status"] == "skipped"
+
+    def test_a_stage_result_carrying_paths_still_saves(self):
+        """What stops every scheduled run failing to record: sort.run()'s
+        moved_files are Path objects, and json.dumps raises on a Path --
+        the conversion has to happen on the way into the record."""
+        from evolver import PipelineResult, StageRecord
+
+        pipeline_result = PipelineResult(
+            stages=[StageRecord(
+                "sort", "completed", 1.5,
+                _StageOutcome(moved=1, moved_files=[Path("C:/videos/a.mp4")]),
+            )],
+            has_errors=False,
+            duration_seconds=10.0,
+        )
+        record = RunRecord.from_pipeline_result(pipeline_result, trigger="scheduled")
+
+        with workspace_temp_dir() as tmp:
+            runs_dir = tmp / "runs"
+            save_run(record, runs_dir)  # json.dumps on the real payload shape
+            loaded = load_runs(runs_dir)
+
+        assert loaded[0].stages[0]["result"]["moved_files"] == [str(Path("C:/videos/a.mp4"))]
 
     def test_load_runs_sorted_newest_first(self):
         with workspace_temp_dir() as tmp:
@@ -81,17 +124,16 @@ class TestRunRecordRoundTrip(unittest.TestCase):
 
             loaded = load_runs(runs_dir)
             ids = [r.id for r in loaded]
-            self.assertEqual(ids, ["2026-03-29T14-30-00", "2026-03-29T14-15-00", "2026-03-29T14-00-00"])
+            assert ids == ["2026-03-29T14-30-00", "2026-03-29T14-15-00", "2026-03-29T14-00-00"]
 
     def test_load_runs_returns_empty_for_missing_dir(self):
-        self.assertEqual(load_runs(Path("nonexistent_dir_xyz")), [])
+        assert load_runs(Path("nonexistent_dir_xyz")) == []
 
 
-class TestRunRecordFromPipelineResult(unittest.TestCase):
+class TestRunRecordFromPipelineResult:
 
     def test_from_pipeline_result_creates_record(self):
         from evolver import PipelineResult, StageRecord
-        from gui.run_record import RunRecord
 
         pr = PipelineResult(
             stages=[
@@ -103,30 +145,26 @@ class TestRunRecordFromPipelineResult(unittest.TestCase):
         )
 
         record = RunRecord.from_pipeline_result(pr, trigger="scheduled")
-        self.assertEqual(record.trigger, "scheduled")
-        self.assertEqual(record.status, "success")
-        self.assertEqual(len(record.stages), 2)
-        self.assertEqual(record.stages[0]["name"], "sort")
-        self.assertEqual(record.stages[0]["status"], "completed")
-        self.assertEqual(record.stages[1]["skip_reason"], "cpu_busy")
+        assert record.trigger == "scheduled"
+        assert record.status == "success"
+        assert len(record.stages) == 2
+        assert record.stages[0]["name"] == "sort"
+        assert record.stages[0]["status"] == "completed"
+        assert record.stages[1]["skip_reason"] == "cpu_busy"
 
 
-class TestFormatRunLabel(unittest.TestCase):
+class TestFormatRunLabel:
 
     def test_formats_utc_to_pacific_standard_time(self):
         # 2026-01-15T06:05:00 UTC = 2025-01-14 22:05 PST (UTC-8)
         label = format_run_label("2026-01-15T06:05:00", 5.0)
-        self.assertEqual(label, "2026/01/14 22:05 (5s)")
+        assert label == "2026/01/14 22:05 (5s)"
 
     def test_formats_utc_to_pacific_daylight_time(self):
         # 2026-07-15T03:20:00 UTC = 2026-07-14 20:20 PDT (UTC-7)
         label = format_run_label("2026-07-15T03:20:00", 12.0)
-        self.assertEqual(label, "2026/07/14 20:20 (12s)")
+        assert label == "2026/07/14 20:20 (12s)"
 
     def test_rounds_duration_to_integer(self):
         label = format_run_label("2026-03-30T05:20:00", 83.7)
-        self.assertEqual(label, "2026/03/29 22:20 (84s)")
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert label == "2026/03/29 22:20 (84s)"
