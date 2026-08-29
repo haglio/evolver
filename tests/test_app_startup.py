@@ -139,7 +139,9 @@ class TestRestart:
             mock_popen.assert_called_once()
             mock_quit.assert_called_once()
 
-    def test_restart_launches_tray_app(self, request):
+    def test_restart_launches_tray_app_on_this_interpreter(self, request):
+        import sys as real_sys
+
         import config
 
         app = build_evolver_app(request)
@@ -148,6 +150,7 @@ class TestRestart:
              patch.object(app, "_quit"):
             app._restart()
             args = mock_popen.call_args[0][0]
+            assert args[0] == real_sys.executable
             assert args[1] == str(config.PROJECT_DIR / "tray_app.py")
 
     def test_restart_passes_show_window_when_window_visible(self, request):
