@@ -1,15 +1,17 @@
 """Tests for the stats window and stacked area chart."""
 
-from unittest.mock import patch
-
 import pytest
 
+from PyQt6.QtGui import QImage
+
 from gui.run_record import RunRecord
-from gui.stats_window import StackedAreaChart, StatsWindow, _pick_y_ticks
+from gui.stats_window import STAGE_COLORS, StackedAreaChart, StatsWindow, _pick_y_ticks
 from tests.gui_support import build_evolver_app
 
 
-def _make_record(stage_durations: dict[str, float]) -> RunRecord:
+def _make_record(
+    stage_durations: dict[str, float], started_at: str = "2026-03-30T00:00:00",
+) -> RunRecord:
     """Build a minimal RunRecord with the given stage durations."""
     stages = [
         {"name": name, "status": "completed", "duration_seconds": dur}
@@ -17,13 +19,66 @@ def _make_record(stage_durations: dict[str, float]) -> RunRecord:
     ]
     return RunRecord(
         id="test",
-        started_at="2026-03-30T00:00:00",
+        started_at=started_at,
         finished_at="2026-03-30T00:00:01",
         duration_seconds=sum(stage_durations.values()),
         trigger="manual",
         status="success",
         stages=stages,
     )
+
+
+_UNPAINTED = (255, 0, 255)  # the sentinel _render fills with; paintEvent covers it
+_WHITE = (255, 255, 255)
+
+
+def _render(chart, w: int = 800, h: int = 400) -> QImage:
+    """Render the chart into an image, which enters paintEvent even offscreen.
+
+    ``repaint()`` on a widget that was never shown dispatches no paint event at
+    all on the offscreen platform, which is how four earlier "does not crash"
+    tests covered none of the drawing code. The image starts magenta so a
+    paintEvent that returns without painting is distinguishable from white.
+    """
+    chart.resize(w, h)
+    image = QImage(w, h, QImage.Format.Format_ARGB32)
+    image.fill(0xFFFF00FF)
+    chart.render(image)
+    return image
+
+
+def _rgb(image: QImage, x: int, y: int) -> tuple[int, int, int]:
+    return image.pixelColor(x, y).getRgb()[:3]
+
+
+def _ink_count(image: QImage, xs: range, ys: range) -> int:
+    """Pixels in the region that are neither the white ground nor unpainted."""
+    return sum(
+        1
+        for y in ys
+        for x in xs
+        if _rgb(image, x, y) not in (_WHITE, _UNPAINTED)
+    )
+
+
+def _fill_over_white(color) -> tuple[int, int, int]:
+    """A stage band's fill: its color at the alpha paintEvent uses, over white."""
+    alpha = 180
+    return tuple(
+        round((c * alpha + 255 * (255 - alpha)) / 255)
+        for c in (color.red(), color.green(), color.blue())
+    )
+
+
+def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
+    """Whether *pixel* is *stage_key*'s band fill, within a rounding step.
+
+    Qt's alpha blend and this file's arithmetic can round a channel apart, and
+    pinning the exact rounding would fail on a raster-engine change that no
+    user could see.
+    """
+    expected = _fill_over_white(STAGE_COLORS[stage_key])
+    return all(abs(p - e) <= 1 for p, e in zip(pixel, expected))
 
 
 class TestStackedAreaChartSeries:
@@ -70,16 +125,6 @@ class TestStackedAreaChartSeries:
         # raw = [2, 4, 6], running avg = [2/1, 6/2, 12/3] = [2.0, 3.0, 4.0]
         assert sort_series == pytest.approx([2.0, 3.0, 4.0])
 
-    def test_set_mode_triggers_update(self, chart):
-        with patch.object(chart, "update") as mock_update:
-            chart.set_mode("averages")
-            mock_update.assert_called_once()
-
-    def test_set_fit_triggers_update(self, chart):
-        with patch.object(chart, "update") as mock_update:
-            chart.set_fit(True)
-            mock_update.assert_called_once()
-
 
 class TestStackedAreaChartEdgeCases:
     def test_empty_records(self):
@@ -88,23 +133,104 @@ class TestStackedAreaChartEdgeCases:
         for s in series:
             assert s == []
 
-    def test_paint_does_not_crash_with_data(self):
-        records = [_make_record({"sort": 1.0})]
-        chart = StackedAreaChart(records)
-        chart.resize(800, 400)
-        chart.repaint()  # should not raise
 
-    def test_paint_does_not_crash_empty(self):
-        chart = StackedAreaChart([])
-        chart.resize(800, 400)
-        chart.repaint()
+def _two_runs(stage_durations_old, stage_durations_new):
+    """Two records a day apart, newest first, the order load_runs returns."""
+    return [
+        _make_record(stage_durations_new, started_at="2026-03-31T00:00:00"),
+        _make_record(stage_durations_old, started_at="2026-03-30T00:00:00"),
+    ]
 
-    def test_paint_does_not_crash_fit_mode(self):
-        records = [_make_record({"sort": 1.0, "purge": 2.0})]
-        chart = StackedAreaChart(records)
-        chart.set_fit(True)
-        chart.resize(800, 400)
-        chart.repaint()
+
+def _limit_line_rows(image: QImage) -> list[int]:
+    """Rows in the 10-minute line's neighbourhood holding a long gray dash run.
+
+    At the default 700 s scale the dotted line lands at y = 67; antialiasing
+    splits it across two rows of mid-gray. Sixty gray pixels across the chart's
+    middle cannot come from any band, whose colors are never gray.
+    """
+    rows = []
+    for y in range(55, 81):
+        grays = sum(
+            1
+            for x in range(100, 640)
+            if (lambda c: c[0] == c[1] == c[2] and 150 <= c[0] <= 235)(_rgb(image, x, y))
+        )
+        if grays >= 60:
+            rows.append(y)
+    return rows
+
+
+class TestStackedAreaChartPainting:
+    """What the rendered chart shows.
+
+    Four earlier tests called ``repaint()`` on a widget that was never shown,
+    which dispatches no paint event offscreen; a ``raise`` at the top of
+    paintEvent left all four green. Everything here goes through ``_render``,
+    which does enter paintEvent, and asserts on the ink that comes out.
+    """
+
+    def test_a_run_paints_each_stage_as_a_band_of_its_own_color(self):
+        chart = StackedAreaChart(
+            _two_runs({"purge": 200.0, "sort": 200.0}, {"purge": 200.0, "sort": 200.0})
+        )
+        image = _render(chart)
+        # purge stacks first, so its band is the bottom 200 s, sort the next 200 s
+        assert _is_band_fill(_rgb(image, 380, 300), "purge")
+        assert _is_band_fill(_rgb(image, 380, 230), "sort")
+        assert _rgb(image, 380, 120) == _WHITE  # above the stack: bare ground
+
+    def test_an_empty_chart_says_so_instead_of_going_blank(self):
+        image = _render(StackedAreaChart([]))
+        assert _ink_count(image, range(71, 690, 2), range(21, 350, 2)) > 20
+
+    def test_fit_mode_rescales_the_bands_to_fill_the_chart(self):
+        # 50 s of work is 7 % of the fixed 700 s scale -- a sliver at the very
+        # bottom. Fit mode rescales to the tallest run plus headroom, so the
+        # same band then covers most of the chart's height.
+        normal = _render(StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0})))
+        fitted_chart = StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0}))
+        fitted_chart.set_fit(True)
+        fitted = _render(fitted_chart)
+        assert _rgb(normal, 380, 185) == _WHITE
+        assert _is_band_fill(_rgb(fitted, 380, 185), "sort")
+
+    def test_averages_mode_charts_the_running_mean_not_the_raw_run(self):
+        # sort runs 100 s then 300 s: the second run's raw band reaches 300 s,
+        # its running mean only 200 s, so a pixel between the two heights near
+        # the newest run is inked in one mode and bare in the other.
+        normal = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
+        averaged_chart = StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0}))
+        averaged_chart.set_mode("averages")
+        averaged = _render(averaged_chart)
+        assert _is_band_fill(_rgb(normal, 680, 230), "sort")
+        assert _rgb(averaged, 680, 230) == _WHITE
+
+    def test_the_10_minute_line_appears_only_when_the_scale_reaches_it(self):
+        tall = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
+        assert _limit_line_rows(tall), "no dotted 10-minute line at the 700 s scale"
+        # Fit mode over 50 s runs scales to ~57 s, far short of 600 s
+        fitted_chart = StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0}))
+        fitted_chart.set_fit(True)
+        fitted = _render(fitted_chart)
+        assert not _limit_line_rows(fitted)
+
+    def test_the_legend_swatches_every_stage_in_its_chart_color(self):
+        from gui.progress import ALL_STAGES
+
+        image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
+        margin_pixels = {
+            _rgb(image, x, y) for x in range(690, 800) for y in range(20, 350)
+        }
+        for stage_key in ALL_STAGES:
+            color = STAGE_COLORS[stage_key]
+            assert (color.red(), color.green(), color.blue()) in margin_pixels, (
+                f"legend has no swatch for {stage_key!r}"
+            )
+
+    def test_the_runs_are_dated_along_the_x_axis(self):
+        image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
+        assert _ink_count(image, range(60, 740, 2), range(352, 380)) > 50
 
 
 class TestStatsWindow:
