@@ -101,8 +101,12 @@ class RunDetailWidget(QWidget):
 
             no_edit = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 
-            num = STAGE_NUMBER.get(stage_key, i + 1)
-            num_item = QTableWidgetItem(str(num))
+            # A record can name a stage this build no longer has — regeneration
+            # mode was one — and its position in a run is not its position in
+            # the pipeline. Guessing an ordinal there is what let a stage with
+            # no registry row take the number of the stage after it.
+            num = STAGE_NUMBER.get(stage_key)
+            num_item = QTableWidgetItem("\u2014" if num is None else str(num))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             num_item.setForeground(GRAY)
             num_item.setFlags(no_edit)

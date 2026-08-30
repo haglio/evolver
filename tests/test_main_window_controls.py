@@ -64,6 +64,7 @@ class TestRunDetailRendering:
         ))
 
         assert widget._table.item(0, 1).text() == "regen_cutover"
+        assert widget._table.item(0, 0).text() == "\u2014"
 
 
 class TestRunHistoryMarks:
