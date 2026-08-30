@@ -1,3 +1,4 @@
+import dataclasses
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -472,3 +473,17 @@ class TestFollowRetiredVideos(unittest.TestCase):
 
             self.assertEqual(result.unmatched, 1)
             self.assertTrue(script_path.exists())
+
+
+class TestScriptsSyncResultSurface(unittest.TestCase):
+    def test_the_result_carries_only_what_a_reader_consults(self):
+        """`unmatched_paths` is shown in the main window; the other list was not."""
+        self.assertEqual(
+            {f.name for f in dataclasses.fields(scripts_sync.ScriptsSyncResult)},
+            {
+                "moved", "already_aligned", "unmatched", "ambiguous", "collisions",
+                "copied_variants", "ambiguous_variant_groups", "variant_copy_errors",
+                "rehomed_to_variants", "followed_to_archive", "discarded_duplicates",
+                "unmatched_paths",
+            },
+        )

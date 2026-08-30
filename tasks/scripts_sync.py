@@ -29,12 +29,9 @@ class ScriptsSyncResult:
     rehomed_to_variants: int = 0
     followed_to_archive: int = 0
     discarded_duplicates: int = 0
-    copied_variant_paths: list[str] | None = None
     unmatched_paths: list[str] | None = None
 
     def __post_init__(self) -> None:
-        if self.copied_variant_paths is None:
-            self.copied_variant_paths = []
         if self.unmatched_paths is None:
             self.unmatched_paths = []
 
@@ -301,9 +298,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: Sc
                 result.variant_copy_errors += 1
                 log.exception("FAILED TO COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
                 continue
-            rel_dest = dest_script.relative_to(config.SCRIPT_LIBRARY_DIR)
             result.copied_variants += 1
-            result.copied_variant_paths.append(str(rel_dest))
             existing_sources.append(target_video)
             log.info("COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
 
