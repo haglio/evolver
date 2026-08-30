@@ -28,7 +28,7 @@ def remove_empty_dirs(root: Path) -> None:
                 pass
 
 
-def remove_partial_video_files(root: Path, video_extensions: set[str], logger: logging.Logger | None = None) -> int:
+def remove_partial_video_files(root: Path, video_extensions: set[str], logger: logging.Logger) -> int:
     if not root.is_dir():
         return 0
 
@@ -39,8 +39,7 @@ def remove_partial_video_files(root: Path, video_extensions: set[str], logger: l
         try:
             path.unlink()
         except OSError:
-            if logger is not None:
-                logger.exception("Failed to delete stale partial output: %s", path)
+            logger.exception("Failed to delete stale partial output: %s", path)
             continue
         removed += 1
     return removed
