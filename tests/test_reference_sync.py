@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import unittest
 from contextlib import contextmanager
@@ -87,7 +88,7 @@ class TestClipperSessions(unittest.TestCase):
                 result = reference_sync.run()
 
             self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], gone)
-            self.assertEqual(result.unresolved_paths, [gone])
+            self.assertEqual(result.unresolved, 1)
 
     def test_leaves_a_session_whose_video_never_moved_untouched(self):
         with workspace_temp_dir() as temp:
@@ -169,3 +170,12 @@ class TestFunTimeFavorites(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReferenceSyncResultSurface(unittest.TestCase):
+    def test_the_result_carries_only_what_a_reader_consults(self):
+        """Every field lands in a run record; one nothing reads is dead weight."""
+        self.assertEqual(
+            {f.name for f in dataclasses.fields(reference_sync.ReferenceSyncResult)},
+            {"checked", "relocated", "unresolved", "write_errors"},
+        )
