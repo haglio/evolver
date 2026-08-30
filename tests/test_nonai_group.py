@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 
+import evolver
 from tasks import nonai_group
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import sidecar
@@ -169,6 +170,15 @@ class TestNonAiGroup(unittest.TestCase):
                 result = nonai_group.run()
                 self.assertEqual(result.pruned, 1)
                 self.assertFalse(sidecar.sidecar_path(clip).exists())
+
+
+class TestGroupingCannotFail(unittest.TestCase):
+    def test_the_verdict_rule_lives_in_the_table_and_nowhere_else(self):
+        """Grouping is bookkeeping over whatever files exist: absence from
+        ``_STAGE_FAILED`` is what says it cannot fail, so a result that also
+        advertises an ``ok`` invites a reader to look in the wrong place."""
+        self.assertNotIn("group_non_ai", evolver._STAGE_FAILED)
+        self.assertFalse(hasattr(nonai_group.NonAiGroupResult(), "ok"))
 
 
 if __name__ == "__main__":
