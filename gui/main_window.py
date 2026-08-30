@@ -101,7 +101,6 @@ class RunDetailWidget(QWidget):
 
             no_edit = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 
-            # Column 0: stage number
             num = STAGE_NUMBER.get(stage_key, i + 1)
             num_item = QTableWidgetItem(str(num))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -109,7 +108,6 @@ class RunDetailWidget(QWidget):
             num_item.setFlags(no_edit)
             self._table.setItem(i, 0, num_item)
 
-            # Column 1: stage name with tooltip
             name_item = QTableWidgetItem(stage_key)
             name_item.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
             name_item.setFlags(no_edit)
@@ -126,13 +124,11 @@ class RunDetailWidget(QWidget):
             status_item.setFlags(no_edit)
             self._table.setItem(i, 2, status_item)
 
-            # Column 3: duration
             duration = stage.get("duration_seconds", 0.0)
             dur_item = QTableWidgetItem(f"{duration:.1f}s")
             dur_item.setFlags(no_edit)
             self._table.setItem(i, 3, dur_item)
 
-            # Column 4: details (double-click to select/copy text)
             details = _summarize_result(stage.get("result"), stage.get("skip_reason"), stage_key)
             details_item = QTableWidgetItem(details)
             self._table.setItem(i, 4, details_item)
@@ -281,7 +277,6 @@ class EvolverMainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(splitter)
 
-        # Left panel: run history
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(8, 8, 4, 8)
@@ -298,7 +293,6 @@ class EvolverMainWindow(QMainWindow):
         left_layout.addWidget(self._history_list)
         splitter.addWidget(left)
 
-        # Right panel: run detail view
         self._detail_widget = RunDetailWidget()
         splitter.addWidget(self._detail_widget)
 
@@ -316,45 +310,36 @@ class EvolverMainWindow(QMainWindow):
         toolbar.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
         self.addToolBar(toolbar)
 
-        # Small left pad so the toggle isn't flush with the window edge
         left_pad = QWidget()
         left_pad.setFixedWidth(6)
         toolbar.addWidget(left_pad)
 
-        # Active/Paused toggle switch
         self.active_toggle = ToggleSwitch(checked=True)
         toolbar.addWidget(self.active_toggle)
 
         toolbar.addSeparator()
 
-        # Next-run info label
         self._next_run_label = QLabel("")
         toolbar.addWidget(self._next_run_label)
 
-        # Spacer pushes remaining actions to the right
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         toolbar.addWidget(spacer)
 
-        # Run Now
         self.run_now_action = QAction(run_now_icon(_ICON_COLOR), "Run Now", self)
         toolbar.addAction(self.run_now_action)
 
         toolbar.addSeparator()
 
-        # Settings
         self.settings_action = QAction(qta.icon("fa5s.cog", color=_ICON_COLOR), "Settings", self)
         toolbar.addAction(self.settings_action)
 
-        # Stats
         self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats", self)
         toolbar.addAction(self.stats_action)
 
-        # Restart
         self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self)
         toolbar.addAction(self.restart_action)
 
-        # Quit
         self.quit_action = QAction(quit_icon(_ICON_COLOR), "Quit", self)
         toolbar.addAction(self.quit_action)
 
