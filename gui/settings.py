@@ -29,6 +29,11 @@ class EvolverSettings:
             return cls()
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+            settings = cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
         except Exception:
             return cls()
+        # The dialog's spin box cannot go below 1, but this file is plain JSON
+        # in the project folder: a hand-edited 0 reaches the scheduler's
+        # clock alignment, which divides by it.
+        settings.interval_minutes = max(settings.interval_minutes, 1)
+        return settings
