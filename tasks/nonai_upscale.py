@@ -154,12 +154,12 @@ def throttle_to_presence() -> str:
 def _adopt_orphan() -> dict | None:
     """Rebuild the job record for a lone still-running encode of ours.
 
-    The job file can vanish out from under a live encode (the sync service
-    covering the project tree renamed it mid-run more than once). Losing it
-    used to orphan the encode — unsupervised, never promoted, and no longer
-    blocking new starts, so encodes stacked up. A single Topaz ffmpeg whose
-    output is one of our .partial files in the non-AI tree is unambiguously
-    ours, so it is adopted back under supervision.
+    The job file can vanish out from under a live encode: the sync service
+    covering the project tree renames it mid-run. Without the record the encode
+    is orphaned — unsupervised, never promoted, and no longer blocking new
+    starts. A single Topaz ffmpeg whose output is one of our .partial files in
+    the non-AI tree is unambiguously ours, so it is adopted back under
+    supervision.
     """
     pids = processes.pids_of_image(config.FFMPEG)
     if len(pids) != 1:
@@ -386,9 +386,8 @@ def _carry_metadata(source: Path, out: Path) -> bool:
 
     Nothing downstream puts them back.  The grouping stage would copy a ``clip``
     across from an in-library original, but it runs later in the same pass and
-    by then there is none.  So an upscaled cut arrived in the library with
-    nothing to say it was ever a cut — which is how 33 of one folder's came to
-    sit among the very scenes they were carved from.
+    by then there is none.  So without this the upscale reaches the library with
+    nothing to say it was ever a cut.
 
     Funscripts are deliberately not carried: :mod:`tasks.scripts_sync` already
     copies an original's script onto its processed variants, and a second thing
@@ -640,10 +639,9 @@ def _machine_busy_reason() -> str:
 
     A present user comes first: an unattended multi-hour encode has no business
     starting while someone is at the keyboard. Any live Topaz ffmpeg — an
-    orphaned encode or the user's own GUI export — already owns the GPU; CPU
-    sampling never sees that, which is how encodes stacked up and crashed the
-    machine. RAM and a post-encode cooldown keep an unattended night from
-    running the box flat out end to end.
+    orphaned encode or the user's own GUI export — already owns the GPU, and CPU
+    sampling never sees that. RAM and a post-encode cooldown keep an unattended
+    night from running the box flat out end to end.
     """
     if _user_present():
         return "user_present"

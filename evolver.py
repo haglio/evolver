@@ -50,9 +50,7 @@ class StageRecord:
 # What counts as a failure for each stage, read off that stage's own result. A
 # stage absent here cannot fail. The run's verdict is then nothing more than its
 # stages' verdicts (see ``run_pipeline``), which is what keeps the two legible
-# together: a run used to read "error" while every stage it listed read
-# "completed", because the verdict was computed from the result payloads and the
-# stage status only ever recorded that the function had returned.
+# together.
 _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "purge": lambda r: bool(r.missing_sorted),
     "metadata": lambda r: not r.ok,
@@ -72,10 +70,7 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
 
 # What counts as work held back rather than work gone wrong. Nothing broke and
 # nothing is owed to anyone: there is no room to write another upscale, so the
-# stage parks the queue and picks it up again the moment space frees up. This
-# used to read as an outright failure, and because free space stays low for days
-# at a stretch it turned the whole run history into a wall of red — a standing
-# alarm for a condition with nothing in it to fix.
+# stage parks the queue and picks it up again the moment space frees up.
 _STAGE_HELD_BACK: dict[str, Callable[[object], bool]] = {
     "upscale": lambda r: r.deferred_low_disk,
     "upscale_non_ai": lambda r: r.deferred_low_disk,
