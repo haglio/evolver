@@ -223,8 +223,13 @@ class TestCollectCandidates(unittest.TestCase):
 
 def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
               source=None, tmp_bytes=b"partial", suspended=False, suspended_at=0.0,
-              suspended_seconds=0.0):
-    """A persisted in-flight job whose tmp file exists under the bucket."""
+              suspended_seconds=0.0, job_file=None):
+    """A persisted in-flight job whose tmp file exists under the bucket.
+
+    *job_file* writes the record somewhere other than the configured path, which
+    is how the tests for the state-file parameters put the record where only a
+    caller passing that path could find it.
+    """
     non_ai = overrides["NON_AI_DIR"]
     source = source or make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
     out = non_ai / "larkin" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
@@ -243,8 +248,9 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
         "suspended_at": suspended_at,
         "suspended_seconds": suspended_seconds,
     }
-    overrides["NONAI_JOB_STATE_FILE"].parent.mkdir(parents=True, exist_ok=True)
-    overrides["NONAI_JOB_STATE_FILE"].write_text(json.dumps(job), encoding="utf-8")
+    job_file = job_file or overrides["NONAI_JOB_STATE_FILE"]
+    job_file.parent.mkdir(parents=True, exist_ok=True)
+    job_file.write_text(json.dumps(job), encoding="utf-8")
     return source, tmp, out
 
 
@@ -712,6 +718,82 @@ class TestThrottleToPresence(unittest.TestCase):
 
             self.assertEqual(changed, "")
             mocks["suspend"].assert_not_called()
+
+
+class TestStateFilesAreParameters(unittest.TestCase):
+    """The three state files are arguments, not ambient reads.
+
+    Each one threads through the functions that decide whether a live encode is
+    promoted, failed or killed, so a parameter wired to the wrong place — or
+    resolved once at import, past ``override_config`` — would leave the stage
+    writing to the configured path anyway and nothing would say so. These point
+    all three somewhere else and check both halves: the state lands where the
+    caller asked, and the configured files stay untouched.
+    """
+
+    def test_a_start_writes_its_record_and_attempt_where_the_parameters_point(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            elsewhere = root / "elsewhere"
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+
+            stack, _ = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(
+                    allow_start=True,
+                    job_file=elsewhere / "job.json",
+                    attempts_file=elsewhere / "attempts.json",
+                    cooldown_file=elsewhere / "cooldown.json",
+                )
+
+            self.assertEqual(result.started, "larkin/0 unsorted/a.mp4")
+            self.assertTrue((elsewhere / "job.json").is_file())
+            self.assertEqual(
+                json.loads((elsewhere / "attempts.json").read_text(encoding="utf-8")),
+                {"larkin/0 unsorted/a.mp4": 1},
+            )
+            self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
+            self.assertFalse(overrides["NONAI_ATTEMPTS_FILE"].exists())
+
+    def test_a_conclusion_stamps_the_cooldown_file_the_parameter_names(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            elsewhere = root / "elsewhere"
+            (overrides["NON_AI_DIR"] / "larkin" / "2 do not need work").mkdir(parents=True)
+            write_job(root, overrides, expected=100.0, job_file=elsewhere / "job.json")
+
+            stack, _ = probes(is_running=False, duration=99.5)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(
+                    allow_start=False,
+                    job_file=elsewhere / "job.json",
+                    attempts_file=elsewhere / "attempts.json",
+                    cooldown_file=elsewhere / "cooldown.json",
+                )
+
+            self.assertEqual(result.promoted, "larkin/0 unsorted/busy.mp4")
+            self.assertIn(
+                "ended_at",
+                json.loads((elsewhere / "cooldown.json").read_text(encoding="utf-8")),
+            )
+            self.assertFalse(overrides["NONAI_COOLDOWN_FILE"].exists())
+
+    def test_the_presence_throttle_parks_the_job_file_it_is_given(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            elsewhere = root / "elsewhere"
+            write_job(root, overrides, job_file=elsewhere / "job.json")
+
+            stack, mocks = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                changed = nonai_upscale.throttle_to_presence(
+                    job_file=elsewhere / "job.json")
+
+            self.assertEqual(changed, "suspended")
+            mocks["suspend"].assert_called_once_with(4242)
+            job = json.loads((elsewhere / "job.json").read_text(encoding="utf-8"))
+            self.assertTrue(job["suspended"])
+            self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
 
 
 class TestPortraitTargets(unittest.TestCase):

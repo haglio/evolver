@@ -88,7 +88,9 @@ class NonAiUpscaleResult:
 
 
 def run(allow_start: bool = True, stop: bool = False,
-        presence_managed: bool = False) -> NonAiUpscaleResult:
+        presence_managed: bool = False, *, job_file: Path | None = None,
+        attempts_file: Path | None = None,
+        cooldown_file: Path | None = None) -> NonAiUpscaleResult:
     """Check on the in-flight encode, then start the next one if the box is free.
 
     With *stop* (the tray toggle is off), a still-running encode is killed and
@@ -100,22 +102,36 @@ def run(allow_start: bool = True, stop: bool = False,
     they idle out again, so a day of intermittent use makes progress in the
     gaps instead of throwing partial work away. The headless CLI leaves it off
     and simply lets an in-flight encode run.
+
+    The three state files are resolved here rather than read where they are
+    used, so everything below is handed the paths it writes to. They are
+    sentinels rather than signature defaults on purpose: a default is evaluated
+    at import, which would freeze whatever ``config`` held then and put the
+    value out of reach of ``override_config``, the seam the stage's tests steer
+    it with.
     """
+    job_file = config.NONAI_JOB_STATE_FILE if job_file is None else job_file
+    attempts_file = config.NONAI_ATTEMPTS_FILE if attempts_file is None else attempts_file
+    cooldown_file = config.NONAI_COOLDOWN_FILE if cooldown_file is None else cooldown_file
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
     repair_retired_metadata(result)
 
     with _throttle_lock:
-        job = _load_job()
+        job = nonai_job.load_job(job_file)
         if job is None:
-            job = _adopt_orphan()
+            job = _adopt_orphan(job_file)
         _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
         if job is not None:
-            _supervise(job, result, stop=stop, presence_managed=presence_managed)
+            _supervise(job, result, job_file=job_file, attempts_file=attempts_file,
+                       cooldown_file=cooldown_file, stop=stop,
+                       presence_managed=presence_managed)
 
         if not result.in_flight and allow_start and not stop:
-            _start_next_candidate(result)
+            _start_next_candidate(result, job_file=job_file,
+                                  attempts_file=attempts_file,
+                                  cooldown_file=cooldown_file)
 
     result.pending = len(collect_candidates())
     in_flight = result.in_flight or "-"
@@ -133,7 +149,7 @@ def run(allow_start: bool = True, stop: bool = False,
     return result
 
 
-def throttle_to_presence() -> str:
+def throttle_to_presence(*, job_file: Path | None = None) -> str:
     """Between full pipeline ticks, keep the in-flight encode in step with the
     user: suspend it the moment they return, resume it once they idle out.
 
@@ -142,8 +158,9 @@ def throttle_to_presence() -> str:
     nothing changed. Starting a new encode stays with the pipeline tick, which
     has the candidate scan and resource checks; this only parks and thaws.
     """
+    job_file = config.NONAI_JOB_STATE_FILE if job_file is None else job_file
     with _throttle_lock:
-        job = _load_job()
+        job = nonai_job.load_job(job_file)
         if job is None:
             return ""
         pid = job.get("pid", 0)
@@ -151,15 +168,15 @@ def throttle_to_presence() -> str:
             return ""
         present = _user_present()
         if present and not job.get("suspended"):
-            _suspend_job(job)
+            _suspend_job(job, job_file)
             return "suspended"
         if not present and job.get("suspended"):
-            _resume_job(job)
+            _resume_job(job, job_file)
             return "resumed"
         return ""
 
 
-def _adopt_orphan() -> dict | None:
+def _adopt_orphan(job_file: Path) -> dict | None:
     """Rebuild the job record for a lone still-running encode of ours.
 
     The job file can vanish out from under a live encode: the sync service
@@ -197,7 +214,7 @@ def _adopt_orphan() -> dict | None:
     # inherits a permanently-suspended process. resume() no-ops if it is
     # already running.
     processes.resume(pids[0])
-    _save_job(job)
+    nonai_job.save_job(job_file, job)
     log.warning(
         "Adopted an orphaned non-AI encode (pid %d) of %s; its job state had gone missing.",
         pids[0], source,
@@ -217,50 +234,54 @@ def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
     return Path(source), Path(output)
 
 
-def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False,
+def _supervise(job: dict, result: NonAiUpscaleResult, *, job_file: Path,
+               attempts_file: Path, cooldown_file: Path, stop: bool = False,
                presence_managed: bool = False) -> None:
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
         if stop:
-            _stop_in_flight(job, result, "the non-AI upscale toggle is off")
+            _stop_in_flight(job, result, "the non-AI upscale toggle is off",
+                            job_file=job_file, attempts_file=attempts_file)
             return
         if _is_low_disk():
             # The 250 GB floor was clear at start, but a 4K60 output plus
             # whatever else writes overnight can cross it mid-encode.
             result.deferred_low_disk = True
-            _stop_in_flight(job, result, "free disk fell below the safety floor mid-encode")
+            _stop_in_flight(job, result,
+                            "free disk fell below the safety floor mid-encode",
+                            job_file=job_file, attempts_file=attempts_file)
             return
         if presence_managed and _user_present():
-            _suspend_job(job)
+            _suspend_job(job, job_file)
             result.in_flight = relpath(source)
             result.in_flight_percent = _percent_encoded(job)
             result.suspended = True
             return
         if presence_managed:
-            _resume_job(job)  # a no-op unless it was frozen
+            _resume_job(job, job_file)  # a no-op unless it was frozen
         if not _overran(job):
             result.in_flight = relpath(source)
             result.in_flight_percent = _percent_encoded(job)
             return
         _terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
-    _conclude(job, result)
-    _clear_job()
+    _conclude(job, result, attempts_file=attempts_file, cooldown_file=cooldown_file)
+    nonai_job.clear_job(job_file)
 
 
-def _suspend_job(job: dict) -> None:
+def _suspend_job(job: dict, job_file: Path) -> None:
     """Freeze the encode and remember when, so the pause is not charged runtime."""
     if job.get("suspended"):
         return
     processes.suspend(job.get("pid", 0))
     job["suspended"] = True
     job["suspended_at"] = time.time()
-    _save_job(job)
+    nonai_job.save_job(job_file, job)
     log.info("Suspended the non-AI encode of %s; the user is back at the machine.",
              job.get("source"))
 
 
-def _resume_job(job: dict) -> None:
+def _resume_job(job: dict, job_file: Path) -> None:
     """Thaw the encode and bank the time it spent frozen."""
     if not job.get("suspended"):
         return
@@ -269,18 +290,19 @@ def _resume_job(job: dict) -> None:
     job["suspended_seconds"] = job.get("suspended_seconds", 0.0) + paused_for
     job["suspended"] = False
     job["suspended_at"] = 0.0
-    _save_job(job)
+    nonai_job.save_job(job_file, job)
     log.info("Resumed the non-AI encode of %s; the machine is idle again.",
              job.get("source"))
 
 
-def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str) -> None:
+def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str, *,
+                    job_file: Path, attempts_file: Path) -> None:
     """End the encode through no fault of its video — no retry penalty."""
     source = Path(job.get("source", ""))
     _terminate_ffmpeg(job.get("pid", 0), reason)
     _delete_tmp(Path(job.get("tmp", "")))
-    _clear_attempts(source)
-    _clear_job()
+    nonai_job.clear_attempts(attempts_file, relpath(source))
+    nonai_job.clear_job(job_file)
     result.stopped = relpath(source)
     log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
 
@@ -326,20 +348,21 @@ def _terminate_ffmpeg(pid: int, reason: str) -> None:
         log.warning("Job pid %d is no longer ffmpeg; treating the encode as ended.", pid)
 
 
-def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
+def _conclude(job: dict, result: NonAiUpscaleResult, *, attempts_file: Path,
+              cooldown_file: Path) -> None:
     source = Path(job.get("source", ""))
     tmp = Path(job.get("tmp", ""))
     out = Path(job.get("out", ""))
     expected = job.get("expected_duration") or 0.0
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
 
-    _stamp_encode_ended()
+    nonai_job.stamp_encode_ended(cooldown_file)
     if actual and expected and actual >= config.NONAI_COMPLETE_DURATION_FRACTION * expected:
         tmp.replace(out)
         # Before the original leaves, and it takes its sidecar with it.
         _carry_metadata(source, out)
         _retire_original(source)
-        _clear_attempts(source)
+        nonai_job.clear_attempts(attempts_file, relpath(source))
         result.promoted = relpath(source)
         log.info("Promoted finished non-AI upscale: %s", out)
         return
@@ -348,9 +371,9 @@ def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
     log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
     _delete_tmp(tmp)
-    if _attempts_of(source) >= config.NONAI_MAX_ATTEMPTS:
+    if nonai_job.attempts_of(attempts_file, relpath(source)) >= config.NONAI_MAX_ATTEMPTS:
         _add_to_skip_manifest(source, f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
-        _clear_attempts(source)
+        nonai_job.clear_attempts(attempts_file, relpath(source))
 
 
 def _delete_tmp(tmp: Path) -> None:
@@ -569,12 +592,13 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
                 log.info("Removed %d stale partial output file(s) from %s", removed, done_dir)
 
 
-def _start_next_candidate(result: NonAiUpscaleResult) -> None:
+def _start_next_candidate(result: NonAiUpscaleResult, *, job_file: Path,
+                          attempts_file: Path, cooldown_file: Path) -> None:
     if _is_low_disk():
         result.deferred_low_disk = True
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
         return
-    result.start_deferred = _machine_busy_reason()
+    result.start_deferred = _machine_busy_reason(cooldown_file)
     if result.start_deferred:
         log.info("Deferring non-AI upscale start: %s.", result.start_deferred)
         return
@@ -593,9 +617,9 @@ def _start_next_candidate(result: NonAiUpscaleResult) -> None:
         out = _output_path(candidate)
         out.parent.mkdir(parents=True, exist_ok=True)
         tmp = out.with_name(f"{source.stem}.partial.{uuid.uuid4().hex}.mp4")
-        _bump_attempts(source)
+        nonai_job.bump_attempts(attempts_file, relpath(source))
         pid = _launch(source, tmp, orientation)
-        _save_job({
+        nonai_job.save_job(job_file, {
             "pid": pid,
             "source": str(source),
             "tmp": str(tmp),
@@ -642,7 +666,7 @@ def _is_low_disk() -> bool:
     return free_gb < config.LOW_DISK_WARNING_GB
 
 
-def _machine_busy_reason() -> str:
+def _machine_busy_reason(cooldown_file: Path) -> str:
     """Why the machine cannot take a new encode right now — "" when it can.
 
     A present user comes first: an unattended multi-hour encode has no business
@@ -657,7 +681,8 @@ def _machine_busy_reason() -> str:
         return "topaz_busy"
     if system_resources.available_ram_gb() < config.NONAI_MIN_AVAILABLE_RAM_GB:
         return "low_ram"
-    if time.time() - _last_encode_ended_at() < config.NONAI_COOLDOWN_MINUTES * 60:
+    if (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
+            < config.NONAI_COOLDOWN_MINUTES * 60):
         return "cooldown"
     return ""
 
@@ -673,41 +698,6 @@ def _user_present() -> bool:
     except OSError:
         return True
     return idle < config.NONAI_USER_IDLE_THRESHOLD_SECONDS
-
-
-# The three state files now live in :mod:`util.nonai_job`, which takes each
-# path as an argument.  These bind the stage's configured ones; the parameters
-# that will replace them are the next commit.
-def _last_encode_ended_at() -> float:
-    return nonai_job.last_encode_ended_at(config.NONAI_COOLDOWN_FILE)
-
-
-def _stamp_encode_ended() -> None:
-    nonai_job.stamp_encode_ended(config.NONAI_COOLDOWN_FILE)
-
-
-def _load_job() -> dict | None:
-    return nonai_job.load_job(config.NONAI_JOB_STATE_FILE)
-
-
-def _save_job(job: dict) -> None:
-    nonai_job.save_job(config.NONAI_JOB_STATE_FILE, job)
-
-
-def _clear_job() -> None:
-    nonai_job.clear_job(config.NONAI_JOB_STATE_FILE)
-
-
-def _attempts_of(source: Path) -> int:
-    return nonai_job.attempts_of(config.NONAI_ATTEMPTS_FILE, relpath(source))
-
-
-def _bump_attempts(source: Path) -> None:
-    nonai_job.bump_attempts(config.NONAI_ATTEMPTS_FILE, relpath(source))
-
-
-def _clear_attempts(source: Path) -> None:
-    nonai_job.clear_attempts(config.NONAI_ATTEMPTS_FILE, relpath(source))
 
 
 def _add_to_skip_manifest(source: Path, reason: str) -> None:

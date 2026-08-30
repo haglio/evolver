@@ -58,7 +58,7 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/clip_scripts.py": 2,
     "tasks/genau_deliver.py": 6,
     "tasks/nonai_group.py": 4,
-    "tasks/nonai_upscale.py": 51,
+    "tasks/nonai_upscale.py": 47,
     "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 7,
     "tasks/purge_weird.py": 5,
