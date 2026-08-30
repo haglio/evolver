@@ -27,6 +27,7 @@ from pathlib import Path
 import config
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
 from util.sidecar import sidecar_path
+from util.variants import is_upscaled_stem, sorted_stem_of
 
 log = logging.getLogger(__name__)
 
@@ -56,11 +57,11 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
     ``<orient>/<source>`` pair, so the source path is recoverable from the output
     path alone — no bookkeeping to keep in step.
     """
-    if not upscaled.stem.endswith("_topaz"):
+    if not is_upscaled_stem(upscaled.stem):
         return None
     orient = upscaled.parent.parent.name
     for candidate in (genau_sorted_dir / orient).glob(
-        f"{upscaled.stem[: -len('_topaz')]}.*"
+        f"{sorted_stem_of(upscaled.stem)}.*"
     ):
         if candidate.suffix.lower() in config.VIDEO_EXTENSIONS:
             return candidate

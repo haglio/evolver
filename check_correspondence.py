@@ -8,6 +8,7 @@ from pathlib import Path
 import config
 from util.media_files import library_videos
 from util.windows_alert import show_error_window
+from util.variants import UPSCALE_SUFFIX, upscaled_stem
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class CorrespondenceResult:
 
 
 def sorted_to_outbox_name(sorted_file: Path) -> str:
-    return f"{sorted_file.stem}_topaz{sorted_file.suffix}"
+    return f"{upscaled_stem(sorted_file.stem)}{sorted_file.suffix}"
 
 
 def run(
@@ -177,7 +178,8 @@ def main() -> int:
     print()
 
     if result.orphan_outbox:
-        print(f"[ORPHAN-OUTBOX] {len(result.orphan_outbox)} outbox file(s) do not match '<sorted_name>_topaz.ext':")
+        print(f"[ORPHAN-OUTBOX] {len(result.orphan_outbox)} outbox file(s) do not "
+              f"match '<sorted_name>{UPSCALE_SUFFIX}.ext':")
         for item in result.orphan_outbox:
             print(f"  {item}")
         print()

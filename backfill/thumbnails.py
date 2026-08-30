@@ -32,6 +32,7 @@ from backfill.queue import iter_library_videos
 from backfill.vocabulary import scoped_grid
 from util.ffprobe import duration_seconds
 from util.sidecar import action_of, read, sidecar_path
+from util.variants import sorted_stem_of
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ def _scan_library() -> tuple[dict[str, Path], dict[str, Path]]:
     by_id: dict[str, Path] = {}
     for _source, video in iter_library_videos():
         stem = video.stem
-        clip_id = stem[: -len("_topaz")] if stem.endswith("_topaz") else stem
+        clip_id = sorted_stem_of(stem)
         by_id.setdefault(clip_id, video)
         action = action_of(read(sidecar_path(video)))
         if action:

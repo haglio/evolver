@@ -9,6 +9,7 @@ from typing import List
 import config
 from util.media_files import is_finalized_video_file
 from util.windows_alert import show_error_window
+from util.variants import UPSCALE_SUFFIX
 
 log = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ def source_stem(stem: str) -> str:
         'abc_apo8_gcg5'     -> 'abc'
         'abc_apo8_gcg5_x'   -> 'abc'
     """
-    stripped_topaz = re.sub(r"_topaz(?:_.*)?$", "", stem)
+    stripped_topaz = re.sub(rf"{re.escape(UPSCALE_SUFFIX)}(?:_.*)?$", "", stem)
     if stripped_topaz != stem:
         return stripped_topaz
     return re.sub(r"_apo8_gcg5(?:_.*)?$", "", stem)

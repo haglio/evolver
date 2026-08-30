@@ -16,6 +16,7 @@ from pathlib import Path
 
 import config
 from util.json_store import atomic_write_text, read_dict
+from util.variants import upscaled_stem
 
 
 def upscaled_video_path(
@@ -29,7 +30,7 @@ def upscaled_video_path(
     different trees.
     """
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
-    return outbox_dir / orient / source / f"{sorted_stem}_topaz.mp4"
+    return outbox_dir / orient / source / f"{upscaled_stem(sorted_stem)}.mp4"
 
 
 def sidecar_path(video: Path) -> Path:
