@@ -72,6 +72,50 @@ class NonAiUpscaleResult:
     repaired_sidecars: int = 0
 
 
+@dataclass(frozen=True)
+class StageFiles:
+    """The six files the stage touches, resolved once at its boundary.
+
+    Three it writes -- the job record, the attempt counter, the cooldown stamp
+    -- and three the queue reads: the skip and pin manifests, and Fun Time's
+    watch stats. Held as one record rather than threaded separately because
+    every function below is handed the same set, and six separate resolutions
+    put six conditionals in front of the code that supervises a live multi-hour
+    encode -- the one function here that most needs to read straight through.
+    """
+
+    job: Path
+    attempts: Path
+    cooldown: Path
+    skip_manifest: Path
+    pin_manifest: Path
+    watch_stats: Path
+
+
+def _configured_files(job_file: Path | None, attempts_file: Path | None,
+                      cooldown_file: Path | None, skip_manifest: Path | None,
+                      pin_manifest: Path | None,
+                      watch_stats_file: Path | None) -> StageFiles:
+    """Each argument, or the configured path when the caller named none.
+
+    The sentinel form -- ``x=None``, then ``config.X if x is None else x`` --
+    rather than signature defaults: a default is evaluated at import, which
+    would freeze whatever ``config`` held then and put the value out of reach
+    of ``override_config``, the seam every stage test steers with.
+    """
+    return StageFiles(
+        job=config.NONAI_JOB_STATE_FILE if job_file is None else job_file,
+        attempts=config.NONAI_ATTEMPTS_FILE if attempts_file is None else attempts_file,
+        cooldown=config.NONAI_COOLDOWN_FILE if cooldown_file is None else cooldown_file,
+        skip_manifest=(config.NONAI_SKIP_MANIFEST if skip_manifest is None
+                       else skip_manifest),
+        pin_manifest=(config.NONAI_PRIORITY_MANIFEST if pin_manifest is None
+                      else pin_manifest),
+        watch_stats=(config.FUN_TIME_WATCH_STATS_FILE if watch_stats_file is None
+                     else watch_stats_file),
+    )
+
+
 def run(allow_start: bool = True, stop: bool = False,
         presence_managed: bool = False, *, job_file: Path | None = None,
         attempts_file: Path | None = None, cooldown_file: Path | None = None,
@@ -89,52 +133,33 @@ def run(allow_start: bool = True, stop: bool = False,
     gaps instead of throwing partial work away. The headless CLI leaves it off
     and simply lets an in-flight encode run.
 
-    The six files the stage touches are resolved here rather than read where
-    they are used, so everything below is handed the paths it works on: three
-    it writes (the job record, the attempt counter, the cooldown stamp) and
-    three the queue reads (the skip and pin manifests, and Fun Time's watch
-    stats). They are sentinels rather than signature defaults on purpose: a
-    default is evaluated at import, which would freeze whatever ``config`` held
-    then and put the value out of reach of ``override_config``, the seam the
-    stage's tests steer it with.
+    Every file the stage touches is named at this boundary and resolved once;
+    see :class:`StageFiles`.
     """
-    job_file = config.NONAI_JOB_STATE_FILE if job_file is None else job_file
-    attempts_file = config.NONAI_ATTEMPTS_FILE if attempts_file is None else attempts_file
-    cooldown_file = config.NONAI_COOLDOWN_FILE if cooldown_file is None else cooldown_file
-    skip_manifest = config.NONAI_SKIP_MANIFEST if skip_manifest is None else skip_manifest
-    pin_manifest = config.NONAI_PRIORITY_MANIFEST if pin_manifest is None else pin_manifest
-    watch_stats_file = (config.FUN_TIME_WATCH_STATS_FILE if watch_stats_file is None
-                        else watch_stats_file)
+    files = _configured_files(job_file, attempts_file, cooldown_file,
+                              skip_manifest, pin_manifest, watch_stats_file)
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
     repair_retired_metadata(result)
 
     with _throttle_lock:
-        job = nonai_job.load_job(job_file)
+        job = nonai_job.load_job(files.job)
         if job is None:
-            job = nonai_encode.adopt_orphan(job_file)
+            job = nonai_encode.adopt_orphan(files.job)
         _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
         if job is not None:
-            _supervise(job, result, job_file=job_file, attempts_file=attempts_file,
-                       cooldown_file=cooldown_file, skip_manifest=skip_manifest,
-                       stop=stop, presence_managed=presence_managed)
+            _supervise(job, result, files, stop=stop,
+                       presence_managed=presence_managed)
 
         if not result.in_flight and allow_start and not stop:
-            _start_next_candidate(result, job_file=job_file,
-                                  attempts_file=attempts_file,
-                                  cooldown_file=cooldown_file,
-                                  skip_manifest=skip_manifest,
-                                  pin_manifest=pin_manifest,
-                                  watch_stats_file=watch_stats_file)
+            _start_next_candidate(result, files)
 
     # Collected a second time on purpose: a start attempt can retire clips to
     # the skip manifest, and the count reported is the queue as it stands after
     # that. The doubled walk is finding tasks/design/008's; merging the two
     # would change what `pending` means, so it stays and stays visible.
-    result.pending = len(collect_candidates(
-        skip_manifest=skip_manifest, pin_manifest=pin_manifest,
-        watch_stats_file=watch_stats_file))
+    result.pending = len(_collect(files))
     in_flight = result.in_flight or "-"
     if result.in_flight and result.in_flight_percent is not None:
         in_flight = f"{result.in_flight} ({result.in_flight_percent}% encoded)"
@@ -177,69 +202,70 @@ def throttle_to_presence(*, job_file: Path | None = None) -> str:
         return ""
 
 
-def _supervise(job: dict, result: NonAiUpscaleResult, *, job_file: Path,
-               attempts_file: Path, cooldown_file: Path, skip_manifest: Path,
+def _collect(files: StageFiles) -> list[Candidate]:
+    return collect_candidates(skip_manifest=files.skip_manifest,
+                              pin_manifest=files.pin_manifest,
+                              watch_stats_file=files.watch_stats)
+
+
+def _supervise(job: dict, result: NonAiUpscaleResult, files: StageFiles, *,
                stop: bool = False, presence_managed: bool = False) -> None:
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
         if stop:
-            _stop_in_flight(job, result, "the non-AI upscale toggle is off",
-                            job_file=job_file, attempts_file=attempts_file)
+            _stop_in_flight(job, result, "the non-AI upscale toggle is off", files)
             return
         if _is_low_disk():
             # The 250 GB floor was clear at start, but a 4K60 output plus
             # whatever else writes overnight can cross it mid-encode.
             result.deferred_low_disk = True
             _stop_in_flight(job, result,
-                            "free disk fell below the safety floor mid-encode",
-                            job_file=job_file, attempts_file=attempts_file)
+                            "free disk fell below the safety floor mid-encode", files)
             return
         if presence_managed and _user_present():
-            nonai_encode.suspend_job(job, job_file)
+            nonai_encode.suspend_job(job, files.job)
             result.in_flight = relpath(source)
             result.in_flight_percent = nonai_encode.percent_encoded(job)
             result.suspended = True
             return
         if presence_managed:
-            nonai_encode.resume_job(job, job_file)  # a no-op unless it was frozen
+            nonai_encode.resume_job(job, files.job)  # a no-op unless it was frozen
         if not nonai_encode.overran(job):
             result.in_flight = relpath(source)
             result.in_flight_percent = nonai_encode.percent_encoded(job)
             return
         nonai_encode.terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
-    _conclude(job, result, attempts_file=attempts_file, cooldown_file=cooldown_file,
-              skip_manifest=skip_manifest)
-    nonai_job.clear_job(job_file)
+    _conclude(job, result, files)
+    nonai_job.clear_job(files.job)
 
 
-def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str, *,
-                    job_file: Path, attempts_file: Path) -> None:
+def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str,
+                    files: StageFiles) -> None:
     """End the encode through no fault of its video — no retry penalty."""
     source = Path(job.get("source", ""))
     nonai_encode.terminate_ffmpeg(job.get("pid", 0), reason)
     nonai_encode.delete_tmp(Path(job.get("tmp", "")))
-    nonai_job.clear_attempts(attempts_file, relpath(source))
-    nonai_job.clear_job(job_file)
+    nonai_job.clear_attempts(files.attempts, relpath(source))
+    nonai_job.clear_job(files.job)
     result.stopped = relpath(source)
     log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
 
 
-def _conclude(job: dict, result: NonAiUpscaleResult, *, attempts_file: Path,
-              cooldown_file: Path, skip_manifest: Path) -> None:
+def _conclude(job: dict, result: NonAiUpscaleResult, files: StageFiles) -> None:
     source = Path(job.get("source", ""))
     tmp = Path(job.get("tmp", ""))
     out = Path(job.get("out", ""))
     expected = job.get("expected_duration") or 0.0
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
 
-    nonai_job.stamp_encode_ended(cooldown_file)
+    nonai_job.stamp_encode_ended(files.cooldown)
     if actual and expected and actual >= config.NONAI_COMPLETE_DURATION_FRACTION * expected:
         tmp.replace(out)
         # Before the original leaves, and it takes its sidecar with it.
         carry_metadata(source, out)
         retire_original(source, archive_root=config.NONAI_RETIRED_ROOT)
-        nonai_job.clear_attempts(attempts_file, relpath(source))
+        nonai_job.clear_attempts(files.attempts, relpath(source))
         result.promoted = relpath(source)
         log.info("Promoted finished non-AI upscale: %s", out)
         return
@@ -248,10 +274,10 @@ def _conclude(job: dict, result: NonAiUpscaleResult, *, attempts_file: Path,
     log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
     nonai_encode.delete_tmp(tmp)
-    if nonai_job.attempts_of(attempts_file, relpath(source)) >= config.NONAI_MAX_ATTEMPTS:
-        add_to_skip_manifest(skip_manifest, source,
+    if nonai_job.attempts_of(files.attempts, relpath(source)) >= config.NONAI_MAX_ATTEMPTS:
+        add_to_skip_manifest(files.skip_manifest, source,
                              f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
-        nonai_job.clear_attempts(attempts_file, relpath(source))
+        nonai_job.clear_attempts(files.attempts, relpath(source))
 
 
 def repair_retired_metadata(result: NonAiUpscaleResult) -> None:
@@ -311,40 +337,35 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
                 log.info("Removed %d stale partial output file(s) from %s", removed, done_dir)
 
 
-def _start_next_candidate(result: NonAiUpscaleResult, *, job_file: Path,
-                          attempts_file: Path, cooldown_file: Path,
-                          skip_manifest: Path, pin_manifest: Path,
-                          watch_stats_file: Path) -> None:
+def _start_next_candidate(result: NonAiUpscaleResult, files: StageFiles) -> None:
     if _is_low_disk():
         result.deferred_low_disk = True
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
         return
-    result.start_deferred = _machine_busy_reason(cooldown_file)
+    result.start_deferred = _machine_busy_reason(files.cooldown)
     if result.start_deferred:
         log.info("Deferring non-AI upscale start: %s.", result.start_deferred)
         return
 
-    for candidate in collect_candidates(skip_manifest=skip_manifest,
-                                        pin_manifest=pin_manifest,
-                                        watch_stats_file=watch_stats_file):
+    for candidate in _collect(files):
         source = candidate.path
         expected_duration = ffprobe.duration_seconds(source)
         orient = ffprobe.get_orientation(source)
         if ffprobe.videoai_tag(source):
-            add_to_skip_manifest(skip_manifest, source,
+            add_to_skip_manifest(files.skip_manifest, source,
                                  "already carries a Topaz videoai tag")
             continue
         if expected_duration is None or orient == orientation.UNKNOWN:
-            add_to_skip_manifest(skip_manifest, source,
+            add_to_skip_manifest(files.skip_manifest, source,
                                  "ffprobe could not read duration or orientation")
             continue
 
         out = _output_path(candidate)
         out.parent.mkdir(parents=True, exist_ok=True)
         tmp = out.with_name(f"{source.stem}.partial.{uuid.uuid4().hex}.mp4")
-        nonai_job.bump_attempts(attempts_file, relpath(source))
+        nonai_job.bump_attempts(files.attempts, relpath(source))
         pid = nonai_encode.launch(source, tmp, orient)
-        nonai_job.save_job(job_file, {
+        nonai_job.save_job(files.job, {
             "pid": pid,
             "source": str(source),
             "tmp": str(tmp),
