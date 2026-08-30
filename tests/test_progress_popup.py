@@ -23,7 +23,7 @@ class TestPopupConstruction(unittest.TestCase):
         stage is rather than the key the run record files it under."""
         from PyQt6.QtWidgets import QLabel
 
-        from gui.progress import STAGE_LABELS
+        from tasks.stages import STAGE_LABELS
 
         captions = {label.text() for label in self.popup.findChildren(QLabel)}
 
@@ -36,7 +36,7 @@ class TestPopupConstruction(unittest.TestCase):
         the font is whatever the machine running it has."""
         from PyQt6.QtWidgets import QLabel
 
-        from gui.progress import STAGE_LABELS
+        from tasks.stages import STAGE_LABELS
 
         for label in self.popup.findChildren(QLabel):
             if label.text() in set(STAGE_LABELS.values()):

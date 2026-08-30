@@ -1,13 +1,20 @@
-"""The GUI's stage registry must cover every stage the pipeline emits."""
+"""One declaration of the stages, and everything that must agree with it.
+
+The pipeline's order, the popup's bars, the detail table's names, tooltips
+and numbers and the chart's palette all come off ``tasks/stages.py``. What
+is left to check is that the list really is the one the pipeline runs.
+"""
 
 import itertools
 import re
 import unittest
 from pathlib import Path
 
+from PyQt6.QtGui import QColor
+
 import evolver
-from gui.progress import ALL_STAGES
 from gui.stats_window import STAGE_COLORS
+from tasks.stages import ALL_STAGES, STAGES
 from tests.color_support import band_fill, delta_e
 from tests.test_dead_code import PROJECT_ROOT, _source_files
 from tests.test_evolver import _patched_stages, _stage_mocks
@@ -69,10 +76,19 @@ class TestStageRegistry(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
-    def test_every_stage_has_a_chart_color(self):
-        for stage in ALL_STAGES:
-            with self.subTest(stage=stage):
-                self.assertIn(stage, STAGE_COLORS)
+    def test_the_one_declaration_carries_every_stage_s_color(self):
+        """The chart's palette is the registry's fourth column, not a second list.
+
+        It was a dict of its own in the stats window, keyed by the same strings
+        in a different order and maintained by hand — a second place to add a
+        stage to, next to the one that had already been missed. Deriving it
+        means the colour cannot be forgotten and cannot be spelled against a
+        key no stage has.
+        """
+        self.assertEqual(
+            {stage.key: QColor(*stage.color) for stage in STAGES},
+            STAGE_COLORS,
+        )
 
     def test_no_two_stage_bands_are_hard_to_tell_apart(self):
         """The chart stacks every stage as a band in one column, so a close

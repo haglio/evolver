@@ -15,26 +15,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.progress import ALL_STAGES, STAGE_LABELS
 from gui.run_record import RunRecord
+from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 
-STAGE_COLORS = {
-    "strays": QColor(0xBA, 0xB0, 0xAC),
-    "sort": QColor(0x38, 0x6A, 0x9C),
-    "purge": QColor(0xF2, 0x8E, 0x2B),
-    "scripts": QColor(0xAD, 0x40, 0x35),
-    "clip_scripts": QColor(0xF6, 0x70, 0x99),
-    "scene_scripts": QColor(0xDE, 0xB8, 0xC6),
-    "bookmarks": QColor(0x4B, 0x96, 0x88),
-    "metadata": QColor(0x14, 0x7D, 0x3C),
-    "upscale": QColor(0xED, 0xC9, 0x48),
-    "genau_deliver": QColor(0x7B, 0x41, 0x73),
-    "upscale_non_ai": QColor(0x76, 0x67, 0x47),
-    "group_non_ai": QColor(0x6F, 0xDB, 0x9A),
-    "references": QColor(0x61, 0xCA, 0xF2),
-    "dupes": QColor(0xCA, 0x94, 0xDB),
-    "verify": QColor(0xFF, 0x9D, 0x83),
-}
+# The registry's colours, as the painter wants them. This is the edge where Qt
+# begins: the declaration holds plain RGB so the headless pipeline can read it.
+STAGE_COLORS = {stage.key: QColor(*stage.color) for stage in STAGES}
 
 _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
 _LIMIT_SECONDS = 600.0
@@ -206,7 +192,7 @@ class StackedAreaChart(QWidget):
 
         for stage_idx, stage_key in enumerate(ALL_STAGES):
             vals = series[stage_idx]
-            color = STAGE_COLORS.get(stage_key, QColor(0x80, 0x80, 0x80))
+            color = STAGE_COLORS[stage_key]
 
             path = QPainterPath()
             path.moveTo(to_x(timestamps[0]), to_y(prev_cum[0]))
@@ -345,7 +331,7 @@ class StackedAreaChart(QWidget):
         painter.drawRect(lx, ly, legend_w, legend_h)
 
         for i, stage_key in enumerate(ALL_STAGES):
-            color = STAGE_COLORS.get(stage_key, QColor(0x80, 0x80, 0x80))
+            color = STAGE_COLORS[stage_key]
             y_pos = ly + padding + i * line_height
             painter.setBrush(color)
             painter.setPen(Qt.PenStyle.NoPen)

@@ -6,7 +6,7 @@ import pytest
 
 from PyQt6.QtGui import QFontMetrics, QImage
 
-from gui.progress import STAGE_LABELS
+from tasks.stages import STAGE_LABELS
 from tests.color_support import band_fill
 
 from gui.run_record import RunRecord
@@ -222,7 +222,7 @@ class TestStackedAreaChartPainting:
         assert not _limit_line_rows(fitted)
 
     def test_the_legend_swatches_every_stage_in_its_chart_color(self):
-        from gui.progress import ALL_STAGES
+        from tasks.stages import ALL_STAGES
 
         image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
         margin_pixels = {

@@ -8,7 +8,7 @@ import pytest
 
 import config
 import evolver
-from gui.progress import ALL_STAGES
+from tasks.stages import ALL_STAGES
 
 
 def _stage_mocks() -> dict:
@@ -68,7 +68,7 @@ def _patched_stages(mocks: dict) -> ExitStack:
     return stack
 
 
-# The pipeline's stage order has one home, gui/progress.STAGES, and these
+# The pipeline's stage order has one home, tasks/stages.py, and these
 # tests read it rather than keeping a second copy. It was a second copy while
 # the registry was missing genau_deliver, since deriving from it would have
 # encoded that bug here too; tests/test_stage_registry.py is what holds the

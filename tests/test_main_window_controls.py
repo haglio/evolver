@@ -10,7 +10,7 @@ from PyQt6.QtGui import QTextDocument
 from PyQt6.QtWidgets import QMessageBox, QToolBar
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
-from gui.progress import STAGE_TOOLTIPS
+from tasks.stages import STAGE_TOOLTIPS
 from gui.toggle_switch import ToggleSwitch
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import make_run_record

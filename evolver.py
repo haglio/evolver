@@ -3,15 +3,11 @@
 
 Invoked by the tray app scheduler or directly via CLI.
 
-The stages and the order they run in are ``run_pipeline`` below, with the reason
-for each ordering constraint in a comment beside the stage it binds. Their
-display names and descriptions are ``gui/progress.STAGES``. Each of those is the
-one copy of what it holds; a list here would be a second, free to drift from
-both.
-
-One gap, held for sign-off rather than closed here: ``genau_deliver`` is emitted
-by ``run_pipeline`` and has no ``STAGES`` entry, so the progress popup gives it no
-bar and the stats chart drops its duration.
+What the stages are, what they are called, and the order they run in is
+``tasks/stages.py``. ``run_pipeline`` below walks that order — the reason for
+each ordering constraint is in a comment beside the stage it binds — and each
+stage's own arguments and skip conditions are the only thing it decides for
+itself.
 """
 
 import logging

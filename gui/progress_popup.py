@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.progress import ALL_STAGES, STAGE_LABELS
+from tasks.stages import ALL_STAGES, STAGE_LABELS
 
 _CAPTION_GUTTER = 12
 

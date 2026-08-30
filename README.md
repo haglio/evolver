@@ -58,7 +58,9 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `util/crash_log.py` - what the tray app records about the way it died
   - `gui/tray.py` - system tray icon and context menu
   - `gui/main_window.py` - run history list and detail/progress panel
-  - `gui/progress.py` - live per-stage progress widget
+  - `tasks/stages.py` - the one declaration of the pipeline's stages: key, shown name, description, chart color, order
+  - `gui/progress_popup.py` - the floating per-stage progress window
+  - `gui/stats_window.py` - the stacked-area chart of stage durations across runs
   - `gui/worker.py` - background QThread pipeline runner
   - `gui/scheduler.py` - timer-based scheduling with run-guard
   - `gui/run_record.py` - JSON run record persistence
