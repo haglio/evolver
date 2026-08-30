@@ -24,6 +24,7 @@ class ToggleSwitch(QWidget):
     def __init__(self, checked: bool = False, parent: QWidget | None = None):
         super().__init__(parent)
         self._checked = checked
+        self._pressed = False
         self.setFixedSize(_TRACK_W, _TRACK_H)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -36,6 +37,28 @@ class ToggleSwitch(QWidget):
             self.update()
 
     def mousePressEvent(self, event):
+        """Take the press only if it is the left button; the flip waits for the
+        release."""
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)
+            return
+        self._pressed = True
+
+    def mouseReleaseEvent(self, event):
+        """Flip on a left release that landed back on the switch.
+
+        Both halves matter here because in the main window this switch IS the
+        pause control: it used to flip on any press of any button, so a
+        right-click looking for a context menu stopped the pipeline schedule,
+        and a press dragged away and released elsewhere -- how a user takes
+        back a click they did not mean -- stopped it too.
+        """
+        was_pressed, self._pressed = self._pressed, False
+        if event.button() != Qt.MouseButton.LeftButton or not was_pressed:
+            super().mouseReleaseEvent(event)
+            return
+        if not self.rect().contains(event.position().toPoint()):
+            return
         self._checked = not self._checked
         self.update()
         self.clicked.emit(self._checked)

@@ -6,8 +6,10 @@ accessed dynamically at runtime.
 """
 
 # -- Qt virtual-method overrides (called by the event loop) --
+# mousePressEvent and mouseReleaseEvent are not here: each calls the other's
+# base implementation for the events it declines, so vulture already sees them
+# used and an entry would suppress nothing.
 _.paintEvent  # noqa: F821
-_.mousePressEvent  # noqa: F821
 _.drawFocus  # noqa: F821
 _.option  # noqa: F821  — drawFocus override parameter (Qt signature)
 

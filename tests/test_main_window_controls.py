@@ -420,6 +420,10 @@ class TestToolbarStateUpdates:
         assert window.active_toggle.isChecked()
 
 
+# Well outside the 44x22 track, so a release there is unambiguously off it.
+_OFF_THE_SWITCH = 200
+
+
 class TestToggleSwitch:
     """The pause control: what a click does, and what the user sees.
 
@@ -448,6 +452,40 @@ class TestToggleSwitch:
         QTest.mouseClick(toggle, Qt.MouseButton.LeftButton)
         assert not toggle.isChecked()
         assert announced == [True, False]
+
+    def test_only_the_left_button_flips_it(self):
+        """In the main window this switch IS the pause control, so a right-click
+        on it stopped the pipeline schedule -- and a right-click is what a user
+        does looking for a context menu."""
+        from PyQt6.QtTest import QTest
+
+        toggle = ToggleSwitch()
+        announced = []
+        toggle.clicked.connect(announced.append)
+
+        QTest.mouseClick(toggle, Qt.MouseButton.RightButton)
+        QTest.mouseClick(toggle, Qt.MouseButton.MiddleButton)
+
+        assert not toggle.isChecked()
+        assert announced == []
+
+    def test_a_press_dragged_off_the_switch_does_not_flip_it(self):
+        """The other half of the button protocol: a press is not a click until
+        it is released on the widget, which is how a user takes back a click
+        they did not mean."""
+        from PyQt6.QtCore import QPoint
+        from PyQt6.QtTest import QTest
+
+        toggle = ToggleSwitch()
+        announced = []
+        toggle.clicked.connect(announced.append)
+
+        QTest.mousePress(toggle, Qt.MouseButton.LeftButton, pos=QPoint(22, 11))
+        QTest.mouseRelease(toggle, Qt.MouseButton.LeftButton,
+                           pos=QPoint(_OFF_THE_SWITCH, 11))
+
+        assert not toggle.isChecked()
+        assert announced == []
 
     def test_the_switch_states_its_size_once(self):
         """`setFixedSize` pins minimum and maximum, so the layout takes 44x22
