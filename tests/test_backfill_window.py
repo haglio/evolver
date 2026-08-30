@@ -8,12 +8,13 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QToolButton
 
 from backfill import vocabulary
+from backfill.vocabulary import Command
 from backfill.window import BackfillWindow
 
 
-def _every_grid_phrase():
+def _every_grid_command():
     groups = [*vocabulary.scoped_grid(), vocabulary.control_commands()]
-    return {command.phrase for group in groups for command in group}
+    return [command for group in groups for command in group]
 
 
 
@@ -179,8 +180,29 @@ class TestBackfillWindow(unittest.TestCase):
     def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        missing = {phrase for phrase in _every_grid_phrase() if window.tile_for(phrase) is None}
-        self.assertEqual(missing, set())
+        self.assertEqual(
+            {command.phrase: window.tile_for(command.phrase).text()
+             for command in _every_grid_command()},
+            {command.phrase: command.label for command in _every_grid_command()},
+        )
+
+    def test_every_command_keeps_its_own_tile(self):
+        """One command's phrase can equal another's label: the vocabulary is
+        private and its acts are named by the user, so a spoken "dancing" and
+        an act labelled "Dancing" can coexist. Neither may take the other's
+        tile — the phrase would click the wrong act, and the example frame
+        would land on the wrong face."""
+        shadowing = [[
+            Command("side dancing", "Side Dance Move"),
+            Command("side dance", "Side Dancing"),
+        ]]
+        with patch("backfill.window.scoped_grid", return_value=shadowing), \
+             patch("backfill.window.control_commands", return_value=[]):
+            window = self._window(FakeSession([Path("a_topaz.mp4")]))
+
+        for command in shadowing[0]:
+            self.assertEqual(window.tile_for(command.phrase).text(), command.label)
+            self.assertEqual(window.tile_for(command.label).text(), command.label)
 
     def test_a_tile_is_labelled_with_the_action_it_records(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
