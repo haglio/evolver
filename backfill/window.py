@@ -81,8 +81,7 @@ class BackfillWindow(QWidget):
     ) -> None:
         super().__init__(parent)
         self._session = session
-        self._command_buttons: dict[str, QToolButton] = {}
-        self._tiles_by_action: dict[str, QToolButton] = {}
+        self._tiles: dict[str, QToolButton] = {}
         self.setWindowTitle("Evolver - Backfill Metadata")
 
         self._video = QVideoWidget()
@@ -166,11 +165,14 @@ class BackfillWindow(QWidget):
         # and Esc must keep closing the window rather than being swallowed here.
         tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         tile.clicked.connect(lambda _checked=False, phrase=command.phrase: self.on_phrase(phrase))
-        self._command_buttons[command.phrase] = tile
-        # Keyed by lower-cased label so an example clip stored under the library's
-        # older casing ("Pov Alpha") still lights the tile the vocabulary now
-        # writes ("POV Alpha").
-        self._tiles_by_action[command.label.lower()] = tile
+        # One index, reachable by either name a caller has: the spoken phrase,
+        # and the act label lower-cased so an example clip stored under the
+        # library's older casing ("Pov Alpha") still lights the tile the
+        # vocabulary now writes ("POV Alpha"). The two agree for most commands
+        # and differ where the phrase is shorter than the label ("side dance"
+        # records "Side Dancing").
+        self._tiles[command.phrase] = tile
+        self._tiles[command.label.lower()] = tile
         return tile
 
     # The window's read surface: what the three lines say and which tile a
@@ -191,14 +193,11 @@ class BackfillWindow(QWidget):
     def tile_for(self, key: str) -> QToolButton | None:
         """The tile for a spoken *key* -- a command phrase, or an act label in
         any casing."""
-        tile = self._command_buttons.get(key)
-        if tile is not None:
-            return tile
-        return self._tiles_by_action.get(key.lower())
+        return self._tiles.get(key) or self._tiles.get(key.lower())
 
     def set_thumbnail(self, action: str, path: str) -> None:
         """Put *action*'s example frame on its tile, aspect-locked so it never stretches."""
-        tile = self._tiles_by_action.get(action.lower())
+        tile = self._tiles.get(action.lower())
         if tile is None or not path:
             return
         icon = _aspect_locked_icon(path, _THUMBNAIL_SIZE)

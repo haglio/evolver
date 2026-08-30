@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QToolButton
 
 from backfill import vocabulary
 from backfill.window import BackfillWindow
@@ -169,7 +170,8 @@ class TestBackfillWindow(unittest.TestCase):
     def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        self.assertEqual(set(window._command_buttons), _every_grid_phrase())
+        missing = {phrase for phrase in _every_grid_phrase() if window.tile_for(phrase) is None}
+        self.assertEqual(missing, set())
 
     def test_a_tile_is_labelled_with_the_action_it_records(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
@@ -216,7 +218,7 @@ class TestBackfillWindow(unittest.TestCase):
 
         # ...and must not have decorated some other act's tile with it either
         self.assertTrue(
-            all(tile.icon().isNull() for tile in window._tiles_by_action.values())
+            all(tile.icon().isNull() for tile in window.findChildren(QToolButton))
         )
 
     def test_an_empty_thumbnail_path_leaves_the_tile_iconless(self):
@@ -284,8 +286,9 @@ class TestBackfillWindow(unittest.TestCase):
         from PyQt6.QtCore import Qt
 
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
-        self.assertTrue(window._command_buttons)
-        for tile in window._command_buttons.values():
+        tiles = window.findChildren(QToolButton)
+        self.assertTrue(tiles)
+        for tile in tiles:
             self.assertEqual(tile.focusPolicy(), Qt.FocusPolicy.NoFocus)
 
     def test_a_portrait_frame_lands_unsquished_on_a_square_icon(self):
