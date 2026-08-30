@@ -32,6 +32,15 @@ class TestWindowsAlert(unittest.TestCase):
 
         message_box.assert_called_once_with(0, "Body", "Title", 0x10)
 
+    @patch("util.windows_alert._message_box_w", side_effect=OSError("no user32"))
+    def test_a_dialog_that_will_not_open_is_logged_rather_than_raised(self, _box):
+        """A stage that already failed must not fail again on the way to
+        saying so."""
+        with self.assertLogs("util.windows_alert", level="ERROR") as logged:
+            windows_alert.show_error_window("Title", "Body")
+
+        self.assertIn("Title", logged.records[0].getMessage())
+
 
 if __name__ == "__main__":
     unittest.main()
