@@ -2,6 +2,43 @@
 
 Shared rules are in the global `~/.claude/CLAUDE.md`. This file contains only evolver-specific overrides.
 
+## ⏳ On the Windows machine: read the log, then delete `repair_retired_metadata` (2026-08-30)
+
+**Do this the first time you work in this repo on the machine that holds the real library.** It needs
+no run and no waiting — the answer is already in `evolver.log` — and it is the last open piece of
+backlog item 27. Delete this section once it is done.
+
+`repair_retired_metadata` (`tasks/nonai_upscale.py`) is a one-shot historical backfill wired into
+every scheduler tick: it hands back metadata that upscales promoted before `_carry_metadata` existed
+lost. `_carry_metadata` runs at promotion time now, so nothing new can be stranded and the pass is
+purely retrospective — a permanent recursive walk of every non-AI bucket, a sidecar read per
+processed video, and an `rglob` of the archive per candidate, on every tick forever.
+
+It runs on **every** tick (the non-AI stage is called unconditionally at `evolver.py`'s
+`_run_stage("upscale_non_ai", ...)` — it always runs so it can check on a detached encode) and writes
+its count into the stage's closing line every time. `evolver.log` is a plain appending `FileHandler`
+with no rotation, so the whole history is there:
+
+```bash
+grep -c 'repaired=0 sidecar(s)' evolver.log; grep -n 'repaired=[1-9]' evolver.log | tail -5; grep -c 'Ambiguous archived original' evolver.log
+```
+
+**It is safe to delete when** the most recent `repaired=` in the log is `0` *and* no `Ambiguous
+archived original` warning stands after the last non-zero repair. Two things make a `0` mean less
+than it looks, so check both: the pass returns at its first line when `content.local.json` has no
+`retired_root` (or the folder is missing), and `_archived_original` declines to guess — logging
+`Ambiguous archived original` — when two archived originals share a stem, leaving that sidecar
+unrepaired while still reporting 0. If `retired_root` is unset, the pass has never done anything on
+this machine and the deletion is safe outright. If ambiguity warnings stand, resolve those stems by
+hand first; the next tick re-runs the pass on its own.
+
+**Then delete:** `repair_retired_metadata`, its call in `run()`, `_archived_original`, the
+`repaired_sidecars` field and its comment, the `repaired=%d sidecar(s)` fragment of the closing log
+line, and `TestRepairRetiredMetadata` in `tests/test_nonai_upscale.py` — scaffolding for a completed
+migration, not regression guards. **Keep `_carry_metadata`**, which is the promotion-time half that
+makes the repair unnecessary. Roughly −75 production lines. `git revert` restores the pass in seconds
+if it is ever wanted again. Full write-up: `audit/CHANGELOG.md`, the 2026-08-30 item 27 entry.
+
 ## Repo-specific gotchas
 
 (None yet — add entries here when they materially affect launches, tests, or architectural decisions.)
