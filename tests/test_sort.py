@@ -1,9 +1,12 @@
+import inspect
+import logging
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from tasks import sort as sort_task
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util.media_files import is_partial_video_path, remove_empty_dirs
+from util.media_files import is_partial_video_path, remove_empty_dirs, remove_partial_video_files
 
 
 class TestSortHelpers(unittest.TestCase):
@@ -44,6 +47,36 @@ class TestSortHelpers(unittest.TestCase):
 
             self.assertFalse((root / "a").exists())
             self.assertTrue(nonempty_sub.exists())
+
+    def test_remove_partial_video_files_takes_the_partials_and_leaves_the_rest(self):
+        """Its one caller always hands it a logger, so it does not carry a
+        branch for the case where it has none."""
+        self.assertIs(
+            inspect.signature(remove_partial_video_files).parameters["logger"].default,
+            inspect.Parameter.empty,
+        )
+        with workspace_temp_dir() as root:
+            partial = root / "clip.partial.deadbeef.mp4"
+            finished = root / "clip.mp4"
+            partial.write_bytes(b"partial")
+            finished.write_bytes(b"video")
+
+            removed = remove_partial_video_files(root, {".mp4"}, logging.getLogger(__name__))
+
+            self.assertEqual(removed, 1)
+            self.assertFalse(partial.exists())
+            self.assertTrue(finished.exists())
+
+    def test_a_partial_that_will_not_delete_is_reported_and_not_counted(self):
+        with workspace_temp_dir() as root:
+            (root / "clip.partial.deadbeef.mp4").write_bytes(b"partial")
+            log = logging.getLogger(__name__)
+
+            with patch.object(Path, "unlink", side_effect=OSError("held open")):
+                with self.assertLogs(log, level="ERROR"):
+                    removed = remove_partial_video_files(root, {".mp4"}, log)
+
+            self.assertEqual(removed, 0)
 
     def test_run_processes_dynamic_source_directory(self):
         with workspace_temp_dir() as td_path:
