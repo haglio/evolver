@@ -346,6 +346,22 @@ class EvolverMainWindow(QMainWindow):
         self.quit_action = QAction(quit_icon(_ICON_COLOR), "Quit", self)
         toolbar.addAction(self.quit_action)
 
+    def commands(self):
+        """Each toolbar command's signal, by the name the app knows it as.
+
+        The same names the tray menu uses, so a command the two share is
+        connected once on each side rather than spelled out twice in the app.
+        Quit is the one that differs in what it does: from here it asks first.
+        """
+        return {
+            "run_now": self.run_now_action.triggered,
+            "pause": self.active_toggle.clicked,
+            "settings": self.settings_action.triggered,
+            "stats": self.stats_action.triggered,
+            "restart": self.restart_action.triggered,
+            "quit": self.quit_action.triggered,
+        }
+
     def refresh_history(self):
         """Reload run records from disk."""
         self._records = load_runs(config.RUNS_DIR)

@@ -1,7 +1,11 @@
 """Smoke test: verify the tray app can be constructed without crashing."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from gui.app import _wire
 from gui.process_identity import APP_MODEL_ID
 from tests.gui_support import build_evolver_app
 
@@ -64,6 +68,44 @@ class TestBuildingIsNotStarting:
         load.assert_called_once()
         assert app._presence_monitor.isActive()
         assert app._scheduler.next_run_at is not None
+
+
+class TestCommandWiring:
+    """Each view says what commands it offers; the app says what each one does.
+
+    Ten tray attributes and six window ones used to be connected by hand, so
+    every control was something two files had to agree about with nothing
+    checking that they did -- and a QAction nobody connected raises nothing
+    when clicked, it simply does not work.
+    """
+
+    def test_a_command_a_view_offers_with_no_slot_is_refused(self):
+        view = SimpleNamespace(commands=lambda: {"run_now": MagicMock(), "quit": MagicMock()})
+
+        with pytest.raises(ValueError, match="quit"):
+            _wire(view, {"run_now": lambda: None})
+
+    def test_a_slot_no_view_offers_is_refused_too(self):
+        view = SimpleNamespace(commands=lambda: {"run_now": MagicMock()})
+
+        with pytest.raises(ValueError, match="backfill"):
+            _wire(view, {"run_now": lambda: None, "backfill": lambda: None})
+
+    def test_each_command_reaches_its_own_slot(self):
+        signals = {"run_now": MagicMock(), "quit": MagicMock()}
+        slots = {"run_now": object(), "quit": object()}
+
+        _wire(SimpleNamespace(commands=lambda: signals), slots)
+
+        signals["run_now"].connect.assert_called_once_with(slots["run_now"])
+        signals["quit"].connect.assert_called_once_with(slots["quit"])
+
+    def test_the_two_views_name_their_shared_commands_the_same(self, request):
+        """The toolbar is a subset of the tray menu. A name that drifted on one
+        side would wire fine and just mean two different things."""
+        app = build_evolver_app(request)
+
+        assert set(app._window.commands()) < set(app._tray.commands())
 
 
 class TestRunTeardown:

@@ -29,6 +29,25 @@ from util.windows_alert import show_error_window
 log = logging.getLogger(__name__)
 
 
+def _wire(view, slots: dict) -> None:
+    """Connect each of *view*'s commands to the slot of the same name.
+
+    The two sides are held equal on purpose. A control a view offers that
+    nothing is wired to is a menu item that does nothing when clicked, and a
+    slot no view offers is a command the user cannot reach -- neither shows up
+    anywhere else, because a QAction with no connection raises nothing. It
+    fails here, while the app is being built and before it has done anything.
+    """
+    offered = view.commands()
+    if set(offered) != set(slots):
+        raise ValueError(
+            f"{type(view).__name__} offers commands {sorted(offered)}, "
+            f"wired to {sorted(slots)}"
+        )
+    for key, signal in offered.items():
+        signal.connect(slots[key])
+
+
 class EvolverApp:
     """Wires together all GUI components and runs the Qt event loop.
 
@@ -69,26 +88,32 @@ class EvolverApp:
 
         self._tray = EvolverTray()
         self._app.setWindowIcon(self._tray.icon())
-        self._tray.open_action.triggered.connect(self._show_window)
-        self._tray.run_now_action.triggered.connect(self._scheduler.run_now)
-        self._tray.pause_action.triggered.connect(self._toggle_pause)
-        self._tray.nonai_action.setChecked(self._settings.nonai_upscale_enabled)
-        self._tray.nonai_action.toggled.connect(self._set_nonai_enabled)
-        self._tray.settings_action.triggered.connect(self._show_settings)
-        self._tray.stats_action.triggered.connect(self._show_stats)
-        self._tray.backfill_action.triggered.connect(self._launch_backfill)
-        self._tray.restart_action.triggered.connect(self._restart)
-        self._tray.quit_action.triggered.connect(self._quit)
+        self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
+        _wire(self._tray, {
+            "open": self._show_window,
+            "run_now": self._scheduler.run_now,
+            "pause": self._toggle_pause,
+            "nonai": self._set_nonai_enabled,
+            "settings": self._show_settings,
+            "stats": self._show_stats,
+            "backfill": self._launch_backfill,
+            "restart": self._restart,
+            "quit": self._quit,
+        })
 
         self._app.commitDataRequest.connect(self._on_session_end)
 
         self._window = EvolverMainWindow()
-        self._window.run_now_action.triggered.connect(self._scheduler.run_now)
-        self._window.active_toggle.clicked.connect(self._toggle_pause)
-        self._window.settings_action.triggered.connect(self._show_settings)
-        self._window.stats_action.triggered.connect(self._show_stats)
-        self._window.restart_action.triggered.connect(self._restart)
-        self._window.quit_action.triggered.connect(self._confirm_quit)
+        # Quit is the one command that means something different here: from the
+        # window it asks first, because the window is where a stray click lands.
+        _wire(self._window, {
+            "run_now": self._scheduler.run_now,
+            "pause": self._toggle_pause,
+            "settings": self._show_settings,
+            "stats": self._show_stats,
+            "restart": self._restart,
+            "quit": self._confirm_quit,
+        })
 
     def start(self) -> None:
         """Everything the app does to the machine, in the order it must happen.
