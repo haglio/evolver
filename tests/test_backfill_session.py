@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backfill.queue import BackfillQueue
+from backfill import session
 from backfill.session import BackfillSession
 from tests.temp_helpers import library_tree
 from util.sidecar import sidecar_path
@@ -499,6 +500,33 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
             self.assertEqual(video.read_bytes(), b"video")
             self.assertEqual(list(lib.weird.iterdir()), [])
             self.assertEqual(session.current, video)
+
+
+class TestTheStepContract(unittest.TestCase):
+    """The three decision kinds are related only by carrying the same five names.
+
+    The module's docstring said every decision is a :class:`_Step` while no such
+    thing existed anywhere in the repo, so the cross-reference pointed at
+    nothing and a reader went looking for a class that was never written. It is
+    a Protocol now, and this is what says the three still answer to it.
+    """
+
+    def test_every_decision_kind_carries_all_five_members(self):
+        for kind in (session._Labelled, session._Discarded, session._Deferred):
+            with self.subTest(kind=kind.__name__):
+                for member in ("note", "take_effect", "put_back", "commit", "roll_back"):
+                    self.assertTrue(hasattr(kind, member), member)
+
+    def test_the_protocol_names_exactly_those_five(self):
+        """So a sixth member added to one kind and not the others cannot quietly
+        become something the session calls."""
+        declared = {
+            name for name in vars(session._Step)
+            if not name.startswith("_")
+        }
+        self.assertEqual(
+            declared, {"note", "take_effect", "put_back", "commit", "roll_back"}
+        )
 
 
 if __name__ == "__main__":
