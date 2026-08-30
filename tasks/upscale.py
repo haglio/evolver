@@ -35,7 +35,6 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
     min_start_remaining_seconds = max(config.UPSCALE_MIN_START_REMAINING_SECONDS, 0)
     started_at = time.monotonic()
 
-    # Ensure output dirs exist
     for orient in ("landscape", "portrait"):
         (config.OUT_UPSCALED_DIR / orient).mkdir(parents=True, exist_ok=True)
     config.WEIRD_DIR.mkdir(parents=True, exist_ok=True)
