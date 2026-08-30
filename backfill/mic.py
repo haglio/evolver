@@ -3,9 +3,9 @@
 Windows often makes a dead virtual input the system default — a VR headset's silent
 mic (a Pimax update is enough to repoint it), "Sound Mapper", and the like — which
 hands back pure silence, so vosk hears nothing and the tool just sits there. Opening
-``device=None`` walks straight into that. :func:`resolve_input_device` avoids it the
-way the Entity project does: probe the real inputs and take the liveliest, or honor
-an explicit name override.
+``device=None`` walks straight into that. :func:`resolve_input_device` avoids it by
+probing the real inputs and taking the liveliest, or by honoring an explicit name
+override.
 
 The pure selection lives in :func:`choose_input_device`, which takes the probe as an
 injected callable so it is tested without a microphone; only :func:`probe_input_device`

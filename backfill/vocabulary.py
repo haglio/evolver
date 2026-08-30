@@ -147,10 +147,7 @@ def _build_actions() -> dict[str, str]:
 def _build_controls() -> dict[str, str]:
     return {form: control.kind for control in _CONTROLS for form in control.forms()}
 
-# Spoken phrase -> the ``video.action`` it records.
 ACTIONS: dict[str, str] = _build_actions()
-
-# Spoken phrase -> control.
 CONTROLS: dict[str, str] = _build_controls()
 
 
