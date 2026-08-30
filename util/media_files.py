@@ -10,6 +10,7 @@ so. The two functions that DO take it are the ones a caller genuinely narrows
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 import config
@@ -32,6 +33,41 @@ def iter_finalized_videos(root: Path, video_extensions: set[str]):
 def library_videos(root: Path):
     """Every finished video under *root*, at any depth, unordered."""
     yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
+
+
+# How a name collision is uniquified: "stem", then "stem (2)", "stem (3)"...
+# It is a contract between two apps -- Origenerator applies it exporting into
+# Evolver's inbox, Evolver applies it again delivering into Genau's folder, and
+# Evolver strips it back off to match a library file to the row that produced
+# it -- so the append and the strip are declared beside each other, where they
+# cannot drift apart.
+_UNIQUIFIER_RE = re.compile(r" \((\d+)\)$")
+
+
+def unique_path(path: Path) -> Path:
+    """*path* if the name is free, else the same name with a `` (2)``, `` (3)``…
+
+    Flat folders here hold files put there by hand as well as generated ones,
+    so a name can genuinely already be taken and a move must never quietly
+    overwrite one.
+    """
+    if not path.exists():
+        return path
+    number = 2
+    while True:
+        candidate = path.with_name(f"{path.stem} ({number}){path.suffix}")
+        if not candidate.exists():
+            return candidate
+        number += 1
+
+
+def strip_uniquifier(stem: str) -> str:
+    """*stem* without a trailing `` (2)``, and itself when it has none.
+
+    The inverse of what :func:`unique_path` appends, used to match a library
+    file back to the row that produced it.
+    """
+    return _UNIQUIFIER_RE.sub("", stem)
 
 
 def child_dirs(root: Path):

@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util.media_files import child_dirs, library_videos, remove_empty_dirs
+from util.media_files import child_dirs, library_videos, remove_empty_dirs, unique_path
 from util.sidecar import sidecar_path
 from util.variants import is_upscaled_stem, sorted_stem_of
 
@@ -68,27 +68,13 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
     return None
 
 
-def _unique_destination(path: Path) -> Path:
-    """``path`` if the name is free, else the same name with a `` (2)``, ``(3)``…
-
-    Genau's folder is flat and holds clips carved by hand as well as generated
-    ones, so a name can genuinely already be taken; delivering must never quietly
-    overwrite a clip that is already being played.
-    """
-    if not path.exists():
-        return path
-    n = 2
-    while True:
-        candidate = path.with_name(f"{path.stem} ({n}){path.suffix}")
-        if not candidate.exists():
-            return candidate
-        n += 1
-
-
 def _deliver(upscaled: Path, clips_dir: Path) -> Path:
     """Move one finished upscale into Genau's clips folder; return where it landed."""
     clips_dir.mkdir(parents=True, exist_ok=True)
-    destination = _unique_destination(clips_dir / upscaled.name)
+    # Genau's folder is flat and holds clips carved by hand as well as
+    # generated ones, so a name can genuinely already be taken and
+    # delivering must never overwrite a clip that is already being played.
+    destination = unique_path(clips_dir / upscaled.name)
     upscaled.replace(destination)
     return destination
 

@@ -17,6 +17,8 @@ from util.media_files import (
     library_videos,
     remove_empty_dirs,
     remove_partial_video_files,
+    strip_uniquifier,
+    unique_path,
 )
 
 
@@ -70,6 +72,51 @@ class TestChildDirs(unittest.TestCase):
         pipeline had not created yet."""
         with workspace_temp_dir() as root:
             self.assertEqual(list(child_dirs(root / "nope")), [])
+
+
+class TestTheUniquifier(unittest.TestCase):
+    """"stem", then "stem (2)", "stem (3)"... -- a contract between two apps.
+
+    Origenerator applies it exporting into Evolver's inbox, Evolver applies it
+    again delivering into Genau's folder, and Evolver strips it back off to
+    match a library file to the row that produced it. Three expressions of one
+    rule; two of them are here now, side by side, and cannot drift.
+    """
+
+    def test_a_free_name_is_left_alone(self):
+        with workspace_temp_dir() as root:
+            self.assertEqual(unique_path(root / "clip.mp4"), root / "clip.mp4")
+
+    def test_a_taken_name_gets_the_next_free_number(self):
+        with workspace_temp_dir() as root:
+            (root / "clip.mp4").write_bytes(b"one")
+            (root / "clip (2).mp4").write_bytes(b"two")
+
+            self.assertEqual(unique_path(root / "clip.mp4"), root / "clip (3).mp4")
+
+    def test_the_suffix_survives_and_the_number_goes_before_it(self):
+        with workspace_temp_dir() as root:
+            (root / "clip one.mkv").write_bytes(b"one")
+
+            self.assertEqual(
+                unique_path(root / "clip one.mkv"), root / "clip one (2).mkv"
+            )
+
+    def test_stripping_is_the_inverse_of_appending(self):
+        with workspace_temp_dir() as root:
+            (root / "clip.mp4").write_bytes(b"one")
+
+            taken = unique_path(root / "clip.mp4")
+
+            self.assertEqual(strip_uniquifier(taken.stem), "clip")
+
+    def test_a_stem_with_no_number_comes_back_whole(self):
+        self.assertEqual(strip_uniquifier("clip one"), "clip one")
+
+    def test_only_a_trailing_number_in_parentheses_is_stripped(self):
+        """A title is free to hold parentheses of its own."""
+        self.assertEqual(strip_uniquifier("clip (director's cut)"), "clip (director's cut)")
+        self.assertEqual(strip_uniquifier("clip (2) more"), "clip (2) more")
 
 
 class TestRemoveEmptyDirs(unittest.TestCase):
