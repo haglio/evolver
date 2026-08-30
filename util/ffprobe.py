@@ -1,5 +1,47 @@
+"""Asking ffprobe about a video, one process per question at most.
+
+Every function here answers None (or "") when ffprobe cannot say, including
+when it is not installed at all: these are called from the tray pipeline and
+from the backfill tool, and the tool has no console for a traceback to land
+in -- an escaping FileNotFoundError left it never appearing on screen.
+"""
+
+from __future__ import annotations
+
 import subprocess
 from pathlib import Path
+
+# Width, height and the rotation tag in one invocation. ffprobe takes several
+# -show_entries sections at once, and the tag is optional, so the CSV comes
+# back with two fields or three.
+_GEOMETRY_ENTRIES = "stream=width,height:stream_tags=rotate"
+
+
+def _stream_geometry(file: Path) -> tuple[int, int, int] | None:
+    """(width, height, rotation degrees) for the first video stream, or None.
+
+    One process for all three. The sort stage asks this once per incoming file,
+    so a batch of a hundred clips used to be three hundred process spawns --
+    and on Windows the spawn is the expensive part, not the probing.
+
+    A rotation nothing can parse counts as none: the width and height are still
+    good, and a tag this cannot read only means the clip is not rotated as far
+    as it can tell.
+    """
+    fields = _probe(file, _GEOMETRY_ENTRIES).split(",")
+    if len(fields) not in (2, 3):
+        return None
+    try:
+        width, height = int(fields[0]), int(fields[1])
+    except ValueError:
+        return None
+    rotation = 0
+    if len(fields) == 3:
+        try:
+            rotation = int(fields[2])
+        except ValueError:
+            rotation = 0
+    return width, height, rotation
 
 
 def video_dimensions(file: Path) -> tuple[int, int] | None:
@@ -8,36 +50,21 @@ def video_dimensions(file: Path) -> tuple[int, int] | None:
     Raw stored dimensions — rotation is not applied. Callers that need display
     orientation (see :func:`get_orientation`) fold the rotate tag in themselves.
     """
-    w_str = _probe(file, "stream=width")
-    h_str = _probe(file, "stream=height")
-    if not w_str or not h_str:
-        return None
-    try:
-        return int(w_str), int(h_str)
-    except ValueError:
-        return None
+    geometry = _stream_geometry(file)
+    return None if geometry is None else geometry[:2]
 
 
 def get_orientation(file: Path) -> str:
     """Return 'landscape', 'portrait', or 'unknown' based on the first video stream."""
-    dims = video_dimensions(file)
-    if dims is None:
+    geometry = _stream_geometry(file)
+    if geometry is None:
         return "unknown"
-    w, h = dims
-
-    rot_str = _probe(file, "stream_tags=rotate")
-    try:
-        rot = int(rot_str)
-        if (rot % 180) != 0:
-            w, h = h, w
-    except (ValueError, TypeError):
-        pass
-
-    if w > h:
-        return "landscape"
-    elif h > w:
-        return "portrait"
-    return "landscape"  # square
+    width, height, rotation = geometry
+    if rotation % 180 != 0:
+        width, height = height, width
+    # Square counts as landscape: it is a tie the sorted-folder choice has to
+    # break somehow, and this is the side it has always fallen.
+    return "portrait" if height > width else "landscape"
 
 
 def duration_seconds(file: Path) -> float | None:
@@ -79,10 +106,22 @@ def _probe_format(file: Path, show_entries: str) -> str:
 
 
 def _run_ffprobe(args: list[str]) -> str:
-    result = subprocess.run(
-        ["ffprobe", "-v", "error", "-of", "csv=p=0", *args],
-        capture_output=True,
-        text=True,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    )
+    """ffprobe's answer, or "" when there is none to be had.
+
+    OSError covers ffprobe not being installed, which is the case that used to
+    escape: every function here documents itself as answering None when the
+    probe is unavailable, and none of them did. check=False is deliberate --
+    a non-zero exit means ffprobe had nothing to say about this file, which is
+    the same "" as any other silence.
+    """
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-of", "csv=p=0", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except OSError:
+        return ""
     return result.stdout.strip()

@@ -65,6 +65,9 @@ def choose_input_device(
         try:
             level = probe(index)
         except Exception:
+            # A device that consistently refuses to open is why nothing is
+            # heard; without a line here there is nothing anywhere to say so.
+            log.debug("Input device %d could not be probed.", index, exc_info=True)
             continue
         if level is None or not math.isfinite(level):
             continue

@@ -183,6 +183,28 @@ class TestExtractFrame(unittest.TestCase):
                  patch("backfill.thumbnails.subprocess.run", return_value=SimpleNamespace(returncode=1)):
                 self.assertFalse(thumbnails.extract_frame(Path("clip.mp4"), dest))
 
+    def test_a_missing_probe_leaves_the_tile_text_only_rather_than_crashing(self):
+        """duration_seconds sat ABOVE the try that exists to survive a missing
+        binary, so a FileNotFoundError from it escaped extract_frame, escaped
+        the build_thumbnails generator and took backfill_app.main() down -- and
+        under pythonw.exe there is no console, so the tool simply never
+        appeared."""
+        with workspace_temp_dir() as root:
+            dest = root / "out.jpg"
+
+            with patch("backfill.thumbnails.duration_seconds",
+                       side_effect=FileNotFoundError("ffprobe")):
+                self.assertFalse(thumbnails.extract_frame(Path("clip.mp4"), dest))
+
+    def test_a_missing_encoder_leaves_it_text_only_too(self):
+        with workspace_temp_dir() as root:
+            dest = root / "out.jpg"
+
+            with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
+                 patch("backfill.thumbnails.subprocess.run",
+                       side_effect=FileNotFoundError("ffmpeg")):
+                self.assertFalse(thumbnails.extract_frame(Path("clip.mp4"), dest))
+
 
 if __name__ == "__main__":
     unittest.main()

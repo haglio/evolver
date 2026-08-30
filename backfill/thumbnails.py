@@ -108,10 +108,14 @@ def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTI
     and scales to ``_THUMBNAIL_HEIGHT``, keeping the aspect ratio. Uses the same
     Topaz ffmpeg and console-suppressed invocation the rest of the pipeline does.
     """
-    duration = duration_seconds(clip)
-    timestamp = duration * at_fraction if duration else 0.0
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
+        # The probe is inside the try too: it also runs a binary, and one that
+        # is not installed used to escape here, escape build_thumbnails and
+        # take the whole tool's startup down -- silently, since pythonw.exe has
+        # no console for the traceback.
+        duration = duration_seconds(clip)
+        timestamp = duration * at_fraction if duration else 0.0
         result = subprocess.run(
             [
                 str(config.FFMPEG),
@@ -123,10 +127,11 @@ def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTI
                 "-y", str(dest),
             ],
             capture_output=True,
+            check=False,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
     except OSError:
-        log.exception("Could not run ffmpeg to thumbnail %s", clip)
+        log.exception("Could not build a thumbnail for %s", clip)
         return False
     return result.returncode == 0 and dest.is_file()
 
