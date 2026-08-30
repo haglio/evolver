@@ -245,6 +245,45 @@ class TestBookmarksSync(unittest.TestCase):
             self.assertFalse(result.ok)
             self.assertTrue(result.profile_missing)
 
+    def test_run_uses_the_favorites_file_and_profile_it_is_given(self):
+        """Four things reach outside this repo, and all four are arguments now.
+
+        `config` still answers when the caller names none of them, which is
+        every other test here and the pipeline itself. Pointing the ambient
+        four at a profile that would sync a different URL is what proves the
+        given ones are the ones used, rather than merely accepted.
+        """
+        with workspace_temp_dir() as root:
+            given_favs = root / "given" / "favs.csv"
+            given_favs.parent.mkdir(parents=True)
+            given_favs.write_text("web_url\nhttps://example.com/given\n", encoding="utf-8")
+            given_user_data, given_bookmarks = chrome_profile(root / "given", name="Robin")
+
+            ambient_favs = root / "ambient" / "favs.csv"
+            ambient_favs.parent.mkdir(parents=True)
+            ambient_favs.write_text("web_url\nhttps://example.com/ambient\n", encoding="utf-8")
+            ambient_user_data, _ = chrome_profile(root / "ambient", name="Ambient")
+
+            with override_config(
+                FUN_TIME_FAVS_FILE=ambient_favs,
+                CHROME_USER_DATA_DIR=ambient_user_data,
+                CHROME_PROFILE_NAME="Ambient",
+                CHROME_BOOKMARKS_FOLDER_NAME="Ambient Folder",
+            ):
+                result = bookmarks_sync.run(
+                    favs_file=given_favs,
+                    chrome_user_data_dir=given_user_data,
+                    chrome_profile_name="Robin",
+                    bookmarks_folder_name="Given Folder",
+                )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.synced, 1)
+            written = json.loads(given_bookmarks.read_text(encoding="utf-8"))
+            folder = written["roots"]["bookmark_bar"]["children"][0]
+            self.assertEqual(folder["name"], "Given Folder")
+            self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/given"])
+
 
 if __name__ == "__main__":
     unittest.main()
