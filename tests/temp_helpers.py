@@ -107,6 +107,15 @@ def nonai_library_overrides(root: Path, **extra):
     metadata root the checkout is configured with — the real one, on a machine
     that has a real one. Tests then also share that tree with each other, and
     two of them naming a clip the same way read back one another's fixtures.
+
+    NONAI_RETIRED_ROOT and NONAI_PRIORITY_MANIFEST are here for the same
+    reason, and both default to a machine's own answer rather than to nothing:
+    the archive comes from the overlay's ``retired_root``, and the pin manifest
+    is a path *inside the checkout*. So on a machine that has configured an
+    archive, retiring an original in a test moved the fixture into the real one
+    and then failed the assertion that it had gone to the bucket's ``2*``
+    folder — four tests, green here and on CI only because neither has an
+    overlay. Pinned to the case's own temp tree, they cannot.
     """
     video_lib = root / "videos"
     overrides = dict(
@@ -114,6 +123,8 @@ def nonai_library_overrides(root: Path, **extra):
         NON_AI_DIR=video_lib / "2D" / "non_AI",
         METADATA_DIR=root / "metadata",
         SCRIPT_LIBRARY_DIR=root / "scripts",
+        NONAI_RETIRED_ROOT=None,
+        NONAI_PRIORITY_MANIFEST=root / "next.txt",
         NONAI_SKIP_MANIFEST=root / "skip.txt",
         NONAI_JOB_STATE_FILE=root / "job.json",
         NONAI_ATTEMPTS_FILE=root / "attempts.json",
