@@ -66,6 +66,134 @@ class TestBuildingIsNotStarting:
         assert app._scheduler.next_run_at is not None
 
 
+class TestRunTeardown:
+    """What ending a run has to let go of.
+
+    The teardown was written out twice and the toast block three times, and
+    both of the things they forgot are lifetime leaks that only show on the
+    *second* run.
+    """
+
+    def _finished_record(self, status="success"):
+        record = MagicMock()
+        record.status = status
+        record.duration_seconds = 12.0
+        return record
+
+    def test_a_finished_run_lets_go_of_its_progress_popup(self, request):
+        """It is closed by then. Held, the next run started while the window is
+        hidden calls on_pipeline_finished() on last run's dead popup."""
+        app = build_evolver_app(request)
+        popup = MagicMock()
+        app._progress_popup = popup
+
+        app._on_finished(self._finished_record())
+
+        popup.on_pipeline_finished.assert_called_once_with()
+        assert app._progress_popup is None
+
+    def test_an_errored_run_lets_go_of_it_too(self, request):
+        app = build_evolver_app(request)
+        popup = MagicMock()
+        app._progress_popup = popup
+
+        app._on_error("something went wrong")
+
+        popup.on_pipeline_finished.assert_called_once_with()
+        assert app._progress_popup is None
+
+    def test_a_finished_run_stops_the_watchdog_and_re_opens_scheduling(self, request):
+        app = build_evolver_app(request)
+        with patch("gui.app.PipelineWorker"):
+            app._start_run("manual")
+        assert app._watchdog.isActive()
+
+        app._on_finished(self._finished_record())
+
+        assert not app._watchdog.isActive()
+        assert not app._scheduler.is_running
+
+    def test_an_errored_run_does_the_same(self, request):
+        app = build_evolver_app(request)
+        with patch("gui.app.PipelineWorker"):
+            app._start_run("manual")
+
+        app._on_error("something went wrong")
+
+        assert not app._watchdog.isActive()
+        assert not app._scheduler.is_running
+
+
+class TestToastPolicy:
+    """One place decides whether a tray balloon is shown at all."""
+
+    def _app(self, request, *, enable_toasts):
+        from gui.settings import EvolverSettings
+        settings = EvolverSettings(enable_toasts=enable_toasts)
+        with patch("gui.app.EvolverSettings.load", return_value=settings):
+            return build_evolver_app(request)
+
+    def _record(self, status="success"):
+        record = MagicMock()
+        record.status = status
+        record.duration_seconds = 12.0
+        return record
+
+    def test_toasts_off_silences_the_finish_the_error_and_the_overrun(self, request):
+        app = self._app(request, enable_toasts=False)
+        with patch("gui.app.PipelineWorker") as worker_cls:
+            worker_cls.return_value.isRunning.return_value = True
+            app._start_run("manual")
+
+        with patch.object(app._tray, "showMessage") as toast:
+            app._on_watchdog()
+            app._on_error("boom")
+            app._on_finished(self._record())
+
+        toast.assert_not_called()
+
+    def test_toasts_on_says_something_for_each_of_the_three(self, request):
+        app = self._app(request, enable_toasts=True)
+        with patch("gui.app.PipelineWorker") as worker_cls:
+            worker_cls.return_value.isRunning.return_value = True
+            app._start_run("manual")
+
+        with patch.object(app._tray, "showMessage") as toast:
+            app._on_watchdog()
+            app._on_error("boom")
+            app._on_finished(self._record())
+
+        assert toast.call_count == 3
+
+
+class TestStatsWindowLifetime:
+    def test_a_second_stats_window_takes_the_first_one_down(self, request):
+        """The dialog is parented to the main window, so one replaced without
+        being closed stays alive for the process's whole life."""
+        app = build_evolver_app(request)
+        with patch("gui.app.StatsWindow") as stats_cls, \
+             patch("gui.app.load_runs", return_value=[]):
+            first = stats_cls.return_value
+            first.isVisible.return_value = False
+            app._show_stats()
+            app._show_stats()
+
+        first.close.assert_called_once_with()
+        first.deleteLater.assert_called_once_with()
+
+    def test_a_stats_window_still_open_is_raised_rather_than_replaced(self, request):
+        app = build_evolver_app(request)
+        with patch("gui.app.StatsWindow") as stats_cls, \
+             patch("gui.app.load_runs", return_value=[]):
+            stats_cls.return_value.isVisible.return_value = True
+            app._show_stats()
+            app._show_stats()
+
+        assert stats_cls.call_count == 1
+        stats_cls.return_value.raise_.assert_called_once_with()
+        stats_cls.return_value.close.assert_not_called()
+
+
 class TestNonAiUpscaleToggle:
     """The tray menu's opt-in switch for the multi-hour non-AI encodes."""
 
