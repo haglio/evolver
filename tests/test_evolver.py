@@ -8,6 +8,7 @@ import pytest
 
 import config
 import evolver
+from gui.progress import ALL_STAGES
 
 
 def _stage_mocks() -> dict:
@@ -67,14 +68,12 @@ def _patched_stages(mocks: dict) -> ExitStack:
     return stack
 
 
-# The pipeline's stage order, in one place. gui/progress.ALL_STAGES cannot be
-# the source yet: it is missing genau_deliver (bug 5, held for sign-off), so
-# deriving from it would encode the bug into these tests.
-_EXPECTED_STAGE_ORDER = [
-    "purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai",
-    "verify", "references", "bookmarks", "clip_scripts", "scene_scripts",
-    "scripts", "group_non_ai", "dupes",
-]
+# The pipeline's stage order has one home, gui/progress.STAGES, and these
+# tests read it rather than keeping a second copy. It was a second copy while
+# the registry was missing genau_deliver, since deriving from it would have
+# encoded that bug here too; tests/test_stage_registry.py is what holds the
+# two in step now.
+_EXPECTED_STAGE_ORDER = ALL_STAGES
 
 
 class TestEvolverMain:

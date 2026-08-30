@@ -54,17 +54,16 @@ class TestRunDetailRendering:
         assert widget._table.item(0, 1).toolTip() == STAGE_TOOLTIPS["metadata"]
 
     def test_a_stage_the_registry_does_not_list_still_shows_its_key(self):
-        """`genau_deliver` is emitted by the pipeline and has no registry entry
-        (bug 2, held), and records on disk go back months — a row must render
-        rather than raise or come out blank."""
+        """Records on disk go back months and name stages this build has since
+        retired, so a row must render rather than raise or come out blank."""
         widget = RunDetailWidget()
         widget.show_record(make_run_record(
             id="x", started_at="2026-06-27T22:18:46", finished_at="2026-06-27T22:18:46",
             duration_seconds=1.0, trigger="manual", status="success",
-            stages=[{"name": "genau_deliver", "status": "completed", "duration_seconds": 1.0}],
+            stages=[{"name": "regen_cutover", "status": "completed", "duration_seconds": 1.0}],
         ))
 
-        assert widget._table.item(0, 1).text() == "genau_deliver"
+        assert widget._table.item(0, 1).text() == "regen_cutover"
 
 
 class TestRunHistoryMarks:

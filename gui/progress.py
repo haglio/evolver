@@ -6,6 +6,7 @@ STAGES = [
     ("metadata",  "Metadata Scrape",      "Scrape AI prompt metadata into mirrored JSON files"),
     ("sort",      "Sort Inbox",           "Move AI videos from 0_inbox into 1_sorted by source and orientation"),
     ("upscale",   "Upscale",              "Apply Topaz 60fps frame interpolation + 4x upscale + various AI enhancements to 1_sorted AI videos, placing them in 2_outbox"),
+    ("genau_deliver", "Genau Delivery",   "Move each upscaled Genau-lane clip out of 2_outbox into the folder Genau plays from, retiring the 1_sorted copy it was made from — both halves leave together or the upscale stage redoes the clip forever"),
     ("upscale_non_ai", "Upscale non-AI",  "Supervise one detached Topaz encode of a 2D/non_AI video (apo-8 60fps + iris-2 toward 4K); with the toggle on, run it while the user is idle and the AI queue is drained, suspending it the moment they return"),
     ("verify",    "Correspondence Check", "Verify 1_sorted and 2_outbox are in 1-to-1 correspondence"),
     ("references", "Follow Moved Videos", "Repoint the suite's saved video paths — Clipper sessions, Scripture projects, Fun Time favorites and watch counts — at videos that have since moved"),
