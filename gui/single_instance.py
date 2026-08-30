@@ -75,7 +75,7 @@ def serve_show_requests(on_show: Callable[[], None]) -> QLocalServer:
     return server
 
 
-def request_show(timeout_ms: int = _CONNECT_TIMEOUT_MS) -> bool:
+def request_show() -> bool:
     """Ask the running instance to open its window. True if it took the request.
 
     The connection itself is the whole message — there is no payload to get
@@ -83,7 +83,7 @@ def request_show(timeout_ms: int = _CONNECT_TIMEOUT_MS) -> bool:
     """
     socket = QLocalSocket()
     socket.connectToServer(_PIPE_NAME)
-    if not socket.waitForConnected(timeout_ms):
+    if not socket.waitForConnected(_CONNECT_TIMEOUT_MS):
         return False
     socket.disconnectFromServer()
     return True
