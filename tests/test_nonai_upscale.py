@@ -880,132 +880,13 @@ class TestRunSupervisesAJob(unittest.TestCase):
             mocks["terminate"].assert_not_called()
 
 
-class TestRetireOriginal(unittest.TestCase):
-    def test_carries_the_sidecar_to_the_retire_folder(self):
-        """A clip's `clip` metadata must follow the file when it is retired, or
-        it is orphaned and pruned — losing Nau's navigation data."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
+class TestPromotionCarriesTheRecord(unittest.TestCase):
+    """What the upscale must be handed before its original leaves the library.
 
-            with override_config(**overrides):
-                sidecar.write(
-                    sidecar.sidecar_path(source),
-                    {"clip": {"compilation": "Vol6", "index": 1}},
-                )
-
-                nonai_upscale._retire_original(source)
-
-                dest = non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4"
-                self.assertTrue(dest.exists())
-                self.assertFalse(source.exists())
-                self.assertFalse(sidecar.sidecar_path(source).exists())
-                self.assertEqual(
-                    sidecar.read(sidecar.sidecar_path(dest))["clip"],
-                    {"compilation": "Vol6", "index": 1},
-                )
-
-    def test_carries_the_funscript_to_the_retire_folder(self):
-        """A script left in the old folder still matches the moved video, so the
-        scripts sync would relocate it — but the clip-scripts stage runs first
-        and writes the clip a fresh script at the new path, and the sync then
-        fails the whole run on a collision nothing can resolve."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
-
-            with override_config(**overrides):
-                script = funscript.script_path_for_video(source)
-                funscript.write(script, {"actions": [{"at": 0, "pos": 20}]})
-
-                nonai_upscale._retire_original(source)
-
-                dest = non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4"
-                self.assertFalse(script.exists())
-                self.assertEqual(
-                    funscript.read(funscript.script_path_for_video(dest)),
-                    {"actions": [{"at": 0, "pos": 20}]},
-                )
-
-
-class TestRetireToAnArchive(unittest.TestCase):
-    """With an archive configured, a retired original leaves the library entirely.
-
-    The bucket's ``2*`` folder sits on the working drive inside the file-sync
-    pair, so every finished encode left roughly a gigabyte of superseded source
-    behind and the drive filled up. An archive root points those files at
-    somewhere else — cloud storage, another volume — and the library keeps only
-    what is watched.
+    The move itself is :mod:`util.nonai_retire`'s and tested there; these are
+    the stage's half — that promotion does the carry at all, and before the
+    retire rather than after.
     """
-
-    def test_the_original_lands_in_the_archive_at_its_library_path(self):
-        with workspace_temp_dir() as root:
-            archive = root / "archive"
-            overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
-            non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
-
-            with override_config(**overrides):
-                nonai_upscale._retire_original(source)
-
-            self.assertFalse(source.exists())
-            self.assertTrue(
-                (archive / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
-            )
-
-    def test_the_funscript_goes_with_it_rather_than_being_left_behind(self):
-        """A script left in the library still matches the archived video by name,
-        so the scripts sync tries to relocate it — and the clip-scripts stage has
-        already written a fresh script at that destination, so the sync fails the
-        run on a collision nothing can resolve."""
-        with workspace_temp_dir() as root:
-            archive = root / "archive"
-            overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
-            non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-
-            with override_config(**overrides):
-                script = funscript.script_path_for_video(source)
-                funscript.write(script, {"actions": [{"at": 0, "pos": 20}]})
-
-                nonai_upscale._retire_original(source)
-
-                self.assertFalse(script.exists())
-            archived = archive / "larkin" / "1 clips to upscale" / "Lee-Poe.funscript"
-            self.assertEqual(
-                json.loads(archived.read_text(encoding="utf-8")),
-                {"actions": [{"at": 0, "pos": 20}]},
-            )
-
-    def test_the_sidecar_goes_with_it_so_the_archive_describes_itself(self):
-        """The metadata tree mirrors the library, and the grouping stage prunes
-        any sidecar no library video maps to — so a sidecar left behind is
-        deleted on the next run, taking the clip's provenance with it."""
-        with workspace_temp_dir() as root:
-            archive = root / "archive"
-            overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
-            non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-
-            with override_config(**overrides):
-                sidecar.write(
-                    sidecar.sidecar_path(source),
-                    {"clip": {"compilation": "Volume One", "index": 1}},
-                )
-
-                nonai_upscale._retire_original(source)
-
-                self.assertFalse(sidecar.sidecar_path(source).exists())
-            archived = archive / "larkin" / "1 clips to upscale" / "Lee-Poe.json"
-            self.assertEqual(
-                json.loads(archived.read_text(encoding="utf-8"))["clip"],
-                {"compilation": "Volume One", "index": 1},
-            )
 
     def test_the_upscale_keeps_the_clip_record_the_original_takes_away(self):
         """Promotion must hand the upscale its own copy first, or the record goes.
@@ -1211,24 +1092,6 @@ class TestRepairRetiredMetadata(unittest.TestCase):
 
                 self.assertEqual(sidecar.read(sidecar.sidecar_path(out)), {})
             self.assertEqual(result.repaired_sidecars, 0)
-
-
-class TestUnsetArchive(unittest.TestCase):
-    def test_an_unset_archive_keeps_the_user_s_own_retire_folder(self):
-        """A public checkout, and any machine that has not configured one, must
-        go on behaving exactly as before."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root, NONAI_RETIRED_ROOT=None)
-            non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
-
-            with override_config(**overrides):
-                nonai_upscale._retire_original(source)
-
-            self.assertTrue(
-                (non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4").exists()
-            )
 
 
 if __name__ == "__main__":
