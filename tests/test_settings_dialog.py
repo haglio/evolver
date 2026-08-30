@@ -1,5 +1,5 @@
-"""Tests for the Settings dialog — where the three settings are written and
-the Startup shortcut is created or removed."""
+"""Tests for the Settings dialog — where the two saved settings are written
+and the Startup shortcut is created or removed."""
 
 from unittest.mock import patch
 
@@ -33,18 +33,17 @@ class TestDialogShowsCurrentSettings:
         assert dialog._toasts_check.isChecked()
         assert dialog._startup_check.isChecked()
 
-    def test_the_startup_box_reflects_the_real_shortcut_not_the_json(self):
+    def test_the_startup_box_reflects_the_real_shortcut(self):
         """The shortcut can be deleted behind the app's back, so the box asks
-        the Startup folder, not the saved start_with_windows flag."""
-        settings = EvolverSettings(start_with_windows=True)
+        the Startup folder — which is the only record of it there is."""
         with patch("gui.startup.is_registered", return_value=False):
-            dialog = SettingsDialog(settings)
+            dialog = SettingsDialog(EvolverSettings())
         assert not dialog._startup_check.isChecked()
 
 
 class TestAccept:
 
-    def test_writes_all_three_fields_and_saves(self, dialog_parts):
+    def test_writes_both_saved_fields_and_saves(self, dialog_parts):
         dialog, settings, save, _, _ = dialog_parts
         dialog._interval_spin.setValue(42)
         dialog._toasts_check.setChecked(True)
@@ -54,7 +53,6 @@ class TestAccept:
 
         assert settings.interval_minutes == 42
         assert settings.enable_toasts is True
-        assert settings.start_with_windows is False
         save.assert_called_once()
         assert dialog.result() == QDialog.DialogCode.Accepted
 

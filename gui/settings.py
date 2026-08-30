@@ -12,7 +12,6 @@ import config
 @dataclass
 class EvolverSettings:
     interval_minutes: int = 10
-    start_with_windows: bool = False
     enable_toasts: bool = False
     # A one-time opt-in, off by default because a non-AI encode owns the GPU
     # for hours. Once on, Evolver auto-manages it by user presence — running it
