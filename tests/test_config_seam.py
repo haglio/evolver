@@ -27,28 +27,51 @@ from pathlib import Path
 
 from tests.test_dead_code import PROJECT_ROOT, _source_files
 
-# What each unit reads off the ambient ``config`` singleton today. Lower a
-# number when a conversion removes reads. A number goes UP only for a read that
-# nothing could reach becoming an ordinary one — a value a module bound at its
-# own import is not counted here and cannot be redirected either, so moving it
-# into ``config`` costs references and buys the seam; say which in the commit.
-# Anything else that raises a number is a new ambient read, and the build stops
-# it. The count comes from the syntax tree, so a mention in a comment or a
-# docstring does not move it.
+# What each module reads off the ambient ``config`` singleton today, held
+# exactly. Lower a number when a conversion removes reads. A number goes UP only
+# for a read that nothing could reach becoming an ordinary one — a value a
+# module bound at its own import is not counted here and cannot be redirected
+# either, so moving it into ``config`` costs references and buys the seam; say
+# which in the commit. Anything else that raises a number is a new ambient read,
+# and the build stops it.
+#
+# Per module rather than per unit, because a total lets a read added in one file
+# pay for a read removed in another: a stage "converted" by hardcoding the value
+# it used to look up scores exactly as well as one given a parameter. The count
+# comes from the syntax tree, so a mention in a comment or a docstring does not
+# move it.
 CONFIG_REFERENCE_LEDGER = {
-    "tasks": 147,
-    "util+backfill": 37,
-    "gui": 14,
-}
-
-_UNITS = {
-    "tasks": lambda name: name.startswith("tasks/") or name in (
-        "evolver.py", "check_correspondence.py", "check_duplicate_sizes.py",
-    ),
-    "util+backfill": lambda name: name.startswith(("util/", "backfill/")),
-    "gui": lambda name: name.startswith("gui/") or name in (
-        "tray_app.py", "backfill_app.py",
-    ),
+    "backfill/decisions.py": 3,
+    "backfill/mic.py": 1,
+    "backfill/queue.py": 2,
+    "backfill/thumbnails.py": 2,
+    "backfill/voice.py": 5,
+    "check_correspondence.py": 7,
+    "check_duplicate_sizes.py": 5,
+    "evolver.py": 9,
+    "gui/app.py": 9,
+    "gui/main_window.py": 1,
+    "gui/settings.py": 2,
+    "gui/tray.py": 1,
+    "gui/worker.py": 1,
+    "tasks/bookmarks_sync.py": 4,
+    "tasks/clip_scripts.py": 2,
+    "tasks/genau_deliver.py": 6,
+    "tasks/nonai_group.py": 4,
+    "tasks/nonai_upscale.py": 53,
+    "tasks/origenerator_metadata.py": 1,
+    "tasks/prompt_scrape.py": 7,
+    "tasks/purge_weird.py": 5,
+    "tasks/scene_scripts.py": 2,
+    "tasks/scripts_sync.py": 21,
+    "tasks/sort.py": 3,
+    "tasks/upscale.py": 18,
+    "util/funscript.py": 3,
+    "util/nonai_library.py": 5,
+    "util/reference_stores.py": 6,
+    "util/sidecar.py": 3,
+    "util/topaz.py": 3,
+    "util/video_locator.py": 4,
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or
@@ -84,6 +107,51 @@ def _config_references(tree: ast.AST) -> int:
     )
 
 
+def _config_imports(tree: ast.AST) -> list[int]:
+    """Lines importing ``config`` as anything but the plain module name.
+
+    The ledger counts loads of the name ``config``, so ``from config import X``
+    reaches the same singleton and scores zero — a new ambient read that lands
+    green, and a way to "convert" a module by rewriting its import while
+    lowering its number. Neither spelling exists in the tree; the point of
+    refusing them is that the seam is opened by a parameter, not by a different
+    way of saying the same import.
+    """
+    lines = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "config":
+            lines.append(node.lineno)
+        elif isinstance(node, ast.Import):
+            lines += [node.lineno for a in node.names if a.name == "config" and a.asname]
+    return lines
+
+
+def _import_time_config_defaults(tree: ast.AST) -> list[int]:
+    """Lines where a signature default is read off ``config``.
+
+    The one rule the whole seam rests on. ``def run(*, x=config.X)`` is
+    evaluated once, when the module is imported, so the value is frozen before
+    anything can redirect it and ``override_config`` — which every stage test
+    steers with — cannot reach it. The sentinel form
+    (``x=None`` then ``x = config.X if x is None else x``) reads at call time.
+    Both spellings hold the same ``config.X``, so the count cannot tell them
+    apart and this does.
+    """
+    lines = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for default in [*node.args.defaults, *node.args.kw_defaults]:
+            if default is None:
+                continue
+            lines += [
+                default.lineno
+                for inner in ast.walk(default)
+                if isinstance(inner, ast.Name) and inner.id == "config"
+            ]
+    return lines
+
+
 class _OverlayKeys(ast.NodeVisitor):
     """The overlay keys one module reads, followed through the names it binds.
 
@@ -96,10 +164,12 @@ class _OverlayKeys(ast.NodeVisitor):
     than the overlay's key names, and are not followed.
     """
 
-    def __init__(self):
-        # ``content`` is the parameter name config.py's two overlay-reading
-        # helpers take their mapping as.
-        self.paths: dict[str, str] = {"_CONTENT": "", "content": ""}
+    def __init__(self, prebound: dict[str, str] | None = None):
+        # Only config.py starts with names already holding overlay data —
+        # ``_CONTENT`` and the ``content`` parameter its two helpers take their
+        # mapping as. Seeding those everywhere would harvest the literal keys of
+        # any unrelated dict a module happened to call ``content``.
+        self.paths: dict[str, str] = dict(prebound or {})
         self.keys: set[str] = set()
         # Overlay reads whose key this cannot see: a name, an f-string, a
         # comprehension target. One of those would put a key into the contract
@@ -122,12 +192,23 @@ class _OverlayKeys(ast.NodeVisitor):
             self.unreadable.append(node.lineno)
         return None
 
+    def _bind(self, target: ast.AST, value: ast.AST) -> None:
+        path = self._path_of(value)
+        if path is not None and isinstance(target, ast.Name):
+            self.paths[target.id] = path
+
     def visit_Assign(self, node: ast.Assign):
-        path = self._path_of(node.value)
-        if path is not None:
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    self.paths[target.id] = path
+        for target in node.targets:
+            self._bind(target, node.value)
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign):
+        if node.value is not None:
+            self._bind(node.target, node.value)
+        self.generic_visit(node)
+
+    def visit_NamedExpr(self, node: ast.NamedExpr):
+        self._bind(node.target, node.value)
         self.generic_visit(node)
 
     def visit_Subscript(self, node: ast.Subscript):
@@ -138,14 +219,16 @@ class _OverlayKeys(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call):
         func = node.func
-        if isinstance(func, ast.Attribute) and func.attr == "get" and node.args:
-            base = self._path_of(func.value)
-            if base is not None:
-                key = node.args[0]
-                if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                    self.keys.add(f"{base}.{key.value}".lstrip("."))
-                else:
-                    self.unreadable.append(node.lineno)
+        if isinstance(func, ast.Attribute) and (base := self._path_of(func.value)) is not None:
+            # ``get`` is the one call this can read a key out of. Every other
+            # method on the mapping — ``pop``, ``setdefault``, ``keys`` — either
+            # names a key it would have to know about or ranges over all of
+            # them, so it is refused rather than read past.
+            key = node.args[0] if node.args else None
+            if func.attr == "get" and isinstance(key, ast.Constant) and isinstance(key.value, str):
+                self.keys.add(f"{base}.{key.value}".lstrip("."))
+            else:
+                self.unreadable.append(node.lineno)
         self.generic_visit(node)
 
 
@@ -158,31 +241,53 @@ def _trees() -> dict[str, ast.AST]:
 
 class TestConfigSeam(unittest.TestCase):
     def test_the_config_reference_count_matches_the_ledger(self):
-        counts = dict.fromkeys(CONFIG_REFERENCE_LEDGER, 0)
-        unplaced = []
-        for name, tree in _trees().items():
-            references = _config_references(tree)
-            if not references:
-                continue
-            for unit, belongs in _UNITS.items():
-                if belongs(name):
-                    counts[unit] += references
-                    break
-            else:
-                unplaced.append(name)
+        counts = {
+            name: references
+            for name, tree in _trees().items()
+            if name != "config.py" and (references := _config_references(tree))
+        }
 
-        self.assertEqual(unplaced, [], "these modules belong to no unit, so nothing counts them")
         self.assertEqual(
             counts,
             CONFIG_REFERENCE_LEDGER,
-            "lower the ledger in the commit that removes the reads; never raise it",
+            "lower a module's number in the commit that removes its reads; a "
+            "number going up is a new ambient read unless the commit says why",
+        )
+
+    def test_config_is_reached_only_as_the_module(self):
+        offenders = sorted(
+            f"{name}:{line}"
+            for name, tree in _trees().items()
+            for line in _config_imports(tree)
+        )
+
+        self.assertEqual(
+            offenders,
+            [],
+            "`import config` and `config.X`, so the ledger can see the read",
+        )
+
+    def test_no_signature_default_is_read_off_config(self):
+        offenders = sorted(
+            f"{name}:{line}"
+            for name, tree in _trees().items()
+            for line in _import_time_config_defaults(tree)
+        )
+
+        self.assertEqual(
+            offenders,
+            [],
+            "a default is evaluated at import and freezes the value past "
+            "override_config; resolve it in the body instead",
         )
 
     def test_the_overlay_keys_are_the_ones_the_contract_names(self):
         found: set[str] = set()
         unreadable: list[str] = []
         for name, tree in _trees().items():
-            visitor = _OverlayKeys()
+            visitor = _OverlayKeys(
+                {"_CONTENT": "", "content": ""} if name == "config.py" else None
+            )
             visitor.visit(tree)
             found |= visitor.keys
             unreadable += [f"{name}:{line}" for line in visitor.unreadable]

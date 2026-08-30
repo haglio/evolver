@@ -84,6 +84,38 @@ class TestStageRegistry(unittest.TestCase):
 
         self.assertEqual([name for name, _ in itertools.groupby(spelled)], ALL_STAGES)
 
+    def test_a_stage_reaches_the_run_record_through_those_two_calls_and_no_other(self):
+        """The gate above reads two call names, so it is only as good as the
+        claim that a stage cannot be emitted any other way.
+
+        `records.append(StageRecord(...))` inside one of the pipeline's skip
+        branches would emit a stage that neither gate sees — the syntax-tree
+        one because it is not a `_run_stage` call, the mocked run because it
+        takes one path and never enters that branch.
+        """
+        tree = ast.parse(Path(PROJECT_ROOT, "evolver.py").read_text(encoding="utf-8"))
+        emitters = set()
+        enclosing = []
+
+        def walk(node):
+            named = isinstance(node, ast.FunctionDef)
+            if named:
+                enclosing.append(node.name)
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "StageRecord"
+            ):
+                emitters.add(enclosing[-1] if enclosing else "<module>")
+            for child in ast.iter_child_nodes(node):
+                walk(child)
+            if named:
+                enclosing.pop()
+
+        walk(tree)
+
+        self.assertEqual(emitters, {"_run_stage", "_skip_stage"})
+
     def test_every_stage_either_has_a_verdict_rule_or_is_declared_unable_to_fail(self):
         """The last copy of the stage names, and the one that fails silently.
 
