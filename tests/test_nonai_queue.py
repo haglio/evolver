@@ -11,19 +11,21 @@ import unittest
 from tasks import nonai_queue
 from tests.temp_helpers import (
     make_video,
-    nonai_library_overrides as library_overrides,
     override_config,
     workspace_temp_dir,
+)
+from tests.temp_helpers import (
+    nonai_library_overrides as library_overrides,
 )
 
 
 def queue_files(root, overrides, *, pin_manifest=None):
     """The three files collect_candidates reads, defaulted to absent ones."""
-    return dict(
-        skip_manifest=overrides["NONAI_SKIP_MANIFEST"],
-        pin_manifest=pin_manifest or root / "next.txt",
-        watch_stats_file=overrides["FUN_TIME_WATCH_STATS_FILE"],
-    )
+    return {
+        "skip_manifest": overrides["NONAI_SKIP_MANIFEST"],
+        "pin_manifest": pin_manifest or root / "next.txt",
+        "watch_stats_file": overrides["FUN_TIME_WATCH_STATS_FILE"],
+    }
 
 
 class TestCollectCandidates(unittest.TestCase):

@@ -47,9 +47,8 @@ class TestReadDictStrict(unittest.TestCase):
             self.assertEqual(json_store.read_dict_strict(path), {"a": 1})
 
     def test_a_missing_file_raises(self):
-        with workspace_temp_dir() as root:
-            with self.assertRaises(OSError):
-                json_store.read_dict_strict(root / "none.json")
+        with workspace_temp_dir() as root, self.assertRaises(OSError):
+            json_store.read_dict_strict(root / "none.json")
 
     def test_a_half_written_file_raises(self):
         with workspace_temp_dir() as root:
@@ -85,9 +84,9 @@ class TestAtomicWriteText(unittest.TestCase):
             path = root / "a.json"
             path.write_text("the old one", encoding="utf-8")
 
-            with patch("pathlib.Path.replace", side_effect=OSError("interrupted")):
-                with self.assertRaises(OSError):
-                    json_store.atomic_write_text(path, "the new one")
+            with patch("pathlib.Path.replace", side_effect=OSError("interrupted")), \
+                 self.assertRaises(OSError):
+                json_store.atomic_write_text(path, "the new one")
 
             self.assertEqual(path.read_text(encoding="utf-8"), "the old one")
 

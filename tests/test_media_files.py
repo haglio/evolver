@@ -32,9 +32,10 @@ class TestLibraryVideos(unittest.TestCase):
             partial.write_bytes(b"partial")
 
             with override_config(VIDEO_EXTENSIONS={".mp4"}):
-                self.assertEqual(list(library_videos(root)), [good])
+                found = list(library_videos(root))
 
-            self.assertTrue(is_partial_video_path(partial))
+        self.assertEqual(found, [good])
+        self.assertTrue(is_partial_video_path(partial))
 
     def test_what_counts_as_a_video_is_read_when_it_is_asked_not_at_import(self):
         """Five stages threaded config.VIDEO_EXTENSIONS through one-line
@@ -159,9 +160,9 @@ class TestRemovePartialVideoFiles(unittest.TestCase):
             (root / "clip.partial.deadbeef.mp4").write_bytes(b"partial")
             log = logging.getLogger(__name__)
 
-            with patch.object(Path, "unlink", side_effect=OSError("held open")):
-                with self.assertLogs(log, level="ERROR"):
-                    removed = remove_partial_video_files(root, {".mp4"}, log)
+            with patch.object(Path, "unlink", side_effect=OSError("held open")), \
+                 self.assertLogs(log, level="ERROR"):
+                removed = remove_partial_video_files(root, {".mp4"}, log)
 
             self.assertEqual(removed, 0)
 

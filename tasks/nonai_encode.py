@@ -29,8 +29,7 @@ import time
 from pathlib import Path
 
 import config
-from util import ffprobe, nonai_job, processes, topaz
-from util import orientation
+from util import ffprobe, nonai_job, orientation, processes, topaz
 
 log = logging.getLogger(__name__)
 

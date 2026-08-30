@@ -22,7 +22,10 @@ class TestFindBrowserExecutable(unittest.TestCase):
             candidates = (root / "chrome.exe", second, root / "other.exe")
 
             with patch.object(headless_browser, "_BROWSER_CANDIDATES", candidates):
-                self.assertEqual(headless_browser.find_browser_executable(), second)
+                found = headless_browser.find_browser_executable()
+
+        self.assertEqual(found, second)
+
 
     def test_no_browser_installed_is_no_answer_rather_than_an_error(self):
         """The stage degrades to "scraping unavailable this run" on a None; an
@@ -69,20 +72,20 @@ class TestFetchDom(unittest.TestCase):
     def test_a_nonzero_exit_names_the_url_and_what_the_browser_said(self):
         with workspace_temp_dir() as root:
             with patch("subprocess.run",
-                       return_value=_completed(returncode=1, stderr="no display")):
-                with self.assertRaises(RuntimeError) as caught:
-                    headless_browser.fetch_dom("https://example.invalid/a",
-                                               Path("chrome.exe"), profile_dir=root)
+                       return_value=_completed(returncode=1, stderr="no display")), \
+                 self.assertRaises(RuntimeError) as caught:
+                headless_browser.fetch_dom("https://example.invalid/a",
+                                           Path("chrome.exe"), profile_dir=root)
 
             self.assertIn("https://example.invalid/a", str(caught.exception))
             self.assertIn("no display", str(caught.exception))
 
     def test_a_silent_nonzero_exit_still_says_what_the_code_was(self):
         with workspace_temp_dir() as root:
-            with patch("subprocess.run", return_value=_completed(returncode=3)):
-                with self.assertRaises(RuntimeError) as caught:
-                    headless_browser.fetch_dom("https://example.invalid/a",
-                                               Path("chrome.exe"), profile_dir=root)
+            with patch("subprocess.run", return_value=_completed(returncode=3)), \
+                 self.assertRaises(RuntimeError) as caught:
+                headless_browser.fetch_dom("https://example.invalid/a",
+                                           Path("chrome.exe"), profile_dir=root)
 
             self.assertIn("exit 3", str(caught.exception))
 
