@@ -101,14 +101,12 @@ def thumbnail_cache_path(action: str) -> Path:
     return config.BACKFILL_THUMBNAIL_DIR / f"{slug}.jpg"
 
 
-def extract_frame(
-    clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTION, height: int = _THUMBNAIL_HEIGHT
-) -> bool:
+def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTION) -> bool:
     """Write one downscaled frame of *clip* to *dest*; True when it lands.
 
     Seeks to *at_fraction* of the clip's duration (0 when the duration is unknown)
-    and scales to *height*, keeping the aspect ratio. Uses the same Topaz ffmpeg
-    and console-suppressed invocation the rest of the pipeline does.
+    and scales to ``_THUMBNAIL_HEIGHT``, keeping the aspect ratio. Uses the same
+    Topaz ffmpeg and console-suppressed invocation the rest of the pipeline does.
     """
     duration = duration_seconds(clip)
     timestamp = duration * at_fraction if duration else 0.0
@@ -121,7 +119,7 @@ def extract_frame(
                 "-ss", f"{timestamp:.3f}",
                 "-i", str(clip),
                 "-frames:v", "1",
-                "-vf", f"scale=-2:{height}",
+                "-vf", f"scale=-2:{_THUMBNAIL_HEIGHT}",
                 "-y", str(dest),
             ],
             capture_output=True,

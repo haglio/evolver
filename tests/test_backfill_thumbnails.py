@@ -1,3 +1,4 @@
+import inspect
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -141,6 +142,24 @@ class TestExtractFrame(unittest.TestCase):
             argv = run.call_args[0][0]
             self.assertEqual(argv[argv.index("-ss") + 1], "4.000")
             self.assertIn(str(dest), argv)
+
+    def test_scales_to_the_one_thumbnail_height(self):
+        """Like at_fraction, the height is the tuned value and no caller names
+        it — the grid draws every tile at one size."""
+        assert "height" not in inspect.signature(thumbnails.extract_frame).parameters
+        with workspace_temp_dir() as root:
+            dest = root / "out.jpg"
+
+            def fake_run(argv, **kwargs):
+                dest.write_bytes(b"img")
+                return SimpleNamespace(returncode=0)
+
+            with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
+                 patch("backfill.thumbnails.subprocess.run", side_effect=fake_run) as run:
+                thumbnails.extract_frame(Path("clip.mp4"), dest)
+
+            argv = run.call_args[0][0]
+            self.assertEqual(argv[argv.index("-vf") + 1], f"scale=-2:{thumbnails._THUMBNAIL_HEIGHT}")
 
     def test_seeks_to_zero_when_the_duration_is_unknown(self):
         with workspace_temp_dir() as root:
