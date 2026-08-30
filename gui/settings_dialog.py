@@ -53,12 +53,12 @@ class SettingsDialog(QDialog):
 
     def accept(self):
         self._settings.interval_minutes = self._interval_spin.value()
-        self._settings.start_with_windows = self._startup_check.isChecked()
         self._settings.enable_toasts = self._toasts_check.isChecked()
         self._settings.save()
 
+        wants_startup = self._startup_check.isChecked()
         try:
-            if self._settings.start_with_windows:
+            if wants_startup:
                 startup.register_startup()
             else:
                 startup.unregister_startup()

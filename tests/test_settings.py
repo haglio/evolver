@@ -11,17 +11,32 @@ class TestEvolverSettings(unittest.TestCase):
     def test_defaults(self):
         s = EvolverSettings()
         self.assertEqual(s.interval_minutes, 10)
-        self.assertFalse(s.start_with_windows)
+        self.assertFalse(s.enable_toasts)
+
+    def test_the_file_holds_only_settings_something_reads_back(self):
+        """A key written every save and never read is not configuration."""
+        self.assertEqual(
+            set(EvolverSettings.__dataclass_fields__),
+            {"interval_minutes", "enable_toasts", "nonai_upscale_enabled"},
+        )
 
     def test_save_and_load_round_trip(self):
         with workspace_temp_dir() as tmp:
             path = tmp / "settings.json"
-            s = EvolverSettings(interval_minutes=5, start_with_windows=True)
+            s = EvolverSettings(interval_minutes=5, enable_toasts=True)
             s.save(path)
 
             loaded = EvolverSettings.load(path)
             self.assertEqual(loaded.interval_minutes, 5)
-            self.assertTrue(loaded.start_with_windows)
+            self.assertTrue(loaded.enable_toasts)
+
+    def test_a_file_still_carrying_start_with_windows_loads(self):
+        """The key was written for years; a hand-edited or old file keeps it."""
+        with workspace_temp_dir() as tmp:
+            path = tmp / "settings.json"
+            path.write_text(json.dumps({"interval_minutes": 7, "start_with_windows": True}))
+
+            self.assertEqual(EvolverSettings.load(path).interval_minutes, 7)
 
     def test_load_returns_defaults_for_missing_file(self):
         s = EvolverSettings.load(path=None)
