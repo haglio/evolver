@@ -15,6 +15,7 @@ from pathlib import Path
 
 import config
 from util import favs_csv
+from util.json_store import atomic_write_text, read_dict_strict
 
 
 def _no_fingerprint(path: Path) -> tuple[float, int] | None:
@@ -128,13 +129,12 @@ def _favorite_locals(rows: list[dict[str, str]], column: str, base_dir: Path) ->
 
 
 def _load_json(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as fh:
-        return json.load(fh)
+    """Strict on purpose: these files belong to the sibling apps, so one this
+    cannot read must stop the rewrite rather than be treated as empty and
+    replaced with a new one."""
+    return read_dict_strict(path)
 
 
 def _write_json(path: Path, payload: dict) -> None:
-    temp_path = path.with_name(path.name + ".tmp")
-    with temp_path.open("w", encoding="utf-8", newline="\n") as fh:
-        json.dump(payload, fh, indent=2)
-        fh.write("\n")
-    temp_path.replace(path)
+    # newline="\n" because the app that owns this file wrote it that way.
+    atomic_write_text(path, json.dumps(payload, indent=2) + "\n", newline="\n")

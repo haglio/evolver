@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 import config
+from util.json_store import atomic_write_text, read_dict
 
 
 def upscaled_video_path(
@@ -45,17 +46,17 @@ def sidecar_path(video: Path) -> Path:
 
 def read(path: Path) -> dict:
     """A sidecar's payload — empty when it is absent or unreadable."""
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    return read_dict(path)
 
 
 def write(path: Path, payload: dict) -> None:
-    """Serialize *payload* to *path*, creating the mirrored directory if need be."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    """Serialize *payload* to *path*, creating the mirrored directory if need be.
+
+    Written atomically because this is the one format three apps write: Fun
+    Time stamps a watch onto one while a pipeline stage is rewriting it, and a
+    reader must see the old file or the new one, never half of either.
+    """
+    atomic_write_text(path, json.dumps(payload, indent=2) + "\n")
 
 
 def _video_field(payload: dict, field: str) -> str:

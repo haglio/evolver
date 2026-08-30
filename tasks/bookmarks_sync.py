@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 import config
 from util import favs_csv
+from util.json_store import atomic_write_text
 
 log = logging.getLogger(__name__)
 
@@ -304,9 +305,6 @@ def _chrome_timestamp() -> str:
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_name(path.name + ".tmp")
-    with temp_path.open("w", encoding="utf-8", newline="\n") as fh:
-        json.dump(data, fh, indent=3)
-        fh.write("\n")
-    temp_path.replace(path)
+    # indent=3 and newline="\n" because that is how Chrome writes this file,
+    # and it is Chrome's to read back.
+    atomic_write_text(path, json.dumps(data, indent=3) + "\n", newline="\n")
