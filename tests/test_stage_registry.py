@@ -4,15 +4,39 @@ import re
 import unittest
 from pathlib import Path
 
+import evolver
 from gui.progress import ALL_STAGES
 from gui.stats_window import STAGE_COLORS
 from tests.test_dead_code import PROJECT_ROOT, _source_files
+from tests.test_evolver import _patched_stages, _stage_mocks
 
 
 class TestStageRegistry(unittest.TestCase):
-    def test_gui_lists_the_non_ai_upscale_stage_after_the_ai_one(self):
+    def test_the_registry_lists_exactly_the_stages_the_pipeline_emits(self):
+        """The gate that can see a stage go missing, which nothing here could.
+
+        `genau_deliver` ran for months with no registry row: it drew no
+        progress bar, its duration was dropped from the chart, and the detail
+        table fell back to numbering it with the number the stage after it
+        already carried. Every test in this file read the registry and none of
+        them imported `evolver`, so the two could not be compared.
+        """
+        mocks = _stage_mocks()
+        with _patched_stages(mocks):
+            result = evolver.run_pipeline()
+
+        self.assertEqual([stage.name for stage in result.stages], ALL_STAGES)
+
+    def test_gui_lists_the_genau_delivery_between_the_two_upscales(self):
+        """Delivery runs straight after the AI upscale, so a clip made this run
+        reaches Genau this run, and before the correspondence check, which
+        would otherwise see the delivered clip's source still in 1_sorted with
+        nothing beside it in the outbox."""
+        self.assertIn("genau_deliver", ALL_STAGES)
         self.assertIn("upscale_non_ai", ALL_STAGES)
-        self.assertEqual(ALL_STAGES.index("upscale_non_ai"), ALL_STAGES.index("upscale") + 1)
+        self.assertEqual(ALL_STAGES.index("genau_deliver"), ALL_STAGES.index("upscale") + 1)
+        self.assertEqual(ALL_STAGES.index("upscale_non_ai"), ALL_STAGES.index("genau_deliver") + 1)
+        self.assertLess(ALL_STAGES.index("genau_deliver"), ALL_STAGES.index("verify"))
 
     def test_gui_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
         self.assertIn("group_non_ai", ALL_STAGES)
@@ -47,6 +71,14 @@ class TestStageRegistry(unittest.TestCase):
         for stage in ALL_STAGES:
             with self.subTest(stage=stage):
                 self.assertIn(stage, STAGE_COLORS)
+
+    def test_no_two_stages_share_a_chart_color(self):
+        """The chart stacks every stage as a band in one column, so two stages
+        drawn alike are two bands nobody can tell apart — and the legend then
+        names the same colour twice."""
+        colors = [STAGE_COLORS[stage].getRgb()[:3] for stage in ALL_STAGES]
+
+        self.assertEqual(len(set(colors)), len(colors))
 
 
 if __name__ == "__main__":
