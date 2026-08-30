@@ -21,7 +21,6 @@ log = logging.getLogger(__name__)
 @dataclass
 class UpscaleResult:
     processed: int = 0
-    already_done: int = 0
     failed: int = 0
     timed_out: int = 0
     deferred_low_disk: bool = False
@@ -135,7 +134,6 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
     log.info("")
     log.info("Done.")
     log.info("Upscaled: %d", result.processed)
-    log.info("Skipped (already processed): %d", result.already_done)
     log.info("Failed: %d", result.failed)
     if result.pending_after_run:
         log.info("Pending after this run: %d", result.pending_after_run)
