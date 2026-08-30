@@ -3,9 +3,12 @@
 Separated from the window so it can be exercised without a media backend, and so
 the window is left with only what a window should do: show a clip, show a count.
 
-Every decision is a :class:`_Step` that knows how to take itself back, in both
-places it landed: the queue, and the disk.  The session keeps them on a stack, so
-"undo" walks back through a whole run of them.
+Every decision is a :class:`_Labelled`, a :class:`_Discarded` or a
+:class:`_Deferred` — three classes related only by carrying the same five names
+(``note``, ``take_effect``, ``put_back``, ``commit``, ``roll_back``), which is
+how each knows to take itself back in both places it landed: the queue, and the
+disk.  The session keeps them on a stack, so "undo" walks back through a whole
+run of them.
 """
 
 from __future__ import annotations
