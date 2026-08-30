@@ -7,7 +7,7 @@ import json
 import logging
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from email.utils import parsedate
 from pathlib import Path
 
@@ -153,68 +153,113 @@ def _iter_source_dirs(root: Path):
             yield p
 
 
+@dataclass(frozen=True)
+class _VideoFields:
+    """What the walk has learned about one video so far."""
+
+    prompt: str = ""
+    source_image_url: str = ""
+    metadata: dict[str, str] = field(default_factory=dict)
+
+
 def _scrape_provider_video(
     video_path: Path, image_url: str, browser: Path, base_url: str, profile_dir: Path,
-) -> dict[str, str]:
+) -> dict[str, object]:
+    """The sidecar payload for one video: its own record, and its source image's.
+
+    The video is looked for at four URLs because the site files one under
+    several paths depending on how it was made, and the first that yields a
+    prompt is taken to be it.
+    """
     image_id = image_url.rstrip("/").split("/")[-1]
-    candidate_urls = [
+    found = _VideoFields()
+    for candidate in _candidate_urls(image_url, image_id, base_url):
+        html = fetch_dom(candidate, browser, profile_dir=profile_dir)
+        found = _folded_in(found, html, image_id, base_url)
+        if found.prompt:
+            break
+    if not found.prompt:
+        raise RuntimeError(f"Could not extract Provider video prompt for {video_path.name}")
+
+    payload: dict[str, object] = {"video": {"prompt": found.prompt, **found.metadata}}
+    if found.source_image_url:
+        image_data = _scrape_source_image(
+            found.source_image_url, browser, profile_dir=profile_dir)
+        if image_data:
+            payload["source_image"] = image_data
+    return payload
+
+
+def _candidate_urls(image_url: str, image_id: str, base_url: str) -> list[str]:
+    """Where one video might be filed, most likely first.
+
+    Which of the three video paths a clip sits under depends on how it was
+    made, and nothing in the file name says which; the image path is tried
+    first because it is the one a video's own stem maps to.
+    """
+    return [
         image_url,
         f"{base_url}/video/{image_id}",
         f"{base_url}/text-to-video/{image_id}",
         f"{base_url}/image-to-video/{image_id}",
     ]
 
-    video_prompt = ""
-    source_image_url = ""
-    video_metadata: dict[str, str] = {}
-    for candidate in candidate_urls:
-        html = fetch_dom(candidate, browser, profile_dir=profile_dir)
-        document = parse_document(html)
-        panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
-        if panel is not None:
-            video_prompt = _extract_prompt_text(panel)
-            source_image_url = _extract_source_image_url(panel, base_url)
-            video_metadata = _extract_metadata_fields(document)
-        if not video_prompt:
-            embedded = _extract_provider_embedded_metadata(html, image_id)
-            if embedded.prompt:
-                video_prompt = embedded.prompt
-                if not video_metadata:
-                    video_metadata = _embedded_to_video_metadata(embedded)
-                if embedded.parent_image_id and not source_image_url:
-                    source_image_url = f"{base_url}/image/{embedded.parent_image_id}"
-        if video_prompt:
-            break
-    if not video_prompt:
-        raise RuntimeError(f"Could not extract Provider video prompt for {video_path.name}")
 
-    video_data: dict[str, str] = {"prompt": video_prompt, **video_metadata}
-    payload: dict[str, object] = {"video": video_data}
+def _folded_in(found: _VideoFields, html: str, image_id: str,
+               base_url: str) -> _VideoFields:
+    """*found*, plus what one more candidate page says.
 
-    if source_image_url:
-        image_html = fetch_dom(source_image_url, browser, profile_dir=profile_dir)
-        image_document = parse_document(image_html)
-        image_panel = query_selector(image_document, _CONTENT_PANEL_SELECTOR)
-        image_data: dict[str, str] = {}
-        if image_panel is not None:
-            pos = _extract_prompt_text(image_panel)
-            neg = _extract_negative_prompt_text(image_panel)
-            if pos:
-                image_data["positive_prompt"] = pos
-            if neg:
-                image_data["negative_prompt"] = neg
-            image_data.update(_extract_metadata_fields(image_document))
-        else:
-            image_id_str = source_image_url.rstrip("/").split("/")[-1]
-            embedded = _extract_provider_embedded_metadata(image_html, image_id_str)
-            if embedded.prompt:
-                image_data["positive_prompt"] = embedded.prompt
-            if embedded.negative_prompt:
-                image_data["negative_prompt"] = embedded.negative_prompt
-            image_data.update(_embedded_to_image_metadata(embedded))
-        if image_data:
-            payload["source_image"] = image_data
-    return payload
+    A content panel replaces all three wholesale -- it is what a reader sees on
+    the site, so a page that has one is the authority on that page. The record
+    embedded in the page is the fallback, and fills in only what is still
+    missing: a panel that carried the metadata labels but no prompt keeps its
+    metadata even when the prompt arrives from a later page's JSON.
+    """
+    document = parse_document(html)
+    panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
+    if panel is not None:
+        found = _VideoFields(
+            prompt=_extract_prompt_text(panel),
+            source_image_url=_extract_source_image_url(panel, base_url),
+            metadata=_extract_metadata_fields(document),
+        )
+    if found.prompt:
+        return found
+    embedded = _extract_provider_embedded_metadata(html, image_id)
+    if not embedded.prompt:
+        return found
+    parent_url = (f"{base_url}/image/{embedded.parent_image_id}"
+                  if embedded.parent_image_id else "")
+    return _VideoFields(
+        prompt=embedded.prompt,
+        source_image_url=found.source_image_url or parent_url,
+        metadata=found.metadata or _embedded_to_video_metadata(embedded),
+    )
+
+
+def _scrape_source_image(url: str, browser: Path, *, profile_dir: Path) -> dict[str, str]:
+    """What the image a video was made from says about itself.
+
+    Same two ways round as the video: the content panel if the page has one,
+    the record embedded in it if not.
+    """
+    html = fetch_dom(url, browser, profile_dir=profile_dir)
+    document = parse_document(html)
+    panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
+    if panel is not None:
+        fields = {
+            "positive_prompt": _extract_prompt_text(panel),
+            "negative_prompt": _extract_negative_prompt_text(panel),
+        }
+        return {key: value for key, value in fields.items() if value} | \
+            _extract_metadata_fields(document)
+    embedded = _extract_provider_embedded_metadata(html, url.rstrip("/").split("/")[-1])
+    fields = {
+        "positive_prompt": embedded.prompt,
+        "negative_prompt": embedded.negative_prompt,
+    }
+    return {key: value for key, value in fields.items() if value} | \
+        _embedded_to_image_metadata(embedded)
 
 
 def _build_strategies(browser, profile_dir):
