@@ -39,7 +39,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import ffprobe, funscript, processes, sidecar, system_resources, topaz
+from util import (
+    ffprobe,
+    funscript,
+    nonai_job,
+    processes,
+    sidecar,
+    system_resources,
+    topaz,
+)
 from util.media_files import is_finalized_video_file, is_partial_video_path
 from util.nonai_library import bucket_of, buckets
 from util.variants import is_processed_stem, strip_processing_suffixes
@@ -667,66 +675,39 @@ def _user_present() -> bool:
     return idle < config.NONAI_USER_IDLE_THRESHOLD_SECONDS
 
 
+# The three state files now live in :mod:`util.nonai_job`, which takes each
+# path as an argument.  These bind the stage's configured ones; the parameters
+# that will replace them are the next commit.
 def _last_encode_ended_at() -> float:
-    try:
-        payload = json.loads(config.NONAI_COOLDOWN_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return 0.0
-    ended_at = payload.get("ended_at", 0.0) if isinstance(payload, dict) else 0.0
-    return ended_at if isinstance(ended_at, (int, float)) else 0.0
+    return nonai_job.last_encode_ended_at(config.NONAI_COOLDOWN_FILE)
 
 
 def _stamp_encode_ended() -> None:
-    config.NONAI_COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    config.NONAI_COOLDOWN_FILE.write_text(
-        json.dumps({"ended_at": time.time()}), encoding="utf-8"
-    )
+    nonai_job.stamp_encode_ended(config.NONAI_COOLDOWN_FILE)
 
 
 def _load_job() -> dict | None:
-    try:
-        payload = json.loads(config.NONAI_JOB_STATE_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return payload if isinstance(payload, dict) else None
+    return nonai_job.load_job(config.NONAI_JOB_STATE_FILE)
 
 
 def _save_job(job: dict) -> None:
-    config.NONAI_JOB_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    config.NONAI_JOB_STATE_FILE.write_text(json.dumps(job, indent=2), encoding="utf-8")
+    nonai_job.save_job(config.NONAI_JOB_STATE_FILE, job)
 
 
 def _clear_job() -> None:
-    config.NONAI_JOB_STATE_FILE.unlink(missing_ok=True)
+    nonai_job.clear_job(config.NONAI_JOB_STATE_FILE)
 
 
 def _attempts_of(source: Path) -> int:
-    return _load_attempts().get(relpath(source), 0)
+    return nonai_job.attempts_of(config.NONAI_ATTEMPTS_FILE, relpath(source))
 
 
 def _bump_attempts(source: Path) -> None:
-    attempts = _load_attempts()
-    attempts[relpath(source)] = attempts.get(relpath(source), 0) + 1
-    _save_attempts(attempts)
+    nonai_job.bump_attempts(config.NONAI_ATTEMPTS_FILE, relpath(source))
 
 
 def _clear_attempts(source: Path) -> None:
-    attempts = _load_attempts()
-    if attempts.pop(relpath(source), None) is not None:
-        _save_attempts(attempts)
-
-
-def _load_attempts() -> dict[str, int]:
-    try:
-        payload = json.loads(config.NONAI_ATTEMPTS_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _save_attempts(attempts: dict[str, int]) -> None:
-    config.NONAI_ATTEMPTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    config.NONAI_ATTEMPTS_FILE.write_text(json.dumps(attempts, indent=2), encoding="utf-8")
+    nonai_job.clear_attempts(config.NONAI_ATTEMPTS_FILE, relpath(source))
 
 
 def _add_to_skip_manifest(source: Path, reason: str) -> None:
