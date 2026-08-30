@@ -2,6 +2,7 @@
 
 import dataclasses
 import unittest
+from unittest.mock import patch
 
 from tasks import genau_deliver
 from tests.temp_helpers import override_config, workspace_temp_dir
@@ -106,15 +107,16 @@ class TestGenauDeliver(unittest.TestCase):
             def _locked(self, target):
                 raise OSError("the file is in use")
 
+            # patch.object, not a hand-rolled save and restore: `replace` is
+            # inherited from Path, so reading it off the concrete class and
+            # writing it back leaves an OWN attribute there, shadowing Path's
+            # for the rest of the session -- which silently disarms any later
+            # patch("pathlib.Path.replace"). patch.object deletes instead.
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
                                  GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                original_replace = type(upscaled).replace
-                type(upscaled).replace = _locked
-                try:
-                    result = genau_deliver.run()
-                finally:
-                    type(upscaled).replace = original_replace
+                                 METADATA_DIR=root / "metadata"), \
+                 patch.object(type(upscaled), "replace", _locked):
+                result = genau_deliver.run()
 
             self.assertEqual((result.delivered, result.failed), (0, 1))
             self.assertTrue(upscaled.is_file())
