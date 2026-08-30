@@ -283,6 +283,36 @@ class TestIsT2vProvider(unittest.TestCase):
             with override_config(METADATA_DIR=meta_dir):
                 self.assertFalse(upscale._is_t2v_provider("provider2", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
+    def test_false_when_the_sidecar_is_not_readable_as_json(self):
+        """A half-written sidecar must take the default recipe, not the t2v one:
+        the wrong Topaz model is baked into a finished encode nobody re-runs."""
+        with workspace_temp_dir() as root:
+            meta_dir = root / "meta"
+            json_path = (meta_dir / "2D" / "AI" / "2_outbox"
+                         / "upscaled_by_orientation" / "landscape" / "provider"
+                         / "clip_topaz.json")
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text('{"video": {"prompt"', encoding="utf-8")
+
+            with override_config(METADATA_DIR=meta_dir):
+                self.assertFalse(upscale._is_t2v_provider(
+                    "provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+
+    def test_false_when_the_sidecar_holds_something_other_than_a_record(self):
+        """Valid JSON that is not an object: the membership test would raise on
+        a number, and that is a malformed sidecar like any other."""
+        with workspace_temp_dir() as root:
+            meta_dir = root / "meta"
+            json_path = (meta_dir / "2D" / "AI" / "2_outbox"
+                         / "upscaled_by_orientation" / "landscape" / "provider"
+                         / "clip_topaz.json")
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text("5", encoding="utf-8")
+
+            with override_config(METADATA_DIR=meta_dir):
+                self.assertFalse(upscale._is_t2v_provider(
+                    "provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+
     def test_false_when_metadata_missing(self):
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"

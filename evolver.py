@@ -124,7 +124,12 @@ def setup_logging():
 def check_dependencies():
     if not config.FFMPEG.is_file():
         raise RuntimeError(f"Topaz ffmpeg not found: {config.FFMPEG}")
-    if subprocess.run(["ffprobe", "-version"], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW).returncode != 0:
+    # check=False, said out loud: the returncode is inspected below and turned
+    # into the RuntimeError this function raises for every missing dependency,
+    # rather than a CalledProcessError from one of them.
+    probe = subprocess.run(["ffprobe", "-version"], capture_output=True, check=False,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+    if probe.returncode != 0:
         raise RuntimeError("ffprobe not found in PATH")
 
 
@@ -284,7 +289,9 @@ def main():
     try:
         check_dependencies()
     except RuntimeError as e:
-        log.error("Dependency check failed: %s", e)
+        # exception, not error: the traceback names which dependency check
+        # raised, which is the whole content of the diagnosis.
+        log.exception("Dependency check failed: %s", e)
         sys.exit(1)
 
     result = run_pipeline()

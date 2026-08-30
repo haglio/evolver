@@ -466,12 +466,19 @@ def _titlecase_action(raw_action: str) -> str:
 
 
 def _parse_provider_created_at(value: str) -> str:
+    """*value* as an ISO date, or *value* itself when it does not name one.
+
+    ``parsedate`` is lenient enough to read a day number no month has, so the
+    ValueError comes from building the date rather than from parsing it. That
+    is the only failure this expects: a non-string reaching here would be a
+    caller bug and should say so rather than pass silently through.
+    """
     try:
         t = parsedate(value)
         if t is not None:
             return datetime.date(t[0], t[1], t[2]).isoformat()
-    except Exception:
-        pass
+    except ValueError:
+        log.debug("Not a usable date: %r", value, exc_info=True)
     return value
 
 

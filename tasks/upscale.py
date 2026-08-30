@@ -225,9 +225,12 @@ def collect_candidates(
 
 
 def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoai_tag: str, timeout: float | None = None) -> bool:
+    # check=False, said out loud: a non-zero exit is this function's answer --
+    # the caller counts the clip failed, deletes the partial and moves on --
+    # not an exception for the loop to catch around every encode.
     return subprocess.run(
         topaz.command(in_file, tmp, filter_complex, videoai_tag), env=env, timeout=timeout,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
         creationflags=subprocess.CREATE_NO_WINDOW,
     ).returncode == 0
 
@@ -252,7 +255,13 @@ def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> b
     try:
         payload = json.loads(meta_path.read_text(encoding="utf-8"))
         return "source_image" not in payload
-    except Exception:
+    except (OSError, json.JSONDecodeError, TypeError):
+        # Unreadable, not JSON, or JSON that is not a mapping -- the membership
+        # test raises TypeError on a bare number. A malformed sidecar answers
+        # the same as an absent one: the default recipe, because the wrong
+        # Topaz model is baked into a finished encode nobody re-runs.
+        log.debug("Could not read %s as a sidecar; taking the default recipe.",
+                  meta_path, exc_info=True)
         return False
 
 

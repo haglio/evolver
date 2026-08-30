@@ -112,6 +112,20 @@ class TestEvolverMain:
         assert mocks["exit_code"] == 1
         mocks["sort_run"].assert_not_called()
 
+    def test_a_dependency_failure_is_logged_with_its_traceback(self, caplog):
+        """Which of the checks raised is the whole content of the diagnosis, and
+        only the traceback names it -- the message reads "Dependency check
+        failed" either way."""
+        with caplog.at_level(logging.ERROR):
+            self._run_pipeline(
+                check_dependencies=Mock(side_effect=RuntimeError("ffprobe not found")),
+            )
+
+        failures = [record for record in caplog.records
+                    if "Dependency check failed" in record.getMessage()]
+        assert failures
+        assert all(record.exc_info for record in failures)
+
     # --- Stage sequencing ---
 
     def test_skips_upscale_when_no_pending_work(self):

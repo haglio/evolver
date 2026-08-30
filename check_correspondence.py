@@ -122,7 +122,7 @@ def _popup_message(result: CorrespondenceResult) -> str:
     lines = [
         "Evolver found a 1_sorted / outbox correspondence problem.",
         "",
-        f"Check the log for full details:",
+        "Check the log for full details:",
         str(config.LOG_FILE),
         "",
         f"1_sorted files: {result.sorted_count}",

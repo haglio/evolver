@@ -576,6 +576,31 @@ class TestTheEmbeddedFieldTable(unittest.TestCase):
                 self.assertEqual(extract("{}"), "")
 
 
+class TestParseProviderCreatedAt(unittest.TestCase):
+    def test_an_rfc_date_becomes_an_iso_one(self):
+        self.assertEqual(
+            prompt_scrape._parse_provider_created_at("Fri, 13 Mar 2026 09:45:26 GMT"),
+            "2026-03-13",
+        )
+
+    def test_something_that_is_not_a_date_comes_back_as_it_was(self):
+        self.assertEqual(prompt_scrape._parse_provider_created_at("3d ago"), "3d ago")
+
+    def test_a_date_that_parses_but_cannot_exist_comes_back_as_it_was(self):
+        """The 32nd of March reads as a date and is not one, which is the case
+        the narrowed except is for: date() raises ValueError on it."""
+        self.assertEqual(
+            prompt_scrape._parse_provider_created_at("Fri, 32 Mar 2026 09:45:26 GMT"),
+            "Fri, 32 Mar 2026 09:45:26 GMT",
+        )
+
+    def test_a_year_outside_the_calendar_comes_back_as_it_was(self):
+        self.assertEqual(
+            prompt_scrape._parse_provider_created_at("Fri, 13 Mar 99999 09:45:26 GMT"),
+            "Fri, 13 Mar 99999 09:45:26 GMT",
+        )
+
+
 class TestTitlecaseAction(unittest.TestCase):
     def test_title_cases_each_word(self):
         self.assertEqual(prompt_scrape._titlecase_action("two_words"), "Two Words")
