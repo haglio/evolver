@@ -124,7 +124,7 @@ class TestStageRegistry(unittest.TestCase):
             with self.subTest(table=name):
                 self.assertEqual(sorted(set(table) - set(ALL_STAGES)), [])
 
-    def test_gui_lists_the_genau_delivery_between_the_two_upscales(self):
+    def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
         """Delivery runs straight after the AI upscale, so a clip made this run
         reaches Genau this run, and before the correspondence check, which
         would otherwise see the delivered clip's source still in 1_sorted with
@@ -135,11 +135,11 @@ class TestStageRegistry(unittest.TestCase):
         self.assertEqual(ALL_STAGES.index("upscale_non_ai"), ALL_STAGES.index("genau_deliver") + 1)
         self.assertLess(ALL_STAGES.index("genau_deliver"), ALL_STAGES.index("verify"))
 
-    def test_gui_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
+    def test_the_registry_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
         self.assertIn("group_non_ai", ALL_STAGES)
         self.assertEqual(ALL_STAGES.index("group_non_ai"), ALL_STAGES.index("scripts") + 1)
 
-    def test_gui_lists_the_script_writing_stages_before_the_sync_that_aligns_them(self):
+    def test_the_registry_lists_the_script_writing_stages_before_the_sync_that_aligns_them(self):
         """Both stages carry a funscript between a clip and its scene, and the
         sync is what settles a new one across a video's version family — so
         neither can come after it."""
@@ -196,8 +196,9 @@ class TestStageRegistry(unittest.TestCase):
         """
         for stage in STAGES:
             with self.subTest(stage=stage.key):
+                # Three channels, not four: a fourth would be an alpha Qt
+                # accepts, and the band's alpha is the painter's to decide.
                 self.assertEqual(len(stage.color), 3)
-                self.assertTrue(all(channel in range(256) for channel in stage.color))
                 self.assertTrue(QColor(*stage.color).isValid())
 
     def test_no_two_stage_bands_are_hard_to_tell_apart(self):

@@ -101,6 +101,11 @@ class _OverlayKeys(ast.NodeVisitor):
         # helpers take their mapping as.
         self.paths: dict[str, str] = {"_CONTENT": "", "content": ""}
         self.keys: set[str] = set()
+        # Overlay reads whose key this cannot see: a name, an f-string, a
+        # comprehension target. One of those would put a key into the contract
+        # with nothing recording it, so the gate refuses them rather than
+        # quietly reading past them.
+        self.unreadable: list[int] = []
 
     def _path_of(self, node: ast.AST) -> str | None:
         """The overlay path *node* evaluates to, or None if it is not overlay data."""
@@ -110,8 +115,11 @@ class _OverlayKeys(ast.NodeVisitor):
             return ""
         if isinstance(node, ast.Subscript):
             base = self._path_of(node.value)
-            if base is not None and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+            if base is None:
+                return None
+            if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
                 return f"{base}.{node.slice.value}".lstrip(".")
+            self.unreadable.append(node.lineno)
         return None
 
     def visit_Assign(self, node: ast.Assign):
@@ -130,16 +138,14 @@ class _OverlayKeys(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call):
         func = node.func
-        if (
-            isinstance(func, ast.Attribute)
-            and func.attr == "get"
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
+        if isinstance(func, ast.Attribute) and func.attr == "get" and node.args:
             base = self._path_of(func.value)
             if base is not None:
-                self.keys.add(f"{base}.{node.args[0].value}".lstrip("."))
+                key = node.args[0]
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    self.keys.add(f"{base}.{key.value}".lstrip("."))
+                else:
+                    self.unreadable.append(node.lineno)
         self.generic_visit(node)
 
 
@@ -174,11 +180,19 @@ class TestConfigSeam(unittest.TestCase):
 
     def test_the_overlay_keys_are_the_ones_the_contract_names(self):
         found: set[str] = set()
-        for tree in _trees().values():
+        unreadable: list[str] = []
+        for name, tree in _trees().items():
             visitor = _OverlayKeys()
             visitor.visit(tree)
             found |= visitor.keys
+            unreadable += [f"{name}:{line}" for line in visitor.unreadable]
 
+        self.assertEqual(
+            sorted(unreadable),
+            [],
+            "an overlay key spelled as anything but a literal is a key this "
+            "gate cannot record; spell it out",
+        )
         self.assertEqual(found, OVERLAY_KEYS)
 
     def test_the_committed_example_carries_every_required_key(self):

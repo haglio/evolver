@@ -105,6 +105,32 @@ class TestUpscaleHelpers(unittest.TestCase):
             self.assertFalse(ambient_out.exists())
             self.assertTrue(ambient_in.exists())
 
+    def test_a_given_outbox_outside_the_library_still_upscales(self):
+        """The scraped provider's own clips, upscaled into a folder of one's own.
+
+        A given outbox is not under the library root, and the sidecar mirror
+        is the library's — so asking for one there is a question with no
+        answer rather than an error. The recipe choice degrades to the default
+        exactly as it does for a clip that simply has no sidecar; it must not
+        take the stage down before it has processed anything.
+        """
+        with workspace_temp_dir() as root:
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            in_file = sorted_dir / config.PROVIDER_SOURCE / "landscape" / "clip one.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                 patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                result = upscale.run(
+                    max_items=5,
+                    sorted_dir=sorted_dir, outbox_dir=out_dir, weird_dir=weird_dir,
+                    low_disk_floor_gb=1,
+                )
+
+            self.assertEqual(result.processed, 1)
+            self.assertEqual(result.failed, 0)
+
     def test_collect_candidates_prioritizes_newly_sorted_files(self):
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, weird_dir = library_dirs(root)

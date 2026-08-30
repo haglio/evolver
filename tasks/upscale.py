@@ -233,9 +233,20 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoa
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> bool:
+    """Whether this clip is a text-to-video one, which takes the other recipe.
+
+    The sidecar mirror is the *library's*, so ``sidecar_path`` can only answer
+    for a clip inside it and raises for anything else. An outbox given from
+    outside the library therefore has no sidecar to consult, which is a
+    question with no answer rather than a failure: the clip takes the default
+    recipe, exactly as one with no sidecar on disk already does.
+    """
     if source != "provider":
         return False
-    meta_path = sidecar_path(upscaled_video_path(source, orient, stem, outbox_dir))
+    try:
+        meta_path = sidecar_path(upscaled_video_path(source, orient, stem, outbox_dir))
+    except ValueError:
+        return False
     if not meta_path.is_file():
         return False
     try:

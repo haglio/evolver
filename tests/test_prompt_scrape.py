@@ -537,10 +537,6 @@ class TestParseRelativeDate(unittest.TestCase):
         self.assertEqual(prompt_scrape._parse_relative_date(""), "")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestProviderSettingsAreRedirectable(unittest.TestCase):
     """The scraped provider's name and site root come from the overlay, and
     used to be bound the first time this module was imported.
@@ -556,10 +552,15 @@ class TestProviderSettingsAreRedirectable(unittest.TestCase):
             PROVIDER_SOURCE="examplesource", PROVIDER_BASE_URL="https://example.invalid",
         ):
             strategies = prompt_scrape._build_strategies(Path("browser.exe"))
-
             self.assertIn("examplesource", strategies)
-            self.assertEqual(
-                prompt_scrape._provider_image_url(Path("abc.mp4"), "https://example.invalid"),
-                "https://example.invalid/image/abc",
-            )
 
+            with patch("tasks.prompt_scrape._scrape_provider_video") as scrape:
+                strategies["examplesource"](Path("abc_topaz.mp4"))
+
+        _video, image_url, _browser, base_url = scrape.call_args.args
+        self.assertEqual(image_url, "https://example.invalid/image/abc")
+        self.assertEqual(base_url, "https://example.invalid")
+
+
+if __name__ == "__main__":
+    unittest.main()
