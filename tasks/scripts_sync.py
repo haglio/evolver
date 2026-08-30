@@ -117,11 +117,9 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     it, because the script tree mirrors only the library: a video outside it has
     to describe itself, script beside it rather than in a tree that no longer
     covers it. This stage follows rather than trusting the retiring to have done
-    it, because the archive also fills by hand — 129 originals were swept into
-    it at once, and the funscripts they left behind matched no video, failed
-    this stage, and would have failed it identically on every run afterward. A
-    stage that can never go green again on its own is the failure to prevent,
-    not the sweep.
+    it, because the archive also fills by hand: a funscript left behind by a
+    video swept in matches no video, fails this stage, and would fail it
+    identically on every run afterward.
 
     Only a stem that names exactly one archived video is followed. Two of them
     is a guess about which video the script belongs to, and no archived video at

@@ -51,9 +51,7 @@ class StageRecord:
 # What counts as a failure for each stage, read off that stage's own result. A
 # stage absent here cannot fail. The run's verdict is then nothing more than its
 # stages' verdicts (see ``run_pipeline``), which is what keeps the two legible
-# together: a run used to read "error" while every stage it listed read
-# "completed", because the verdict was computed from the result payloads and the
-# stage status only ever recorded that the function had returned.
+# together.
 _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "purge": lambda r: bool(r.missing_sorted),
     "metadata": lambda r: not r.ok,
@@ -73,12 +71,10 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
 
 # What counts as worth a person's eye without being work gone wrong. Two shapes
 # land here. Work held back: there is no room to write another upscale, so the
-# stage parks the queue and picks it up again the moment space frees up — that
-# used to read as an outright failure, and because free space stays low for days
-# at a stretch it turned the whole run history into a wall of red, a standing
-# alarm for a condition with nothing in it to fix. And a finding a person has to
-# judge: the stray-files stage fixes what it can name and reports the rest,
-# where reporting IS the stage doing its job rather than failing at it.
+# stage parks the queue and picks it up again the moment space frees up. And a
+# finding a person has to judge: the stray-files stage fixes what it can name and
+# reports the rest, where reporting IS the stage doing its job rather than
+# failing at it.
 _STAGE_WARNED: dict[str, Callable[[object], bool]] = {
     "strays": lambda r: not r.ok,
     "upscale": lambda r: r.deferred_low_disk,
