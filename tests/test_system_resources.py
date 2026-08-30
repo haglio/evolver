@@ -31,9 +31,17 @@ class TestCpuBusyPercentSurface:
         default here would be a second copy of that tuning value, free to
         disagree with it."""
         assert (
-            inspect.signature(system_resources.cpu_busy_percent).parameters["sample_seconds"].default
+            inspect.signature(
+                system_resources.measure_cpu_busy_percent
+            ).parameters["sample_seconds"].default
             is inspect.Parameter.empty
         )
+
+    def test_the_name_says_it_takes_time(self):
+        """It reads like a property lookup and blocks for the sample window by
+        construction -- two samples of counters that are totals, with a sleep
+        between them."""
+        assert not hasattr(system_resources, "cpu_busy_percent")
 
 
 class TestAvailableRamConversion:

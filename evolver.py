@@ -311,7 +311,8 @@ def main():
 
 def _should_skip_upscale_due_to_cpu(log: logging.Logger) -> bool:
     try:
-        busy_percent = system_resources.cpu_busy_percent(config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
+        busy_percent = system_resources.measure_cpu_busy_percent(
+            config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
     except Exception:
         log.exception("CPU usage probe failed; proceeding with the upscale stage.")
         return False

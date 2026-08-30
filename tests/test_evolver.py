@@ -560,7 +560,7 @@ class TestCpuBusySkip:
     """
 
     def _verdict(self, probe: Mock) -> bool:
-        with patch("evolver.system_resources.cpu_busy_percent", probe):
+        with patch("evolver.system_resources.measure_cpu_busy_percent", probe):
             return evolver._should_skip_upscale_due_to_cpu(logging.getLogger("test"))
 
     def test_skips_when_the_sample_reaches_the_threshold(self):

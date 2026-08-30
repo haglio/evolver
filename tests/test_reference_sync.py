@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import reference_sync
+from util import reference_stores
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
@@ -174,6 +175,52 @@ class TestFunTimeFavorites(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReferenceStoreSurface(unittest.TestCase):
+    """A store asks its own file, rather than being handed it back.
+
+    Every call site read `store.read(store.path)`, `store.rewrite(store.path,
+    moves)`, `store.fingerprint(store.path)` -- the object passing its own
+    field into its own function, three times out of three, with nothing
+    stopping a caller passing a different one.
+    """
+
+    def _store(self, calls):
+        return reference_stores.ReferenceStore(
+            "example",
+            Path("C:/somewhere/refs.json"),
+            lambda path: calls.append(("read", path)) or ["a.mp4"],
+            lambda path, moves: calls.append(("rewrite", path, moves)),
+            lambda path: calls.append(("fingerprint", path)) or (30.0, 100),
+        )
+
+    def test_all_three_reach_the_stores_own_path(self):
+        calls = []
+        store = self._store(calls)
+
+        self.assertEqual(store.read(), ["a.mp4"])
+        store.rewrite({"a.mp4": "b.mp4"})
+        self.assertEqual(store.fingerprint(), (30.0, 100))
+
+        self.assertEqual(
+            calls,
+            [
+                ("read", store.path),
+                ("rewrite", store.path, {"a.mp4": "b.mp4"}),
+                ("fingerprint", store.path),
+            ],
+        )
+
+    def test_a_store_that_records_no_fingerprint_answers_none(self):
+        """Most of them record only a path, so a renamed video is beyond their
+        reach and the last-resort match is skipped rather than guessed."""
+        store = reference_stores.ReferenceStore(
+            "example", Path("C:/somewhere/refs.json"), lambda path: [],
+            lambda path, moves: None,
+        )
+
+        self.assertIsNone(store.fingerprint())
 
 
 class TestReferenceSyncResultSurface(unittest.TestCase):

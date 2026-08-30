@@ -53,7 +53,7 @@ def _reconcile(
     index: dict[str, list[Path]],
     result: ReferenceSyncResult,
 ) -> None:
-    references = store.read(store.path)
+    references = store.read()
     result.checked += len(references)
 
     moves: dict[str, str] = {}
@@ -71,13 +71,13 @@ def _reconcile(
 
     if not moves:
         return
-    store.rewrite(store.path, moves)
+    store.rewrite(moves)
     result.relocated += len(moves)
 
 
 def _renamed(store: reference_stores.ReferenceStore, was_at: Path) -> Path | None:
     """Last resort: the video is still where it was, under a name it no longer has."""
-    fingerprint = store.fingerprint(store.path)
+    fingerprint = store.fingerprint()
     if fingerprint is None or not was_at.parent.is_dir():
         return None
     return video_locator.renamed_in_place(was_at, fingerprint)

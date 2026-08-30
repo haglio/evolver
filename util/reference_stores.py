@@ -18,20 +18,42 @@ from util import favs_csv
 from util.json_store import atomic_write_text, read_dict_strict
 
 
-def _no_fingerprint(path: Path) -> tuple[float, int] | None:
+def _no_fingerprint(_path: Path) -> tuple[float, int] | None:
     """Most stores record only a path, so a renamed video is beyond their reach."""
     return None
 
 
 @dataclass(frozen=True)
 class ReferenceStore:
+    """One file that names videos, and the three things this can ask of it.
+
+    The readers are held as fields rather than as subclasses because what
+    varies between stores is exactly these three functions and nothing else.
+    They are private and reached through the methods below: a store handing its
+    own path back into its own function -- ``store.read(store.path)`` -- is a
+    hand-rolled vtable, and the one thing it makes possible is passing the
+    wrong path.
+    """
+
     label: str
     path: Path
-    read: Callable[[Path], list[str]]
-    rewrite: Callable[[Path, dict[str, str]], None]
+    _read: Callable[[Path], list[str]]
+    _rewrite: Callable[[Path, dict[str, str]], None]
     # (fps, frame count) of the video this file references, when it records one —
     # the only handle left once a rename has taken the filename away.
-    fingerprint: Callable[[Path], tuple[float, int] | None] = _no_fingerprint
+    _fingerprint: Callable[[Path], tuple[float, int] | None] = _no_fingerprint
+
+    def read(self) -> list[str]:
+        """Every video path this file names."""
+        return self._read(self.path)
+
+    def rewrite(self, moves: dict[str, str]) -> None:
+        """Apply an old -> new mapping in place, dropping nothing."""
+        self._rewrite(self.path, moves)
+
+    def fingerprint(self) -> tuple[float, int] | None:
+        """The video's (fps, frame count), when this store records one."""
+        return self._fingerprint(self.path)
 
 
 def discover() -> Iterator[ReferenceStore]:
