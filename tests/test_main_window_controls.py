@@ -426,6 +426,22 @@ class TestToggleSwitch:
         assert not toggle.isChecked()
         assert announced == [True, False]
 
+    def test_the_switch_states_its_size_once(self):
+        """`setFixedSize` pins minimum and maximum, so the layout takes 44x22
+        from it and a `sizeHint` override could not change any outcome. One of
+        the two, never both — a second statement of the size can only disagree
+        with the first."""
+        from PyQt6.QtWidgets import QHBoxLayout, QWidget
+
+        host = QWidget()
+        QHBoxLayout(host).addWidget(ToggleSwitch())
+        host.resize(400, 200)
+        host.layout().activate()
+
+        toggle = host.layout().itemAt(0).widget()
+        assert (toggle.width(), toggle.height()) == (44, 22)
+        assert "sizeHint" not in ToggleSwitch.__dict__
+
     def test_the_knob_and_track_show_which_state_it_is_in(self):
         """The paint is the only thing that tells the user the pipeline runs:
         on is a blue track with the knob right, off a gray track, knob left."""
