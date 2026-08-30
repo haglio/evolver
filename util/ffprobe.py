@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from util import orientation
 
 # Width, height and the rotation tag in one invocation. ffprobe takes several
 # -show_entries sections at once, and the tag is optional, so the CSV comes
@@ -58,13 +59,13 @@ def get_orientation(file: Path) -> str:
     """Return 'landscape', 'portrait', or 'unknown' based on the first video stream."""
     geometry = _stream_geometry(file)
     if geometry is None:
-        return "unknown"
+        return orientation.UNKNOWN
     width, height, rotation = geometry
     if rotation % 180 != 0:
         width, height = height, width
     # Square counts as landscape: it is a tie the sorted-folder choice has to
     # break somehow, and this is the side it has always fallen.
-    return "portrait" if height > width else "landscape"
+    return orientation.PORTRAIT if height > width else orientation.LANDSCAPE
 
 
 def duration_seconds(file: Path) -> float | None:

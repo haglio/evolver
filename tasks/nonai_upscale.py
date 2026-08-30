@@ -44,6 +44,7 @@ from util.media_files import is_finalized_video_file, is_partial_video_path
 from util.nonai_library import buckets, stage_dirs
 from util.nonai_retire import archived_original, carry_metadata, retire_original
 from util.variants import is_processed_stem, strip_processing_suffixes
+from util import orientation
 
 log = logging.getLogger(__name__)
 
@@ -328,12 +329,12 @@ def _start_next_candidate(result: NonAiUpscaleResult, *, job_file: Path,
                                         watch_stats_file=watch_stats_file):
         source = candidate.path
         expected_duration = ffprobe.duration_seconds(source)
-        orientation = ffprobe.get_orientation(source)
+        orient = ffprobe.get_orientation(source)
         if ffprobe.videoai_tag(source):
             add_to_skip_manifest(skip_manifest, source,
                                  "already carries a Topaz videoai tag")
             continue
-        if expected_duration is None or orientation == "unknown":
+        if expected_duration is None or orient == orientation.UNKNOWN:
             add_to_skip_manifest(skip_manifest, source,
                                  "ffprobe could not read duration or orientation")
             continue
@@ -342,7 +343,7 @@ def _start_next_candidate(result: NonAiUpscaleResult, *, job_file: Path,
         out.parent.mkdir(parents=True, exist_ok=True)
         tmp = out.with_name(f"{source.stem}.partial.{uuid.uuid4().hex}.mp4")
         nonai_job.bump_attempts(attempts_file, relpath(source))
-        pid = nonai_encode.launch(source, tmp, orientation)
+        pid = nonai_encode.launch(source, tmp, orient)
         nonai_job.save_job(job_file, {
             "pid": pid,
             "source": str(source),

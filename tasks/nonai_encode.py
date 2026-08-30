@@ -30,6 +30,7 @@ from pathlib import Path
 
 import config
 from util import ffprobe, nonai_job, processes, topaz
+from util import orientation
 
 log = logging.getLogger(__name__)
 
@@ -174,10 +175,10 @@ def delete_tmp(tmp: Path) -> None:
         log.exception("Could not delete partial output %s yet.", tmp)
 
 
-def launch(source: Path, tmp: Path, orientation: str) -> int:
+def launch(source: Path, tmp: Path, orient: str) -> int:
     width, height = (
         (config.NONAI_TARGET_LONG_EDGE, config.NONAI_TARGET_SHORT_EDGE)
-        if orientation == "landscape"
+        if orient == orientation.LANDSCAPE
         else (config.NONAI_TARGET_SHORT_EDGE, config.NONAI_TARGET_LONG_EDGE)
     )
     filter_complex = config.NONAI_UPSCALE_FILTER_TEMPLATE.format(width=width, height=height)

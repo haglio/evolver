@@ -19,6 +19,7 @@ from util.media_files import (
 )
 from util.sidecar import sidecar_path, upscaled_video_path
 from util.windows_alert import show_error_window
+from util import orientation
 
 log = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def run(
     min_start_remaining_seconds = max(config.UPSCALE_MIN_START_REMAINING_SECONDS, 0)
     started_at = time.monotonic()
 
-    for orient in ("landscape", "portrait"):
+    for orient in orientation.SORTED:
         (outbox_dir / orient).mkdir(parents=True, exist_ok=True)
     weird_dir.mkdir(parents=True, exist_ok=True)
     removed_partial_outputs = remove_partial_video_files(outbox_dir, config.VIDEO_EXTENSIONS, logger=log)
@@ -211,7 +212,7 @@ def collect_candidates(
         if len(rel.parts) < 3:
             continue
         source, orient = rel.parts[0], rel.parts[1]
-        if orient not in ("landscape", "portrait"):
+        if orient not in orientation.SORTED:
             continue
         if is_finalized_video_file(in_file, config.VIDEO_EXTENSIONS):
             if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
@@ -219,7 +220,7 @@ def collect_candidates(
 
     for source_dir in child_dirs(sorted_dir):
         source = source_dir.name
-        for orient in ("landscape", "portrait"):
+        for orient in orientation.SORTED:
             in_root = sorted_dir / source / orient
             if not in_root.is_dir():
                 continue
@@ -277,7 +278,7 @@ def _already_processed(source: str, fname: str, outbox_dir: Path, weird_dir: Pat
     The roots are required rather than defaulted: a sentinel here would read
     config again and leave the caller's roots decorative.
     """
-    for orient in ("landscape", "portrait"):
+    for orient in orientation.SORTED:
         p = outbox_dir / orient / source / fname
         if p.exists() and p.stat().st_size > 0:
             return True

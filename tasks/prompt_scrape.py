@@ -28,6 +28,7 @@ from util import relative_dates
 from util.headless_browser import fetch_dom, find_browser_executable
 from util.media_files import child_dirs, library_videos
 from util.sidecar import sidecar_path, upscaled_video_path, write
+from util import orientation
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ def run(*, sorted_dir: Path | None = None,
                 continue
 
             orient = video.relative_to(source_dir).parts[0]
-            if orient not in ("landscape", "portrait"):
+            if orient not in orientation.SORTED:
                 continue
 
             output_path = sidecar_path(upscaled_video_path(source, orient, video.stem))

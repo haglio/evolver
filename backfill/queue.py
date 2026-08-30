@@ -9,8 +9,11 @@ from pathlib import Path
 import config
 from util.media_files import library_videos
 from util.sidecar import action_of, read, sidecar_path, wrong_action_of
+from util import orientation
 
-_ORIENTATIONS = ("portrait", "landscape")
+# Portrait first, and that is not cosmetic: it is the order the tool asks a
+# human about, and most of the unlabeled queue is portrait.
+_ORIENTATIONS = (orientation.PORTRAIT, orientation.LANDSCAPE)
 
 # Sources the scrape stage already has a metadata strategy for (see
 # :mod:`tasks.prompt_scrape`): Provider from its website, Origenerator from its gallery
