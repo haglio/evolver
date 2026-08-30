@@ -91,6 +91,40 @@ def library_tree(**config_extra):
             yield tree
 
 
+def make_video(path: Path) -> Path:
+    """A file at *path* that every "is this a video" check will accept."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"video")
+    return path
+
+
+def nonai_library_overrides(root: Path, **extra):
+    """Config overrides mapping a temp tree shaped like the real non-AI library.
+
+    METADATA_DIR belongs here with the rest: a sidecar's path is the metadata
+    root joined to the video's path *within the library*, so pointing only the
+    library at the temp tree sends every sidecar a test writes to whatever
+    metadata root the checkout is configured with — the real one, on a machine
+    that has a real one. Tests then also share that tree with each other, and
+    two of them naming a clip the same way read back one another's fixtures.
+    """
+    video_lib = root / "videos"
+    overrides = dict(
+        VIDEO_LIBRARY_DIR=video_lib,
+        NON_AI_DIR=video_lib / "2D" / "non_AI",
+        METADATA_DIR=root / "metadata",
+        SCRIPT_LIBRARY_DIR=root / "scripts",
+        NONAI_SKIP_MANIFEST=root / "skip.txt",
+        NONAI_JOB_STATE_FILE=root / "job.json",
+        NONAI_ATTEMPTS_FILE=root / "attempts.json",
+        NONAI_COOLDOWN_FILE=root / "cooldown.json",
+        NONAI_FFMPEG_LOG=root / "ffmpeg.log",
+        FUN_TIME_WATCH_STATS_FILE=root / "watch_stats.json",
+    )
+    overrides.update(extra)
+    return overrides
+
+
 LARKIN = Path("2D") / "non_AI" / "larkin"
 
 

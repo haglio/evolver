@@ -7,218 +7,13 @@ from unittest.mock import Mock, patch
 
 import config
 from tasks import nonai_upscale
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import (
+    make_video,
+    nonai_library_overrides as library_overrides,
+    override_config,
+    workspace_temp_dir,
+)
 from util import funscript, sidecar
-
-
-def make_video(path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b"video")
-    return path
-
-
-def library_overrides(root, **extra):
-    """Config overrides mapping a temp tree shaped like the real library.
-
-    METADATA_DIR belongs here with the rest: a sidecar's path is the metadata
-    root joined to the video's path *within the library*, so pointing only the
-    library at the temp tree sends every sidecar a test writes to whatever
-    metadata root the checkout is configured with — the real one, on a machine
-    that has a real one. Tests then also share that tree with each other, and
-    two of them naming a clip the same way read back one another's fixtures.
-    """
-    video_lib = root / "videos"
-    overrides = dict(
-        VIDEO_LIBRARY_DIR=video_lib,
-        NON_AI_DIR=video_lib / "2D" / "non_AI",
-        METADATA_DIR=root / "metadata",
-        SCRIPT_LIBRARY_DIR=root / "scripts",
-        NONAI_SKIP_MANIFEST=root / "skip.txt",
-        NONAI_JOB_STATE_FILE=root / "job.json",
-        NONAI_ATTEMPTS_FILE=root / "attempts.json",
-        NONAI_COOLDOWN_FILE=root / "cooldown.json",
-        NONAI_FFMPEG_LOG=root / "ffmpeg.log",
-        FUN_TIME_WATCH_STATS_FILE=root / "watch_stats.json",
-    )
-    overrides.update(extra)
-    return overrides
-
-
-class TestCollectCandidates(unittest.TestCase):
-    def test_finds_unprocessed_videos_in_triage_dirs_only(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-
-            unsorted_video = make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
-            flagged_video = make_video(non_ai / "other" / "1 could use work" / "b.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "retired.mp4")
-            make_video(non_ai / "larkin" / "3_good_to_go" / "processed" / "done_iris2.mp4")
-            make_video(non_ai / "actually_AI_but_funscripted" / "0 unsorted" / "ai.mp4")
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            # Sort both sides: which bucket name sorts first is an accident of
-            # the fixture's spelling, not something this test is about.
-            self.assertEqual(
-                sorted(c.path for c in candidates),
-                sorted([flagged_video, unsorted_video]),
-            )
-
-    def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
-        """A triage dir's first sub-stage holds manual pre-work (e.g. larkin's
-        '1 could use work/1_originals_needing_trimming'); those clips are not
-        ready for an unattended multi-hour encode."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-
-            ready = make_video(non_ai / "larkin" / "1 could use work" / "ready.mp4")
-            make_video(
-                non_ai / "larkin" / "1 could use work"
-                / "1_originals_needing_trimming" / "not yet.mp4"
-            )
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            self.assertEqual([c.path for c in candidates], [ready])
-
-    def test_finds_videos_in_a_triage_dirs_upscale_ready_substages(self):
-        """Past the manual-pre-work one, a triage dir's sub-stages say in their
-        own names that the only thing left is the encode, so they queue too."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-            work = non_ai / "larkin" / "1 could use work"
-
-            good = make_video(
-                work / "2_originals_good_trimwise_but_need_upscaling" / "good.mp4"
-            )
-            trimmed = make_video(
-                work / "3_trimmed_from_originals_but_still_need_upscaling" / "trimmed.mp4"
-            )
-            make_video(work / "1_originals_needing_trimming" / "not yet.mp4")
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            self.assertEqual(sorted(c.path for c in candidates), [good, trimmed])
-
-    def test_pinned_videos_lead_the_queue_in_the_order_listed(self):
-        """The pin manifest is how the user says "encode this one next", so it
-        outranks the triage digit and every other ordering heuristic."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root, NONAI_PRIORITY_MANIFEST=root / "next.txt")
-            non_ai = overrides["NON_AI_DIR"]
-
-            make_video(non_ai / "larkin" / "1 could use work" / "a.mp4")
-            second = make_video(non_ai / "other" / "0 unsorted" / "y.mp4")
-            first = make_video(non_ai / "larkin" / "0 unsorted" / "z.mp4")
-            (root / "next.txt").write_text(
-                "larkin/0 unsorted/z.mp4\nother/0 unsorted/y.mp4\n", encoding="utf-8"
-            )
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            self.assertEqual([c.path for c in candidates][:2], [first, second])
-
-    def test_a_pin_re_queues_a_video_that_already_has_a_processed_variant(self):
-        """An existing variant normally reads as "already done". When it came
-        from an older recipe, pinning is how the user asks for the redo."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root, NONAI_PRIORITY_MANIFEST=root / "next.txt")
-            non_ai = overrides["NON_AI_DIR"]
-
-            original = make_video(non_ai / "larkin" / "1 could use work" / "scene.mp4")
-            make_video(
-                non_ai / "larkin" / "3_good_to_go" / "processed" / "scene_topaz.mp4"
-            )
-            (root / "next.txt").write_text(
-                "larkin/1 could use work/scene.mp4\n", encoding="utf-8"
-            )
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            self.assertEqual([c.path for c in candidates], [original])
-
-    def test_excludes_originals_that_already_have_a_processed_variant(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-
-            make_video(non_ai / "other" / "0 unsorted" / "kina.mp4")
-            make_video(non_ai / "other" / "0 unsorted" / "kina_apo8_prob4.mp4")
-            make_video(non_ai / "other" / "0 unsorted" / "lily.mp4")
-            make_video(non_ai / "other" / "3 good to go" / "processed" / "lily_iris2.mp4")
-            fresh = make_video(non_ai / "other" / "0 unsorted" / "fresh.mp4")
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            self.assertEqual([c.path for c in candidates], [fresh])
-
-    def test_excludes_skip_manifest_entries(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-
-            make_video(non_ai / "other" / "0 unsorted" / "hopeless.mp4")
-            fresh = make_video(non_ai / "other" / "0 unsorted" / "fresh.mp4")
-            overrides["NONAI_SKIP_MANIFEST"].write_text(
-                "other/0 unsorted/hopeless.mp4\tfailed twice\n", encoding="utf-8"
-            )
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            self.assertEqual([c.path for c in candidates], [fresh])
-
-    def test_watched_videos_outrank_funscripted_ones(self):
-        """Fun Time's watch stats (once its Nau tracking records them) are the
-        strongest popularity signal; funscripts break ties among the unwatched."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-
-            watched = make_video(non_ai / "larkin" / "0 unsorted" / "watched.mp4")
-            scripted = make_video(non_ai / "larkin" / "0 unsorted" / "scripted.mp4")
-            plain = make_video(non_ai / "larkin" / "0 unsorted" / "plain.mp4")
-            disliked = make_video(non_ai / "larkin" / "0 unsorted" / "disliked.mp4")
-            script = overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "larkin" / "0 unsorted" / "scripted.funscript"
-            script.parent.mkdir(parents=True)
-            script.write_text("{}", encoding="utf-8")
-            overrides["FUN_TIME_WATCH_STATS_FILE"].write_text(json.dumps({
-                str(watched).lower(): {"completions": 4, "skips": 0, "locks": 1},
-                str(disliked).lower(): {"completions": 0, "skips": 3, "locks": 0},
-            }), encoding="utf-8")
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            self.assertEqual(
-                [c.path for c in candidates], [watched, scripted, plain, disliked]
-            )
-
-    def test_orders_flagged_then_funscripted_then_the_rest(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-
-            plain = make_video(non_ai / "larkin" / "0 unsorted" / "aaa plain.mp4")
-            scripted = make_video(non_ai / "larkin" / "0 unsorted" / "zzz scripted.mp4")
-            flagged = make_video(non_ai / "larkin" / "1 could use work" / "flagged.mp4")
-            script = overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "larkin" / "0 unsorted" / "zzz scripted.funscript"
-            script.parent.mkdir(parents=True)
-            script.write_text("{}", encoding="utf-8")
-
-            with override_config(**overrides):
-                candidates = nonai_upscale.collect_candidates()
-
-            self.assertEqual([c.path for c in candidates], [flagged, scripted, plain])
 
 
 def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
@@ -720,15 +515,18 @@ class TestThrottleToPresence(unittest.TestCase):
             mocks["suspend"].assert_not_called()
 
 
-class TestStateFilesAreParameters(unittest.TestCase):
-    """The three state files are arguments, not ambient reads.
+class TestEveryFileIsAParameter(unittest.TestCase):
+    """The six files the stage touches are arguments, not ambient reads.
 
-    Each one threads through the functions that decide whether a live encode is
-    promoted, failed or killed, so a parameter wired to the wrong place — or
-    resolved once at import, past ``override_config`` — would leave the stage
-    writing to the configured path anyway and nothing would say so. These point
-    all three somewhere else and check both halves: the state lands where the
-    caller asked, and the configured files stay untouched.
+    Three it writes -- the job record, the attempt counter, the cooldown stamp
+    -- and three the queue reads -- the skip and pin manifests, and Fun Time's
+    watch stats. Each threads through functions that decide whether a live
+    encode is promoted, failed or killed, or which clip is started at all, so a
+    parameter wired to the wrong place -- or resolved once at import, past
+    ``override_config`` -- would leave the stage using the configured path
+    anyway and nothing would say so. These point all six somewhere else and
+    check both halves where there is a file to see: what the stage does follows
+    the paths it was given, and the configured files stay untouched.
     """
 
     def test_a_start_writes_its_record_and_attempt_where_the_parameters_point(self):
@@ -777,6 +575,84 @@ class TestStateFilesAreParameters(unittest.TestCase):
                 json.loads((elsewhere / "cooldown.json").read_text(encoding="utf-8")),
             )
             self.assertFalse(overrides["NONAI_COOLDOWN_FILE"].exists())
+
+    def test_a_refused_start_is_recorded_in_the_skip_manifest_it_is_given(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            elsewhere = root / "elsewhere"
+            elsewhere.mkdir()
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+
+            stack, _ = probes(videoai="apo8")  # already carries a Topaz tag
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(
+                    allow_start=True,
+                    job_file=elsewhere / "job.json",
+                    attempts_file=elsewhere / "attempts.json",
+                    cooldown_file=elsewhere / "cooldown.json",
+                    skip_manifest=elsewhere / "skip.txt",
+                    pin_manifest=elsewhere / "next.txt",
+                    watch_stats_file=elsewhere / "watch.json",
+                )
+
+            self.assertEqual(result.started, "")
+            self.assertEqual(
+                (elsewhere / "skip.txt").read_text(encoding="utf-8").splitlines(),
+                ["larkin/0 unsorted/a.mp4\talready carries a Topaz videoai tag"],
+            )
+            self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
+
+    def test_the_pin_manifest_it_is_given_decides_which_clip_starts(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            elsewhere = root / "elsewhere"
+            elsewhere.mkdir()
+            non_ai = overrides["NON_AI_DIR"]
+            make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
+            make_video(non_ai / "larkin" / "0 unsorted" / "z.mp4")
+            (elsewhere / "next.txt").write_text(
+                "larkin/0 unsorted/z.mp4\n", encoding="utf-8")
+
+            stack, _ = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(
+                    allow_start=True,
+                    job_file=elsewhere / "job.json",
+                    attempts_file=elsewhere / "attempts.json",
+                    cooldown_file=elsewhere / "cooldown.json",
+                    skip_manifest=elsewhere / "skip.txt",
+                    pin_manifest=elsewhere / "next.txt",
+                    watch_stats_file=elsewhere / "watch.json",
+                )
+
+            # Alphabetically "a" leads; only the pin puts "z" in front of it.
+            self.assertEqual(result.started, "larkin/0 unsorted/z.mp4")
+
+    def test_the_watch_stats_file_it_is_given_decides_which_clip_starts(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            elsewhere = root / "elsewhere"
+            elsewhere.mkdir()
+            non_ai = overrides["NON_AI_DIR"]
+            make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
+            watched = make_video(non_ai / "larkin" / "0 unsorted" / "z.mp4")
+            (elsewhere / "watch.json").write_text(json.dumps({
+                str(watched).lower(): {"completions": 5, "skips": 0, "locks": 0},
+            }), encoding="utf-8")
+
+            stack, _ = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(
+                    allow_start=True,
+                    job_file=elsewhere / "job.json",
+                    attempts_file=elsewhere / "attempts.json",
+                    cooldown_file=elsewhere / "cooldown.json",
+                    skip_manifest=elsewhere / "skip.txt",
+                    pin_manifest=elsewhere / "next.txt",
+                    watch_stats_file=elsewhere / "watch.json",
+                )
+
+            self.assertEqual(result.started, "larkin/0 unsorted/z.mp4")
 
     def test_the_presence_throttle_parks_the_job_file_it_is_given(self):
         with workspace_temp_dir() as root:

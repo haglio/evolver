@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util.nonai_library import bucket_of, buckets
+from util.nonai_library import bucket_of, buckets, stage_dirs
 
 
 def make_video(path):
@@ -124,3 +124,40 @@ class TestSplitInProgress(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStageDirs(unittest.TestCase):
+    """The numbered-folder convention, read at either level of it."""
+
+    def test_finds_only_the_digits_asked_for_and_names_each_one(self):
+        with workspace_temp_dir() as root:
+            for name in ("0 unsorted", "1 could use work", "2 do not need work",
+                         "3_good_to_go"):
+                (root / name).mkdir()
+
+            found = stage_dirs(root, digits=(0, 1))
+
+            self.assertEqual(
+                found,
+                [(0, root / "0 unsorted"), (1, root / "1 could use work")],
+            )
+
+    def test_a_triage_folders_own_sub_stages_read_the_same_way(self):
+        with workspace_temp_dir() as root:
+            triage = root / "1 could use work"
+            (triage / "1_originals_needing_trimming").mkdir(parents=True)
+            (triage / "2_originals_good_trimwise_but_need_upscaling").mkdir()
+
+            found = stage_dirs(triage, digits=(2, 3))
+
+            self.assertEqual(
+                [path.name for _, path in found],
+                ["2_originals_good_trimwise_but_need_upscaling"],
+            )
+
+    def test_files_and_unnumbered_folders_are_not_stages(self):
+        with workspace_temp_dir() as root:
+            (root / "processed").mkdir()
+            (root / "0 notes.txt").write_text("x", encoding="utf-8")
+
+            self.assertEqual(stage_dirs(root, digits=(0, 1, 2, 3)), [])

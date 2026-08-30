@@ -17,12 +17,9 @@ detached ffmpeg the moment they return (frozen, zero compute, resumed exactly
 where it left off). A fast GUI poll — ``throttle_to_presence`` — parks and
 thaws it between ticks so returning to the machine takes effect in seconds.
 
-Candidates come from the buckets' triage folders (``0 unsorted``, ``1 could
-use work``), most-wanted first: a pin in ``.nonai-upscale-next.txt`` beats
-everything and also re-queues a video whose only processed variant came from an
-older recipe, then an explicit ``1`` flag, then clips with a funscript — the
-only per-video engagement signal the non_AI library has, since Fun Time's watch
-stats cover only the AI outbox.
+Which clip is next, and why it beat the others, is
+:mod:`tasks.nonai_queue`'s; what is left here is the stage: repair, supervise,
+maybe start, report.
 """
 
 from __future__ import annotations
@@ -39,6 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
+from tasks.nonai_queue import Candidate, add_to_skip_manifest, collect_candidates, relpath
 from util import (
     ffprobe,
     funscript,
@@ -49,7 +47,7 @@ from util import (
     topaz,
 )
 from util.media_files import is_finalized_video_file, is_partial_video_path
-from util.nonai_library import bucket_of, buckets
+from util.nonai_library import bucket_of, buckets, stage_dirs
 from util.variants import is_processed_stem, strip_processing_suffixes
 
 log = logging.getLogger(__name__)
@@ -58,15 +56,6 @@ log = logging.getLogger(__name__)
 # thread) both touch the one job file and its ffmpeg. This serializes them so a
 # suspend/resume never races a supervise.
 _throttle_lock = threading.Lock()
-
-
-@dataclass(frozen=True)
-class Candidate:
-    path: Path
-    bucket: Path
-    triage_digit: int
-    has_funscript: bool
-    watch_score: float
 
 
 @dataclass
@@ -89,8 +78,9 @@ class NonAiUpscaleResult:
 
 def run(allow_start: bool = True, stop: bool = False,
         presence_managed: bool = False, *, job_file: Path | None = None,
-        attempts_file: Path | None = None,
-        cooldown_file: Path | None = None) -> NonAiUpscaleResult:
+        attempts_file: Path | None = None, cooldown_file: Path | None = None,
+        skip_manifest: Path | None = None, pin_manifest: Path | None = None,
+        watch_stats_file: Path | None = None) -> NonAiUpscaleResult:
     """Check on the in-flight encode, then start the next one if the box is free.
 
     With *stop* (the tray toggle is off), a still-running encode is killed and
@@ -103,16 +93,22 @@ def run(allow_start: bool = True, stop: bool = False,
     gaps instead of throwing partial work away. The headless CLI leaves it off
     and simply lets an in-flight encode run.
 
-    The three state files are resolved here rather than read where they are
-    used, so everything below is handed the paths it writes to. They are
-    sentinels rather than signature defaults on purpose: a default is evaluated
-    at import, which would freeze whatever ``config`` held then and put the
-    value out of reach of ``override_config``, the seam the stage's tests steer
-    it with.
+    The six files the stage touches are resolved here rather than read where
+    they are used, so everything below is handed the paths it works on: three
+    it writes (the job record, the attempt counter, the cooldown stamp) and
+    three the queue reads (the skip and pin manifests, and Fun Time's watch
+    stats). They are sentinels rather than signature defaults on purpose: a
+    default is evaluated at import, which would freeze whatever ``config`` held
+    then and put the value out of reach of ``override_config``, the seam the
+    stage's tests steer it with.
     """
     job_file = config.NONAI_JOB_STATE_FILE if job_file is None else job_file
     attempts_file = config.NONAI_ATTEMPTS_FILE if attempts_file is None else attempts_file
     cooldown_file = config.NONAI_COOLDOWN_FILE if cooldown_file is None else cooldown_file
+    skip_manifest = config.NONAI_SKIP_MANIFEST if skip_manifest is None else skip_manifest
+    pin_manifest = config.NONAI_PRIORITY_MANIFEST if pin_manifest is None else pin_manifest
+    watch_stats_file = (config.FUN_TIME_WATCH_STATS_FILE if watch_stats_file is None
+                        else watch_stats_file)
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
@@ -125,15 +121,24 @@ def run(allow_start: bool = True, stop: bool = False,
         _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
         if job is not None:
             _supervise(job, result, job_file=job_file, attempts_file=attempts_file,
-                       cooldown_file=cooldown_file, stop=stop,
-                       presence_managed=presence_managed)
+                       cooldown_file=cooldown_file, skip_manifest=skip_manifest,
+                       stop=stop, presence_managed=presence_managed)
 
         if not result.in_flight and allow_start and not stop:
             _start_next_candidate(result, job_file=job_file,
                                   attempts_file=attempts_file,
-                                  cooldown_file=cooldown_file)
+                                  cooldown_file=cooldown_file,
+                                  skip_manifest=skip_manifest,
+                                  pin_manifest=pin_manifest,
+                                  watch_stats_file=watch_stats_file)
 
-    result.pending = len(collect_candidates())
+    # Collected a second time on purpose: a start attempt can retire clips to
+    # the skip manifest, and the count reported is the queue as it stands after
+    # that. The doubled walk is finding tasks/design/008's; merging the two
+    # would change what `pending` means, so it stays and stays visible.
+    result.pending = len(collect_candidates(
+        skip_manifest=skip_manifest, pin_manifest=pin_manifest,
+        watch_stats_file=watch_stats_file))
     in_flight = result.in_flight or "-"
     if result.in_flight and result.in_flight_percent is not None:
         in_flight = f"{result.in_flight} ({result.in_flight_percent}% encoded)"
@@ -235,8 +240,8 @@ def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
 
 
 def _supervise(job: dict, result: NonAiUpscaleResult, *, job_file: Path,
-               attempts_file: Path, cooldown_file: Path, stop: bool = False,
-               presence_managed: bool = False) -> None:
+               attempts_file: Path, cooldown_file: Path, skip_manifest: Path,
+               stop: bool = False, presence_managed: bool = False) -> None:
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
@@ -265,7 +270,8 @@ def _supervise(job: dict, result: NonAiUpscaleResult, *, job_file: Path,
             result.in_flight_percent = _percent_encoded(job)
             return
         _terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
-    _conclude(job, result, attempts_file=attempts_file, cooldown_file=cooldown_file)
+    _conclude(job, result, attempts_file=attempts_file, cooldown_file=cooldown_file,
+              skip_manifest=skip_manifest)
     nonai_job.clear_job(job_file)
 
 
@@ -349,7 +355,7 @@ def _terminate_ffmpeg(pid: int, reason: str) -> None:
 
 
 def _conclude(job: dict, result: NonAiUpscaleResult, *, attempts_file: Path,
-              cooldown_file: Path) -> None:
+              cooldown_file: Path, skip_manifest: Path) -> None:
     source = Path(job.get("source", ""))
     tmp = Path(job.get("tmp", ""))
     out = Path(job.get("out", ""))
@@ -372,7 +378,8 @@ def _conclude(job: dict, result: NonAiUpscaleResult, *, attempts_file: Path,
               source, f"{actual:.1f}s" if actual else "none", expected)
     _delete_tmp(tmp)
     if nonai_job.attempts_of(attempts_file, relpath(source)) >= config.NONAI_MAX_ATTEMPTS:
-        _add_to_skip_manifest(source, f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
+        add_to_skip_manifest(skip_manifest, source,
+                             f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
         nonai_job.clear_attempts(attempts_file, relpath(source))
 
 
@@ -511,7 +518,7 @@ def _retire_original(source: Path) -> None:
         _archive_original(source)
         return
     bucket = bucket_of(source)
-    retire_dirs = _numbered_dirs(bucket, digits=(2,)) if bucket else []
+    retire_dirs = stage_dirs(bucket, digits=(2,)) if bucket else []
     if not retire_dirs:
         log.warning("No '2*' folder in %s; leaving the original at %s.", bucket, source)
         return
@@ -576,7 +583,7 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
     open just fails to unlink and gets swept on a later tick.
     """
     for bucket in buckets():
-        for _, done_dir in _numbered_dirs(bucket, digits=(3,)):
+        for _, done_dir in stage_dirs(bucket, digits=(3,)):
             removed = 0
             for path in done_dir.rglob("*.partial.*"):
                 if keep is not None and path == keep:
@@ -593,7 +600,9 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
 
 
 def _start_next_candidate(result: NonAiUpscaleResult, *, job_file: Path,
-                          attempts_file: Path, cooldown_file: Path) -> None:
+                          attempts_file: Path, cooldown_file: Path,
+                          skip_manifest: Path, pin_manifest: Path,
+                          watch_stats_file: Path) -> None:
     if _is_low_disk():
         result.deferred_low_disk = True
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
@@ -603,15 +612,19 @@ def _start_next_candidate(result: NonAiUpscaleResult, *, job_file: Path,
         log.info("Deferring non-AI upscale start: %s.", result.start_deferred)
         return
 
-    for candidate in collect_candidates():
+    for candidate in collect_candidates(skip_manifest=skip_manifest,
+                                        pin_manifest=pin_manifest,
+                                        watch_stats_file=watch_stats_file):
         source = candidate.path
         expected_duration = ffprobe.duration_seconds(source)
         orientation = ffprobe.get_orientation(source)
         if ffprobe.videoai_tag(source):
-            _add_to_skip_manifest(source, "already carries a Topaz videoai tag")
+            add_to_skip_manifest(skip_manifest, source,
+                                 "already carries a Topaz videoai tag")
             continue
         if expected_duration is None or orientation == "unknown":
-            _add_to_skip_manifest(source, "ffprobe could not read duration or orientation")
+            add_to_skip_manifest(skip_manifest, source,
+                                 "ffprobe could not read duration or orientation")
             continue
 
         out = _output_path(candidate)
@@ -652,7 +665,7 @@ def _launch(source: Path, tmp: Path, orientation: str) -> int:
 
 
 def _output_path(candidate: Candidate) -> Path:
-    done_dirs = _numbered_dirs(candidate.bucket, digits=(3,))
+    done_dirs = stage_dirs(candidate.bucket, digits=(3,))
     done_dir = (
         done_dirs[0][1] if done_dirs
         else candidate.bucket / config.NONAI_FALLBACK_DONE_DIR_NAME
@@ -698,135 +711,3 @@ def _user_present() -> bool:
     except OSError:
         return True
     return idle < config.NONAI_USER_IDLE_THRESHOLD_SECONDS
-
-
-def _add_to_skip_manifest(source: Path, reason: str) -> None:
-    log.warning("Skipping %s permanently: %s", source, reason)
-    with open(config.NONAI_SKIP_MANIFEST, "a", encoding="utf-8") as manifest:
-        manifest.write(f"{relpath(source)}\t{reason}\n")
-
-
-def collect_candidates() -> list[Candidate]:
-    """Unprocessed triage-folder videos, most-wanted first."""
-    candidates: list[Candidate] = []
-    skipped = _skip_manifest_entries()
-    pinned = _pin_manifest_entries()
-    watch_scores = _watch_scores()
-    for bucket in buckets():
-        processed_stems = _processed_stems(bucket)
-        for triage_digit, triage_dir in _numbered_dirs(bucket, digits=(0, 1)):
-            for scan_dir in _upscale_ready_dirs(triage_dir):
-                for video in sorted(scan_dir.iterdir()):
-                    if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
-                        continue
-                    rel = relpath(video)
-                    if is_processed_stem(video.stem):
-                        continue
-                    # A variant of this video already existing normally means
-                    # there is nothing to do. A pin overrides that: the variant
-                    # is an older recipe, and the redo is the whole point.
-                    if video.stem in processed_stems and rel not in pinned:
-                        continue
-                    if rel in skipped:
-                        continue
-                    candidates.append(Candidate(
-                        video, bucket, triage_digit, _has_funscript(video),
-                        watch_scores.get(str(video).strip().lower(), 0.0),
-                    ))
-    candidates.sort(key=lambda c: (
-        _pin_rank(pinned, c.path),
-        c.triage_digit != 1, -c.watch_score, not c.has_funscript, str(c.path).lower(),
-    ))
-    return candidates
-
-
-def relpath(video: Path) -> str:
-    return video.relative_to(config.NON_AI_DIR).as_posix()
-
-
-def _upscale_ready_dirs(triage_dir: Path) -> list[Path]:
-    """*triage_dir* plus the sub-stages of it whose clips need only the encode.
-
-    A triage dir can split into numbered sub-stages. The first is manual
-    pre-work — "1_originals_needing_trimming" still wants a human with a
-    trimmer, so an unattended multi-hour encode would bake in the untrimmed
-    footage. The later ones say in their own names that trimming is settled and
-    upscaling is all that's left, so their clips queue like direct children do.
-    """
-    return [triage_dir] + [d for _, d in _numbered_dirs(triage_dir, digits=(2, 3))]
-
-
-def _numbered_dirs(parent: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
-    """*parent*'s numbered stage folders whose names start with one of *digits*.
-
-    Serves both levels of the convention: a bucket's triage/stage folders, and
-    the sub-stages a triage folder splits into.
-    """
-    found = []
-    for child in sorted(parent.iterdir()):
-        if child.is_dir() and child.name[:1].isdigit() and int(child.name[:1]) in digits:
-            found.append((int(child.name[:1]), child))
-    return found
-
-
-def _processed_stems(bucket: Path) -> set[str]:
-    """Original stems that already have a processed variant somewhere in *bucket*."""
-    stems = set()
-    for video in bucket.rglob("*"):
-        if is_finalized_video_file(video, config.VIDEO_EXTENSIONS) and is_processed_stem(video.stem):
-            stems.add(strip_processing_suffixes(video.stem))
-    return stems
-
-
-def _watch_scores() -> dict[str, float]:
-    """Fun Time's per-video watch score, keyed by its normalized path.
-
-    Mirrors the breeding score its playlist weighting uses: completions plus
-    three per lock, minus skips. Empty until Fun Time starts tracking primary
-    (Nau) plays; satellite entries all point at the AI outbox and simply never
-    match a non-AI candidate.
-    """
-    try:
-        payload = json.loads(config.FUN_TIME_WATCH_STATS_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    if not isinstance(payload, dict):
-        return {}
-    return {
-        key: entry.get("completions", 0) + 3 * entry.get("locks", 0) - entry.get("skips", 0)
-        for key, entry in payload.items()
-        if isinstance(entry, dict)
-    }
-
-
-def _has_funscript(video: Path) -> bool:
-    return funscript.script_path_for_video(video).is_file()
-
-
-def _skip_manifest_entries() -> set[str]:
-    return set(_manifest_entries(config.NONAI_SKIP_MANIFEST))
-
-
-def _pin_manifest_entries() -> list[str]:
-    """Relative paths the user wants encoded next, in the order listed."""
-    return _manifest_entries(config.NONAI_PRIORITY_MANIFEST)
-
-
-def _pin_rank(pinned: list[str], video: Path) -> int:
-    """Where *video* sits in the pin list — past the end when it is not pinned."""
-    try:
-        return pinned.index(relpath(video))
-    except ValueError:
-        return len(pinned)
-
-
-def _manifest_entries(path: Path) -> list[str]:
-    """A hand-edited manifest's relative paths, in file order.
-
-    One path per line; anything past a tab is the user's own note about why.
-    """
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
-    return [line.split("\t", 1)[0].strip() for line in lines if line.strip()]
