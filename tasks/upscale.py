@@ -1,4 +1,4 @@
-"""Stage 4: Upscale videos from 1_sorted/<source>/<orientation>/ using Topaz."""
+"""Upscale videos from 1_sorted/<source>/<orientation>/ using Topaz."""
 
 import json
 import logging
@@ -41,7 +41,7 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
     config.WEIRD_DIR.mkdir(parents=True, exist_ok=True)
     removed_partial_outputs = remove_partial_video_files(config.OUT_UPSCALED_DIR, config.VIDEO_EXTENSIONS, logger=log)
 
-    log.info("=== Stage 4: upscale from 1_sorted ===")
+    log.info("=== Stage: upscale from 1_sorted ===")
     log.info("OUT: %s/{landscape,portrait}/<source>/", config.OUT_UPSCALED_DIR)
     log.info("Also skip if exists in: %s", config.WEIRD_DIR)
     if removed_partial_outputs:
@@ -65,7 +65,7 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
         remaining_budget = run_budget_seconds - elapsed
         if run_budget_seconds and (result.processed or result.failed) and remaining_budget < min_start_remaining_seconds:
             log.info(
-                "Stopping Stage 4 before starting another video to stay under the run budget "
+                "Stopping the upscale stage before starting another video to stay under the run budget "
                 "(elapsed %.1f min, remaining %.1f min).",
                 elapsed / 60,
                 max(remaining_budget, 0) / 60,
@@ -76,7 +76,7 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
             result.deferred_low_disk = True
             result.pending_after_run = total_pending - result.processed - result.failed
             _show_low_disk_warning()
-            log.warning("Stopping Stage 4 early due to low free disk space.")
+            log.warning("Stopping the upscale stage early due to low free disk space.")
             break
 
         out = upscaled_video_path(source, orient, in_file.stem)
@@ -223,7 +223,7 @@ def _show_low_disk_warning() -> None:
     show_error_window(
         "Evolver - Low Disk Space",
         (
-            "Evolver paused Stage 4 because free disk space is below the configured safety floor.\n\n"
+            "Evolver paused the upscale stage because free disk space is below the configured safety floor.\n\n"
             f"Target outbox: {config.OUT_UPSCALED_DIR}\n"
             f"Free space: {free_gb:.1f} GiB\n"
             f"Required floor: {config.LOW_DISK_WARNING_GB:.1f} GiB\n\n"
