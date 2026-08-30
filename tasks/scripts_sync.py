@@ -113,7 +113,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     beside it for self-description.
 
     A retired original is moved out of the library entirely (see
-    :func:`tasks.nonai_upscale._archive_original`) and its funscript goes with
+    :func:`util.nonai_retire._archive_original`) and its funscript goes with
     it, because the script tree mirrors only the library: a video outside it has
     to describe itself, script beside it rather than in a tree that no longer
     covers it. This stage follows rather than trusting the retiring to have done

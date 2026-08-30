@@ -42,17 +42,26 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `tasks/upscale.py` - Topaz processing
   - `tasks/genau_deliver.py` - the Genau lane's last step: an upscaled loop leaves for Genau's clips folder
   - `tasks/nonai_upscale.py` - the non-AI library's detached Topaz encodes, one at a time
+  - `tasks/nonai_queue.py` - which non-AI clip is encoded next, and why it beat the others
+  - `tasks/nonai_encode.py` - the detached encode itself: start, adopt, freeze, measure, kill
+  - `util/nonai_job.py` - the three JSON files that encode keeps its state in
+  - `util/nonai_retire.py` - moving a superseded original out of the library, record and all
   - `tasks/reference_sync.py` - repointing the suite's saved video paths at videos that moved
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
   - `util/favs_csv.py` - Fun Time's favorites CSV: its rows, and the local path each cell links to
   - `util/video_locator.py` - where a video a reference has lost track of now lives
   - `check_duplicate_sizes.py` - duplicate-size scan for likely source duplicates
   - `check_correspondence.py` - integrity verification and one-time manual check
-  - `util/ffprobe.py` - orientation probing
-  - `util/media_files.py` - shared helpers for finalized-vs-partial video detection and stale partial cleanup
+  - `util/ffprobe.py` - what ffprobe can say about a video, one process per question at most
+  - `util/media_files.py` - what counts as a video here, how the tree is walked, and how a name collision is uniquified
+  - `util/json_store.py` - reading the app's small JSON files, and writing them atomically
+  - `util/orientation.py` - the two orientations the library files a video under, and the third answer
   - `util/sidecar.py` - where a video's metadata JSON lives, and what the upscale stage names its output
   - `util/topaz.py` - the Topaz ffmpeg invocation both upscale stages share
-  - `util/variants.py` - the `_apo8`/`_iris2`-style suffixes that pair originals with processed variants
+  - `util/variants.py` - the `_topaz` and `_apo8`/`_iris2`-style suffixes that pair originals with processed variants
+  - `util/html_query.py` - a small HTML parse-and-query library
+  - `util/headless_browser.py` - driving an installed Chrome or Edge to dump a page's rendered DOM
+  - `util/relative_dates.py` - turning "2d ago" into a date
   - `util/processes.py` - liveness, identity, and termination of detached encodes
   - `backfill_app.py` - voice-driven metadata backfill tool (see below), launched from the tray
   - `backfill/vocabulary.py` - the spoken phrases, and the `video.action` each one records
@@ -62,7 +71,9 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `backfill/work.py` - the single thread the file work runs on, in the order it was spoken
   - `backfill/voice.py` - offline vosk recognition over the tool's grammar
   - `backfill/window.py` - the looping player, the remaining count, and the last decision
-  - `gui/app.py` - tray application wiring
+  - `gui/app.py` - tray application wiring: builds the parts, then starts them
+  - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
+  - `gui/presence_throttle.py` - the fast poll that parks the in-flight non-AI encode when the user returns
   - `gui/single_instance.py` - who owns the one instance, and where a second launch goes
   - `util/crash_log.py` - what the tray app records about the way it died
   - `gui/tray.py` - system tray icon and context menu
@@ -136,7 +147,10 @@ Undo restores the clip to the screen and reverses what the decision did on disk:
 
 Three lines sit beneath the video: what is on screen now and how many clips are left; what the recognizer is hearing this moment; and what your last phrase did — the last naming its own clip, which by then is not the one you are watching. The middle "hearing" line fills in as it recognizes on-script words and stays blank when what you said is not a command, so a phrase that never lands shows as a visible nothing rather than a silent one — the way to tell listening-but-unmatched from not-listening. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
 
-A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: every act as a grid of `Side` / `POV` columns, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records, names its spoken phrase on hover, and carries an example frame so the grid reads as a gallery you recognize at a glance. Most tiles take that frame from the first clip the library already labels with the act — a compound tag like `Pov Gamma, Alpha` counts for either part — while the acts the library never tags in a camera-scoped form (a side beta, a POV delta) are pinned to a hand-picked clip in `CURATED_EXAMPLES`. Frames are sampled a little way into the clip (past the intro, with the act actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
+A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: every act as a grid of `Side` / `POV` columns, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records, names its spoken phrase on hover, and carries an example frame so the grid reads as a gallery you recognize at a glance. Most tiles take that frame from the first clip the library already labels with the act — a compound tag like `Pov Gamma, Alpha` counts for either part — while the acts the library never tags in a camera-scoped form (a side beta, a POV delta) are pinned to a hand-picked clip by the content overlay's optional `curated_examples`
+(tile label -> clip id), read as `config.CURATED_EXAMPLES` — it names clips inside the library, so it
+lives there rather than in source, and leaving it out simply means every tile takes the automatic
+match. Frames are sampled a little way into the clip (past the intro, with the act actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
 
 Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. Set `config.VOICE_DEVICE_NAME` to a substring of your mic's name (from `python -m sounddevice`) to pin a specific one instead.
 
