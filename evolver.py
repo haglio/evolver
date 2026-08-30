@@ -32,6 +32,7 @@ from tasks import (
     scene_scripts,
     scripts_sync,
     sort,
+    stages,
     stray_files,
     upscale,
 )
@@ -156,31 +157,46 @@ def run_pipeline(
     """
     log = logging.getLogger(__name__)
     pipeline_t0 = time.monotonic()
-    stages: list[StageRecord] = []
+    records: list[StageRecord] = []
+    planned = iter(stages.ALL_STAGES)
 
-    def _run_stage(name, fn, **kwargs):
+    def _begin_stage(name):
+        """Take the next stage off the registry, and insist it is this one.
+
+        The body below stays the readable form — one call per stage, with the
+        reason for its position beside it — but the order it walks is the
+        registry's rather than a second copy of it. A stage added here and
+        nowhere else drew no progress bar, lost its duration from the chart
+        and took the number of the stage after it, for months, because the
+        only thing that could notice was a test somebody had to run. This
+        notices wherever the pipeline runs, before the stage does any work.
+        """
         if should_stop is not None and should_stop():
             raise _StopRequested
+        expected = next(planned, None)
+        if expected != name:
+            raise RuntimeError(
+                f"the pipeline ran {name!r} where tasks/stages.py names "
+                f"{expected!r}; the two are edited together or not at all"
+            )
         if on_stage_start:
             on_stage_start(name)
+
+    def _run_stage(name, fn, **kwargs):
+        _begin_stage(name)
         t0 = time.monotonic()
         result = fn(**kwargs)
         elapsed = time.monotonic() - t0
         status = _stage_status(name, result)
-        record = StageRecord(name, status, elapsed, result)
-        stages.append(record)
+        records.append(StageRecord(name, status, elapsed, result))
         if on_stage_complete:
             on_stage_complete(name, result, elapsed, status)
         log.info("")
         return result
 
     def _skip_stage(name, reason):
-        if should_stop is not None and should_stop():
-            raise _StopRequested
-        if on_stage_start:
-            on_stage_start(name)
-        record = StageRecord(name, "skipped", 0.0, skip_reason=reason)
-        stages.append(record)
+        _begin_stage(name)
+        records.append(StageRecord(name, "skipped", 0.0, skip_reason=reason))
         if on_stage_complete:
             on_stage_complete(name, None, 0.0, "skipped")
 
@@ -267,12 +283,12 @@ def run_pipeline(
         _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
     except _StopRequested:
         log.warning(
-            "Stop requested; dropping the remaining stages after %d ran.", len(stages),
+            "Stop requested; dropping the remaining stages after %d ran.", len(records),
         )
 
     return PipelineResult(
-        stages=stages,
-        has_errors=any(stage.status == "error" for stage in stages),
+        stages=records,
+        has_errors=any(record.status == "error" for record in records),
         duration_seconds=time.monotonic() - pipeline_t0,
     )
 

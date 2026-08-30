@@ -10,10 +10,13 @@ import re
 import unittest
 from pathlib import Path
 
+from unittest.mock import patch
+
 from PyQt6.QtGui import QColor
 
 import evolver
 from gui.stats_window import STAGE_COLORS
+from tasks import stages
 from tasks.stages import ALL_STAGES, STAGES
 from tests.color_support import band_fill, delta_e
 from tests.test_dead_code import PROJECT_ROOT, _source_files
@@ -35,6 +38,50 @@ class TestStageRegistry(unittest.TestCase):
             result = evolver.run_pipeline()
 
         self.assertEqual([stage.name for stage in result.stages], ALL_STAGES)
+
+    def test_the_pipeline_stops_at_a_stage_the_registry_does_not_name(self):
+        """The same drift, caught where no test has to be run to catch it.
+
+        The gate above is a test, and a test only fails where someone runs it.
+        The pipeline walks the registry as it goes, so a stage the list does
+        not name cannot get past its own boundary — on a developer's machine,
+        on the runner, or on the machine the tray app runs on.
+        """
+        with (
+            _patched_stages(_stage_mocks()),
+            patch.object(stages, "ALL_STAGES", [key for key in ALL_STAGES if key != "purge"]),
+            self.assertRaises(RuntimeError) as caught,
+        ):
+            evolver.run_pipeline()
+
+        self.assertIn("purge", str(caught.exception))
+
+    def test_the_pipeline_stops_when_it_runs_past_the_end_of_the_registry(self):
+        """A stage appended to the pipeline and to nothing else, which is how
+        the delivery stage came to have no row for months."""
+        with (
+            _patched_stages(_stage_mocks()),
+            patch.object(stages, "ALL_STAGES", ["purge"]),
+            self.assertRaises(RuntimeError) as caught,
+        ):
+            evolver.run_pipeline()
+
+        self.assertIn("metadata", str(caught.exception))
+
+    def test_every_verdict_rule_names_a_stage_that_exists(self):
+        """The last copy of the stage names, and the one that fails silently.
+
+        A stage absent from `_STAGE_FAILED` cannot report an error — that is
+        the table's design, and it is why a key misspelled there is invisible:
+        the stage keeps running, keeps finishing, and simply never fails
+        again. Nothing else in the run would look different.
+        """
+        for table, name in (
+            (evolver._STAGE_FAILED, "_STAGE_FAILED"),
+            (evolver._STAGE_HELD_BACK, "_STAGE_HELD_BACK"),
+        ):
+            with self.subTest(table=name):
+                self.assertEqual(sorted(set(table) - set(ALL_STAGES)), [])
 
     def test_gui_lists_the_genau_delivery_between_the_two_upscales(self):
         """Delivery runs straight after the AI upscale, so a clip made this run
