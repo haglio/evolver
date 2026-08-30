@@ -17,6 +17,10 @@ GREEN = QColor(0x30, 0xA0, 0x30)
 RED = QColor(0xFF, 0x3C, 0x3C)
 GRAY = QColor(0x80, 0x80, 0x80)
 
+# The pixmap a mark is drawn into for a list item's icon. One size, because one
+# view draws them and nothing has ever asked for another.
+_MARK_PX = 16
+
 CHECK = "✔"
 CROSS = "✘"
 CIRCLE = "○"  # no work happened here — an outline, not a filled dot
@@ -46,7 +50,7 @@ def mark_for(status: str) -> tuple[str, QColor]:
     return _MARKS.get(status, _NO_MARK)
 
 
-def mark_icon(status: str, size: int = 16) -> QIcon:
+def mark_icon(status: str) -> QIcon:
     """*status*'s mark as an icon, for a view that cannot color part of a row.
 
     A list item's text takes one color for the whole string, so the run history
@@ -57,7 +61,7 @@ def mark_icon(status: str, size: int = 16) -> QIcon:
     glyph, color = mark_for(status)
     if not glyph:
         return QIcon()
-    pixmap = QPixmap(size, size)
+    pixmap = QPixmap(_MARK_PX, _MARK_PX)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setPen(color)
