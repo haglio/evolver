@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta
 
 from PyQt6.QtTest import QSignalSpy
 
@@ -10,9 +11,11 @@ class TestPipelineScheduler(unittest.TestCase):
 
     def test_emits_run_requested_on_timer_tick(self):
         """The one end-to-end timer test: the real QTimer wiring, waited on by
-        deadline rather than a fixed sleep. interval_minutes=0 is testing
-        mode and fires immediately."""
-        scheduler = PipelineScheduler(interval_minutes=0)
+        deadline rather than a fixed sleep. The clock is parked a millisecond
+        short of an aligned slot, so the real alignment arithmetic runs and
+        still hands the timer a delay a test can wait on."""
+        almost = datetime(2026, 1, 1, 12, 10) - timedelta(milliseconds=1)
+        scheduler = PipelineScheduler(interval_minutes=10, now=lambda: almost)
 
         spy = QSignalSpy(scheduler.run_requested)
         scheduler.start()

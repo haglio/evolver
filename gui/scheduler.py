@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Callable
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
@@ -17,11 +18,16 @@ class PipelineScheduler(QObject):
     run_requested = pyqtSignal(str)  # "scheduled" or "manual"
     status_changed = pyqtSignal()    # emitted when state changes that affect display
 
-    def __init__(self, interval_minutes: int = 10, parent=None):
+    def __init__(self, interval_minutes: int = 10, parent=None,
+                 now: Callable[[], datetime] = datetime.now):
         super().__init__(parent)
         self._running = False
         self._paused = False
         self._interval_minutes = interval_minutes
+        # The clock is a seam: a test parks it just short of a slot boundary
+        # and gets a real timer firing in milliseconds. The interval itself is
+        # never a signal — the spin box clamps it to 1..120.
+        self._now = now
         self._next_run_at: datetime | None = None
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -81,15 +87,8 @@ class PipelineScheduler(QObject):
 
     def _schedule_next(self):
         """Set a one-shot timer for the next clock-aligned interval."""
-        now = datetime.now()
+        now = self._now()
         interval = self._interval_minutes
-
-        if interval <= 0:
-            # Testing mode: fire immediately
-            self._next_run_at = now
-            self._timer.start(0)
-            self.status_changed.emit()
-            return
 
         # Align to clock: find next minute that's a multiple of interval
         current_minute = now.hour * 60 + now.minute
