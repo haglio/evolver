@@ -30,6 +30,18 @@ class TestEvolverSettings(unittest.TestCase):
             self.assertEqual(loaded.interval_minutes, 5)
             self.assertTrue(loaded.enable_toasts)
 
+    def test_a_hand_edited_interval_below_one_loads_as_one(self):
+        """The spin box is clamped to 1..120, but the file is plain JSON in the
+        project folder and nothing stopped a 0 from reaching the scheduler's
+        clock-alignment arithmetic, which divides by it."""
+        with workspace_temp_dir() as tmp:
+            path = tmp / "settings.json"
+            path.write_text(json.dumps({"interval_minutes": 0}))
+            self.assertEqual(EvolverSettings.load(path).interval_minutes, 1)
+
+            path.write_text(json.dumps({"interval_minutes": -5}))
+            self.assertEqual(EvolverSettings.load(path).interval_minutes, 1)
+
     def test_a_file_still_carrying_start_with_windows_loads(self):
         """The key was written for years; a hand-edited or old file keeps it."""
         with workspace_temp_dir() as tmp:
