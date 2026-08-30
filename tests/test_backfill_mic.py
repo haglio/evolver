@@ -1,5 +1,7 @@
+import inspect
 import unittest
 
+from backfill import mic
 from backfill.mic import choose_input_device
 
 
@@ -97,3 +99,11 @@ class TestChooseInputDevice(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheProbeContract(unittest.TestCase):
+    def test_the_probe_takes_an_index_and_nothing_else(self):
+        """`choose_input_device` calls the probe as `probe(index)`, so a probe
+        with a second knob has no way to be told about it — and the one real
+        implementation is the only thing that is ever injected in production."""
+        self.assertEqual(list(inspect.signature(mic.probe_input_device).parameters), ["index"])
