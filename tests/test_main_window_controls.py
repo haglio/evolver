@@ -268,10 +268,10 @@ class TestNonAiUpscaleSummary(unittest.TestCase):
 
     def test_a_finished_encode_names_what_it_promoted(self):
         """Why an in-flight percent vanishes between runs: the encode landed."""
-        summary = self._result(promoted="larkin/1 clips/POV Scene 3.mp4",
+        summary = self._result(promoted="larkin/1 clips/Scene Three 3.mp4",
                                start_deferred="user_present", pending=394)
         self.assertIn("finished", summary)
-        self.assertIn("larkin/1 clips/POV Scene 3.mp4", summary)
+        self.assertIn("larkin/1 clips/Scene Three 3.mp4", summary)
 
     def test_a_died_encode_names_what_failed(self):
         """The other way a percent vanishes: ffmpeg died partway through."""
