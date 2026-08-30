@@ -55,8 +55,7 @@ def run() -> SortResult:
             else:
                 result.deleted_collisions += 1
 
-        if config.CLEAN_EMPTY_INBOX_DIRS:
-            remove_empty_dirs(src_root)
+        remove_empty_dirs(src_root)
 
     log.info(
         "Stage 3 done. Moved: %d, Deleted collisions: %d, Unknown skipped: %d",
