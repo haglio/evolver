@@ -225,11 +225,3 @@ VOICE_CONFIDENCE_THRESHOLD = 0.7
 # One example frame per act, cached for the backfill window's clickable tiles. Local
 # only (like the non-AI state above) and disposable — delete the folder to rebuild.
 BACKFILL_THUMBNAIL_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver" / "backfill_thumbnails"
-
-
-def active_outbox_dirs() -> list[Path]:
-    return [OUTBOX_DIR]
-
-
-def active_weird_dirs() -> list[Path]:
-    return [WEIRD_DIR]

@@ -35,10 +35,7 @@ class TestRelocate(unittest.TestCase):
         with workspace_temp_dir() as temp:
             weird_dir = temp / "videos" / "2_outbox" / "kinda_weird"
             _write_video(weird_dir / "clip.mp4")
-            with override_config(
-                VIDEO_SEARCH_ROOT=temp / "videos",
-                active_weird_dirs=lambda: [weird_dir],
-            ):
+            with override_config(VIDEO_SEARCH_ROOT=temp / "videos", WEIRD_DIR=weird_dir):
                 index = video_locator.build_index()
 
             self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
