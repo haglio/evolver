@@ -8,7 +8,7 @@ from pathlib import Path
 
 import config
 from util import ffprobe
-from util.media_files import is_finalized_video_file, iter_finalized_videos
+from util.media_files import is_finalized_video_file, library_videos
 
 
 def build_index() -> dict[str, list[Path]]:
@@ -21,7 +21,7 @@ def build_index() -> dict[str, list[Path]]:
     root = config.VIDEO_SEARCH_ROOT
     if not root.is_dir():
         return index
-    for video_path in iter_finalized_videos(root, config.VIDEO_EXTENSIONS):
+    for video_path in library_videos(root):
         if video_path.is_relative_to(config.WEIRD_DIR):
             continue
         index[video_path.name.lower()].append(video_path)

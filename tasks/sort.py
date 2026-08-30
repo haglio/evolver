@@ -6,7 +6,7 @@ from pathlib import Path
 
 import config
 from util.ffprobe import get_orientation
-from util.media_files import iter_finalized_videos, remove_empty_dirs
+from util.media_files import child_dirs, library_videos, remove_empty_dirs
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> Sor
     log.info("INBOX:  %s", inbox_dir)
     log.info("SORTED: %s", sorted_dir)
 
-    sources = list(_iter_source_dirs(inbox_dir))
+    sources = list(child_dirs(inbox_dir))
     if not sources:
         log.info("No source directories found in inbox: %s", inbox_dir)
 
@@ -46,7 +46,7 @@ def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> Sor
 
         log.info("--- Sorting source: %s ---", source)
 
-        for src in _iter_videos(src_root):
+        for src in library_videos(src_root):
             orient = get_orientation(src)
 
             if orient not in ("landscape", "portrait"):
@@ -82,17 +82,3 @@ def _move_unique(src: Path, dest: Path) -> bool:
     log.info("COLLISION (deleting inbox file): %s  ->  %s", src, dest)
     src.unlink()
     return False
-
-
-def _iter_videos(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
-
-
-def _iter_source_dirs(root: Path):
-    if not root.is_dir():
-        return
-    for p in sorted(root.iterdir()):
-        if p.is_dir():
-            yield p
-
-

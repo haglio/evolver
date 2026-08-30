@@ -9,7 +9,7 @@ from pathlib import Path
 
 import config
 from util.funscript import script_path_for_video
-from util.media_files import iter_finalized_videos, remove_empty_dirs
+from util.media_files import library_videos, remove_empty_dirs
 from util.variants import strip_processing_suffixes
 from util.windows_alert import show_error_window
 
@@ -229,7 +229,7 @@ def _index_archived_videos() -> dict[str, list[Path]]:
     if root is None or not root.is_dir():
         return {}
     index: dict[str, list[Path]] = defaultdict(list)
-    for video_path in iter_finalized_videos(root, config.VIDEO_EXTENSIONS):
+    for video_path in library_videos(root):
         index[video_path.stem].append(video_path)
     return index
 
@@ -238,7 +238,7 @@ def _index_videos(root: Path) -> dict[str, list[Path]]:
     index: dict[str, list[Path]] = defaultdict(list)
     if not root.is_dir():
         return index
-    for video_path in iter_finalized_videos(root, config.VIDEO_EXTENSIONS):
+    for video_path in library_videos(root):
         index[video_path.stem].append(video_path)
     return index
 

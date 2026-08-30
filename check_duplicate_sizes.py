@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
-from util.media_files import iter_finalized_videos
+from util.media_files import library_videos
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -22,10 +22,6 @@ class DuplicateSizesResult:
         return not self.duplicate_groups
 
 
-def iter_videos(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
-
-
 def run(show_popup: bool = False, *, non_ai_dir: Path | None = None) -> DuplicateSizesResult:
     """Report non-AI videos that share an exact filesize with another.
 
@@ -37,7 +33,7 @@ def run(show_popup: bool = False, *, non_ai_dir: Path | None = None) -> Duplicat
     """
     non_ai_root = config.NON_AI_DIR if non_ai_dir is None else non_ai_dir
 
-    files = sorted(iter_videos(non_ai_root))
+    files = sorted(library_videos(non_ai_root))
     size_to_paths: dict[int, list[str]] = {}
 
     for file_path in files:

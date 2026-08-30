@@ -6,7 +6,7 @@ from pathlib import Path
 
 import config
 from util import ffprobe, funscript, sidecar
-from util.media_files import iter_finalized_videos
+from util.media_files import library_videos
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ def run() -> ClipScriptsResult:
     result = ClipScriptsResult()
 
     log.info("=== Stage: scene funscripts -> carved clips ===")
-    for video in iter_finalized_videos(config.VIDEO_LIBRARY_DIR, config.VIDEO_EXTENSIONS):
+    for video in library_videos(config.VIDEO_LIBRARY_DIR):
         clip = sidecar.read(sidecar.sidecar_path(video)).get("clip")
         if not isinstance(clip, dict):
             continue

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
-from util.media_files import iter_finalized_videos
+from util.media_files import library_videos
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -23,10 +23,6 @@ class CorrespondenceResult:
     @property
     def ok(self) -> bool:
         return not (self.orphan_outbox or self.orphan_sorted or self.duplicates or self.sorted_count != self.outbox_count)
-
-
-def iter_videos(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
 
 
 def sorted_to_outbox_name(sorted_file: Path) -> str:
@@ -48,8 +44,8 @@ def run(
     sorted_root = config.SORTED_DIR if sorted_dir is None else sorted_dir
     outbox_root = config.OUTBOX_DIR if outbox_dir is None else outbox_dir
 
-    sorted_files = sorted(iter_videos(sorted_root))
-    outbox_files = sorted(iter_videos(outbox_root))
+    sorted_files = sorted(library_videos(sorted_root))
+    outbox_files = sorted(library_videos(outbox_root))
 
     expected_outbox_names = {sorted_to_outbox_name(p) for p in sorted_files}
     outbox_name_to_paths: dict[str, list[str]] = {}

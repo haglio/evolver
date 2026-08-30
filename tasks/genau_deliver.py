@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util.media_files import iter_finalized_videos, remove_empty_dirs
+from util.media_files import child_dirs, library_videos, remove_empty_dirs
 from util.sidecar import sidecar_path
 
 log = logging.getLogger(__name__)
@@ -43,12 +43,10 @@ def _upscaled_genau_clips(root: Path, genau_source: str):
     The upscale stage files its output under ``<orient>/<source>/``, so the lane's
     clips are spread across the orientation folders rather than gathered in one.
     """
-    if not root.is_dir():
-        return
-    for orient_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+    for orient_dir in child_dirs(root):
         source_dir = orient_dir / genau_source
         if source_dir.is_dir():
-            yield from sorted(iter_finalized_videos(source_dir, config.VIDEO_EXTENSIONS))
+            yield from sorted(library_videos(source_dir))
 
 
 def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:

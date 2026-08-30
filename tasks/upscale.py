@@ -11,7 +11,12 @@ from pathlib import Path
 
 import config
 from util import system_resources, topaz
-from util.media_files import is_finalized_video_file, iter_finalized_videos, remove_partial_video_files
+from util.media_files import (
+    child_dirs,
+    is_finalized_video_file,
+    library_videos,
+    remove_partial_video_files,
+)
 from util.sidecar import sidecar_path, upscaled_video_path
 from util.windows_alert import show_error_window
 
@@ -212,12 +217,13 @@ def collect_candidates(
             if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
                 return candidates
 
-    for source in _iter_sources(sorted_dir):
+    for source_dir in child_dirs(sorted_dir):
+        source = source_dir.name
         for orient in ("landscape", "portrait"):
             in_root = sorted_dir / source / orient
             if not in_root.is_dir():
                 continue
-            for in_file in _iter_videos(in_root):
+            for in_file in library_videos(in_root):
                 if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
                     return candidates
 
@@ -296,15 +302,3 @@ def _show_low_disk_warning(outbox_dir: Path, floor_gb: float) -> None:
             f"Check the log for details:\n{config.LOG_FILE}"
         ),
     )
-
-
-def _iter_videos(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
-
-
-def _iter_sources(root: Path):
-    if not root.is_dir():
-        return
-    for p in sorted(root.iterdir()):
-        if p.is_dir():
-            yield p.name

@@ -26,7 +26,7 @@ from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
 from util import relative_dates
 from util.headless_browser import fetch_dom, find_browser_executable
-from util.media_files import iter_finalized_videos
+from util.media_files import child_dirs, library_videos
 from util.sidecar import sidecar_path, upscaled_video_path, write
 
 log = logging.getLogger(__name__)
@@ -77,11 +77,11 @@ def run(*, sorted_dir: Path | None = None,
         log.warning("No supported browser found; Provider scraping is unavailable this run.")
     strategies = _build_strategies(browser, browser_profile_dir)
 
-    for source_dir in _iter_source_dirs(sorted_dir):
+    for source_dir in child_dirs(sorted_dir):
         source = source_dir.name
         strategy = strategies.get(source)
 
-        for video in sorted(_iter_video_files(source_dir)):
+        for video in sorted(library_videos(source_dir)):
             if strategy is None:
                 result.no_scrape_strat += 1
                 continue
@@ -139,18 +139,6 @@ def _write_failure_marker(output_path: Path, video: Path, error: BaseException) 
 def _provider_image_url(video: Path, base_url: str) -> str:
     """The Provider image-page URL a video's stem maps to — its scrape entry point."""
     return f"{base_url}/image/{source_stem(video.stem)}"
-
-
-def _iter_video_files(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
-
-
-def _iter_source_dirs(root: Path):
-    if not root.is_dir():
-        return
-    for p in sorted(root.iterdir()):
-        if p.is_dir():
-            yield p
 
 
 @dataclass(frozen=True)

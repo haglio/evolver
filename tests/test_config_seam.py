@@ -40,44 +40,50 @@ from tests.test_dead_code import PROJECT_ROOT, _source_files
 # it used to look up scores exactly as well as one given a parameter. The count
 # comes from the syntax tree, so a mention in a comment or a docstring does not
 # move it.
+#
+# util/media_files.py's 1 is the other shape a number may go up for: one read
+# of VIDEO_EXTENSIONS in the module that owns "what is a video", replacing
+# eleven that were threaded through call sites and five identical one-line
+# wrappers to say the same thing.
 CONFIG_REFERENCE_LEDGER = {
     "backfill/decisions.py": 3,
     "backfill/mic.py": 1,
-    "backfill/queue.py": 2,
+    "backfill/queue.py": 1,
     "backfill/thumbnails.py": 3,
     "backfill/voice.py": 5,
-    "check_correspondence.py": 7,
-    "check_duplicate_sizes.py": 5,
+    "check_correspondence.py": 6,
+    "check_duplicate_sizes.py": 4,
     "evolver.py": 9,
     "gui/app.py": 6,
+    "gui/main_window.py": 1,
     "gui/presence_throttle.py": 1,
     "gui/process_identity.py": 2,
-    "gui/main_window.py": 1,
     "gui/settings.py": 2,
     "gui/tray.py": 1,
     "gui/worker.py": 1,
     "tasks/bookmarks_sync.py": 4,
-    "tasks/clip_scripts.py": 2,
-    "tasks/genau_deliver.py": 6,
+    "tasks/clip_scripts.py": 1,
+    "tasks/genau_deliver.py": 5,
     "tasks/nonai_encode.py": 12,
     "tasks/nonai_group.py": 4,
     "tasks/nonai_queue.py": 3,
     "tasks/nonai_upscale.py": 27,
     "tasks/origenerator_metadata.py": 1,
-    "tasks/prompt_scrape.py": 6,
+    "tasks/prompt_scrape.py": 5,
     "tasks/purge_weird.py": 5,
-    "tasks/scene_scripts.py": 2,
-    "tasks/scripts_sync.py": 21,
-    "tasks/sort.py": 3,
+    "tasks/scene_scripts.py": 1,
+    "tasks/scripts_sync.py": 19,
+    "tasks/sort.py": 2,
     "tasks/stray_files.py": 8,
-    "tasks/upscale.py": 18,
+    "tasks/upscale.py": 17,
     "util/funscript.py": 3,
+    "util/media_files.py": 1,
     "util/nonai_library.py": 5,
     "util/nonai_retire.py": 3,
     "util/reference_stores.py": 6,
     "util/sidecar.py": 3,
     "util/topaz.py": 3,
-    "util/video_locator.py": 4,
+    "util/video_locator.py": 3,
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or
