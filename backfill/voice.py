@@ -2,8 +2,8 @@
 
 Fun Time drives the same offline recognizer (vosk) from a phrase list and routes
 what it hears into a command file; here the heard phrase is emitted straight to
-the window.  vosk and sounddevice are imported inside :meth:`VoiceListener.start`
-so the pure grammar and parsing below stay importable without an audio backend.
+the window.  vosk and sounddevice are imported inside the listening thread, so
+the pure grammar and parsing below stay importable without an audio backend.
 """
 
 from __future__ import annotations
