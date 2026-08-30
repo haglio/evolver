@@ -20,20 +20,20 @@ from gui.run_record import RunRecord
 
 STAGE_COLORS = {
     "strays": QColor(0xBA, 0xB0, 0xAC),
-    "sort": QColor(0x4E, 0x79, 0xA7),
+    "sort": QColor(0x38, 0x6A, 0x9C),
     "purge": QColor(0xF2, 0x8E, 0x2B),
-    "scripts": QColor(0xE1, 0x57, 0x59),
-    "clip_scripts": QColor(0xD3, 0x7A, 0x9C),
-    "scene_scripts": QColor(0xC4, 0x9A, 0xC8),
-    "bookmarks": QColor(0x76, 0xB7, 0xB2),
-    "metadata": QColor(0x59, 0xA1, 0x4F),
+    "scripts": QColor(0xAD, 0x40, 0x35),
+    "clip_scripts": QColor(0xF6, 0x70, 0x99),
+    "scene_scripts": QColor(0xDE, 0xB8, 0xC6),
+    "bookmarks": QColor(0x4B, 0x96, 0x88),
+    "metadata": QColor(0x14, 0x7D, 0x3C),
     "upscale": QColor(0xED, 0xC9, 0x48),
     "genau_deliver": QColor(0x7B, 0x41, 0x73),
-    "upscale_non_ai": QColor(0x9C, 0x75, 0x5F),
-    "group_non_ai": QColor(0x8C, 0xD1, 0x7D),
-    "references": QColor(0xA0, 0xCB, 0xE8),
-    "dupes": QColor(0xB0, 0x7A, 0xA1),
-    "verify": QColor(0xFF, 0x9D, 0xA7),
+    "upscale_non_ai": QColor(0x76, 0x67, 0x47),
+    "group_non_ai": QColor(0x6F, 0xDB, 0x9A),
+    "references": QColor(0x61, 0xCA, 0xF2),
+    "dupes": QColor(0xCA, 0x94, 0xDB),
+    "verify": QColor(0xFF, 0x9D, 0x83),
 }
 
 _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
@@ -41,6 +41,11 @@ _LIMIT_SECONDS = 600.0
 _MARGIN_LEFT = 70
 _MARGIN_TOP = 20
 _MARGIN_BOTTOM = 50
+
+# What a band is painted with. Named because the tests compare stage colours as
+# the bands the eye actually sees — translucent over white, which draws them
+# closer together than the colours themselves are.
+BAND_ALPHA = 180
 
 _LEGEND_POINT_SIZE = 8
 _LEGEND_SWATCH = 10
@@ -212,7 +217,7 @@ class StackedAreaChart(QWidget):
             path.closeSubpath()
 
             fill = QColor(color)
-            fill.setAlpha(180)
+            fill.setAlpha(BAND_ALPHA)
             painter.setBrush(fill)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawPath(path)

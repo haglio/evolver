@@ -7,6 +7,7 @@ import pytest
 from PyQt6.QtGui import QFontMetrics, QImage
 
 from gui.progress import STAGE_LABELS
+from tests.color_support import band_fill
 
 from gui.run_record import RunRecord
 from gui.stats_window import (
@@ -72,15 +73,6 @@ def _ink_count(image: QImage, xs: range, ys: range) -> int:
     )
 
 
-def _fill_over_white(color) -> tuple[int, int, int]:
-    """A stage band's fill: its color at the alpha paintEvent uses, over white."""
-    alpha = 180
-    return tuple(
-        round((c * alpha + 255 * (255 - alpha)) / 255)
-        for c in (color.red(), color.green(), color.blue())
-    )
-
-
 def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
     """Whether *pixel* is *stage_key*'s band fill, within a rounding step.
 
@@ -88,7 +80,7 @@ def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
     pinning the exact rounding would fail on a raster-engine change that no
     user could see.
     """
-    expected = _fill_over_white(STAGE_COLORS[stage_key])
+    expected = band_fill(STAGE_COLORS[stage_key])
     return all(abs(p - e) <= 1 for p, e in zip(pixel, expected))
 
 

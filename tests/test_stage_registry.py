@@ -1,5 +1,6 @@
 """The GUI's stage registry must cover every stage the pipeline emits."""
 
+import itertools
 import re
 import unittest
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import evolver
 from gui.progress import ALL_STAGES
 from gui.stats_window import STAGE_COLORS
+from tests.color_support import band_fill, delta_e
 from tests.test_dead_code import PROJECT_ROOT, _source_files
 from tests.test_evolver import _patched_stages, _stage_mocks
 
@@ -72,13 +74,23 @@ class TestStageRegistry(unittest.TestCase):
             with self.subTest(stage=stage):
                 self.assertIn(stage, STAGE_COLORS)
 
-    def test_no_two_stages_share_a_chart_color(self):
-        """The chart stacks every stage as a band in one column, so two stages
-        drawn alike are two bands nobody can tell apart — and the legend then
-        names the same colour twice."""
-        colors = [STAGE_COLORS[stage].getRgb()[:3] for stage in ALL_STAGES]
+    def test_no_two_stage_bands_are_hard_to_tell_apart(self):
+        """The chart stacks every stage as a band in one column, so a close
+        pair is two bands nobody can separate and a legend that names the same
+        colour twice.
 
-        self.assertEqual(len(set(colors)), len(colors))
+        The floor is 20 Delta-E, argued from the units rather than fitted to
+        this palette: ~2 is the smallest difference anyone sees and ~10 already
+        reads as two colours, so 20 is a comfortable "obviously different"
+        rather than the least that would pass. The palette this replaced scored
+        8.8 and would fail it; the one here clears it by three.
+        """
+        worst, pair = min(
+            (delta_e(band_fill(STAGE_COLORS[one]), band_fill(STAGE_COLORS[other])), (one, other))
+            for one, other in itertools.combinations(ALL_STAGES, 2)
+        )
+
+        self.assertGreaterEqual(worst, 20.0, f"{pair[0]} and {pair[1]} differ by only {worst:.1f}")
 
 
 if __name__ == "__main__":
