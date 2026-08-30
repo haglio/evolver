@@ -75,12 +75,11 @@ class TestPipelineWorker(unittest.TestCase):
         self.assertEqual(started, ["sort", "upscale"])
 
     def test_emits_stage_completed_for_each_stage(self):
+        """Only the name crosses: the popup marks a bar full and reads nothing
+        else, and the stage's result, duration and status reach the run record
+        by their own route."""
         _, completed, _, _, _ = self._run_worker()
-        self.assertEqual(len(completed), 2)
-        self.assertEqual(completed[0][0], "sort")
-        self.assertEqual(completed[0][3], "completed")
-        self.assertEqual(completed[1][0], "upscale")
-        self.assertEqual(completed[1][3], "skipped")
+        self.assertEqual(completed, [("sort",), ("upscale",)])
 
     def test_emits_pipeline_finished_with_run_record(self):
         _, _, finished, _, _ = self._run_worker()

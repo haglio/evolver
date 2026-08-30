@@ -85,7 +85,7 @@ class ProgressPopup(QWidget):
             bar = self._bars[name]
             bar.setRange(0, 0)  # indeterminate
 
-    def on_stage_completed(self, name: str, result: object, elapsed: float, status: str):
+    def on_stage_completed(self, name: str):
         if name not in self._bars:
             return
         bar = self._bars[name]
