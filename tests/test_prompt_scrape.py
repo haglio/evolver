@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import config
 from tasks import prompt_scrape
 from util import html_query
 from tests.temp_helpers import override_config, workspace_temp_dir
@@ -42,7 +43,7 @@ class TestPromptScrape(unittest.TestCase):
 
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
 
             with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
@@ -52,7 +53,7 @@ class TestPromptScrape(unittest.TestCase):
 
             self.assertTrue(result.ok)
             self.assertEqual(result.newly_scraped, 1)
-            output_path = self._mirror_path(metadata_dir, "portrait", prompt_scrape.PROVIDER_SOURCE, "abc")
+            output_path = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 payload,
@@ -82,7 +83,7 @@ class TestPromptScrape(unittest.TestCase):
         change nothing (audit probe P9)."""
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "extras", "stray.mp4")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "extras", "stray.mp4")
 
             with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
@@ -133,8 +134,8 @@ class TestPromptScrape(unittest.TestCase):
     def test_run_ignores_partial_video_files(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "portrait", "one.mp4")
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "portrait", "one.partial.deadbeef.mp4")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "one.mp4")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "one.partial.deadbeef.mp4")
 
             with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
@@ -143,12 +144,12 @@ class TestPromptScrape(unittest.TestCase):
 
             self.assertTrue(result.ok)
             self.assertEqual(result.newly_scraped, 1)
-            self.assertFalse(self._mirror_path(metadata_dir, "portrait", prompt_scrape.PROVIDER_SOURCE, "one.partial.deadbeef").exists())
+            self.assertFalse(self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "one.partial.deadbeef").exists())
 
     def test_run_counts_error_and_reports_not_ok(self):
         with workspace_temp_dir() as root:
             sorted_dir, _metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "landscape", "fail.mp4")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
 
             with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
@@ -162,7 +163,7 @@ class TestPromptScrape(unittest.TestCase):
     def test_failed_scrape_writes_failure_marker(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "landscape", "fail.mp4")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
 
             with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
@@ -170,13 +171,13 @@ class TestPromptScrape(unittest.TestCase):
                         result = prompt_scrape.run()
 
             self.assertEqual(result.errors, 1)
-            self.assertTrue(self._marker_path(metadata_dir, "landscape", prompt_scrape.PROVIDER_SOURCE, "fail").exists())
+            self.assertTrue(self._marker_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists())
 
     def test_skips_video_that_already_has_json(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "portrait", "abc.mp4")
-            existing = self._mirror_path(metadata_dir, "portrait", prompt_scrape.PROVIDER_SOURCE, "abc")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             existing.parent.mkdir(parents=True, exist_ok=True)
             existing.write_text("{}", encoding="utf-8")
 
@@ -192,8 +193,8 @@ class TestPromptScrape(unittest.TestCase):
     def test_skips_video_with_failure_marker(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "portrait", "abc.mp4")
-            marker = self._marker_path(metadata_dir, "portrait", prompt_scrape.PROVIDER_SOURCE, "abc")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            marker = self._marker_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             marker.parent.mkdir(parents=True, exist_ok=True)
             marker.write_text("previously failed", encoding="utf-8")
 
@@ -212,7 +213,7 @@ class TestPromptScrape(unittest.TestCase):
 
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, prompt_scrape.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
 
             with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
@@ -225,7 +226,7 @@ class TestPromptScrape(unittest.TestCase):
 
             # JSON must land where _is_t2v_provider looks:
             # METADATA_DIR / "2_outbox" / "upscaled_by_orientation" / <orient> / <source> / <stem>_topaz.json
-            expected_path = self._mirror_path(metadata_dir, "portrait", prompt_scrape.PROVIDER_SOURCE, "abc")
+            expected_path = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             self.assertTrue(expected_path.exists(), f"Expected metadata at {expected_path}")
             payload = json.loads(expected_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["video"]["prompt"], "text only video prompt")
@@ -403,16 +404,16 @@ class TestCssSelector(unittest.TestCase):
 
     def test_image_page_url_from_src(self):
         self.assertEqual(
-            prompt_scrape._image_page_url_from_src("https://cdn1.example.com/abc123"),
-            f"{prompt_scrape.PROVIDER_BASE_URL}/image/abc123",
+            prompt_scrape._image_page_url_from_src("https://cdn1.example.com/abc123", config.PROVIDER_BASE_URL),
+            f"{config.PROVIDER_BASE_URL}/image/abc123",
         )
-        self.assertEqual(prompt_scrape._image_page_url_from_src("https://cdn1.example.com/"), "")
+        self.assertEqual(prompt_scrape._image_page_url_from_src("https://cdn1.example.com/", config.PROVIDER_BASE_URL), "")
 
 
 class TestProviderImageUrl(unittest.TestCase):
     def test_generates_provider_url(self):
         video = Path("C:/videos/0_inbox/provider/abc.mp4")
-        self.assertEqual(prompt_scrape._provider_image_url(video), f"{prompt_scrape.PROVIDER_BASE_URL}/image/abc")
+        self.assertEqual(prompt_scrape._provider_image_url(video, config.PROVIDER_BASE_URL), f"{config.PROVIDER_BASE_URL}/image/abc")
 
 
 class TestExtractMetadataFields(unittest.TestCase):
@@ -484,8 +485,9 @@ class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
             with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
                 payload = prompt_scrape._scrape_provider_video(
                     Path("vid1_topaz.mp4"),
-                    f"{prompt_scrape.PROVIDER_BASE_URL}/image/vid1",
+                    f"{config.PROVIDER_BASE_URL}/image/vid1",
                     Path("chrome.exe"),
+                    config.PROVIDER_BASE_URL,
                 )
 
         self.assertEqual(payload["video"]["prompt"], "video prompt")
@@ -537,3 +539,27 @@ class TestParseRelativeDate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestProviderSettingsAreRedirectable(unittest.TestCase):
+    """The scraped provider's name and site root come from the overlay, and
+    used to be bound the first time this module was imported.
+
+    Nothing could redirect them after that — not a caller, not a test — which
+    is why they were read straight off ``load_content()`` at module level and
+    why four of this module's imports sat below executable code. They are
+    ordinary config values now, resolved when the stage runs.
+    """
+
+    def test_the_source_name_and_site_root_come_from_config_at_call_time(self):
+        with override_config(
+            PROVIDER_SOURCE="examplesource", PROVIDER_BASE_URL="https://example.invalid",
+        ):
+            strategies = prompt_scrape._build_strategies(Path("browser.exe"))
+
+            self.assertIn("examplesource", strategies)
+            self.assertEqual(
+                prompt_scrape._provider_image_url(Path("abc.mp4"), "https://example.invalid"),
+                "https://example.invalid/image/abc",
+            )
+

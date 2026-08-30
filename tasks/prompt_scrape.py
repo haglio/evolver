@@ -22,13 +22,6 @@ from util.html_query import (
 from urllib.parse import urlparse
 
 import config
-from content import load_content
-
-# The scraped provider's ingest-source folder and site root are private, so
-# they come from the git-ignored content overlay rather than the source.
-_PROVIDER = load_content()["scrape_provider"]
-PROVIDER_SOURCE = _PROVIDER["source"]
-PROVIDER_BASE_URL = _PROVIDER["base_url"]
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
 from util.media_files import iter_finalized_videos
@@ -122,9 +115,9 @@ def _write_failure_marker(output_path: Path, video: Path, error: BaseException) 
     marker.write_text(f"{video.name}\n{error}\n", encoding="utf-8")
 
 
-def _provider_image_url(video: Path) -> str:
+def _provider_image_url(video: Path, base_url: str) -> str:
     """The Provider image-page URL a video's stem maps to — its scrape entry point."""
-    return f"{PROVIDER_BASE_URL}/image/{source_stem(video.stem)}"
+    return f"{base_url}/image/{source_stem(video.stem)}"
 
 
 def _iter_video_files(root: Path):
@@ -139,13 +132,15 @@ def _iter_source_dirs(root: Path):
             yield p
 
 
-def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> dict[str, str]:
+def _scrape_provider_video(
+    video_path: Path, image_url: str, browser: Path, base_url: str,
+) -> dict[str, str]:
     image_id = image_url.rstrip("/").split("/")[-1]
     candidate_urls = [
         image_url,
-        f"{PROVIDER_BASE_URL}/video/{image_id}",
-        f"{PROVIDER_BASE_URL}/text-to-video/{image_id}",
-        f"{PROVIDER_BASE_URL}/image-to-video/{image_id}",
+        f"{base_url}/video/{image_id}",
+        f"{base_url}/text-to-video/{image_id}",
+        f"{base_url}/image-to-video/{image_id}",
     ]
 
     video_prompt = ""
@@ -157,7 +152,7 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
         panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
         if panel is not None:
             video_prompt = _extract_prompt_text(panel)
-            source_image_url = _extract_source_image_url(panel)
+            source_image_url = _extract_source_image_url(panel, base_url)
             video_metadata = _extract_metadata_fields(document)
         if not video_prompt:
             embedded = _extract_provider_embedded_metadata(html, image_id)
@@ -166,7 +161,7 @@ def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> d
                 if not video_metadata:
                     video_metadata = _embedded_to_video_metadata(embedded)
                 if embedded.parent_image_id and not source_image_url:
-                    source_image_url = f"{PROVIDER_BASE_URL}/image/{embedded.parent_image_id}"
+                    source_image_url = f"{base_url}/image/{embedded.parent_image_id}"
         if video_prompt:
             break
     if not video_prompt:
@@ -209,10 +204,12 @@ def _build_strategies(browser):
     needs no browser and is always available. Provider metadata is scraped from its
     website, so it registers only when a headless browser was found.
     """
+    provider_source = config.PROVIDER_SOURCE
+    base_url = config.PROVIDER_BASE_URL
     strategies = {"origenerator": origenerator_metadata.build_metadata}
     if browser is not None:
-        strategies[PROVIDER_SOURCE] = lambda video: _scrape_provider_video(
-            video, _provider_image_url(video), browser
+        strategies[provider_source] = lambda video: _scrape_provider_video(
+            video, _provider_image_url(video, base_url), browser, base_url
         )
     return strategies
 
@@ -253,21 +250,21 @@ def _extract_negative_prompt_text(panel: Node) -> str:
     return ""
 
 
-def _extract_source_image_url(panel: Node) -> str:
+def _extract_source_image_url(panel: Node, base_url: str) -> str:
     """Find the source image thumbnail img and derive the image page URL."""
     for img in find_all_by_tag(panel, "img"):
         src = img.attrs.get("src", "")
         if src:
-            return _image_page_url_from_src(src)
+            return _image_page_url_from_src(src, base_url)
     return ""
 
 
-def _image_page_url_from_src(src: str) -> str:
+def _image_page_url_from_src(src: str, base_url: str) -> str:
     parsed = urlparse(src)
     image_id = parsed.path.strip("/").split("/")[-1]
     if not image_id:
         return ""
-    return f"{PROVIDER_BASE_URL}/image/{image_id}"
+    return f"{base_url}/image/{image_id}"
 
 
 def _fetch_dom(url: str, browser: Path) -> str:

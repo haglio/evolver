@@ -113,6 +113,15 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 GENAU_SOURCE    = _CONTENT["genau_source"]
 GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
 
+# The scraped provider: the 0_inbox folder its clips arrive under, and the site
+# root the metadata stage fetches their prompt pages from. Both are private, so
+# they come from the overlay for the same reason GENAU_SOURCE does. They live
+# here rather than in the stage because a value read at the stage's own import
+# is bound before anything can redirect it — which is exactly what they were.
+_SCRAPE_PROVIDER = _CONTENT["scrape_provider"]
+PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
+PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]
+
 FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")
 TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
 
