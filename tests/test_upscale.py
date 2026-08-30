@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import subprocess
 import unittest
@@ -398,6 +399,15 @@ class TestFilterSelection(unittest.TestCase):
 
             self.assertEqual(captured_args["filter_complex"], config.UPSCALE_FILTER_DEFAULT)
             self.assertEqual(captured_args["videoai_tag"], config.VIDEOAI_TAG_DEFAULT)
+
+
+class TestUpscaleResultSurface(unittest.TestCase):
+    def test_the_result_carries_only_counters_something_raises(self):
+        """A counter nothing increments reads as a tally and is always a lie."""
+        self.assertEqual(
+            {f.name for f in dataclasses.fields(upscale.UpscaleResult)},
+            {"processed", "failed", "timed_out", "deferred_low_disk", "pending_after_run"},
+        )
 
 
 if __name__ == "__main__":
