@@ -71,10 +71,6 @@ def run() -> PurgeWeirdResult:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def source_stem(stem: str) -> str:
     """Strip known processing suffixes from an outbox file stem.
 

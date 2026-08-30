@@ -1,15 +1,11 @@
 """Deliver upscaled Genau clips to the folder Genau plays from.
 
-Origenerator makes a Genau clip — one complete stroke, looping end to end — and
-drops it in the inbox under its own source folder (``config.GENAU_SOURCE``,
-which the content overlay names). From there it is an ordinary AI
-video: sorted by orientation, then upscaled by the Topaz stage like everything
-else, which is the whole reason it comes through here rather than being copied
-straight to Genau. A loop fresh out of the graph is visibly softer than the clips
-already in that folder, which came from upscaled library video.
-
-This is the last step of that lane: once the upscale exists, move it into
-``videos/genau/clips/`` and retire the ``1_sorted`` copy it was made from.
+The last step of the Genau lane, which ``config.GENAU_SOURCE`` describes: once
+the upscale exists, move it into ``videos/genau/clips/`` and retire the
+``1_sorted`` copy it was made from. A loop goes through the Topaz stage like
+any other AI video rather than being copied straight across, because one fresh
+out of the graph is visibly softer than the clips already in that folder, which
+came from upscaled library video.
 
 Both halves leave together, and that is not tidiness:
 
