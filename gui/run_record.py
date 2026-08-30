@@ -6,7 +6,7 @@ import dataclasses
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
@@ -27,11 +27,21 @@ class RunRecord:
 
     @classmethod
     def from_pipeline_result(cls, result, trigger: str = "scheduled") -> RunRecord:
-        """Build a RunRecord from a PipelineResult."""
+        """Build a RunRecord from a PipelineResult, called as the run ends.
+
+        The start is derived from the finish rather than captured, so
+        ``finished_at - started_at == duration_seconds`` holds by construction
+        and the three cannot drift apart. Both used to be stamped with the
+        finish, which made every view that trusts the name -- the history
+        label, the chart's x axis -- wrong by the run's whole duration; at the
+        660-second watchdog ceiling that is eleven minutes, a full slot past
+        the ten-minute schedule, so a run read as belonging to the next tick.
+        """
         now = datetime.now(timezone.utc)
-        run_id = now.strftime("%Y-%m-%dT%H-%M-%S")
-        started_at = now.strftime("%Y-%m-%dT%H:%M:%S")
-        finished_at = started_at  # Will be close enough for display
+        started = now - timedelta(seconds=result.duration_seconds)
+        run_id = started.strftime("%Y-%m-%dT%H-%M-%S")
+        started_at = started.strftime("%Y-%m-%dT%H:%M:%S")
+        finished_at = now.strftime("%Y-%m-%dT%H:%M:%S")
 
         stages = []
         for sr in result.stages:

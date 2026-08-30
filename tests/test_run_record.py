@@ -1,5 +1,7 @@
 import json
 import logging
+
+import pytest
 from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from unittest.mock import Mock
@@ -208,6 +210,32 @@ class TestRunRecordFromPipelineResult:
         assert record.stages[0]["name"] == "sort"
         assert record.stages[0]["status"] == "completed"
         assert record.stages[1]["skip_reason"] == "cpu_busy"
+
+    def test_started_at_is_the_start_and_finished_at_is_the_finish(self):
+        """Both used to be the finish. So every view that trusts the name was
+        wrong by the run's whole duration -- and at the 660-second watchdog
+        ceiling that is eleven minutes, a full slot past the ten-minute
+        schedule, which reads as belonging to the following tick."""
+        from datetime import datetime
+
+        from evolver import PipelineResult
+
+        pr = PipelineResult(stages=[], has_errors=False, duration_seconds=699.7)
+
+        record = RunRecord.from_pipeline_result(pr)
+
+        started = datetime.fromisoformat(record.started_at)
+        finished = datetime.fromisoformat(record.finished_at)
+        assert (finished - started).total_seconds() == pytest.approx(699.7, abs=1.0)
+
+    def test_the_id_names_the_start_so_the_history_sorts_by_it(self):
+        from evolver import PipelineResult
+
+        pr = PipelineResult(stages=[], has_errors=False, duration_seconds=699.7)
+
+        record = RunRecord.from_pipeline_result(pr)
+
+        assert record.id == record.started_at.replace(":", "-")
 
 
 class TestFormatRunLabel:
