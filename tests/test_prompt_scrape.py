@@ -46,8 +46,8 @@ class TestPromptScrape(unittest.TestCase):
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_with_source_image):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_with_source_image):
                         with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
                             result = prompt_scrape.run()
 
@@ -86,10 +86,10 @@ class TestPromptScrape(unittest.TestCase):
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "extras", "stray.mp4")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
                     # A real (empty) document, so if the skip is ever removed
                     # the scrape fails loudly instead of chewing on a Mock.
-                    with patch("tasks.prompt_scrape._fetch_dom", return_value="<html></html>") as fetch_dom:
+                    with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
@@ -103,8 +103,8 @@ class TestPromptScrape(unittest.TestCase):
             self._make_video(sorted_dir, "provider2", "portrait", "two.mp4")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape._fetch_dom") as fetch_dom:
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom") as fetch_dom:
                         result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
@@ -120,7 +120,7 @@ class TestPromptScrape(unittest.TestCase):
             payload = {"video": {"prompt": "a scene", "seed": "42"}}
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=None):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=None):
                     with patch("tasks.prompt_scrape.origenerator_metadata.build_metadata",
                                return_value=payload) as build:
                         result = prompt_scrape.run()
@@ -138,8 +138,8 @@ class TestPromptScrape(unittest.TestCase):
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "one.partial.deadbeef.mp4")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only):
                         result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
@@ -152,8 +152,8 @@ class TestPromptScrape(unittest.TestCase):
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("network error")):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", side_effect=RuntimeError("network error")):
                         result = prompt_scrape.run()
 
             self.assertFalse(result.ok)
@@ -166,8 +166,8 @@ class TestPromptScrape(unittest.TestCase):
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=RuntimeError("source gone")):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", side_effect=RuntimeError("source gone")):
                         result = prompt_scrape.run()
 
             self.assertEqual(result.errors, 1)
@@ -182,8 +182,8 @@ class TestPromptScrape(unittest.TestCase):
             existing.write_text("{}", encoding="utf-8")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape._fetch_dom", return_value="<html></html>") as fetch_dom:
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
 
             self.assertEqual(result.already_scraped, 1)
@@ -199,8 +199,8 @@ class TestPromptScrape(unittest.TestCase):
             marker.write_text("previously failed", encoding="utf-8")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape._fetch_dom", return_value="<html></html>") as fetch_dom:
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
 
             self.assertEqual(result.skipped_failed, 1)
@@ -216,8 +216,8 @@ class TestPromptScrape(unittest.TestCase):
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
 
             with self._override(root):
-                with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
-                    with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only):
                         with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
                             result = prompt_scrape.run()
 
@@ -232,7 +232,7 @@ class TestPromptScrape(unittest.TestCase):
             self.assertEqual(payload["video"]["prompt"], "text only video prompt")
 
     @staticmethod
-    def _fetch_dom_with_source_image(url: str, browser: Path) -> str:
+    def _fetch_dom_with_source_image(url: str, browser: Path, *, profile_dir: Path) -> str:
         if "/image/source-image-u1" in url:
             return """
             <body>
@@ -297,7 +297,7 @@ class TestPromptScrape(unittest.TestCase):
         """
 
     @staticmethod
-    def _fetch_dom_text_only(url: str, browser: Path) -> str:
+    def _fetch_dom_text_only(url: str, browser: Path, *, profile_dir: Path) -> str:
         return """
         <body>
           <div>
@@ -323,6 +323,61 @@ class TestPromptScrape(unittest.TestCase):
           </div>
         </body>
         """
+
+
+class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
+    """The tree walked and the browser's scratch profile are arguments.
+
+    A sentinel wired to the wrong place -- or resolved once at import, past
+    override_config -- would leave the stage walking the configured tree and
+    writing the browser's profile into the checkout anyway, and nothing would
+    say so.
+    """
+
+    def _override(self, root):
+        ai = root / "videos" / "videos" / "2D" / "AI"
+        return override_config(
+            VIDEO_LIBRARY_DIR=root / "videos" / "videos", AI_DIR=ai,
+            SORTED_DIR=ai / "1_sorted", METADATA_DIR=root / "videos" / "metadata",
+            OUT_UPSCALED_DIR=ai / "2_outbox" / "upscaled_by_orientation")
+
+    def test_the_tree_walked_is_the_one_the_parameter_names(self):
+        with workspace_temp_dir() as root:
+            elsewhere = root / "elsewhere"
+            video = elsewhere / config.PROVIDER_SOURCE / "portrait" / "abc.mp4"
+            video.parent.mkdir(parents=True)
+            video.write_text("x", encoding="utf-8")
+
+            with self._override(root):
+                with patch("tasks.prompt_scrape.find_browser_executable",
+                           return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom",
+                               side_effect=RuntimeError("reached the page")):
+                        result = prompt_scrape.run(sorted_dir=elsewhere)
+
+            # The configured tree does not exist, so a stage still reading it
+            # would find nothing at all and report zero of everything.
+            self.assertEqual(result.errors, 1)
+
+    def test_the_browser_gets_the_scratch_profile_the_parameter_names(self):
+        with workspace_temp_dir() as root:
+            elsewhere = root / "elsewhere"
+            profile = root / "profile"
+            video = elsewhere / config.PROVIDER_SOURCE / "portrait" / "abc.mp4"
+            video.parent.mkdir(parents=True)
+            video.write_text("x", encoding="utf-8")
+
+            with self._override(root):
+                with patch("tasks.prompt_scrape.find_browser_executable",
+                           return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom",
+                               return_value="<html></html>") as fetch:
+                        prompt_scrape.run(sorted_dir=elsewhere,
+                                          browser_profile_dir=profile)
+
+            self.assertEqual(fetch.call_args.kwargs["profile_dir"], profile)
+            self.assertFalse(
+                (config.PROJECT_DIR / ".tmp-prompt-browser-profile").exists())
 
 
 class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
@@ -481,13 +536,14 @@ class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
             "</body></html>"
         )
 
-        with patch("tasks.prompt_scrape._fetch_dom", return_value=html):
+        with patch("tasks.prompt_scrape.fetch_dom", return_value=html):
             with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
                 payload = prompt_scrape._scrape_provider_video(
                     Path("vid1_topaz.mp4"),
                     f"{config.PROVIDER_BASE_URL}/image/vid1",
                     Path("chrome.exe"),
                     config.PROVIDER_BASE_URL,
+                    Path("profile"),
                 )
 
         self.assertEqual(payload["video"]["prompt"], "video prompt")
@@ -516,13 +572,14 @@ class TestProviderSettingsAreRedirectable(unittest.TestCase):
         with override_config(
             PROVIDER_SOURCE="examplesource", PROVIDER_BASE_URL="https://example.invalid",
         ):
-            strategies = prompt_scrape._build_strategies(Path("browser.exe"))
+            strategies = prompt_scrape._build_strategies(
+                Path("browser.exe"), Path("profile"))
             self.assertIn("examplesource", strategies)
 
             with patch("tasks.prompt_scrape._scrape_provider_video") as scrape:
                 strategies["examplesource"](Path("abc_topaz.mp4"))
 
-        _video, image_url, _browser, base_url = scrape.call_args.args
+        _video, image_url, _browser, base_url, _profile = scrape.call_args.args
         self.assertEqual(image_url, "https://example.invalid/image/abc")
         self.assertEqual(base_url, "https://example.invalid")
 

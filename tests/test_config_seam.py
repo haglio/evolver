@@ -62,7 +62,7 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/nonai_queue.py": 3,
     "tasks/nonai_upscale.py": 27,
     "tasks/origenerator_metadata.py": 1,
-    "tasks/prompt_scrape.py": 7,
+    "tasks/prompt_scrape.py": 6,
     "tasks/purge_weird.py": 5,
     "tasks/scene_scripts.py": 2,
     "tasks/scripts_sync.py": 21,

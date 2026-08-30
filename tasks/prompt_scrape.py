@@ -6,7 +6,6 @@ import datetime
 import json
 import logging
 import re
-import subprocess
 from dataclasses import dataclass
 from email.utils import parsedate
 from pathlib import Path
@@ -25,12 +24,18 @@ import config
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
 from util import relative_dates
+from util.headless_browser import fetch_dom, find_browser_executable
 from util.media_files import iter_finalized_videos
 from util.sidecar import sidecar_path, upscaled_video_path, write
 
 log = logging.getLogger(__name__)
 
 _CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.font-regular"
+
+# The headless browser's scratch profile, under the checkout by default because
+# that is where it has always been; a caller passing its own keeps a running
+# app's scratch state out of a git working tree entirely.
+_BROWSER_PROFILE_DIR_NAME = ".tmp-prompt-browser-profile"
 
 
 @dataclass
@@ -46,18 +51,32 @@ class PromptScrapeResult:
         return self.errors == 0
 
 
-def run() -> PromptScrapeResult:
+def run(*, sorted_dir: Path | None = None,
+        browser_profile_dir: Path | None = None) -> PromptScrapeResult:
+    """Scrape each newly sorted video's provenance into its mirrored sidecar.
+
+    *sorted_dir* is the tree walked; *browser_profile_dir* is the scratch
+    profile the headless browser is given. Both are sentinels rather than
+    signature defaults: a default is evaluated at import, which would freeze
+    whatever ``config`` held then and put the value out of reach of
+    ``override_config``.
+    """
+    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
+    browser_profile_dir = (
+        config.PROJECT_DIR / _BROWSER_PROFILE_DIR_NAME if browser_profile_dir is None
+        else browser_profile_dir
+    )
     result = PromptScrapeResult()
     log.info("=== Stage: scrape AI metadata ===")
-    log.info("SORTED DIR: %s", config.SORTED_DIR)
+    log.info("SORTED DIR: %s", sorted_dir)
     log.info("METADATA DIR: %s", config.METADATA_DIR)
 
-    browser = _find_browser_executable()
+    browser = find_browser_executable()
     if browser is None:
         log.warning("No supported browser found; Provider scraping is unavailable this run.")
-    strategies = _build_strategies(browser)
+    strategies = _build_strategies(browser, browser_profile_dir)
 
-    for source_dir in _iter_source_dirs(config.SORTED_DIR):
+    for source_dir in _iter_source_dirs(sorted_dir):
         source = source_dir.name
         strategy = strategies.get(source)
 
@@ -134,7 +153,7 @@ def _iter_source_dirs(root: Path):
 
 
 def _scrape_provider_video(
-    video_path: Path, image_url: str, browser: Path, base_url: str,
+    video_path: Path, image_url: str, browser: Path, base_url: str, profile_dir: Path,
 ) -> dict[str, str]:
     image_id = image_url.rstrip("/").split("/")[-1]
     candidate_urls = [
@@ -148,7 +167,7 @@ def _scrape_provider_video(
     source_image_url = ""
     video_metadata: dict[str, str] = {}
     for candidate in candidate_urls:
-        html = _fetch_dom(candidate, browser)
+        html = fetch_dom(candidate, browser, profile_dir=profile_dir)
         document = parse_document(html)
         panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
         if panel is not None:
@@ -172,7 +191,7 @@ def _scrape_provider_video(
     payload: dict[str, object] = {"video": video_data}
 
     if source_image_url:
-        image_html = _fetch_dom(source_image_url, browser)
+        image_html = fetch_dom(source_image_url, browser, profile_dir=profile_dir)
         image_document = parse_document(image_html)
         image_panel = query_selector(image_document, _CONTENT_PANEL_SELECTOR)
         image_data: dict[str, str] = {}
@@ -197,7 +216,7 @@ def _scrape_provider_video(
     return payload
 
 
-def _build_strategies(browser):
+def _build_strategies(browser, profile_dir):
     """Map each ingest source to a ``(video) -> payload`` metadata builder.
 
     Origenerator is a normal external content source whose metadata Evolver pulls
@@ -210,7 +229,7 @@ def _build_strategies(browser):
     strategies = {"origenerator": origenerator_metadata.build_metadata}
     if browser is not None:
         strategies[provider_source] = lambda video: _scrape_provider_video(
-            video, _provider_image_url(video, base_url), browser, base_url
+            video, _provider_image_url(video, base_url), browser, base_url, profile_dir
         )
     return strategies
 
@@ -266,47 +285,6 @@ def _image_page_url_from_src(src: str, base_url: str) -> str:
     if not image_id:
         return ""
     return f"{base_url}/image/{image_id}"
-
-
-def _fetch_dom(url: str, browser: Path) -> str:
-    profile_dir = config.PROJECT_DIR / ".tmp-prompt-browser-profile"
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    proc = subprocess.run(
-        [
-            str(browser),
-            "--headless=new",
-            "--disable-gpu",
-            "--disable-breakpad",
-            "--disable-crash-reporter",
-            "--no-first-run",
-            f"--user-data-dir={profile_dir}",
-            "--virtual-time-budget=10000",
-            "--dump-dom",
-            url,
-        ],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-    if proc.returncode != 0:
-        stderr = proc.stderr.strip() or f"exit {proc.returncode}"
-        raise RuntimeError(f"Browser DOM dump failed for {url}: {stderr}")
-    return proc.stdout
-
-
-def _find_browser_executable() -> Path | None:
-    candidates = [
-        Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
-        Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
-        Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
-        Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-    ]
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return None
 
 
 @dataclass
