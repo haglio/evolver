@@ -1,7 +1,9 @@
 import json
+import sys
 import unittest
+from unittest.mock import patch
 
-from backfill.voice import build_grammar, partial_text, recognized_phrase
+from backfill.voice import VoiceListener, build_grammar, partial_text, recognized_phrase
 
 
 class TestBuildGrammar(unittest.TestCase):
@@ -65,3 +67,20 @@ class TestPartialText(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAMissingAudioStack(unittest.TestCase):
+    def test_it_is_reported_through_the_one_handler_that_wraps_the_run(self):
+        """vosk and sounddevice are declared runtime dependencies, so a missing
+        one is not an expected condition with a friendly message of its own —
+        it is a broken install, reported the way every other failure in this
+        thread is, and mic.py already imports sounddevice unguarded inside the
+        same block."""
+        listener = VoiceListener(["side beta"])
+
+        with patch.dict(sys.modules, {"vosk": None}):
+            with self.assertLogs("backfill.voice", level="ERROR") as logged:
+                listener._run()
+
+        self.assertEqual(len(logged.records), 1)
+        self.assertEqual(logged.records[0].getMessage(), "Voice listener crashed")

@@ -97,13 +97,6 @@ class VoiceListener(QObject):
         self._stop.set()
 
     def _run(self) -> None:
-        try:
-            import sounddevice
-            import vosk
-        except ImportError:
-            log.exception("Voice control needs vosk and sounddevice")
-            return
-
         audio: queue.Queue[bytes] = queue.Queue()
 
         def on_audio(indata, _frames, _time, status):
@@ -112,6 +105,9 @@ class VoiceListener(QObject):
             audio.put(bytes(indata))
 
         try:
+            import sounddevice
+            import vosk
+
             model = vosk.Model(model_name=config.VOICE_MODEL_NAME)
             recognizer = vosk.KaldiRecognizer(
                 model, config.VOICE_SAMPLE_RATE, build_grammar(self._phrases)
