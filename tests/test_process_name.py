@@ -54,3 +54,16 @@ def test_naming_never_takes_a_launch_down():
         side_effect=OSError("read-only venv"),
     ):
         tray_app._name_this_process()  # returning at all is the contract
+
+
+def test_a_failure_to_name_leaves_a_trace():
+    """Silently, the task list is full of anonymous Pythons and nothing anywhere
+    says why -- which is the state this whole mechanism exists to end."""
+    with patch(
+        "app_support.process_identity.ProcessNamer",
+        side_effect=OSError("read-only venv"),
+    ), patch("tray_app.crash_log.write_info") as write_info:
+        tray_app._name_this_process()
+
+    write_info.assert_called_once()
+    assert "name" in " ".join(str(arg) for arg in write_info.call_args[0]).lower()

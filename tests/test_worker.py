@@ -92,6 +92,14 @@ class TestPipelineWorker(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("boom", errors[0])
 
+    def test_the_traceback_is_logged_before_the_message_is_flattened(self):
+        """str(exc) is all the GUI ever sees. Without this the only record of
+        where a pipeline died is a sentence in a toast."""
+        with self.assertLogs("gui.worker", level="ERROR") as caught:
+            self._run_worker(pipeline_error=RuntimeError("boom"))
+
+        self.assertTrue(any(record.exc_info for record in caught.records))
+
     def test_trigger_passed_to_run_record(self):
         _, _, finished, _, _ = self._run_worker(trigger="scheduled")
         self.assertEqual(finished[0].trigger, "scheduled")

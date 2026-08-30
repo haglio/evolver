@@ -1,3 +1,5 @@
+import json
+import logging
 from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from unittest.mock import Mock
@@ -128,6 +130,61 @@ class TestRunRecordRoundTrip:
 
     def test_load_runs_returns_empty_for_missing_dir(self):
         assert load_runs(Path("nonexistent_dir_xyz")) == []
+
+
+class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
+    """One added field must not take the whole history down with it.
+
+    ``RunRecord(**data)`` inside a bare ``except Exception: continue`` meant a
+    record carrying a key the dataclass does not declare vanished with no word
+    -- so adding one field to the format silently emptied the history list and
+    the stats chart of every run written since, and so did one truncated file.
+    """
+
+    def _record(self, run_id, **extra):
+        return {
+            "id": run_id,
+            "started_at": "2026-01-01T00:00:00",
+            "finished_at": "2026-01-01T00:00:05",
+            "duration_seconds": 5.0,
+            "trigger": "manual",
+            "status": "success",
+            "stages": [],
+            **extra,
+        }
+
+    def test_a_key_the_dataclass_does_not_declare_is_dropped_not_the_record(self):
+        with workspace_temp_dir() as root:
+            (root / "a.json").write_text(json.dumps(self._record("a")), encoding="utf-8")
+            (root / "b.json").write_text(
+                json.dumps(self._record("b", notes="a field added later")),
+                encoding="utf-8",
+            )
+
+            records = load_runs(root)
+
+            assert [r.id for r in records] == ["b", "a"]
+
+    def test_a_file_written_half_way_is_skipped_and_named(self, caplog):
+        with workspace_temp_dir() as root:
+            (root / "a.json").write_text(json.dumps(self._record("a")), encoding="utf-8")
+            (root / "b.json").write_text('{"id": "b", "started_at":', encoding="utf-8")
+
+            with caplog.at_level(logging.WARNING):
+                records = load_runs(root)
+
+            assert [r.id for r in records] == ["a"]
+            assert any("b.json" in record.getMessage() for record in caplog.records)
+
+    def test_a_record_missing_a_field_the_dataclass_requires_is_named_too(self, caplog):
+        with workspace_temp_dir() as root:
+            (root / "a.json").write_text(json.dumps({"id": "a"}), encoding="utf-8")
+
+            with caplog.at_level(logging.WARNING):
+                records = load_runs(root)
+
+            assert records == []
+            assert any("a.json" in record.getMessage() for record in caplog.records)
 
 
 class TestRunRecordFromPipelineResult:

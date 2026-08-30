@@ -69,6 +69,20 @@ class TestEvolverSettings(unittest.TestCase):
             loaded = EvolverSettings.load(path)
             self.assertEqual(loaded.interval_minutes, 10)
 
+    def test_a_corrupt_file_says_so_before_the_defaults_overwrite_it(self):
+        """Silently resetting is how one malformed byte turns into "my interval
+        went back to ten and I do not know why" -- and the next save writes the
+        evidence away."""
+        with workspace_temp_dir() as tmp:
+            path = tmp / "settings.json"
+            path.write_text("not json!!!")
+
+            with self.assertLogs("gui.settings", level="WARNING") as caught:
+                EvolverSettings.load(path)
+
+            self.assertTrue(any(str(path) in record.getMessage()
+                                for record in caught.records))
+
     def test_enable_toasts_defaults_to_false(self):
         s = EvolverSettings()
         self.assertFalse(s.enable_toasts)

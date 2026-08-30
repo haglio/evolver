@@ -51,6 +51,10 @@ class PipelineWorker(QThread):
                 log.exception("Failed to save run record")
             self.pipeline_finished.emit(record)
         except Exception as exc:
+            # Logged before it is flattened: str(exc) is all the GUI ever sees,
+            # so without this the only record of where a pipeline died is a
+            # sentence in a toast.
+            log.exception("Pipeline run failed")
             self.pipeline_error.emit(str(exc))
 
     def _on_stage_start(self, name: str):

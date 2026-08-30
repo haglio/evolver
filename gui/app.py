@@ -299,9 +299,12 @@ class EvolverApp:
     def _on_session_end(self, manager):
         """Handle Windows session-management events (shutdown, logoff, installer restart).
 
-        Logs the event and initiates a graceful shutdown so the scheduler,
-        worker thread, and any running subprocesses are cleaned up before
-        Windows force-kills the process.
+        Logs the event, then quits the way the tray menu does: the scheduler
+        stops and the worker thread is given five seconds to finish its stage.
+        What it deliberately does NOT do is touch the detached processes -- the
+        in-flight non-AI encode, the backfill tool -- because those are
+        detached precisely so they outlive this one, and Windows is about to
+        end the session for all of them anyway.
         """
         crash_log.write_info(
             "Windows session end requested:",

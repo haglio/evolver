@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -78,7 +81,12 @@ def result_to_dict(result: Any) -> dict[str, Any] | None:
             d = dataclasses.asdict(result)
         else:
             d = {k: v for k, v in vars(result).items() if not k.startswith("_")}
-    except Exception:
+    except TypeError:
+        # Something with no __dict__ to read -- a bare object, an int. Nothing
+        # downstream reads this shape; it exists so one odd stage result cannot
+        # cost the whole run its record.
+        log.warning("Stage result %r could not be described; keeping its repr.",
+                    type(result).__name__)
         return {"repr": repr(result)}
     return _make_json_safe(d)
 
@@ -104,15 +112,29 @@ def save_run(record: RunRecord, runs_dir: Path) -> Path:
 
 
 def load_runs(runs_dir: Path) -> list[RunRecord]:
-    """Load all run records from a directory, newest first."""
+    """Load all run records from a directory, newest first.
+
+    Only the keys the dataclass declares are read off a record, so a field
+    added to the format later does not make every record written since
+    unreadable -- which, behind a bare ``except: continue``, emptied the
+    history list and the stats chart with nothing said. A file that genuinely
+    cannot be read is skipped and named in the log instead of vanishing.
+    """
     if not runs_dir.is_dir():
         return []
     records = []
-    for path in runs_dir.glob("*.json"):
+    for path in sorted(runs_dir.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            records.append(RunRecord(**data))
-        except Exception:
-            continue
+            records.append(RunRecord(**{
+                key: value for key, value in data.items()
+                if key in RunRecord.__dataclass_fields__
+            }))
+        except (OSError, json.JSONDecodeError, TypeError, AttributeError):
+            # AttributeError: valid JSON that is not an object, so .items() is
+            # not there to call. TypeError: a record missing a field the
+            # dataclass requires.
+            log.warning("Could not read run record %s; skipping it.", path,
+                        exc_info=True)
     records.sort(key=lambda r: r.id, reverse=True)
     return records
