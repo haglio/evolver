@@ -8,6 +8,7 @@ Win32 boundary with the structures filled by hand; those tests run on any
 platform.
 """
 
+import inspect
 import unittest
 
 import pytest
@@ -22,6 +23,17 @@ def _fills(**fields):
             setattr(ref._obj, name, value)
         return 1
     return fake
+
+
+class TestCpuBusyPercentSurface:
+    def test_the_sample_window_has_to_be_named_by_the_caller(self):
+        """The one caller passes `config.CPU_BUSY_SKIP_SAMPLE_SECONDS`; a
+        default here would be a second copy of that tuning value, free to
+        disagree with it."""
+        assert (
+            inspect.signature(system_resources.cpu_busy_percent).parameters["sample_seconds"].default
+            is inspect.Parameter.empty
+        )
 
 
 class TestAvailableRamConversion:
