@@ -85,10 +85,14 @@ class TestClipperSessions(unittest.TestCase):
             session = _write_json(temp / "sessions" / "Scratch.json", {"video_path": gone})
 
             with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
-                result = reference_sync.run()
+                with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
+                    result = reference_sync.run()
 
             self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], gone)
             self.assertEqual(result.unresolved, 1)
+            # The stage no longer carries the paths on its result, so the log is
+            # the only place that says *which* reference could not be followed.
+            self.assertIn(gone, logged.records[0].getMessage())
 
     def test_leaves_a_session_whose_video_never_moved_untouched(self):
         with workspace_temp_dir() as temp:

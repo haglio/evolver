@@ -8,6 +8,10 @@ for each ordering constraint in a comment beside the stage it binds. Their
 display names and descriptions are ``gui/progress.STAGES``. Each of those is the
 one copy of what it holds; a list here would be a second, free to drift from
 both.
+
+One gap, held for sign-off rather than closed here: ``genau_deliver`` is emitted
+by ``run_pipeline`` and has no ``STAGES`` entry, so the progress popup gives it no
+bar and the stats chart drops its duration.
 """
 
 import logging
