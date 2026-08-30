@@ -19,17 +19,27 @@ class SortResult:
     moved_files: list[Path] = field(default_factory=list)
 
 
-def run() -> SortResult:
+def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> SortResult:
+    """Move every finalized inbox video into the sorted tree, by source and shape.
+
+    The two folders are arguments so the signature says what the stage
+    touches. They are resolved here rather than in the signature: a default
+    evaluated at import would freeze whatever ``config`` held then, and the
+    suite redirects those paths after this module has been imported.
+    """
+    inbox_dir = config.INBOX_DIR if inbox_dir is None else inbox_dir
+    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
+
     result = SortResult()
-    config.SORTED_DIR.mkdir(parents=True, exist_ok=True)
+    sorted_dir.mkdir(parents=True, exist_ok=True)
 
     log.info("=== Stage: 0_inbox -> 1_sorted (move) ===")
-    log.info("INBOX:  %s", config.INBOX_DIR)
-    log.info("SORTED: %s", config.SORTED_DIR)
+    log.info("INBOX:  %s", inbox_dir)
+    log.info("SORTED: %s", sorted_dir)
 
-    sources = list(_iter_source_dirs(config.INBOX_DIR))
+    sources = list(_iter_source_dirs(inbox_dir))
     if not sources:
-        log.info("No source directories found in inbox: %s", config.INBOX_DIR)
+        log.info("No source directories found in inbox: %s", inbox_dir)
 
     for src_root in sources:
         source = src_root.name
@@ -45,7 +55,7 @@ def run() -> SortResult:
                 continue
 
             rel = src.relative_to(src_root)
-            dest = config.SORTED_DIR / source / orient / rel
+            dest = sorted_dir / source / orient / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
 
             log.info("MOVE  [%s/%s] %s", source, orient, rel)

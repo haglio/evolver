@@ -31,7 +31,7 @@ from tests.test_dead_code import PROJECT_ROOT, _source_files
 # number when a conversion removes reads; never raise one. The count comes from
 # the syntax tree, so a mention in a comment or a docstring does not move it.
 CONFIG_REFERENCE_LEDGER = {
-    "tasks": 173,
+    "tasks": 169,
     "util+backfill": 37,
     "gui": 14,
 }

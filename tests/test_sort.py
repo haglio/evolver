@@ -111,6 +111,31 @@ class TestSortHelpers(unittest.TestCase):
 
             self.assertFalse(source_dir.exists())
 
+    def test_run_sorts_between_the_folders_it_is_given(self):
+        """The two folders the stage moves between are arguments to it.
+
+        `config` still answers when the caller names nothing — everything else
+        in this file relies on that, and so does the pipeline — but the
+        signature now says what the stage touches instead of leaving a reader
+        to grep the body for it. The ambient inbox and sorted root here are
+        paths that do not exist: a stage still reaching for them would create
+        the sorted one on its first line.
+        """
+        with workspace_temp_dir() as td_path:
+            inbox = td_path / "given_inbox"
+            sorted_dir = td_path / "given_sorted"
+            (inbox / "examplesource").mkdir(parents=True)
+            (inbox / "examplesource" / "clip one.mp4").write_bytes(b"video")
+            ambient = td_path / "ambient"
+
+            with override_config(INBOX_DIR=ambient / "0_inbox", SORTED_DIR=ambient / "1_sorted"):
+                with patch("tasks.sort.get_orientation", return_value="portrait"):
+                    result = sort_task.run(inbox_dir=inbox, sorted_dir=sorted_dir)
+
+            self.assertEqual(result.moved, 1)
+            self.assertTrue((sorted_dir / "examplesource" / "portrait" / "clip one.mp4").exists())
+            self.assertFalse(ambient.exists())
+
     def test_iter_videos_ignores_partial_files(self):
         with workspace_temp_dir() as td_path:
             good = td_path / "clip.mp4"
