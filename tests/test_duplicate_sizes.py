@@ -62,6 +62,26 @@ class TestDuplicateSizes:
             assert result.ok
             assert result.scanned_count == 2
 
+    def test_run_scans_the_folder_it_is_given(self):
+        """The root scanned and the root paths are reported relative to are one
+        thing, and it is an argument now. The ambient folder here holds a
+        duplicate pair the given one does not."""
+        with workspace_temp_dir() as root:
+            given = root / "given"
+            (given / "examplebucket").mkdir(parents=True)
+            (given / "examplebucket" / "clip one.mp4").write_bytes(b"unique")
+
+            ambient = root / "ambient"
+            (ambient / "examplebucket").mkdir(parents=True)
+            (ambient / "examplebucket" / "clip two.mp4").write_bytes(b"same-size")
+            (ambient / "examplebucket" / "clip three.mp4").write_bytes(b"same-size")
+
+            with override_config(NON_AI_DIR=ambient):
+                result = check_duplicate_sizes.run(show_popup=False, non_ai_dir=given)
+
+            assert result.ok
+            assert result.scanned_count == 1
+
 
 class TestMain:
     """The standalone entry point's report and exit code, previously untested

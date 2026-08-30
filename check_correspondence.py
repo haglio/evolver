@@ -33,9 +33,22 @@ def sorted_to_outbox_name(sorted_file: Path) -> str:
     return f"{sorted_file.stem}_topaz{sorted_file.suffix}"
 
 
-def run(show_popup: bool = False) -> CorrespondenceResult:
-    sorted_files = sorted(iter_videos(config.SORTED_DIR))
-    outbox_root = config.OUTBOX_DIR
+def run(
+    show_popup: bool = False,
+    *,
+    sorted_dir: Path | None = None,
+    outbox_dir: Path | None = None,
+) -> CorrespondenceResult:
+    """Check that every sorted video has exactly one upscale, and vice versa.
+
+    The two trees compared are arguments, resolved here rather than in the
+    signature: a default is evaluated at import, which would freeze the value
+    past ``override_config``.
+    """
+    sorted_root = config.SORTED_DIR if sorted_dir is None else sorted_dir
+    outbox_root = config.OUTBOX_DIR if outbox_dir is None else outbox_dir
+
+    sorted_files = sorted(iter_videos(sorted_root))
     outbox_files = sorted(iter_videos(outbox_root))
 
     expected_outbox_names = {sorted_to_outbox_name(p) for p in sorted_files}
@@ -53,7 +66,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     for sorted_file in sorted_files:
         expected_outbox_name = sorted_to_outbox_name(sorted_file)
         if expected_outbox_name not in outbox_name_to_paths:
-            orphan_sorted.append(str(sorted_file.relative_to(config.SORTED_DIR)))
+            orphan_sorted.append(str(sorted_file.relative_to(sorted_root)))
 
     duplicates = {
         outbox_name: sorted(paths)
@@ -68,7 +81,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
         orphan_sorted=sorted(orphan_sorted),
         duplicates=duplicates,
     )
-    _log_result(result)
+    _log_result(result, sorted_root, outbox_root)
 
     if show_popup and not result.ok:
         log.info("Showing error popup for correspondence failure")
@@ -78,10 +91,10 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     return result
 
 
-def _log_result(result: CorrespondenceResult) -> None:
+def _log_result(result: CorrespondenceResult, sorted_root: Path, outbox_root: Path) -> None:
     log.info("=== Stage: correspondence check ===")
-    log.info("1_sorted: %d video file(s) in %s", result.sorted_count, config.SORTED_DIR)
-    log.info("Outboxes: %d video file(s) across %s", result.outbox_count, config.OUTBOX_DIR)
+    log.info("1_sorted: %d video file(s) in %s", result.sorted_count, sorted_root)
+    log.info("Outboxes: %d video file(s) across %s", result.outbox_count, outbox_root)
 
     if result.sorted_count == result.outbox_count:
         log.info("Count check OK: %d files each", result.sorted_count)
@@ -152,10 +165,12 @@ def _truncate(items: list[str], limit: int = 10) -> list[str]:
 
 
 def main() -> int:
-    result = run(show_popup=False)
+    sorted_root = config.SORTED_DIR
+    outbox_root = config.OUTBOX_DIR
+    result = run(show_popup=False, sorted_dir=sorted_root, outbox_dir=outbox_root)
 
-    print(f"1_sorted  : {result.sorted_count} video file(s)  in  {config.SORTED_DIR}")
-    print(f"outboxes  : {result.outbox_count} video file(s)  in  {config.OUTBOX_DIR}")
+    print(f"1_sorted  : {result.sorted_count} video file(s)  in  {sorted_root}")
+    print(f"outboxes  : {result.outbox_count} video file(s)  in  {outbox_root}")
     print()
 
     if result.sorted_count == result.outbox_count:

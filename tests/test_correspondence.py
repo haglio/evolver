@@ -138,6 +138,37 @@ class TestCorrespondence:
             assert result.sorted_count == 1
             assert result.outbox_count == 1
 
+    def test_run_checks_the_two_trees_it_is_given(self):
+        """The pair the stage compares is an argument, not something to grep for.
+
+        `config` still answers when the caller names neither, which is what the
+        pipeline does. The ambient pair here holds a mismatch the given pair
+        does not, so a stage still reading it would report a failure instead of
+        a clean check.
+        """
+        with workspace_temp_dir() as root:
+            given_sorted = root / "given" / "sorted"
+            given_outbox = root / "given" / "outbox"
+            (given_sorted / "examplesource" / "landscape").mkdir(parents=True)
+            (given_outbox / "landscape").mkdir(parents=True)
+            (given_sorted / "examplesource" / "landscape" / "clip one.mp4").write_bytes(b"a")
+            (given_outbox / "landscape" / "clip one_topaz.mp4").write_bytes(b"a")
+
+            ambient_sorted = root / "ambient" / "sorted"
+            ambient_outbox = root / "ambient" / "outbox"
+            (ambient_sorted / "examplesource").mkdir(parents=True)
+            ambient_outbox.mkdir(parents=True)
+            (ambient_sorted / "examplesource" / "orphan.mp4").write_bytes(b"a")
+
+            with override_config(SORTED_DIR=ambient_sorted, OUTBOX_DIR=ambient_outbox):
+                result = check_correspondence.run(
+                    show_popup=False, sorted_dir=given_sorted, outbox_dir=given_outbox,
+                )
+
+            assert result.ok
+            assert result.sorted_count == 1
+            assert result.outbox_count == 1
+
 
 class TestMain:
     """The standalone entry point: the exit code is the contract a shell or a
