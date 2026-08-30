@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.progress import ALL_STAGES
+from gui.progress import ALL_STAGES, STAGE_LABELS
 from gui.run_record import RunRecord
 
 STAGE_COLORS = {
@@ -38,9 +38,38 @@ STAGE_COLORS = {
 _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
 _LIMIT_SECONDS = 600.0
 _MARGIN_LEFT = 70
-_MARGIN_RIGHT = 110
 _MARGIN_TOP = 20
 _MARGIN_BOTTOM = 50
+
+_LEGEND_POINT_SIZE = 8
+_LEGEND_SWATCH = 10
+_LEGEND_PADDING = 6
+_LEGEND_TEXT_GAP = 6
+_LEGEND_LINE_HEIGHT = 16
+_LEGEND_INSET = 10  # between the legend box and both the chart and the widget edge
+
+
+def _legend_font() -> QFont:
+    font = QFont()
+    font.setPointSize(_LEGEND_POINT_SIZE)
+    return font
+
+
+def legend_width() -> int:
+    """The legend box's width: enough for the longest stage label, measured.
+
+    Not a fixed number, because the labels run half again the width of the
+    stage keys they replaced and by how much depends on the machine's font —
+    one picked here would clip the legend on a box with a wider one.
+    """
+    metrics = QFontMetrics(_legend_font())
+    widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())
+    return _LEGEND_PADDING + _LEGEND_SWATCH + _LEGEND_TEXT_GAP + widest + _LEGEND_PADDING
+
+
+def chart_right_margin() -> int:
+    """What the legend costs the chart: its own width, inset from both sides."""
+    return legend_width() + 2 * _LEGEND_INSET
 
 
 def _pick_y_ticks(y_max: float) -> list[float]:
@@ -126,7 +155,7 @@ class StackedAreaChart(QWidget):
         w, h = self.width(), self.height()
         chart_x = _MARGIN_LEFT
         chart_y = _MARGIN_TOP
-        chart_w = w - _MARGIN_LEFT - _MARGIN_RIGHT
+        chart_w = w - _MARGIN_LEFT - chart_right_margin()
         chart_h = h - _MARGIN_TOP - _MARGIN_BOTTOM
 
         if chart_w <= 0 or chart_h <= 0:
@@ -292,16 +321,14 @@ class StackedAreaChart(QWidget):
                 painter.drawText(x - 12, baseline_y + 26, lines[1])
 
     def _draw_legend(self, painter: QPainter, widget_w: int, top_y: int):
-        font = QFont()
-        font.setPointSize(8)
-        painter.setFont(font)
+        painter.setFont(_legend_font())
 
-        box_size = 10
-        line_height = 16
-        padding = 6
-        legend_w = _MARGIN_RIGHT - 20
+        box_size = _LEGEND_SWATCH
+        line_height = _LEGEND_LINE_HEIGHT
+        padding = _LEGEND_PADDING
+        legend_w = legend_width()
 
-        lx = widget_w - _MARGIN_RIGHT + 10
+        lx = widget_w - legend_w - _LEGEND_INSET
         ly = int(top_y + 10)
 
         legend_h = len(ALL_STAGES) * line_height + padding * 2
@@ -318,7 +345,8 @@ class StackedAreaChart(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(lx + padding, y_pos, box_size, box_size)
             painter.setPen(QColor(0x30, 0x30, 0x30))
-            painter.drawText(lx + padding + box_size + 6, y_pos + box_size - 1, stage_key)
+            painter.drawText(lx + padding + box_size + _LEGEND_TEXT_GAP, y_pos + box_size - 1,
+                             STAGE_LABELS[stage_key])
 
 
 class StatsWindow(QDialog):

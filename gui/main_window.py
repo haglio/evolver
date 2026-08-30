@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 import config
-from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
+from gui.progress import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from gui.toggle_switch import ToggleSwitch
@@ -108,7 +108,7 @@ class RunDetailWidget(QWidget):
             num_item.setFlags(no_edit)
             self._table.setItem(i, 0, num_item)
 
-            name_item = QTableWidgetItem(stage_key)
+            name_item = QTableWidgetItem(STAGE_LABELS.get(stage_key, stage_key))
             name_item.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
             name_item.setFlags(no_edit)
             self._table.setItem(i, 1, name_item)

@@ -10,6 +10,7 @@ from PyQt6.QtGui import QTextDocument
 from PyQt6.QtWidgets import QMessageBox, QToolBar
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
+from gui.progress import STAGE_TOOLTIPS
 from gui.toggle_switch import ToggleSwitch
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import make_run_record
@@ -30,18 +31,40 @@ class TestRunDetailRendering:
             ],
         )
 
-    def _row_details(self, widget, stage_name):
+    def _row_details(self, widget, shown_as):
         for row in range(widget._table.rowCount()):
-            if widget._table.item(row, 1).text() == stage_name:
+            if widget._table.item(row, 1).text() == shown_as:
                 return widget._table.item(row, 4).text()
         return None
 
     def test_metadata_row_shows_scraped_and_errors(self):
         widget = RunDetailWidget()
         widget.show_record(self._record())
-        details = self._row_details(widget, "metadata")
+        details = self._row_details(widget, "Metadata Scrape")
         assert "newly_scraped=0" in details
         assert "errors=58" in details
+
+    def test_the_stage_column_reads_the_stage_name_not_its_key(self):
+        """The table is what you read after a run; the key is what the record
+        files it under, and the two are not the same word."""
+        widget = RunDetailWidget()
+        widget.show_record(self._record())
+
+        assert widget._table.item(0, 1).text() == "Metadata Scrape"
+        assert widget._table.item(0, 1).toolTip() == STAGE_TOOLTIPS["metadata"]
+
+    def test_a_stage_the_registry_does_not_list_still_shows_its_key(self):
+        """`genau_deliver` is emitted by the pipeline and has no registry entry
+        (bug 2, held), and records on disk go back months — a row must render
+        rather than raise or come out blank."""
+        widget = RunDetailWidget()
+        widget.show_record(make_run_record(
+            id="x", started_at="2026-06-27T22:18:46", finished_at="2026-06-27T22:18:46",
+            duration_seconds=1.0, trigger="manual", status="success",
+            stages=[{"name": "genau_deliver", "status": "completed", "duration_seconds": 1.0}],
+        ))
+
+        assert widget._table.item(0, 1).text() == "genau_deliver"
 
 
 class TestRunHistoryMarks:
