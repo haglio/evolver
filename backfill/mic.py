@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import config
 
@@ -26,37 +27,72 @@ log = logging.getLogger(__name__)
 _PROBE_SECONDS = 0.4
 
 
+@dataclass(frozen=True)
+class ChosenInput:
+    """Which device was picked. The name is for the log line that says so."""
+
+    index: int
+    name: str
+
+
 def choose_input_device(
     devices: list[dict],
     probe: Callable[[int], float],
     *,
     override: str | None = None,
     hostapi: int | None = None,
-) -> tuple[int | None, str | None]:
-    """Pick an input device index from a ``sounddevice.query_devices()`` list.
+) -> ChosenInput | None:
+    """Pick an input device from a ``sounddevice.query_devices()`` list.
 
-    Only devices on *hostapi* are considered when it is given — on Windows the same
-    mic is listed under several host APIs and some (WDM-KS) cannot be opened for
-    blocking reads, so selection sticks to the API the OS default uses. With
-    *override* (a device-name substring) the first matching input wins, unprobed.
-    Otherwise each distinct input's live level is measured via ``probe(index) -> rms``
-    and the LIVELIEST is taken — a real mic's self-noise always beats a disconnected
-    virtual device's ~0, so this passes over a dead default even in a silent room,
-    where an absolute-threshold check would find nothing and fall back to that very
-    dead default. Returns ``(index, name)``, or ``(None, None)`` when there is no
-    input device to probe at all.
+    Override else liveliest, and None when there is no input device to probe at
+    all. What each of those two means is in the function that does it.
     """
-    inputs = [
-        (i, d)
-        for i, d in enumerate(devices)
-        if d.get("max_input_channels", 0) > 0 and (hostapi is None or d.get("hostapi") == hostapi)
+    inputs = _inputs_on(devices, hostapi)
+    return _matching_override(inputs, override) or _liveliest(inputs, probe)
+
+
+def _inputs_on(devices: list[dict], hostapi: int | None) -> list[tuple[int, dict]]:
+    """The devices that can record, on *hostapi* when one is named.
+
+    On Windows the same mic is listed under several host APIs and some (WDM-KS)
+    cannot be opened for blocking reads, so selection sticks to the API the OS
+    default already uses.
+    """
+    return [
+        (index, device)
+        for index, device in enumerate(devices)
+        if device.get("max_input_channels", 0) > 0
+        and (hostapi is None or device.get("hostapi") == hostapi)
     ]
-    if override:
-        want = override.strip().lower()
-        for index, device in inputs:
-            if want and want in device["name"].lower():
-                return index, device["name"]
-    best_index, best_name, best_level = None, None, None
+
+
+def _matching_override(inputs: list[tuple[int, dict]],
+                       override: str | None) -> ChosenInput | None:
+    """The first input whose name contains *override*, unprobed.
+
+    An explicit choice never listens to anything: the user has said which mic,
+    and probing it could only overrule them.
+    """
+    want = (override or "").strip().lower()
+    if not want:
+        return None
+    for index, device in inputs:
+        if want in device["name"].lower():
+            return ChosenInput(index, device["name"])
+    return None
+
+
+def _liveliest(inputs: list[tuple[int, dict]],
+               probe: Callable[[int], float]) -> ChosenInput | None:
+    """The input hearing the most, measured by ``probe(index) -> rms``.
+
+    Liveliest rather than "above some level": a real mic's self-noise always
+    beats a disconnected virtual device's ~0, so this passes over a dead
+    default even in a silent room, where an absolute threshold would find
+    nothing and fall back to that very dead default.
+    """
+    best: ChosenInput | None = None
+    best_level: float | None = None
     seen: set[str] = set()
     for index, device in inputs:
         if device["name"] in seen:
@@ -72,8 +108,8 @@ def choose_input_device(
         if level is None or not math.isfinite(level):
             continue
         if best_level is None or level > best_level:
-            best_index, best_name, best_level = index, device["name"], level
-    return best_index, best_name
+            best, best_level = ChosenInput(index, device["name"]), level
+    return best
 
 
 def probe_input_device(index: int) -> float:
@@ -132,14 +168,14 @@ def resolve_input_device() -> int | None:
     hostapi = None
     if default_input is not None and default_input >= 0:
         hostapi = sounddevice.query_devices(default_input)["hostapi"]
-    index, name = choose_input_device(
+    chosen = choose_input_device(
         sounddevice.query_devices(),
         probe_input_device,
         override=config.VOICE_DEVICE_NAME,
         hostapi=hostapi,
     )
-    if index is None:
+    if chosen is None:
         log.warning("No usable input device found; falling back to the system default")
-    else:
-        log.info("Listening on input device [%d] %s", index, name)
-    return index
+        return None
+    log.info("Listening on input device [%d] %s", chosen.index, chosen.name)
+    return chosen.index
