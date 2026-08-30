@@ -178,8 +178,8 @@ def collect_candidates(
     """The pending videos, newly sorted ones first, as (file, source, orient).
 
     Public, and reached with no roots from ``has_pending_work`` as well as
-    from ``run``, so it resolves its own — which is why the outbox and the
-    weird folder each keep one read here on top of the one in ``run``.
+    from ``run``, so it resolves its own — which is why all three roots keep a
+    read here on top of the one in ``run``.
     """
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir

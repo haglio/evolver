@@ -114,7 +114,11 @@ class TestUpscaleHelpers(unittest.TestCase):
         exactly as it does for a clip that simply has no sidecar; it must not
         take the stage down before it has processed anything.
         """
-        with workspace_temp_dir() as root:
+        # The guard is reached only for a clip whose source name passes
+        # `_is_t2v_provider`'s own hardcoded "provider" check (bug 7, held), so
+        # the source is named here rather than taken from the overlay, which
+        # agrees with that literal only by happening to.
+        with workspace_temp_dir() as root, override_config(PROVIDER_SOURCE="provider"):
             sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / config.PROVIDER_SOURCE / "landscape" / "clip one.mp4"
             in_file.parent.mkdir(parents=True)

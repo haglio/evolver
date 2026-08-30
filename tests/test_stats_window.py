@@ -173,15 +173,17 @@ class TestStackedAreaChartPainting:
     """
 
     def test_a_run_paints_each_stage_as_a_band_of_its_own_color(self):
+        # Which of the two stacks first is the registry's to say, so the test
+        # asks it rather than assuming: bands go up in registry order, so the
+        # bottom 200 s belongs to whichever of the two comes earlier in it.
+        bottom, top = sorted(("purge", "sort"), key=ALL_STAGES.index)
         chart = StackedAreaChart(
-            _two_runs({"purge": 200.0, "sort": 200.0}, {"purge": 200.0, "sort": 200.0})
+            _two_runs({bottom: 200.0, top: 200.0}, {bottom: 200.0, top: 200.0})
         )
         image = _render(chart)
-        # purge is the first stage in the registry, so its band is the bottom
-        # 200 s of the stack and sort's — the next stage these records mention —
-        # is the 200 s above it.
-        assert _is_band_fill(_rgb(image, 380, 300), "purge")
-        assert _is_band_fill(_rgb(image, 380, 230), "sort")
+
+        assert _is_band_fill(_rgb(image, 380, 300), bottom)
+        assert _is_band_fill(_rgb(image, 380, 230), top)
         assert _rgb(image, 380, 120) == _WHITE  # above the stack: bare ground
 
     def test_an_empty_chart_says_so_instead_of_going_blank(self):

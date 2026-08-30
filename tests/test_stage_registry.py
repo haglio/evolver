@@ -204,8 +204,8 @@ class TestStageRegistry(unittest.TestCase):
         that way, and the README carried a third numbering again.
 
         The prose is scanned as well as the code because that is where the
-        worst of it was — twenty-four "Stage N" mentions, spread across a
-        module list and a page of notes.
+        worst of it was: twenty "Stage N" mentions across a module list and a
+        page of notes, in two numbering schemes, neither the registry's.
         """
         scanned = _source_files(PROJECT_ROOT) + ["README.md", "docs/maintenance_notes.md"]
         offenders = sorted(
