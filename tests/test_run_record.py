@@ -4,7 +4,7 @@ import logging
 import pytest
 from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from tests.temp_helpers import workspace_temp_dir
 
@@ -187,6 +187,55 @@ class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
 
             assert records == []
             assert any("a.json" in record.getMessage() for record in caplog.records)
+
+
+class TestLoadingOnlyTheNewest:
+    """Nothing prunes the runs directory, and the main window reads it on the
+    GUI thread after every run."""
+
+    def _write(self, root, run_id):
+        (root / f"{run_id}.json").write_text(json.dumps({
+            "id": run_id, "started_at": "2026-01-01T00:00:00",
+            "finished_at": "2026-01-01T00:00:05", "duration_seconds": 5.0,
+            "trigger": "manual", "status": "success", "stages": [],
+        }), encoding="utf-8")
+
+    def test_a_limit_takes_the_newest_that_many(self):
+        with workspace_temp_dir() as root:
+            for run_id in ("2026-01-01T00-00-00", "2026-01-02T00-00-00",
+                           "2026-01-03T00-00-00"):
+                self._write(root, run_id)
+
+            records = load_runs(root, limit=2)
+
+            assert [r.id for r in records] == ["2026-01-03T00-00-00",
+                                               "2026-01-02T00-00-00"]
+
+    def test_no_limit_reads_them_all(self):
+        with workspace_temp_dir() as root:
+            for run_id in ("2026-01-01T00-00-00", "2026-01-02T00-00-00"):
+                self._write(root, run_id)
+
+            assert len(load_runs(root)) == 2
+
+    def test_the_limit_is_applied_before_any_file_is_opened(self):
+        """The whole point: a run's file is named for the moment it started, so
+        newest-first is the reverse of their order and picking the newest N
+        costs one directory listing rather than parsing the lot."""
+        with workspace_temp_dir() as root:
+            for day in range(1, 6):
+                self._write(root, f"2026-01-0{day}T00-00-00")
+            opened = []
+            real_read_text = Path.read_text
+
+            def counting_read_text(self, *args, **kwargs):
+                opened.append(self.name)
+                return real_read_text(self, *args, **kwargs)
+
+            with patch.object(Path, "read_text", counting_read_text):
+                load_runs(root, limit=2)
+
+            assert opened == ["2026-01-05T00-00-00.json", "2026-01-04T00-00-00.json"]
 
 
 class TestRunRecordFromPipelineResult:

@@ -55,7 +55,7 @@ CONFIG_REFERENCE_LEDGER = {
     "check_duplicate_sizes.py": 4,
     "evolver.py": 9,
     "gui/app.py": 6,
-    "gui/main_window.py": 1,
+    "gui/main_window.py": 2,
     "gui/presence_throttle.py": 1,
     "gui/process_identity.py": 2,
     "gui/settings.py": 2,

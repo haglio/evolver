@@ -364,7 +364,7 @@ class EvolverMainWindow(QMainWindow):
 
     def refresh_history(self):
         """Reload run records from disk."""
-        self._records = load_runs(config.RUNS_DIR)
+        self._records = load_runs(config.RUNS_DIR, limit=config.RUNS_SHOWN)
         self._history_list.clear()
         for record in self._records:
             item = QListWidgetItem(

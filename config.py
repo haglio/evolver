@@ -224,6 +224,12 @@ NONAI_PRESENCE_POLL_SECONDS = 20.0
 
 LOG_FILE = PROJECT_DIR / "evolver.log"
 RUNS_DIR = PROJECT_DIR / "runs"
+# How many runs the main window's history list reads. Nothing prunes RUNS_DIR
+# -- about 144 files a day at the default interval, kept forever -- and the
+# read happens on the GUI thread after every run, so it needs a ceiling. A
+# thousand is a week at ten minutes and months at longer intervals; the files
+# themselves are all still there, and the stats window still charts every one.
+RUNS_SHOWN = 1000
 GUI_SETTINGS_FILE = PROJECT_DIR / "gui_settings.json"
 
 # Voice control for the metadata backfill tool. The model name is resolved and cached

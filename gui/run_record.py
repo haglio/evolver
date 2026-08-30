@@ -121,19 +121,29 @@ def save_run(record: RunRecord, runs_dir: Path) -> Path:
     return path
 
 
-def load_runs(runs_dir: Path) -> list[RunRecord]:
-    """Load all run records from a directory, newest first.
+def load_runs(runs_dir: Path, limit: int | None = None) -> list[RunRecord]:
+    """Load run records from a directory, newest first, at most *limit* of them.
 
     Only the keys the dataclass declares are read off a record, so a field
     added to the format later does not make every record written since
     unreadable -- which, behind a bare ``except: continue``, emptied the
     history list and the stats chart with nothing said. A file that genuinely
     cannot be read is skipped and named in the log instead of vanishing.
+
+    *limit* is applied to the FILENAMES, before anything is opened: a run's
+    file is named for the moment it started, so newest-first is the reverse of
+    their order and picking the newest N costs one directory listing. Nothing
+    prunes this directory -- roughly 144 files a day at the default interval,
+    kept forever -- so without a limit every read of it grows, and this one
+    happens on the GUI thread after every run.
     """
     if not runs_dir.is_dir():
         return []
+    paths = sorted(runs_dir.glob("*.json"), reverse=True)
+    if limit is not None:
+        paths = paths[:limit]
     records = []
-    for path in sorted(runs_dir.glob("*.json")):
+    for path in paths:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             records.append(RunRecord(**{
