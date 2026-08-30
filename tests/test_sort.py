@@ -55,13 +55,28 @@ class TestSortHelpers(unittest.TestCase):
             src = source_dir / "clip.mp4"
             src.write_bytes(b"video")
 
-            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir, CLEAN_EMPTY_INBOX_DIRS=False):
+            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir):
                 with patch("tasks.sort.get_orientation", return_value="landscape"):
                     result = sort_task.run()
 
             self.assertEqual(result.moved, 1)
             self.assertTrue((sorted_dir / dynamic_source / "landscape" / "clip.mp4").exists())
             self.assertFalse(src.exists())
+
+    def test_run_clears_the_source_folder_it_emptied(self):
+        """The inbox is swept behind every run, not behind a switch."""
+        with workspace_temp_dir() as td_path:
+            inbox = td_path / "0_inbox"
+            sorted_dir = td_path / "1_sorted"
+            source_dir = inbox / "newsource" / "landscape"
+            source_dir.mkdir(parents=True)
+            (source_dir / "clip.mp4").write_bytes(b"video")
+
+            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir):
+                with patch("tasks.sort.get_orientation", return_value="landscape"):
+                    sort_task.run()
+
+            self.assertFalse(source_dir.exists())
 
     def test_iter_videos_ignores_partial_files(self):
         with workspace_temp_dir() as td_path:

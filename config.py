@@ -121,8 +121,6 @@ TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm", ".m4v"}
 FUNSCRIPT_EXTENSION = ".funscript"
 
-CLEAN_EMPTY_INBOX_DIRS = True
-
 UPSCALE_BATCH_LIMIT = 5
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
