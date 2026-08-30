@@ -10,7 +10,7 @@ from PyQt6.QtGui import QTextDocument
 from PyQt6.QtWidgets import QMessageBox, QToolBar
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
-from tasks.stages import STAGE_TOOLTIPS
+from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
 from gui.toggle_switch import ToggleSwitch
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import make_run_record
@@ -40,7 +40,7 @@ class TestRunDetailRendering:
     def test_metadata_row_shows_scraped_and_errors(self):
         widget = RunDetailWidget()
         widget.show_record(self._record())
-        details = self._row_details(widget, "Metadata Scrape")
+        details = self._row_details(widget, STAGE_LABELS["metadata"])
         assert "newly_scraped=0" in details
         assert "errors=58" in details
 
@@ -50,7 +50,7 @@ class TestRunDetailRendering:
         widget = RunDetailWidget()
         widget.show_record(self._record())
 
-        assert widget._table.item(0, 1).text() == "Metadata Scrape"
+        assert widget._table.item(0, 1).text() == STAGE_LABELS["metadata"]
         assert widget._table.item(0, 1).toolTip() == STAGE_TOOLTIPS["metadata"]
 
     def test_a_stage_the_registry_does_not_list_still_shows_its_key(self):

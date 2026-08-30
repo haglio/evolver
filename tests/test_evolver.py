@@ -312,9 +312,9 @@ class TestRunPipeline:
         stack, mocks = self._patch_all_stages()
         with stack:
             evolver.run_pipeline(on_stage_complete=on_complete)
-        # Check purge stage callback (first stage)
-        purge_call = on_complete.call_args_list[0]
-        assert purge_call.args[0] == "purge"
+        # Any stage would do; purge is picked by name rather than by position,
+        # because its position is the registry's to decide.
+        purge_call = next(c for c in on_complete.call_args_list if c.args[0] == "purge")
         assert purge_call.args[1] == mocks["purge_run"].return_value
         assert isinstance(purge_call.args[2], float)  # elapsed
         assert purge_call.args[3] == "completed"
@@ -500,13 +500,21 @@ class TestCooperativeStop:
     """The watchdog's stop request: honored between stages, never mid-stage."""
 
     def test_stops_between_stages_once_asked(self):
+        """Asked after whatever ran first, the run ends there.
+
+        Which stage that is belongs to the registry, so the stop is armed by
+        the first completion rather than by naming a stage — and the record
+        holding exactly one entry is what says the rest were dropped.
+        """
+        completed: list[str] = []
         mocks = _stage_mocks()
         with _patched_stages(mocks):
-            result = evolver.run_pipeline(should_stop=lambda: mocks["purge_run"].called)
+            result = evolver.run_pipeline(
+                on_stage_complete=lambda name, *_: completed.append(name),
+                should_stop=lambda: bool(completed),
+            )
 
-        assert [s.name for s in result.stages] == ["purge"]
-        mocks["prompt_scrape_run"].assert_not_called()
-        mocks["sort_run"].assert_not_called()
+        assert [s.name for s in result.stages] == ALL_STAGES[:1]
 
     def test_a_stop_that_is_never_requested_changes_nothing(self):
         mocks = _stage_mocks()

@@ -160,10 +160,9 @@ def _summarize_result(
         return f"Reason: {skip_reason}"
     if not result:
         return ""
-    if stage_key == "upscale_non_ai":
-        return _summarize_nonai_upscale(result)
-    if stage_key == "scripts":
-        return _summarize_scripts_sync(result)
+    custom = _SUMMARIZERS.get(stage_key)
+    if custom is not None:
+        return custom(result)
     headline = _HEADLINE_FIELDS.get(stage_key, ())
     parts = [f"{key}={result[key]}" for key in headline
              if isinstance(result.get(key), (int, float))]
@@ -384,3 +383,13 @@ class EvolverMainWindow(QMainWindow):
         """Hide instead of close — the tray icon keeps the app alive."""
         event.ignore()
         self.hide()
+
+
+# The two stages whose results are names and words rather than counts, so the
+# generic numeric dump has nothing useful to say about them. A table rather
+# than two `stage_key ==` branches, so a key that stops naming a stage is
+# something a test can see (tests/test_stage_registry.py).
+_SUMMARIZERS = {
+    "upscale_non_ai": _summarize_nonai_upscale,
+    "scripts": _summarize_scripts_sync,
+}

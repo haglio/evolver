@@ -14,8 +14,9 @@ from pathlib import Path
 from PyQt6.QtGui import QColor
 
 import evolver
+from gui import main_window
 from gui.stats_window import STAGE_COLORS
-from tasks.stages import ALL_STAGES, STAGES
+from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 from tests.color_support import band_fill, delta_e
 from tests.test_dead_code import PROJECT_ROOT, _source_files
 from tests.test_evolver import _patched_stages, _stage_mocks
@@ -103,6 +104,26 @@ class TestStageRegistry(unittest.TestCase):
         self.assertEqual(sorted(set(evolver._STAGE_FAILED) & CANNOT_FAIL), [])
         self.assertEqual(sorted(set(evolver._STAGE_HELD_BACK) - set(ALL_STAGES)), [])
 
+    def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
+        """Two more tables keyed by stage string, with the same silent shape.
+
+        `_HEADLINE_FIELDS` exists so a "0 succeeded" stays on screen instead of
+        vanishing and making a total failure look like a partial one, and the
+        summarizers replace a bland numeric tally with the clip names and the
+        words that say what went wrong. A stale key in either loses exactly
+        that, with nothing raised and the row still drawn.
+
+        The two summarizers were `stage_key == "upscale_non_ai"` and
+        `== "scripts"` written into the dispatch, where no gate could see
+        them; they are a table now so this can.
+        """
+        for table, name in (
+            (main_window._HEADLINE_FIELDS, "_HEADLINE_FIELDS"),
+            (main_window._SUMMARIZERS, "_SUMMARIZERS"),
+        ):
+            with self.subTest(table=name):
+                self.assertEqual(sorted(set(table) - set(ALL_STAGES)), [])
+
     def test_gui_lists_the_genau_delivery_between_the_two_upscales(self):
         """Delivery runs straight after the AI upscale, so a clip made this run
         reaches Genau this run, and before the correspondence check, which
@@ -127,16 +148,37 @@ class TestStageRegistry(unittest.TestCase):
         self.assertEqual(ALL_STAGES.index("scene_scripts"), ALL_STAGES.index("clip_scripts") + 1)
         self.assertEqual(ALL_STAGES.index("scene_scripts"), ALL_STAGES.index("scripts") - 1)
 
-    def test_no_module_writes_a_stage_number_of_its_own(self):
-        """Ordering has one home, `STAGES`. A number typed into a log line or a
-        docstring is a second copy that cannot be kept in step with it: four
-        stages were still printing the position they held in a shorter
-        pipeline, so `evolver.log` named a stage nothing else numbered that
-        way.
+    def test_the_readme_enumerates_the_stages_the_registry_declares(self):
+        """The README walks a reader through the pipeline, which makes it a
+        copy of the list like any other — and it had drifted furthest of all.
+        It enumerated eleven stages, leaving out `clip_scripts`,
+        `scene_scripts` and `group_non_ai` entirely, in an order matching
+        neither the pipeline's nor anything else's: a reader saw Sort Inbox
+        numbered 1 while the run detail table beside it printed 3.
+
+        Each entry leads with the stage's shown name in bold, so the list can
+        be read back and compared rather than maintained by hand.
         """
+        readme = Path(PROJECT_ROOT, "README.md").read_text(encoding="utf-8")
+        listed = re.findall(r"^\d+\. \*\*(.+?)\*\*", readme, re.MULTILINE)
+
+        self.assertEqual(listed, [STAGE_LABELS[key] for key in ALL_STAGES])
+
+    def test_nothing_writes_a_stage_number_of_its_own(self):
+        """Ordering has one home, `STAGES`. A number typed into a log line, a
+        docstring or a paragraph is a second copy that cannot be kept in step
+        with it: four stages were still printing the position they held in a
+        shorter pipeline, so `evolver.log` named a stage nothing else numbered
+        that way, and the README carried a third numbering again.
+
+        The prose is scanned as well as the code because that is where the
+        worst of it was — twenty-four "Stage N" mentions, spread across a
+        module list and a page of notes.
+        """
+        scanned = _source_files(PROJECT_ROOT) + ["README.md", "docs/maintenance_notes.md"]
         offenders = sorted(
             f"{name}:{i}"
-            for name in _source_files(PROJECT_ROOT)
+            for name in scanned
             for i, line in enumerate(Path(PROJECT_ROOT, name).read_text(encoding="utf-8").splitlines(), 1)
             if re.search(r"\bStage \d", line)
         )

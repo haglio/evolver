@@ -6,9 +6,6 @@ import pytest
 
 from PyQt6.QtGui import QFontMetrics, QImage
 
-from tasks.stages import STAGE_LABELS
-from tests.color_support import band_fill
-
 from gui.run_record import RunRecord
 from gui.stats_window import (
     STAGE_COLORS,
@@ -19,6 +16,8 @@ from gui.stats_window import (
     chart_right_margin,
     legend_width,
 )
+from tasks.stages import ALL_STAGES, STAGE_LABELS
+from tests.color_support import band_fill
 from tests.temp_helpers import make_run_record
 
 
@@ -100,31 +99,31 @@ class TestStackedAreaChartSeries:
     def test_normal_returns_raw_durations_chronological(self, chart):
         series = chart._compute_series()
         # Records are reversed to chronological, so purge values = [1, 2, 3]
-        purge_series = series[0]  # purge is first in ALL_STAGES
+        purge_series = series[ALL_STAGES.index("purge")]
         assert purge_series == [1.0, 2.0, 3.0]
 
     def test_every_stage_charts_its_own_durations(self, chart):
         series = chart._compute_series()
-        sort_series = series[2]  # sort is third (after purge, metadata)
+        sort_series = series[ALL_STAGES.index("sort")]
         assert sort_series == [2.0, 4.0, 6.0]
 
     def test_missing_stage_returns_zero(self, chart):
         series = chart._compute_series()
-        # "metadata" is second stage but not in our records
-        metadata_series = series[1]
+        # "metadata" is a stage the records here do not mention
+        metadata_series = series[ALL_STAGES.index("metadata")]
         assert metadata_series == [0.0, 0.0, 0.0]
 
     def test_averages_returns_running_mean(self, chart):
         chart.set_mode("averages")
         series = chart._compute_series()
-        purge_series = series[0]
+        purge_series = series[ALL_STAGES.index("purge")]
         # raw = [1, 2, 3], running avg = [1/1, 3/2, 6/3] = [1.0, 1.5, 2.0]
         assert purge_series == pytest.approx([1.0, 1.5, 2.0])
 
     def test_averages_mode_means_every_stage_not_just_the_first(self, chart):
         chart.set_mode("averages")
         series = chart._compute_series()
-        sort_series = series[2]  # sort is third (after purge, metadata)
+        sort_series = series[ALL_STAGES.index("sort")]
         # raw = [2, 4, 6], running avg = [2/1, 6/2, 12/3] = [2.0, 3.0, 4.0]
         assert sort_series == pytest.approx([2.0, 3.0, 4.0])
 
@@ -178,7 +177,9 @@ class TestStackedAreaChartPainting:
             _two_runs({"purge": 200.0, "sort": 200.0}, {"purge": 200.0, "sort": 200.0})
         )
         image = _render(chart)
-        # purge stacks first, so its band is the bottom 200 s, sort the next 200 s
+        # purge is the first stage in the registry, so its band is the bottom
+        # 200 s of the stack and sort's — the next stage these records mention —
+        # is the 200 s above it.
         assert _is_band_fill(_rgb(image, 380, 300), "purge")
         assert _is_band_fill(_rgb(image, 380, 230), "sort")
         assert _rgb(image, 380, 120) == _WHITE  # above the stack: bare ground
@@ -222,8 +223,6 @@ class TestStackedAreaChartPainting:
         assert not _limit_line_rows(fitted)
 
     def test_the_legend_swatches_every_stage_in_its_chart_color(self):
-        from tasks.stages import ALL_STAGES
-
         image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
         margin_pixels = {
             _rgb(image, x, y)
