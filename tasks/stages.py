@@ -1,22 +1,25 @@
 """The pipeline's stages, declared once.
 
 Every stage is a key, the name a person is shown, the sentence explaining it,
-and the colour its band is drawn in — in the order ``run_pipeline`` runs them.
+and the color its band is drawn in — in the order ``run_pipeline`` runs them.
 Nothing else declares any of that: the progress popup's bars, the run detail
 table's names, tooltips and numbers, the stats chart's series and its legend
-all read this list, and the pipeline's own order is checked against it as it
-runs.
+all read this list.
 
-It lives beside the stages rather than in ``gui/`` because the pipeline is the
-thing being described. The colour is a plain RGB triple for the same reason —
-the headless CLI has no Qt, and the one window that paints it can build its own
-``QColor`` at the edge where Qt begins.
+It sits with the stage implementations — twelve of the fourteen are in this
+package, and the other two are the ``check_*`` scripts at the repo root — and
+outside ``gui/`` so the headless CLI can read it without Qt. The color is a
+plain RGB triple for the same reason: the one window that paints a band builds
+its own ``QColor`` at the edge where Qt begins.
 
-A stage the pipeline emitted with no row here drew no progress bar, lost its
-duration from the chart and took the number of the stage after it, for months
-(bug 5). Two things stop that recurring: there is one list to add to rather
-than four, and ``tests/test_stage_registry.py`` runs the pipeline and compares
-what it emits against this.
+``run_pipeline`` spells the same order a second time, because each stage
+carries its own arguments and skip branches. That copy is not derived from this
+one; it is held against it by ``tests/test_stage_registry.py``, which reads the
+names out of evolver.py's syntax tree and also runs the pipeline with its
+stages mocked. A stage the pipeline emitted with no row here drew no progress
+bar, lost its duration from the chart and took the number of the stage after
+it, for months (bug 5), because the only thing comparing the two lists never
+imported the pipeline.
 """
 
 from __future__ import annotations

@@ -15,7 +15,7 @@ class TestPopupConstruction(unittest.TestCase):
         self.popup.close()
 
     def test_has_a_bar_per_pipeline_stage(self):
-        from gui.progress_popup import ALL_STAGES
+        from tasks.stages import ALL_STAGES
         self.assertEqual(len(self.popup._bars), len(ALL_STAGES))
 
     def test_every_row_is_captioned_with_the_stage_label(self):
@@ -54,7 +54,7 @@ class TestPopupConstruction(unittest.TestCase):
         self.assertEqual(self.popup._total_bar.value(), 0)
 
     def test_total_bar_range_is_100_per_stage(self):
-        from gui.progress_popup import ALL_STAGES
+        from tasks.stages import ALL_STAGES
         self.assertEqual(self.popup._total_bar.maximum(), 100 * len(ALL_STAGES))
 
     def test_window_flags_include_tool_without_stay_on_top(self):
@@ -122,7 +122,8 @@ class TestPopupIntraProgress(unittest.TestCase):
 
 class TestPopupTotalBar(unittest.TestCase):
     def setUp(self):
-        from gui.progress_popup import ProgressPopup, ALL_STAGES
+        from gui.progress_popup import ProgressPopup
+        from tasks.stages import ALL_STAGES
         self.popup = ProgressPopup()
         self._all_stages = ALL_STAGES
 

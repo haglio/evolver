@@ -5,22 +5,28 @@ and numbers and the chart's palette all come off ``tasks/stages.py``. What
 is left to check is that the list really is the one the pipeline runs.
 """
 
+import ast
 import itertools
 import re
 import unittest
 from pathlib import Path
 
-from unittest.mock import patch
-
 from PyQt6.QtGui import QColor
 
 import evolver
 from gui.stats_window import STAGE_COLORS
-from tasks import stages
 from tasks.stages import ALL_STAGES, STAGES
 from tests.color_support import band_fill, delta_e
 from tests.test_dead_code import PROJECT_ROOT, _source_files
 from tests.test_evolver import _patched_stages, _stage_mocks
+
+# The stages with no `_STAGE_FAILED` rule, and why each one has none: nothing
+# any of them does can come out wrong in a way the run should report.
+# `sort` moves what it can identify and leaves the rest in the inbox;
+# `clip_scripts` and `scene_scripts` write a funscript where one is missing and
+# leave every existing one alone; `group_non_ai` is bookkeeping over whatever
+# files happen to be there.
+CANNOT_FAIL = frozenset({"sort", "clip_scripts", "scene_scripts", "group_non_ai"})
 
 
 class TestStageRegistry(unittest.TestCase):
@@ -39,49 +45,63 @@ class TestStageRegistry(unittest.TestCase):
 
         self.assertEqual([stage.name for stage in result.stages], ALL_STAGES)
 
-    def test_the_pipeline_stops_at_a_stage_the_registry_does_not_name(self):
-        """The same drift, caught where no test has to be run to catch it.
+    def test_the_pipeline_spells_the_registry_s_order_and_nothing_else(self):
+        """The same two lists, compared without running anything.
 
-        The gate above is a test, and a test only fails where someone runs it.
-        The pipeline walks the registry as it goes, so a stage the list does
-        not name cannot get past its own boundary — on a developer's machine,
-        on the runner, or on the machine the tray app runs on.
+        `run_pipeline` names its stages one call at a time, because each
+        carries its own arguments and skip branches — so the order is written
+        twice and the second copy is checked rather than derived. This reads
+        the names straight out of evolver.py's syntax tree, which means it
+        also covers the four skip branches a single mocked run never takes,
+        and it sees a registry row the pipeline runs nowhere as readily as a
+        pipeline stage the registry does not name.
+
+        A stage may be spelled several times running — `upscale` has three
+        skip branches and one run — so consecutive repeats collapse. Two
+        mentions that are not adjacent do not, because a stage reached from
+        two places in the pipeline is exactly the drift worth failing on.
         """
-        with (
-            _patched_stages(_stage_mocks()),
-            patch.object(stages, "ALL_STAGES", [key for key in ALL_STAGES if key != "purge"]),
-            self.assertRaises(RuntimeError) as caught,
-        ):
-            evolver.run_pipeline()
+        source = Path(PROJECT_ROOT, "evolver.py").read_text(encoding="utf-8")
+        calls = [
+            node
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in ("_run_stage", "_skip_stage")
+        ]
+        calls.sort(key=lambda node: (node.lineno, node.col_offset))
 
-        self.assertIn("purge", str(caught.exception))
+        spelled = []
+        for call in calls:
+            first = call.args[0] if call.args else None
+            self.assertTrue(
+                isinstance(first, ast.Constant) and isinstance(first.value, str),
+                f"the stage name at evolver.py:{call.lineno} is not a literal, "
+                "so nothing can compare it to the registry",
+            )
+            spelled.append(first.value)
 
-    def test_the_pipeline_stops_when_it_runs_past_the_end_of_the_registry(self):
-        """A stage appended to the pipeline and to nothing else, which is how
-        the delivery stage came to have no row for months."""
-        with (
-            _patched_stages(_stage_mocks()),
-            patch.object(stages, "ALL_STAGES", ["purge"]),
-            self.assertRaises(RuntimeError) as caught,
-        ):
-            evolver.run_pipeline()
+        self.assertEqual([name for name, _ in itertools.groupby(spelled)], ALL_STAGES)
 
-        self.assertIn("metadata", str(caught.exception))
-
-    def test_every_verdict_rule_names_a_stage_that_exists(self):
+    def test_every_stage_either_has_a_verdict_rule_or_is_declared_unable_to_fail(self):
         """The last copy of the stage names, and the one that fails silently.
 
         A stage absent from `_STAGE_FAILED` cannot report an error — that is
-        the table's design, and it is why a key misspelled there is invisible:
-        the stage keeps running, keeps finishing, and simply never fails
-        again. Nothing else in the run would look different.
+        the table's design, so both a key misspelled there and a stage nobody
+        wrote a rule for come out the same way: the stage keeps running, keeps
+        finishing, and simply never fails. Nothing else in the run looks
+        different either way.
+
+        So the check is an equality rather than a subset, and the stages that
+        genuinely cannot fail are named here. Adding a stage then has to
+        answer "how does this one fail?" instead of defaulting to "it can't".
         """
-        for table, name in (
-            (evolver._STAGE_FAILED, "_STAGE_FAILED"),
-            (evolver._STAGE_HELD_BACK, "_STAGE_HELD_BACK"),
-        ):
-            with self.subTest(table=name):
-                self.assertEqual(sorted(set(table) - set(ALL_STAGES)), [])
+        self.assertEqual(
+            sorted(set(evolver._STAGE_FAILED) | CANNOT_FAIL),
+            sorted(ALL_STAGES),
+        )
+        self.assertEqual(sorted(set(evolver._STAGE_FAILED) & CANNOT_FAIL), [])
+        self.assertEqual(sorted(set(evolver._STAGE_HELD_BACK) - set(ALL_STAGES)), [])
 
     def test_gui_lists_the_genau_delivery_between_the_two_upscales(self):
         """Delivery runs straight after the AI upscale, so a clip made this run
@@ -123,28 +143,29 @@ class TestStageRegistry(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
-    def test_the_one_declaration_carries_every_stage_s_color(self):
-        """The chart's palette is the registry's fourth column, not a second list.
-
-        It was a dict of its own in the stats window, keyed by the same strings
-        in a different order and maintained by hand — a second place to add a
-        stage to, next to the one that had already been missed. Deriving it
-        means the colour cannot be forgotten and cannot be spelled against a
-        key no stage has.
+    def test_every_declared_color_is_one_qt_can_paint(self):
+        """The fourth column used to be a dict of `QColor`s, which rejected a
+        bad channel where it was written. Plain integers do not, and the
+        annotation is not checked at runtime: `QColor(300, 0, 0)` is simply
+        invalid, and Qt paints an invalid color as black. That would give one
+        stage a black band and a black legend swatch, and the Delta-E floor
+        would not notice, because it measures the same invalid color on both
+        sides of the comparison.
         """
-        self.assertEqual(
-            {stage.key: QColor(*stage.color) for stage in STAGES},
-            STAGE_COLORS,
-        )
+        for stage in STAGES:
+            with self.subTest(stage=stage.key):
+                self.assertEqual(len(stage.color), 3)
+                self.assertTrue(all(channel in range(256) for channel in stage.color))
+                self.assertTrue(QColor(*stage.color).isValid())
 
     def test_no_two_stage_bands_are_hard_to_tell_apart(self):
         """The chart stacks every stage as a band in one column, so a close
         pair is two bands nobody can separate and a legend that names the same
-        colour twice.
+        color twice.
 
         The floor is 20 Delta-E, argued from the units rather than fitted to
         this palette: ~2 is the smallest difference anyone sees and ~10 already
-        reads as two colours, so 20 is a comfortable "obviously different"
+        reads as two colors, so 20 is a comfortable "obviously different"
         rather than the least that would pass. The palette this replaced scored
         8.8 and would fail it; the one here clears it by three.
         """

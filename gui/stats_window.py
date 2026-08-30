@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 from gui.run_record import RunRecord
 from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 
-# The registry's colours, as the painter wants them. This is the edge where Qt
+# The registry's colors, as the painter wants them. This is the edge where Qt
 # begins: the declaration holds plain RGB so the headless pipeline can read it.
 STAGE_COLORS = {stage.key: QColor(*stage.color) for stage in STAGES}
 
@@ -28,9 +28,9 @@ _MARGIN_LEFT = 70
 _MARGIN_TOP = 20
 _MARGIN_BOTTOM = 50
 
-# What a band is painted with. Named because the tests compare stage colours as
+# What a band is painted with. Named because the tests compare stage colors as
 # the bands the eye actually sees — translucent over white, which draws them
-# closer together than the colours themselves are.
+# closer together than the colors themselves are.
 BAND_ALPHA = 180
 
 _LEGEND_POINT_SIZE = 8
