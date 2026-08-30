@@ -17,9 +17,18 @@ from pathlib import Path
 import config
 
 
-def upscaled_video_path(source: str, orient: str, sorted_stem: str) -> Path:
-    """The clip the upscale stage writes for the ``1_sorted`` video *sorted_stem*."""
-    return config.OUT_UPSCALED_DIR / orient / source / f"{sorted_stem}_topaz.mp4"
+def upscaled_video_path(
+    source: str, orient: str, sorted_stem: str, outbox_dir: Path | None = None,
+) -> Path:
+    """The clip the upscale stage writes for the ``1_sorted`` video *sorted_stem*.
+
+    *outbox_dir* is the tree it will be written under; without one, the
+    configured outbox answers. The upscale stage passes the root it was itself
+    given, so the path it checks for and the path it writes cannot be two
+    different trees.
+    """
+    outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
+    return outbox_dir / orient / source / f"{sorted_stem}_topaz.mp4"
 
 
 def sidecar_path(video: Path) -> Path:

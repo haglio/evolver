@@ -31,23 +31,23 @@ class TestUpscaleHelpers(unittest.TestCase):
             weird.mkdir(parents=True)
 
             with override_config(OUT_UPSCALED_DIR=out, WEIRD_DIR=weird):
-                self.assertFalse(upscale._already_processed("provider", "a_topaz.mp4"))
+                self.assertFalse(upscale._already_processed("provider", "a_topaz.mp4", out, weird))
 
                 p1 = out / "landscape" / "provider" / "a_topaz.mp4"
                 p1.write_bytes(b"1")
-                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4"))
+                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4", out, weird))
 
                 p1.unlink()
                 # The portrait arm on its own -- narrowing the loop to
                 # ('landscape',) used to leave this test green (audit probe P3).
                 p2 = out / "portrait" / "provider" / "a_topaz.mp4"
                 p2.write_bytes(b"1")
-                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4"))
+                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4", out, weird))
 
                 p2.unlink()
                 p3 = weird / "a_topaz.mp4"
                 p3.write_bytes(b"1")
-                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4"))
+                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4", out, weird))
 
     def test_run_processes_dynamic_source_and_creates_out_dir(self):
         with workspace_temp_dir() as root:
@@ -66,6 +66,44 @@ class TestUpscaleHelpers(unittest.TestCase):
             self.assertEqual(result.failed, 0)
             self.assertTrue((out_dir / "landscape" / source).is_dir())
             self.assertTrue((out_dir / "landscape" / source / "clip_topaz.mp4").exists())
+
+    def test_run_upscales_between_the_three_trees_it_is_given(self):
+        """The stage spans three trees and a disk floor, and says so now.
+
+        `config` still answers when the caller names none of them, which is
+        what the pipeline does and what every other test here relies on. The
+        ambient three are pointed at a second sorted clip, so a stage still
+        reading them would upscale that one instead.
+        """
+        with workspace_temp_dir() as root:
+            given_sorted, given_out, given_weird = library_dirs(root / "given")
+            given_in = given_sorted / "examplesource" / "landscape" / "clip one.mp4"
+            given_in.parent.mkdir(parents=True)
+            given_in.write_bytes(b"video")
+
+            ambient_sorted, ambient_out, ambient_weird = library_dirs(root / "ambient")
+            ambient_in = ambient_sorted / "examplesource" / "landscape" / "clip two.mp4"
+            ambient_in.parent.mkdir(parents=True)
+            ambient_in.write_bytes(b"video")
+
+            with override_config(
+                SORTED_DIR=ambient_sorted, OUT_UPSCALED_DIR=ambient_out, WEIRD_DIR=ambient_weird,
+                LOW_DISK_WARNING_GB=10 ** 9,
+            ):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    result = upscale.run(
+                        max_items=5,
+                        sorted_dir=given_sorted,
+                        outbox_dir=given_out,
+                        weird_dir=given_weird,
+                        low_disk_floor_gb=1,
+                    )
+
+            self.assertEqual(result.processed, 1)
+            self.assertTrue((given_out / "landscape" / "examplesource" / "clip one_topaz.mp4").exists())
+            self.assertFalse(ambient_out.exists())
+            self.assertTrue(ambient_in.exists())
 
     def test_collect_candidates_prioritizes_newly_sorted_files(self):
         with workspace_temp_dir() as root:
@@ -188,7 +226,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertTrue(upscale._is_t2v_provider("provider", "landscape", "clip"))
+                self.assertTrue(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
     def test_false_for_provider_with_source_image(self):
         with workspace_temp_dir() as root:
@@ -198,7 +236,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text(json.dumps({"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}), encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip"))
+                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
     def test_false_for_non_provider_source(self):
         # The sidecar is a valid t2v one, so only the source-name guard can
@@ -213,13 +251,13 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider("provider2", "landscape", "clip"))
+                self.assertFalse(upscale._is_t2v_provider("provider2", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
     def test_false_when_metadata_missing(self):
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip"))
+                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
 
 class TestOnProgressCallback(unittest.TestCase):

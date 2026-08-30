@@ -27,8 +27,29 @@ class UpscaleResult:
     pending_after_run: int = 0
 
 
-def run(priority_files: list[Path] | None = None, max_items: int | None = None,
-        on_progress: Callable[[int, int], None] | None = None) -> UpscaleResult:
+def run(
+    *,
+    priority_files: list[Path] | None = None,
+    max_items: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+    sorted_dir: Path | None = None,
+    outbox_dir: Path | None = None,
+    weird_dir: Path | None = None,
+    low_disk_floor_gb: float | None = None,
+) -> UpscaleResult:
+    """Upscale the pending sorted videos into the outbox, within one run's budget.
+
+    The three trees the stage spans and the free-space floor it stops at are
+    arguments, resolved here rather than in the signature: a default is
+    evaluated at import, which would freeze the value past ``override_config``.
+    """
+    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
+    outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
+    weird_dir = config.WEIRD_DIR if weird_dir is None else weird_dir
+    low_disk_floor_gb = (
+        config.LOW_DISK_WARNING_GB if low_disk_floor_gb is None else low_disk_floor_gb
+    )
+
     result = UpscaleResult()
     max_items = config.UPSCALE_BATCH_LIMIT if max_items is None else max_items
     run_budget_seconds = max(config.UPSCALE_RUN_BUDGET_SECONDS, 0)
@@ -36,18 +57,21 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
     started_at = time.monotonic()
 
     for orient in ("landscape", "portrait"):
-        (config.OUT_UPSCALED_DIR / orient).mkdir(parents=True, exist_ok=True)
-    config.WEIRD_DIR.mkdir(parents=True, exist_ok=True)
-    removed_partial_outputs = remove_partial_video_files(config.OUT_UPSCALED_DIR, config.VIDEO_EXTENSIONS, logger=log)
+        (outbox_dir / orient).mkdir(parents=True, exist_ok=True)
+    weird_dir.mkdir(parents=True, exist_ok=True)
+    removed_partial_outputs = remove_partial_video_files(outbox_dir, config.VIDEO_EXTENSIONS, logger=log)
 
     log.info("=== Stage: upscale from 1_sorted ===")
-    log.info("OUT: %s/{landscape,portrait}/<source>/", config.OUT_UPSCALED_DIR)
-    log.info("Also skip if exists in: %s", config.WEIRD_DIR)
+    log.info("OUT: %s/{landscape,portrait}/<source>/", outbox_dir)
+    log.info("Also skip if exists in: %s", weird_dir)
     if removed_partial_outputs:
-        log.info("Removed %d stale partial output file(s) from %s", removed_partial_outputs, config.OUT_UPSCALED_DIR)
+        log.info("Removed %d stale partial output file(s) from %s", removed_partial_outputs, outbox_dir)
 
     env = topaz.environment()
-    candidates = collect_candidates(priority_files=priority_files)
+    candidates = collect_candidates(
+        priority_files=priority_files,
+        sorted_dir=sorted_dir, outbox_dir=outbox_dir, weird_dir=weird_dir,
+    )
     total_pending = len(candidates)
     if max_items is not None:
         candidates = candidates[:max_items]
@@ -71,20 +95,20 @@ def run(priority_files: list[Path] | None = None, max_items: int | None = None,
             )
             break
 
-        if _is_low_disk():
+        if _is_low_disk(outbox_dir, low_disk_floor_gb):
             result.deferred_low_disk = True
             result.pending_after_run = total_pending - result.processed - result.failed
-            _show_low_disk_warning()
+            _show_low_disk_warning(outbox_dir, low_disk_floor_gb)
             log.warning("Stopping the upscale stage early due to low free disk space.")
             break
 
-        out = upscaled_video_path(source, orient, in_file.stem)
+        out = upscaled_video_path(source, orient, in_file.stem, outbox_dir)
         out.parent.mkdir(parents=True, exist_ok=True)
         tmp = out.with_name(f"{in_file.stem}.partial.{uuid.uuid4().hex}.mp4")
 
         log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
 
-        if _is_t2v_provider(source, orient, in_file.stem):
+        if _is_t2v_provider(source, orient, in_file.stem, outbox_dir):
             filter_complex = config.UPSCALE_FILTER_T2V_provider
             videoai_tag = config.VIDEOAI_TAG_T2V_provider
         else:
@@ -143,7 +167,24 @@ def has_pending_work(priority_files: list[Path] | None = None) -> bool:
     return bool(collect_candidates(priority_files=priority_files, limit=1))
 
 
-def collect_candidates(priority_files: list[Path] | None = None, limit: int | None = None) -> list[tuple[Path, str, str]]:
+def collect_candidates(
+    priority_files: list[Path] | None = None,
+    limit: int | None = None,
+    *,
+    sorted_dir: Path | None = None,
+    outbox_dir: Path | None = None,
+    weird_dir: Path | None = None,
+) -> list[tuple[Path, str, str]]:
+    """The pending videos, newly sorted ones first, as (file, source, orient).
+
+    Public, and reached with no roots from ``has_pending_work`` as well as
+    from ``run``, so it resolves its own — which is why the outbox and the
+    weird folder each keep one read here on top of the one in ``run``.
+    """
+    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
+    outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
+    weird_dir = config.WEIRD_DIR if weird_dir is None else weird_dir
+
     candidates: list[tuple[Path, str, str]] = []
     seen: set[Path] = set()
 
@@ -151,14 +192,15 @@ def collect_candidates(priority_files: list[Path] | None = None, limit: int | No
         if in_file in seen or not in_file.exists():
             return False
         seen.add(in_file)
-        if _already_processed(source, upscaled_video_path(source, orient, in_file.stem).name):
+        name = upscaled_video_path(source, orient, in_file.stem, outbox_dir).name
+        if _already_processed(source, name, outbox_dir, weird_dir):
             return False
         candidates.append((in_file, source, orient))
         return True
 
     for in_file in priority_files or []:
         try:
-            rel = in_file.relative_to(config.SORTED_DIR)
+            rel = in_file.relative_to(sorted_dir)
         except ValueError:
             continue
         if len(rel.parts) < 3:
@@ -170,9 +212,9 @@ def collect_candidates(priority_files: list[Path] | None = None, limit: int | No
             if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
                 return candidates
 
-    for source in _iter_sources(config.SORTED_DIR):
+    for source in _iter_sources(sorted_dir):
         for orient in ("landscape", "portrait"):
-            in_root = config.SORTED_DIR / source / orient
+            in_root = sorted_dir / source / orient
             if not in_root.is_dir():
                 continue
             for in_file in _iter_videos(in_root):
@@ -190,10 +232,10 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoa
     ).returncode == 0
 
 
-def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:
+def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> bool:
     if source != "provider":
         return False
-    meta_path = sidecar_path(upscaled_video_path(source, orient, stem))
+    meta_path = sidecar_path(upscaled_video_path(source, orient, stem, outbox_dir))
     if not meta_path.is_file():
         return False
     try:
@@ -203,29 +245,34 @@ def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:
         return False
 
 
-def _already_processed(source: str, fname: str) -> bool:
+def _already_processed(source: str, fname: str, outbox_dir: Path, weird_dir: Path) -> bool:
+    """Whether this output already exists, in either orientation or in weird.
+
+    The roots are required rather than defaulted: a sentinel here would read
+    config again and leave the caller's roots decorative.
+    """
     for orient in ("landscape", "portrait"):
-        p = config.OUT_UPSCALED_DIR / orient / source / fname
+        p = outbox_dir / orient / source / fname
         if p.exists() and p.stat().st_size > 0:
             return True
-    weird = config.WEIRD_DIR / fname
+    weird = weird_dir / fname
     return weird.exists() and weird.stat().st_size > 0
 
 
-def _is_low_disk() -> bool:
-    free_gb = system_resources.free_bytes(config.OUT_UPSCALED_DIR) / (1024 ** 3)
-    return free_gb < config.LOW_DISK_WARNING_GB
+def _is_low_disk(outbox_dir: Path, floor_gb: float) -> bool:
+    free_gb = system_resources.free_bytes(outbox_dir) / (1024 ** 3)
+    return free_gb < floor_gb
 
 
-def _show_low_disk_warning() -> None:
-    free_gb = system_resources.free_bytes(config.OUT_UPSCALED_DIR) / (1024 ** 3)
+def _show_low_disk_warning(outbox_dir: Path, floor_gb: float) -> None:
+    free_gb = system_resources.free_bytes(outbox_dir) / (1024 ** 3)
     show_error_window(
         "Evolver - Low Disk Space",
         (
             "Evolver paused the upscale stage because free disk space is below the configured safety floor.\n\n"
-            f"Target outbox: {config.OUT_UPSCALED_DIR}\n"
+            f"Target outbox: {outbox_dir}\n"
             f"Free space: {free_gb:.1f} GiB\n"
-            f"Required floor: {config.LOW_DISK_WARNING_GB:.1f} GiB\n\n"
+            f"Required floor: {floor_gb:.1f} GiB\n\n"
             f"Check the log for details:\n{config.LOG_FILE}"
         ),
     )
