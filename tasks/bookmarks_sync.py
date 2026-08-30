@@ -39,7 +39,7 @@ class BookmarksSyncResult:
 
 def run() -> BookmarksSyncResult:
     result = BookmarksSyncResult()
-    log.info("=== Stage 6: bookmarks -> Chrome profile %s ===", config.CHROME_PROFILE_NAME)
+    log.info("=== Stage: bookmarks -> Chrome profile %s ===", config.CHROME_PROFILE_NAME)
     log.info("SOURCE CSV: %s", config.FUN_TIME_FAVS_FILE)
     log.info("CHROME USER DATA: %s", config.CHROME_USER_DATA_DIR)
 
@@ -74,7 +74,7 @@ def run() -> BookmarksSyncResult:
 
     result.synced = added
     log.info(
-        "Stage 6 done. Synced: %d, No URL: %d, Bad URL: %d, Target: %s",
+        "Bookmarks sync done. Synced: %d, No URL: %d, Bad URL: %d, Target: %s",
         result.synced,
         result.no_url,
         result.bad_url,

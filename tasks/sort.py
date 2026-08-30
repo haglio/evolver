@@ -1,4 +1,4 @@
-"""Stage 3: Move videos from 0_inbox/<source>/ -> 1_sorted/<source>/<orientation>/"""
+"""Move videos from 0_inbox/<source>/ -> 1_sorted/<source>/<orientation>/"""
 
 import logging
 from dataclasses import dataclass, field
@@ -23,7 +23,7 @@ def run() -> SortResult:
     result = SortResult()
     config.SORTED_DIR.mkdir(parents=True, exist_ok=True)
 
-    log.info("=== Stage 3: 0_inbox -> 1_sorted (move) ===")
+    log.info("=== Stage: 0_inbox -> 1_sorted (move) ===")
     log.info("INBOX:  %s", config.INBOX_DIR)
     log.info("SORTED: %s", config.SORTED_DIR)
 
@@ -58,7 +58,7 @@ def run() -> SortResult:
         remove_empty_dirs(src_root)
 
     log.info(
-        "Stage 3 done. Moved: %d, Deleted collisions: %d, Unknown skipped: %d",
+        "Sort done. Moved: %d, Deleted collisions: %d, Unknown skipped: %d",
         result.moved, result.deleted_collisions, result.skipped_unknown,
     )
     return result

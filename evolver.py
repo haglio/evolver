@@ -1,22 +1,13 @@
 #!/usr/bin/env python3
 """evolver.py - video collection maintenance pipeline.
 
-Invoked by the tray app scheduler or directly via CLI. Stages:
-  1. strays          - repair malformed names and rehome funscripts found in the video tree
-  2. purge           - remove weird outputs and their matching sources
-  3. metadata        - scrape AI prompt metadata into mirrored JSON files
-  4. sort            - move new videos from inbox into sorted folders by source/orientation
-  5. upscale         - apply Topaz frame interpolation + 4x upscale to sorted AI videos
-  6. genau_deliver   - hand finished Genau clips to the folder Genau plays from
-  7. upscale_non_ai  - supervise one detached Topaz encode of a non-AI library video
-  8. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
-  9. references      - repoint the suite's saved video paths at videos that moved
- 10. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
- 11. clip_scripts    - cut a carved clip's funscript out of its source scene's
- 12. scene_scripts   - place a carved clip's funscript back into its unscripted scene's
- 13. scripts         - align funscripts to mirror the video library tree
- 14. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
- 15. dupes           - scan non_AI for likely duplicate videos by exact filesize
+Invoked by the tray app scheduler or directly via CLI.
+
+The stages and the order they run in are ``run_pipeline`` below, with the reason
+for each ordering constraint in a comment beside the stage it binds. Their
+display names and descriptions are ``gui/progress.STAGES``. Each of those is the
+one copy of what it holds; a list here would be a second, free to drift from
+both.
 """
 
 import logging
@@ -308,7 +299,7 @@ def _should_skip_upscale_due_to_cpu(log: logging.Logger) -> bool:
     try:
         busy_percent = system_resources.cpu_busy_percent(config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
     except Exception:
-        log.exception("CPU usage probe failed; proceeding with Stage 4.")
+        log.exception("CPU usage probe failed; proceeding with the upscale stage.")
         return False
 
     log.info(

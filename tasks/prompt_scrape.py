@@ -54,7 +54,7 @@ class PromptScrapeResult:
 
 def run() -> PromptScrapeResult:
     result = PromptScrapeResult()
-    log.info("=== Stage 2: scrape AI metadata ===")
+    log.info("=== Stage: scrape AI metadata ===")
     log.info("SORTED DIR: %s", config.SORTED_DIR)
     log.info("METADATA DIR: %s", config.METADATA_DIR)
 
@@ -97,7 +97,7 @@ def run() -> PromptScrapeResult:
             log.info("Wrote metadata: %s", output_path)
 
     log.info(
-        "Stage 2 done. Scraped: %d, Already: %d, Skipped failed: %d, No strategy: %d, Errors: %d",
+        "Metadata scrape done. Scraped: %d, Already: %d, Skipped failed: %d, No strategy: %d, Errors: %d",
         result.newly_scraped,
         result.already_scraped,
         result.skipped_failed,

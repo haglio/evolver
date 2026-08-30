@@ -44,7 +44,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
     result = ScriptsSyncResult()
     config.SCRIPT_LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
 
-    log.info("=== Stage 7: scripts -> mirror video library ===")
+    log.info("=== Stage: scripts -> mirror video library ===")
     log.info("VIDEOS:  %s", config.VIDEO_LIBRARY_DIR)
     log.info("SCRIPTS: %s", config.SCRIPT_LIBRARY_DIR)
 
@@ -79,7 +79,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
     remove_empty_dirs(config.SCRIPT_LIBRARY_DIR)
     _copy_missing_variant_scripts(video_index, result)
     log.info(
-        "Stage 7 done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d, Rehomed to variants: %d, Followed to archive: %d, Discarded duplicates: %d",
+        "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d, Rehomed to variants: %d, Followed to archive: %d, Discarded duplicates: %d",
         result.moved,
         result.already_aligned,
         result.unmatched,
@@ -93,7 +93,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
         result.discarded_duplicates,
     )
     if not result.ok:
-        log.error("Stage 7 failed. See log entries above for unresolved funscript alignment issues.")
+        log.error("Scripts sync failed. See log entries above for unresolved funscript alignment issues.")
         if show_popup:
             log.info("Showing error popup for scripts-sync failure")
             show_error_window("Evolver - Funscript Match Error", _popup_message(result))

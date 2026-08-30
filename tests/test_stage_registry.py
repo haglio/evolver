@@ -1,9 +1,12 @@
 """The GUI's stage registry must cover every stage the pipeline emits."""
 
+import re
 import unittest
+from pathlib import Path
 
 from gui.progress import ALL_STAGES
 from gui.stats_window import STAGE_COLORS
+from tests.test_dead_code import PROJECT_ROOT, _source_files
 
 
 class TestStageRegistry(unittest.TestCase):
@@ -28,6 +31,22 @@ class TestStageRegistry(unittest.TestCase):
         self.assertIn("scene_scripts", ALL_STAGES)
         self.assertEqual(ALL_STAGES.index("scene_scripts"), ALL_STAGES.index("clip_scripts") + 1)
         self.assertEqual(ALL_STAGES.index("scene_scripts"), ALL_STAGES.index("scripts") - 1)
+
+    def test_no_module_writes_a_stage_number_of_its_own(self):
+        """Ordering has one home, `STAGES`. A number typed into a log line or a
+        docstring is a second copy that cannot be kept in step with it: four
+        stages were still printing the position they held in a shorter
+        pipeline, so `evolver.log` named a stage nothing else numbered that
+        way.
+        """
+        offenders = sorted(
+            f"{name}:{i}"
+            for name in _source_files(PROJECT_ROOT)
+            for i, line in enumerate(Path(PROJECT_ROOT, name).read_text(encoding="utf-8").splitlines(), 1)
+            if re.search(r"\bStage \d", line)
+        )
+
+        self.assertEqual(offenders, [])
 
     def test_every_stage_has_a_chart_color(self):
         for stage in ALL_STAGES:
