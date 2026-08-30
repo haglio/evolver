@@ -30,7 +30,7 @@ def _to_int(value: _FileTime) -> int:
     return (value.dwHighDateTime << 32) | value.dwLowDateTime
 
 
-def cpu_busy_percent(sample_seconds: float = 0.75) -> float:
+def cpu_busy_percent(sample_seconds: float) -> float:
     start_idle, start_kernel, start_user = _get_system_times()
     time.sleep(max(sample_seconds, 0.05))
     end_idle, end_kernel, end_user = _get_system_times()
