@@ -42,6 +42,19 @@ class TestBackfillSession(unittest.TestCase):
         queue = BackfillQueue(videos)
         return BackfillSession(queue, worker or ImmediateWorker())
 
+    def test_a_control_the_session_does_not_dispatch_moves_no_file(self):
+        """The four controls are dispatched by name. A fifth added to the
+        vocabulary and not here has to do nothing: the fallback used to be the
+        discard path, which moves the clip on screen into the weird folder."""
+        session = self._session()
+        clip = session.current
+
+        with patch.dict("backfill.session.CONTROLS", {"reticulate": "reticulate"}):
+            note = session.apply("reticulate")
+
+        self.assertIsNone(note)
+        self.assertEqual(session.current, clip)
+
     def test_an_act_records_the_action_against_the_clip_on_screen(self):
         session = self._session()
         clip = session.current
