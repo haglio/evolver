@@ -1,4 +1,5 @@
 import itertools
+import logging
 import subprocess
 from contextlib import ExitStack
 from unittest.mock import Mock, patch
@@ -526,3 +527,29 @@ class TestCheckDependenciesWindowSuppression:
             kwargs = mock_run.call_args.kwargs
             assert "creationflags" in kwargs
             assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
+
+
+class TestCpuBusySkip:
+    """The probe alone decides whether the upscale stage stands down.
+
+    Nothing else exercised `_should_skip_upscale_due_to_cpu`: every pipeline
+    test patches it out, so the body it guards two stages with had no cover.
+    """
+
+    def _verdict(self, probe: Mock) -> bool:
+        with patch("evolver.system_resources.cpu_busy_percent", probe):
+            return evolver._should_skip_upscale_due_to_cpu(logging.getLogger("test"))
+
+    def test_skips_when_the_sample_reaches_the_threshold(self):
+        assert self._verdict(Mock(return_value=config.CPU_BUSY_SKIP_THRESHOLD_PCT)) is True
+
+    def test_runs_when_the_sample_is_under_the_threshold(self):
+        assert self._verdict(Mock(return_value=config.CPU_BUSY_SKIP_THRESHOLD_PCT - 0.1)) is False
+
+    def test_runs_when_the_probe_fails(self):
+        assert self._verdict(Mock(side_effect=OSError("no counter"))) is False
+
+    def test_samples_for_the_configured_window(self):
+        probe = Mock(return_value=0.0)
+        self._verdict(probe)
+        probe.assert_called_once_with(config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
