@@ -2,14 +2,13 @@
 
 Grown inside the prompt scraper and extracted once it was, in substance, its
 own module: a lenient DOM built on html.parser, a child-combinator CSS
-selector (classes, escaped class names, :nth-child), text extraction, and the
+selector (tag and class), text extraction, and the
 label/value walk the scraped pages use (an ``<h2>`` label answered by the next
 ``<h1>`` sibling). Stdlib only; nothing here knows what a video is.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
@@ -50,7 +49,6 @@ class _DocumentParser(HTMLParser):
 class _SelectorPart:
     tag: str
     classes: list[str]
-    nth_child: int | None = None
 
 
 def parse_document(html: str) -> Node:
@@ -122,55 +120,12 @@ def _descendants(node: Node):
 
 
 def _parse_selector_part(raw: str) -> _SelectorPart:
-    nth_child = None
-    match = re.search(r":nth-child\((\d+)\)", raw)
-    if match:
-        nth_child = int(match.group(1))
-        raw = raw[:match.start()] + raw[match.end():]
-
-    bits = _split_selector_token(raw)
-    tag = bits[0] or "*"
-    classes = [_unescape_css_name(bit) for bit in bits[1:] if bit]
-    return _SelectorPart(tag=tag, classes=classes, nth_child=nth_child)
-
-
-def _unescape_css_name(value: str) -> str:
-    return re.sub(r"\\(.)", r"\1", value)
-
-
-def _split_selector_token(raw: str) -> list[str]:
-    parts: list[str] = []
-    current: list[str] = []
-    escaped = False
-    for char in raw:
-        if escaped:
-            current.append(char)
-            escaped = False
-            continue
-        if char == "\\":
-            current.append(char)
-            escaped = True
-            continue
-        if char == ".":
-            parts.append("".join(current))
-            current = []
-            continue
-        current.append(char)
-    parts.append("".join(current))
-    return parts
+    tag, _, classes = raw.partition(".")
+    return _SelectorPart(tag=tag or "*", classes=[c for c in classes.split(".") if c])
 
 
 def _matches_selector_part(node: Node, part: _SelectorPart) -> bool:
     if part.tag != "*" and node.tag != part.tag:
         return False
     classes = set(node.attrs.get("class", "").split())
-    if any(required not in classes for required in part.classes):
-        return False
-    if part.nth_child is not None:
-        parent = node.parent
-        if parent is None:
-            return False
-        position = parent.children.index(node) + 1
-        if position != part.nth_child:
-            return False
-    return True
+    return all(required in classes for required in part.classes)
