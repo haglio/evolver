@@ -12,7 +12,7 @@ from PyQt6.QtNetwork import QLocalServer
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import config
-from gui import single_instance
+from gui import process_identity, single_instance
 from gui.main_window import EvolverMainWindow
 from gui.progress_popup import ProgressPopup
 from gui.run_record import load_runs
@@ -20,7 +20,6 @@ from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
 from gui.stats_window import StatsWindow
-from gui.taskbar import set_taskbar_properties
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
 from tasks import nonai_upscale
@@ -29,14 +28,20 @@ from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
-_APP_MODEL_ID = "Evolver.TrayApp"
-
 
 class EvolverApp:
-    """Wires together all GUI components and runs the Qt event loop."""
+    """Wires together all GUI components and runs the Qt event loop.
+
+    Split in two on purpose. ``__init__`` only *builds*: it constructs the
+    parts and connects them, and touches nothing outside the process. ``start``
+    is everything the app *does* -- claim the Windows identity, read the run
+    history off disk, start the two timers, show the tray. Merely constructing
+    one used to name this process to the shell and begin a twenty-second
+    presence poll, which is why every test of any one part had to build the
+    whole thing and then live with a running timer for the rest of the session.
+    """
 
     def __init__(self):
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(_APP_MODEL_ID)
         self._app = QApplication(sys.argv)
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("Evolver")
@@ -57,7 +62,6 @@ class EvolverApp:
         self._presence_monitor = QTimer()
         self._presence_monitor.setInterval(int(config.NONAI_PRESENCE_POLL_SECONDS * 1000))
         self._presence_monitor.timeout.connect(self._throttle_presence)
-        self._presence_monitor.start()
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.run_requested.connect(self._start_run)
@@ -79,20 +83,27 @@ class EvolverApp:
         self._app.commitDataRequest.connect(self._on_session_end)
 
         self._window = EvolverMainWindow()
-        set_taskbar_properties(
-            int(self._window.winId()),
-            _APP_MODEL_ID,
-            f'"{sys.executable}" "{config.PROJECT_DIR / "tray_app.py"}" --show-window',
-            "Evolver",
-            str(config.PROJECT_DIR / "icon.ico"),
-        )
         self._window.run_now_action.triggered.connect(self._scheduler.run_now)
         self._window.active_toggle.clicked.connect(self._toggle_pause)
         self._window.settings_action.triggered.connect(self._show_settings)
         self._window.stats_action.triggered.connect(self._show_stats)
         self._window.restart_action.triggered.connect(self._restart)
         self._window.quit_action.triggered.connect(self._confirm_quit)
+
+    def start(self) -> None:
+        """Everything the app does to the machine, in the order it must happen.
+
+        The identity goes first: the taskbar reads it when a window of this
+        process first appears, so claiming it after the tray is up is claiming
+        it too late.
+        """
+        process_identity.claim(int(self._window.winId()))
         self._window.refresh_history()
+        self._presence_monitor.start()
+        self._tray.show()
+        self._scheduler.start()
+        if "--show-window" in sys.argv:
+            self._show_window()
 
     def run(self) -> int:
         if not single_instance.is_first_instance():
@@ -112,10 +123,7 @@ class EvolverApp:
         # it, and every later launch fails the handoff instead of taking it.
         self._show_requests = single_instance.serve_show_requests(self._show_window)
 
-        self._tray.show()
-        self._scheduler.start()
-        if "--show-window" in sys.argv:
-            self._show_window()
+        self.start()
         return self._app.exec()
 
     def _show_window(self):

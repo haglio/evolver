@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from gui.app import _APP_MODEL_ID
+from gui.process_identity import APP_MODEL_ID
 from tests.gui_support import build_evolver_app
 
 
@@ -22,9 +22,48 @@ class TestAppStartup:
         assert not app_icon.isNull(), "Application window icon should be set"
 
     def test_app_sets_appusermodelid(self, request):
-        with patch("gui.app.ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID") as mock_set_id:
+        app = build_evolver_app(request)
+        with patch("gui.process_identity.ctypes.windll.shell32"
+                   ".SetCurrentProcessExplicitAppUserModelID") as mock_set_id, \
+             patch("gui.process_identity.set_taskbar_properties"):
+            app.start()
+        mock_set_id.assert_called_once_with(APP_MODEL_ID)
+
+
+class TestBuildingIsNotStarting:
+    """Constructing an EvolverApp touches nothing outside the process.
+
+    It used to name this process to the shell, set taskbar properties on a
+    window handle, read the whole run-history directory off disk and begin a
+    twenty-second presence poll -- so a test that wanted any one part paid for
+    all of them, and left a live timer behind for the rest of the session.
+    """
+
+    def test_construction_claims_no_identity(self, request):
+        with patch("gui.app.process_identity.claim") as claim:
             build_evolver_app(request)
-        mock_set_id.assert_called_once_with(_APP_MODEL_ID)
+        claim.assert_not_called()
+
+    def test_construction_starts_neither_timer(self, request):
+        app = build_evolver_app(request)
+        assert not app._presence_monitor.isActive()
+        assert not app._watchdog.isActive()
+
+    def test_construction_reads_no_run_history(self, request):
+        with patch("gui.main_window.load_runs") as load:
+            build_evolver_app(request)
+        load.assert_not_called()
+
+    def test_starting_does_all_four(self, request):
+        app = build_evolver_app(request)
+        with patch("gui.app.process_identity.claim") as claim, \
+             patch("gui.main_window.load_runs", return_value=[]) as load:
+            app.start()
+
+        claim.assert_called_once()
+        load.assert_called_once()
+        assert app._presence_monitor.isActive()
+        assert app._scheduler.next_run_at is not None
 
 
 class TestNonAiUpscaleToggle:
@@ -66,8 +105,11 @@ class TestPresenceMonitor:
         with patch("gui.app.EvolverSettings.load", return_value=settings):
             return build_evolver_app(request)
 
-    def test_monitor_timer_is_running(self, request):
+    def test_monitor_timer_runs_once_the_app_is_started(self, request):
         app = self._app_with_toggle(request, True)
+        with patch("gui.app.process_identity.claim"), \
+             patch("gui.main_window.load_runs", return_value=[]):
+            app.start()
         assert app._presence_monitor.isActive()
 
     def test_throttles_the_encode_while_the_toggle_is_on(self, request):

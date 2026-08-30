@@ -24,10 +24,11 @@ class TestSetTaskbarProperties:
 class TestAppSetsTaskbarProperties:
 
     def test_evolver_app_sets_taskbar_pin_properties(self, request):
-        from gui.app import _APP_MODEL_ID
+        from gui.process_identity import APP_MODEL_ID
 
-        with patch("gui.app.set_taskbar_properties") as mock_set:
-            build_evolver_app(request)
+        app = build_evolver_app(request)
+        with patch("gui.process_identity.set_taskbar_properties") as mock_set:
+            app.start()
 
         mock_set.assert_called_once()
         args = mock_set.call_args
@@ -36,6 +37,6 @@ class TestAppSetsTaskbarProperties:
         # the literal is pinned here, beside the display name -- comparing the
         # call against the imported constant accepted any value at all.
         assert args[0][1] == "Evolver.TrayApp"
-        assert args[0][1] == _APP_MODEL_ID
+        assert args[0][1] == APP_MODEL_ID
         # Display name should be "Evolver"
         assert args[0][3] == "Evolver"
