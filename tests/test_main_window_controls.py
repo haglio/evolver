@@ -204,8 +204,7 @@ class TestScriptsSyncSummary:
             "moved": 0, "already_aligned": 0, "unmatched": 0, "ambiguous": 0,
             "collisions": 0, "copied_variants": 0, "ambiguous_variant_groups": 0,
             "variant_copy_errors": 0, "followed_to_archive": 0,
-            "discarded_duplicates": 0, "copied_variant_paths": [],
-            "unmatched_paths": [],
+            "discarded_duplicates": 0, "unmatched_paths": [],
         }
         result.update(overrides)
         return _summarize_result(result, None, "scripts")
