@@ -44,7 +44,7 @@ CONFIG_REFERENCE_LEDGER = {
     "backfill/decisions.py": 3,
     "backfill/mic.py": 1,
     "backfill/queue.py": 2,
-    "backfill/thumbnails.py": 2,
+    "backfill/thumbnails.py": 3,
     "backfill/voice.py": 5,
     "check_correspondence.py": 7,
     "check_duplicate_sizes.py": 5,
@@ -85,6 +85,7 @@ CONFIG_REFERENCE_LEDGER = {
 OVERLAY_KEYS = {
     "acts",
     "chrome_profile",
+    "curated_examples",
     "genau_source",
     "library_root",
     "project_roots",

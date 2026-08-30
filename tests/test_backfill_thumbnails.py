@@ -7,6 +7,12 @@ from unittest.mock import patch
 from backfill import thumbnails
 from tests.temp_helpers import library_tree, override_config, workspace_temp_dir
 
+# Fabricated: a real pin names a clip inside the library, which is why the pins
+# moved to the git-ignored overlay in the first place. The tile label is one the
+# committed act list produces.
+PINNED_TILE = "Side Gamma"
+PINNED_ID = "11111111-2222-3333-4444-555555555555"
+
 
 class TestExampleClips(unittest.TestCase):
     def _tag(self, lib, orient, source, stem, action):
@@ -53,20 +59,39 @@ class TestExampleClips(unittest.TestCase):
             self.assertEqual(examples["Side Alpha"], video)
 
     def test_a_curated_pin_supplies_a_tile_the_library_never_tags(self):
-        tile, clip_id = next(iter(thumbnails.CURATED_EXAMPLES.items()))
         with library_tree() as lib:
-            pinned = lib.video("portrait", "provider", f"{clip_id}_topaz.mp4")
+            pinned = lib.video("portrait", "provider", f"{PINNED_ID}_topaz.mp4")
 
-            self.assertEqual(thumbnails.example_clips(), {tile: pinned})
+            with override_config(CURATED_EXAMPLES={PINNED_TILE: PINNED_ID}):
+                self.assertEqual(thumbnails.example_clips(), {PINNED_TILE: pinned})
 
     def test_a_curated_pin_wins_over_an_auto_match(self):
-        tile, clip_id = next(iter(thumbnails.CURATED_EXAMPLES.items()))
         with library_tree() as lib:
-            pinned = lib.video("portrait", "provider", f"{clip_id}_topaz.mp4")
+            pinned = lib.video("portrait", "provider", f"{PINNED_ID}_topaz.mp4")
             lib.video("portrait", "provider2", "auto_topaz.mp4")
-            self._tag(lib, "portrait", "provider2", "auto_topaz", tile)
+            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
 
-            self.assertEqual(thumbnails.example_clips()[tile], pinned)
+            with override_config(CURATED_EXAMPLES={PINNED_TILE: PINNED_ID}):
+                self.assertEqual(thumbnails.example_clips()[PINNED_TILE], pinned)
+
+    def test_a_pin_naming_a_clip_the_library_does_not_hold_falls_through(self):
+        """Which is every pin on every machine but the one whose library the
+        overlay describes -- so it has to be the ordinary case, not an error."""
+        with library_tree() as lib:
+            auto = lib.video("portrait", "provider2", "auto_topaz.mp4")
+            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
+
+            with override_config(CURATED_EXAMPLES={PINNED_TILE: "not-in-this-library"}):
+                self.assertEqual(thumbnails.example_clips()[PINNED_TILE], auto)
+
+    def test_no_pins_at_all_leaves_every_tile_to_the_automatic_match(self):
+        """A public checkout's overlay carries an empty curated_examples."""
+        with library_tree() as lib:
+            auto = lib.video("portrait", "provider2", "auto_topaz.mp4")
+            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
+
+            with override_config(CURATED_EXAMPLES={}):
+                self.assertEqual(thumbnails.example_clips(), {PINNED_TILE: auto})
 
 
 class TestThumbnailCachePath(unittest.TestCase):

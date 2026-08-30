@@ -118,6 +118,14 @@ GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
 # they come from the overlay for the same reason GENAU_SOURCE does. They live
 # here rather than in the stage because a value read at the stage's own import
 # is bound before anything can redirect it — which is exactly what they were.
+# Tile label -> the id of the clip that best illustrates it, for the acts the
+# library has no clip tagged with. From the overlay for the same reason
+# GENAU_SOURCE is: these name clips inside the library, and a clip id in source
+# is library vocabulary. Optional, and empty in the committed example: without
+# it every tile simply takes the first library clip whose action matches, which
+# is what it does for any tile with no pin anyway.
+CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
+
 _SCRAPE_PROVIDER = _CONTENT["scrape_provider"]
 PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
 PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]

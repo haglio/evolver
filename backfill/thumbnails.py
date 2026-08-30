@@ -7,7 +7,7 @@ later open, so the window only ever loads ready files — it never extracts on o
 
 A tile's example comes from one of two places, curated first:
 
-* :data:`CURATED_EXAMPLES` pins a specific clip to a tile by id. This is how the acts
+* ``config.CURATED_EXAMPLES`` pins a specific clip to a tile by id. This is how the acts
   the library never tags in a camera-scoped form get a picture — a side gamma, a POV
   zeta — and how a clip mistagged (or tagged for a different act than it best shows)
   is still put to use.
@@ -39,19 +39,6 @@ _THUMBNAIL_HEIGHT = 96
 # Sample the frame a little under halfway in: past a clip's title card or fade-in, and
 # far enough that the act — and the anchor — is actually in frame, not just beginning.
 _SAMPLE_FRACTION = 0.4
-
-# Tile action -> the id (clip stem, minus the "_topaz" suffix) of the clip that best
-# illustrates it. These are the acts the library has no camera-scoped clip for, hand
-# picked because the sidecar tags either miss the act or name a different one.
-CURATED_EXAMPLES: dict[str, str] = {
-    "Side Gamma": "036e8d4e-2f84-4178-89f2-541e4200452f",
-    "Side Epsilon": "Wve2uiuZKyP1RoJJFgri",
-    "Side Zeta": "ceb1cd47-a631-437f-9ff4-a773fac92e82",
-    "POV Zeta": "067f11ff-963f-4a40-b0b6-c43656d71bbf",
-    "Side Dancing": "59020ab7-57c3-4a1d-a91c-22cbe64231ea",
-    "POV Dancing": "243a79f8-6982-43b5-ae7a-512ed73c7076",
-}
-
 
 def _tile_actions() -> list[str]:
     """Every act a tile is built for, in grid order — the labels a thumbnail fills."""
@@ -89,7 +76,8 @@ def example_clips() -> dict[str, Path]:
     by_action, by_id = _scan_library()
     examples: dict[str, Path] = {}
     for action in _tile_actions():
-        clip = by_id.get(CURATED_EXAMPLES.get(action, "")) or by_action.get(action.lower())
+        clip = (by_id.get(config.CURATED_EXAMPLES.get(action, ""))
+                or by_action.get(action.lower()))
         if clip is not None:
             examples[action] = clip
     return examples
