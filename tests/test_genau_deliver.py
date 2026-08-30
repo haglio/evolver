@@ -131,6 +131,37 @@ class TestGenauDeliver(unittest.TestCase):
             self.assertEqual((result.delivered, result.failed), (0, 0))
             self.assertFalse(clips.exists())  # nothing to deliver, nothing created
 
+    def test_the_lane_runs_between_the_four_places_it_is_given(self):
+        """The lane spans four places, and all four are arguments now.
+
+        `config` still answers when the caller names none of them — the
+        pipeline names none. The ambient four here are pointed at a second
+        staged clip, so a stage still reading them would deliver that one
+        instead of this one.
+        """
+        with workspace_temp_dir() as root:
+            given_outbox, given_sorted, given_clips = _lane(root / "given")
+            _stage_clip(given_outbox, given_sorted, stem="loop_given")
+
+            ambient_outbox, ambient_sorted, ambient_clips = _lane(root / "ambient")
+            _stage_clip(ambient_outbox, ambient_sorted, stem="loop_ambient")
+
+            with override_config(
+                OUT_UPSCALED_DIR=ambient_outbox, SORTED_DIR=ambient_sorted,
+                GENAU_CLIPS_DIR=ambient_clips, GENAU_SOURCE=GENAU_SOURCE,
+                METADATA_DIR=root / "metadata",
+            ):
+                result = genau_deliver.run(
+                    outbox_dir=given_outbox,
+                    sorted_dir=given_sorted,
+                    genau_source=GENAU_SOURCE,
+                    genau_clips_dir=given_clips,
+                )
+
+            self.assertEqual(result.delivered, 1)
+            self.assertTrue((given_clips / "loop_given_topaz.mp4").is_file())
+            self.assertFalse(ambient_clips.exists())
+            self.assertTrue((ambient_outbox / "landscape" / GENAU_SOURCE / "loop_ambient_topaz.mp4").is_file())
 
 class TestGenauDeliverResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):

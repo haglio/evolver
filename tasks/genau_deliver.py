@@ -37,22 +37,21 @@ class GenauDeliverResult:
     failed: int = 0
 
 
-def _upscaled_genau_clips():
+def _upscaled_genau_clips(root: Path, genau_source: str):
     """Every finished Genau upscale waiting in the outbox, whatever its orientation.
 
     The upscale stage files its output under ``<orient>/<source>/``, so the lane's
     clips are spread across the orientation folders rather than gathered in one.
     """
-    root = config.OUT_UPSCALED_DIR
     if not root.is_dir():
         return
     for orient_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        source_dir = orient_dir / config.GENAU_SOURCE
+        source_dir = orient_dir / genau_source
         if source_dir.is_dir():
             yield from sorted(iter_finalized_videos(source_dir, config.VIDEO_EXTENSIONS))
 
 
-def _sorted_original(upscaled: Path) -> Path | None:
+def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
     """The ``1_sorted`` video ``upscaled`` was made from, if it is still there.
 
     The upscale stage names its output ``<sorted stem>_topaz`` under the same
@@ -62,7 +61,7 @@ def _sorted_original(upscaled: Path) -> Path | None:
     if not upscaled.stem.endswith("_topaz"):
         return None
     orient = upscaled.parent.parent.name
-    for candidate in (config.SORTED_DIR / config.GENAU_SOURCE / orient).glob(
+    for candidate in (genau_sorted_dir / orient).glob(
         f"{upscaled.stem[: -len('_topaz')]}.*"
     ):
         if candidate.suffix.lower() in config.VIDEO_EXTENSIONS:
@@ -87,10 +86,10 @@ def _unique_destination(path: Path) -> Path:
         n += 1
 
 
-def _deliver(upscaled: Path) -> Path:
+def _deliver(upscaled: Path, clips_dir: Path) -> Path:
     """Move one finished upscale into Genau's clips folder; return where it landed."""
-    config.GENAU_CLIPS_DIR.mkdir(parents=True, exist_ok=True)
-    destination = _unique_destination(config.GENAU_CLIPS_DIR / upscaled.name)
+    clips_dir.mkdir(parents=True, exist_ok=True)
+    destination = _unique_destination(clips_dir / upscaled.name)
     upscaled.replace(destination)
     return destination
 
@@ -108,28 +107,50 @@ def _retire_sidecar(upscaled: Path) -> None:
         pass
 
 
-def _retire_source(upscaled: Path) -> None:
+def _retire_source(upscaled: Path, genau_sorted_dir: Path) -> None:
     """Remove the ``1_sorted`` copy the delivered clip was made from, and its sidecar.
 
     See the module docstring for why this is not optional. The sidecar mirrors the
     outbox path the clip no longer occupies, so it would otherwise describe nothing.
     """
-    original = _sorted_original(upscaled)
+    original = _sorted_original(upscaled, genau_sorted_dir)
     if original is not None:
         original.unlink(missing_ok=True)
-        remove_empty_dirs(config.SORTED_DIR / config.GENAU_SOURCE)
+        remove_empty_dirs(genau_sorted_dir)
     _retire_sidecar(upscaled)
 
 
-def run() -> GenauDeliverResult:
-    """Move every finished Genau upscale into Genau's folder, retiring its source."""
-    result = GenauDeliverResult()
-    log.info("=== Genau lane: 2_outbox -> %s ===", config.GENAU_CLIPS_DIR)
+def run(
+    *,
+    outbox_dir: Path | None = None,
+    sorted_dir: Path | None = None,
+    genau_source: str | None = None,
+    genau_clips_dir: Path | None = None,
+) -> GenauDeliverResult:
+    """Move every finished Genau upscale into Genau's folder, retiring its source.
 
-    for upscaled in _upscaled_genau_clips():
+    The four places the lane spans are arguments, resolved here rather than in
+    the signature: a default is evaluated at import, which would freeze the
+    value past ``override_config``. ``genau_source`` is the overlay's
+    ``genau_source`` folder name, which origenerator reads from its own overlay
+    under the same key; a parameter changes where the value can come from, not
+    what it is called.
+    """
+    outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
+    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
+    genau_source = config.GENAU_SOURCE if genau_source is None else genau_source
+    genau_clips_dir = config.GENAU_CLIPS_DIR if genau_clips_dir is None else genau_clips_dir
+    # The lane's own corner of 1_sorted. Composed once so the two helpers that
+    # need it take one path rather than two halves they could pair differently.
+    genau_sorted_dir = sorted_dir / genau_source
+
+    result = GenauDeliverResult()
+    log.info("=== Genau lane: 2_outbox -> %s ===", genau_clips_dir)
+
+    for upscaled in _upscaled_genau_clips(outbox_dir, genau_source):
         try:
-            destination = _deliver(upscaled)
-            _retire_source(upscaled)
+            destination = _deliver(upscaled, genau_clips_dir)
+            _retire_source(upscaled, genau_sorted_dir)
         except OSError:
             # A clip Genau is playing right now is locked on Windows. Leaving it
             # is right: it is still a valid outbox entry with its source beside
