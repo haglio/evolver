@@ -52,18 +52,18 @@ class TestPopupStageLifecycle(unittest.TestCase):
 
     def test_stage_completed_sets_bar_to_100(self):
         self.popup.on_stage_started("sort")
-        self.popup.on_stage_completed("sort", None, 1.5, "completed")
+        self.popup.on_stage_completed("sort")
         bar = self.popup._bars["sort"]
         self.assertEqual(bar.maximum(), 100)
         self.assertEqual(bar.value(), 100)
 
     def test_stage_skipped_sets_bar_to_100(self):
-        self.popup.on_stage_completed("upscale", None, 0.0, "skipped")
+        self.popup.on_stage_completed("upscale")
         bar = self.popup._bars["upscale"]
         self.assertEqual(bar.value(), 100)
 
     def test_stage_error_sets_bar_to_100(self):
-        self.popup.on_stage_completed("dupes", None, 2.0, "error")
+        self.popup.on_stage_completed("dupes")
         bar = self.popup._bars["dupes"]
         self.assertEqual(bar.value(), 100)
 
@@ -86,7 +86,7 @@ class TestPopupIntraProgress(unittest.TestCase):
 
     def test_stage_progress_updates_total_bar(self):
         # Complete sort (contributes 100), then partial progress on upscale
-        self.popup.on_stage_completed("sort", None, 1.0, "completed")
+        self.popup.on_stage_completed("sort")
         self.popup.on_stage_started("upscale")
         self.popup.on_stage_progress("upscale", 2, 5)
         # sort=100, upscale=40, rest=0 => total=140
@@ -104,11 +104,11 @@ class TestPopupTotalBar(unittest.TestCase):
 
     def test_total_reaches_its_maximum_when_all_complete(self):
         for stage in self._all_stages:
-            self.popup.on_stage_completed(stage, None, 0.5, "completed")
+            self.popup.on_stage_completed(stage)
         self.assertEqual(self.popup._total_bar.value(), 100 * len(self._all_stages))
 
     def test_skipped_stages_contribute_to_total(self):
-        self.popup.on_stage_completed("sort", None, 0.0, "skipped")
+        self.popup.on_stage_completed("sort")
         self.assertEqual(self.popup._total_bar.value(), 100)
 
 
