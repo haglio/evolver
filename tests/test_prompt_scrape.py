@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import unittest
 from pathlib import Path
@@ -420,6 +421,26 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
         self.assertEqual(result.action, "POV Beta")
         self.assertEqual(result.style, "")
         self.assertEqual(result.creativity, "7")
+
+
+class TestTheEmbeddedFieldTable(unittest.TestCase):
+    def test_every_declared_field_has_a_reader(self):
+        """The thirteen readers were thirteen copies of the same three lines, so
+        a fourteenth field arriving with no reader looked exactly like the other
+        thirteen and read as absent forever. It has to answer here instead."""
+        self.assertEqual(
+            {name for name, _ in prompt_scrape._EMBEDDED_FIELDS},
+            {field.name for field in
+             dataclasses.fields(prompt_scrape._ProviderEmbeddedMetadata)},
+        )
+
+    def test_a_reader_answers_the_empty_string_when_its_field_is_absent(self):
+        """The one shape the loop depends on: absent is "", never None, so a
+        field already found is never overwritten and a missing one never has to
+        be special-cased."""
+        for name, extract in prompt_scrape._EMBEDDED_FIELDS:
+            with self.subTest(field=name):
+                self.assertEqual(extract("{}"), "")
 
 
 class TestTitlecaseAction(unittest.TestCase):

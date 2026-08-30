@@ -6,6 +6,7 @@ import datetime
 import json
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from email.utils import parsedate
 from pathlib import Path
@@ -304,51 +305,80 @@ class _ProviderEmbeddedMetadata:
     creativity: str = ""
 
 
+# How wide a slice of the page around each mention of the id is read as the
+# record for it. The embedded JSON is minified onto one line with everything
+# else on the page, so there is no delimiter to stop at; 5,000 characters
+# either side comfortably spans one record's fields without reaching the next
+# item's on a listing page.
+_JSON_WINDOW_CHARS = 5000
+
+# Each field of the embedded record: what it is called on the dataclass, and
+# how to read it out of a window. Every reader answers "" for absent, so the
+# loop below has one shape rather than thirteen copies of it -- three of which
+# differed only in converting an int, joining a pair, or reformatting a date.
+_EMBEDDED_FIELDS: tuple[tuple[str, Callable[[str], str]], ...] = (
+    ("prompt", lambda blob: _extract_json_string_field(blob, "prompt")),
+    ("negative_prompt",
+     lambda blob: _extract_nullable_json_string_field(blob, "negative_prompt")),
+    ("parent_image_id",
+     lambda blob: _extract_nullable_json_string_field(blob, "parent_image_id")),
+    ("model", lambda blob: _extract_json_string_field(blob, "model")),
+    ("version", lambda blob: _extract_json_string_field(blob, "version")),
+    ("seed", lambda blob: _int_field_as_text(blob, "seed")),
+    ("aspect_ratio", lambda blob: _extract_json_string_field(blob, "aspectRatio")),
+    ("resolution", lambda blob: _resolution_field(blob)),
+    ("quality", lambda blob: _extract_json_string_field(blob, "quality")),
+    ("created", lambda blob: _created_field(blob)),
+    ("action", lambda blob: _action_field(blob)),
+    ("style", lambda blob: _extract_nullable_json_string_field(blob, "styleValue")),
+    ("creativity", lambda blob: _int_field_as_text(blob, "creativity")),
+)
+
+
 def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmbeddedMetadata:
-    metadata = _ProviderEmbeddedMetadata()
+    """The record the page embeds for *page_id*, read out of the JSON around it.
+
+    Each mention of the id is tried in turn, and each window twice -- once as
+    it stands and once with the backslash-escaped quotes unescaped, because the
+    same record appears both as JSON and as a JSON string holding JSON. The
+    first mention that yields a prompt is taken to be the right one; a field
+    already found is never overwritten by a later window.
+    """
+    found: dict[str, str] = {}
     for index in _all_indices(html, page_id):
-        window = html[max(0, index - 5000): index + 5000]
+        window = html[max(0, index - _JSON_WINDOW_CHARS): index + _JSON_WINDOW_CHARS]
         for candidate in (window, window.replace('\\"', '"')):
-            if not metadata.prompt:
-                metadata.prompt = _extract_json_string_field(candidate, "prompt")
-            if not metadata.negative_prompt:
-                metadata.negative_prompt = _extract_nullable_json_string_field(candidate, "negative_prompt")
-            if not metadata.parent_image_id:
-                metadata.parent_image_id = _extract_nullable_json_string_field(candidate, "parent_image_id")
-            if not metadata.model:
-                metadata.model = _extract_json_string_field(candidate, "model")
-            if not metadata.version:
-                metadata.version = _extract_json_string_field(candidate, "version")
-            if not metadata.seed:
-                seed_int = _extract_json_int_field(candidate, "seed")
-                if seed_int is not None:
-                    metadata.seed = str(seed_int)
-            if not metadata.aspect_ratio:
-                metadata.aspect_ratio = _extract_json_string_field(candidate, "aspectRatio")
-            if not metadata.resolution:
-                width = _extract_json_int_field(candidate, "width")
-                height = _extract_json_int_field(candidate, "height")
-                if width is not None and height is not None:
-                    metadata.resolution = f"{width}x{height}"
-            if not metadata.quality:
-                metadata.quality = _extract_json_string_field(candidate, "quality")
-            if not metadata.created:
-                created_at = _extract_json_string_field(candidate, "createdAt")
-                if created_at:
-                    metadata.created = _parse_provider_created_at(created_at)
-            if not metadata.action:
-                raw_action = _extract_json_first_array_string(candidate, "action")
-                if raw_action:
-                    metadata.action = _titlecase_action(raw_action)
-            if not metadata.style:
-                metadata.style = _extract_nullable_json_string_field(candidate, "styleValue")
-            if not metadata.creativity:
-                creativity_int = _extract_json_int_field(candidate, "creativity")
-                if creativity_int is not None:
-                    metadata.creativity = str(creativity_int)
-        if metadata.prompt:
+            for attribute, extract in _EMBEDDED_FIELDS:
+                if not found.get(attribute):
+                    found[attribute] = extract(candidate)
+        if found.get("prompt"):
             break
-    return metadata
+    # By keyword, so a name in the table that no field answers to is a
+    # TypeError here rather than a value silently going nowhere.
+    return _ProviderEmbeddedMetadata(**found)
+
+
+def _int_field_as_text(blob: str, field_name: str) -> str:
+    value = _extract_json_int_field(blob, field_name)
+    return "" if value is None else str(value)
+
+
+def _resolution_field(blob: str) -> str:
+    width = _extract_json_int_field(blob, "width")
+    height = _extract_json_int_field(blob, "height")
+    if width is None or height is None:
+        return ""
+    return f"{width}x{height}"
+
+
+def _created_field(blob: str) -> str:
+    created_at = _extract_json_string_field(blob, "createdAt")
+    return _parse_provider_created_at(created_at) if created_at else ""
+
+
+def _action_field(blob: str) -> str:
+    raw_action = _extract_json_first_array_string(blob, "action")
+    return _titlecase_action(raw_action) if raw_action else ""
 
 
 def _extract_json_string_field(blob: str, field_name: str) -> str:
