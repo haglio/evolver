@@ -73,13 +73,8 @@ class BackfillWindow(QWidget):
     soundtrack would be one more thing for the recognizer to mishear.
     """
 
-    def __init__(
-        self,
-        session: BackfillSession,
-        thumbnails: dict[str, str] | None = None,
-        parent: QWidget | None = None,
-    ) -> None:
-        super().__init__(parent)
+    def __init__(self, session: BackfillSession, thumbnails: dict[str, str] | None = None) -> None:
+        super().__init__()
         self._session = session
         self._tiles: dict[str, QToolButton] = {}
         self.setWindowTitle("Evolver - Backfill Metadata")

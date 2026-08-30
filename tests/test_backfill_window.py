@@ -1,3 +1,4 @@
+import inspect
 import tempfile
 import unittest
 from pathlib import Path
@@ -166,6 +167,14 @@ class TestBackfillWindow(unittest.TestCase):
         self.assertIn("a_topaz.mp4", set_source.call_args[0][0].toLocalFile())
         self.assertIn("1 remaining", window.status_text())
         self.assertEqual(window.last_text(), "Last: undid a_topaz.mp4 → Dancing")
+
+    def test_the_window_is_built_from_a_session_and_its_thumbnails(self):
+        """It is the top-level window of its own process — nothing owns it, so
+        there is no parent to take."""
+        self.assertEqual(
+            list(inspect.signature(BackfillWindow.__init__).parameters)[1:],
+            ["session", "thumbnails"],
+        )
 
     def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
