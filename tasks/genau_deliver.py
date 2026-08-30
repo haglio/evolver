@@ -25,7 +25,7 @@ still sits in ComfyUI's output folder and in Origenerator's gallery.
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import config
@@ -39,7 +39,6 @@ log = logging.getLogger(__name__)
 class GenauDeliverResult:
     delivered: int = 0
     failed: int = 0
-    delivered_files: list[Path] = field(default_factory=list)
 
 
 def _upscaled_genau_clips():
@@ -145,7 +144,6 @@ def run() -> GenauDeliverResult:
             continue
         log.info("DELIVER %s -> %s", upscaled.name, destination)
         result.delivered += 1
-        result.delivered_files.append(destination)
 
     log.info("Genau lane done. Delivered: %d, Failed: %d", result.delivered, result.failed)
     return result

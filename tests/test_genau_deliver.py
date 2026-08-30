@@ -1,5 +1,6 @@
 """The Genau lane's last step: an upscaled loop leaves the outbox for Genau's folder."""
 
+import dataclasses
 import unittest
 
 from tasks import genau_deliver
@@ -129,6 +130,15 @@ class TestGenauDeliver(unittest.TestCase):
 
             self.assertEqual((result.delivered, result.failed), (0, 0))
             self.assertFalse(clips.exists())  # nothing to deliver, nothing created
+
+
+class TestGenauDeliverResultSurface(unittest.TestCase):
+    def test_the_result_carries_only_what_a_reader_consults(self):
+        """Every field lands in a run record; one nothing reads is dead weight."""
+        self.assertEqual(
+            {f.name for f in dataclasses.fields(genau_deliver.GenauDeliverResult)},
+            {"delivered", "failed"},
+        )
 
 
 if __name__ == "__main__":
