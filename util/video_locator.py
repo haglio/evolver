@@ -21,9 +21,8 @@ def build_index() -> dict[str, list[Path]]:
     root = config.VIDEO_SEARCH_ROOT
     if not root.is_dir():
         return index
-    doomed = tuple(config.active_weird_dirs())
     for video_path in iter_finalized_videos(root, config.VIDEO_EXTENSIONS):
-        if any(video_path.is_relative_to(weird_dir) for weird_dir in doomed):
+        if video_path.is_relative_to(config.WEIRD_DIR):
             continue
         index[video_path.name.lower()].append(video_path)
     return index

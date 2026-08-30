@@ -35,19 +35,15 @@ def sorted_to_outbox_name(sorted_file: Path) -> str:
 
 def run(show_popup: bool = False) -> CorrespondenceResult:
     sorted_files = sorted(iter_videos(config.SORTED_DIR))
-    outbox_roots = config.active_outbox_dirs()
-    outbox_files = []
-    for root in outbox_roots:
-        outbox_files.extend(iter_videos(root))
-    outbox_files = sorted(outbox_files)
+    outbox_root = config.OUTBOX_DIR
+    outbox_files = sorted(iter_videos(outbox_root))
 
     expected_outbox_names = {sorted_to_outbox_name(p) for p in sorted_files}
     outbox_name_to_paths: dict[str, list[str]] = {}
 
     orphan_outbox: list[str] = []
     for outbox_file in outbox_files:
-        root = next(root for root in outbox_roots if outbox_file.is_relative_to(root))
-        relative_outbox = str(Path(root.name) / outbox_file.relative_to(root))
+        relative_outbox = str(Path(outbox_root.name) / outbox_file.relative_to(outbox_root))
         outbox_name = outbox_file.name
         outbox_name_to_paths.setdefault(outbox_name, []).append(relative_outbox)
         if outbox_name not in expected_outbox_names:
@@ -85,7 +81,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
 def _log_result(result: CorrespondenceResult) -> None:
     log.info("=== Stage 5: correspondence check ===")
     log.info("1_sorted: %d video file(s) in %s", result.sorted_count, config.SORTED_DIR)
-    log.info("Outboxes: %d video file(s) across %s", result.outbox_count, ", ".join(str(p) for p in config.active_outbox_dirs()))
+    log.info("Outboxes: %d video file(s) across %s", result.outbox_count, config.OUTBOX_DIR)
 
     if result.sorted_count == result.outbox_count:
         log.info("Count check OK: %d files each", result.sorted_count)
@@ -159,7 +155,7 @@ def main() -> int:
     result = run(show_popup=False)
 
     print(f"1_sorted  : {result.sorted_count} video file(s)  in  {config.SORTED_DIR}")
-    print(f"outboxes  : {result.outbox_count} video file(s)  in  {', '.join(str(p) for p in config.active_outbox_dirs())}")
+    print(f"outboxes  : {result.outbox_count} video file(s)  in  {config.OUTBOX_DIR}")
     print()
 
     if result.sorted_count == result.outbox_count:
