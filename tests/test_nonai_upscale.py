@@ -54,40 +54,46 @@ def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**1
            topaz_pids=(), cmdline=None, available_ram=64.0, idle_seconds=10_000.0):
     """An ExitStack patching every outside contact the stage makes.
 
+    Patched on the module that owns each function rather than through whichever
+    stage module imports it: ``patch("tasks.nonai_upscale.processes.suspend")``
+    resolves ``processes`` to ``util.processes`` and sets the attribute there
+    anyway, so the prefix never scoped anything -- it only recorded which file
+    happened to call it, and went stale the moment the call moved.
+
     idle_seconds defaults to a long idle (the user is away), so the presence
     throttle lets encodes start unless a test says otherwise.
     """
     stack = ExitStack()
     mocks = {
         "idle_seconds": stack.enter_context(
-            patch("tasks.nonai_upscale.system_resources.seconds_since_last_input",
+            patch("util.system_resources.seconds_since_last_input",
                   return_value=idle_seconds)),
         "suspend": stack.enter_context(
-            patch("tasks.nonai_upscale.processes.suspend", return_value=True)),
+            patch("util.processes.suspend", return_value=True)),
         "resume": stack.enter_context(
-            patch("tasks.nonai_upscale.processes.resume", return_value=True)),
+            patch("util.processes.resume", return_value=True)),
         "videoai": stack.enter_context(
-            patch("tasks.nonai_upscale.ffprobe.videoai_tag", return_value=videoai)),
+            patch("util.ffprobe.videoai_tag", return_value=videoai)),
         "orientation": stack.enter_context(
-            patch("tasks.nonai_upscale.ffprobe.get_orientation", return_value=orientation)),
+            patch("util.ffprobe.get_orientation", return_value=orientation)),
         "duration": stack.enter_context(
-            patch("tasks.nonai_upscale.ffprobe.duration_seconds", return_value=duration)),
+            patch("util.ffprobe.duration_seconds", return_value=duration)),
         "free_bytes": stack.enter_context(
-            patch("tasks.nonai_upscale.system_resources.free_bytes", return_value=free_bytes)),
+            patch("util.system_resources.free_bytes", return_value=free_bytes)),
         "available_ram": stack.enter_context(
-            patch("tasks.nonai_upscale.system_resources.available_ram_gb", return_value=available_ram)),
+            patch("util.system_resources.available_ram_gb", return_value=available_ram)),
         "popen": stack.enter_context(
-            patch("tasks.nonai_upscale.subprocess.Popen", popen or Mock(return_value=Mock(pid=4242)))),
+            patch("subprocess.Popen", popen or Mock(return_value=Mock(pid=4242)))),
         "is_running": stack.enter_context(
-            patch("tasks.nonai_upscale.processes.is_running", return_value=is_running)),
+            patch("util.processes.is_running", return_value=is_running)),
         "image_path": stack.enter_context(
-            patch("tasks.nonai_upscale.processes.image_path", return_value=image)),
+            patch("util.processes.image_path", return_value=image)),
         "terminate": stack.enter_context(
-            patch("tasks.nonai_upscale.processes.terminate", return_value=terminate)),
+            patch("util.processes.terminate", return_value=terminate)),
         "pids_of_image": stack.enter_context(
-            patch("tasks.nonai_upscale.processes.pids_of_image", return_value=list(topaz_pids))),
+            patch("util.processes.pids_of_image", return_value=list(topaz_pids))),
         "command_line": stack.enter_context(
-            patch("tasks.nonai_upscale.processes.command_line", return_value=cmdline)),
+            patch("util.processes.command_line", return_value=cmdline)),
     }
     return stack, mocks
 

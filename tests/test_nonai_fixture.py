@@ -26,6 +26,7 @@ from tests.test_dead_code import PROJECT_ROOT
 # helpers that resolve a library file's path or launch the encoder.
 MODULES = (
     "tasks/nonai_upscale.py",
+    "tasks/nonai_encode.py",
     "tasks/nonai_queue.py",
     "util/nonai_job.py",
     "util/nonai_library.py",
