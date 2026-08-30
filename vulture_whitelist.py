@@ -8,9 +8,7 @@ accessed dynamically at runtime.
 # -- Qt virtual-method overrides (called by the event loop) --
 _.paintEvent  # noqa: F821
 _.mousePressEvent  # noqa: F821
-_.closeEvent  # noqa: F821
 _.drawFocus  # noqa: F821
-_.accept  # noqa: F821  — QDialog.accept
 _.option  # noqa: F821  — drawFocus override parameter (Qt signature)
 
 # -- Python HTMLParser overrides --
@@ -31,9 +29,6 @@ _.timed_out  # noqa: F821  — UpscaleResult.timed_out, serialized to run record
 
 # -- Written-but-never-read on purpose: the reference IS the job --
 _._show_requests  # noqa: F821  — anchors the QLocalServer; collecting it closes the pipe
-
-# -- Script entry points (invoked by __main__ guard) --
-_.main  # noqa: F821
 
 # -- BackfillWindow's read surface: reached from the tests, which the vulture
 #    scan deliberately excludes. The accessors exist so assertions about the
