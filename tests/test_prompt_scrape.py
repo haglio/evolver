@@ -326,6 +326,139 @@ class TestPromptScrape(unittest.TestCase):
         """
 
 
+PANEL_WITH_METADATA_BUT_NO_PROMPT = """
+<body><div><div class="relative flex h-full min-h-screen flex-col"><main><div>
+  <div class="mt-2 w-full max-w-full gap-x-2 rounded-sm p-2">
+    <div class="flex-1 overflow-hidden">
+      <div class="font-regular selection:bg-primary">
+        <div class="space-y-2.5 overflow-hidden">
+          <div><h2>Model</h2><h1>Panel Model</h1></div>
+          <div><h2>Seed</h2><h1>111</h1></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></main></div></div></body>
+"""
+
+PAGE_WITH_ONLY_EMBEDDED_JSON = (
+    "<html><body>"
+    '{"imageId":"abc","prompt":"embedded prompt","model":"Embedded Model",'
+    '"seed":222}'
+    "</body></html>"
+)
+
+
+class TestFieldsAccumulateAcrossCandidateUrls(unittest.TestCase):
+    """One video is looked for at four URLs, and what each says is kept.
+
+    A page can carry a content panel with the metadata labels on it and still
+    have no prompt -- the video pages of one shape do exactly that. The prompt
+    then comes from a later URL's embedded JSON, and the metadata the panel
+    already gave must survive it: the panel's is what a reader sees on the site,
+    and the embedded record is the fallback for what is missing, not a
+    replacement for what was found.
+    """
+
+    def test_a_panels_metadata_survives_a_prompt_found_at_a_later_url(self):
+        def fetch(url, browser, *, profile_dir):
+            if url.endswith("/image/abc"):
+                return PANEL_WITH_METADATA_BUT_NO_PROMPT
+            return PAGE_WITH_ONLY_EMBEDDED_JSON
+
+        with patch("tasks.prompt_scrape.fetch_dom", side_effect=fetch):
+            payload = prompt_scrape._scrape_provider_video(
+                Path("abc_topaz.mp4"),
+                f"{config.PROVIDER_BASE_URL}/image/abc",
+                Path("chrome.exe"),
+                config.PROVIDER_BASE_URL,
+                Path("profile"),
+            )
+
+        self.assertEqual(payload["video"]["prompt"], "embedded prompt")
+        self.assertEqual(payload["video"]["model"], "Panel Model")
+        self.assertEqual(payload["video"]["seed"], "111")
+
+    def test_with_no_panel_anywhere_the_embedded_record_supplies_the_metadata(self):
+        with patch("tasks.prompt_scrape.fetch_dom",
+                   return_value=PAGE_WITH_ONLY_EMBEDDED_JSON):
+            payload = prompt_scrape._scrape_provider_video(
+                Path("abc_topaz.mp4"),
+                f"{config.PROVIDER_BASE_URL}/image/abc",
+                Path("chrome.exe"),
+                config.PROVIDER_BASE_URL,
+                Path("profile"),
+            )
+
+        self.assertEqual(payload["video"]["model"], "Embedded Model")
+        self.assertEqual(payload["video"]["seed"], "222")
+
+    def test_a_parent_image_from_the_embedded_record_is_followed(self):
+        def fetch(url, browser, *, profile_dir):
+            if url.endswith("/image/parent-1"):
+                return (
+                    "<html><body>"
+                    '{"imageId":"parent-1","prompt":"the source image prompt",'
+                    '"negative_prompt":"not this","model":"Image Model"}'
+                    "</body></html>"
+                )
+            return (
+                "<html><body>"
+                '{"imageId":"abc","prompt":"video prompt",'
+                '"parent_image_id":"parent-1"}'
+                "</body></html>"
+            )
+
+        with patch("tasks.prompt_scrape.fetch_dom", side_effect=fetch):
+            payload = prompt_scrape._scrape_provider_video(
+                Path("abc_topaz.mp4"),
+                f"{config.PROVIDER_BASE_URL}/image/abc",
+                Path("chrome.exe"),
+                config.PROVIDER_BASE_URL,
+                Path("profile"),
+            )
+
+        self.assertEqual(payload["source_image"]["positive_prompt"],
+                         "the source image prompt")
+        self.assertEqual(payload["source_image"]["negative_prompt"], "not this")
+        self.assertEqual(payload["source_image"]["model"], "Image Model")
+
+    def test_no_prompt_at_any_of_the_four_urls_is_an_error_naming_the_video(self):
+        with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>"):
+            with self.assertRaises(RuntimeError) as caught:
+                prompt_scrape._scrape_provider_video(
+                    Path("abc_topaz.mp4"),
+                    f"{config.PROVIDER_BASE_URL}/image/abc",
+                    Path("chrome.exe"),
+                    config.PROVIDER_BASE_URL,
+                    Path("profile"),
+                )
+
+        self.assertIn("abc_topaz.mp4", str(caught.exception))
+
+    def test_the_four_urls_are_tried_in_order_and_stop_at_the_first_prompt(self):
+        seen = []
+
+        def fetch(url, browser, *, profile_dir):
+            seen.append(url)
+            if url.endswith("/text-to-video/abc"):
+                return PAGE_WITH_ONLY_EMBEDDED_JSON
+            return "<html></html>"
+
+        with patch("tasks.prompt_scrape.fetch_dom", side_effect=fetch):
+            prompt_scrape._scrape_provider_video(
+                Path("abc_topaz.mp4"),
+                f"{config.PROVIDER_BASE_URL}/image/abc",
+                Path("chrome.exe"),
+                config.PROVIDER_BASE_URL,
+                Path("profile"),
+            )
+
+        base = config.PROVIDER_BASE_URL
+        self.assertEqual(seen, [f"{base}/image/abc", f"{base}/video/abc",
+                                f"{base}/text-to-video/abc"])
+
+
 class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
     """The tree walked and the browser's scratch profile are arguments.
 
