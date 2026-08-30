@@ -1,11 +1,16 @@
 """Content overlay — the copy that must not be published, loaded at runtime.
 
-The spoken act vocabulary is content, not logic: the phrases a viewer says and
-the ``video.action`` strings they record describe the library, so they live in
-``content.local.json`` (git-ignored) rather than in source.  A committed
-``content.example.json`` documents the shape and is what a fresh or public
-checkout loads, so the recognizer, the grid and the tests all behave the same
-either way.  Everything else about the vocabulary — the camera words, the
+Everything here describes the machine and the library rather than the app: the
+library root, the browser profile, the folder Origenerator drops Genau clips
+in, the scraped provider, and the spoken act vocabulary. All of it lives in
+``content.local.json`` (git-ignored) rather than in source; the committed
+``content.example.json`` documents every key and is what a fresh or public
+checkout loads, so ``config``, the recognizer, the grid and the tests all
+behave the same either way.
+
+The act vocabulary is where the content/logic line is easiest to see: the
+phrases a viewer says and the ``video.action`` strings they record describe the
+library, while everything else about the vocabulary — the camera words, the
 controls, how phrases are combined — is logic and stays in the module.
 """
 from __future__ import annotations
