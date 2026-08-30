@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 import config
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
+from util import relative_dates
 from util.media_files import iter_finalized_videos
 from util.sidecar import sidecar_path, upscaled_video_path, write
 
@@ -471,46 +472,9 @@ def _extract_metadata_fields(root: Node) -> dict[str, str]:
     for label, value in extract_label_values(root, _METADATA_LABELS).items():
         key = label.replace(" ", "_")
         if key == "created":
-            value = _parse_relative_date(value)
+            value = relative_dates.as_iso_date(value)
         fields[key] = value
     return fields
-
-
-def _today() -> datetime.date:
-    return datetime.date.today()
-
-
-_RELATIVE_DATE_RE = re.compile(r"^(\d+)(mo|[mhdw])\s+ago$", re.IGNORECASE)
-
-
-def _parse_relative_date(value: str) -> str:
-    match = _RELATIVE_DATE_RE.match(value.strip())
-    if not match:
-        return value
-    amount = int(match.group(1))
-    unit = match.group(2).lower()
-    today = _today()
-    if unit == "m" or unit == "h":
-        return today.isoformat()
-    if unit == "d":
-        return (today - datetime.timedelta(days=amount)).isoformat()
-    if unit == "w":
-        return (today - datetime.timedelta(weeks=amount)).isoformat()
-    if unit == "mo":
-        month = today.month - amount
-        year = today.year
-        while month < 1:
-            month += 12
-            year -= 1
-        day = min(today.day, _days_in_month(year, month))
-        return datetime.date(year, month, day).isoformat()
-    return value
-
-
-def _days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)).day
 
 
 def _all_indices(haystack: str, needle: str) -> list[int]:

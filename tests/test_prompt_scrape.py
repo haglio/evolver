@@ -48,7 +48,7 @@ class TestPromptScrape(unittest.TestCase):
             with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_with_source_image):
-                        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+                        with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
                             result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
@@ -218,7 +218,7 @@ class TestPromptScrape(unittest.TestCase):
             with self._override(root):
                 with patch("tasks.prompt_scrape._find_browser_executable", return_value=Path("chrome.exe")):
                     with patch("tasks.prompt_scrape._fetch_dom", side_effect=self._fetch_dom_text_only):
-                        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+                        with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
                             result = prompt_scrape.run()
 
             self.assertTrue(result.ok)
@@ -449,7 +449,7 @@ class TestExtractMetadataFields(unittest.TestCase):
         from datetime import date
         html = '<div><h2>Created</h2><h1>2w ago</h1></div>'
         doc = html_query.parse_document(html)
-        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+        with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
             result = prompt_scrape._extract_metadata_fields(doc)
         self.assertEqual(result["created"], "2026-03-14")
 
@@ -482,7 +482,7 @@ class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
         )
 
         with patch("tasks.prompt_scrape._fetch_dom", return_value=html):
-            with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
+            with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
                 payload = prompt_scrape._scrape_provider_video(
                     Path("vid1_topaz.mp4"),
                     f"{config.PROVIDER_BASE_URL}/image/vid1",
@@ -500,41 +500,6 @@ class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
         self.assertEqual(payload["video"]["action"], "Alpha")
         self.assertEqual(payload["video"]["style"], "Default")
         self.assertNotIn("source_image", payload)
-
-
-class TestParseRelativeDate(unittest.TestCase):
-    def test_days_ago(self):
-        from datetime import date
-        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
-            self.assertEqual(prompt_scrape._parse_relative_date("2d ago"), "2026-03-26")
-
-    def test_weeks_ago(self):
-        from datetime import date
-        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
-            self.assertEqual(prompt_scrape._parse_relative_date("2w ago"), "2026-03-14")
-
-    def test_months_ago(self):
-        from datetime import date
-        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
-            self.assertEqual(prompt_scrape._parse_relative_date("3mo ago"), "2025-12-28")
-
-    def test_minutes_ago(self):
-        # The 'm' unit had no case at all: collapsing the minutes branch into
-        # the hours one survived the whole file (audit probe P8).
-        from datetime import date
-        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
-            self.assertEqual(prompt_scrape._parse_relative_date("5m ago"), "2026-03-28")
-
-    def test_hours_ago(self):
-        from datetime import date
-        with patch("tasks.prompt_scrape._today", return_value=date(2026, 3, 28)):
-            self.assertEqual(prompt_scrape._parse_relative_date("5h ago"), "2026-03-28")
-
-    def test_passthrough_non_relative(self):
-        self.assertEqual(prompt_scrape._parse_relative_date("2026-01-15"), "2026-01-15")
-
-    def test_passthrough_empty(self):
-        self.assertEqual(prompt_scrape._parse_relative_date(""), "")
 
 
 class TestProviderSettingsAreRedirectable(unittest.TestCase):
