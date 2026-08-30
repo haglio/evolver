@@ -25,9 +25,8 @@ tagged Side or POV, never bare.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from content import EXAMPLE_CONTENT, LOCAL_CONTENT, load_content
+from content import load_content
 
 
 @dataclass(frozen=True)
@@ -80,17 +79,14 @@ class Command:
     label: str
 
 
-def load_acts(
-    local_path: Path = LOCAL_CONTENT,
-    example_path: Path = EXAMPLE_CONTENT,
-) -> tuple[_Act, ...]:
+def load_acts() -> tuple[_Act, ...]:
     """Every act, from the content overlay — the local copy, else the example.
 
     Each is scoped by a camera word so none stands bare, and the written actions
     keep the library's existing Title Case, so one Fun Time query reaches new
     clips and old.
     """
-    data = load_content(local_path, example_path)
+    data = load_content()
     return tuple(
         _Act(
             spoken=entry["spoken"],
