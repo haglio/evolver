@@ -73,7 +73,7 @@ def choose_input_device(
     return best_index, best_name
 
 
-def probe_input_device(index: int, *, seconds: float = _PROBE_SECONDS) -> float:
+def probe_input_device(index: int) -> float:
     """Measure device *index*'s live RMS by briefly recording int16 mono from it.
 
     Real hardware; :func:`choose_input_device` takes this as an injected callable.
@@ -87,7 +87,7 @@ def probe_input_device(index: int, *, seconds: float = _PROBE_SECONDS) -> float:
     import sounddevice
 
     sample_rate = int(sounddevice.query_devices(index)["default_samplerate"])
-    wanted_bytes = int(seconds * sample_rate) * 2  # int16 → 2 bytes per sample
+    wanted_bytes = int(_PROBE_SECONDS * sample_rate) * 2  # int16 → 2 bytes per sample
     collected = bytearray()
     frames: _queue.Queue[bytes] = _queue.Queue()
 
