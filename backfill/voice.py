@@ -23,6 +23,12 @@ log = logging.getLogger(__name__)
 _UNKNOWN = "[unk]"
 _BLOCK_SIZE = 8000
 
+# How long stop() waits for the listening thread. The loop polls the stop event
+# every 0.5 s through the audio queue's timeout, so this is four chances to
+# notice -- long enough that a live thread always makes it, short enough that a
+# wedged one does not hold a closing window.
+_STOP_TIMEOUT_SECONDS = 2.0
+
 
 def build_grammar(phrases: list[str]) -> str:
     """The vosk grammar restricting the recognizer to *phrases*.
@@ -80,6 +86,10 @@ class VoiceListener(QObject):
 
     heard = pyqtSignal(str)
     hearing = pyqtSignal(str)
+    # The recognizer stopped for good. Without it the window kept showing its
+    # command grid with nothing saying the microphone path had gone, so a user
+    # was left clicking tiles wondering why speech had stopped working.
+    failed = pyqtSignal(str)
 
     def __init__(self, phrases: list[str], parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -94,7 +104,22 @@ class VoiceListener(QObject):
         self._thread.start()
 
     def stop(self) -> None:
+        """Ask the thread to finish, and wait for it to.
+
+        Waiting matters twice. The loop is inside a PortAudio stream's context,
+        so returning without a join lets the interpreter tear down while a C
+        callback thread is still live in it. And clearing the reference is what
+        makes a stopped listener startable again -- start()'s guard is on this
+        attribute, so leaving it set made stopping permanent.
+
+        Bounded: the loop polls the stop event every 0.5 s through the queue's
+        timeout, so a live one returns promptly and a wedged one is not
+        something a closing window should hang on.
+        """
         self._stop.set()
+        thread, self._thread = self._thread, None
+        if thread is not None:
+            thread.join(timeout=_STOP_TIMEOUT_SECONDS)
 
     def _run(self) -> None:
         audio: queue.Queue[bytes] = queue.Queue()
@@ -147,5 +172,6 @@ class VoiceListener(QObject):
                     if phrase:
                         log.info("Heard: %s", phrase)
                         self.heard.emit(phrase)
-        except Exception:
+        except Exception as exc:
             log.exception("Voice listener crashed")
+            self.failed.emit(str(exc) or type(exc).__name__)

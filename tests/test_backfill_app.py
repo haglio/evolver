@@ -54,6 +54,11 @@ class TestMain(unittest.TestCase):
         listener.return_value.heard.connect.assert_called_once_with(
             window.return_value.on_phrase
         )
+        # A recognizer that dies has to reach the window, or the grid goes on
+        # looking like it is listening.
+        listener.return_value.failed.connect.assert_called_once_with(
+            window.return_value.on_voice_failed
+        )
         listener.return_value.stop.assert_called_once()
         worker.return_value.shutdown.assert_called_once()
 

@@ -211,6 +211,15 @@ class BackfillWindow(QWidget):
         """Show the recognizer's live guess, or clear the line once it settles."""
         self._hearing.setText(f"Hearing: {text}" if text else "")
 
+    def on_voice_failed(self, detail: str) -> None:
+        """Say the microphone path has gone, where the live guess used to be.
+
+        The tiles still work -- they are clickable -- so the window does not
+        close or disable anything. What it must not do is go on looking like it
+        is listening.
+        """
+        self._hearing.setText(f"Speech recognition stopped: {detail}")
+
     def on_phrase(self, phrase: str) -> None:
         """React to a phrase — spoken or clicked."""
         # The phrase settled, so the live guess that led to it is spent.

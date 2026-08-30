@@ -87,6 +87,18 @@ class TestBackfillWindow(unittest.TestCase):
 
         self.assertEqual(window.hearing_text(), "")
 
+    def test_a_dead_recognizer_says_so_where_the_live_guess_was(self):
+        """The tiles still work -- they are clickable -- so nothing closes or
+        disables. What the window must not do is go on looking like it is
+        listening while the microphone path has gone."""
+        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        window.on_hearing("side eta")
+
+        window.on_voice_failed("no input device")
+
+        self.assertIn("stopped", window.hearing_text().lower())
+        self.assertIn("no input device", window.hearing_text())
+
     def test_a_landed_phrase_clears_the_stale_hearing_line(self):
         session = FakeSession(
             [Path("a_topaz.mp4"), Path("b_topaz.mp4")],
