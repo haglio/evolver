@@ -21,7 +21,7 @@ from backfill.decisions import (
     sidecar_snapshot,
 )
 from backfill.queue import BackfillQueue
-from backfill.vocabulary import ACTIONS, CONTROLS, SAME, SKIP, UNDO
+from backfill.vocabulary import ACTIONS, CONTROLS, SAME, SKIP, UNDO, WEIRD
 from backfill.work import SerialWorker
 
 NOTHING_TO_UNDO = "nothing to undo"
@@ -170,9 +170,14 @@ class BackfillSession:
         if action is not None:
             return _Labelled(clip, action)
         control = CONTROLS.get(phrase)
-        if control is None:
-            return None
-        return _Deferred(clip) if control == SKIP else _Discarded(clip)
+        if control == SKIP:
+            return _Deferred(clip)
+        if control == WEIRD:
+            return _Discarded(clip)
+        # UNDO and SAME are answered in apply() before a step is asked for, and
+        # anything else is a control this dispatch does not know: do nothing
+        # rather than fall through to the branch that moves a file.
+        return None
 
     def _undo(self) -> str:
         """Take the last decision back, in the queue and on disk."""
