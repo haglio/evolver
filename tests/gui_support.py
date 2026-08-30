@@ -56,7 +56,7 @@ def retire_evolver_app(app) -> None:
     suite's own QApplication with it. This undoes construction instead -- both
     timers, the session-end connection, the tray and the window.
     """
-    app._presence_monitor.stop()
+    app._presence.stop()
     app._watchdog.stop()
     app._scheduler.stop()
     try:

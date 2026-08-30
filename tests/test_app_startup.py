@@ -50,7 +50,7 @@ class TestBuildingIsNotStarting:
 
     def test_construction_starts_neither_timer(self, request):
         app = build_evolver_app(request)
-        assert not app._presence_monitor.isActive()
+        assert not app._presence.is_running
         assert not app._watchdog.isActive()
 
     def test_construction_reads_no_run_history(self, request):
@@ -66,7 +66,7 @@ class TestBuildingIsNotStarting:
 
         claim.assert_called_once()
         load.assert_called_once()
-        assert app._presence_monitor.isActive()
+        assert app._presence.is_running
         assert app._scheduler.next_run_at is not None
 
 
@@ -280,19 +280,30 @@ class TestPresenceMonitor:
         with patch("gui.app.process_identity.claim"), \
              patch("gui.main_window.load_runs", return_value=[]):
             app.start()
-        assert app._presence_monitor.isActive()
+        assert app._presence.is_running
 
     def test_throttles_the_encode_while_the_toggle_is_on(self, request):
         app = self._app_with_toggle(request, True)
-        with patch("gui.app.nonai_upscale.throttle_to_presence") as mock_throttle:
-            app._throttle_presence()
+        with patch("evolver.throttle_nonai_to_presence") as mock_throttle:
+            app._presence.poll()
         mock_throttle.assert_called_once_with()
 
     def test_leaves_the_encode_alone_while_the_toggle_is_off(self, request):
         app = self._app_with_toggle(request, False)
-        with patch("gui.app.nonai_upscale.throttle_to_presence") as mock_throttle:
-            app._throttle_presence()
+        with patch("evolver.throttle_nonai_to_presence") as mock_throttle:
+            app._presence.poll()
         mock_throttle.assert_not_called()
+
+    def test_the_toggle_is_read_at_every_poll_not_at_construction(self, request):
+        """The tray flips it while this is running, so a throttle that had to
+        be rebuilt to notice would be a second place the setting lives."""
+        app = self._app_with_toggle(request, False)
+        app._settings.nonai_upscale_enabled = True
+
+        with patch("evolver.throttle_nonai_to_presence") as mock_throttle:
+            app._presence.poll()
+
+        mock_throttle.assert_called_once_with()
 
 
 class TestSessionManagement:
