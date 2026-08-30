@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QPainter
 from PyQt6.QtWidgets import QWidget
 
@@ -34,9 +34,6 @@ class ToggleSwitch(QWidget):
         if self._checked != on:
             self._checked = on
             self.update()
-
-    def sizeHint(self) -> QSize:
-        return QSize(_TRACK_W, _TRACK_H)
 
     def mousePressEvent(self, event):
         self._checked = not self._checked

@@ -9,7 +9,6 @@ accessed dynamically at runtime.
 _.paintEvent  # noqa: F821
 _.mousePressEvent  # noqa: F821
 _.closeEvent  # noqa: F821
-_.sizeHint  # noqa: F821
 _.drawFocus  # noqa: F821
 _.accept  # noqa: F821  — QDialog.accept
 _.option  # noqa: F821  — drawFocus override parameter (Qt signature)
