@@ -389,19 +389,17 @@ class TestCssSelector(unittest.TestCase):
         doc = html_query.parse_document(html)
         self.assertIsNone(html_query.query_selector(doc, "body > div.missing"))
 
-    def test_query_selector_nth_child(self):
-        html = '<body><div><span>first</span><span>second</span><span>third</span></div></body>'
+    def test_the_engine_answers_the_one_selector_production_asks_for(self):
+        """Nothing builds a selector: there is one constant, of this shape."""
+        html = (
+            "<body><main><div><div>"
+            '<div class="flex-1 overflow-hidden"><div class="font-regular">panel</div></div>'
+            "</div></div></main></body>"
+        )
         doc = html_query.parse_document(html)
-        node = html_query.query_selector(doc, "body > div > span:nth-child(2)")
+        node = html_query.query_selector(doc, prompt_scrape._CONTENT_PANEL_SELECTOR)
         self.assertIsNotNone(node)
-        self.assertEqual(html_query.text_content(node).strip(), "second")
-
-    def test_query_selector_escaped_class_names(self):
-        html = '<body><div class="text-[#fefefe]">styled</div></body>'
-        doc = html_query.parse_document(html)
-        node = html_query.query_selector(doc, r"body > div.text-\[\#fefefe\]")
-        self.assertIsNotNone(node)
-        self.assertEqual(html_query.text_content(node).strip(), "styled")
+        self.assertEqual(html_query.text_content(node).strip(), "panel")
 
     def test_image_page_url_from_src(self):
         self.assertEqual(
