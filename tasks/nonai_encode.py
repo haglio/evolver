@@ -118,17 +118,23 @@ def resume_job(job: dict, job_file: Path) -> None:
              job.get("source"))
 
 
-def overran(job: dict) -> bool:
-    return active_runtime(job) > config.NONAI_MAX_RUNTIME_HOURS * 3600
+def overran(job: dict, *, now: float | None = None) -> bool:
+    return active_runtime(job, now=now) > config.NONAI_MAX_RUNTIME_HOURS * 3600
 
 
-def active_runtime(job: dict) -> float:
+def active_runtime(job: dict, *, now: float | None = None) -> float:
     """Wall-clock since the encode started, minus the time it spent suspended.
 
     The runtime cap exists to catch a *stuck* encode; hours parked frozen while
     the user was at the machine are not the encode's fault and must not count.
+
+    *now* is the moment to measure against, defaulting to this one. It is an
+    argument because this arithmetic is what decides that a live multi-hour
+    encode is stuck and kills it, and against the wall clock the only way to
+    ask it a question is to build a job that started a chosen number of seconds
+    ago and accept the answer to within the test's own runtime.
     """
-    now = time.time()
+    now = time.time() if now is None else now
     suspended = job.get("suspended_seconds", 0.0)
     if job.get("suspended") and job.get("suspended_at"):
         suspended += now - job["suspended_at"]
