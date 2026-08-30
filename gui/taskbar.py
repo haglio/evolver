@@ -23,10 +23,6 @@ def _guid_bytes(s: str) -> bytes:
     return struct.pack("<IHH", int(p[0], 16), int(p[1], 16), int(p[2], 16)) + bytes.fromhex(p[3] + p[4])
 
 
-# ---------------------------------------------------------------------------
-# Minimal COM types for IPropertyStore
-# ---------------------------------------------------------------------------
-
 class _GUID(ctypes.Structure):
     _fields_ = [("raw", ctypes.c_byte * 16)]
 
@@ -82,10 +78,6 @@ _SHGetPropertyStoreForWindow.argtypes = [wt.HWND, ctypes.POINTER(_GUID), ctypes.
 _SHGetPropertyStoreForWindow.restype = HRESULT
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
 def set_taskbar_properties(hwnd: int, app_id: str, relaunch_cmd: str, display_name: str, icon_path: str) -> None:
     """Set AppUserModel properties on *hwnd* so pinning uses the correct icon/name.
 
@@ -96,10 +88,6 @@ def set_taskbar_properties(hwnd: int, app_id: str, relaunch_cmd: str, display_na
     except Exception:
         log.warning("Failed to set taskbar pin properties", exc_info=True)
 
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
 
 def _vtable_method(obj_ptr: int, index: int, proto):
     """Fetch a COM vtable entry by *index* and cast to *proto*."""
