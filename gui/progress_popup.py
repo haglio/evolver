@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -12,7 +13,20 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.progress import ALL_STAGES
+from gui.progress import ALL_STAGES, STAGE_LABELS
+
+_CAPTION_GUTTER = 12
+
+
+def _caption_width(font) -> int:
+    """Wide enough for the longest stage label, in the font it will be drawn in.
+
+    Measured rather than guessed: the widest label is a third wider than the
+    widest stage key it replaced, and the gap between them is font-dependent,
+    so a number picked on one machine would clip on another.
+    """
+    metrics = QFontMetrics(font)
+    return max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values()) + _CAPTION_GUTTER
 
 
 class ProgressPopup(QWidget):
@@ -40,10 +54,11 @@ class ProgressPopup(QWidget):
         self._bars: dict[str, QProgressBar] = {}
         self._stage_values: dict[str, int] = {}
 
+        caption_width = _caption_width(self.font())
         for key in ALL_STAGES:
             row_layout = QHBoxLayout()
-            label = QLabel(key)
-            label.setFixedWidth(160)
+            label = QLabel(STAGE_LABELS[key])
+            label.setFixedWidth(caption_width)
             row_layout.addWidget(label)
 
             bar = QProgressBar()

@@ -1,11 +1,23 @@
 """Tests for the stats window and stacked area chart."""
 
+from unittest.mock import patch
+
 import pytest
 
-from PyQt6.QtGui import QImage
+from PyQt6.QtGui import QFontMetrics, QImage
+
+from gui.progress import STAGE_LABELS
 
 from gui.run_record import RunRecord
-from gui.stats_window import STAGE_COLORS, StackedAreaChart, StatsWindow, _pick_y_ticks
+from gui.stats_window import (
+    STAGE_COLORS,
+    StackedAreaChart,
+    StatsWindow,
+    _legend_font,
+    _pick_y_ticks,
+    chart_right_margin,
+    legend_width,
+)
 from tests.temp_helpers import make_run_record
 
 
@@ -202,8 +214,11 @@ class TestStackedAreaChartPainting:
         averaged_chart = StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0}))
         averaged_chart.set_mode("averages")
         averaged = _render(averaged_chart)
-        assert _is_band_fill(_rgb(normal, 680, 230), "sort")
-        assert _rgb(averaged, 680, 230) == _WHITE
+        # Just inside the chart's right edge, which the legend's measured width
+        # decides -- a fixed x here would land in the margin on another font.
+        newest = 800 - chart_right_margin() - 10
+        assert _is_band_fill(_rgb(normal, newest, 230), "sort")
+        assert _rgb(averaged, newest, 230) == _WHITE
 
     def test_the_10_minute_line_appears_only_when_the_scale_reaches_it(self):
         tall = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
@@ -219,13 +234,44 @@ class TestStackedAreaChartPainting:
 
         image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
         margin_pixels = {
-            _rgb(image, x, y) for x in range(690, 800) for y in range(20, 350)
+            _rgb(image, x, y)
+            for x in range(800 - chart_right_margin(), 800)
+            for y in range(20, 350)
         }
         for stage_key in ALL_STAGES:
             color = STAGE_COLORS[stage_key]
             assert (color.red(), color.green(), color.blue()) in margin_pixels, (
                 f"legend has no swatch for {stage_key!r}"
             )
+
+    def test_the_legend_names_each_stage_rather_than_its_key(self):
+        """Patching the labels to nothing takes the legend's words with them,
+        which is what says the words come from the label table and not from
+        the keys the chart iterates."""
+        chart = StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0}))
+        text_band = (
+            range(800 - chart_right_margin() + 26, 795),
+            range(20, 20 + 16 * 13),
+        )
+
+        named = _ink_count(_render(chart), *text_band)
+        with patch.dict(
+            "gui.stats_window.STAGE_LABELS",
+            {key: "" for key in STAGE_LABELS},
+            clear=True,
+        ):
+            blank = _ink_count(_render(chart), *text_band)
+
+        assert named > blank + 100
+
+    def test_the_legend_is_wide_enough_for_the_longest_label(self):
+        """The words are up to half again the width of the keys they replaced,
+        and by how much is the machine's font's business, so the box is
+        measured from them rather than set to a number picked on one box."""
+        metrics = QFontMetrics(_legend_font())
+        widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())
+
+        assert legend_width() >= widest + 22
 
     def test_the_runs_are_dated_along_the_x_axis(self):
         image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))

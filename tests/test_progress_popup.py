@@ -18,6 +18,33 @@ class TestPopupConstruction(unittest.TestCase):
         from gui.progress_popup import ALL_STAGES
         self.assertEqual(len(self.popup._bars), len(ALL_STAGES))
 
+    def test_every_row_is_captioned_with_the_stage_label(self):
+        """The bars are read while a run is in flight, so they say what the
+        stage is rather than the key the run record files it under."""
+        from PyQt6.QtWidgets import QLabel
+
+        from gui.progress import STAGE_LABELS
+
+        captions = {label.text() for label in self.popup.findChildren(QLabel)}
+
+        self.assertTrue(set(STAGE_LABELS.values()) <= captions)
+        self.assertEqual(captions & set(STAGE_LABELS), set())
+
+    def test_a_caption_is_never_clipped_by_the_column_it_sits_in(self):
+        """The column is sized from the labels, not from a guess: the widest
+        one is 137 px in this machine's default font and was 91 as a key, and
+        the font is whatever the machine running it has."""
+        from PyQt6.QtWidgets import QLabel
+
+        from gui.progress import STAGE_LABELS
+
+        for label in self.popup.findChildren(QLabel):
+            if label.text() in set(STAGE_LABELS.values()):
+                with self.subTest(caption=label.text()):
+                    self.assertGreaterEqual(
+                        label.width(), label.fontMetrics().horizontalAdvance(label.text())
+                    )
+
     def test_has_total_bar(self):
         self.assertIsInstance(self.popup._total_bar, QProgressBar)
 
