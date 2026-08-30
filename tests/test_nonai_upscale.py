@@ -302,6 +302,70 @@ class TestRunStopsAJob(unittest.TestCase):
             self.assertTrue(out.exists())
 
 
+# The on-disk record's key names, held exactly. The file lives at
+# %LOCALAPPDATA%\Evolver\nonai_upscale_job.json and describes an encode that
+# is still running: a renamed key orphans it mid-run, and the stage then sees
+# no job, leaves the ffmpeg unsupervised and starts another on top of it --
+# which is the failure the adoption path below exists to recover from.
+JOB_KEYS_AT_START = {"pid", "source", "tmp", "out", "expected_duration", "started_at"}
+# Adoption knows three more, because it takes over an encode already in flight
+# and must be able to say it is not frozen.
+JOB_KEYS_ON_ADOPTION = JOB_KEYS_AT_START | {
+    "suspended", "suspended_at", "suspended_seconds",
+}
+
+
+class TestTheJobFilesKeys(unittest.TestCase):
+    def test_a_started_encode_writes_exactly_these_keys(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+
+            stack, _ = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=True)
+
+            written = json.loads(
+                overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertEqual(set(written), JOB_KEYS_AT_START)
+
+    def test_an_adopted_encode_writes_exactly_these(self):
+        from util import topaz
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            source = make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
+            tmp = (non_ai / "larkin" / "3_good_to_go" / "processed"
+                   / "busy.partial.deadbeefcafe.mp4")
+            make_video(tmp)
+            cmdline = subprocess.list2cmdline(
+                topaz.command(source, tmp, "the-filter", "the-tag", keep_audio=True)
+            )
+
+            stack, _ = probes(topaz_pids=(31337,), cmdline=cmdline, duration=581.0)
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=False)
+
+            written = json.loads(
+                overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertEqual(set(written), JOB_KEYS_ON_ADOPTION)
+
+    def test_suspending_and_resuming_add_no_keys_of_their_own(self):
+        """The throttle rewrites the record on every park and thaw, and it is
+        the same record: three of the nine exist for exactly this."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+
+            stack, _ = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                nonai_upscale.throttle_to_presence()
+
+            written = json.loads(
+                overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertEqual(set(written), JOB_KEYS_ON_ADOPTION)
+
+
 class TestOrphanAdoption(unittest.TestCase):
     """A lost job file must not orphan a live encode.
 
