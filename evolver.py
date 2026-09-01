@@ -2,20 +2,21 @@
 """evolver.py - video collection maintenance pipeline.
 
 Invoked by the tray app scheduler or directly via CLI. Stages:
-  1. purge           - remove weird outputs and their matching sources
-  2. metadata        - scrape AI prompt metadata into mirrored JSON files
-  3. sort            - move new videos from inbox into sorted folders by source/orientation
-  4. upscale         - apply Topaz frame interpolation + 4x upscale to sorted AI videos
-  5. genau_deliver   - hand finished Genau clips to the folder Genau plays from
-  6. upscale_non_ai  - supervise one detached Topaz encode of a non-AI library video
-  7. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
-  8. references      - repoint the suite's saved video paths at videos that moved
-  9. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
- 10. clip_scripts    - cut a carved clip's funscript out of its source scene's
- 11. scene_scripts   - place a carved clip's funscript back into its unscripted scene's
- 12. scripts         - align funscripts to mirror the video library tree
- 13. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
- 14. dupes           - scan non_AI for likely duplicate videos by exact filesize
+  1. strays          - repair malformed names and rehome funscripts found in the video tree
+  2. purge           - remove weird outputs and their matching sources
+  3. metadata        - scrape AI prompt metadata into mirrored JSON files
+  4. sort            - move new videos from inbox into sorted folders by source/orientation
+  5. upscale         - apply Topaz frame interpolation + 4x upscale to sorted AI videos
+  6. genau_deliver   - hand finished Genau clips to the folder Genau plays from
+  7. upscale_non_ai  - supervise one detached Topaz encode of a non-AI library video
+  8. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
+  9. references      - repoint the suite's saved video paths at videos that moved
+ 10. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
+ 11. clip_scripts    - cut a carved clip's funscript out of its source scene's
+ 12. scene_scripts   - place a carved clip's funscript back into its unscripted scene's
+ 13. scripts         - align funscripts to mirror the video library tree
+ 14. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
+ 15. dupes           - scan non_AI for likely duplicate videos by exact filesize
 """
 
 import logging
@@ -40,6 +41,7 @@ from tasks import (
     scene_scripts,
     scripts_sync,
     sort,
+    stray_files,
     upscale,
 )
 from util import processes, system_resources
@@ -78,13 +80,16 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "dupes": lambda r: not r.ok,
 }
 
-# What counts as work held back rather than work gone wrong. Nothing broke and
-# nothing is owed to anyone: there is no room to write another upscale, so the
-# stage parks the queue and picks it up again the moment space frees up. This
+# What counts as worth a person's eye without being work gone wrong. Two shapes
+# land here. Work held back: there is no room to write another upscale, so the
+# stage parks the queue and picks it up again the moment space frees up — that
 # used to read as an outright failure, and because free space stays low for days
-# at a stretch it turned the whole run history into a wall of red — a standing
-# alarm for a condition with nothing in it to fix.
-_STAGE_HELD_BACK: dict[str, Callable[[object], bool]] = {
+# at a stretch it turned the whole run history into a wall of red, a standing
+# alarm for a condition with nothing in it to fix. And a finding a person has to
+# judge: the stray-files stage fixes what it can name and reports the rest,
+# where reporting IS the stage doing its job rather than failing at it.
+_STAGE_WARNED: dict[str, Callable[[object], bool]] = {
+    "strays": lambda r: not r.ok,
     "upscale": lambda r: r.deferred_low_disk,
     "upscale_non_ai": lambda r: r.deferred_low_disk,
 }
@@ -99,8 +104,8 @@ def _stage_status(name: str, result: object) -> str:
     failed = _STAGE_FAILED.get(name)
     if failed is not None and failed(result):
         return "error"
-    held_back = _STAGE_HELD_BACK.get(name)
-    if held_back is not None and held_back(result):
+    warned = _STAGE_WARNED.get(name)
+    if warned is not None and warned(result):
         return "warning"
     return "completed"
 
@@ -193,6 +198,10 @@ def run_pipeline(
             on_stage_complete(name, None, 0.0, "skipped")
 
     try:
+        # First: every stage below finds videos by a positive extension filter and
+        # funscripts only under the script tree, so a name this one repairs or a
+        # script it rehomes is invisible to all of them until it has run.
+        _run_stage("strays", stray_files.run)
         _run_stage("purge", purge_weird.run)
         _run_stage("metadata", prompt_scrape.run)
         sort_result = _run_stage("sort", sort.run)

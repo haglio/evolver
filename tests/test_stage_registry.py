@@ -7,6 +7,11 @@ from gui.stats_window import STAGE_COLORS
 
 
 class TestStageRegistry(unittest.TestCase):
+    def test_gui_lists_the_stray_file_stage_first(self):
+        """It repairs names and rehomes scripts, so every stage that scans for
+        either has to run after it."""
+        self.assertEqual(ALL_STAGES[0], "strays")
+
     def test_gui_lists_the_non_ai_upscale_stage_after_the_ai_one(self):
         self.assertIn("upscale_non_ai", ALL_STAGES)
         self.assertEqual(ALL_STAGES.index("upscale_non_ai"), ALL_STAGES.index("upscale") + 1)

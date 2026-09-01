@@ -1,6 +1,7 @@
 """Pipeline stage constants shared by the progress popup and detail views."""
 
 STAGES = [
+    ("strays",    "Stray Files",          "Repair a video whose extension separator is not a dot, send a funscript found in the video tree to its mirror path under the scripts, and report every other non-video file found there"),
     ("purge",     "Purge Weird",          "Delete 2_outbox/kinda_weird AI vids, their matching sources in 1_sorted, and their metadata"),
     ("metadata",  "Metadata Scrape",      "Scrape AI prompt metadata into mirrored JSON files"),
     ("sort",      "Sort Inbox",           "Move AI videos from 0_inbox into 1_sorted by source and orientation"),

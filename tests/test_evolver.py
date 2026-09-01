@@ -18,6 +18,7 @@ def _stage_mocks() -> dict:
     """
     return {
         "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
+        "stray_files_run": Mock(return_value=Mock(ok=True)),
         "purge_run": Mock(return_value=Mock(missing_sorted=[])),
         "scripts_sync_run": Mock(return_value=Mock(ok=True)),
         "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
@@ -38,6 +39,7 @@ def _stage_mocks() -> dict:
 
 _STAGE_PATCHES = [
     ("evolver.sort.run", "sort_run"),
+    ("evolver.stray_files.run", "stray_files_run"),
     ("evolver.purge_weird.run", "purge_run"),
     ("evolver.clip_scripts.run", "clip_scripts_run"),
     ("evolver.scene_scripts.run", "scene_scripts_run"),
@@ -53,6 +55,16 @@ _STAGE_PATCHES = [
     ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
     ("evolver.processes.count_running", "count_running"),
     ("evolver.prompt_scrape.run", "prompt_scrape_run"),
+]
+
+
+# The stages run_pipeline emits, in order. One list rather than a copy per
+# assertion: three of them said the same thing, so adding a stage meant finding
+# every place that had spelled the order out.
+_EXPECTED_STAGES = [
+    "strays", "purge", "metadata", "sort", "upscale", "genau_deliver",
+    "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts",
+    "scene_scripts", "scripts", "group_non_ai", "dupes",
 ]
 
 
@@ -258,7 +270,21 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        self.assertEqual(names, ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "dupes"])
+        self.assertEqual(names, _EXPECTED_STAGES)
+
+    def test_a_reported_stray_warns_without_failing_the_run(self):
+        """Reporting a file it cannot name is the stage working, not breaking —
+        and a foreign file can sit in the library for months while its owner
+        decides, so an error every ten minutes would be an alarm about nothing."""
+        stack, _ = self._patch_all_stages(
+            stray_files_run=Mock(return_value=Mock(ok=False)),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+
+        stage = next(s for s in result.stages if s.name == "strays")
+        self.assertEqual(stage.status, "warning")
+        self.assertFalse(result.has_errors)
 
     def test_references_run_before_bookmarks_prunes_the_favorites(self):
         """Both stages touch favs.csv, and bookmarks drops rows whose file is gone.
@@ -286,15 +312,14 @@ class TestRunPipeline(unittest.TestCase):
         with stack:
             evolver.run_pipeline(on_stage_start=on_start)
         started_names = [call.args[0] for call in on_start.call_args_list]
-        self.assertEqual(started_names, ["purge", "metadata", "sort", "upscale", "genau_deliver", "upscale_non_ai", "verify", "references", "bookmarks", "clip_scripts", "scene_scripts", "scripts", "group_non_ai", "dupes"])
+        self.assertEqual(started_names, _EXPECTED_STAGES)
 
     def test_on_stage_complete_called_with_result_and_status(self):
         on_complete = Mock()
         stack, mocks = self._patch_all_stages()
         with stack:
             evolver.run_pipeline(on_stage_complete=on_complete)
-        # Check purge stage callback (first stage)
-        purge_call = on_complete.call_args_list[0]
+        purge_call = on_complete.call_args_list[_EXPECTED_STAGES.index("purge")]
         self.assertEqual(purge_call.args[0], "purge")
         self.assertEqual(purge_call.args[1], mocks["purge_run"].return_value)
         self.assertIsInstance(purge_call.args[2], float)  # elapsed
@@ -485,7 +510,7 @@ class TestCooperativeStop(unittest.TestCase):
         with _patched_stages(mocks):
             result = evolver.run_pipeline(should_stop=lambda: mocks["purge_run"].called)
 
-        self.assertEqual([s.name for s in result.stages], ["purge"])
+        self.assertEqual([s.name for s in result.stages], ["strays", "purge"])
         mocks["prompt_scrape_run"].assert_not_called()
         mocks["sort_run"].assert_not_called()
 
@@ -494,7 +519,7 @@ class TestCooperativeStop(unittest.TestCase):
         with _patched_stages(mocks):
             result = evolver.run_pipeline(should_stop=lambda: False)
 
-        self.assertEqual(len(result.stages), 14)
+        self.assertEqual(len(result.stages), len(_EXPECTED_STAGES))
 
 
 class TestCheckDependenciesWindowSuppression(unittest.TestCase):
