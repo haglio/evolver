@@ -19,6 +19,8 @@ The shared helpers for this contract live in `util/media_files.py`:
 
 If a future change adds a new stage that scans video trees, prefer `iter_finalized_videos(...)` instead of open-coding `rglob("*")` plus an extension check.
 
+`tasks/stray_files.py` is the one deliberate exception. It exists to look at what those helpers filter *out*, so it walks `rglob("*")` itself and asks only whether the suffix is a video extension — a partial output is a video to it, and therefore neither a stray to fix nor news to report. Using `is_finalized_video_file` there would report every in-flight Topaz write as a foreign file.
+
 ## Tests that protect this behavior
 
 The current regression coverage for partial-file handling is intentionally spread across multiple stages:

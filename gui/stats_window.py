@@ -19,6 +19,7 @@ from gui.progress import ALL_STAGES
 from gui.run_record import RunRecord
 
 STAGE_COLORS = {
+    "strays": QColor(0xBA, 0xB0, 0xAC),
     "sort": QColor(0x4E, 0x79, 0xA7),
     "purge": QColor(0xF2, 0x8E, 0x2B),
     "scripts": QColor(0xE1, 0x57, 0x59),

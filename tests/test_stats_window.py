@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 
+from gui.progress import ALL_STAGES
 from gui.run_record import RunRecord
 from gui.stats_window import StackedAreaChart, StatsWindow, _pick_y_ticks
 from tests.gui_support import build_evolver_app
@@ -39,27 +40,29 @@ class TestStackedAreaChartSeries(unittest.TestCase):
         ]
         self.chart = StackedAreaChart(self.records)
 
+    def _series_for(self, stage: str) -> list[float]:
+        """The one band of the chart that belongs to *stage*.
+
+        Looked up by name rather than by a hardcoded row number: the rows are
+        ``ALL_STAGES`` in order, so a stage added anywhere but the end used to
+        shift every row after it and make these read the wrong band.
+        """
+        return self.chart._compute_series()[ALL_STAGES.index(stage)]
+
     def test_normal_returns_raw_durations_chronological(self):
-        series = self.chart._compute_series()
         # Records are reversed to chronological, so purge values = [1, 2, 3]
-        purge_series = series[0]  # purge is first in ALL_STAGES
-        self.assertEqual(purge_series, [1.0, 2.0, 3.0])
+        self.assertEqual(self._series_for("purge"), [1.0, 2.0, 3.0])
 
     def test_normal_returns_raw_for_sort_stage(self):
-        series = self.chart._compute_series()
-        sort_series = series[2]  # sort is third (after purge, metadata)
-        self.assertEqual(sort_series, [2.0, 4.0, 6.0])
+        self.assertEqual(self._series_for("sort"), [2.0, 4.0, 6.0])
 
     def test_missing_stage_returns_zero(self):
-        series = self.chart._compute_series()
-        # "metadata" is second stage but not in our records
-        metadata_series = series[1]
-        self.assertEqual(metadata_series, [0.0, 0.0, 0.0])
+        # "metadata" is a stage of the pipeline but not in our records
+        self.assertEqual(self._series_for("metadata"), [0.0, 0.0, 0.0])
 
     def test_averages_returns_running_mean(self):
         self.chart.set_mode("averages")
-        series = self.chart._compute_series()
-        purge_series = series[0]
+        purge_series = self._series_for("purge")
         # raw = [1, 2, 3], running avg = [1/1, 3/2, 6/3] = [1.0, 1.5, 2.0]
         self.assertAlmostEqual(purge_series[0], 1.0)
         self.assertAlmostEqual(purge_series[1], 1.5)
@@ -67,8 +70,7 @@ class TestStackedAreaChartSeries(unittest.TestCase):
 
     def test_averages_sort_stage(self):
         self.chart.set_mode("averages")
-        series = self.chart._compute_series()
-        sort_series = series[2]  # sort is third (after purge, metadata)
+        sort_series = self._series_for("sort")
         # raw = [2, 4, 6], running avg = [2/1, 6/2, 12/3] = [2.0, 3.0, 4.0]
         self.assertAlmostEqual(sort_series[0], 2.0)
         self.assertAlmostEqual(sort_series[1], 3.0)

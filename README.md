@@ -13,6 +13,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 9. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
 10. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
 11. Delivers the Genau lane — Origenerator's looping single-stroke clips, which arrive under their own `0_inbox` source folder (`config.GENAU_SOURCE`, named by the content overlay) — out of the outbox into `videos/genau/clips/`, the one folder Genau plays from, retiring the `1_sorted` copy along with it. Those clips come through the pipeline only to be upscaled: a loop straight out of the graph is visibly softer than the clips already in that folder, which came from upscaled library video. Both halves have to leave together — the upscale stage decides what still needs doing by looking for the output beside its source, and step 10 requires each sorted video to have a `_topaz` counterpart.
+12. Puts right the files sitting in the video tree that are not videos. Every other step finds a video by a positive test — the extension is one of `config.VIDEO_EXTENSIONS` — so a file that fails it is not reported as odd, it is skipped as though it were not there, forever. Two arrive that way: a name whose extension separator is a space, underscore or hyphen instead of a dot (`clip mp4`), which no step can see is a video at all, and a `.funscript` dropped among the videos, which step 3 never walks. The first is renamed to the extension it meant; the second is moved to its mirror path under `videos/scripts/scripts`, where step 3 then places it by name or reports it as matching no video. Anything else — a cover image, a stray text file — is logged by path and left exactly where it is, and the run reads as a warning rather than an error, since a foreign file can sit there for months while its owner decides what it is. A repaired name that is already taken, and a script whose mirror path is already taken, are reported the same way rather than overwriting what is there. `desktop.ini`, `Thumbs.db` and `.DS_Store` are ignored: Windows writes them by itself, and reporting them would put every library folder on a list that never empties.
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
@@ -23,6 +24,7 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 - Pipeline entry point: `evolver.py`
 - Modules:
   - `config.py` - paths and settings
+  - `tasks/stray_files.py` - non-videos in the video tree: malformed extensions repaired, funscripts rehomed, the rest reported
   - `tasks/sort.py` - Stage 1 inbox sorting
   - `tasks/purge_weird.py` - Stage 2 kinda_weird cleanup
   - `tasks/scripts_sync.py` - Stage 3 funscript/video tree alignment and processed/original variant copying
