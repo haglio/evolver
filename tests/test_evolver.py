@@ -20,6 +20,7 @@ def _stage_mocks() -> dict:
     maintenance run.
     """
     return {
+        "strays_run": Mock(return_value=Mock(ok=True)),
         "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
         "purge_run": Mock(return_value=Mock(missing_sorted=[])),
         "scripts_sync_run": Mock(return_value=Mock(ok=True)),
@@ -41,6 +42,7 @@ def _stage_mocks() -> dict:
 
 
 _STAGE_PATCHES = [
+    ("evolver.stray_files.run", "strays_run"),
     ("evolver.sort.run", "sort_run"),
     ("evolver.purge_weird.run", "purge_run"),
     ("evolver.clip_scripts.run", "clip_scripts_run"),
@@ -255,7 +257,7 @@ class TestRunPipeline:
         )
         with stack:
             result = evolver.run_pipeline()
-        assert len(result.stages) == 14
+        assert len(result.stages) == 15
         for stage in result.stages:
             assert stage.status != "skipped", \
                 f"stage {stage.name!r} must actually run in this test"
@@ -521,7 +523,7 @@ class TestCooperativeStop:
         with _patched_stages(mocks):
             result = evolver.run_pipeline(should_stop=lambda: False)
 
-        assert len(result.stages) == 14
+        assert len(result.stages) == 15
 
 
 class TestCheckDependenciesWindowSuppression:

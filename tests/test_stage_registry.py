@@ -27,7 +27,7 @@ from tests.test_evolver import _patched_stages, _stage_mocks
 # `clip_scripts` and `scene_scripts` write a funscript where one is missing and
 # leave every existing one alone; `group_non_ai` is bookkeeping over whatever
 # files happen to be there.
-CANNOT_FAIL = frozenset({"sort", "clip_scripts", "scene_scripts", "group_non_ai"})
+CANNOT_FAIL = frozenset({"strays", "sort", "clip_scripts", "scene_scripts", "group_non_ai"})
 
 
 class TestStageRegistry(unittest.TestCase):
@@ -134,7 +134,7 @@ class TestStageRegistry(unittest.TestCase):
             sorted(ALL_STAGES),
         )
         self.assertEqual(sorted(set(evolver._STAGE_FAILED) & CANNOT_FAIL), [])
-        self.assertEqual(sorted(set(evolver._STAGE_HELD_BACK) - set(ALL_STAGES)), [])
+        self.assertEqual(sorted(set(evolver._STAGE_WARNED) - set(ALL_STAGES)), [])
 
     def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
         """Two more tables keyed by stage string, with the same silent shape.

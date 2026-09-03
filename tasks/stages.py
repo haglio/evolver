@@ -40,7 +40,7 @@ class Stage:
 STAGES: tuple[Stage, ...] = (
     Stage("strays", "Stray Files",
           "Repair a video whose extension separator is not a dot, send a funscript found in the video tree to its mirror path under the scripts, and report every other non-video file found there",
-          (0xBA, 0xB0, 0xAC)),
+          (0x0A, 0x12, 0x2C)),
     Stage("purge", "Purge Weird",
           "Delete 2_outbox/kinda_weird AI vids, their matching sources in 1_sorted, and their metadata",
           (0xF2, 0x8E, 0x2B)),

@@ -65,6 +65,7 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/scene_scripts.py": 2,
     "tasks/scripts_sync.py": 21,
     "tasks/sort.py": 3,
+    "tasks/stray_files.py": 8,
     "tasks/upscale.py": 18,
     "util/funscript.py": 3,
     "util/nonai_library.py": 5,
