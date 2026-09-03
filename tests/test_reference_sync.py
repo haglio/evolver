@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import unittest
 from contextlib import contextmanager
@@ -5,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import reference_sync
+from util import reference_stores
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
@@ -84,10 +86,14 @@ class TestClipperSessions(unittest.TestCase):
             session = _write_json(temp / "sessions" / "Scratch.json", {"video_path": gone})
 
             with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
-                result = reference_sync.run()
+                with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
+                    result = reference_sync.run()
 
             self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], gone)
-            self.assertEqual(result.unresolved_paths, [gone])
+            self.assertEqual(result.unresolved, 1)
+            # The stage no longer carries the paths on its result, so the log is
+            # the only place that says *which* reference could not be followed.
+            self.assertIn(gone, logged.records[0].getMessage())
 
     def test_leaves_a_session_whose_video_never_moved_untouched(self):
         with workspace_temp_dir() as temp:
@@ -169,3 +175,58 @@ class TestFunTimeFavorites(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReferenceStoreSurface(unittest.TestCase):
+    """A store asks its own file, rather than being handed it back.
+
+    Every call site read `store.read(store.path)`, `store.rewrite(store.path,
+    moves)`, `store.fingerprint(store.path)` -- the object passing its own
+    field into its own function, three times out of three, with nothing
+    stopping a caller passing a different one.
+    """
+
+    def _store(self, calls):
+        return reference_stores.ReferenceStore(
+            "example",
+            Path("C:/somewhere/refs.json"),
+            lambda path: calls.append(("read", path)) or ["a.mp4"],
+            lambda path, moves: calls.append(("rewrite", path, moves)),
+            lambda path: calls.append(("fingerprint", path)) or (30.0, 100),
+        )
+
+    def test_all_three_reach_the_stores_own_path(self):
+        calls = []
+        store = self._store(calls)
+
+        self.assertEqual(store.read(), ["a.mp4"])
+        store.rewrite({"a.mp4": "b.mp4"})
+        self.assertEqual(store.fingerprint(), (30.0, 100))
+
+        self.assertEqual(
+            calls,
+            [
+                ("read", store.path),
+                ("rewrite", store.path, {"a.mp4": "b.mp4"}),
+                ("fingerprint", store.path),
+            ],
+        )
+
+    def test_a_store_that_records_no_fingerprint_answers_none(self):
+        """Most of them record only a path, so a renamed video is beyond their
+        reach and the last-resort match is skipped rather than guessed."""
+        store = reference_stores.ReferenceStore(
+            "example", Path("C:/somewhere/refs.json"), lambda path: [],
+            lambda path, moves: None,
+        )
+
+        self.assertIsNone(store.fingerprint())
+
+
+class TestReferenceSyncResultSurface(unittest.TestCase):
+    def test_the_result_carries_only_what_a_reader_consults(self):
+        """Every field lands in a run record; one nothing reads is dead weight."""
+        self.assertEqual(
+            {f.name for f in dataclasses.fields(reference_sync.ReferenceSyncResult)},
+            {"checked", "relocated", "unresolved", "write_errors"},
+        )

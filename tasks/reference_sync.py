@@ -10,7 +10,7 @@ each run and follows the move.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from util import reference_stores, video_locator
@@ -24,7 +24,6 @@ class ReferenceSyncResult:
     relocated: int = 0
     unresolved: int = 0
     write_errors: int = 0
-    unresolved_paths: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -54,7 +53,7 @@ def _reconcile(
     index: dict[str, list[Path]],
     result: ReferenceSyncResult,
 ) -> None:
-    references = store.read(store.path)
+    references = store.read()
     result.checked += len(references)
 
     moves: dict[str, str] = {}
@@ -65,7 +64,6 @@ def _reconcile(
         now_at = video_locator.relocate(was_at, index) or _renamed(store, was_at)
         if now_at is None:
             result.unresolved += 1
-            result.unresolved_paths.append(reference)
             log.warning("UNRESOLVED %s reference (%s): %s", store.label, store.path.name, reference)
             continue
         moves[reference] = str(now_at)
@@ -73,13 +71,13 @@ def _reconcile(
 
     if not moves:
         return
-    store.rewrite(store.path, moves)
+    store.rewrite(moves)
     result.relocated += len(moves)
 
 
 def _renamed(store: reference_stores.ReferenceStore, was_at: Path) -> Path | None:
     """Last resort: the video is still where it was, under a name it no longer has."""
-    fingerprint = store.fingerprint(store.path)
+    fingerprint = store.fingerprint()
     if fingerprint is None or not was_at.parent.is_dir():
         return None
     return video_locator.renamed_in_place(was_at, fingerprint)

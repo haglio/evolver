@@ -1,4 +1,4 @@
-"""Stage 3: Move videos from 0_inbox/<source>/ -> 1_sorted/<source>/<orientation>/"""
+"""Move videos from 0_inbox/<source>/ -> 1_sorted/<source>/<orientation>/"""
 
 import logging
 from dataclasses import dataclass, field
@@ -6,7 +6,8 @@ from pathlib import Path
 
 import config
 from util.ffprobe import get_orientation
-from util.media_files import iter_finalized_videos, remove_empty_dirs
+from util.media_files import child_dirs, library_videos, remove_empty_dirs
+from util import orientation
 
 log = logging.getLogger(__name__)
 
@@ -19,33 +20,43 @@ class SortResult:
     moved_files: list[Path] = field(default_factory=list)
 
 
-def run() -> SortResult:
+def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> SortResult:
+    """Move every finalized inbox video into the sorted tree, by source and shape.
+
+    The two folders are arguments so the signature says what the stage
+    touches. They are resolved here rather than in the signature: a default
+    evaluated at import would freeze whatever ``config`` held then, and the
+    suite redirects those paths after this module has been imported.
+    """
+    inbox_dir = config.INBOX_DIR if inbox_dir is None else inbox_dir
+    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
+
     result = SortResult()
-    config.SORTED_DIR.mkdir(parents=True, exist_ok=True)
+    sorted_dir.mkdir(parents=True, exist_ok=True)
 
-    log.info("=== Stage 3: 0_inbox -> 1_sorted (move) ===")
-    log.info("INBOX:  %s", config.INBOX_DIR)
-    log.info("SORTED: %s", config.SORTED_DIR)
+    log.info("=== Stage: 0_inbox -> 1_sorted (move) ===")
+    log.info("INBOX:  %s", inbox_dir)
+    log.info("SORTED: %s", sorted_dir)
 
-    sources = list(_iter_source_dirs(config.INBOX_DIR))
+    sources = list(child_dirs(inbox_dir))
     if not sources:
-        log.info("No source directories found in inbox: %s", config.INBOX_DIR)
+        log.info("No source directories found in inbox: %s", inbox_dir)
 
     for src_root in sources:
         source = src_root.name
 
         log.info("--- Sorting source: %s ---", source)
 
-        for src in _iter_videos(src_root):
+        for src in library_videos(src_root):
             orient = get_orientation(src)
 
-            if orient not in ("landscape", "portrait"):
+            if orient not in orientation.SORTED:
                 log.info("UNKNOWN (leaving in inbox): %s", src)
                 result.skipped_unknown += 1
                 continue
 
             rel = src.relative_to(src_root)
-            dest = config.SORTED_DIR / source / orient / rel
+            dest = sorted_dir / source / orient / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
 
             log.info("MOVE  [%s/%s] %s", source, orient, rel)
@@ -55,11 +66,10 @@ def run() -> SortResult:
             else:
                 result.deleted_collisions += 1
 
-        if config.CLEAN_EMPTY_INBOX_DIRS:
-            remove_empty_dirs(src_root)
+        remove_empty_dirs(src_root)
 
     log.info(
-        "Stage 3 done. Moved: %d, Deleted collisions: %d, Unknown skipped: %d",
+        "Sort done. Moved: %d, Deleted collisions: %d, Unknown skipped: %d",
         result.moved, result.deleted_collisions, result.skipped_unknown,
     )
     return result
@@ -73,17 +83,3 @@ def _move_unique(src: Path, dest: Path) -> bool:
     log.info("COLLISION (deleting inbox file): %s  ->  %s", src, dest)
     src.unlink()
     return False
-
-
-def _iter_videos(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
-
-
-def _iter_source_dirs(root: Path):
-    if not root.is_dir():
-        return
-    for p in sorted(root.iterdir()):
-        if p.is_dir():
-            yield p
-
-

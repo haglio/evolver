@@ -15,6 +15,8 @@ import csv
 import re
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+import io
+from util.json_store import atomic_write_text
 
 _HYPERLINK_RE = re.compile(r'^=HYPERLINK\("([^"]+)"[;,]"([^"]*)"\)\s*$', re.IGNORECASE)
 _HYPERLINK_URL_RE = re.compile(r'^=HYPERLINK\("([^"]+)"[;,]', re.IGNORECASE)
@@ -37,12 +39,13 @@ def read_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
 
 
 def write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
-    temp_path = path.with_name(path.name + ".tmp")
-    with temp_path.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-    temp_path.replace(path)
+    # newline="" all the way through, which is what the csv module requires:
+    # it writes its own \r\n terminators and must not have them translated.
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    atomic_write_text(path, buffer.getvalue(), newline="")
 
 
 def local_path(value: str, base_dir: Path) -> Path | None:

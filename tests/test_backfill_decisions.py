@@ -9,29 +9,17 @@ from backfill.decisions import (
     restore_sidecar,
     sidecar_snapshot,
 )
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import library_tree, override_config, workspace_temp_dir
 from util.sidecar import sidecar_path
 
 
 class TestRecordAction(unittest.TestCase):
-    def _tree(self, root):
-        ai = root / "AI"
-        return ai, ai / "2_outbox" / "upscaled_by_orientation", root / "metadata"
-
-    def _make_video(self, upscaled):
-        video = upscaled / "portrait" / "provider2" / "a_topaz.mp4"
-        video.parent.mkdir(parents=True, exist_ok=True)
-        video.write_bytes(b"video")
-        return video
-
     def test_writes_a_sidecar_recording_the_action(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled)
+        with library_tree() as lib:
+            video = lib.video()
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                record_action(video, "Side Beta")
-                payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
+            record_action(video, "Side Beta")
+            payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
             self.assertEqual(payload, {"video": {"action": "Side Beta"}})
 
@@ -39,37 +27,31 @@ class TestRecordAction(unittest.TestCase):
         """``wrong_action`` is a standing question — "this clip is mislabeled,
         ask me again" — and recording an act is the answer, so the marker goes
         with it.  Left behind it would jump the queue on every future open."""
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled)
+        with library_tree() as lib:
+            video = lib.video()
+            path = sidecar_path(video)
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                json.dumps({"video": {"prompt": "p", "wrong_action": "Alpha"}}), encoding="utf-8"
+            )
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                path = sidecar_path(video)
-                path.parent.mkdir(parents=True)
-                path.write_text(
-                    json.dumps({"video": {"prompt": "p", "wrong_action": "Alpha"}}), encoding="utf-8"
-                )
-
-                record_action(video, "Side Beta")
-                payload = json.loads(path.read_text(encoding="utf-8"))
+            record_action(video, "Side Beta")
+            payload = json.loads(path.read_text(encoding="utf-8"))
 
             self.assertEqual(payload, {"video": {"prompt": "p", "action": "Side Beta"}})
 
     def test_keeps_the_metadata_an_existing_sidecar_already_holds(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled)
+        with library_tree() as lib:
+            video = lib.video()
+            path = sidecar_path(video)
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                json.dumps({"video": {"prompt": "a prompt"}, "source_image": {"seed": "7"}}),
+                encoding="utf-8",
+            )
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                path = sidecar_path(video)
-                path.parent.mkdir(parents=True)
-                path.write_text(
-                    json.dumps({"video": {"prompt": "a prompt"}, "source_image": {"seed": "7"}}),
-                    encoding="utf-8",
-                )
-
-                record_action(video, "Dancing")
-                payload = json.loads(path.read_text(encoding="utf-8"))
+            record_action(video, "Dancing")
+            payload = json.loads(path.read_text(encoding="utf-8"))
 
             self.assertEqual(
                 payload,
@@ -77,75 +59,55 @@ class TestRecordAction(unittest.TestCase):
             )
 
     def test_relabelling_replaces_the_previous_action(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled)
+        with library_tree() as lib:
+            video = lib.video()
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                record_action(video, "Dancing")
-                record_action(video, "POV Gamma")
-                payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
+            record_action(video, "Dancing")
+            record_action(video, "POV Gamma")
+            payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
             self.assertEqual(payload, {"video": {"action": "POV Gamma"}})
 
 
 class TestSidecarSnapshotAndRestore(unittest.TestCase):
-    def _tree(self, root):
-        ai = root / "AI"
-        return ai, ai / "2_outbox" / "upscaled_by_orientation", root / "metadata"
-
-    def _make_video(self, upscaled):
-        video = upscaled / "portrait" / "provider2" / "a_topaz.mp4"
-        video.parent.mkdir(parents=True, exist_ok=True)
-        video.write_bytes(b"video")
-        return video
-
     def test_a_clip_with_no_sidecar_snapshots_as_nothing(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled)
-
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                self.assertIsNone(sidecar_snapshot(video))
+        with library_tree() as lib:
+            self.assertIsNone(sidecar_snapshot(lib.video()))
 
     def test_restoring_nothing_deletes_the_sidecar_that_was_written(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled)
+        with library_tree() as lib:
+            video = lib.video()
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                snapshot = sidecar_snapshot(video)
-                record_action(video, "Dancing")
-                self.assertTrue(sidecar_path(video).is_file())
+            snapshot = sidecar_snapshot(video)
+            record_action(video, "Dancing")
+            self.assertTrue(sidecar_path(video).is_file())
 
-                restore_sidecar(video, snapshot)
+            restore_sidecar(video, snapshot)
 
-                self.assertFalse(sidecar_path(video).exists())
+            self.assertFalse(sidecar_path(video).exists())
 
     def test_restoring_a_snapshot_puts_the_earlier_metadata_back(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled)
+        with library_tree() as lib:
+            video = lib.video()
             earlier = {"video": {"prompt": "a prompt"}}
+            path = sidecar_path(video)
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps(earlier), encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                path = sidecar_path(video)
-                path.parent.mkdir(parents=True)
-                path.write_text(json.dumps(earlier), encoding="utf-8")
+            snapshot = sidecar_snapshot(video)
+            record_action(video, "Dancing")
+            restore_sidecar(video, snapshot)
 
-                snapshot = sidecar_snapshot(video)
-                record_action(video, "Dancing")
-                restore_sidecar(video, snapshot)
-
-                self.assertEqual(json.loads(path.read_text(encoding="utf-8")), earlier)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), earlier)
 
     def test_restoring_nothing_tolerates_a_sidecar_that_was_never_written(self):
-        with workspace_temp_dir() as root:
-            ai, upscaled, metadata = self._tree(root)
-            video = self._make_video(upscaled)
+        with library_tree() as lib:
+            video = lib.video()
 
-            with override_config(VIDEO_LIBRARY_DIR=root, AI_DIR=ai, OUT_UPSCALED_DIR=upscaled, METADATA_DIR=metadata):
-                restore_sidecar(video, None)  # must not raise
+            restore_sidecar(video, None)  # must not raise
+
+            # ...and must not have conjured a sidecar out of the nothing
+            self.assertFalse(sidecar_path(video).exists())
 
 
 class TestReclaimFromWeird(unittest.TestCase):
@@ -218,6 +180,38 @@ class TestDiscardAsWeird(unittest.TestCase):
 
             self.assertEqual(len(attempts), 2)
             sleep.assert_called_once()
+            self.assertTrue(destination.is_file())
+
+    def test_the_player_gets_ten_short_chances_to_let_go(self):
+        """The retry budget in numbers: nine 0.2 s waits, then the tenth try.
+
+        Both constants could drift freely before (audit probes 13/14 took the
+        attempts to 2 and the delay to 30 s with the suite green) -- and
+        together they are the difference between 'undo works while the player
+        still holds the clip' and a two-second UI hang or an instant failure.
+        """
+        with workspace_temp_dir() as root:
+            weird_dir = root / "kinda_weird"
+            video = self._make_video(root)
+            real_replace = type(video).replace
+            attempts = []
+
+            def locked_until_the_last_chance(self, target):
+                attempts.append(target)
+                if len(attempts) < 10:
+                    raise PermissionError(32, "The process cannot access the file")
+                return real_replace(self, target)
+
+            with override_config(WEIRD_DIR=weird_dir):
+                with patch.object(type(video), "replace", locked_until_the_last_chance), \
+                     patch("backfill.decisions.time.sleep") as sleep:
+                    destination = discard_as_weird(video)
+
+            self.assertEqual(len(attempts), 10)
+            self.assertEqual(sleep.call_count, 9)
+            self.assertEqual(
+                {call.args[0] for call in sleep.call_args_list}, {0.2},
+            )
             self.assertTrue(destination.is_file())
 
     def test_gives_up_on_a_clip_that_never_unlocks(self):

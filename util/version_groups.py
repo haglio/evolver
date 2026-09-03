@@ -6,9 +6,8 @@ stem (``foo`` -> ``foo_apo8_iris2``), so stripping those suffixes (see
 the user added by hand — a copy counter (``foo (2)``) or a tag like ``trimmed``
 — so a variant reads as its original's tokens and then markers, nothing else.
 
-Matching a bare token *prefix* was too loose to hold: every scene of a
-performer starts with her name, so a stem that is only her name anchored all of
-them, and three unrelated scenes came out as one family.
+Matching a bare token *prefix* is too loose to hold: every scene of a performer
+starts with her name, so a stem that is only her name anchors all of them.
 
 A version renamed rather than suffixed keeps no such thread back to its
 original, so those pairs are declared instead (``config.NONAI_VERSION_OVERRIDES``).

@@ -1,6 +1,8 @@
 """The Genau lane's last step: an upscaled loop leaves the outbox for Genau's folder."""
 
+import dataclasses
 import unittest
+from unittest.mock import patch
 
 from tasks import genau_deliver
 from tests.temp_helpers import override_config, workspace_temp_dir
@@ -105,15 +107,16 @@ class TestGenauDeliver(unittest.TestCase):
             def _locked(self, target):
                 raise OSError("the file is in use")
 
+            # patch.object, not a hand-rolled save and restore: `replace` is
+            # inherited from Path, so reading it off the concrete class and
+            # writing it back leaves an OWN attribute there, shadowing Path's
+            # for the rest of the session -- which silently disarms any later
+            # patch("pathlib.Path.replace"). patch.object deletes instead.
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
                                  GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                original_replace = type(upscaled).replace
-                type(upscaled).replace = _locked
-                try:
-                    result = genau_deliver.run()
-                finally:
-                    type(upscaled).replace = original_replace
+                                 METADATA_DIR=root / "metadata"), \
+                 patch.object(type(upscaled), "replace", _locked):
+                result = genau_deliver.run()
 
             self.assertEqual((result.delivered, result.failed), (0, 1))
             self.assertTrue(upscaled.is_file())
@@ -129,6 +132,46 @@ class TestGenauDeliver(unittest.TestCase):
 
             self.assertEqual((result.delivered, result.failed), (0, 0))
             self.assertFalse(clips.exists())  # nothing to deliver, nothing created
+
+    def test_the_lane_runs_between_the_four_places_it_is_given(self):
+        """The lane spans four places, and all four are arguments now.
+
+        `config` still answers when the caller names none of them — the
+        pipeline names none. The ambient four here are pointed at a second
+        staged clip, so a stage still reading them would deliver that one
+        instead of this one.
+        """
+        with workspace_temp_dir() as root:
+            given_outbox, given_sorted, given_clips = _lane(root / "given")
+            _stage_clip(given_outbox, given_sorted, stem="loop_given")
+
+            ambient_outbox, ambient_sorted, ambient_clips = _lane(root / "ambient")
+            _stage_clip(ambient_outbox, ambient_sorted, stem="loop_ambient")
+
+            with override_config(
+                OUT_UPSCALED_DIR=ambient_outbox, SORTED_DIR=ambient_sorted,
+                GENAU_CLIPS_DIR=ambient_clips, GENAU_SOURCE=GENAU_SOURCE,
+                METADATA_DIR=root / "metadata",
+            ):
+                result = genau_deliver.run(
+                    outbox_dir=given_outbox,
+                    sorted_dir=given_sorted,
+                    genau_source=GENAU_SOURCE,
+                    genau_clips_dir=given_clips,
+                )
+
+            self.assertEqual(result.delivered, 1)
+            self.assertTrue((given_clips / "loop_given_topaz.mp4").is_file())
+            self.assertFalse(ambient_clips.exists())
+            self.assertTrue((ambient_outbox / "landscape" / GENAU_SOURCE / "loop_ambient_topaz.mp4").is_file())
+
+class TestGenauDeliverResultSurface(unittest.TestCase):
+    def test_the_result_carries_only_what_a_reader_consults(self):
+        """Every field lands in a run record; one nothing reads is dead weight."""
+        self.assertEqual(
+            {f.name for f in dataclasses.fields(genau_deliver.GenauDeliverResult)},
+            {"delivered", "failed"},
+        )
 
 
 if __name__ == "__main__":

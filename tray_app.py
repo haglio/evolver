@@ -34,7 +34,11 @@ def _name_this_process() -> None:
         icon = _Path(__file__).resolve().parent / "icon.ico"
         ProcessNamer("Evolver", icon=icon).prepare_launcher("Evolver")
     except Exception:
-        pass  # Cosmetic: costs a name in the task list, never a launch.
+        # Cosmetic: costs a name in the task list, never a launch. But say so
+        # somewhere, or the task list fills with anonymous Pythons and nothing
+        # anywhere records why -- which is the state this exists to end.
+        crash_log.write_info(
+            "Could not name this process:", f"{traceback.format_exc()}\n")
 
 
 def main():

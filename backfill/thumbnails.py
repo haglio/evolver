@@ -7,7 +7,7 @@ later open, so the window only ever loads ready files — it never extracts on o
 
 A tile's example comes from one of two places, curated first:
 
-* :data:`CURATED_EXAMPLES` pins a specific clip to a tile by id. This is how the acts
+* ``config.CURATED_EXAMPLES`` pins a specific clip to a tile by id. This is how the acts
   the library never tags in a camera-scoped form get a picture — a side gamma, a POV
   zeta — and how a clip mistagged (or tagged for a different act than it best shows)
   is still put to use.
@@ -32,6 +32,7 @@ from backfill.queue import iter_library_videos
 from backfill.vocabulary import scoped_grid
 from util.ffprobe import duration_seconds
 from util.sidecar import action_of, read, sidecar_path
+from util.variants import sorted_stem_of
 
 log = logging.getLogger(__name__)
 
@@ -39,19 +40,6 @@ _THUMBNAIL_HEIGHT = 96
 # Sample the frame a little under halfway in: past a clip's title card or fade-in, and
 # far enough that the act — and the anchor — is actually in frame, not just beginning.
 _SAMPLE_FRACTION = 0.4
-
-# Tile action -> the id (clip stem, minus the "_topaz" suffix) of the clip that best
-# illustrates it. These are the acts the library has no camera-scoped clip for, hand
-# picked because the sidecar tags either miss the act or name a different one.
-CURATED_EXAMPLES: dict[str, str] = {
-    "Side Gamma": "036e8d4e-2f84-4178-89f2-541e4200452f",
-    "Side Epsilon": "Wve2uiuZKyP1RoJJFgri",
-    "Side Zeta": "ceb1cd47-a631-437f-9ff4-a773fac92e82",
-    "POV Zeta": "067f11ff-963f-4a40-b0b6-c43656d71bbf",
-    "Side Dancing": "59020ab7-57c3-4a1d-a91c-22cbe64231ea",
-    "POV Dancing": "243a79f8-6982-43b5-ae7a-512ed73c7076",
-}
-
 
 def _tile_actions() -> list[str]:
     """Every act a tile is built for, in grid order — the labels a thumbnail fills."""
@@ -69,7 +57,7 @@ def _scan_library() -> tuple[dict[str, Path], dict[str, Path]]:
     by_id: dict[str, Path] = {}
     for _source, video in iter_library_videos():
         stem = video.stem
-        clip_id = stem[: -len("_topaz")] if stem.endswith("_topaz") else stem
+        clip_id = sorted_stem_of(stem)
         by_id.setdefault(clip_id, video)
         action = action_of(read(sidecar_path(video)))
         if action:
@@ -89,7 +77,8 @@ def example_clips() -> dict[str, Path]:
     by_action, by_id = _scan_library()
     examples: dict[str, Path] = {}
     for action in _tile_actions():
-        clip = by_id.get(CURATED_EXAMPLES.get(action, "")) or by_action.get(action.lower())
+        clip = (by_id.get(config.CURATED_EXAMPLES.get(action, ""))
+                or by_action.get(action.lower()))
         if clip is not None:
             examples[action] = clip
     return examples
@@ -101,19 +90,21 @@ def thumbnail_cache_path(action: str) -> Path:
     return config.BACKFILL_THUMBNAIL_DIR / f"{slug}.jpg"
 
 
-def extract_frame(
-    clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTION, height: int = _THUMBNAIL_HEIGHT
-) -> bool:
+def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTION) -> bool:
     """Write one downscaled frame of *clip* to *dest*; True when it lands.
 
     Seeks to *at_fraction* of the clip's duration (0 when the duration is unknown)
-    and scales to *height*, keeping the aspect ratio. Uses the same Topaz ffmpeg
-    and console-suppressed invocation the rest of the pipeline does.
+    and scales to ``_THUMBNAIL_HEIGHT``, keeping the aspect ratio. Uses the same
+    Topaz ffmpeg and console-suppressed invocation the rest of the pipeline does.
     """
-    duration = duration_seconds(clip)
-    timestamp = duration * at_fraction if duration else 0.0
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
+        # The probe is inside the try too: it also runs a binary, and one that
+        # is not installed used to escape here, escape build_thumbnails and
+        # take the whole tool's startup down -- silently, since pythonw.exe has
+        # no console for the traceback.
+        duration = duration_seconds(clip)
+        timestamp = duration * at_fraction if duration else 0.0
         result = subprocess.run(
             [
                 str(config.FFMPEG),
@@ -121,14 +112,15 @@ def extract_frame(
                 "-ss", f"{timestamp:.3f}",
                 "-i", str(clip),
                 "-frames:v", "1",
-                "-vf", f"scale=-2:{height}",
+                "-vf", f"scale=-2:{_THUMBNAIL_HEIGHT}",
                 "-y", str(dest),
             ],
             capture_output=True,
+            check=False,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
     except OSError:
-        log.exception("Could not run ffmpeg to thumbnail %s", clip)
+        log.exception("Could not build a thumbnail for %s", clip)
         return False
     return result.returncode == 0 and dest.is_file()
 

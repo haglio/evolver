@@ -1,7 +1,10 @@
 import json
+import sys
+import threading
 import unittest
+from unittest.mock import patch
 
-from backfill.voice import build_grammar, partial_text, recognized_phrase
+from backfill.voice import VoiceListener, build_grammar, partial_text, recognized_phrase
 
 
 class TestBuildGrammar(unittest.TestCase):
@@ -27,6 +30,12 @@ class TestRecognizedPhrase(unittest.TestCase):
 
     def test_rejects_a_phrase_heard_too_faintly(self):
         self.assertIsNone(recognized_phrase(self._result("dance", [0.4]), threshold=0.7))
+
+    def test_a_phrase_exactly_at_the_threshold_is_trusted(self):
+        # The comparison is strictly-below: at the boundary the phrase passes.
+        # Nothing exercised the boundary before, so < could become <= unseen
+        # (audit probe 20).
+        self.assertEqual(recognized_phrase(self._result("dance", [0.7]), threshold=0.7), "dance")
 
     def test_accepts_a_phrase_heard_clearly(self):
         self.assertEqual(recognized_phrase(self._result("dance", [0.9]), threshold=0.7), "dance")
@@ -55,6 +64,106 @@ class TestPartialText(unittest.TestCase):
 
     def test_empty_for_malformed_json(self):
         self.assertEqual(partial_text("not json"), "")
+
+
+class TestAMissingAudioStack(unittest.TestCase):
+    def test_it_is_reported_through_the_one_handler_that_wraps_the_run(self):
+        """vosk and sounddevice are declared runtime dependencies, so a missing
+        one is not an expected condition with a friendly message of its own —
+        it is a broken install, reported the way every other failure in this
+        thread is, and mic.py already imports sounddevice unguarded inside the
+        same block."""
+        listener = VoiceListener(["side beta"])
+
+        with patch.dict(sys.modules, {"vosk": None}):
+            with self.assertLogs("backfill.voice", level="ERROR") as logged:
+                listener._run()
+
+        self.assertEqual(len(logged.records), 1)
+        self.assertEqual(logged.records[0].getMessage(), "Voice listener crashed")
+
+
+class TestStoppingAndRestarting(unittest.TestCase):
+    """stop() has to actually stop it, and leave it startable again.
+
+    It set an Event and returned: nothing waited for the thread to leave the
+    PortAudio stream, so the interpreter could tear down while a C callback
+    thread was still live in it. And it never cleared _thread, so the
+    `if self._thread is not None: return` guard in start() made a stopped
+    listener permanently unstartable.
+    """
+
+    def _listener(self):
+        listener = VoiceListener(["side beta"])
+        # _run is replaced wholesale: the real one wants vosk, a model and a
+        # microphone. What is under test is the thread's lifetime.
+        return listener
+
+    def test_stop_waits_for_the_thread_to_finish(self):
+        listener = self._listener()
+        left = threading.Event()
+
+        def body():
+            listener._stop.wait(5.0)
+            left.set()
+
+        with patch.object(listener, "_run", body):
+            listener.start()
+            listener.stop()
+
+        self.assertTrue(left.is_set())
+
+    def test_a_stopped_listener_can_be_started_again(self):
+        listener = self._listener()
+        runs = []
+
+        def body():
+            runs.append(1)
+            listener._stop.wait(5.0)
+
+        with patch.object(listener, "_run", body):
+            listener.start()
+            listener.stop()
+            listener._stop.clear()
+            listener.start()
+            listener.stop()
+
+        self.assertEqual(len(runs), 2)
+
+    def test_stopping_one_that_never_started_is_not_an_error(self):
+        self._listener().stop()
+
+    def test_starting_twice_runs_one_thread(self):
+        listener = self._listener()
+        runs = []
+
+        def body():
+            runs.append(1)
+            listener._stop.wait(5.0)
+
+        with patch.object(listener, "_run", body):
+            listener.start()
+            listener.start()
+            listener.stop()
+
+        self.assertEqual(len(runs), 1)
+
+
+class TestReportingAFailure(unittest.TestCase):
+    def test_a_crash_says_so_rather_than_leaving_the_grid_looking_alive(self):
+        """It logged and returned. The window kept showing its command grid with
+        no signal that the microphone path was gone, so a user was left clicking
+        tiles wondering why speech had stopped working."""
+        listener = VoiceListener(["side beta"])
+        failures = []
+        listener.failed.connect(failures.append)
+
+        with patch.dict(sys.modules, {"vosk": None}):
+            with self.assertLogs("backfill.voice", level="ERROR"):
+                listener._run()
+
+        self.assertEqual(len(failures), 1)
+        self.assertTrue(failures[0])
 
 
 if __name__ == "__main__":

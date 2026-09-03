@@ -1,22 +1,15 @@
 #!/usr/bin/env python3
 """evolver.py - video collection maintenance pipeline.
 
-Invoked by the tray app scheduler or directly via CLI. Stages:
-  1. strays          - repair malformed names and rehome funscripts found in the video tree
-  2. purge           - remove weird outputs and their matching sources
-  3. metadata        - scrape AI prompt metadata into mirrored JSON files
-  4. sort            - move new videos from inbox into sorted folders by source/orientation
-  5. upscale         - apply Topaz frame interpolation + 4x upscale to sorted AI videos
-  6. genau_deliver   - hand finished Genau clips to the folder Genau plays from
-  7. upscale_non_ai  - supervise one detached Topaz encode of a non-AI library video
-  8. verify          - check 1_sorted and 2_outbox are in 1-to-1 correspondence
-  9. references      - repoint the suite's saved video paths at videos that moved
- 10. bookmarks       - sync Fun Time favorites into a Chrome bookmarks folder
- 11. clip_scripts    - cut a carved clip's funscript out of its source scene's
- 12. scene_scripts   - place a carved clip's funscript back into its unscripted scene's
- 13. scripts         - align funscripts to mirror the video library tree
- 14. group_non_ai    - record each non-AI clip's version family in a mirrored sidecar
- 15. dupes           - scan non_AI for likely duplicate videos by exact filesize
+Invoked by the tray app scheduler or directly via CLI.
+
+What the stages are and what they are called is ``tasks/stages.py``, which is
+also where their order is declared. ``run_pipeline`` below spells that order a
+second time — it has to, because each stage carries its own arguments and skip
+branches, and the reason for its position is a comment beside it — so the two
+are held in step by ``tests/test_stage_registry.py`` rather than by one of them
+being derived from the other. Two gates: one reads the names out of this file's
+syntax tree, one runs the pipeline with its stages mocked.
 """
 
 import logging
@@ -60,9 +53,7 @@ class StageRecord:
 # What counts as a failure for each stage, read off that stage's own result. A
 # stage absent here cannot fail. The run's verdict is then nothing more than its
 # stages' verdicts (see ``run_pipeline``), which is what keeps the two legible
-# together: a run used to read "error" while every stage it listed read
-# "completed", because the verdict was computed from the result payloads and the
-# stage status only ever recorded that the function had returned.
+# together.
 _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "purge": lambda r: bool(r.missing_sorted),
     "metadata": lambda r: not r.ok,
@@ -82,12 +73,10 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
 
 # What counts as worth a person's eye without being work gone wrong. Two shapes
 # land here. Work held back: there is no room to write another upscale, so the
-# stage parks the queue and picks it up again the moment space frees up — that
-# used to read as an outright failure, and because free space stays low for days
-# at a stretch it turned the whole run history into a wall of red, a standing
-# alarm for a condition with nothing in it to fix. And a finding a person has to
-# judge: the stray-files stage fixes what it can name and reports the rest,
-# where reporting IS the stage doing its job rather than failing at it.
+# stage parks the queue and picks it up again the moment space frees up. And a
+# finding a person has to judge: the stray-files stage fixes what it can name and
+# reports the rest, where reporting IS the stage doing its job rather than
+# failing at it.
 _STAGE_WARNED: dict[str, Callable[[object], bool]] = {
     "strays": lambda r: not r.ok,
     "upscale": lambda r: r.deferred_low_disk,
@@ -135,8 +124,24 @@ def setup_logging():
 def check_dependencies():
     if not config.FFMPEG.is_file():
         raise RuntimeError(f"Topaz ffmpeg not found: {config.FFMPEG}")
-    if subprocess.run(["ffprobe", "-version"], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW).returncode != 0:
+    # check=False, said out loud: the returncode is inspected below and turned
+    # into the RuntimeError this function raises for every missing dependency,
+    # rather than a CalledProcessError from one of them.
+    probe = subprocess.run(["ffprobe", "-version"], capture_output=True, check=False,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+    if probe.returncode != 0:
         raise RuntimeError("ffprobe not found in PATH")
+
+
+def throttle_nonai_to_presence() -> str:
+    """Suspend or resume the in-flight non-AI encode as the user comes and goes.
+
+    The one thing the pipeline does while it is not running, and the GUI's one
+    door to it. The layering here is ``util <- tasks <- evolver <- gui``: gui
+    reaches the stages through this module and nothing else, so the window
+    layer does not have to know which stage owns a detached ffmpeg.
+    """
+    return nonai_upscale.throttle_to_presence()
 
 
 def run_pipeline(
@@ -169,7 +174,7 @@ def run_pipeline(
     """
     log = logging.getLogger(__name__)
     pipeline_t0 = time.monotonic()
-    stages: list[StageRecord] = []
+    records: list[StageRecord] = []
 
     def _run_stage(name, fn, **kwargs):
         if should_stop is not None and should_stop():
@@ -180,8 +185,7 @@ def run_pipeline(
         result = fn(**kwargs)
         elapsed = time.monotonic() - t0
         status = _stage_status(name, result)
-        record = StageRecord(name, status, elapsed, result)
-        stages.append(record)
+        records.append(StageRecord(name, status, elapsed, result))
         if on_stage_complete:
             on_stage_complete(name, result, elapsed, status)
         log.info("")
@@ -192,8 +196,7 @@ def run_pipeline(
             raise _StopRequested
         if on_stage_start:
             on_stage_start(name)
-        record = StageRecord(name, "skipped", 0.0, skip_reason=reason)
-        stages.append(record)
+        records.append(StageRecord(name, "skipped", 0.0, skip_reason=reason))
         if on_stage_complete:
             on_stage_complete(name, None, 0.0, "skipped")
 
@@ -280,12 +283,12 @@ def run_pipeline(
         _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
     except _StopRequested:
         log.warning(
-            "Stop requested; dropping the remaining stages after %d ran.", len(stages),
+            "Stop requested; dropping the remaining stages after %d ran.", len(records),
         )
 
     return PipelineResult(
-        stages=stages,
-        has_errors=any(stage.status == "error" for stage in stages),
+        stages=records,
+        has_errors=any(record.status == "error" for record in records),
         duration_seconds=time.monotonic() - pipeline_t0,
     )
 
@@ -297,7 +300,9 @@ def main():
     try:
         check_dependencies()
     except RuntimeError as e:
-        log.error("Dependency check failed: %s", e)
+        # exception, not error: the traceback names which dependency check
+        # raised, which is the whole content of the diagnosis.
+        log.exception("Dependency check failed: %s", e)
         sys.exit(1)
 
     result = run_pipeline()
@@ -305,12 +310,11 @@ def main():
 
 
 def _should_skip_upscale_due_to_cpu(log: logging.Logger) -> bool:
-    if not config.ENABLE_CPU_BUSY_SKIP:
-        return False
     try:
-        busy_percent = system_resources.cpu_busy_percent(config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
+        busy_percent = system_resources.measure_cpu_busy_percent(
+            config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
     except Exception:
-        log.exception("CPU usage probe failed; proceeding with Stage 4.")
+        log.exception("CPU usage probe failed; proceeding with the upscale stage.")
         return False
 
     log.info(

@@ -2,18 +2,23 @@
 
 Evolver is a video collection maintenance pipeline that runs as a system tray application and:
 
-1. Sorts videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`
-2. Purges `kinda_weird/` outputs from the active outbox set — normally `2_outbox`, and both `2_outbox` plus `3_new_outbox` while regeneration mode is enabled. It also deletes each weird file's corresponding source from `1_sorted/`. A Windows error dialog pops up if any source file cannot be found.
-3. Rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match in the same library lane; scripts under `2D/AI` only consider `2D/AI` videos, and scripts under `2D/non_AI` only consider `2D/non_AI` videos. A script whose video is gone from the library but present in the `retired_root` archive (see "Non-AI library upscaling" below) follows it out and comes to sit beside it; a left-behind duplicate of a script the archive already holds is discarded once the two compare byte-identical. Names that match no video at all, or more than one, are logged and left alone. After that, Evolver also copies missing funscripts across matching processed/original video variants, including `1_sorted` <-> `2_outbox` / `3_new_outbox` `_topaz` pairs and matching `processed` <-> non-processed variants within the same source bucket.
-4. Prunes stale rows from `fun_time/favs.csv` when the `local_file` or `file` column points at a missing local file — but only after step 8 has already repointed every favorite whose video merely moved, so a row is dropped only when its video is genuinely gone. The remaining `web_url` values are then synced into a `Fun Time Favs` folder on the Chrome bookmarks bar for the Chrome profile whose visible name is `Blair`.
-5. Scrapes prompt metadata for AI videos in `1_sorted` into `videos/metadata`, mirroring the active outbox tree. The scan is idempotent — videos that already have a metadata JSON are skipped, and a video whose scrape fails is marked so it is not retried every run. Currently supports Provider prompt extraction with the video prompt plus optional source-image prompt keys.
-6. Upscales/interpolates sorted videos using Topaz Video AI ffmpeg. Work is now capped per scheduler run, newly sorted inbox files are processed first, and any remaining batch slots can be used for regeneration backlog.
-7. Gradually upscales the `2D/non_AI` library too, with the recipe its already-processed clips carry in their `videoai` tags (see "Non-AI library upscaling" below). Off by default — a one-time opt-in from the tray menu, after which Evolver runs at most one detached encode while you're idle (AI queue drained) and suspends it the moment you return to the machine.
-8. Repoints the suite's saved video paths at videos that have since moved, so a Clipper session or a Fun Time favorite survives the library being rearranged (see "Following videos that moved" below).
-9. Scans `1_sorted` for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found
-10. Runs a final 1-to-1 correspondence check between `1_sorted` and the active outbox set, where each sorted file must have an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain
-11. Delivers the Genau lane — Origenerator's looping single-stroke clips, which arrive under their own `0_inbox` source folder (`config.GENAU_SOURCE`, named by the content overlay) — out of the outbox into `videos/genau/clips/`, the one folder Genau plays from, retiring the `1_sorted` copy along with it. Those clips come through the pipeline only to be upscaled: a loop straight out of the graph is visibly softer than the clips already in that folder, which came from upscaled library video. Both halves have to leave together — the upscale stage decides what still needs doing by looking for the output beside its source, and step 10 requires each sorted video to have a `_topaz` counterpart.
-12. Puts right the files sitting in the video tree that are not videos. Every other step finds a video by a positive test — the extension is one of `config.VIDEO_EXTENSIONS` — so a file that fails it is not reported as odd, it is skipped as though it were not there, forever. Two arrive that way: a name whose extension separator is a space, underscore or hyphen instead of a dot (`clip mp4`), which no step can see is a video at all, and a `.funscript` dropped among the videos, which step 3 never walks. The first is renamed to the extension it meant; the second is moved to its mirror path under `videos/scripts/scripts`, where step 3 then places it by name or reports it as matching no video. Anything else — a cover image, a stray text file — is logged by path and left exactly where it is, and the run reads as a warning rather than an error, since a foreign file can sit there for months while its owner decides what it is. A repaired name that is already taken, and a script whose mirror path is already taken, are reported the same way rather than overwriting what is there. `desktop.ini`, `Thumbs.db` and `.DS_Store` are ignored: Windows writes them by itself, and reporting them would put every library folder on a list that never empties.
+1. **Stray Files** — puts right the files in the video tree that are not videos. Every stage below finds a video by a positive test — the extension is one of `config.VIDEO_EXTENSIONS` — so a file that fails it is skipped as though it were not there. A name whose extension separator is a space, underscore or hyphen instead of a dot (`clip mp4`) is repaired to the extension it meant; a `.funscript` dropped among the videos is moved to its mirror path under `videos/scripts/scripts`; everything else is reported by path and left where it is, a warning rather than an error. It runs first, because anything it repairs or rehomes is invisible to every stage below until it has.
+2. **Purge Weird** — deletes `kinda_weird/` outputs from `2_outbox`, each weird file's matching source in `1_sorted/`, and their metadata. A Windows error dialog pops up if any source file cannot be found.
+3. **Metadata Scrape** — scrapes prompt metadata for AI videos in `1_sorted` into `videos/metadata`, mirroring the outbox tree. The scan is idempotent: a video that already has a metadata JSON is skipped, and one whose scrape fails is marked so it is not retried every run.
+4. **Sort Inbox** — moves videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`.
+5. **Upscale** — upscales and interpolates sorted videos with Topaz Video AI ffmpeg. Work is capped per scheduler run and newly sorted inbox files go first.
+6. **Genau Delivery** — moves the Genau lane's upscaled loops — Origenerator's looping single-stroke clips, which arrive under their own `0_inbox` source folder, named by the content overlay — out of the outbox into `videos/genau/clips/`, the one folder Genau plays from, retiring the `1_sorted` copy along with them. Those clips come through the pipeline only to be upscaled: a loop straight out of the graph is visibly softer than the clips already in that folder, which came from upscaled library video. Both halves have to leave together — the upscale stage decides what still needs doing by looking for the output beside its source, and the correspondence check requires each sorted video to have a `_topaz` counterpart.
+7. **Upscale non-AI** — gradually upscales the `2D/non_AI` library too, with the recipe its already-processed clips carry in their `videoai` tags (see "Non-AI library upscaling" below). Off by default — a one-time opt-in from the tray menu, after which Evolver runs at most one detached encode while you are idle and the AI queue is drained, suspending it the moment you return to the machine.
+8. **Correspondence Check** — verifies `1_sorted` and `2_outbox` are in 1-to-1 correspondence, each sorted file having an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain.
+9. **Follow Moved Videos** — repoints the suite's saved video paths at videos that have since moved, so a Clipper session or a Fun Time favorite survives the library being rearranged (see "Following videos that moved" below).
+10. **Bookmarks Sync** — prunes stale rows from `fun_time/favs.csv` whose local file is gone, then syncs the remaining `web_url` values into a `Fun Time Favs` folder on the Chrome bookmarks bar. It runs after the repointing above, so a row is dropped only when its video is genuinely gone rather than merely moved.
+11. **Clip Scripts** — cuts each carved clip's funscript out of its source scene's, using the offset the clip was matched at.
+12. **Scene Scripts** — gives an unscripted source scene a mostly-blank funscript holding its carved clip's, placed where the clip sits in it.
+13. **Scripts Sync** — rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match in the same library lane; scripts under `2D/AI` only consider `2D/AI` videos, and scripts under `2D/non_AI` only consider `2D/non_AI` videos. A script whose video is gone from the library but present in the `retired_root` archive (see "Non-AI library upscaling" below) follows it out and comes to sit beside it; a left-behind duplicate of a script the archive already holds is discarded once the two compare byte-identical. Names that match no video at all, or more than one, are logged and left alone. It also copies missing funscripts across matching processed/original video variants.
+14. **Group non-AI** — records each `2D/non_AI` clip's version family, the original and its processed variants, in a mirrored metadata sidecar.
+15. **Duplicate Check** — scans the `non_AI` folder for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found.
+
+The order above is the order they run in, and it is not maintained here: `tasks/stages.py` declares it, and a test reads this list back out of the README and holds it against that declaration.
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
@@ -24,26 +29,39 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 - Pipeline entry point: `evolver.py`
 - Modules:
   - `config.py` - paths and settings
+  - `tasks/stages.py` - the one declaration of the stages: key, shown name, description, chart color, order
   - `tasks/stray_files.py` - non-videos in the video tree: malformed extensions repaired, funscripts rehomed, the rest reported
-  - `tasks/sort.py` - Stage 1 inbox sorting
-  - `tasks/purge_weird.py` - Stage 2 kinda_weird cleanup
-  - `tasks/scripts_sync.py` - Stage 3 funscript/video tree alignment and processed/original variant copying
-  - `tasks/bookmarks_sync.py` - Stage 3.5 favorites -> Chrome bookmarks sync
-  - `tasks/prompt_scrape.py` - Stage 4 prompt scraping into mirrored JSON files
-  - `tasks/upscale.py` - Stage 5 Topaz processing
+  - `tasks/sort.py` - inbox sorting
+  - `tasks/purge_weird.py` - kinda_weird cleanup
+  - `tasks/scripts_sync.py` - funscript/video tree alignment and processed/original variant copying
+  - `tasks/clip_scripts.py` - carving a clip's funscript out of its scene's
+  - `tasks/scene_scripts.py` - giving an unscripted scene a funscript holding its clip's
+  - `tasks/nonai_group.py` - recording a non-AI clip's version family in its sidecar
+  - `tasks/bookmarks_sync.py` - favorites -> Chrome bookmarks sync
+  - `tasks/prompt_scrape.py` - prompt scraping into mirrored JSON files
+  - `tasks/upscale.py` - Topaz processing
   - `tasks/genau_deliver.py` - the Genau lane's last step: an upscaled loop leaves for Genau's clips folder
   - `tasks/nonai_upscale.py` - the non-AI library's detached Topaz encodes, one at a time
+  - `tasks/nonai_queue.py` - which non-AI clip is encoded next, and why it beat the others
+  - `tasks/nonai_encode.py` - the detached encode itself: start, adopt, freeze, measure, kill
+  - `util/nonai_job.py` - the three JSON files that encode keeps its state in
+  - `util/nonai_retire.py` - moving a superseded original out of the library, record and all
   - `tasks/reference_sync.py` - repointing the suite's saved video paths at videos that moved
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
   - `util/favs_csv.py` - Fun Time's favorites CSV: its rows, and the local path each cell links to
   - `util/video_locator.py` - where a video a reference has lost track of now lives
-  - `check_duplicate_sizes.py` - Stage 6 duplicate-size scan for likely source duplicates
-  - `check_correspondence.py` - Stage 7 integrity verification and one-time manual check
-  - `util/ffprobe.py` - orientation probing
-  - `util/media_files.py` - shared helpers for finalized-vs-partial video detection and stale partial cleanup
+  - `check_duplicate_sizes.py` - duplicate-size scan for likely source duplicates
+  - `check_correspondence.py` - integrity verification and one-time manual check
+  - `util/ffprobe.py` - what ffprobe can say about a video, one process per question at most
+  - `util/media_files.py` - what counts as a video here, how the tree is walked, and how a name collision is uniquified
+  - `util/json_store.py` - reading the app's small JSON files, and writing them atomically
+  - `util/orientation.py` - the two orientations the library files a video under, and the third answer
   - `util/sidecar.py` - where a video's metadata JSON lives, and what the upscale stage names its output
   - `util/topaz.py` - the Topaz ffmpeg invocation both upscale stages share
-  - `util/variants.py` - the `_apo8`/`_iris2`-style suffixes that pair originals with processed variants
+  - `util/variants.py` - the `_topaz` and `_apo8`/`_iris2`-style suffixes that pair originals with processed variants
+  - `util/html_query.py` - a small HTML parse-and-query library
+  - `util/headless_browser.py` - driving an installed Chrome or Edge to dump a page's rendered DOM
+  - `util/relative_dates.py` - turning "2d ago" into a date
   - `util/processes.py` - liveness, identity, and termination of detached encodes
   - `backfill_app.py` - voice-driven metadata backfill tool (see below), launched from the tray
   - `backfill/vocabulary.py` - the spoken phrases, and the `video.action` each one records
@@ -53,12 +71,15 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
   - `backfill/work.py` - the single thread the file work runs on, in the order it was spoken
   - `backfill/voice.py` - offline vosk recognition over the tool's grammar
   - `backfill/window.py` - the looping player, the remaining count, and the last decision
-  - `gui/app.py` - tray application wiring
+  - `gui/app.py` - tray application wiring: builds the parts, then starts them
+  - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
+  - `gui/presence_throttle.py` - the fast poll that parks the in-flight non-AI encode when the user returns
   - `gui/single_instance.py` - who owns the one instance, and where a second launch goes
   - `util/crash_log.py` - what the tray app records about the way it died
   - `gui/tray.py` - system tray icon and context menu
   - `gui/main_window.py` - run history list and detail/progress panel
-  - `gui/progress.py` - live per-stage progress widget
+  - `gui/progress_popup.py` - the floating per-stage progress window
+  - `gui/stats_window.py` - the stacked-area chart of stage durations across runs
   - `gui/worker.py` - background QThread pipeline runner
   - `gui/scheduler.py` - timer-based scheduling with run-guard
   - `gui/run_record.py` - JSON run record persistence
@@ -93,7 +114,7 @@ A launch never ends without telling you why. If the running instance holds the m
 
 ## Metadata backfill tool
 
-Most sources publish nothing about what a clip actually shows. Provider exposes an action on its site and Origenerator has its gallery database, so Stage 5 fills those in on its own; a clip from Provider2, Provider3, Candy, ComfyUI or Provider4 arrives with no `video.action` at all, and Fun Time cannot group or filter it.
+Most sources publish nothing about what a clip actually shows. Provider exposes an action on its site and Origenerator has its gallery database, so the metadata scrape fills those in on its own; a clip from Provider2, Provider3, Candy, ComfyUI or Provider4 arrives with no `video.action` at all, and Fun Time cannot group or filter it.
 
 **Backfill Metadata...** in the tray menu opens a separate window that plays every such clip — looping and muted, in the stable order it found them so a reopened session resumes where the last left off — until you say what it is. The clip changes the instant you speak, and the sidecar is written behind it.
 
@@ -119,14 +140,17 @@ Four more phrases:
 
 - `same` — record the last act again on the clip now on screen, for a run that all share one act. It reaches past any intervening `skip` to the last act actually spoken, and says "nothing to repeat" if you have not named one yet
 - `skip` — not now; the clip goes to the back of the queue and comes round again
-- `weird` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "mark as weird" does. No metadata is written; Stage 2 later deletes it along with its `1_sorted` source
+- `weird` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "mark as weird" does. No metadata is written; the purge stage later deletes it along with its `1_sorted` source
 - `undo` — take the last decision back, and keep saying it to walk back through the whole run
 
 Undo restores the clip to the screen and reverses what the decision did on disk: a sidecar it wrote is deleted (or, if the clip arrived carrying prompts, only the act is removed), and a clip sent to `kinda_weird/` is reclaimed from where it landed. Undoing every decision rewinds the queue to the order it had. It works after the last clip too, so a mislabelled final clip is still recoverable.
 
 Three lines sit beneath the video: what is on screen now and how many clips are left; what the recognizer is hearing this moment; and what your last phrase did — the last naming its own clip, which by then is not the one you are watching. The middle "hearing" line fills in as it recognizes on-script words and stays blank when what you said is not a command, so a phrase that never lands shows as a visible nothing rather than a silent one — the way to tell listening-but-unmatched from not-listening. `Esc` closes the window; whatever you have labelled is already on disk, and reopening picks up where you left off.
 
-A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: every act as a grid of `Side` / `POV` columns, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records, names its spoken phrase on hover, and carries an example frame so the grid reads as a gallery you recognize at a glance. Most tiles take that frame from the first clip the library already labels with the act — a compound tag like `Pov Gamma, Alpha` counts for either part — while the acts the library never tags in a camera-scoped form (a side beta, a POV delta) are pinned to a hand-picked clip in `CURATED_EXAMPLES`. Frames are sampled a little way into the clip (past the intro, with the act actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
+A panel on the right lists every command as a clickable tile, laid out the way the vocabulary is: every act as a grid of `Side` / `POV` columns, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a tile drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each tile shows the action it records, names its spoken phrase on hover, and carries an example frame so the grid reads as a gallery you recognize at a glance. Most tiles take that frame from the first clip the library already labels with the act — a compound tag like `Pov Gamma, Alpha` counts for either part — while the acts the library never tags in a camera-scoped form (a side beta, a POV delta) are pinned to a hand-picked clip by the content overlay's optional `curated_examples`
+(tile label -> clip id), read as `config.CURATED_EXAMPLES` — it names clips inside the library, so it
+lives there rather than in source, and leaving it out simply means every tile takes the automatic
+match. Frames are sampled a little way into the clip (past the intro, with the act actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
 
 Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. Set `config.VOICE_DEVICE_NAME` to a substring of your mic's name (from `python -m sounddevice`) to pin a specific one instead.
 
@@ -209,27 +233,6 @@ Output reports any mismatches — orphaned outbox files, orphaned sorted files, 
 - Log file: `evolver.log`
 - Each run logs sort, purge, scripts-sync, bookmark-sync, prompt-scrape, upscale, duplicate-scan, and correspondence summary counts
 
-## Regeneration mode
-
-When `config.REGEN_ENABLED = True`, Evolver writes new outputs to `3_new_outbox` instead of `2_outbox`.
-
-- Correspondence checks treat `2_outbox` and `3_new_outbox` as one combined active output set.
-- Existing `2_outbox` files remain valid until their regenerated `3_new_outbox` replacement succeeds.
-- After a successful regenerated write, Evolver can delete the matching legacy `2_outbox` file immediately to save disk space.
-- When correspondence is clean and the legacy `2_outbox` payload has been fully drained, Evolver can notify you, remove the emptied legacy tree, and rename `3_new_outbox` back to `2_outbox` automatically.
-- A completion marker is written to `config.REGEN_COMPLETE_MARKER` so later scheduler ticks stay in normal mode after cutover instead of starting a second regeneration by accident.
-- This makes it possible to regenerate the library incrementally while keeping the old outbox available until cutover.
-
-### Regen skip manifest
-
-During regeneration mode, Evolver may write `.regen-skip.txt` in the repo root.
-
-- This is a generated runtime manifest, not source code.
-- Each line is a `1_sorted`-relative video path that should be skipped on future regen retries.
-- Evolver records an entry when regen work fails but the matching legacy `2_outbox` counterpart still exists, so the same item does not get retried every scheduler run.
-- If you want Evolver to retry one of those items, remove that line from `.regen-skip.txt` after dealing with the underlying issue.
-- The file is intentionally gitignored.
-
 ## Test suite
 
 The suite runs under `pytest` (configured in `pyproject.toml`) and is enforced in
@@ -255,7 +258,7 @@ What is covered:
 - Duplicate-size scan for likely same-content source videos (`check_duplicate_sizes.py`)
 - Funscript alignment so `videos/scripts/scripts` mirrors `videos/videos` when basename matches are unique within the same `AI` or `non_AI` lane, plus variant-copy support for processed/original counterparts (`tasks/scripts_sync.py`)
 - Correspondence rules for `<sorted_stem>_topaz<ext>` matching (`check_correspondence.py`)
-- Scheduler flow behavior, including always-running purge and pending-work-based Stage 3 decisions (`evolver.py`)
+- Scheduler flow behavior, including the always-running purge and the pending-work check that decides whether the upscale runs (`evolver.py`)
 - Already-processed detection (`tasks/upscale.py`)
 - Partial-file handling across upscale cleanup and downstream scanners (`tasks/upscale.py`, `check_correspondence.py`, `tasks/prompt_scrape.py`, `tasks/sort.py`)
 - Non-AI candidate discovery, priority order, and the detached-encode lifecycle: launch, in-flight, promote, retry, skip-manifest, and stuck-job kill (`tasks/nonai_upscale.py`)
@@ -264,27 +267,25 @@ What is covered:
 
 ## Output temp-file contract
 
-Stage 5 writes Topaz output to a temporary filename before promoting it to the final `_topaz` path.
+The upscale writes Topaz output to a temporary filename before promoting it to the final `_topaz` path.
 
 - Temp files use the pattern `*.partial.<uuid>.mp4`
 - Temp files are not considered valid library videos
 - Shared filtering and cleanup lives in `util/media_files.py`
-- On each Stage 5 run, stale partial outputs under the active upscale target are deleted before new work starts
+- On each upscale run, stale partial outputs under the upscale target are deleted before new work starts
 
 For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 
 ## Notes
 
-- Stage 2 (purge_weird) always runs, regardless of Stage 1 activity.
-- Stage 3 always runs after purge. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` lane within `videos/videos`, then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously.
-- Stage 4 always runs after scripts sync. It first normalizes any accidental `3_new_outbox` references in `favs.csv` back to `2_outbox`, then removes rows whose local favorite file no longer exists in either `2_outbox` or `3_new_outbox`, and finally resolves the Chrome profile named `Blair` from Chrome `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the remaining CSV `web_url` values.
-- Stage 5 scans `1_sorted` and writes prompt JSON files under `videos/metadata/<2_outbox or 3_new_outbox>/.../<video-name>_topaz.json`, skipping any video that already has a JSON. A video whose scrape fails (for example, its source page was deleted) gets a sibling `<video-name>_topaz.json.failed` marker so it is not retried every run; delete the marker to force a retry. The current scraper only extracts Provider prompts.
-- Stage 6 runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick.
-- Stage 6 is conservative by default: it processes at most `config.UPSCALE_BATCH_LIMIT` videos per run.
-- If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips Stage 6 for that scheduler tick instead of competing with other work.
-- If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops Stage 6 early and warns instead of continuing toward a full disk.
-- Stage 7 (non-AI upscale) always runs so it can check on its detached encode — suspending or resuming it to match the user's presence — but only launches a new one when the AI queue is drained, the user is away, and the box is otherwise quiet.
-- Stage 8 always runs before the final correspondence check and flags likely duplicates in `1_sorted` by exact filesize.
-- Stage 9 always runs as the final integrity check, and any mismatch popup points you to `evolver.log` for the full details.
+- Purge Weird always runs, whether or not Sort Inbox moved anything.
+- Scripts Sync always runs after the purge. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` lane within `videos/videos`, then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously.
+- Bookmarks Sync resolves the Chrome profile from Chrome's `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the remaining CSV `web_url` values, after dropping rows whose local favorite file no longer exists.
+- Metadata Scrape writes prompt JSON files under `videos/metadata/2_outbox/.../<video-name>_topaz.json`, skipping any video that already has a JSON. A video whose scrape fails (for example, its source page was deleted) gets a sibling `<video-name>_topaz.json.failed` marker so it is not retried every run; delete the marker to force a retry. The current scraper only extracts Provider prompts.
+- Upscale runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick, and is conservative by default: at most `config.UPSCALE_BATCH_LIMIT` videos per run.
+- If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips the upscale for that scheduler tick instead of competing with other work.
+- If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops the upscale early and warns instead of continuing toward a full disk.
+- Upscale non-AI always runs so it can check on its detached encode — suspending or resuming it to match the user's presence — but only launches a new one when the AI queue is drained, the user is away, and the box is otherwise quiet.
+- Duplicate Check flags likely duplicates by exact filesize, and the Correspondence Check is the final integrity check; either popup points you to `evolver.log` for the full details.
 - Errors are shown via Windows message box.
 - Existing output checks prevent duplicate processing.

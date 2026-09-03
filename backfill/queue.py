@@ -7,10 +7,13 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import config
-from util.media_files import iter_finalized_videos
+from util.media_files import library_videos
 from util.sidecar import action_of, read, sidecar_path, wrong_action_of
+from util import orientation
 
-_ORIENTATIONS = ("portrait", "landscape")
+# Portrait first, and that is not cosmetic: it is the order the tool asks a
+# human about, and most of the unlabeled queue is portrait.
+_ORIENTATIONS = (orientation.PORTRAIT, orientation.LANDSCAPE)
 
 # Sources the scrape stage already has a metadata strategy for (see
 # :mod:`tasks.prompt_scrape`): Provider from its website, Origenerator from its gallery
@@ -30,7 +33,7 @@ def iter_library_videos() -> Iterator[tuple[str, Path]]:
         if not orient_dir.is_dir():
             continue
         for source_dir in sorted(p for p in orient_dir.iterdir() if p.is_dir()):
-            for video in sorted(iter_finalized_videos(source_dir, config.VIDEO_EXTENSIONS)):
+            for video in sorted(library_videos(source_dir)):
                 yield source_dir.name, video
 
 

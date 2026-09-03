@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
-from util.media_files import iter_finalized_videos
+from util.media_files import library_videos
 from util.windows_alert import show_error_window
+from util.variants import UPSCALE_SUFFIX, upscaled_stem
 
 log = logging.getLogger(__name__)
 
@@ -25,29 +26,34 @@ class CorrespondenceResult:
         return not (self.orphan_outbox or self.orphan_sorted or self.duplicates or self.sorted_count != self.outbox_count)
 
 
-def iter_videos(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
-
-
 def sorted_to_outbox_name(sorted_file: Path) -> str:
-    return f"{sorted_file.stem}_topaz{sorted_file.suffix}"
+    return f"{upscaled_stem(sorted_file.stem)}{sorted_file.suffix}"
 
 
-def run(show_popup: bool = False) -> CorrespondenceResult:
-    sorted_files = sorted(iter_videos(config.SORTED_DIR))
-    outbox_roots = config.active_outbox_dirs()
-    outbox_files = []
-    for root in outbox_roots:
-        outbox_files.extend(iter_videos(root))
-    outbox_files = sorted(outbox_files)
+def run(
+    show_popup: bool = False,
+    *,
+    sorted_dir: Path | None = None,
+    outbox_dir: Path | None = None,
+) -> CorrespondenceResult:
+    """Check that every sorted video has exactly one upscale, and vice versa.
+
+    The two trees compared are arguments, resolved here rather than in the
+    signature: a default is evaluated at import, which would freeze the value
+    past ``override_config``.
+    """
+    sorted_root = config.SORTED_DIR if sorted_dir is None else sorted_dir
+    outbox_root = config.OUTBOX_DIR if outbox_dir is None else outbox_dir
+
+    sorted_files = sorted(library_videos(sorted_root))
+    outbox_files = sorted(library_videos(outbox_root))
 
     expected_outbox_names = {sorted_to_outbox_name(p) for p in sorted_files}
     outbox_name_to_paths: dict[str, list[str]] = {}
 
     orphan_outbox: list[str] = []
     for outbox_file in outbox_files:
-        root = next(root for root in outbox_roots if outbox_file.is_relative_to(root))
-        relative_outbox = str(Path(root.name) / outbox_file.relative_to(root))
+        relative_outbox = str(Path(outbox_root.name) / outbox_file.relative_to(outbox_root))
         outbox_name = outbox_file.name
         outbox_name_to_paths.setdefault(outbox_name, []).append(relative_outbox)
         if outbox_name not in expected_outbox_names:
@@ -57,7 +63,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     for sorted_file in sorted_files:
         expected_outbox_name = sorted_to_outbox_name(sorted_file)
         if expected_outbox_name not in outbox_name_to_paths:
-            orphan_sorted.append(str(sorted_file.relative_to(config.SORTED_DIR)))
+            orphan_sorted.append(str(sorted_file.relative_to(sorted_root)))
 
     duplicates = {
         outbox_name: sorted(paths)
@@ -72,7 +78,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
         orphan_sorted=sorted(orphan_sorted),
         duplicates=duplicates,
     )
-    _log_result(result)
+    _log_result(result, sorted_root, outbox_root)
 
     if show_popup and not result.ok:
         log.info("Showing error popup for correspondence failure")
@@ -82,10 +88,10 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     return result
 
 
-def _log_result(result: CorrespondenceResult) -> None:
-    log.info("=== Stage 5: correspondence check ===")
-    log.info("1_sorted: %d video file(s) in %s", result.sorted_count, config.SORTED_DIR)
-    log.info("Outboxes: %d video file(s) across %s", result.outbox_count, ", ".join(str(p) for p in config.active_outbox_dirs()))
+def _log_result(result: CorrespondenceResult, sorted_root: Path, outbox_root: Path) -> None:
+    log.info("=== Stage: correspondence check ===")
+    log.info("1_sorted: %d video file(s) in %s", result.sorted_count, sorted_root)
+    log.info("Outboxes: %d video file(s) across %s", result.outbox_count, outbox_root)
 
     if result.sorted_count == result.outbox_count:
         log.info("Count check OK: %d files each", result.sorted_count)
@@ -104,16 +110,16 @@ def _log_result(result: CorrespondenceResult) -> None:
             log.error("  -> %s", path)
 
     if result.ok:
-        log.info("Stage 5 done. 1_sorted and the active outbox set are in perfect 1-to-1 correspondence.")
+        log.info("Correspondence check done. 1_sorted and the active outbox set are in perfect 1-to-1 correspondence.")
     else:
-        log.error("Stage 5 failed. See log entries above for the mismatch details.")
+        log.error("Correspondence check failed. See log entries above for the mismatch details.")
 
 
 def _popup_message(result: CorrespondenceResult) -> str:
     lines = [
         "Evolver found a 1_sorted / outbox correspondence problem.",
         "",
-        f"Check the log for full details:",
+        "Check the log for full details:",
         str(config.LOG_FILE),
         "",
         f"1_sorted files: {result.sorted_count}",
@@ -156,10 +162,12 @@ def _truncate(items: list[str], limit: int = 10) -> list[str]:
 
 
 def main() -> int:
-    result = run(show_popup=False)
+    sorted_root = config.SORTED_DIR
+    outbox_root = config.OUTBOX_DIR
+    result = run(show_popup=False, sorted_dir=sorted_root, outbox_dir=outbox_root)
 
-    print(f"1_sorted  : {result.sorted_count} video file(s)  in  {config.SORTED_DIR}")
-    print(f"outboxes  : {result.outbox_count} video file(s)  in  {', '.join(str(p) for p in config.active_outbox_dirs())}")
+    print(f"1_sorted  : {result.sorted_count} video file(s)  in  {sorted_root}")
+    print(f"outboxes  : {result.outbox_count} video file(s)  in  {outbox_root}")
     print()
 
     if result.sorted_count == result.outbox_count:
@@ -170,7 +178,8 @@ def main() -> int:
     print()
 
     if result.orphan_outbox:
-        print(f"[ORPHAN-OUTBOX] {len(result.orphan_outbox)} outbox file(s) do not match '<sorted_name>_topaz.ext':")
+        print(f"[ORPHAN-OUTBOX] {len(result.orphan_outbox)} outbox file(s) do not "
+              f"match '<sorted_name>{UPSCALE_SUFFIX}.ext':")
         for item in result.orphan_outbox:
             print(f"  {item}")
         print()

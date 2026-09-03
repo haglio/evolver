@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
-from util.media_files import iter_finalized_videos
+from util.media_files import library_videos
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -22,16 +22,22 @@ class DuplicateSizesResult:
         return not self.duplicate_groups
 
 
-def iter_videos(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
+def run(show_popup: bool = False, *, non_ai_dir: Path | None = None) -> DuplicateSizesResult:
+    """Report non-AI videos that share an exact filesize with another.
 
+    The folder scanned is an argument, resolved here rather than in the
+    signature: a default is evaluated at import, which would freeze the value
+    past ``override_config``. It is one parameter rather than two because the
+    tree walked and the root paths are reported relative to have to be the
+    same folder — as two reads of the same attribute they only happened to be.
+    """
+    non_ai_root = config.NON_AI_DIR if non_ai_dir is None else non_ai_dir
 
-def run(show_popup: bool = False) -> DuplicateSizesResult:
-    files = sorted(iter_videos(config.NON_AI_DIR))
+    files = sorted(library_videos(non_ai_root))
     size_to_paths: dict[int, list[str]] = {}
 
     for file_path in files:
-        relative_path = str(file_path.relative_to(config.NON_AI_DIR))
+        relative_path = str(file_path.relative_to(non_ai_root))
         size_to_paths.setdefault(file_path.stat().st_size, []).append(relative_path)
 
     duplicate_groups = {
@@ -44,7 +50,7 @@ def run(show_popup: bool = False) -> DuplicateSizesResult:
         scanned_count=len(files),
         duplicate_groups=dict(sorted(duplicate_groups.items())),
     )
-    _log_result(result)
+    _log_result(result, non_ai_root)
 
     if show_popup and not result.ok:
         log.info("Showing error popup for duplicate-size scan failure")
@@ -54,9 +60,9 @@ def run(show_popup: bool = False) -> DuplicateSizesResult:
     return result
 
 
-def _log_result(result: DuplicateSizesResult) -> None:
-    log.info("=== Stage 8: duplicate-size scan ===")
-    log.info("non_AI: %d video file(s) scanned in %s", result.scanned_count, config.NON_AI_DIR)
+def _log_result(result: DuplicateSizesResult, non_ai_root: Path) -> None:
+    log.info("=== Stage: duplicate-size scan ===")
+    log.info("non_AI: %d video file(s) scanned in %s", result.scanned_count, non_ai_root)
 
     for size, paths in result.duplicate_groups.items():
         log.error("LIKELY DUPLICATE SIZE: %d bytes", size)
@@ -64,9 +70,9 @@ def _log_result(result: DuplicateSizesResult) -> None:
             log.error("  -> %s", path)
 
     if result.ok:
-        log.info("Stage 8 done. No likely duplicate non-AI videos found by exact filesize.")
+        log.info("Duplicate-size scan done. No likely duplicate non-AI videos found by exact filesize.")
     else:
-        log.error("Stage 8 failed. See log entries above for likely duplicate non-AI videos.")
+        log.error("Duplicate-size scan failed. See log entries above for likely duplicate non-AI videos.")
 
 
 def _popup_message(result: DuplicateSizesResult) -> str:
@@ -94,9 +100,10 @@ def _popup_message(result: DuplicateSizesResult) -> str:
 
 
 def main() -> int:
-    result = run(show_popup=False)
+    non_ai_root = config.NON_AI_DIR
+    result = run(show_popup=False, non_ai_dir=non_ai_root)
 
-    print(f"non_AI : {result.scanned_count} video file(s)  in  {config.NON_AI_DIR}")
+    print(f"non_AI : {result.scanned_count} video file(s)  in  {non_ai_root}")
     print()
 
     if result.duplicate_groups:

@@ -51,6 +51,7 @@ def main() -> int:
     listener = VoiceListener(grammar_phrases(), parent=window)
     listener.heard.connect(window.on_phrase)
     listener.hearing.connect(window.on_hearing)
+    listener.failed.connect(window.on_voice_failed)
     listener.start()
 
     window.showMaximized()

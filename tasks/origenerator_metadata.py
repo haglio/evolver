@@ -24,6 +24,7 @@ from pathlib import Path
 
 import config
 from util.ffprobe import video_dimensions
+from util.media_files import strip_uniquifier
 
 # Columns read from Origenerator's ``generations`` table. ``params_json`` carries
 # the model/LoRA/input_image a run used; the prompts and seed are first-class.
@@ -40,10 +41,6 @@ _MODEL_EXT_RE = re.compile(r"\.(safetensors|ckpt|pt|pth|gguf|sft|bin)$", re.IGNO
 
 # ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
 _TYPE_ANNOTATIONS = ("[output]", "[input]", "[temp]")
-
-# Evolver's export uniquifies an inbox name collision as "stem (2)", "stem (3)"…;
-# strip that back off before matching a library file to the row that produced it.
-_UNIQUIFIER_RE = re.compile(r" \(\d+\)$")
 
 # Aspect ratios a raw WxH is snapped to for display when it lands close enough.
 _COMMON_RATIOS = ((16, 9), (9, 16), (1, 1), (4, 3), (3, 4), (3, 2), (2, 3),
@@ -104,7 +101,7 @@ def _connect_ro(db_path: Path) -> sqlite3.Connection:
 
 def _match_video_row(video_path: Path, rows: list[dict]) -> dict | None:
     """The row whose output files include ``video_path`` (uniquifier stripped)."""
-    key = _frame_name(_strip_uniquifier(video_path.stem) + video_path.suffix)
+    key = _frame_name(strip_uniquifier(video_path.stem) + video_path.suffix)
     for row in rows:
         if key in _output_frame_names(row):
             return row
@@ -224,10 +221,6 @@ def _row_output_files(row: dict) -> list:
     except (json.JSONDecodeError, TypeError):
         return []
     return files if isinstance(files, list) else []
-
-
-def _strip_uniquifier(stem: str) -> str:
-    return _UNIQUIFIER_RE.sub("", stem)
 
 
 def _frame_name(ref: str | None) -> str:

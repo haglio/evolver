@@ -30,7 +30,15 @@ def _to_int(value: _FileTime) -> int:
     return (value.dwHighDateTime << 32) | value.dwLowDateTime
 
 
-def cpu_busy_percent(sample_seconds: float = 0.75) -> float:
+def measure_cpu_busy_percent(sample_seconds: float) -> float:
+    """How busy the CPU was over *sample_seconds* -- and it takes that long.
+
+    Named for the measuring rather than the number, because it blocks by
+    construction: two samples of the system times with a sleep between them is
+    the only way to get a percentage out of counters that are totals. A caller
+    reading three resource values in a row pays this once, and the call now
+    says so.
+    """
     start_idle, start_kernel, start_user = _get_system_times()
     time.sleep(max(sample_seconds, 0.05))
     end_idle, end_kernel, end_user = _get_system_times()

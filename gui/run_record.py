@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -24,11 +27,21 @@ class RunRecord:
 
     @classmethod
     def from_pipeline_result(cls, result, trigger: str = "scheduled") -> RunRecord:
-        """Build a RunRecord from a PipelineResult."""
+        """Build a RunRecord from a PipelineResult, called as the run ends.
+
+        The start is derived from the finish rather than captured, so
+        ``finished_at - started_at == duration_seconds`` holds by construction
+        and the three cannot drift apart. Both used to be stamped with the
+        finish, which made every view that trusts the name -- the history
+        label, the chart's x axis -- wrong by the run's whole duration; at the
+        660-second watchdog ceiling that is eleven minutes, a full slot past
+        the ten-minute schedule, so a run read as belonging to the next tick.
+        """
         now = datetime.now(timezone.utc)
-        run_id = now.strftime("%Y-%m-%dT%H-%M-%S")
-        started_at = now.strftime("%Y-%m-%dT%H:%M:%S")
-        finished_at = started_at  # Will be close enough for display
+        started = now - timedelta(seconds=result.duration_seconds)
+        run_id = started.strftime("%Y-%m-%dT%H-%M-%S")
+        started_at = started.strftime("%Y-%m-%dT%H:%M:%S")
+        finished_at = now.strftime("%Y-%m-%dT%H:%M:%S")
 
         stages = []
         for sr in result.stages:
@@ -78,7 +91,12 @@ def result_to_dict(result: Any) -> dict[str, Any] | None:
             d = dataclasses.asdict(result)
         else:
             d = {k: v for k, v in vars(result).items() if not k.startswith("_")}
-    except Exception:
+    except TypeError:
+        # Something with no __dict__ to read -- a bare object, an int. Nothing
+        # downstream reads this shape; it exists so one odd stage result cannot
+        # cost the whole run its record.
+        log.warning("Stage result %r could not be described; keeping its repr.",
+                    type(result).__name__)
         return {"repr": repr(result)}
     return _make_json_safe(d)
 
@@ -103,16 +121,40 @@ def save_run(record: RunRecord, runs_dir: Path) -> Path:
     return path
 
 
-def load_runs(runs_dir: Path) -> list[RunRecord]:
-    """Load all run records from a directory, newest first."""
+def load_runs(runs_dir: Path, limit: int | None = None) -> list[RunRecord]:
+    """Load run records from a directory, newest first, at most *limit* of them.
+
+    Only the keys the dataclass declares are read off a record, so a field
+    added to the format later does not make every record written since
+    unreadable -- which, behind a bare ``except: continue``, emptied the
+    history list and the stats chart with nothing said. A file that genuinely
+    cannot be read is skipped and named in the log instead of vanishing.
+
+    *limit* is applied to the FILENAMES, before anything is opened: a run's
+    file is named for the moment it started, so newest-first is the reverse of
+    their order and picking the newest N costs one directory listing. Nothing
+    prunes this directory -- roughly 144 files a day at the default interval,
+    kept forever -- so without a limit every read of it grows, and this one
+    happens on the GUI thread after every run.
+    """
     if not runs_dir.is_dir():
         return []
+    paths = sorted(runs_dir.glob("*.json"), reverse=True)
+    if limit is not None:
+        paths = paths[:limit]
     records = []
-    for path in runs_dir.glob("*.json"):
+    for path in paths:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            records.append(RunRecord(**data))
-        except Exception:
-            continue
+            records.append(RunRecord(**{
+                key: value for key, value in data.items()
+                if key in RunRecord.__dataclass_fields__
+            }))
+        except (OSError, json.JSONDecodeError, TypeError, AttributeError):
+            # AttributeError: valid JSON that is not an object, so .items() is
+            # not there to call. TypeError: a record missing a field the
+            # dataclass requires.
+            log.warning("Could not read run record %s; skipping it.", path,
+                        exc_info=True)
     records.sort(key=lambda r: r.id, reverse=True)
     return records
