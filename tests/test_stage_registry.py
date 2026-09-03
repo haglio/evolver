@@ -27,7 +27,7 @@ from tests.test_evolver import _patched_stages, _stage_mocks
 # `clip_scripts` and `scene_scripts` write a funscript where one is missing and
 # leave every existing one alone; `group_non_ai` is bookkeeping over whatever
 # files happen to be there.
-CANNOT_FAIL = frozenset({"strays", "sort", "clip_scripts", "scene_scripts", "group_non_ai"})
+CANNOT_FAIL = frozenset({"strays", "sort", "clip_scripts", "scene_scripts", "group_non_ai", "video_types"})
 
 
 class TestStageRegistry(unittest.TestCase):
@@ -251,23 +251,6 @@ class TestStageRegistry(unittest.TestCase):
 
         self.assertGreaterEqual(worst, 20.0, f"{pair[0]} and {pair[1]} differ by only {worst:.1f}")
 
-    def test_no_two_stage_bands_are_hard_to_tell_apart(self):
-        """The chart stacks every stage as a band in one column, so a close
-        pair is two bands nobody can separate and a legend that names the same
-        colour twice.
-
-        The floor is 20 Delta-E, argued from the units rather than fitted to
-        this palette: ~2 is the smallest difference anyone sees and ~10 already
-        reads as two colours, so 20 is a comfortable "obviously different"
-        rather than the least that would pass. The palette this replaced scored
-        8.8 and would fail it; the one here clears it by three.
-        """
-        worst, pair = min(
-            (delta_e(band_fill(STAGE_COLORS[one]), band_fill(STAGE_COLORS[other])), (one, other))
-            for one, other in itertools.combinations(ALL_STAGES, 2)
-        )
-
-        self.assertGreaterEqual(worst, 20.0, f"{pair[0]} and {pair[1]} differ by only {worst:.1f}")
 
 
 if __name__ == "__main__":

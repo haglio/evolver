@@ -129,6 +129,16 @@ CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 _SCRAPE_PROVIDER = _CONTENT["scrape_provider"]
 PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
 PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]
+# Non-AI folders holding scenes carved out of longer videos and nothing else,
+# as paths relative to the video library ("2D/non_AI/<bucket>/<folder>").
+# ``tasks.video_types`` reads them as excerpts whether or not each one carries
+# the ``clip`` record that normally says so: the batches that were split before
+# anything wrote that record are excerpts all the same, and the folder they were
+# filed into is the only thing left that knows it. From the overlay, not from
+# source, for the same reason ``GENAU_SOURCE`` is — these are folder names, and
+# folder names are library vocabulary. Optional; absent means the ``clip``
+# record is the only test.
+EXCERPT_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
 
 FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")
 TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
@@ -137,6 +147,10 @@ VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm", ".m4v"}
 FUNSCRIPT_EXTENSION = ".funscript"
 
 UPSCALE_BATCH_LIMIT = 5
+# How many videos one run of the video-kinds stage will measure. Only videos
+# whose kind is not yet recorded cost anything, so this bounds the first runs
+# over a library that has never been asked and is never reached again after.
+VIDEO_TYPE_BATCH_LIMIT = 400
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
 PIPELINE_WALL_TIMEOUT_SECONDS = UPSCALE_RUN_BUDGET_SECONDS + 3 * 60  # 11 min

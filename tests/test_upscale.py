@@ -7,6 +7,7 @@ from unittest.mock import patch
 import config
 from tasks import upscale
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util import video_type
 
 
 def library_dirs(root):
@@ -312,6 +313,21 @@ class TestIsT2vProvider(unittest.TestCase):
             with override_config(METADATA_DIR=meta_dir):
                 self.assertFalse(upscale._is_t2v_provider(
                     "provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+
+    def test_false_when_the_sidecar_holds_only_the_video_kind(self):
+        """A sidecar the kinds stage made for a clip nothing has scraped says
+        nothing about how the clip was generated — least of all that it was
+        text-to-video, which is what "no source_image" would otherwise mean."""
+        with workspace_temp_dir() as root:
+            meta_dir = root / "meta"
+            json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text(
+                json.dumps({"video": {"type": video_type.SHORT}}), encoding="utf-8",
+            )
+
+            with override_config(METADATA_DIR=meta_dir):
+                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
     def test_false_when_metadata_missing(self):
         with workspace_temp_dir() as root:
