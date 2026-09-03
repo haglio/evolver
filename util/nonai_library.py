@@ -78,6 +78,21 @@ def buckets() -> list[Path]:
     return found
 
 
+def stage_dirs(parent: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
+    """*parent*'s numbered stage folders whose names start with one of *digits*.
+
+    Serves both levels of the convention: a bucket's triage/stage folders, and
+    the sub-stages a triage folder splits into.  Returned with the digit, since
+    every caller either wants a particular place in the pipeline or wants to
+    know which place it found.
+    """
+    found = []
+    for child in sorted(parent.iterdir()):
+        if child.is_dir() and child.name[:1].isdigit() and int(child.name[:1]) in digits:
+            found.append((int(child.name[:1]), child))
+    return found
+
+
 def bucket_of(video: Path) -> Path | None:
     """The bucket *video* lives in, or None when it is in none of them.
 

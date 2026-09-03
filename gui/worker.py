@@ -21,7 +21,7 @@ class PipelineWorker(QThread):
     """
 
     stage_started = pyqtSignal(str)           # stage_name
-    stage_completed = pyqtSignal(str, object, float, str)  # name, result, elapsed, status
+    stage_completed = pyqtSignal(str)         # stage_name
     stage_progress = pyqtSignal(str, int, int)  # name, current, total
     pipeline_finished = pyqtSignal(object)    # RunRecord
     pipeline_error = pyqtSignal(str)          # error message
@@ -51,13 +51,20 @@ class PipelineWorker(QThread):
                 log.exception("Failed to save run record")
             self.pipeline_finished.emit(record)
         except Exception as exc:
+            # Logged before it is flattened: str(exc) is all the GUI ever sees,
+            # so without this the only record of where a pipeline died is a
+            # sentence in a toast.
+            log.exception("Pipeline run failed")
             self.pipeline_error.emit(str(exc))
 
     def _on_stage_start(self, name: str):
         self.stage_started.emit(name)
 
-    def _on_stage_complete(self, name: str, result: object, elapsed: float, status: str):
-        self.stage_completed.emit(name, result, elapsed, status)
+    def _on_stage_complete(self, name: str, *_):
+        # run_pipeline hands the callback the result, the elapsed time and the
+        # status too; all three reach the run record by their own route, and
+        # the only listener here marks a bar full.
+        self.stage_completed.emit(name)
 
     def _on_stage_progress(self, name: str, current: int, total: int):
         self.stage_progress.emit(name, current, total)

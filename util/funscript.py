@@ -7,21 +7,20 @@ import json
 from pathlib import Path
 
 import config
+from util.json_store import atomic_write_text, read_dict
 
 
 def read(path: Path) -> dict:
     """A funscript's payload — empty when it is absent or unreadable."""
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    return read_dict(path)
 
 
 def write(path: Path, script: dict) -> None:
-    """Serialize *script* to *path*, creating the mirrored directory if need be."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(script), encoding="utf-8")
+    """Serialize *script* to *path*, creating the mirrored directory if need be.
+
+    Minified, the way every player that reads these writes them.
+    """
+    atomic_write_text(path, json.dumps(script))
 
 
 def script_path_for_video(video: Path) -> Path:

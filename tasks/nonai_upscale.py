@@ -17,21 +17,14 @@ detached ffmpeg the moment they return (frozen, zero compute, resumed exactly
 where it left off). A fast GUI poll — ``throttle_to_presence`` — parks and
 thaws it between ticks so returning to the machine takes effect in seconds.
 
-Candidates come from the buckets' triage folders (``0 unsorted``, ``1 could
-use work``), most-wanted first: a pin in ``.nonai-upscale-next.txt`` beats
-everything and also re-queues a video whose only processed variant came from an
-older recipe, then an explicit ``1`` flag, then clips with a funscript — the
-only per-video engagement signal the non_AI library has, since Fun Time's watch
-stats cover only the AI outbox.
+Which clip is next, and why it beat the others, is
+:mod:`tasks.nonai_queue`'s; what is left here is the stage: repair, supervise,
+maybe start, report.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import re
-import shutil
-import subprocess
 import threading
 import time
 import uuid
@@ -39,10 +32,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import ffprobe, funscript, processes, sidecar, system_resources, topaz
+from tasks import nonai_encode
+from tasks.nonai_queue import (
+    Candidate,
+    add_to_skip_manifest,
+    collect_candidates,
+    relpath,
+)
+from util import ffprobe, nonai_job, processes, sidecar, system_resources
 from util.media_files import is_finalized_video_file, is_partial_video_path
-from util.nonai_library import bucket_of, buckets
+from util.nonai_library import buckets, stage_dirs
+from util.nonai_retire import archived_original, carry_metadata, retire_original
 from util.variants import is_processed_stem, strip_processing_suffixes
+from util import orientation
 
 log = logging.getLogger(__name__)
 
@@ -50,15 +52,6 @@ log = logging.getLogger(__name__)
 # thread) both touch the one job file and its ffmpeg. This serializes them so a
 # suspend/resume never races a supervise.
 _throttle_lock = threading.Lock()
-
-
-@dataclass(frozen=True)
-class Candidate:
-    path: Path
-    bucket: Path
-    triage_digit: int
-    has_funscript: bool
-    watch_score: float
 
 
 @dataclass
@@ -79,8 +72,55 @@ class NonAiUpscaleResult:
     repaired_sidecars: int = 0
 
 
+@dataclass(frozen=True)
+class StageFiles:
+    """The six files the stage touches, resolved once at its boundary.
+
+    Three it writes -- the job record, the attempt counter, the cooldown stamp
+    -- and three the queue reads: the skip and pin manifests, and Fun Time's
+    watch stats. Held as one record rather than threaded separately because
+    every function below is handed the same set, and six separate resolutions
+    put six conditionals in front of the code that supervises a live multi-hour
+    encode -- the one function here that most needs to read straight through.
+    """
+
+    job: Path
+    attempts: Path
+    cooldown: Path
+    skip_manifest: Path
+    pin_manifest: Path
+    watch_stats: Path
+
+
+def _configured_files(job_file: Path | None, attempts_file: Path | None,
+                      cooldown_file: Path | None, skip_manifest: Path | None,
+                      pin_manifest: Path | None,
+                      watch_stats_file: Path | None) -> StageFiles:
+    """Each argument, or the configured path when the caller named none.
+
+    The sentinel form -- ``x=None``, then ``config.X if x is None else x`` --
+    rather than signature defaults: a default is evaluated at import, which
+    would freeze whatever ``config`` held then and put the value out of reach
+    of ``override_config``, the seam every stage test steers with.
+    """
+    return StageFiles(
+        job=config.NONAI_JOB_STATE_FILE if job_file is None else job_file,
+        attempts=config.NONAI_ATTEMPTS_FILE if attempts_file is None else attempts_file,
+        cooldown=config.NONAI_COOLDOWN_FILE if cooldown_file is None else cooldown_file,
+        skip_manifest=(config.NONAI_SKIP_MANIFEST if skip_manifest is None
+                       else skip_manifest),
+        pin_manifest=(config.NONAI_PRIORITY_MANIFEST if pin_manifest is None
+                      else pin_manifest),
+        watch_stats=(config.FUN_TIME_WATCH_STATS_FILE if watch_stats_file is None
+                     else watch_stats_file),
+    )
+
+
 def run(allow_start: bool = True, stop: bool = False,
-        presence_managed: bool = False) -> NonAiUpscaleResult:
+        presence_managed: bool = False, *, job_file: Path | None = None,
+        attempts_file: Path | None = None, cooldown_file: Path | None = None,
+        skip_manifest: Path | None = None, pin_manifest: Path | None = None,
+        watch_stats_file: Path | None = None) -> NonAiUpscaleResult:
     """Check on the in-flight encode, then start the next one if the box is free.
 
     With *stop* (the tray toggle is off), a still-running encode is killed and
@@ -92,24 +132,34 @@ def run(allow_start: bool = True, stop: bool = False,
     they idle out again, so a day of intermittent use makes progress in the
     gaps instead of throwing partial work away. The headless CLI leaves it off
     and simply lets an in-flight encode run.
+
+    Every file the stage touches is named at this boundary and resolved once;
+    see :class:`StageFiles`.
     """
+    files = _configured_files(job_file, attempts_file, cooldown_file,
+                              skip_manifest, pin_manifest, watch_stats_file)
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
     repair_retired_metadata(result)
 
     with _throttle_lock:
-        job = _load_job()
+        job = nonai_job.load_job(files.job)
         if job is None:
-            job = _adopt_orphan()
+            job = nonai_encode.adopt_orphan(files.job)
         _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
         if job is not None:
-            _supervise(job, result, stop=stop, presence_managed=presence_managed)
+            _supervise(job, result, files, stop=stop,
+                       presence_managed=presence_managed)
 
         if not result.in_flight and allow_start and not stop:
-            _start_next_candidate(result)
+            _start_next_candidate(result, files)
 
-    result.pending = len(collect_candidates())
+    # Collected a second time on purpose: a start attempt can retire clips to
+    # the skip manifest, and the count reported is the queue as it stands after
+    # that. The doubled walk is finding tasks/design/008's; merging the two
+    # would change what `pending` means, so it stays and stays visible.
+    result.pending = len(_collect(files))
     in_flight = result.in_flight or "-"
     if result.in_flight and result.in_flight_percent is not None:
         in_flight = f"{result.in_flight} ({result.in_flight_percent}% encoded)"
@@ -125,7 +175,7 @@ def run(allow_start: bool = True, stop: bool = False,
     return result
 
 
-def throttle_to_presence() -> str:
+def throttle_to_presence(*, job_file: Path | None = None) -> str:
     """Between full pipeline ticks, keep the in-flight encode in step with the
     user: suspend it the moment they return, resume it once they idle out.
 
@@ -134,8 +184,9 @@ def throttle_to_presence() -> str:
     nothing changed. Starting a new encode stays with the pipeline tick, which
     has the candidate scan and resource checks; this only parks and thaws.
     """
+    job_file = config.NONAI_JOB_STATE_FILE if job_file is None else job_file
     with _throttle_lock:
-        job = _load_job()
+        job = nonai_job.load_job(job_file)
         if job is None:
             return ""
         pid = job.get("pid", 0)
@@ -143,195 +194,78 @@ def throttle_to_presence() -> str:
             return ""
         present = _user_present()
         if present and not job.get("suspended"):
-            _suspend_job(job)
+            nonai_encode.suspend_job(job, job_file)
             return "suspended"
         if not present and job.get("suspended"):
-            _resume_job(job)
+            nonai_encode.resume_job(job, job_file)
             return "resumed"
         return ""
 
 
-def _adopt_orphan() -> dict | None:
-    """Rebuild the job record for a lone still-running encode of ours.
-
-    The job file can vanish out from under a live encode (the sync service
-    covering the project tree renamed it mid-run more than once). Losing it
-    used to orphan the encode — unsupervised, never promoted, and no longer
-    blocking new starts, so encodes stacked up. A single Topaz ffmpeg whose
-    output is one of our .partial files in the non-AI tree is unambiguously
-    ours, so it is adopted back under supervision.
-    """
-    pids = processes.pids_of_image(config.FFMPEG)
-    if len(pids) != 1:
-        return None
-    source, tmp = _parse_topaz_command(processes.command_line(pids[0]) or "")
-    if source is None or tmp is None or ".partial." not in tmp.name:
-        return None
-    try:
-        tmp.relative_to(config.NON_AI_DIR)
-    except ValueError:
-        return None  # some other Topaz run, e.g. a manual GUI export
-    stem = tmp.name.split(".partial.")[0]
-    job = {
-        "pid": pids[0],
-        "source": str(source),
-        "tmp": str(tmp),
-        "out": str(tmp.with_name(f"{stem}{config.NONAI_OUTPUT_SUFFIX}.mp4")),
-        "expected_duration": ffprobe.duration_seconds(source) or 0.0,
-        # The true start time is unknown; counting the runtime cap from
-        # adoption is the conservative reading.
-        "started_at": time.time(),
-        "suspended": False,
-        "suspended_at": 0.0,
-        "suspended_seconds": 0.0,
-    }
-    # A crash could have left the encode frozen; thaw it so adoption never
-    # inherits a permanently-suspended process. resume() no-ops if it is
-    # already running.
-    processes.resume(pids[0])
-    _save_job(job)
-    log.warning(
-        "Adopted an orphaned non-AI encode (pid %d) of %s; its job state had gone missing.",
-        pids[0], source,
-    )
-    return job
+def _collect(files: StageFiles) -> list[Candidate]:
+    return collect_candidates(skip_manifest=files.skip_manifest,
+                              pin_manifest=files.pin_manifest,
+                              watch_stats_file=files.watch_stats)
 
 
-def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
-    """The -i input and the trailing output of a Topaz ffmpeg command line."""
-    token = r'(?:"([^"]+)"|(\S+))'
-    source_match = re.search(rf"-i\s+{token}", cmdline)
-    output_match = re.search(rf"{token}\s*$", cmdline)
-    if not source_match or not output_match:
-        return None, None
-    source = source_match.group(1) or source_match.group(2)
-    output = output_match.group(1) or output_match.group(2)
-    return Path(source), Path(output)
-
-
-def _supervise(job: dict, result: NonAiUpscaleResult, stop: bool = False,
-               presence_managed: bool = False) -> None:
+def _supervise(job: dict, result: NonAiUpscaleResult, files: StageFiles, *,
+               stop: bool = False, presence_managed: bool = False) -> None:
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
         if stop:
-            _stop_in_flight(job, result, "the non-AI upscale toggle is off")
+            _stop_in_flight(job, result, "the non-AI upscale toggle is off", files)
             return
         if _is_low_disk():
             # The 250 GB floor was clear at start, but a 4K60 output plus
             # whatever else writes overnight can cross it mid-encode.
             result.deferred_low_disk = True
-            _stop_in_flight(job, result, "free disk fell below the safety floor mid-encode")
+            _stop_in_flight(job, result,
+                            "free disk fell below the safety floor mid-encode", files)
             return
         if presence_managed and _user_present():
-            _suspend_job(job)
+            nonai_encode.suspend_job(job, files.job)
             result.in_flight = relpath(source)
-            result.in_flight_percent = _percent_encoded(job)
+            result.in_flight_percent = nonai_encode.percent_encoded(job)
             result.suspended = True
             return
         if presence_managed:
-            _resume_job(job)  # a no-op unless it was frozen
-        if not _overran(job):
+            nonai_encode.resume_job(job, files.job)  # a no-op unless it was frozen
+        if not nonai_encode.overran(job):
             result.in_flight = relpath(source)
-            result.in_flight_percent = _percent_encoded(job)
+            result.in_flight_percent = nonai_encode.percent_encoded(job)
             return
-        _terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
-    _conclude(job, result)
-    _clear_job()
+        nonai_encode.terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
+    _conclude(job, result, files)
+    nonai_job.clear_job(files.job)
 
 
-def _suspend_job(job: dict) -> None:
-    """Freeze the encode and remember when, so the pause is not charged runtime."""
-    if job.get("suspended"):
-        return
-    processes.suspend(job.get("pid", 0))
-    job["suspended"] = True
-    job["suspended_at"] = time.time()
-    _save_job(job)
-    log.info("Suspended the non-AI encode of %s; the user is back at the machine.",
-             job.get("source"))
-
-
-def _resume_job(job: dict) -> None:
-    """Thaw the encode and bank the time it spent frozen."""
-    if not job.get("suspended"):
-        return
-    processes.resume(job.get("pid", 0))
-    paused_for = time.time() - job.get("suspended_at", time.time())
-    job["suspended_seconds"] = job.get("suspended_seconds", 0.0) + paused_for
-    job["suspended"] = False
-    job["suspended_at"] = 0.0
-    _save_job(job)
-    log.info("Resumed the non-AI encode of %s; the machine is idle again.",
-             job.get("source"))
-
-
-def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str) -> None:
+def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str,
+                    files: StageFiles) -> None:
     """End the encode through no fault of its video — no retry penalty."""
     source = Path(job.get("source", ""))
-    _terminate_ffmpeg(job.get("pid", 0), reason)
-    _delete_tmp(Path(job.get("tmp", "")))
-    _clear_attempts(source)
-    _clear_job()
+    nonai_encode.terminate_ffmpeg(job.get("pid", 0), reason)
+    nonai_encode.delete_tmp(Path(job.get("tmp", "")))
+    nonai_job.clear_attempts(files.attempts, relpath(source))
+    nonai_job.clear_job(files.job)
     result.stopped = relpath(source)
     log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
 
 
-def _overran(job: dict) -> bool:
-    return _active_runtime(job) > config.NONAI_MAX_RUNTIME_HOURS * 3600
-
-
-def _active_runtime(job: dict) -> float:
-    """Wall-clock since the encode started, minus the time it spent suspended.
-
-    The runtime cap exists to catch a *stuck* encode; hours parked frozen while
-    the user was at the machine are not the encode's fault and must not count.
-    """
-    now = time.time()
-    suspended = job.get("suspended_seconds", 0.0)
-    if job.get("suspended") and job.get("suspended_at"):
-        suspended += now - job["suspended_at"]
-    return now - job.get("started_at", now) - suspended
-
-
-def _percent_encoded(job: dict) -> int | None:
-    """How far the running encode has gotten, read off its growing partial.
-
-    ffmpeg writes fragmented mp4, so the partial is probeable mid-write; its
-    duration over the source's is the encode's progress.
-    """
-    tmp = Path(job.get("tmp", ""))
-    expected = job.get("expected_duration") or 0.0
-    encoded = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
-    if not encoded or not expected:
-        return None
-    return min(100, round(encoded / expected * 100))
-
-
-def _terminate_ffmpeg(pid: int, reason: str) -> None:
-    image = processes.image_path(pid)
-    if image and Path(image).name.lower() == config.FFMPEG.name.lower():
-        log.warning("Killing non-AI upscale ffmpeg (pid %d): %s.", pid, reason)
-        processes.terminate(pid)
-    else:
-        # The pid was recycled by an unrelated process; our ffmpeg is already gone.
-        log.warning("Job pid %d is no longer ffmpeg; treating the encode as ended.", pid)
-
-
-def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
+def _conclude(job: dict, result: NonAiUpscaleResult, files: StageFiles) -> None:
     source = Path(job.get("source", ""))
     tmp = Path(job.get("tmp", ""))
     out = Path(job.get("out", ""))
     expected = job.get("expected_duration") or 0.0
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
 
-    _stamp_encode_ended()
+    nonai_job.stamp_encode_ended(files.cooldown)
     if actual and expected and actual >= config.NONAI_COMPLETE_DURATION_FRACTION * expected:
         tmp.replace(out)
         # Before the original leaves, and it takes its sidecar with it.
-        _carry_metadata(source, out)
-        _retire_original(source)
-        _clear_attempts(source)
+        carry_metadata(source, out)
+        retire_original(source, archive_root=config.NONAI_RETIRED_ROOT)
+        nonai_job.clear_attempts(files.attempts, relpath(source))
         result.promoted = relpath(source)
         log.info("Promoted finished non-AI upscale: %s", out)
         return
@@ -339,76 +273,11 @@ def _conclude(job: dict, result: NonAiUpscaleResult) -> None:
     result.failed = relpath(source)
     log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
-    _delete_tmp(tmp)
-    if _attempts_of(source) >= config.NONAI_MAX_ATTEMPTS:
-        _add_to_skip_manifest(source, f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
-        _clear_attempts(source)
-
-
-def _delete_tmp(tmp: Path) -> None:
-    try:
-        tmp.unlink(missing_ok=True)
-    except OSError:
-        # A just-killed ffmpeg can briefly hold the file; the partial sweep
-        # removes it on a later tick.
-        log.exception("Could not delete partial output %s yet.", tmp)
-
-
-# The one part of a sidecar that describes the FILE rather than the footage in
-# it: which family it belongs to and whether it is a processed variant.  An
-# upscale's is its own, and the grouping stage stamps it on the same pass.
-_FILE_SCOPED_SIDECAR_KEYS = frozenset({"version"})
-
-
-def _sidecar_beside_or_mirrored(video: Path) -> Path:
-    """Where *video*'s sidecar lives: mirrored under ``METADATA_DIR``, or beside it.
-
-    The metadata tree mirrors the library and nothing else, so a retired original
-    that has left the library keeps its own copy next to the video instead (see
-    :func:`_archive_original`).  Asking the mirror where that is computes a path
-    under a tree the video is not in, which is the ``ValueError`` here — the
-    archive is the only thing outside the library this stage ever reads.
-    """
-    try:
-        return sidecar.sidecar_path(video)
-    except ValueError:
-        return video.with_suffix(".json")
-
-
-def _carry_metadata(source: Path, out: Path) -> bool:
-    """Give *out* what *source*'s sidecar says about the footage they share.
-
-    An upscale IS its original's footage, so the ``clip`` object naming which
-    compilation the video was carved out of, and the act recorded on it,
-    describe the upscale exactly as well.  They lived only on the original,
-    though, and retirement takes its sidecar out of the library — so unless the
-    upscale is handed its own copy first, promoting it is what loses them.
-
-    Nothing downstream puts them back.  The grouping stage would copy a ``clip``
-    across from an in-library original, but it runs later in the same pass and
-    by then there is none.  So an upscaled cut arrived in the library with
-    nothing to say it was ever a cut — which is how 33 of one folder's came to
-    sit among the very scenes they were carved from.
-
-    Funscripts are deliberately not carried: :mod:`tasks.scripts_sync` already
-    copies an original's script onto its processed variants, and a second thing
-    writing scripts is a second thing to disagree with it.
-    """
-    payload = sidecar.read(_sidecar_beside_or_mirrored(source))
-    carried = {
-        key: value for key, value in payload.items()
-        if key not in _FILE_SCOPED_SIDECAR_KEYS
-    }
-    if not carried:
-        return False
-    destination = _sidecar_beside_or_mirrored(out)
-    existing = sidecar.read(destination)
-    merged = {**existing, **carried}
-    if merged == existing:
-        return False
-    sidecar.write(destination, merged)
-    log.info("Carried metadata onto upscale: %s -> %s", source.name, out.name)
-    return True
+    nonai_encode.delete_tmp(tmp)
+    if nonai_job.attempts_of(files.attempts, relpath(source)) >= config.NONAI_MAX_ATTEMPTS:
+        add_to_skip_manifest(files.skip_manifest, source,
+                             f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
+        nonai_job.clear_attempts(files.attempts, relpath(source))
 
 
 def repair_retired_metadata(result: NonAiUpscaleResult) -> None:
@@ -438,104 +307,10 @@ def repair_retired_metadata(result: NonAiUpscaleResult) -> None:
                 continue
             if isinstance(sidecar.read(sidecar.sidecar_path(video)).get("clip"), dict):
                 continue
-            original = _archived_original(archived, strip_processing_suffixes(video.stem))
+            original = archived_original(archived, strip_processing_suffixes(video.stem))
             if original is None:
                 continue
-            result.repaired_sidecars += int(_carry_metadata(original, video))
-
-
-def _archived_original(archived: Path, stem: str) -> Path | None:
-    """The retired original named *stem* under *archived*, if exactly one is.
-
-    The archive mirrors the library path an original was retired FROM, which is
-    a triage folder rather than the ``3*/processed/`` the upscale now sits in,
-    so it is found by name within the bucket rather than at a computed path.
-    Two of a name is not a tie to break: nothing here can say which of them the
-    upscale came from, and guessing would write one clip's provenance onto
-    another's footage.
-
-    Matched by comparing stems rather than by globbing one: a title is free to
-    hold the characters a glob reserves, and ``[Studio] scene one`` read as a
-    pattern is a character class that matches none of its own name.
-    """
-    matches = sorted(
-        path for path in archived.rglob("*")
-        if path.stem == stem and is_finalized_video_file(path, config.VIDEO_EXTENSIONS)
-    )
-    if len(matches) == 1:
-        return matches[0]
-    if matches:
-        log.warning("Ambiguous archived original for %s: %d matches, leaving it alone.",
-                    stem, len(matches))
-    return None
-
-
-def _retire_original(source: Path) -> None:
-    """Move the superseded original out of the way, now that its upscale exists.
-
-    Into the bucket's ``2*`` folder, as the user does by hand — or, when
-    ``config.NONAI_RETIRED_ROOT`` names an archive, out of the library
-    altogether, because that folder is on the drive the encodes fill.
-    """
-    if config.NONAI_RETIRED_ROOT is not None:
-        _archive_original(source)
-        return
-    bucket = bucket_of(source)
-    retire_dirs = _numbered_dirs(bucket, digits=(2,)) if bucket else []
-    if not retire_dirs:
-        log.warning("No '2*' folder in %s; leaving the original at %s.", bucket, source)
-        return
-    dest = retire_dirs[0][1] / source.name
-    if dest.exists():
-        log.warning("Original collides with %s; leaving it at %s.", dest, source)
-        return
-    source.replace(dest)
-    _move_mirrored_files(source, dest)
-    log.info("Retired original: %s -> %s", source, dest)
-
-
-def _archive_original(source: Path) -> None:
-    """Move *source* out of the library, under the archive at its library path.
-
-    Its sidecar and funscript come along and sit beside it rather than in the
-    mirrored trees, which only cover the library: an archived video is a cold
-    copy that has to describe itself. Leaving the funscript behind is the worse
-    half — it still matches the video by name, so the scripts sync would try to
-    relocate it onto a destination the clip-scripts stage has already written,
-    and fail the run on a collision nothing can resolve.
-    """
-    dest = config.NONAI_RETIRED_ROOT / source.relative_to(config.NON_AI_DIR)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    for mirrored_path, suffix in (
-        (sidecar.sidecar_path, ".json"),
-        (funscript.script_path_for_video, config.FUNSCRIPT_EXTENSION),
-    ):
-        src = mirrored_path(source)
-        if src.exists():
-            shutil.move(str(src), str(dest.with_suffix(suffix)))
-    shutil.move(str(source), str(dest))
-    log.info("Archived original: %s -> %s", source, dest)
-
-
-def _move_mirrored_files(source: Path, dest: Path) -> None:
-    """Carry a retired original's sidecar and funscript to its new path.
-
-    The metadata and script trees both mirror the video tree, so both of a
-    moved video's files must move with it. A left-behind sidecar is orphaned
-    and pruned, losing the ``clip`` family metadata Nau navigates by (the
-    grouping stage re-stamps ``version`` on the next run; this keeps
-    ``clip``/``video`` from vanishing). A left-behind funscript is worse than
-    orphaned: the scripts sync would relocate it, but the clip-scripts stage
-    runs first and writes the clip a fresh script at the new path, so the sync
-    finds its destination taken and fails the run on an unresolvable collision.
-    """
-    for mirrored_path in (sidecar.sidecar_path, funscript.script_path_for_video):
-        src = mirrored_path(source)
-        if not src.exists():
-            continue
-        dst = mirrored_path(dest)
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        src.replace(dst)
+            result.repaired_sidecars += int(carry_metadata(original, video))
 
 
 def _sweep_orphaned_partials(keep: Path | None) -> None:
@@ -546,7 +321,7 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
     open just fails to unlink and gets swept on a later tick.
     """
     for bucket in buckets():
-        for _, done_dir in _numbered_dirs(bucket, digits=(3,)):
+        for _, done_dir in stage_dirs(bucket, digits=(3,)):
             removed = 0
             for path in done_dir.rglob("*.partial.*"):
                 if keep is not None and path == keep:
@@ -562,33 +337,35 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
                 log.info("Removed %d stale partial output file(s) from %s", removed, done_dir)
 
 
-def _start_next_candidate(result: NonAiUpscaleResult) -> None:
+def _start_next_candidate(result: NonAiUpscaleResult, files: StageFiles) -> None:
     if _is_low_disk():
         result.deferred_low_disk = True
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
         return
-    result.start_deferred = _machine_busy_reason()
+    result.start_deferred = _machine_busy_reason(files.cooldown)
     if result.start_deferred:
         log.info("Deferring non-AI upscale start: %s.", result.start_deferred)
         return
 
-    for candidate in collect_candidates():
+    for candidate in _collect(files):
         source = candidate.path
         expected_duration = ffprobe.duration_seconds(source)
-        orientation = ffprobe.get_orientation(source)
+        orient = ffprobe.get_orientation(source)
         if ffprobe.videoai_tag(source):
-            _add_to_skip_manifest(source, "already carries a Topaz videoai tag")
+            add_to_skip_manifest(files.skip_manifest, source,
+                                 "already carries a Topaz videoai tag")
             continue
-        if expected_duration is None or orientation == "unknown":
-            _add_to_skip_manifest(source, "ffprobe could not read duration or orientation")
+        if expected_duration is None or orient == orientation.UNKNOWN:
+            add_to_skip_manifest(files.skip_manifest, source,
+                                 "ffprobe could not read duration or orientation")
             continue
 
         out = _output_path(candidate)
         out.parent.mkdir(parents=True, exist_ok=True)
         tmp = out.with_name(f"{source.stem}.partial.{uuid.uuid4().hex}.mp4")
-        _bump_attempts(source)
-        pid = _launch(source, tmp, orientation)
-        _save_job({
+        nonai_job.bump_attempts(files.attempts, relpath(source))
+        pid = nonai_encode.launch(source, tmp, orient)
+        nonai_job.save_job(files.job, {
             "pid": pid,
             "source": str(source),
             "tmp": str(tmp),
@@ -601,27 +378,8 @@ def _start_next_candidate(result: NonAiUpscaleResult) -> None:
         return
 
 
-def _launch(source: Path, tmp: Path, orientation: str) -> int:
-    width, height = (
-        (config.NONAI_TARGET_LONG_EDGE, config.NONAI_TARGET_SHORT_EDGE)
-        if orientation == "landscape"
-        else (config.NONAI_TARGET_SHORT_EDGE, config.NONAI_TARGET_LONG_EDGE)
-    )
-    filter_complex = config.NONAI_UPSCALE_FILTER_TEMPLATE.format(width=width, height=height)
-    cmd = topaz.command(source, tmp, filter_complex, config.VIDEOAI_TAG_NONAI, keep_audio=True)
-    with open(config.NONAI_FFMPEG_LOG, "w", encoding="utf-8") as ffmpeg_log:
-        proc = subprocess.Popen(
-            cmd,
-            env=topaz.environment(),
-            stdout=subprocess.DEVNULL,
-            stderr=ffmpeg_log,
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS,
-        )
-    return proc.pid
-
-
 def _output_path(candidate: Candidate) -> Path:
-    done_dirs = _numbered_dirs(candidate.bucket, digits=(3,))
+    done_dirs = stage_dirs(candidate.bucket, digits=(3,))
     done_dir = (
         done_dirs[0][1] if done_dirs
         else candidate.bucket / config.NONAI_FALLBACK_DONE_DIR_NAME
@@ -635,15 +393,14 @@ def _is_low_disk() -> bool:
     return free_gb < config.LOW_DISK_WARNING_GB
 
 
-def _machine_busy_reason() -> str:
+def _machine_busy_reason(cooldown_file: Path) -> str:
     """Why the machine cannot take a new encode right now — "" when it can.
 
     A present user comes first: an unattended multi-hour encode has no business
     starting while someone is at the keyboard. Any live Topaz ffmpeg — an
-    orphaned encode or the user's own GUI export — already owns the GPU; CPU
-    sampling never sees that, which is how encodes stacked up and crashed the
-    machine. RAM and a post-encode cooldown keep an unattended night from
-    running the box flat out end to end.
+    orphaned encode or the user's own GUI export — already owns the GPU, and CPU
+    sampling never sees that. RAM and a post-encode cooldown keep an unattended
+    night from running the box flat out end to end.
     """
     if _user_present():
         return "user_present"
@@ -651,7 +408,8 @@ def _machine_busy_reason() -> str:
         return "topaz_busy"
     if system_resources.available_ram_gb() < config.NONAI_MIN_AVAILABLE_RAM_GB:
         return "low_ram"
-    if time.time() - _last_encode_ended_at() < config.NONAI_COOLDOWN_MINUTES * 60:
+    if (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
+            < config.NONAI_COOLDOWN_MINUTES * 60):
         return "cooldown"
     return ""
 
@@ -667,197 +425,3 @@ def _user_present() -> bool:
     except OSError:
         return True
     return idle < config.NONAI_USER_IDLE_THRESHOLD_SECONDS
-
-
-def _last_encode_ended_at() -> float:
-    try:
-        payload = json.loads(config.NONAI_COOLDOWN_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return 0.0
-    ended_at = payload.get("ended_at", 0.0) if isinstance(payload, dict) else 0.0
-    return ended_at if isinstance(ended_at, (int, float)) else 0.0
-
-
-def _stamp_encode_ended() -> None:
-    config.NONAI_COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    config.NONAI_COOLDOWN_FILE.write_text(
-        json.dumps({"ended_at": time.time()}), encoding="utf-8"
-    )
-
-
-def _load_job() -> dict | None:
-    try:
-        payload = json.loads(config.NONAI_JOB_STATE_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _save_job(job: dict) -> None:
-    config.NONAI_JOB_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    config.NONAI_JOB_STATE_FILE.write_text(json.dumps(job, indent=2), encoding="utf-8")
-
-
-def _clear_job() -> None:
-    config.NONAI_JOB_STATE_FILE.unlink(missing_ok=True)
-
-
-def _attempts_of(source: Path) -> int:
-    return _load_attempts().get(relpath(source), 0)
-
-
-def _bump_attempts(source: Path) -> None:
-    attempts = _load_attempts()
-    attempts[relpath(source)] = attempts.get(relpath(source), 0) + 1
-    _save_attempts(attempts)
-
-
-def _clear_attempts(source: Path) -> None:
-    attempts = _load_attempts()
-    if attempts.pop(relpath(source), None) is not None:
-        _save_attempts(attempts)
-
-
-def _load_attempts() -> dict[str, int]:
-    try:
-        payload = json.loads(config.NONAI_ATTEMPTS_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _save_attempts(attempts: dict[str, int]) -> None:
-    config.NONAI_ATTEMPTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    config.NONAI_ATTEMPTS_FILE.write_text(json.dumps(attempts, indent=2), encoding="utf-8")
-
-
-def _add_to_skip_manifest(source: Path, reason: str) -> None:
-    log.warning("Skipping %s permanently: %s", source, reason)
-    with open(config.NONAI_SKIP_MANIFEST, "a", encoding="utf-8") as manifest:
-        manifest.write(f"{relpath(source)}\t{reason}\n")
-
-
-def collect_candidates() -> list[Candidate]:
-    """Unprocessed triage-folder videos, most-wanted first."""
-    candidates: list[Candidate] = []
-    skipped = _skip_manifest_entries()
-    pinned = _pin_manifest_entries()
-    watch_scores = _watch_scores()
-    for bucket in buckets():
-        processed_stems = _processed_stems(bucket)
-        for triage_digit, triage_dir in _numbered_dirs(bucket, digits=(0, 1)):
-            for scan_dir in _upscale_ready_dirs(triage_dir):
-                for video in sorted(scan_dir.iterdir()):
-                    if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
-                        continue
-                    rel = relpath(video)
-                    if is_processed_stem(video.stem):
-                        continue
-                    # A variant of this video already existing normally means
-                    # there is nothing to do. A pin overrides that: the variant
-                    # is an older recipe, and the redo is the whole point.
-                    if video.stem in processed_stems and rel not in pinned:
-                        continue
-                    if rel in skipped:
-                        continue
-                    candidates.append(Candidate(
-                        video, bucket, triage_digit, _has_funscript(video),
-                        watch_scores.get(str(video).strip().lower(), 0.0),
-                    ))
-    candidates.sort(key=lambda c: (
-        _pin_rank(pinned, c.path),
-        c.triage_digit != 1, -c.watch_score, not c.has_funscript, str(c.path).lower(),
-    ))
-    return candidates
-
-
-def relpath(video: Path) -> str:
-    return video.relative_to(config.NON_AI_DIR).as_posix()
-
-
-def _upscale_ready_dirs(triage_dir: Path) -> list[Path]:
-    """*triage_dir* plus the sub-stages of it whose clips need only the encode.
-
-    A triage dir can split into numbered sub-stages. The first is manual
-    pre-work — "1_originals_needing_trimming" still wants a human with a
-    trimmer, so an unattended multi-hour encode would bake in the untrimmed
-    footage. The later ones say in their own names that trimming is settled and
-    upscaling is all that's left, so their clips queue like direct children do.
-    """
-    return [triage_dir] + [d for _, d in _numbered_dirs(triage_dir, digits=(2, 3))]
-
-
-def _numbered_dirs(parent: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
-    """*parent*'s numbered stage folders whose names start with one of *digits*.
-
-    Serves both levels of the convention: a bucket's triage/stage folders, and
-    the sub-stages a triage folder splits into.
-    """
-    found = []
-    for child in sorted(parent.iterdir()):
-        if child.is_dir() and child.name[:1].isdigit() and int(child.name[:1]) in digits:
-            found.append((int(child.name[:1]), child))
-    return found
-
-
-def _processed_stems(bucket: Path) -> set[str]:
-    """Original stems that already have a processed variant somewhere in *bucket*."""
-    stems = set()
-    for video in bucket.rglob("*"):
-        if is_finalized_video_file(video, config.VIDEO_EXTENSIONS) and is_processed_stem(video.stem):
-            stems.add(strip_processing_suffixes(video.stem))
-    return stems
-
-
-def _watch_scores() -> dict[str, float]:
-    """Fun Time's per-video watch score, keyed by its normalized path.
-
-    Mirrors the breeding score its playlist weighting uses: completions plus
-    three per lock, minus skips. Empty until Fun Time starts tracking primary
-    (Nau) plays; satellite entries all point at the AI outbox and simply never
-    match a non-AI candidate.
-    """
-    try:
-        payload = json.loads(config.FUN_TIME_WATCH_STATS_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    if not isinstance(payload, dict):
-        return {}
-    return {
-        key: entry.get("completions", 0) + 3 * entry.get("locks", 0) - entry.get("skips", 0)
-        for key, entry in payload.items()
-        if isinstance(entry, dict)
-    }
-
-
-def _has_funscript(video: Path) -> bool:
-    return funscript.script_path_for_video(video).is_file()
-
-
-def _skip_manifest_entries() -> set[str]:
-    return set(_manifest_entries(config.NONAI_SKIP_MANIFEST))
-
-
-def _pin_manifest_entries() -> list[str]:
-    """Relative paths the user wants encoded next, in the order listed."""
-    return _manifest_entries(config.NONAI_PRIORITY_MANIFEST)
-
-
-def _pin_rank(pinned: list[str], video: Path) -> int:
-    """Where *video* sits in the pin list — past the end when it is not pinned."""
-    try:
-        return pinned.index(relpath(video))
-    except ValueError:
-        return len(pinned)
-
-
-def _manifest_entries(path: Path) -> list[str]:
-    """A hand-edited manifest's relative paths, in file order.
-
-    One path per line; anything past a tab is the user's own note about why.
-    """
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
-    return [line.split("\t", 1)[0].strip() for line in lines if line.strip()]

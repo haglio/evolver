@@ -1,4 +1,4 @@
-"""Stage 1: Delete all files from kinda_weird and their source files from 1_sorted."""
+"""Delete every file in kinda_weird, and its source file in 1_sorted."""
 
 import logging
 import re
@@ -9,6 +9,7 @@ from typing import List
 import config
 from util.media_files import is_finalized_video_file
 from util.windows_alert import show_error_window
+from util.variants import UPSCALE_SUFFIX
 
 log = logging.getLogger(__name__)
 
@@ -23,64 +24,53 @@ class PurgeWeirdResult:
 
 def run() -> PurgeWeirdResult:
     result = PurgeWeirdResult()
-    roots = [root for root in config.active_weird_dirs() if root.is_dir()]
-    if not roots:
+    weird_root = config.WEIRD_DIR
+    if not weird_root.is_dir():
         return result
 
-    seen_header = False
-    for weird_root in roots:
-        weird_files = [
-            p for p in weird_root.iterdir()
-            if is_finalized_video_file(p, config.VIDEO_EXTENSIONS)
-        ]
-        if not weird_files:
-            continue
-
-        if not seen_header:
-            log.info("=== Stage 1: purge kinda_weird ===")
-            seen_header = True
-        log.info("WEIRD:  %s", weird_root)
-        log.info("Found %d file(s) to purge", len(weird_files))
-
-        for weird_file in sorted(weird_files):
-            src_name = _source_name(weird_file)
-            matches = list(config.SORTED_DIR.rglob(src_name))
-            matches = [p for p in matches if p.is_file()]
-
-            if not matches:
-                log.warning("No source found in 1_sorted for: %s  (expected: %s)", weird_file.name, src_name)
-                result.missing_sorted.append(weird_file.name)
-            else:
-                for match in matches:
-                    match.unlink()
-                    result.deleted_sorted += 1
-                    log.info("Deleted source: %s", match)
-
-            for json_file in config.METADATA_DIR.rglob(weird_file.stem + ".json"):
-                json_file.unlink()
-                result.deleted_metadata += 1
-                log.info("Deleted metadata: %s", json_file)
-
-            weird_file.unlink()
-            result.deleted_weird += 1
-            log.info("Deleted weird:  %s", weird_file.name)
-
-    if not seen_header:
+    weird_files = [
+        p for p in weird_root.iterdir()
+        if is_finalized_video_file(p, config.VIDEO_EXTENSIONS)
+    ]
+    if not weird_files:
         return result
+
+    log.info("=== Stage: purge kinda_weird ===")
+    log.info("WEIRD:  %s", weird_root)
+    log.info("Found %d file(s) to purge", len(weird_files))
+
+    for weird_file in sorted(weird_files):
+        src_name = _source_name(weird_file)
+        matches = list(config.SORTED_DIR.rglob(src_name))
+        matches = [p for p in matches if p.is_file()]
+
+        if not matches:
+            log.warning("No source found in 1_sorted for: %s  (expected: %s)", weird_file.name, src_name)
+            result.missing_sorted.append(weird_file.name)
+        else:
+            for match in matches:
+                match.unlink()
+                result.deleted_sorted += 1
+                log.info("Deleted source: %s", match)
+
+        for json_file in config.METADATA_DIR.rglob(weird_file.stem + ".json"):
+            json_file.unlink()
+            result.deleted_metadata += 1
+            log.info("Deleted metadata: %s", json_file)
+
+        weird_file.unlink()
+        result.deleted_weird += 1
+        log.info("Deleted weird:  %s", weird_file.name)
 
     if result.missing_sorted:
         _show_error_window(result.missing_sorted)
 
     log.info(
-        "Stage 1 done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
+        "Purge done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
         result.deleted_weird, result.deleted_sorted, result.deleted_metadata, len(result.missing_sorted),
     )
     return result
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def source_stem(stem: str) -> str:
     """Strip known processing suffixes from an outbox file stem.
@@ -93,7 +83,7 @@ def source_stem(stem: str) -> str:
         'abc_apo8_gcg5'     -> 'abc'
         'abc_apo8_gcg5_x'   -> 'abc'
     """
-    stripped_topaz = re.sub(r"_topaz(?:_.*)?$", "", stem)
+    stripped_topaz = re.sub(rf"{re.escape(UPSCALE_SUFFIX)}(?:_.*)?$", "", stem)
     if stripped_topaz != stem:
         return stripped_topaz
     return re.sub(r"_apo8_gcg5(?:_.*)?$", "", stem)

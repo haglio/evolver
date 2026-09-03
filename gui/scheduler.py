@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Callable
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
@@ -17,15 +18,22 @@ class PipelineScheduler(QObject):
     run_requested = pyqtSignal(str)  # "scheduled" or "manual"
     status_changed = pyqtSignal()    # emitted when state changes that affect display
 
-    def __init__(self, interval_minutes: int = 10, parent=None):
+    def __init__(self, interval_minutes: int = 10, parent=None,
+                 now: Callable[[], datetime] = datetime.now):
         super().__init__(parent)
         self._running = False
         self._paused = False
         self._interval_minutes = interval_minutes
+        # The clock is a seam: a test parks it just short of a slot boundary
+        # and gets a real timer firing in milliseconds. The interval is never
+        # one — the spin box offers 1..120 and EvolverSettings.load clamps a
+        # hand-edited file to the same floor, because _schedule_next divides
+        # by it.
+        self._now = now
         self._next_run_at: datetime | None = None
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self._on_tick)
+        self._timer.timeout.connect(self.tick)
 
     def start(self):
         if not self._paused:
@@ -81,15 +89,8 @@ class PipelineScheduler(QObject):
 
     def _schedule_next(self):
         """Set a one-shot timer for the next clock-aligned interval."""
-        now = datetime.now()
+        now = self._now()
         interval = self._interval_minutes
-
-        if interval <= 0:
-            # Testing mode: fire immediately
-            self._next_run_at = now
-            self._timer.start(0)
-            self.status_changed.emit()
-            return
 
         # Align to clock: find next minute that's a multiple of interval
         current_minute = now.hour * 60 + now.minute
@@ -110,7 +111,12 @@ class PipelineScheduler(QObject):
         self._timer.start(ms_until)
         self.status_changed.emit()
 
-    def _on_tick(self):
+    def tick(self):
+        """What one firing of the interval timer does.
+
+        Public so tests can drive a tick deterministically instead of waiting
+        on the wall clock; the timer connects here and nothing else calls it.
+        """
         if not self._running:
             self.run_requested.emit("scheduled")
         # Always schedule the next tick (if the run is in progress, mark_idle

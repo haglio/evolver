@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 import config
 from util import favs_csv
+from util.json_store import atomic_write_text
 
 log = logging.getLogger(__name__)
 
@@ -37,31 +38,58 @@ class BookmarksSyncResult:
         return not (self.profile_missing or self.write_error)
 
 
-def run() -> BookmarksSyncResult:
-    result = BookmarksSyncResult()
-    log.info("=== Stage 6: bookmarks -> Chrome profile %s ===", config.CHROME_PROFILE_NAME)
-    log.info("SOURCE CSV: %s", config.FUN_TIME_FAVS_FILE)
-    log.info("CHROME USER DATA: %s", config.CHROME_USER_DATA_DIR)
+def run(
+    *,
+    favs_file: Path | None = None,
+    chrome_user_data_dir: Path | None = None,
+    chrome_profile_name: str | None = None,
+    bookmarks_folder_name: str | None = None,
+) -> BookmarksSyncResult:
+    """Write the favorites' web URLs into one folder of a Chrome profile.
 
-    urls = _read_urls(result)
+    Every one of the four things this stage reaches for lives outside the
+    repo — a sibling app's CSV, and a browser profile on this machine — so
+    each is an argument rather than a name to grep the body for. They are
+    resolved here rather than in the signature: a default is evaluated at
+    import, which would freeze the value past ``override_config``.
+    """
+    favs_file = config.FUN_TIME_FAVS_FILE if favs_file is None else favs_file
+    chrome_user_data_dir = (
+        config.CHROME_USER_DATA_DIR if chrome_user_data_dir is None else chrome_user_data_dir
+    )
+    chrome_profile_name = (
+        config.CHROME_PROFILE_NAME if chrome_profile_name is None else chrome_profile_name
+    )
+    bookmarks_folder_name = (
+        config.CHROME_BOOKMARKS_FOLDER_NAME
+        if bookmarks_folder_name is None
+        else bookmarks_folder_name
+    )
+
+    result = BookmarksSyncResult()
+    log.info("=== Stage: bookmarks -> Chrome profile %s ===", chrome_profile_name)
+    log.info("SOURCE CSV: %s", favs_file)
+    log.info("CHROME USER DATA: %s", chrome_user_data_dir)
+
+    urls = _read_urls(result, favs_file)
     if result.source_missing:
         log.info("Favorites CSV not found. Skipping bookmarks sync.")
         return result
 
-    profile_dir = _find_profile_dir(config.CHROME_USER_DATA_DIR, config.CHROME_PROFILE_NAME)
+    profile_dir = _find_profile_dir(chrome_user_data_dir, chrome_profile_name)
     if profile_dir is None:
         result.profile_missing = True
         log.error(
             "Chrome profile named %r was not found under %s.",
-            config.CHROME_PROFILE_NAME,
-            config.CHROME_USER_DATA_DIR,
+            chrome_profile_name,
+            chrome_user_data_dir,
         )
         return result
 
     bookmarks_path = profile_dir / "Bookmarks"
     try:
         data = _load_bookmarks(bookmarks_path)
-        added = _upsert_folder(data, urls, config.CHROME_BOOKMARKS_FOLDER_NAME)
+        added = _upsert_folder(data, urls, bookmarks_folder_name)
         _atomic_write_json(bookmarks_path, data)
     except OSError as exc:
         result.write_error = str(exc)
@@ -74,7 +102,7 @@ def run() -> BookmarksSyncResult:
 
     result.synced = added
     log.info(
-        "Stage 6 done. Synced: %d, No URL: %d, Bad URL: %d, Target: %s",
+        "Bookmarks sync done. Synced: %d, No URL: %d, Bad URL: %d, Target: %s",
         result.synced,
         result.no_url,
         result.bad_url,
@@ -83,8 +111,7 @@ def run() -> BookmarksSyncResult:
     return result
 
 
-def _read_urls(result: BookmarksSyncResult) -> list[str]:
-    path = config.FUN_TIME_FAVS_FILE
+def _read_urls(result: BookmarksSyncResult, path: Path) -> list[str]:
     if not path.is_file():
         result.source_missing = True
         return []
@@ -278,9 +305,6 @@ def _chrome_timestamp() -> str:
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_name(path.name + ".tmp")
-    with temp_path.open("w", encoding="utf-8", newline="\n") as fh:
-        json.dump(data, fh, indent=3)
-        fh.write("\n")
-    temp_path.replace(path)
+    # indent=3 and newline="\n" because that is how Chrome writes this file,
+    # and it is Chrome's to read back.
+    atomic_write_text(path, json.dumps(data, indent=3) + "\n", newline="\n")

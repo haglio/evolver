@@ -11,7 +11,6 @@ import unittest
 from unittest.mock import Mock, patch
 
 
-from gui.app import EvolverApp
 from gui.settings import EvolverSettings
 from tests.gui_support import build_evolver_app
 
@@ -38,7 +37,7 @@ class TestWatchdog(unittest.TestCase):
     def test_no_second_run_starts_while_the_overrun_pipeline_still_runs(self):
         """The audit's double-start: watchdog fires, next tick arrives, and a
         second pipeline must NOT start while the first still owns the library."""
-        app, worker, worker_cls = self._app_mid_overrun()
+        app, _worker, worker_cls = self._app_mid_overrun()
 
         app._on_watchdog()
         app._start_run("scheduled")

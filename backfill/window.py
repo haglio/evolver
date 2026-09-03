@@ -73,16 +73,10 @@ class BackfillWindow(QWidget):
     soundtrack would be one more thing for the recognizer to mishear.
     """
 
-    def __init__(
-        self,
-        session: BackfillSession,
-        thumbnails: dict[str, str] | None = None,
-        parent: QWidget | None = None,
-    ) -> None:
-        super().__init__(parent)
+    def __init__(self, session: BackfillSession, thumbnails: dict[str, str] | None = None) -> None:
+        super().__init__()
         self._session = session
-        self._command_buttons: dict[str, QToolButton] = {}
-        self._tiles_by_action: dict[str, QToolButton] = {}
+        self._tiles: dict[str, QToolButton] = {}
         self.setWindowTitle("Evolver - Backfill Metadata")
 
         self._video = QVideoWidget()
@@ -166,16 +160,47 @@ class BackfillWindow(QWidget):
         # and Esc must keep closing the window rather than being swallowed here.
         tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         tile.clicked.connect(lambda _checked=False, phrase=command.phrase: self.on_phrase(phrase))
-        self._command_buttons[command.phrase] = tile
-        # Keyed by lower-cased label so an example clip stored under the library's
-        # older casing ("Pov Alpha") still lights the tile the vocabulary now
-        # writes ("POV Alpha").
-        self._tiles_by_action[command.label.lower()] = tile
+        # Keyed by the spoken phrase and nothing else. A label is not a second
+        # key here: one command's phrase can equal another's label, and a dict
+        # holding both would hand the second tile the first one's name.
+        self._tiles[command.phrase] = tile
         return tile
+
+    # The window's read surface: what the three lines say and which tile a
+    # phrase or an action owns. One-liners over the same widgets, so the
+    # internals -- label fields, the media backend, how tiles are keyed -- can
+    # move without breaking every assertion made about the window (31 reads of
+    # six private attributes before these existed).
+
+    def status_text(self) -> str:
+        return self._status.text()
+
+    def hearing_text(self) -> str:
+        return self._hearing.text()
+
+    def last_text(self) -> str:
+        return self._last.text()
+
+    def tile_for(self, key: str) -> QToolButton | None:
+        """The tile for a spoken *key* -- a command phrase, or an act label in
+        any casing."""
+        tile = self._tiles.get(key)
+        return tile if tile is not None else self._tile_labelled(key)
+
+    def _tile_labelled(self, label: str) -> QToolButton | None:
+        """The tile whose face reads *label*, in any casing.
+
+        Read off the buttons themselves rather than a second index: the label
+        is already the tile's text, and case-folding bridges the library's
+        older action casing ("Pov Alpha" against the "POV Alpha" the vocabulary
+        writes today).
+        """
+        wanted = label.lower()
+        return next((tile for tile in self._tiles.values() if tile.text().lower() == wanted), None)
 
     def set_thumbnail(self, action: str, path: str) -> None:
         """Put *action*'s example frame on its tile, aspect-locked so it never stretches."""
-        tile = self._tiles_by_action.get(action.lower())
+        tile = self._tile_labelled(action)
         if tile is None or not path:
             return
         icon = _aspect_locked_icon(path, _THUMBNAIL_SIZE)
@@ -185,6 +210,15 @@ class BackfillWindow(QWidget):
     def on_hearing(self, text: str) -> None:
         """Show the recognizer's live guess, or clear the line once it settles."""
         self._hearing.setText(f"Hearing: {text}" if text else "")
+
+    def on_voice_failed(self, detail: str) -> None:
+        """Say the microphone path has gone, where the live guess used to be.
+
+        The tiles still work -- they are clickable -- so the window does not
+        close or disable anything. What it must not do is go on looking like it
+        is listening.
+        """
+        self._hearing.setText(f"Speech recognition stopped: {detail}")
 
     def on_phrase(self, phrase: str) -> None:
         """React to a phrase — spoken or clicked."""

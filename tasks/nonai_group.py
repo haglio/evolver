@@ -39,13 +39,6 @@ class NonAiGroupResult:
     written: int = 0
     pruned: int = 0
 
-    @property
-    def ok(self) -> bool:
-        # Grouping is bookkeeping over whatever files exist; there is no failure
-        # mode that should fail the pipeline. The field exists so the stage
-        # reads like its siblings.
-        return True
-
 
 def run() -> NonAiGroupResult:
     """Group every non-AI clip and record its family in a mirrored sidecar."""

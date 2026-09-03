@@ -15,11 +15,22 @@ import json
 from pathlib import Path
 
 import config
+from util.json_store import atomic_write_text, read_dict
+from util.variants import upscaled_stem
 
 
-def upscaled_video_path(source: str, orient: str, sorted_stem: str) -> Path:
-    """The clip the upscale stage writes for the ``1_sorted`` video *sorted_stem*."""
-    return config.OUT_UPSCALED_DIR / orient / source / f"{sorted_stem}_topaz.mp4"
+def upscaled_video_path(
+    source: str, orient: str, sorted_stem: str, outbox_dir: Path | None = None,
+) -> Path:
+    """The clip the upscale stage writes for the ``1_sorted`` video *sorted_stem*.
+
+    *outbox_dir* is the tree it will be written under; without one, the
+    configured outbox answers. The upscale stage passes the root it was itself
+    given, so the path it checks for and the path it writes cannot be two
+    different trees.
+    """
+    outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
+    return outbox_dir / orient / source / f"{upscaled_stem(sorted_stem)}.mp4"
 
 
 def sidecar_path(video: Path) -> Path:
@@ -36,17 +47,17 @@ def sidecar_path(video: Path) -> Path:
 
 def read(path: Path) -> dict:
     """A sidecar's payload — empty when it is absent or unreadable."""
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    return read_dict(path)
 
 
 def write(path: Path, payload: dict) -> None:
-    """Serialize *payload* to *path*, creating the mirrored directory if need be."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    """Serialize *payload* to *path*, creating the mirrored directory if need be.
+
+    Written atomically because this is the one format three apps write: Fun
+    Time stamps a watch onto one while a pipeline stage is rewriting it, and a
+    reader must see the old file or the new one, never half of either.
+    """
+    atomic_write_text(path, json.dumps(payload, indent=2) + "\n")
 
 
 def _video_field(payload: dict, field: str) -> str:

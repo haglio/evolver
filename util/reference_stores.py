@@ -15,22 +15,45 @@ from pathlib import Path
 
 import config
 from util import favs_csv
+from util.json_store import atomic_write_text, read_dict_strict
 
 
-def _no_fingerprint(path: Path) -> tuple[float, int] | None:
+def _no_fingerprint(_path: Path) -> tuple[float, int] | None:
     """Most stores record only a path, so a renamed video is beyond their reach."""
     return None
 
 
 @dataclass(frozen=True)
 class ReferenceStore:
+    """One file that names videos, and the three things this can ask of it.
+
+    The readers are held as fields rather than as subclasses because what
+    varies between stores is exactly these three functions and nothing else.
+    They are private and reached through the methods below: a store handing its
+    own path back into its own function -- ``store.read(store.path)`` -- is a
+    hand-rolled vtable, and the one thing it makes possible is passing the
+    wrong path.
+    """
+
     label: str
     path: Path
-    read: Callable[[Path], list[str]]
-    rewrite: Callable[[Path, dict[str, str]], None]
+    _read: Callable[[Path], list[str]]
+    _rewrite: Callable[[Path, dict[str, str]], None]
     # (fps, frame count) of the video this file references, when it records one —
     # the only handle left once a rename has taken the filename away.
-    fingerprint: Callable[[Path], tuple[float, int] | None] = _no_fingerprint
+    _fingerprint: Callable[[Path], tuple[float, int] | None] = _no_fingerprint
+
+    def read(self) -> list[str]:
+        """Every video path this file names."""
+        return self._read(self.path)
+
+    def rewrite(self, moves: dict[str, str]) -> None:
+        """Apply an old -> new mapping in place, dropping nothing."""
+        self._rewrite(self.path, moves)
+
+    def fingerprint(self) -> tuple[float, int] | None:
+        """The video's (fps, frame count), when this store records one."""
+        return self._fingerprint(self.path)
 
 
 def discover() -> Iterator[ReferenceStore]:
@@ -128,13 +151,12 @@ def _favorite_locals(rows: list[dict[str, str]], column: str, base_dir: Path) ->
 
 
 def _load_json(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as fh:
-        return json.load(fh)
+    """Strict on purpose: these files belong to the sibling apps, so one this
+    cannot read must stop the rewrite rather than be treated as empty and
+    replaced with a new one."""
+    return read_dict_strict(path)
 
 
 def _write_json(path: Path, payload: dict) -> None:
-    temp_path = path.with_name(path.name + ".tmp")
-    with temp_path.open("w", encoding="utf-8", newline="\n") as fh:
-        json.dump(payload, fh, indent=2)
-        fh.write("\n")
-    temp_path.replace(path)
+    # newline="\n" because the app that owns this file wrote it that way.
+    atomic_write_text(path, json.dumps(payload, indent=2) + "\n", newline="\n")

@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from PyQt6.QtCore import QEventLoop, QTimer
 
@@ -75,12 +75,11 @@ class TestPipelineWorker(unittest.TestCase):
         self.assertEqual(started, ["sort", "upscale"])
 
     def test_emits_stage_completed_for_each_stage(self):
+        """Only the name crosses: the popup marks a bar full and reads nothing
+        else, and the stage's result, duration and status reach the run record
+        by their own route."""
         _, completed, _, _, _ = self._run_worker()
-        self.assertEqual(len(completed), 2)
-        self.assertEqual(completed[0][0], "sort")
-        self.assertEqual(completed[0][3], "completed")
-        self.assertEqual(completed[1][0], "upscale")
-        self.assertEqual(completed[1][3], "skipped")
+        self.assertEqual(completed, [("sort",), ("upscale",)])
 
     def test_emits_pipeline_finished_with_run_record(self):
         _, _, finished, _, _ = self._run_worker()
@@ -92,6 +91,14 @@ class TestPipelineWorker(unittest.TestCase):
         _, _, _, errors, _ = self._run_worker(pipeline_error=RuntimeError("boom"))
         self.assertEqual(len(errors), 1)
         self.assertIn("boom", errors[0])
+
+    def test_the_traceback_is_logged_before_the_message_is_flattened(self):
+        """str(exc) is all the GUI ever sees. Without this the only record of
+        where a pipeline died is a sentence in a toast."""
+        with self.assertLogs("gui.worker", level="ERROR") as caught:
+            self._run_worker(pipeline_error=RuntimeError("boom"))
+
+        self.assertTrue(any(record.exc_info for record in caught.records))
 
     def test_trigger_passed_to_run_record(self):
         _, _, finished, _, _ = self._run_worker(trigger="scheduled")

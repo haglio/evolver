@@ -9,7 +9,7 @@ from pathlib import Path
 
 import config
 from util.funscript import script_path_for_video
-from util.media_files import iter_finalized_videos, remove_empty_dirs
+from util.media_files import library_videos, remove_empty_dirs
 from util.variants import strip_processing_suffixes
 from util.windows_alert import show_error_window
 
@@ -29,12 +29,9 @@ class ScriptsSyncResult:
     rehomed_to_variants: int = 0
     followed_to_archive: int = 0
     discarded_duplicates: int = 0
-    copied_variant_paths: list[str] | None = None
     unmatched_paths: list[str] | None = None
 
     def __post_init__(self) -> None:
-        if self.copied_variant_paths is None:
-            self.copied_variant_paths = []
         if self.unmatched_paths is None:
             self.unmatched_paths = []
 
@@ -47,7 +44,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
     result = ScriptsSyncResult()
     config.SCRIPT_LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
 
-    log.info("=== Stage 7: scripts -> mirror video library ===")
+    log.info("=== Stage: scripts -> mirror video library ===")
     log.info("VIDEOS:  %s", config.VIDEO_LIBRARY_DIR)
     log.info("SCRIPTS: %s", config.SCRIPT_LIBRARY_DIR)
 
@@ -82,7 +79,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
     remove_empty_dirs(config.SCRIPT_LIBRARY_DIR)
     _copy_missing_variant_scripts(video_index, result)
     log.info(
-        "Stage 7 done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d, Rehomed to variants: %d, Followed to archive: %d, Discarded duplicates: %d",
+        "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d, Rehomed to variants: %d, Followed to archive: %d, Discarded duplicates: %d",
         result.moved,
         result.already_aligned,
         result.unmatched,
@@ -96,7 +93,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
         result.discarded_duplicates,
     )
     if not result.ok:
-        log.error("Stage 7 failed. See log entries above for unresolved funscript alignment issues.")
+        log.error("Scripts sync failed. See log entries above for unresolved funscript alignment issues.")
         if show_popup:
             log.info("Showing error popup for scripts-sync failure")
             show_error_window("Evolver - Funscript Match Error", _popup_message(result))
@@ -116,15 +113,13 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     beside it for self-description.
 
     A retired original is moved out of the library entirely (see
-    :func:`tasks.nonai_upscale._archive_original`) and its funscript goes with
+    :func:`util.nonai_retire._archive_original`) and its funscript goes with
     it, because the script tree mirrors only the library: a video outside it has
     to describe itself, script beside it rather than in a tree that no longer
     covers it. This stage follows rather than trusting the retiring to have done
-    it, because the archive also fills by hand — 129 originals were swept into
-    it at once, and the funscripts they left behind matched no video, failed
-    this stage, and would have failed it identically on every run afterward. A
-    stage that can never go green again on its own is the failure to prevent,
-    not the sweep.
+    it, because the archive also fills by hand: a funscript left behind by a
+    video swept in matches no video, fails this stage, and would fail it
+    identically on every run afterward.
 
     Only a stem that names exactly one archived video is followed. Two of them
     is a guess about which video the script belongs to, and no archived video at
@@ -234,7 +229,7 @@ def _index_archived_videos() -> dict[str, list[Path]]:
     if root is None or not root.is_dir():
         return {}
     index: dict[str, list[Path]] = defaultdict(list)
-    for video_path in iter_finalized_videos(root, config.VIDEO_EXTENSIONS):
+    for video_path in library_videos(root):
         index[video_path.stem].append(video_path)
     return index
 
@@ -243,7 +238,7 @@ def _index_videos(root: Path) -> dict[str, list[Path]]:
     index: dict[str, list[Path]] = defaultdict(list)
     if not root.is_dir():
         return index
-    for video_path in iter_finalized_videos(root, config.VIDEO_EXTENSIONS):
+    for video_path in library_videos(root):
         index[video_path.stem].append(video_path)
     return index
 
@@ -301,9 +296,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: Sc
                 result.variant_copy_errors += 1
                 log.exception("FAILED TO COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
                 continue
-            rel_dest = dest_script.relative_to(config.SCRIPT_LIBRARY_DIR)
             result.copied_variants += 1
-            result.copied_variant_paths.append(str(rel_dest))
             existing_sources.append(target_video)
             log.info("COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
 

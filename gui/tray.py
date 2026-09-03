@@ -91,6 +91,30 @@ class EvolverTray(QSystemTrayIcon):
         # Double-click opens the window
         self.activated.connect(self._on_activated)
 
+    def commands(self):
+        """Each menu command's signal, by the name the app knows it as.
+
+        The app connected ten widget attributes of this class by hand, which
+        made every tray control something two files had to agree about with
+        nothing checking they did. Now the menu says what it offers and the app
+        says what each one does.
+        """
+        return {
+            "open": self.open_action.triggered,
+            "run_now": self.run_now_action.triggered,
+            "pause": self.pause_action.triggered,
+            "nonai": self.nonai_action.toggled,
+            "settings": self.settings_action.triggered,
+            "stats": self.stats_action.triggered,
+            "backfill": self.backfill_action.triggered,
+            "restart": self.restart_action.triggered,
+            "quit": self.quit_action.triggered,
+        }
+
+    def set_nonai_enabled(self, enabled: bool):
+        """Show the saved state of the non-AI opt-in, without re-announcing it."""
+        self.nonai_action.setChecked(enabled)
+
     def set_running(self, running: bool):
         self._is_running = running
         self.run_now_action.setEnabled(not running)

@@ -26,10 +26,10 @@ from PyQt6.QtWidgets import (
 )
 
 import config
-from gui.progress import STAGE_NUMBER, STAGE_TOOLTIPS
 from gui.run_record import RunRecord, load_runs, format_run_label
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from gui.toggle_switch import ToggleSwitch
+from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
 from gui.icons import quit_icon, restart_icon, run_now_icon
 from shared_ui.spacing import BUTTON_ICON
@@ -101,16 +101,18 @@ class RunDetailWidget(QWidget):
 
             no_edit = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 
-            # Column 0: stage number
-            num = STAGE_NUMBER.get(stage_key, i + 1)
-            num_item = QTableWidgetItem(str(num))
+            # A record can name a stage this build no longer has — regeneration
+            # mode was one — and its position in a run is not its position in
+            # the pipeline. Guessing an ordinal there is what let a stage with
+            # no registry row take the number of the stage after it.
+            num = STAGE_NUMBER.get(stage_key)
+            num_item = QTableWidgetItem("\u2014" if num is None else str(num))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             num_item.setForeground(GRAY)
             num_item.setFlags(no_edit)
             self._table.setItem(i, 0, num_item)
 
-            # Column 1: stage name with tooltip
-            name_item = QTableWidgetItem(stage_key)
+            name_item = QTableWidgetItem(STAGE_LABELS.get(stage_key, stage_key))
             name_item.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
             name_item.setFlags(no_edit)
             self._table.setItem(i, 1, name_item)
@@ -126,13 +128,11 @@ class RunDetailWidget(QWidget):
             status_item.setFlags(no_edit)
             self._table.setItem(i, 2, status_item)
 
-            # Column 3: duration
             duration = stage.get("duration_seconds", 0.0)
             dur_item = QTableWidgetItem(f"{duration:.1f}s")
             dur_item.setFlags(no_edit)
             self._table.setItem(i, 3, dur_item)
 
-            # Column 4: details (double-click to select/copy text)
             details = _summarize_result(stage.get("result"), stage.get("skip_reason"), stage_key)
             details_item = QTableWidgetItem(details)
             self._table.setItem(i, 4, details_item)
@@ -160,10 +160,9 @@ def _summarize_result(
         return f"Reason: {skip_reason}"
     if not result:
         return ""
-    if stage_key == "upscale_non_ai":
-        return _summarize_nonai_upscale(result)
-    if stage_key == "scripts":
-        return _summarize_scripts_sync(result)
+    custom = _SUMMARIZERS.get(stage_key)
+    if custom is not None:
+        return custom(result)
     headline = _HEADLINE_FIELDS.get(stage_key, ())
     parts = [f"{key}={result[key]}" for key in headline
              if isinstance(result.get(key), (int, float))]
@@ -281,7 +280,6 @@ class EvolverMainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(splitter)
 
-        # Left panel: run history
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(8, 8, 4, 8)
@@ -298,7 +296,6 @@ class EvolverMainWindow(QMainWindow):
         left_layout.addWidget(self._history_list)
         splitter.addWidget(left)
 
-        # Right panel: run detail view
         self._detail_widget = RunDetailWidget()
         splitter.addWidget(self._detail_widget)
 
@@ -316,51 +313,58 @@ class EvolverMainWindow(QMainWindow):
         toolbar.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
         self.addToolBar(toolbar)
 
-        # Small left pad so the toggle isn't flush with the window edge
         left_pad = QWidget()
         left_pad.setFixedWidth(6)
         toolbar.addWidget(left_pad)
 
-        # Active/Paused toggle switch
         self.active_toggle = ToggleSwitch(checked=True)
         toolbar.addWidget(self.active_toggle)
 
         toolbar.addSeparator()
 
-        # Next-run info label
         self._next_run_label = QLabel("")
         toolbar.addWidget(self._next_run_label)
 
-        # Spacer pushes remaining actions to the right
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         toolbar.addWidget(spacer)
 
-        # Run Now
         self.run_now_action = QAction(run_now_icon(_ICON_COLOR), "Run Now", self)
         toolbar.addAction(self.run_now_action)
 
         toolbar.addSeparator()
 
-        # Settings
         self.settings_action = QAction(qta.icon("fa5s.cog", color=_ICON_COLOR), "Settings", self)
         toolbar.addAction(self.settings_action)
 
-        # Stats
         self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats", self)
         toolbar.addAction(self.stats_action)
 
-        # Restart
         self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self)
         toolbar.addAction(self.restart_action)
 
-        # Quit
         self.quit_action = QAction(quit_icon(_ICON_COLOR), "Quit", self)
         toolbar.addAction(self.quit_action)
 
+    def commands(self):
+        """Each toolbar command's signal, by the name the app knows it as.
+
+        The same names the tray menu uses, so a command the two share is
+        connected once on each side rather than spelled out twice in the app.
+        Quit is the one that differs in what it does: from here it asks first.
+        """
+        return {
+            "run_now": self.run_now_action.triggered,
+            "pause": self.active_toggle.clicked,
+            "settings": self.settings_action.triggered,
+            "stats": self.stats_action.triggered,
+            "restart": self.restart_action.triggered,
+            "quit": self.quit_action.triggered,
+        }
+
     def refresh_history(self):
         """Reload run records from disk."""
-        self._records = load_runs(config.RUNS_DIR)
+        self._records = load_runs(config.RUNS_DIR, limit=config.RUNS_SHOWN)
         self._history_list.clear()
         for record in self._records:
             item = QListWidgetItem(
@@ -395,3 +399,13 @@ class EvolverMainWindow(QMainWindow):
         """Hide instead of close — the tray icon keeps the app alive."""
         event.ignore()
         self.hide()
+
+
+# The two stages whose results are names and words rather than counts, so the
+# generic numeric dump has nothing useful to say about them. A table rather
+# than two `stage_key ==` branches, so a key that stops naming a stage is
+# something a test can see (tests/test_stage_registry.py).
+_SUMMARIZERS = {
+    "upscale_non_ai": _summarize_nonai_upscale,
+    "scripts": _summarize_scripts_sync,
+}

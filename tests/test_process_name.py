@@ -15,18 +15,26 @@ it for the run after, and the shortcut is pointed at it once it exists.
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from app_support.process_identity import ProcessNamer
+
+import tray_app
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 APP_NAME = "Evolver"
 ROLE = "Evolver"
 
-ENTRY_POINT = (PROJECT_DIR / "tray_app.py").read_text(encoding="utf-8")
-
 
 def test_the_app_prepares_the_copy_for_next_time():
-    assert 'ProcessNamer("Evolver", icon=icon).prepare_launcher("Evolver")' in ENTRY_POINT
+    # By calling the code, not by grepping tray_app.py's source for the call
+    # string -- a reformat or a rename used to turn this red with the behaviour
+    # unchanged.
+    with patch("app_support.process_identity.ProcessNamer") as namer:
+        tray_app._name_this_process()
+
+    namer.assert_called_once_with("Evolver", icon=PROJECT_DIR / "icon.ico")
+    namer.return_value.prepare_launcher.assert_called_once_with("Evolver")
 
 
 def test_the_row_reads_as_the_app_and_nothing_more():
@@ -41,7 +49,21 @@ def test_it_stamps_its_own_mark():
 def test_naming_never_takes_a_launch_down():
     """A read-only venv or an antivirus hold must cost the name in the task list
     and nothing else -- this app has no console for a failure to land in."""
-    body = ENTRY_POINT[ENTRY_POINT.index('def _name_this_process'):]
-    body = body[:body.index("\ndef ", 1)]
+    with patch(
+        "app_support.process_identity.ProcessNamer",
+        side_effect=OSError("read-only venv"),
+    ):
+        tray_app._name_this_process()  # returning at all is the contract
 
-    assert "except Exception:" in body
+
+def test_a_failure_to_name_leaves_a_trace():
+    """Silently, the task list is full of anonymous Pythons and nothing anywhere
+    says why -- which is the state this whole mechanism exists to end."""
+    with patch(
+        "app_support.process_identity.ProcessNamer",
+        side_effect=OSError("read-only venv"),
+    ), patch("tray_app.crash_log.write_info") as write_info:
+        tray_app._name_this_process()
+
+    write_info.assert_called_once()
+    assert "name" in " ".join(str(arg) for arg in write_info.call_args[0]).lower()

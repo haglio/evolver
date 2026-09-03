@@ -3,7 +3,6 @@ from unittest.mock import patch
 
 from tasks import sort as sort_task
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util.media_files import is_partial_video_path, remove_empty_dirs
 
 
 class TestSortHelpers(unittest.TestCase):
@@ -32,19 +31,6 @@ class TestSortHelpers(unittest.TestCase):
             self.assertFalse(src.exists())
             self.assertEqual(dest.read_text(encoding="utf-8"), "dest")
 
-    def test_remove_empty_dirs_removes_only_empty(self):
-        with workspace_temp_dir() as root:
-            empty_sub = root / "a" / "b"
-            nonempty_sub = root / "c"
-            empty_sub.mkdir(parents=True)
-            nonempty_sub.mkdir(parents=True)
-            (nonempty_sub / "file.txt").write_text("x", encoding="utf-8")
-
-            remove_empty_dirs(root)
-
-            self.assertFalse((root / "a").exists())
-            self.assertTrue(nonempty_sub.exists())
-
     def test_run_processes_dynamic_source_directory(self):
         with workspace_temp_dir() as td_path:
             inbox = td_path / "0_inbox"
@@ -55,7 +41,7 @@ class TestSortHelpers(unittest.TestCase):
             src = source_dir / "clip.mp4"
             src.write_bytes(b"video")
 
-            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir, CLEAN_EMPTY_INBOX_DIRS=False):
+            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir):
                 with patch("tasks.sort.get_orientation", return_value="landscape"):
                     result = sort_task.run()
 
@@ -63,17 +49,45 @@ class TestSortHelpers(unittest.TestCase):
             self.assertTrue((sorted_dir / dynamic_source / "landscape" / "clip.mp4").exists())
             self.assertFalse(src.exists())
 
-    def test_iter_videos_ignores_partial_files(self):
+    def test_run_clears_the_source_folder_it_emptied(self):
+        """The inbox is swept behind every run, not behind a switch."""
         with workspace_temp_dir() as td_path:
-            good = td_path / "clip.mp4"
-            partial = td_path / "clip.partial.deadbeef.mp4"
-            good.write_bytes(b"video")
-            partial.write_bytes(b"partial")
+            inbox = td_path / "0_inbox"
+            sorted_dir = td_path / "1_sorted"
+            source_dir = inbox / "newsource" / "landscape"
+            source_dir.mkdir(parents=True)
+            (source_dir / "clip.mp4").write_bytes(b"video")
 
-            result = list(sort_task._iter_videos(td_path))
+            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir):
+                with patch("tasks.sort.get_orientation", return_value="landscape"):
+                    sort_task.run()
 
-            self.assertEqual(result, [good])
-            self.assertTrue(is_partial_video_path(partial))
+            self.assertFalse(source_dir.exists())
+
+    def test_run_sorts_between_the_folders_it_is_given(self):
+        """The two folders the stage moves between are arguments to it.
+
+        `config` still answers when the caller names nothing — everything else
+        in this file relies on that, and so does the pipeline — but the
+        signature now says what the stage touches instead of leaving a reader
+        to grep the body for it. The ambient inbox and sorted root here are
+        paths that do not exist: a stage still reaching for them would create
+        the sorted one on its first line.
+        """
+        with workspace_temp_dir() as td_path:
+            inbox = td_path / "given_inbox"
+            sorted_dir = td_path / "given_sorted"
+            (inbox / "examplesource").mkdir(parents=True)
+            (inbox / "examplesource" / "clip one.mp4").write_bytes(b"video")
+            ambient = td_path / "ambient"
+
+            with override_config(INBOX_DIR=ambient / "0_inbox", SORTED_DIR=ambient / "1_sorted"):
+                with patch("tasks.sort.get_orientation", return_value="portrait"):
+                    result = sort_task.run(inbox_dir=inbox, sorted_dir=sorted_dir)
+
+            self.assertEqual(result.moved, 1)
+            self.assertTrue((sorted_dir / "examplesource" / "portrait" / "clip one.mp4").exists())
+            self.assertFalse(ambient.exists())
 
 
 if __name__ == "__main__":

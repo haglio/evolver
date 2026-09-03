@@ -1,9 +1,26 @@
+import dataclasses
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from tasks import scripts_sync
 from tests.temp_helpers import override_config, workspace_temp_dir
+
+
+def library_overrides(video_root, script_root, **extra):
+    """Every store scripts_sync reads or writes, in one place.
+
+    Listing them all matters (the discipline test_reference_sync.py's
+    _stores_under documents): a store left at its real location gets read --
+    and rewritten -- out of the live suite by whichever test forgot it.
+    NONAI_RETIRED_ROOT was previously pinned by only two of the eleven tests
+    and left to the imported config everywhere else, correct only because the
+    example overlay happens to supply None.
+    """
+    overrides = dict(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
+                     NONAI_RETIRED_ROOT=None)
+    overrides.update(extra)
+    return override_config(**overrides)
 
 
 class TestScriptsSync(unittest.TestCase):
@@ -18,7 +35,7 @@ class TestScriptsSync(unittest.TestCase):
             video_path.write_bytes(b"video")
             old_script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             expected = script_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.funscript"
@@ -41,7 +58,7 @@ class TestScriptsSync(unittest.TestCase):
             second.write_bytes(b"video-b")
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             self.assertEqual(result.ambiguous, 1)
@@ -61,7 +78,7 @@ class TestScriptsSync(unittest.TestCase):
             non_ai_duplicate.write_bytes(b"duplicate")
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             self.assertEqual(result.ambiguous, 0)
@@ -82,7 +99,7 @@ class TestScriptsSync(unittest.TestCase):
             ai_video.write_bytes(b"ai-video")
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             self.assertEqual(result.ambiguous, 0)
@@ -100,7 +117,7 @@ class TestScriptsSync(unittest.TestCase):
             video_path.write_bytes(b"video")
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             self.assertEqual(result.already_aligned, 1)
@@ -114,7 +131,7 @@ class TestScriptsSync(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 with patch("tasks.scripts_sync.show_error_window") as show_error_window:
                     result = scripts_sync.run(show_popup=True)
 
@@ -136,7 +153,7 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             sorted_script.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             outbox_script = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.funscript"
@@ -158,7 +175,7 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             outbox_script.write_text('{"actions":[2]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             sorted_script = script_root / "2D" / "AI" / "1_sorted" / "src" / "landscape" / "clip.funscript"
@@ -180,13 +197,39 @@ class TestScriptsSync(unittest.TestCase):
             processed_video.write_bytes(b"processed")
             processed_script.write_text('{"actions":[3]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             original_script = script_root / "2D" / "non_AI" / "larkin" / "0 unsorted" / "clip.funscript"
             self.assertEqual(result.copied_variants, 1)
             self.assertTrue(original_script.exists())
             self.assertEqual(original_script.read_text(encoding="utf-8"), processed_script.read_text(encoding="utf-8"))
+
+    def test_two_differing_sibling_scripts_leave_the_variant_unscripted(self):
+        """The guard against copying one clip's funscript onto another variant:
+        when two siblings hold DIFFERING scripts there is no right source, so
+        the stage must refuse and count the group -- dropping the filecmp
+        comparison entirely used to change nothing (audit probe P19), and the
+        counter was asserted nowhere."""
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            studio = video_root / "2D" / "non_AI" / "studio"
+            studio.mkdir(parents=True)
+            (studio / "clip.mp4").write_bytes(b"original")
+            (studio / "clip_apo8_iris2.mp4").write_bytes(b"variant")
+            (studio / "clip_topaz.mp4").write_bytes(b"unscripted variant")
+            scripts = script_root / "2D" / "non_AI" / "studio"
+            scripts.mkdir(parents=True)
+            (scripts / "clip.funscript").write_text('{"actions":[1]}', encoding="utf-8")
+            (scripts / "clip_apo8_iris2.funscript").write_text('{"actions":[2]}', encoding="utf-8")
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.ambiguous_variant_groups, 1)
+            self.assertEqual(result.copied_variants, 0)
+            self.assertFalse((scripts / "clip_topaz.funscript").exists())
 
     def test_records_which_scripts_went_unmatched(self):
         with workspace_temp_dir() as root:
@@ -196,8 +239,7 @@ class TestScriptsSync(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=None):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             self.assertEqual(result.unmatched_paths, [str(Path("unsorted", "clip.funscript"))])
@@ -216,7 +258,7 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             sorted_script.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root):
+            with library_overrides(video_root, script_root):
                 with patch("tasks.scripts_sync.shutil.copy2", side_effect=PermissionError("denied")):
                     result = scripts_sync.run()
 
@@ -258,8 +300,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             orphan.parent.mkdir(parents=True, exist_ok=True)
             orphan.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=archive_root):
+            with library_overrides(video_root, script_root,
+                                    NONAI_RETIRED_ROOT=archive_root):
                 result = scripts_sync.run()
 
             rehomed = script_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.funscript"
@@ -286,8 +328,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             orphan.parent.mkdir(parents=True, exist_ok=True)
             orphan.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=archive_root):
+            with library_overrides(video_root, script_root,
+                                    NONAI_RETIRED_ROOT=archive_root):
                 result = scripts_sync.run()
 
             self.assertEqual(result.rehomed_to_variants, 0)
@@ -305,8 +347,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             archived_video.write_bytes(b"video")
             script_path.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=archive_root):
+            with library_overrides(video_root, script_root,
+                                    NONAI_RETIRED_ROOT=archive_root):
                 result = scripts_sync.run()
 
             followed = archived_video.with_suffix(".funscript")
@@ -329,8 +371,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=archive_root):
+            with library_overrides(video_root, script_root,
+                                    NONAI_RETIRED_ROOT=archive_root):
                 result = scripts_sync.run()
 
             self.assertTrue(result.ok)
@@ -352,8 +394,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=archive_root):
+            with library_overrides(video_root, script_root,
+                                    NONAI_RETIRED_ROOT=archive_root):
                 result = scripts_sync.run()
 
             self.assertFalse(result.ok)
@@ -374,8 +416,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
                 video.parent.mkdir(parents=True, exist_ok=True)
                 video.write_bytes(b"video")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=archive_root):
+            with library_overrides(video_root, script_root,
+                                    NONAI_RETIRED_ROOT=archive_root):
                 result = scripts_sync.run()
 
             self.assertEqual(result.unmatched, 1)
@@ -391,8 +433,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=archive_root):
+            with library_overrides(video_root, script_root,
+                                    NONAI_RETIRED_ROOT=archive_root):
                 with patch("tasks.scripts_sync.shutil.move", side_effect=OSError("denied")):
                     result = scripts_sync.run()
 
@@ -411,8 +453,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             video_path.write_bytes(b"video")
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=archive_root):
+            with library_overrides(video_root, script_root,
+                                    NONAI_RETIRED_ROOT=archive_root):
                 with patch("tasks.scripts_sync._index_archived_videos") as index_archived:
                     result = scripts_sync.run()
 
@@ -426,9 +468,22 @@ class TestFollowRetiredVideos(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text("{}", encoding="utf-8")
 
-            with override_config(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                                 NONAI_RETIRED_ROOT=None):
+            with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
             self.assertEqual(result.unmatched, 1)
             self.assertTrue(script_path.exists())
+
+
+class TestScriptsSyncResultSurface(unittest.TestCase):
+    def test_the_result_carries_only_what_a_reader_consults(self):
+        """`unmatched_paths` is shown in the main window; the other list was not."""
+        self.assertEqual(
+            {f.name for f in dataclasses.fields(scripts_sync.ScriptsSyncResult)},
+            {
+                "moved", "already_aligned", "unmatched", "ambiguous", "collisions",
+                "copied_variants", "ambiguous_variant_groups", "variant_copy_errors",
+                "rehomed_to_variants", "followed_to_archive", "discarded_duplicates",
+                "unmatched_paths",
+            },
+        )

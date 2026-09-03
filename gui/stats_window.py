@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -15,32 +15,53 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.progress import ALL_STAGES
 from gui.run_record import RunRecord
+from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 
-STAGE_COLORS = {
-    "strays": QColor(0xBA, 0xB0, 0xAC),
-    "sort": QColor(0x4E, 0x79, 0xA7),
-    "purge": QColor(0xF2, 0x8E, 0x2B),
-    "scripts": QColor(0xE1, 0x57, 0x59),
-    "clip_scripts": QColor(0xD3, 0x7A, 0x9C),
-    "scene_scripts": QColor(0xC4, 0x9A, 0xC8),
-    "bookmarks": QColor(0x76, 0xB7, 0xB2),
-    "metadata": QColor(0x59, 0xA1, 0x4F),
-    "upscale": QColor(0xED, 0xC9, 0x48),
-    "upscale_non_ai": QColor(0x9C, 0x75, 0x5F),
-    "group_non_ai": QColor(0x8C, 0xD1, 0x7D),
-    "references": QColor(0xA0, 0xCB, 0xE8),
-    "dupes": QColor(0xB0, 0x7A, 0xA1),
-    "verify": QColor(0xFF, 0x9D, 0xA7),
-}
+# The registry's colors, as the painter wants them. This is the edge where Qt
+# begins: the declaration holds plain RGB so the headless pipeline can read it.
+STAGE_COLORS = {stage.key: QColor(*stage.color) for stage in STAGES}
 
 _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
 _LIMIT_SECONDS = 600.0
 _MARGIN_LEFT = 70
-_MARGIN_RIGHT = 110
 _MARGIN_TOP = 20
 _MARGIN_BOTTOM = 50
+
+# What a band is painted with. Named because the tests compare stage colors as
+# the bands the eye actually sees — translucent over white, which draws them
+# closer together than the colors themselves are.
+BAND_ALPHA = 180
+
+_LEGEND_POINT_SIZE = 8
+_LEGEND_SWATCH = 10
+_LEGEND_PADDING = 6
+_LEGEND_TEXT_GAP = 6
+_LEGEND_LINE_HEIGHT = 16
+_LEGEND_INSET = 10  # between the legend box and both the chart and the widget edge
+
+
+def _legend_font() -> QFont:
+    font = QFont()
+    font.setPointSize(_LEGEND_POINT_SIZE)
+    return font
+
+
+def legend_width() -> int:
+    """The legend box's width: enough for the longest stage label, measured.
+
+    Not a fixed number, because the labels run half again the width of the
+    stage keys they replaced and by how much depends on the machine's font —
+    one picked here would clip the legend on a box with a wider one.
+    """
+    metrics = QFontMetrics(_legend_font())
+    widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())
+    return _LEGEND_PADDING + _LEGEND_SWATCH + _LEGEND_TEXT_GAP + widest + _LEGEND_PADDING
+
+
+def chart_right_margin() -> int:
+    """What the legend costs the chart: its own width, inset from both sides."""
+    return legend_width() + 2 * _LEGEND_INSET
 
 
 def _pick_y_ticks(y_max: float) -> list[float]:
@@ -86,7 +107,6 @@ class StackedAreaChart(QWidget):
         In normal mode the values are raw durations.  In averages mode
         each value is the running cumulative mean up to that run.
         """
-        n = len(self._records)
         series: list[list[float]] = []
         for stage_key in ALL_STAGES:
             raw = []
@@ -127,7 +147,7 @@ class StackedAreaChart(QWidget):
         w, h = self.width(), self.height()
         chart_x = _MARGIN_LEFT
         chart_y = _MARGIN_TOP
-        chart_w = w - _MARGIN_LEFT - _MARGIN_RIGHT
+        chart_w = w - _MARGIN_LEFT - chart_right_margin()
         chart_h = h - _MARGIN_TOP - _MARGIN_BOTTOM
 
         if chart_w <= 0 or chart_h <= 0:
@@ -172,7 +192,7 @@ class StackedAreaChart(QWidget):
 
         for stage_idx, stage_key in enumerate(ALL_STAGES):
             vals = series[stage_idx]
-            color = STAGE_COLORS.get(stage_key, QColor(0x80, 0x80, 0x80))
+            color = STAGE_COLORS[stage_key]
 
             path = QPainterPath()
             path.moveTo(to_x(timestamps[0]), to_y(prev_cum[0]))
@@ -183,7 +203,7 @@ class StackedAreaChart(QWidget):
             path.closeSubpath()
 
             fill = QColor(color)
-            fill.setAlpha(180)
+            fill.setAlpha(BAND_ALPHA)
             painter.setBrush(fill)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawPath(path)
@@ -293,16 +313,14 @@ class StackedAreaChart(QWidget):
                 painter.drawText(x - 12, baseline_y + 26, lines[1])
 
     def _draw_legend(self, painter: QPainter, widget_w: int, top_y: int):
-        font = QFont()
-        font.setPointSize(8)
-        painter.setFont(font)
+        painter.setFont(_legend_font())
 
-        box_size = 10
-        line_height = 16
-        padding = 6
-        legend_w = _MARGIN_RIGHT - 20
+        box_size = _LEGEND_SWATCH
+        line_height = _LEGEND_LINE_HEIGHT
+        padding = _LEGEND_PADDING
+        legend_w = legend_width()
 
-        lx = widget_w - _MARGIN_RIGHT + 10
+        lx = widget_w - legend_w - _LEGEND_INSET
         ly = int(top_y + 10)
 
         legend_h = len(ALL_STAGES) * line_height + padding * 2
@@ -313,13 +331,14 @@ class StackedAreaChart(QWidget):
         painter.drawRect(lx, ly, legend_w, legend_h)
 
         for i, stage_key in enumerate(ALL_STAGES):
-            color = STAGE_COLORS.get(stage_key, QColor(0x80, 0x80, 0x80))
+            color = STAGE_COLORS[stage_key]
             y_pos = ly + padding + i * line_height
             painter.setBrush(color)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(lx + padding, y_pos, box_size, box_size)
             painter.setPen(QColor(0x30, 0x30, 0x30))
-            painter.drawText(lx + padding + box_size + 6, y_pos + box_size - 1, stage_key)
+            painter.drawText(lx + padding + box_size + _LEGEND_TEXT_GAP, y_pos + box_size - 1,
+                             STAGE_LABELS[stage_key])
 
 
 class StatsWindow(QDialog):

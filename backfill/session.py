@@ -3,15 +3,18 @@
 Separated from the window so it can be exercised without a media backend, and so
 the window is left with only what a window should do: show a clip, show a count.
 
-Every decision is a :class:`_Step` that knows how to take itself back, in both
-places it landed: the queue, and the disk.  The session keeps them on a stack, so
-"undo" walks back through a whole run of them.
+Every decision is a :class:`_Step` — the contract below, which
+:class:`_Labelled`, :class:`_Discarded` and :class:`_Deferred` each satisfy by
+carrying the same five names.  That is how each knows to take itself back in
+both places it landed: the queue, and the disk.  The session keeps them on a
+stack, so "undo" walks back through a whole run of them.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
 from backfill.decisions import (
     discard_as_weird,
@@ -21,11 +24,38 @@ from backfill.decisions import (
     sidecar_snapshot,
 )
 from backfill.queue import BackfillQueue
-from backfill.vocabulary import ACTIONS, CONTROLS, SAME, SKIP, UNDO
+from backfill.vocabulary import ACTIONS, CONTROLS, SAME, SKIP, UNDO, WEIRD
 from backfill.work import SerialWorker
 
 NOTHING_TO_UNDO = "nothing to undo"
 NOTHING_TO_REPEAT = "nothing to repeat"
+
+
+class _Step(Protocol):
+    """One decision, and how to take it back.
+
+    Declared rather than left implied: the three classes below were related
+    only by happening to carry the same five names, and the two methods that
+    traffic in them were the only unannotated ones in the module -- annotating
+    them meant a three-way union that a fourth kind of decision would have to
+    be added to in two more places.
+    """
+
+    @property
+    def note(self) -> str:
+        """What to show the viewer about what just happened."""
+
+    def take_effect(self, queue: BackfillQueue) -> None:
+        """Move the clip out of the way in the queue."""
+
+    def put_back(self, queue: BackfillQueue) -> None:
+        """Undo that: the clip is on screen again."""
+
+    def commit(self) -> None:
+        """Do the disk work, off the GUI thread."""
+
+    def roll_back(self) -> None:
+        """Undo the disk work."""
 
 
 @dataclass
@@ -113,7 +143,7 @@ class BackfillSession:
     def __init__(self, queue: BackfillQueue, worker: SerialWorker) -> None:
         self._queue = queue
         self._worker = worker
-        self._history: list[_Labelled | _Discarded | _Deferred] = []
+        self._history: list[_Step] = []
 
     @property
     def remaining(self) -> int:
@@ -151,7 +181,7 @@ class BackfillSession:
             return NOTHING_TO_REPEAT
         return self._commit(_Labelled(clip, action))
 
-    def _commit(self, step) -> str:
+    def _commit(self, step: _Step) -> str:
         """Land a decision: retire its clip, dispatch its file work, remember it."""
         step.take_effect(self._queue)
         self._worker.submit(step.commit)
@@ -165,14 +195,19 @@ class BackfillSession:
                 return step.action
         return None
 
-    def _step_for(self, phrase: str, clip: Path):
+    def _step_for(self, phrase: str, clip: Path) -> _Step | None:
         action = ACTIONS.get(phrase)
         if action is not None:
             return _Labelled(clip, action)
         control = CONTROLS.get(phrase)
-        if control is None:
-            return None
-        return _Deferred(clip) if control == SKIP else _Discarded(clip)
+        if control == SKIP:
+            return _Deferred(clip)
+        if control == WEIRD:
+            return _Discarded(clip)
+        # UNDO and SAME are answered in apply() before a step is asked for, and
+        # anything else is a control this dispatch does not know: do nothing
+        # rather than fall through to the branch that moves a file.
+        return None
 
     def _undo(self) -> str:
         """Take the last decision back, in the queue and on disk."""

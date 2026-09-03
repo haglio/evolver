@@ -5,6 +5,49 @@ from tasks import bookmarks_sync
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
+def chrome_profile(root, profile="Profile 2", name="Blair"):
+    """A User Data tree with one named profile; the shape every sync test built
+    by hand. Returns (user_data_dir, bookmarks_path)."""
+    user_data_dir = root / "User Data"
+    profile_dir = user_data_dir / profile
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    (user_data_dir / "Local State").write_text(
+        json.dumps({"profile": {"info_cache": {profile: {"name": name}}}}),
+        encoding="utf-8",
+    )
+    return user_data_dir, profile_dir / "Bookmarks"
+
+
+def _folder(guid, node_id, name, children):
+    return {
+        "children": children,
+        "date_added": "1",
+        "date_last_used": "0",
+        "date_modified": "1",
+        "guid": guid,
+        "id": node_id,
+        "name": name,
+        "type": "folder",
+    }
+
+
+def chrome_bookmarks_payload(favs_children=()):
+    """A minimal Chrome Bookmarks file: the bar holding one Fun Time Favs
+    folder with *favs_children*, plus the empty other/synced roots."""
+    return {
+        "checksum": "",
+        "roots": {
+            "bookmark_bar": _folder(
+                "bar-guid", "1", "Bookmarks bar",
+                [_folder("folder-guid", "10", "Fun Time Favs", list(favs_children))],
+            ),
+            "other": _folder("other-guid", "2", "Other bookmarks", []),
+            "synced": _folder("synced-guid", "3", "Mobile bookmarks", []),
+        },
+        "version": 1,
+    }
+
+
 class TestExtractUrl(unittest.TestCase):
     def test_extracts_plain_urls(self):
         cases = [
@@ -47,18 +90,11 @@ class TestBookmarksSync(unittest.TestCase):
             existing_media.write_text("x", encoding="utf-8")
             missing_media = root / "clips" / "missing.mp4"
             favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
+            user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "file,web_url\n"
                 f"{existing_media.relative_to(root)},https://example.com/keep\n"
                 f"{missing_media.relative_to(root)},https://example.com/drop\n",
-                encoding="utf-8",
-            )
-            (user_data_dir / "Local State").write_text(
-                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
 
@@ -70,7 +106,6 @@ class TestBookmarksSync(unittest.TestCase):
             ):
                 result = bookmarks_sync.run()
 
-            bookmarks_path = profile_dir / "Bookmarks"
             self.assertTrue(result.ok)
             self.assertEqual(result.pruned, 1)
             self.assertEqual(result.synced, 1)
@@ -92,23 +127,16 @@ class TestBookmarksSync(unittest.TestCase):
             existing_media.write_text("x", encoding="utf-8")
             missing_media = root / "clips" / "missing clip.mp4"
             favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
+            user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "local_file,web_url\n"
                 '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/keep\n'
                 '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/drop\n'.format(
-                    existing_media.as_posix().replace(":", ":"),
+                    existing_media.as_posix(),
                     str(existing_media),
-                    missing_media.as_posix().replace(":", ":"),
+                    missing_media.as_posix(),
                     str(missing_media),
                 ),
-                encoding="utf-8",
-            )
-            (user_data_dir / "Local State").write_text(
-                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
 
@@ -125,7 +153,6 @@ class TestBookmarksSync(unittest.TestCase):
             self.assertEqual(result.synced, 1)
             self.assertIn("https://example.com/keep", favs_path.read_text(encoding="utf-8"))
             self.assertNotIn("https://example.com/drop", favs_path.read_text(encoding="utf-8"))
-            bookmarks_path = profile_dir / "Bookmarks"
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
             self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/keep"])
@@ -133,11 +160,7 @@ class TestBookmarksSync(unittest.TestCase):
     def test_run_syncs_web_urls_into_named_profile_folder(self):
         with workspace_temp_dir() as root:
             favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            bookmarks_path = profile_dir / "Bookmarks"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
+            user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "local_file,web_url\n"
                 'one,"=HYPERLINK(""https://example.net/image/abc"";""https://example.net/image/abc"")"\n'
@@ -145,67 +168,10 @@ class TestBookmarksSync(unittest.TestCase):
                 "three,\n",
                 encoding="utf-8",
             )
-            (user_data_dir / "Local State").write_text(
-                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
-                encoding="utf-8",
-            )
             bookmarks_path.write_text(
-                json.dumps(
-                    {
-                        "checksum": "",
-                        "roots": {
-                            "bookmark_bar": {
-                                "children": [
-                                    {
-                                        "children": [
-                                            {
-                                                "id": "20",
-                                                "name": "old",
-                                                "type": "url",
-                                                "url": "https://old.example/",
-                                            }
-                                        ],
-                                        "date_added": "1",
-                                        "date_last_used": "0",
-                                        "date_modified": "1",
-                                        "guid": "folder-guid",
-                                        "id": "10",
-                                        "name": "Fun Time Favs",
-                                        "type": "folder",
-                                    }
-                                ],
-                                "date_added": "1",
-                                "date_last_used": "0",
-                                "date_modified": "1",
-                                "guid": "bar-guid",
-                                "id": "1",
-                                "name": "Bookmarks bar",
-                                "type": "folder",
-                            },
-                            "other": {
-                                "children": [],
-                                "date_added": "1",
-                                "date_last_used": "0",
-                                "date_modified": "1",
-                                "guid": "other-guid",
-                                "id": "2",
-                                "name": "Other bookmarks",
-                                "type": "folder",
-                            },
-                            "synced": {
-                                "children": [],
-                                "date_added": "1",
-                                "date_last_used": "0",
-                                "date_modified": "1",
-                                "guid": "synced-guid",
-                                "id": "3",
-                                "name": "Mobile bookmarks",
-                                "type": "folder",
-                            },
-                        },
-                        "version": 1,
-                    }
-                ),
+                json.dumps(chrome_bookmarks_payload([
+                    {"id": "20", "name": "old", "type": "url", "url": "https://old.example/"},
+                ])),
                 encoding="utf-8",
             )
 
@@ -234,20 +200,12 @@ class TestBookmarksSync(unittest.TestCase):
     def test_run_deduplicates_identical_urls(self):
         with workspace_temp_dir() as root:
             favs_path = root / "favs.csv"
-            user_data_dir = root / "User Data"
-            profile_dir = user_data_dir / "Profile 2"
-            bookmarks_path = profile_dir / "Bookmarks"
-            user_data_dir.mkdir(parents=True, exist_ok=True)
-            profile_dir.mkdir(parents=True, exist_ok=True)
+            user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "local_file,web_url\n"
                 "one,https://example.com/same\n"
                 "two,https://example.com/same\n"
                 "three,https://example.com/different\n",
-                encoding="utf-8",
-            )
-            (user_data_dir / "Local State").write_text(
-                json.dumps({"profile": {"info_cache": {"Profile 2": {"name": "Blair"}}}}),
                 encoding="utf-8",
             )
 
@@ -286,6 +244,45 @@ class TestBookmarksSync(unittest.TestCase):
 
             self.assertFalse(result.ok)
             self.assertTrue(result.profile_missing)
+
+    def test_run_uses_the_favorites_file_and_profile_it_is_given(self):
+        """Four things reach outside this repo, and all four are arguments now.
+
+        `config` still answers when the caller names none of them, which is
+        every other test here and the pipeline itself. Pointing the ambient
+        four at a profile that would sync a different URL is what proves the
+        given ones are the ones used, rather than merely accepted.
+        """
+        with workspace_temp_dir() as root:
+            given_favs = root / "given" / "favs.csv"
+            given_favs.parent.mkdir(parents=True)
+            given_favs.write_text("web_url\nhttps://example.com/given\n", encoding="utf-8")
+            given_user_data, given_bookmarks = chrome_profile(root / "given", name="Robin")
+
+            ambient_favs = root / "ambient" / "favs.csv"
+            ambient_favs.parent.mkdir(parents=True)
+            ambient_favs.write_text("web_url\nhttps://example.com/ambient\n", encoding="utf-8")
+            ambient_user_data, _ = chrome_profile(root / "ambient", name="Ambient")
+
+            with override_config(
+                FUN_TIME_FAVS_FILE=ambient_favs,
+                CHROME_USER_DATA_DIR=ambient_user_data,
+                CHROME_PROFILE_NAME="Ambient",
+                CHROME_BOOKMARKS_FOLDER_NAME="Ambient Folder",
+            ):
+                result = bookmarks_sync.run(
+                    favs_file=given_favs,
+                    chrome_user_data_dir=given_user_data,
+                    chrome_profile_name="Robin",
+                    bookmarks_folder_name="Given Folder",
+                )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.synced, 1)
+            written = json.loads(given_bookmarks.read_text(encoding="utf-8"))
+            folder = written["roots"]["bookmark_bar"]["children"][0]
+            self.assertEqual(folder["name"], "Given Folder")
+            self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/given"])
 
 
 if __name__ == "__main__":

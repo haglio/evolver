@@ -1,7 +1,6 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from PyQt6.QtCore import QEventLoop, QTimer
 from PyQt6.QtTest import QSignalSpy
 
 from gui.scheduler import PipelineScheduler
@@ -11,75 +10,68 @@ from gui.scheduler import PipelineScheduler
 class TestPipelineScheduler(unittest.TestCase):
 
     def test_emits_run_requested_on_timer_tick(self):
-        # interval_minutes=0 is testing mode: fires immediately
-        scheduler = PipelineScheduler(interval_minutes=0)
+        """The one end-to-end timer test: the real QTimer wiring, waited on by
+        deadline rather than a fixed sleep. The clock is parked a millisecond
+        short of an aligned slot, so the real alignment arithmetic runs and
+        still hands the timer a delay a test can wait on."""
+        almost = datetime(2026, 1, 1, 12, 10) - timedelta(milliseconds=1)
+        scheduler = PipelineScheduler(interval_minutes=10, now=lambda: almost)
 
         spy = QSignalSpy(scheduler.run_requested)
         scheduler.start()
-
-        loop = QEventLoop()
-        QTimer.singleShot(150, loop.quit)
-        loop.exec()
+        fired = spy.wait(5000)
         scheduler.stop()
 
-        self.assertGreaterEqual(len(spy), 1)
+        self.assertTrue(fired, "the scheduler's timer never fired")
         self.assertEqual(spy[0][0], "scheduled")
 
+    # The remaining tick behaviour is driven by calling tick() -- the slot the
+    # timer fires -- directly, so each test asserts an exact signal count
+    # instead of hoping a wall-clock window was long enough (these four were
+    # the slowest tests in the whole suite, and the pause/resume one carried a
+    # comment documenting its own nondeterminism).
+
     def test_suppresses_tick_when_running(self):
-        scheduler = PipelineScheduler(interval_minutes=0)
+        scheduler = PipelineScheduler(interval_minutes=10)
 
         spy = QSignalSpy(scheduler.run_requested)
         scheduler.mark_running()
-        scheduler.start()
-
-        loop = QEventLoop()
-        QTimer.singleShot(150, loop.quit)
-        loop.exec()
+        scheduler.tick()
         scheduler.stop()
 
         self.assertEqual(len(spy), 0)
 
     def test_resumes_after_mark_idle(self):
-        scheduler = PipelineScheduler(interval_minutes=0)
+        scheduler = PipelineScheduler(interval_minutes=10)
 
         spy = QSignalSpy(scheduler.run_requested)
         scheduler.mark_running()
-        scheduler.start()
-
-        loop = QEventLoop()
-        QTimer.singleShot(80, loop.quit)
-        loop.exec()
+        scheduler.tick()
         self.assertEqual(len(spy), 0)
 
-        # mark_idle calls _schedule_next, which fires immediately in test mode
-        scheduler.mark_idle()
-        loop2 = QEventLoop()
-        QTimer.singleShot(100, loop2.quit)
-        loop2.exec()
+        scheduler.mark_idle()  # reopens scheduling
+        scheduler.tick()
         scheduler.stop()
 
-        self.assertGreaterEqual(len(spy), 1)
+        self.assertEqual(len(spy), 1)
 
     def test_pause_and_resume(self):
-        scheduler = PipelineScheduler(interval_minutes=0)
+        scheduler = PipelineScheduler(interval_minutes=10)
 
         spy = QSignalSpy(scheduler.run_requested)
         scheduler.start()
         scheduler.pause()
-
-        loop = QEventLoop()
-        QTimer.singleShot(100, loop.quit)
-        loop.exec()
-        # The first tick may or may not have fired before pause — just check pause works
-        count_after_pause = len(spy)
+        # Paused means no tick is scheduled at all -- the timer is stopped and
+        # the next-run display goes blank.
+        self.assertIsNone(scheduler.next_run_at)
 
         scheduler.resume()
-        loop2 = QEventLoop()
-        QTimer.singleShot(100, loop2.quit)
-        loop2.exec()
+        self.assertIsNotNone(scheduler.next_run_at)
+        scheduler.tick()
         scheduler.stop()
 
-        self.assertGreater(len(spy), count_after_pause)
+        self.assertEqual(len(spy), 1)
+        self.assertEqual(spy[0][0], "scheduled")
 
     def test_run_now_emits_manual_trigger(self):
         scheduler = PipelineScheduler(interval_minutes=10)

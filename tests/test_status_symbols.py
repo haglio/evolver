@@ -1,8 +1,10 @@
 """A status is drawn as one colored symbol, the same one wherever it appears."""
 
+import inspect
 import unittest
 
 
+from gui import status_symbols
 from gui.status_symbols import mark_for
 
 
@@ -48,3 +50,11 @@ class TestMarkFor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMarkIconSurface(unittest.TestCase):
+    def test_the_mark_is_drawn_at_one_size(self):
+        """One view draws these icons and it has never asked for another size."""
+        self.assertEqual(list(inspect.signature(status_symbols.mark_icon).parameters), ["status"])
+        self.assertEqual(status_symbols.mark_icon("error").availableSizes()[0].width(),
+                         status_symbols._MARK_PX)

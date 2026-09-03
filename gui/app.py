@@ -9,34 +9,58 @@ import sys
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtNetwork import QLocalServer
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 import config
-from gui import single_instance
+from gui import process_identity, single_instance
 from gui.main_window import EvolverMainWindow
+from gui.presence_throttle import PresenceThrottle
 from gui.progress_popup import ProgressPopup
 from gui.run_record import load_runs
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
 from gui.stats_window import StatsWindow
-from gui.taskbar import set_taskbar_properties
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
-from tasks import nonai_upscale
 from util import crash_log
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
-_APP_MODEL_ID = "Evolver.TrayApp"
+
+def _wire(view, slots: dict) -> None:
+    """Connect each of *view*'s commands to the slot of the same name.
+
+    The two sides are held equal on purpose. A control a view offers that
+    nothing is wired to is a menu item that does nothing when clicked, and a
+    slot no view offers is a command the user cannot reach -- neither shows up
+    anywhere else, because a QAction with no connection raises nothing. It
+    fails here, while the app is being built and before it has done anything.
+    """
+    offered = view.commands()
+    if set(offered) != set(slots):
+        raise ValueError(
+            f"{type(view).__name__} offers commands {sorted(offered)}, "
+            f"wired to {sorted(slots)}"
+        )
+    for key, signal in offered.items():
+        signal.connect(slots[key])
 
 
 class EvolverApp:
-    """Wires together all GUI components and runs the Qt event loop."""
+    """Wires together all GUI components and runs the Qt event loop.
+
+    Split in two on purpose. ``__init__`` only *builds*: it constructs the
+    parts and connects them, and touches nothing outside the process. ``start``
+    is everything the app *does* -- claim the Windows identity, read the run
+    history off disk, start the two timers, show the tray. Merely constructing
+    one used to name this process to the shell and begin a twenty-second
+    presence poll, which is why every test of any one part had to build the
+    whole thing and then live with a running timer for the rest of the session.
+    """
 
     def __init__(self):
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(_APP_MODEL_ID)
         self._app = QApplication(sys.argv)
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("Evolver")
@@ -51,13 +75,11 @@ class EvolverApp:
         self._watchdog.setSingleShot(True)
         self._watchdog.timeout.connect(self._on_watchdog)
 
-        # Presence poll: parks/thaws the in-flight non-AI encode between the
-        # slow pipeline ticks, so returning to the machine suspends it in
-        # seconds. The handler no-ops unless the toggle is on.
-        self._presence_monitor = QTimer()
-        self._presence_monitor.setInterval(int(config.NONAI_PRESENCE_POLL_SECONDS * 1000))
-        self._presence_monitor.timeout.connect(self._throttle_presence)
-        self._presence_monitor.start()
+        # Parks and thaws the in-flight non-AI encode between the slow pipeline
+        # ticks, so returning to the machine suspends it in seconds. Reads the
+        # opt-in at every poll, since the tray toggle flips it while it runs.
+        self._presence = PresenceThrottle(
+            lambda: self._settings.nonai_upscale_enabled)
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.run_requested.connect(self._start_run)
@@ -65,34 +87,47 @@ class EvolverApp:
 
         self._tray = EvolverTray()
         self._app.setWindowIcon(self._tray.icon())
-        self._tray.open_action.triggered.connect(self._show_window)
-        self._tray.run_now_action.triggered.connect(self._scheduler.run_now)
-        self._tray.pause_action.triggered.connect(self._toggle_pause)
-        self._tray.nonai_action.setChecked(self._settings.nonai_upscale_enabled)
-        self._tray.nonai_action.toggled.connect(self._set_nonai_enabled)
-        self._tray.settings_action.triggered.connect(self._show_settings)
-        self._tray.stats_action.triggered.connect(self._show_stats)
-        self._tray.backfill_action.triggered.connect(self._launch_backfill)
-        self._tray.restart_action.triggered.connect(self._restart)
-        self._tray.quit_action.triggered.connect(self._quit)
+        self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
+        _wire(self._tray, {
+            "open": self._show_window,
+            "run_now": self._scheduler.run_now,
+            "pause": self._toggle_pause,
+            "nonai": self._set_nonai_enabled,
+            "settings": self._show_settings,
+            "stats": self._show_stats,
+            "backfill": self._launch_backfill,
+            "restart": self._restart,
+            "quit": self._quit,
+        })
 
         self._app.commitDataRequest.connect(self._on_session_end)
 
         self._window = EvolverMainWindow()
-        set_taskbar_properties(
-            int(self._window.winId()),
-            _APP_MODEL_ID,
-            f'"{sys.executable}" "{config.PROJECT_DIR / "tray_app.py"}" --show-window',
-            "Evolver",
-            str(config.PROJECT_DIR / "icon.ico"),
-        )
-        self._window.run_now_action.triggered.connect(self._scheduler.run_now)
-        self._window.active_toggle.clicked.connect(self._toggle_pause)
-        self._window.settings_action.triggered.connect(self._show_settings)
-        self._window.stats_action.triggered.connect(self._show_stats)
-        self._window.restart_action.triggered.connect(self._restart)
-        self._window.quit_action.triggered.connect(self._confirm_quit)
+        # Quit is the one command that means something different here: from the
+        # window it asks first, because the window is where a stray click lands.
+        _wire(self._window, {
+            "run_now": self._scheduler.run_now,
+            "pause": self._toggle_pause,
+            "settings": self._show_settings,
+            "stats": self._show_stats,
+            "restart": self._restart,
+            "quit": self._confirm_quit,
+        })
+
+    def start(self) -> None:
+        """Everything the app does to the machine, in the order it must happen.
+
+        The identity goes first: the taskbar reads it when a window of this
+        process first appears, so claiming it after the tray is up is claiming
+        it too late.
+        """
+        process_identity.claim(int(self._window.winId()))
         self._window.refresh_history()
+        self._presence.start()
+        self._tray.show()
+        self._scheduler.start()
+        if "--show-window" in sys.argv:
+            self._show_window()
 
     def run(self) -> int:
         if not single_instance.is_first_instance():
@@ -112,10 +147,7 @@ class EvolverApp:
         # it, and every later launch fails the handoff instead of taking it.
         self._show_requests = single_instance.serve_show_requests(self._show_window)
 
-        self._tray.show()
-        self._scheduler.start()
-        if "--show-window" in sys.argv:
-            self._show_window()
+        self.start()
         return self._app.exec()
 
     def _show_window(self):
@@ -136,16 +168,6 @@ class EvolverApp:
         self._settings.nonai_upscale_enabled = enabled
         self._settings.save()
 
-    def _throttle_presence(self):
-        """Suspend/resume the in-flight non-AI encode as the user comes and goes.
-
-        Fires far more often than the pipeline tick, so returning to the machine
-        freezes the encode within seconds. No-op unless the user has opted in.
-        """
-        if not self._settings.nonai_upscale_enabled:
-            return
-        nonai_upscale.throttle_to_presence()
-
     def _show_settings(self):
         dialog = SettingsDialog(self._settings, self._window)
         if dialog.exec():
@@ -153,10 +175,15 @@ class EvolverApp:
             self._scheduler.set_interval_minutes(self._settings.interval_minutes)
 
     def _show_stats(self):
-        if self._stats_window is not None and self._stats_window.isVisible():
-            self._stats_window.raise_()
-            self._stats_window.activateWindow()
-            return
+        if self._stats_window is not None:
+            if self._stats_window.isVisible():
+                self._stats_window.raise_()
+                self._stats_window.activateWindow()
+                return
+            # Closed, but parented to the main window, so one replaced without
+            # being taken down stays alive for the process's whole life.
+            self._stats_window.close()
+            self._stats_window.deleteLater()
         records = load_runs(config.RUNS_DIR)
         self._stats_window = StatsWindow(records, self._window)
         self._stats_window.show()
@@ -205,33 +232,42 @@ class EvolverApp:
         self._worker.start()
         self._watchdog.start(config.PIPELINE_WALL_TIMEOUT_SECONDS * 1000)
 
-    def _on_finished(self, record):
+    def _finish_run(self):
+        """The five things ending a run has to do, whichever way it ended.
+
+        Letting go of the popup is one of them: it is closed by now, and held,
+        the next run started while the window is hidden calls
+        ``on_pipeline_finished()`` on last run's dead one.
+        """
         self._watchdog.stop()
         self._scheduler.mark_idle()
         self._tray.set_running(False)
         if self._progress_popup is not None:
             self._progress_popup.on_pipeline_finished()
+            self._progress_popup = None
         self._window.refresh_history()
 
-        if self._settings.enable_toasts:
-            status = "completed" if record.status == "success" else "completed with errors"
-            self._tray.showMessage(
-                "Evolver",
-                f"Pipeline {status} in {record.duration_seconds:.0f}s",
-                self._tray.MessageIcon.Information if record.status == "success" else self._tray.MessageIcon.Warning,
-                5000,
-            )
+    def _notify(self, body: str, icon: QSystemTrayIcon.MessageIcon, msecs: int):
+        """Say something in a tray balloon, if the user asked for balloons."""
+        if not self._settings.enable_toasts:
+            return
+        self._tray.showMessage("Evolver", body, icon, msecs)
+
+    def _on_finished(self, record):
+        self._finish_run()
+        succeeded = record.status == "success"
+        status = "completed" if succeeded else "completed with errors"
+        self._notify(
+            f"Pipeline {status} in {record.duration_seconds:.0f}s",
+            QSystemTrayIcon.MessageIcon.Information if succeeded
+            else QSystemTrayIcon.MessageIcon.Warning,
+            5000,
+        )
 
     def _on_error(self, message: str):
-        self._watchdog.stop()
-        self._scheduler.mark_idle()
-        self._tray.set_running(False)
-        if self._progress_popup is not None:
-            self._progress_popup.on_pipeline_finished()
-        self._window.refresh_history()
-
-        if self._settings.enable_toasts:
-            self._tray.showMessage("Evolver", f"Pipeline error: {message}", self._tray.MessageIcon.Critical, 8000)
+        self._finish_run()
+        self._notify(f"Pipeline error: {message}",
+                     QSystemTrayIcon.MessageIcon.Critical, 8000)
         log.error("Pipeline error: %s", message)
 
     def _on_watchdog(self):
@@ -253,21 +289,22 @@ class EvolverApp:
         # current file rather than being cut.
         self._worker.requestInterruption()
 
-        if self._settings.enable_toasts:
-            self._tray.showMessage(
-                "Evolver",
-                f"Pipeline still running past the {config.PIPELINE_WALL_TIMEOUT_SECONDS // 60}-minute "
-                "limit; stopping after the current stage. New runs wait until it exits.",
-                self._tray.MessageIcon.Critical,
-                8000,
-            )
+        self._notify(
+            f"Pipeline still running past the {config.PIPELINE_WALL_TIMEOUT_SECONDS // 60}-minute "
+            "limit; stopping after the current stage. New runs wait until it exits.",
+            QSystemTrayIcon.MessageIcon.Critical,
+            8000,
+        )
 
     def _on_session_end(self, manager):
         """Handle Windows session-management events (shutdown, logoff, installer restart).
 
-        Logs the event and initiates a graceful shutdown so the scheduler,
-        worker thread, and any running subprocesses are cleaned up before
-        Windows force-kills the process.
+        Logs the event, then quits the way the tray menu does: the scheduler
+        stops and the worker thread is given five seconds to finish its stage.
+        What it deliberately does NOT do is touch the detached processes -- the
+        in-flight non-AI encode, the backfill tool -- because those are
+        detached precisely so they outlive this one, and Windows is about to
+        end the session for all of them anyway.
         """
         crash_log.write_info(
             "Windows session end requested:",

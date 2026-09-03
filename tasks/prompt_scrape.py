@@ -6,29 +6,38 @@ import datetime
 import json
 import logging
 import re
-import subprocess
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from email.utils import parsedate
-from html.parser import HTMLParser
 from pathlib import Path
+
+from util.html_query import (
+    Node,
+    extract_label_values,
+    find_all_by_tag,
+    parse_document,
+    query_selector,
+    text_content,
+)
 from urllib.parse import urlparse
 
 import config
-from content import load_content
-
-# The scraped provider's ingest-source folder and site root are private, so
-# they come from the git-ignored content overlay rather than the source.
-_PROVIDER = load_content()["scrape_provider"]
-PROVIDER_SOURCE = _PROVIDER["source"]
-PROVIDER_BASE_URL = _PROVIDER["base_url"]
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
-from util.media_files import iter_finalized_videos
+from util import relative_dates
+from util.headless_browser import fetch_dom, find_browser_executable
+from util.media_files import child_dirs, library_videos
 from util.sidecar import sidecar_path, upscaled_video_path, write
+from util import orientation
 
 log = logging.getLogger(__name__)
 
 _CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.font-regular"
+
+# The headless browser's scratch profile, under the checkout by default because
+# that is where it has always been; a caller passing its own keeps a running
+# app's scratch state out of a git working tree entirely.
+_BROWSER_PROFILE_DIR_NAME = ".tmp-prompt-browser-profile"
 
 
 @dataclass
@@ -44,28 +53,42 @@ class PromptScrapeResult:
         return self.errors == 0
 
 
-def run() -> PromptScrapeResult:
+def run(*, sorted_dir: Path | None = None,
+        browser_profile_dir: Path | None = None) -> PromptScrapeResult:
+    """Scrape each newly sorted video's provenance into its mirrored sidecar.
+
+    *sorted_dir* is the tree walked; *browser_profile_dir* is the scratch
+    profile the headless browser is given. Both are sentinels rather than
+    signature defaults: a default is evaluated at import, which would freeze
+    whatever ``config`` held then and put the value out of reach of
+    ``override_config``.
+    """
+    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
+    browser_profile_dir = (
+        config.PROJECT_DIR / _BROWSER_PROFILE_DIR_NAME if browser_profile_dir is None
+        else browser_profile_dir
+    )
     result = PromptScrapeResult()
-    log.info("=== Stage 2: scrape AI metadata ===")
-    log.info("SORTED DIR: %s", config.SORTED_DIR)
+    log.info("=== Stage: scrape AI metadata ===")
+    log.info("SORTED DIR: %s", sorted_dir)
     log.info("METADATA DIR: %s", config.METADATA_DIR)
 
-    browser = _find_browser_executable()
+    browser = find_browser_executable()
     if browser is None:
         log.warning("No supported browser found; Provider scraping is unavailable this run.")
-    strategies = _build_strategies(browser)
+    strategies = _build_strategies(browser, browser_profile_dir)
 
-    for source_dir in _iter_source_dirs(config.SORTED_DIR):
+    for source_dir in child_dirs(sorted_dir):
         source = source_dir.name
         strategy = strategies.get(source)
 
-        for video in sorted(_iter_video_files(source_dir)):
+        for video in sorted(library_videos(source_dir)):
             if strategy is None:
                 result.no_scrape_strat += 1
                 continue
 
             orient = video.relative_to(source_dir).parts[0]
-            if orient not in ("landscape", "portrait"):
+            if orient not in orientation.SORTED:
                 continue
 
             output_path = sidecar_path(upscaled_video_path(source, orient, video.stem))
@@ -89,7 +112,7 @@ def run() -> PromptScrapeResult:
             log.info("Wrote metadata: %s", output_path)
 
     log.info(
-        "Stage 2 done. Scraped: %d, Already: %d, Skipped failed: %d, No strategy: %d, Errors: %d",
+        "Metadata scrape done. Scraped: %d, Already: %d, Skipped failed: %d, No strategy: %d, Errors: %d",
         result.newly_scraped,
         result.already_scraped,
         result.skipped_failed,
@@ -114,86 +137,121 @@ def _write_failure_marker(output_path: Path, video: Path, error: BaseException) 
     marker.write_text(f"{video.name}\n{error}\n", encoding="utf-8")
 
 
-def _provider_image_url(video: Path) -> str:
+def _provider_image_url(video: Path, base_url: str) -> str:
     """The Provider image-page URL a video's stem maps to — its scrape entry point."""
-    return f"{PROVIDER_BASE_URL}/image/{source_stem(video.stem)}"
+    return f"{base_url}/image/{source_stem(video.stem)}"
 
 
-def _iter_video_files(root: Path):
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
+@dataclass(frozen=True)
+class _VideoFields:
+    """What the walk has learned about one video so far."""
+
+    prompt: str = ""
+    source_image_url: str = ""
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
-def _iter_source_dirs(root: Path):
-    if not root.is_dir():
-        return
-    for p in sorted(root.iterdir()):
-        if p.is_dir():
-            yield p
+def _scrape_provider_video(
+    video_path: Path, image_url: str, browser: Path, base_url: str, profile_dir: Path,
+) -> dict[str, object]:
+    """The sidecar payload for one video: its own record, and its source image's.
 
-
-def _scrape_provider_video(video_path: Path, image_url: str, browser: Path) -> dict[str, str]:
+    The video is looked for at four URLs because the site files one under
+    several paths depending on how it was made, and the first that yields a
+    prompt is taken to be it.
+    """
     image_id = image_url.rstrip("/").split("/")[-1]
-    candidate_urls = [
-        image_url,
-        f"{PROVIDER_BASE_URL}/video/{image_id}",
-        f"{PROVIDER_BASE_URL}/text-to-video/{image_id}",
-        f"{PROVIDER_BASE_URL}/image-to-video/{image_id}",
-    ]
-
-    video_prompt = ""
-    source_image_url = ""
-    video_metadata: dict[str, str] = {}
-    for candidate in candidate_urls:
-        html = _fetch_dom(candidate, browser)
-        document = _parse_html_document(html)
-        panel = _query_selector(document, _CONTENT_PANEL_SELECTOR)
-        if panel is not None:
-            video_prompt = _extract_prompt_text(panel)
-            source_image_url = _extract_source_image_url(panel)
-            video_metadata = _extract_metadata_fields(document)
-        if not video_prompt:
-            embedded = _extract_provider_embedded_metadata(html, image_id)
-            if embedded.prompt:
-                video_prompt = embedded.prompt
-                if not video_metadata:
-                    video_metadata = _embedded_to_video_metadata(embedded)
-                if embedded.parent_image_id and not source_image_url:
-                    source_image_url = f"{PROVIDER_BASE_URL}/image/{embedded.parent_image_id}"
-        if video_prompt:
+    found = _VideoFields()
+    for candidate in _candidate_urls(image_url, image_id, base_url):
+        html = fetch_dom(candidate, browser, profile_dir=profile_dir)
+        found = _folded_in(found, html, image_id, base_url)
+        if found.prompt:
             break
-    if not video_prompt:
+    if not found.prompt:
         raise RuntimeError(f"Could not extract Provider video prompt for {video_path.name}")
 
-    video_data: dict[str, str] = {"prompt": video_prompt, **video_metadata}
-    payload: dict[str, object] = {"video": video_data}
-
-    if source_image_url:
-        image_html = _fetch_dom(source_image_url, browser)
-        image_document = _parse_html_document(image_html)
-        image_panel = _query_selector(image_document, _CONTENT_PANEL_SELECTOR)
-        image_data: dict[str, str] = {}
-        if image_panel is not None:
-            pos = _extract_prompt_text(image_panel)
-            neg = _extract_negative_prompt_text(image_panel)
-            if pos:
-                image_data["positive_prompt"] = pos
-            if neg:
-                image_data["negative_prompt"] = neg
-            image_data.update(_extract_metadata_fields(image_document))
-        else:
-            image_id_str = source_image_url.rstrip("/").split("/")[-1]
-            embedded = _extract_provider_embedded_metadata(image_html, image_id_str)
-            if embedded.prompt:
-                image_data["positive_prompt"] = embedded.prompt
-            if embedded.negative_prompt:
-                image_data["negative_prompt"] = embedded.negative_prompt
-            image_data.update(_embedded_to_image_metadata(embedded))
+    payload: dict[str, object] = {"video": {"prompt": found.prompt, **found.metadata}}
+    if found.source_image_url:
+        image_data = _scrape_source_image(
+            found.source_image_url, browser, profile_dir=profile_dir)
         if image_data:
             payload["source_image"] = image_data
     return payload
 
 
-def _build_strategies(browser):
+def _candidate_urls(image_url: str, image_id: str, base_url: str) -> list[str]:
+    """Where one video might be filed, most likely first.
+
+    Which of the three video paths a clip sits under depends on how it was
+    made, and nothing in the file name says which; the image path is tried
+    first because it is the one a video's own stem maps to.
+    """
+    return [
+        image_url,
+        f"{base_url}/video/{image_id}",
+        f"{base_url}/text-to-video/{image_id}",
+        f"{base_url}/image-to-video/{image_id}",
+    ]
+
+
+def _folded_in(found: _VideoFields, html: str, image_id: str,
+               base_url: str) -> _VideoFields:
+    """*found*, plus what one more candidate page says.
+
+    A content panel replaces all three wholesale -- it is what a reader sees on
+    the site, so a page that has one is the authority on that page. The record
+    embedded in the page is the fallback, and fills in only what is still
+    missing: a panel that carried the metadata labels but no prompt keeps its
+    metadata even when the prompt arrives from a later page's JSON.
+    """
+    document = parse_document(html)
+    panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
+    if panel is not None:
+        found = _VideoFields(
+            prompt=_extract_prompt_text(panel),
+            source_image_url=_extract_source_image_url(panel, base_url),
+            metadata=_extract_metadata_fields(document),
+        )
+    if found.prompt:
+        return found
+    embedded = _extract_provider_embedded_metadata(html, image_id)
+    if not embedded.prompt:
+        return found
+    parent_url = (f"{base_url}/image/{embedded.parent_image_id}"
+                  if embedded.parent_image_id else "")
+    return _VideoFields(
+        prompt=embedded.prompt,
+        source_image_url=found.source_image_url or parent_url,
+        metadata=found.metadata or _embedded_to_video_metadata(embedded),
+    )
+
+
+def _scrape_source_image(url: str, browser: Path, *, profile_dir: Path) -> dict[str, str]:
+    """What the image a video was made from says about itself.
+
+    Same two ways round as the video: the content panel if the page has one,
+    the record embedded in it if not.
+    """
+    html = fetch_dom(url, browser, profile_dir=profile_dir)
+    document = parse_document(html)
+    panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
+    if panel is not None:
+        fields = {
+            "positive_prompt": _extract_prompt_text(panel),
+            "negative_prompt": _extract_negative_prompt_text(panel),
+        }
+        return {key: value for key, value in fields.items() if value} | \
+            _extract_metadata_fields(document)
+    embedded = _extract_provider_embedded_metadata(html, url.rstrip("/").split("/")[-1])
+    fields = {
+        "positive_prompt": embedded.prompt,
+        "negative_prompt": embedded.negative_prompt,
+    }
+    return {key: value for key, value in fields.items() if value} | \
+        _embedded_to_image_metadata(embedded)
+
+
+def _build_strategies(browser, profile_dir):
     """Map each ingest source to a ``(video) -> payload`` metadata builder.
 
     Origenerator is a normal external content source whose metadata Evolver pulls
@@ -201,15 +259,17 @@ def _build_strategies(browser):
     needs no browser and is always available. Provider metadata is scraped from its
     website, so it registers only when a headless browser was found.
     """
+    provider_source = config.PROVIDER_SOURCE
+    base_url = config.PROVIDER_BASE_URL
     strategies = {"origenerator": origenerator_metadata.build_metadata}
     if browser is not None:
-        strategies[PROVIDER_SOURCE] = lambda video: _scrape_provider_video(
-            video, _provider_image_url(video), browser
+        strategies[provider_source] = lambda video: _scrape_provider_video(
+            video, _provider_image_url(video, base_url), browser, base_url, profile_dir
         )
     return strategies
 
 
-def _extract_prompt_text(panel: _Node) -> str:
+def _extract_prompt_text(panel: Node) -> str:
     """Extract the positive prompt text from a content panel.
 
     The prompt is the first text block inside a div > div structure that
@@ -220,14 +280,14 @@ def _extract_prompt_text(panel: _Node) -> str:
             continue
         inner_divs = [c for c in child.children if c.tag == "div"]
         if len(inner_divs) == 1:
-            text = _text_content(inner_divs[0]).strip()
-            has_h2 = any(True for _ in _find_all_by_tag(inner_divs[0], "h2"))
+            text = text_content(inner_divs[0]).strip()
+            has_h2 = any(True for _ in find_all_by_tag(inner_divs[0], "h2"))
             if text and not has_h2:
                 return text
     return ""
 
 
-def _extract_negative_prompt_text(panel: _Node) -> str:
+def _extract_negative_prompt_text(panel: Node) -> str:
     """Extract the negative prompt text from a content panel.
 
     The negative prompt is in a div with class 'max-h-80' that appears after
@@ -236,110 +296,30 @@ def _extract_negative_prompt_text(panel: _Node) -> str:
     found_label = False
     for child in panel.children:
         if not found_label:
-            text = _text_content(child).strip().lower()
+            text = text_content(child).strip().lower()
             if "negative prompt" in text and "max-h-80" not in child.attrs.get("class", ""):
                 found_label = True
                 continue
         if found_label and "max-h-80" in child.attrs.get("class", ""):
-            return _text_content(child).strip()
+            return text_content(child).strip()
     return ""
 
 
-def _extract_source_image_url(panel: _Node) -> str:
+def _extract_source_image_url(panel: Node, base_url: str) -> str:
     """Find the source image thumbnail img and derive the image page URL."""
-    for img in _find_all_by_tag(panel, "img"):
+    for img in find_all_by_tag(panel, "img"):
         src = img.attrs.get("src", "")
         if src:
-            return _image_page_url_from_src(src)
+            return _image_page_url_from_src(src, base_url)
     return ""
 
 
-def _image_page_url_from_src(src: str) -> str:
+def _image_page_url_from_src(src: str, base_url: str) -> str:
     parsed = urlparse(src)
     image_id = parsed.path.strip("/").split("/")[-1]
     if not image_id:
         return ""
-    return f"{PROVIDER_BASE_URL}/image/{image_id}"
-
-
-def _fetch_dom(url: str, browser: Path) -> str:
-    profile_dir = config.PROJECT_DIR / ".tmp-prompt-browser-profile"
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    proc = subprocess.run(
-        [
-            str(browser),
-            "--headless=new",
-            "--disable-gpu",
-            "--disable-breakpad",
-            "--disable-crash-reporter",
-            "--no-first-run",
-            f"--user-data-dir={profile_dir}",
-            "--virtual-time-budget=10000",
-            "--dump-dom",
-            url,
-        ],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-    if proc.returncode != 0:
-        stderr = proc.stderr.strip() or f"exit {proc.returncode}"
-        raise RuntimeError(f"Browser DOM dump failed for {url}: {stderr}")
-    return proc.stdout
-
-
-def _find_browser_executable() -> Path | None:
-    candidates = [
-        Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
-        Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
-        Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
-        Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-    ]
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return None
-
-
-class _Node:
-    def __init__(self, tag: str, attrs: dict[str, str], parent: "_Node | None" = None):
-        self.tag = tag
-        self.attrs = attrs
-        self.parent = parent
-        self.children: list[_Node] = []
-        self.text_chunks: list[str] = []
-
-
-class _DocumentParser(HTMLParser):
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.root = _Node("document", {})
-        self.stack = [self.root]
-
-    def handle_starttag(self, tag: str, attrs):
-        node = _Node(tag, {key: value or "" for key, value in attrs}, self.stack[-1])
-        self.stack[-1].children.append(node)
-        self.stack.append(node)
-
-    def handle_endtag(self, tag: str):
-        if len(self.stack) > 1:
-            self.stack.pop()
-
-    def handle_startendtag(self, tag: str, attrs):
-        node = _Node(tag, {key: value or "" for key, value in attrs}, self.stack[-1])
-        self.stack[-1].children.append(node)
-
-    def handle_data(self, data: str):
-        self.stack[-1].text_chunks.append(data)
-
-
-@dataclass
-class _SelectorPart:
-    tag: str
-    classes: list[str]
-    nth_child: int | None = None
+    return f"{base_url}/image/{image_id}"
 
 
 @dataclass
@@ -359,141 +339,80 @@ class _ProviderEmbeddedMetadata:
     creativity: str = ""
 
 
-def _parse_html_document(html: str) -> _Node:
-    parser = _DocumentParser()
-    parser.feed(html)
-    return parser.root
+# How wide a slice of the page around each mention of the id is read as the
+# record for it. The embedded JSON is minified onto one line with everything
+# else on the page, so there is no delimiter to stop at; 5,000 characters
+# either side comfortably spans one record's fields without reaching the next
+# item's on a listing page.
+_JSON_WINDOW_CHARS = 5000
 
-
-def _query_selector(root: _Node, selector: str) -> _Node | None:
-    parts = [_parse_selector_part(part.strip()) for part in selector.split(">")]
-    current = [root]
-    for index, part in enumerate(parts):
-        next_nodes: list[_Node] = []
-        for node in current:
-            candidates = _descendants(node) if index == 0 else node.children
-            for candidate in candidates:
-                if _matches_selector_part(candidate, part):
-                    next_nodes.append(candidate)
-        if not next_nodes:
-            return None
-        current = next_nodes
-    return current[0]
-
-
-def _descendants(node: _Node):
-    for child in node.children:
-        yield child
-        yield from _descendants(child)
-
-
-def _parse_selector_part(raw: str) -> _SelectorPart:
-    nth_child = None
-    match = re.search(r":nth-child\((\d+)\)", raw)
-    if match:
-        nth_child = int(match.group(1))
-        raw = raw[:match.start()] + raw[match.end():]
-
-    bits = _split_selector_token(raw)
-    tag = bits[0] or "*"
-    classes = [_unescape_css_name(bit) for bit in bits[1:] if bit]
-    return _SelectorPart(tag=tag, classes=classes, nth_child=nth_child)
-
-
-def _unescape_css_name(value: str) -> str:
-    return re.sub(r"\\(.)", r"\1", value)
-
-
-def _split_selector_token(raw: str) -> list[str]:
-    parts: list[str] = []
-    current: list[str] = []
-    escaped = False
-    for char in raw:
-        if escaped:
-            current.append(char)
-            escaped = False
-            continue
-        if char == "\\":
-            current.append(char)
-            escaped = True
-            continue
-        if char == ".":
-            parts.append("".join(current))
-            current = []
-            continue
-        current.append(char)
-    parts.append("".join(current))
-    return parts
-
-
-def _matches_selector_part(node: _Node, part: _SelectorPart) -> bool:
-    if part.tag != "*" and node.tag != part.tag:
-        return False
-    classes = set(node.attrs.get("class", "").split())
-    if any(required not in classes for required in part.classes):
-        return False
-    if part.nth_child is not None:
-        parent = node.parent
-        if parent is None:
-            return False
-        position = parent.children.index(node) + 1
-        if position != part.nth_child:
-            return False
-    return True
-
-
-def _text_content(node: _Node) -> str:
-    parts = list(node.text_chunks)
-    for child in node.children:
-        parts.append(_text_content(child))
-    return "".join(parts)
+# Each field of the embedded record: what it is called on the dataclass, and
+# how to read it out of a window. Every reader answers "" for absent, so the
+# loop below has one shape rather than thirteen copies of it -- three of which
+# differed only in converting an int, joining a pair, or reformatting a date.
+_EMBEDDED_FIELDS: tuple[tuple[str, Callable[[str], str]], ...] = (
+    ("prompt", lambda blob: _extract_json_string_field(blob, "prompt")),
+    ("negative_prompt",
+     lambda blob: _extract_nullable_json_string_field(blob, "negative_prompt")),
+    ("parent_image_id",
+     lambda blob: _extract_nullable_json_string_field(blob, "parent_image_id")),
+    ("model", lambda blob: _extract_json_string_field(blob, "model")),
+    ("version", lambda blob: _extract_json_string_field(blob, "version")),
+    ("seed", lambda blob: _int_field_as_text(blob, "seed")),
+    ("aspect_ratio", lambda blob: _extract_json_string_field(blob, "aspectRatio")),
+    ("resolution", lambda blob: _resolution_field(blob)),
+    ("quality", lambda blob: _extract_json_string_field(blob, "quality")),
+    ("created", lambda blob: _created_field(blob)),
+    ("action", lambda blob: _action_field(blob)),
+    ("style", lambda blob: _extract_nullable_json_string_field(blob, "styleValue")),
+    ("creativity", lambda blob: _int_field_as_text(blob, "creativity")),
+)
 
 
 def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmbeddedMetadata:
-    metadata = _ProviderEmbeddedMetadata()
+    """The record the page embeds for *page_id*, read out of the JSON around it.
+
+    Each mention of the id is tried in turn, and each window twice -- once as
+    it stands and once with the backslash-escaped quotes unescaped, because the
+    same record appears both as JSON and as a JSON string holding JSON. The
+    first mention that yields a prompt is taken to be the right one; a field
+    already found is never overwritten by a later window.
+    """
+    found: dict[str, str] = {}
     for index in _all_indices(html, page_id):
-        window = html[max(0, index - 5000): index + 5000]
+        window = html[max(0, index - _JSON_WINDOW_CHARS): index + _JSON_WINDOW_CHARS]
         for candidate in (window, window.replace('\\"', '"')):
-            if not metadata.prompt:
-                metadata.prompt = _extract_json_string_field(candidate, "prompt")
-            if not metadata.negative_prompt:
-                metadata.negative_prompt = _extract_nullable_json_string_field(candidate, "negative_prompt")
-            if not metadata.parent_image_id:
-                metadata.parent_image_id = _extract_nullable_json_string_field(candidate, "parent_image_id")
-            if not metadata.model:
-                metadata.model = _extract_json_string_field(candidate, "model")
-            if not metadata.version:
-                metadata.version = _extract_json_string_field(candidate, "version")
-            if not metadata.seed:
-                seed_int = _extract_json_int_field(candidate, "seed")
-                if seed_int is not None:
-                    metadata.seed = str(seed_int)
-            if not metadata.aspect_ratio:
-                metadata.aspect_ratio = _extract_json_string_field(candidate, "aspectRatio")
-            if not metadata.resolution:
-                width = _extract_json_int_field(candidate, "width")
-                height = _extract_json_int_field(candidate, "height")
-                if width is not None and height is not None:
-                    metadata.resolution = f"{width}x{height}"
-            if not metadata.quality:
-                metadata.quality = _extract_json_string_field(candidate, "quality")
-            if not metadata.created:
-                created_at = _extract_json_string_field(candidate, "createdAt")
-                if created_at:
-                    metadata.created = _parse_provider_created_at(created_at)
-            if not metadata.action:
-                raw_action = _extract_json_first_array_string(candidate, "action")
-                if raw_action:
-                    metadata.action = _titlecase_action(raw_action)
-            if not metadata.style:
-                metadata.style = _extract_nullable_json_string_field(candidate, "styleValue")
-            if not metadata.creativity:
-                creativity_int = _extract_json_int_field(candidate, "creativity")
-                if creativity_int is not None:
-                    metadata.creativity = str(creativity_int)
-        if metadata.prompt:
+            for attribute, extract in _EMBEDDED_FIELDS:
+                if not found.get(attribute):
+                    found[attribute] = extract(candidate)
+        if found.get("prompt"):
             break
-    return metadata
+    # By keyword, so a name in the table that no field answers to is a
+    # TypeError here rather than a value silently going nowhere.
+    return _ProviderEmbeddedMetadata(**found)
+
+
+def _int_field_as_text(blob: str, field_name: str) -> str:
+    value = _extract_json_int_field(blob, field_name)
+    return "" if value is None else str(value)
+
+
+def _resolution_field(blob: str) -> str:
+    width = _extract_json_int_field(blob, "width")
+    height = _extract_json_int_field(blob, "height")
+    if width is None or height is None:
+        return ""
+    return f"{width}x{height}"
+
+
+def _created_field(blob: str) -> str:
+    created_at = _extract_json_string_field(blob, "createdAt")
+    return _parse_provider_created_at(created_at) if created_at else ""
+
+
+def _action_field(blob: str) -> str:
+    raw_action = _extract_json_first_array_string(blob, "action")
+    return _titlecase_action(raw_action) if raw_action else ""
 
 
 def _extract_json_string_field(blob: str, field_name: str) -> str:
@@ -536,12 +455,19 @@ def _titlecase_action(raw_action: str) -> str:
 
 
 def _parse_provider_created_at(value: str) -> str:
+    """*value* as an ISO date, or *value* itself when it does not name one.
+
+    ``parsedate`` is lenient enough to read a day number no month has, so the
+    ValueError comes from building the date rather than from parsing it. That
+    is the only failure this expects: a non-string reaching here would be a
+    caller bug and should say so rather than pass silently through.
+    """
     try:
         t = parsedate(value)
         if t is not None:
             return datetime.date(t[0], t[1], t[2]).isoformat()
-    except Exception:
-        pass
+    except ValueError:
+        log.debug("Not a usable date: %r", value, exc_info=True)
     return value
 
 
@@ -590,73 +516,14 @@ _METADATA_LABELS = {
 }
 
 
-def _extract_metadata_fields(root: _Node) -> dict[str, str]:
+def _extract_metadata_fields(root: Node) -> dict[str, str]:
     fields: dict[str, str] = {}
-    for h2 in _find_all_by_tag(root, "h2"):
-        label = _text_content(h2).strip().lower()
-        if label not in _METADATA_LABELS:
-            continue
-        parent = h2.parent
-        if parent is None:
-            continue
-        siblings = parent.children
-        try:
-            h2_index = siblings.index(h2)
-        except ValueError:
-            continue
-        h1 = next((c for c in siblings[h2_index + 1:] if c.tag == "h1"), None)
-        if h1 is None:
-            continue
+    for label, value in extract_label_values(root, _METADATA_LABELS).items():
         key = label.replace(" ", "_")
-        value = _text_content(h1).strip()
         if key == "created":
-            value = _parse_relative_date(value)
+            value = relative_dates.as_iso_date(value)
         fields[key] = value
     return fields
-
-
-def _find_all_by_tag(node: _Node, tag: str):
-    if node.tag == tag:
-        yield node
-    for child in node.children:
-        yield from _find_all_by_tag(child, tag)
-
-
-def _today() -> datetime.date:
-    return datetime.date.today()
-
-
-_RELATIVE_DATE_RE = re.compile(r"^(\d+)(mo|[mhdw])\s+ago$", re.IGNORECASE)
-
-
-def _parse_relative_date(value: str) -> str:
-    match = _RELATIVE_DATE_RE.match(value.strip())
-    if not match:
-        return value
-    amount = int(match.group(1))
-    unit = match.group(2).lower()
-    today = _today()
-    if unit == "m" or unit == "h":
-        return today.isoformat()
-    if unit == "d":
-        return (today - datetime.timedelta(days=amount)).isoformat()
-    if unit == "w":
-        return (today - datetime.timedelta(weeks=amount)).isoformat()
-    if unit == "mo":
-        month = today.month - amount
-        year = today.year
-        while month < 1:
-            month += 12
-            year -= 1
-        day = min(today.day, _days_in_month(year, month))
-        return datetime.date(year, month, day).isoformat()
-    return value
-
-
-def _days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)).day
 
 
 def _all_indices(haystack: str, needle: str) -> list[int]:

@@ -5,8 +5,7 @@ is a silent abort. Everything here exists to leave a written trace of it.
 
 This lives in its own module rather than in tray_app.py because tray_app.py is
 run as a script: importing it from elsewhere makes a *second* module object, so
-the flag one copy sets is not the flag the other copy reads, and every entry
-written from the GUI was followed by a "Clean exit" line that was not true.
+the flag one copy sets is not the flag the other copy reads.
 """
 
 from __future__ import annotations
