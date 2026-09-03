@@ -20,7 +20,7 @@ class TestTheOnlyWayToAModalDialog(unittest.TestCase):
             if "MessageBoxW" in Path(PROJECT_ROOT, name).read_text(encoding="utf-8")
         ]
 
-        self.assertEqual(callers, [str(Path("util", "windows_alert.py"))])
+        self.assertEqual(callers, ["util/windows_alert.py"])
 
 
 class TestWindowsAlert(unittest.TestCase):

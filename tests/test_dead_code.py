@@ -31,7 +31,7 @@ def _source_files(root: Path) -> list[str]:
             if name not in ("tests", "tools") and not name.startswith((".", "__"))
         ]
         found += [
-            str(Path(dirpath, name).relative_to(root))
+            Path(dirpath, name).relative_to(root).as_posix()
             for name in filenames
             if name.endswith(".py")
         ]
