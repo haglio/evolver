@@ -120,6 +120,11 @@ def nonai_library_overrides(root: Path, **extra):
     video_lib = root / "videos"
     overrides = dict(
         VIDEO_LIBRARY_DIR=video_lib,
+        # The sidecar mirror answers for a video under either root. Pinned to
+        # the library itself rather than to its parent, so an archived original
+        # a case parks beside the tree stays outside both, as the real archive
+        # sits off the working drive.
+        VIDEO_SEARCH_ROOT=video_lib,
         NON_AI_DIR=video_lib / "2D" / "non_AI",
         METADATA_DIR=root / "metadata",
         SCRIPT_LIBRARY_DIR=root / "scripts",

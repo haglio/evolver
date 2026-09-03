@@ -30,6 +30,7 @@ def _stage_mocks() -> dict:
         "genau_deliver_run": Mock(return_value=Mock(failed=0)),
         "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
         "nonai_group_run": Mock(),
+        "video_types_run": Mock(),
         "clip_scripts_run": Mock(),
         "scene_scripts_run": Mock(),
         "reference_sync_run": Mock(return_value=Mock(ok=True)),
@@ -44,6 +45,7 @@ def _stage_mocks() -> dict:
 _STAGE_PATCHES = [
     ("evolver.stray_files.run", "strays_run"),
     ("evolver.sort.run", "sort_run"),
+    ("evolver.video_types.run", "video_types_run"),
     ("evolver.purge_weird.run", "purge_run"),
     ("evolver.clip_scripts.run", "clip_scripts_run"),
     ("evolver.scene_scripts.run", "scene_scripts_run"),
@@ -271,7 +273,7 @@ class TestRunPipeline:
         )
         with stack:
             result = evolver.run_pipeline()
-        assert len(result.stages) == 15
+        assert len(result.stages) == 16
         for stage in result.stages:
             assert stage.status != "skipped", \
                 f"stage {stage.name!r} must actually run in this test"
@@ -537,7 +539,7 @@ class TestCooperativeStop:
         with _patched_stages(mocks):
             result = evolver.run_pipeline(should_stop=lambda: False)
 
-        assert len(result.stages) == 15
+        assert len(result.stages) == 16
 
 
 class TestCheckDependenciesWindowSuppression:

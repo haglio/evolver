@@ -1,6 +1,5 @@
 """Upscale videos from 1_sorted/<source>/<orientation>/ using Topaz."""
 
-import json
 import logging
 import subprocess
 import time
@@ -10,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import system_resources, topaz
+from util import sidecar, system_resources, topaz, video_type
 from util.media_files import (
     child_dirs,
     is_finalized_video_file,
@@ -257,19 +256,15 @@ def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> b
         meta_path = sidecar_path(upscaled_video_path(source, orient, stem, outbox_dir))
     except ValueError:
         return False
-    if not meta_path.is_file():
+    # An absent or unreadable sidecar reads back empty, and a sidecar holding
+    # nothing but the video's kind (util.video_type.only_the_kind) records no
+    # generation at all: neither says text-to-video, so both take the default
+    # recipe -- the wrong Topaz model is baked into a finished encode nobody
+    # re-runs.
+    payload = sidecar.read(meta_path)
+    if not payload or video_type.only_the_kind(payload):
         return False
-    try:
-        payload = json.loads(meta_path.read_text(encoding="utf-8"))
-        return "source_image" not in payload
-    except (OSError, json.JSONDecodeError, TypeError):
-        # Unreadable, not JSON, or JSON that is not a mapping -- the membership
-        # test raises TypeError on a bare number. A malformed sidecar answers
-        # the same as an absent one: the default recipe, because the wrong
-        # Topaz model is baked into a finished encode nobody re-runs.
-        log.debug("Could not read %s as a sidecar; taking the default recipe.",
-                  meta_path, exc_info=True)
-        return False
+    return "source_image" not in payload
 
 
 def _already_processed(source: str, fname: str, outbox_dir: Path, weird_dir: Path) -> bool:

@@ -8,6 +8,7 @@ import config
 from tasks import prompt_scrape
 from util import html_query
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util import sidecar, video_type
 
 
 class TestPromptScrape(unittest.TestCase):
@@ -190,6 +191,30 @@ class TestPromptScrape(unittest.TestCase):
             self.assertEqual(result.already_scraped, 1)
             self.assertEqual(result.newly_scraped, 0)
             fetch_dom.assert_not_called()
+
+    def test_a_sidecar_holding_only_the_video_kind_is_not_a_scrape(self):
+        """``tasks.video_types`` writes a kind onto every library video,
+        including the ones nothing has scraped yet.  Reading that as "already
+        scraped" would lose those prompts for good — the stage never looks at
+        the video again."""
+        with workspace_temp_dir() as root:
+            sorted_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
+            existing.parent.mkdir(parents=True, exist_ok=True)
+            existing.write_text(
+                json.dumps({"video": {"type": video_type.SHORT}}), encoding="utf-8",
+            )
+
+            with self._override(root):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only):
+                        result = prompt_scrape.run()
+
+            self.assertEqual((result.newly_scraped, result.already_scraped), (1, 0))
+            self.assertEqual(
+                video_type.type_of(sidecar.read(existing)), video_type.SHORT,
+            )
 
     def test_skips_video_with_failure_marker(self):
         with workspace_temp_dir() as root:

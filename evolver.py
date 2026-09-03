@@ -36,6 +36,7 @@ from tasks import (
     sort,
     stray_files,
     upscale,
+    video_types,
 )
 from util import processes, system_resources
 
@@ -280,6 +281,10 @@ def run_pipeline(
         _run_stage("scene_scripts", scene_scripts.run)
         _run_stage("scripts", scripts_sync.run, show_popup=True)
         _run_stage("group_non_ai", nonai_group.run)
+        # After the grouping, which is what creates a new non-AI video's sidecar:
+        # the kind then joins a record that is already there rather than making a
+        # second one for the same video in the same run.
+        _run_stage("video_types", video_types.run)
         _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
     except _StopRequested:
         log.warning(
