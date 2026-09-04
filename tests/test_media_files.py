@@ -51,9 +51,8 @@ class TestLibraryVideos(unittest.TestCase):
                 self.assertEqual(list(library_videos(root)), [mkv])
 
     def test_a_root_that_is_not_there_yields_nothing(self):
-        with workspace_temp_dir() as root:
-            with override_config(VIDEO_EXTENSIONS={".mp4"}):
-                self.assertEqual(list(library_videos(root / "nope")), [])
+        with workspace_temp_dir() as root, override_config(VIDEO_EXTENSIONS={".mp4"}):
+            self.assertEqual(list(library_videos(root / "nope")), [])
 
 
 class TestChildDirs(unittest.TestCase):

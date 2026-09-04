@@ -19,11 +19,10 @@ from tests.temp_helpers import workspace_temp_dir
 
 @pytest.fixture
 def startup_dir():
-    with workspace_temp_dir() as tmp:
-        with patch.dict("os.environ", {"APPDATA": str(tmp)}):
-            folder = tmp / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
-            folder.mkdir(parents=True)
-            yield folder
+    with workspace_temp_dir() as tmp, patch.dict("os.environ", {"APPDATA": str(tmp)}):
+        folder = tmp / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+        folder.mkdir(parents=True)
+        yield folder
 
 
 def _capture_cscript(captured):

@@ -18,7 +18,7 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import check_correspondence
 import check_duplicate_sizes
@@ -111,7 +111,7 @@ class PipelineResult:
     # from its finish afterwards -- the run's name is this, and so is the
     # banner it wrote, so the two agree by construction.
     started_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc))
+        default_factory=lambda: datetime.now(UTC))
     # The bytes of the log this run wrote, from the offset its banner sits at
     # to the offset past its last line. None when the log could not be read at
     # one end or the other, which is the whole reason both are optional: a run
@@ -187,7 +187,7 @@ def run_pipeline(
     """
     log = logging.getLogger(__name__)
     pipeline_t0 = time.monotonic()
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     # Read once and carried: the two marks either side of the run and the
     # reader that uses them all take the path rather than reach for it.
     log_path = config.LOG_FILE

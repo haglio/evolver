@@ -11,7 +11,6 @@ from unittest.mock import patch
 
 import config
 
-
 # The system temp dir, not a directory inside the checkout: the suite must not
 # write into the tree it is testing (a killed run left case directories in the
 # repo, a read-only checkout could not run at all, and fixture paths were bound

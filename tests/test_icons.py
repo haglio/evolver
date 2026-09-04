@@ -9,10 +9,9 @@ turned a legitimate glyph redesign into a red evolver suite.
 
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QIcon, QImage
-
-from gui.icons import quit_icon, restart_icon, run_now_icon
 from shared_ui.icons import glyph_pixmap
 
+from gui.icons import quit_icon, restart_icon, run_now_icon
 
 _SIZE = QSize(48, 48)
 

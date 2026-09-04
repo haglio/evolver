@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, QUrl, Qt
+from PyQt6.QtCore import QSize, Qt, QUrl
 from PyQt6.QtGui import QIcon, QKeySequence, QPainter, QPixmap, QShortcut
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget

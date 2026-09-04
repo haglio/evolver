@@ -14,8 +14,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from gui.settings import EvolverSettings
 from gui import startup
+from gui.settings import EvolverSettings
 
 log = logging.getLogger(__name__)
 

@@ -48,7 +48,7 @@ ALLOWED = {
 
 
 def _package_of(dotted: str) -> str | None:
-    head = dotted.split(".")[0]
+    head = dotted.split(".", maxsplit=1)[0]
     return head if head in _OURS else None
 
 

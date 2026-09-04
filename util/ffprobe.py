@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+
 from util import orientation
 
 # Width, height and the rotation tag in one invocation. ffprobe takes several

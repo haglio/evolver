@@ -5,11 +5,9 @@ import sys
 import unittest
 from unittest.mock import patch
 
-
 import config
 from gui.tray import EvolverTray
 from tests.gui_support import build_evolver_app
-
 
 
 class TestTrayMenu(unittest.TestCase):

@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backfill.queue import BackfillQueue
 from backfill import session
+from backfill.queue import BackfillQueue
 from backfill.session import BackfillSession
 from tests.temp_helpers import library_tree
 from util.sidecar import sidecar_path

@@ -1,17 +1,19 @@
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-
-import pytest
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from tests.temp_helpers import make_run_record, workspace_temp_dir
-
 from gui.run_record import (
-    RunRecord, format_run_label, load_runs, result_to_dict, save_run,
+    RunRecord,
+    format_run_label,
+    load_runs,
+    result_to_dict,
+    save_run,
 )
+from tests.temp_helpers import workspace_temp_dir
 
 
 @dataclass
@@ -272,7 +274,7 @@ class TestRunRecordFromPipelineResult:
 
         pr = PipelineResult(
             stages=[], has_errors=False, duration_seconds=699.7,
-            started_at=datetime(2026, 7, 15, 3, 20, 0, tzinfo=timezone.utc),
+            started_at=datetime(2026, 7, 15, 3, 20, 0, tzinfo=UTC),
         )
 
         record = RunRecord.from_pipeline_result(pr)
@@ -288,7 +290,7 @@ class TestRunRecordFromPipelineResult:
         from evolver import PipelineResult
         from util import run_log
 
-        started = datetime(2026, 7, 15, 3, 20, 0, tzinfo=timezone.utc)
+        started = datetime(2026, 7, 15, 3, 20, 0, tzinfo=UTC)
         pr = PipelineResult(stages=[], has_errors=False, duration_seconds=699.7,
                             started_at=started)
 

@@ -8,7 +8,7 @@ stale offset from showing somebody else's run under this run's title.
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from tests.temp_helpers import workspace_temp_dir
 from util import run_log
@@ -26,7 +26,7 @@ def _lines(*texts: str) -> bytes:
 
 class TestRunId(unittest.TestCase):
     def test_a_run_is_named_for_the_second_it_began(self):
-        started = datetime(2026, 7, 15, 3, 20, 2, tzinfo=timezone.utc)
+        started = datetime(2026, 7, 15, 3, 20, 2, tzinfo=UTC)
 
         self.assertEqual(run_log.run_id(started), "2026-07-15T03-20-02")
 

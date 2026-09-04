@@ -14,7 +14,7 @@ from html.parser import HTMLParser
 
 
 class Node:
-    def __init__(self, tag: str, attrs: dict[str, str], parent: "Node | None" = None):
+    def __init__(self, tag: str, attrs: dict[str, str], parent: Node | None = None):
         self.tag = tag
         self.attrs = attrs
         self.parent = parent

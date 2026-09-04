@@ -4,12 +4,11 @@ import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
 
 import config
 from util.media_files import is_finalized_video_file
-from util.windows_alert import show_error_window
 from util.variants import UPSCALE_SUFFIX
+from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ class PurgeWeirdResult:
     deleted_weird: int = 0
     deleted_sorted: int = 0
     deleted_metadata: int = 0
-    missing_sorted: List[str] = field(default_factory=list)
+    missing_sorted: list[str] = field(default_factory=list)
 
 
 def run() -> PurgeWeirdResult:
@@ -94,7 +93,7 @@ def _source_name(outbox_file: Path) -> str:
     return source_stem(outbox_file.stem) + outbox_file.suffix
 
 
-def _show_error_window(missing: List[str]) -> None:
+def _show_error_window(missing: list[str]) -> None:
     lines = "\n".join(missing[:30])
     ellipsis = "\n..." if len(missing) > 30 else ""
     msg = (

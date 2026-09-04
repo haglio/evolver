@@ -90,16 +90,15 @@ class TestUpscaleHelpers(unittest.TestCase):
             with override_config(
                 SORTED_DIR=ambient_sorted, OUT_UPSCALED_DIR=ambient_out, WEIRD_DIR=ambient_weird,
                 LOW_DISK_WARNING_GB=10 ** 9,
-            ):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+            ), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(
-                        max_items=5,
-                        sorted_dir=given_sorted,
-                        outbox_dir=given_out,
-                        weird_dir=given_weird,
-                        low_disk_floor_gb=1,
-                    )
+                result = upscale.run(
+                    max_items=5,
+                    sorted_dir=given_sorted,
+                    outbox_dir=given_out,
+                    weird_dir=given_weird,
+                    low_disk_floor_gb=1,
+                )
 
             self.assertEqual(result.processed, 1)
             self.assertTrue((given_out / "landscape" / "examplesource" / "clip one_topaz.mp4").exists())
@@ -202,10 +201,9 @@ class TestUpscaleHelpers(unittest.TestCase):
             with override_config(
                 SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir,
                 UPSCALE_RUN_BUDGET_SECONDS=1, UPSCALE_MIN_START_REMAINING_SECONDS=9999,
-            ):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+            ), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=10)
+                result = upscale.run(max_items=10)
 
             # With budget=0, it should process the first item but stop before the second
             self.assertEqual(result.processed, 1)

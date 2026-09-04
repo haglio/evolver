@@ -4,14 +4,13 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytest
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
 from PyQt6.QtWidgets import QMessageBox, QToolBar
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
-from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
 from gui.toggle_switch import ToggleSwitch
+from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import make_run_record
 

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import config
 from util.media_files import library_videos
-from util.windows_alert import show_error_window
 from util.variants import UPSCALE_SUFFIX, upscaled_stem
+from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 

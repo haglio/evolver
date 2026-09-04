@@ -10,10 +10,8 @@ showing a run in flight, and the pipeline is asked to stop cooperatively.
 import unittest
 from unittest.mock import Mock, patch
 
-
 from gui.settings import EvolverSettings
 from tests.gui_support import build_evolver_app
-
 
 
 class TestWatchdog(unittest.TestCase):

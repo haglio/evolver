@@ -6,7 +6,6 @@ from PyQt6.QtTest import QSignalSpy
 from gui.scheduler import PipelineScheduler
 
 
-
 class TestPipelineScheduler(unittest.TestCase):
 
     def test_emits_run_requested_on_timer_tick(self):

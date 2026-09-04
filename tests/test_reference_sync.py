@@ -6,8 +6,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import reference_sync
-from util import reference_stores
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util import reference_stores
 
 
 def _write_video(path: Path) -> Path:

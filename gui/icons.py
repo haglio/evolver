@@ -17,7 +17,6 @@ apps sit open side by side:
 from __future__ import annotations
 
 from PyQt6.QtGui import QIcon
-
 from shared_ui.icons import glyph_icon
 
 

@@ -27,7 +27,6 @@ from pathlib import Path
 import config
 from util import sidecar, video_type
 from util.media_files import child_dirs, library_videos, remove_empty_dirs, unique_path
-from util.sidecar import sidecar_path
 from util.variants import is_upscaled_stem, sorted_stem_of
 
 log = logging.getLogger(__name__)

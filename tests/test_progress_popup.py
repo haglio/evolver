@@ -5,7 +5,6 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QProgressBar
 
 
-
 class TestPopupConstruction(unittest.TestCase):
     def setUp(self):
         from gui.progress_popup import ProgressPopup
@@ -159,6 +158,7 @@ class TestPopupAutoClose(unittest.TestCase):
 class TestPopupPositioning(unittest.TestCase):
     def test_centers_on_anchor_window(self):
         from PyQt6.QtWidgets import QMainWindow
+
         from gui.progress_popup import ProgressPopup
 
         anchor = QMainWindow()

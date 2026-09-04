@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QPalette
-
 from shared_ui.colors import BLUE, TEXT_PRIMARY
 
 

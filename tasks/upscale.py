@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import sidecar, system_resources, topaz, video_type
+from util import orientation, sidecar, system_resources, topaz, video_type
 from util.media_files import (
     child_dirs,
     is_finalized_video_file,
@@ -18,7 +18,6 @@ from util.media_files import (
 )
 from util.sidecar import sidecar_path, upscaled_video_path
 from util.windows_alert import show_error_window
-from util import orientation
 
 log = logging.getLogger(__name__)
 
