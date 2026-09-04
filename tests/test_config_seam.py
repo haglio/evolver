@@ -25,7 +25,7 @@ import json
 import unittest
 from pathlib import Path
 
-from tests.test_dead_code import PROJECT_ROOT, _source_files
+from tests.product_sources import PROJECT_ROOT, product_sources
 
 # What each module reads off the ambient ``config`` singleton today, held
 # exactly. Lower a number when a conversion removes reads. A number goes UP only
@@ -273,7 +273,7 @@ class _OverlayKeys(ast.NodeVisitor):
 def _trees() -> dict[str, ast.AST]:
     return {
         name: ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
-        for name in _source_files(PROJECT_ROOT)
+        for name in product_sources(PROJECT_ROOT)
     }
 
 

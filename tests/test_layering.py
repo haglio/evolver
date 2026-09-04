@@ -18,7 +18,7 @@ import ast
 import unittest
 from pathlib import Path
 
-from tests.test_dead_code import PROJECT_ROOT, _source_files
+from tests.product_sources import PROJECT_ROOT, product_sources
 
 # Every package and root module of this checkout, so an import of one can be
 # told from an import of a third-party library or the standard one.
@@ -70,7 +70,7 @@ def _edges() -> tuple[dict[str, set[str]], list[str]]:
     """Which allowed edge each import used, and every import that used none."""
     used: dict[str, set[str]] = {}
     unlisted: list[str] = []
-    for name in _source_files(PROJECT_ROOT):
+    for name in product_sources(PROJECT_ROOT):
         source = _package_of(name.replace("/", ".").removesuffix(".py"))
         if source is None:
             continue
