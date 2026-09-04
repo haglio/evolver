@@ -9,9 +9,11 @@ import config
 from tasks import nonai_upscale
 from tests.temp_helpers import (
     make_video,
-    nonai_library_overrides as library_overrides,
     override_config,
     workspace_temp_dir,
+)
+from tests.temp_helpers import (
+    nonai_library_overrides as library_overrides,
 )
 from util import funscript, sidecar, video_type
 

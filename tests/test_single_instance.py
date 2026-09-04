@@ -5,10 +5,8 @@ import os
 import unittest
 from unittest.mock import patch
 
-from tests.gui_support import QAPP
-
 from gui import single_instance
-
+from tests.gui_support import QAPP
 
 
 class TestIsFirstInstance(unittest.TestCase):

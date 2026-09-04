@@ -3,7 +3,6 @@
 from unittest.mock import patch
 
 import pytest
-
 from PyQt6.QtGui import QFontMetrics, QImage
 
 from gui.run_record import RunRecord
@@ -250,7 +249,7 @@ class TestStackedAreaChartPainting:
         named = _ink_count(_render(chart), *text_band)
         with patch.dict(
             "gui.stats_window.STAGE_LABELS",
-            {key: "" for key in STAGE_LABELS},
+            dict.fromkeys(STAGE_LABELS, ""),
             clear=True,
         ):
             blank = _ink_count(_render(chart), *text_band)

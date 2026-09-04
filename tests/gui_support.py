@@ -22,7 +22,7 @@ from unittest.mock import patch
 # developer override it to watch something on a real display.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication  # noqa: E402  -- after the platform is set
+from PyQt6.QtWidgets import QApplication
 
 # Built at import, not in a fixture: the GUI modules construct widgets at class
 # scope and a QApplication has to exist before the first of them is imported.

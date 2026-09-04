@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util import orientation
 from util.ffprobe import get_orientation
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
-from util import orientation
 
 log = logging.getLogger(__name__)
 

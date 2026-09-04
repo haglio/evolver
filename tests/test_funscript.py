@@ -1,8 +1,8 @@
 import unittest
 from pathlib import Path
 
-from util import funscript
 from tests.temp_helpers import override_config
+from util import funscript
 
 
 class TestTrim(unittest.TestCase):

@@ -7,7 +7,6 @@ from evolver import PipelineResult, StageRecord
 from gui.worker import PipelineWorker
 
 
-
 class TestPipelineWorker(unittest.TestCase):
 
     def _run_worker(self, pipeline_result=None, pipeline_error=None, trigger="manual",

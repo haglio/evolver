@@ -66,13 +66,11 @@ class TestSidecarPath(unittest.TestCase):
                 )
 
     def test_rejects_a_video_outside_the_library(self):
-        with workspace_temp_dir() as root:
-            with override_config(
-                VIDEO_LIBRARY_DIR=root / "videos" / "videos",
-                VIDEO_SEARCH_ROOT=root / "videos", METADATA_DIR=root / "metadata",
-            ):
-                with self.assertRaises(ValueError):
-                    sidecar_path(root / "elsewhere" / "clip.mp4")
+        with workspace_temp_dir() as root, override_config(
+            VIDEO_LIBRARY_DIR=root / "videos" / "videos",
+            VIDEO_SEARCH_ROOT=root / "videos", METADATA_DIR=root / "metadata",
+        ), self.assertRaises(ValueError):
+            sidecar_path(root / "elsewhere" / "clip.mp4")
 
 
 if __name__ == "__main__":

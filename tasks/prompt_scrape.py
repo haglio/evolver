@@ -10,7 +10,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from email.utils import parsedate
 from pathlib import Path
+from urllib.parse import urlparse
 
+import config
+from tasks import origenerator_metadata
+from tasks.purge_weird import source_stem
+from util import orientation, relative_dates, sidecar, video_type
+from util.headless_browser import fetch_dom, find_browser_executable
 from util.html_query import (
     Node,
     extract_label_values,
@@ -19,16 +25,8 @@ from util.html_query import (
     query_selector,
     text_content,
 )
-from urllib.parse import urlparse
-
-import config
-from tasks import origenerator_metadata
-from tasks.purge_weird import source_stem
-from util import relative_dates, sidecar, video_type
-from util.headless_browser import fetch_dom, find_browser_executable
 from util.media_files import child_dirs, library_videos
 from util.sidecar import sidecar_path, upscaled_video_path, write
-from util import orientation
 
 log = logging.getLogger(__name__)
 

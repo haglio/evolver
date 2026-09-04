@@ -2,11 +2,10 @@ import itertools
 import logging
 import subprocess
 from contextlib import ExitStack
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-
-from pathlib import Path
 
 import config
 import evolver

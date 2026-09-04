@@ -4,7 +4,6 @@ and the Startup shortcut is created or removed."""
 from unittest.mock import patch
 
 import pytest
-
 from PyQt6.QtWidgets import QDialog
 
 from gui.settings import EvolverSettings

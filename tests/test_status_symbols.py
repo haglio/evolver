@@ -3,10 +3,8 @@
 import inspect
 import unittest
 
-
 from gui import status_symbols
 from gui.status_symbols import mark_for
-
 
 
 class TestMarkFor(unittest.TestCase):

@@ -40,12 +40,11 @@ from tasks.nonai_queue import (
     collect_candidates,
     relpath,
 )
-from util import ffprobe, nonai_job, processes, sidecar, system_resources
+from util import ffprobe, nonai_job, orientation, processes, sidecar, system_resources
 from util.media_files import is_finalized_video_file, is_partial_video_path
 from util.nonai_library import buckets, stage_dirs
 from util.nonai_retire import archived_original, carry_metadata, retire_original
 from util.variants import is_processed_stem, strip_processing_suffixes
-from util import orientation
 
 log = logging.getLogger(__name__)
 

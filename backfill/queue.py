@@ -7,9 +7,9 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import config
+from util import orientation
 from util.media_files import library_videos
 from util.sidecar import action_of, read, sidecar_path, wrong_action_of
-from util import orientation
 
 # Portrait first, and that is not cosmetic: it is the order the tool asks a
 # human about, and most of the unlabeled queue is portrait.

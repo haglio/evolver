@@ -130,13 +130,8 @@ class TestBookmarksSync(unittest.TestCase):
             user_data_dir, bookmarks_path = chrome_profile(root)
             favs_path.write_text(
                 "local_file,web_url\n"
-                '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/keep\n'
-                '"=HYPERLINK(""file:///{}"";""{}"")",https://example.com/drop\n'.format(
-                    existing_media.as_posix(),
-                    str(existing_media),
-                    missing_media.as_posix(),
-                    str(missing_media),
-                ),
+                f'"=HYPERLINK(""file:///{existing_media.as_posix()}"";""{existing_media!s}"")",https://example.com/keep\n'
+                f'"=HYPERLINK(""file:///{missing_media.as_posix()}"";""{missing_media!s}"")",https://example.com/drop\n',
                 encoding="utf-8",
             )
 

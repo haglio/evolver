@@ -6,10 +6,10 @@ import dataclasses
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from util import run_log
 
@@ -92,7 +92,7 @@ def utc_time(stamp: str) -> datetime:
     A record stores them naive and means UTC by them -- the convention every
     reader has to know, and now knows in one place rather than at each of them.
     """
-    return datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(stamp).replace(tzinfo=UTC)
 
 
 def format_run_label(started_at: str, duration_seconds: float) -> str:

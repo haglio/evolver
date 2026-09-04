@@ -6,9 +6,8 @@ from unittest.mock import patch
 
 import config
 from tasks import prompt_scrape
-from util import html_query
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util import sidecar, video_type
+from util import html_query, sidecar, video_type
 
 
 class TestPromptScrape(unittest.TestCase):

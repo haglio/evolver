@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import qtawesome as qta
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
-import qtawesome as qta
-
 import config
-
 from gui.icons import quit_icon, restart_icon, run_now_icon
 
 _ICON_COLOR = "#333"

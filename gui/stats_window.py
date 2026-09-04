@@ -225,7 +225,7 @@ class StackedAreaChart(QWidget):
         font = QFont()
         font.setPointSize(8)
         painter.setFont(font)
-        if _LIMIT_SECONDS <= y_max:
+        if y_max >= _LIMIT_SECONDS:
             limit_y = int(to_y(_LIMIT_SECONDS))
             pen = QPen(QColor(0x80, 0x80, 0x80), 1, Qt.PenStyle.DotLine)
             painter.setPen(pen)

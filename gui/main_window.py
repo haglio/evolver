@@ -24,15 +24,14 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.spacing import BUTTON_ICON
 
 import config
-from gui.run_record import RunRecord, load_runs, format_run_label
+from gui.icons import quit_icon, restart_icon, run_now_icon
+from gui.run_record import RunRecord, format_run_label, load_runs
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from gui.toggle_switch import ToggleSwitch
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
-
-from gui.icons import quit_icon, restart_icon, run_now_icon
-from shared_ui.spacing import BUTTON_ICON
 
 _ICON_COLOR = "#ddd"
 

@@ -1,9 +1,8 @@
 import json
 import unittest
 
-from tests.temp_helpers import workspace_temp_dir
-
 from gui.settings import EvolverSettings
+from tests.temp_helpers import workspace_temp_dir
 
 
 class TestEvolverSettings(unittest.TestCase):

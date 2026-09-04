@@ -35,17 +35,16 @@ class TestMalformedExtensions(unittest.TestCase):
 
     def test_an_underscore_or_a_hyphen_separator_is_repaired_too(self):
         for name, repaired in (("clip_mkv", "clip.mkv"), ("clip-webm", "clip.webm")):
-            with self.subTest(name=name):
-                with workspace_temp_dir() as root:
-                    videos = root / "videos"
-                    videos.mkdir()
-                    (videos / name).write_bytes(b"video")
+            with self.subTest(name=name), workspace_temp_dir() as root:
+                videos = root / "videos"
+                videos.mkdir()
+                (videos / name).write_bytes(b"video")
 
-                    with override_config(VIDEO_LIBRARY_DIR=videos):
-                        result = stray_files.run()
+                with override_config(VIDEO_LIBRARY_DIR=videos):
+                    result = stray_files.run()
 
-                    self.assertEqual(result.renamed, 1)
-                    self.assertTrue((videos / repaired).is_file())
+                self.assertEqual(result.renamed, 1)
+                self.assertTrue((videos / repaired).is_file())
 
     def test_a_taken_repaired_name_is_reported_rather_than_overwritten(self):
         with workspace_temp_dir() as root:

@@ -117,14 +117,12 @@ class TestBuildMetadata(unittest.TestCase):
         with workspace_temp_dir() as root:
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", outputs=["other.mp4"])])
-            with _no_probe():
-                with self.assertRaises(LookupError):
-                    om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
+            with _no_probe(), self.assertRaises(LookupError):
+                om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
 
     def test_raises_when_db_missing(self):
-        with workspace_temp_dir() as root:
-            with self.assertRaises(FileNotFoundError):
-                om.build_metadata(Path("x.mp4"), db_path=root / "nope.db")
+        with workspace_temp_dir() as root, self.assertRaises(FileNotFoundError):
+            om.build_metadata(Path("x.mp4"), db_path=root / "nope.db")
 
     def test_includes_resolution_and_aspect_from_probe(self):
         with workspace_temp_dir() as root:

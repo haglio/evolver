@@ -12,10 +12,11 @@ path in Windows form. Repointing a favorite has to rewrite both halves.
 from __future__ import annotations
 
 import csv
+import io
 import re
 from pathlib import Path
 from urllib.parse import unquote, urlparse
-import io
+
 from util.json_store import atomic_write_text
 
 _HYPERLINK_RE = re.compile(r'^=HYPERLINK\("([^"]+)"[;,]"([^"]*)"\)\s*$', re.IGNORECASE)
