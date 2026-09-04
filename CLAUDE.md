@@ -67,7 +67,15 @@ replays the launch's whole import phase.
 
 ## Repo-specific gotchas
 
-(None yet — add entries here when they materially affect launches, tests, or architectural decisions.)
+- **Get his eyes on a stage before the PR.** From your worktree, copy the
+  primary's `content.local.json` in (git-ignored; without it the branch runs
+  against the example overlay's placeholder library), then leave
+  `Verify <branch>.lnk` in the primary checkout (ignored there) that runs
+  `.venv\Scripts\python.exe tools\run_stage.py <stage module>` from the
+  worktree in a console that stays open, and hand him the link. The stage runs
+  for real against the library, once — which is what the tray does every ten
+  minutes once it lands — so only a stage whose `run()` takes no arguments
+  can be shown this way. Take the `.lnk` back out when the PR merges.
 
 ## Test fixtures must be fabricated, never copied from the real library
 

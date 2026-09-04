@@ -52,3 +52,6 @@ tray_crash.log
 # pCloud conflict copies (this dir syncs via pCloud). Never our files; an
 # untracked one dirties main and blocks merges. '[' escaped to match literally.
 *\[conflicted*
+
+# The Verify <branch>.lnk an agent leaves in the primary checkout (see CLAUDE.md)
+*.lnk
