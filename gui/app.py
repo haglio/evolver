@@ -12,7 +12,7 @@ from PyQt6.QtNetwork import QLocalServer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 import config
-from gui import process_identity, single_instance
+from gui import peer_watch, process_identity, single_instance
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.presence_throttle import PresenceThrottle
@@ -83,6 +83,16 @@ class EvolverApp:
         self._presence = PresenceThrottle(
             lambda: self._settings.nonai_upscale_enabled)
 
+        # The other half of the pair that keeps both apps up. Evolver starts the
+        # broker's tray when it finds it gone, and that tray does the same for
+        # Evolver -- which is where Evolver's own supervision comes from, since
+        # the tray is revived by a scheduled task and Evolver is revived by the
+        # tray. See gui/peer_watch.py.
+        self._peer = peer_watch.watch_the_broker()
+        self._peer_timer = QTimer()
+        self._peer_timer.setInterval(peer_watch.PEER_CHECK_INTERVAL_MS)
+        self._peer_timer.timeout.connect(self._peer.tick)
+
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.run_requested.connect(self._start_run)
         self._scheduler.status_changed.connect(self._update_status_display)
@@ -99,7 +109,7 @@ class EvolverApp:
             "stats": self._show_stats,
             "backfill": self._launch_backfill,
             "restart": self._restart,
-            "quit": self._quit,
+            "quit": self._quit_by_request,
         })
 
         self._app.commitDataRequest.connect(self._on_session_end)
@@ -127,10 +137,16 @@ class EvolverApp:
         it too late.
         """
         process_identity.claim(int(self._window.winId()))
+        # Whatever the user wanted the last time they closed Evolver, starting it
+        # is them wanting it up now -- so the stand-down goes before the first
+        # peer check, not after it.
+        peer_watch.clear_evolver_stand_down()
         self._window.refresh_history()
         self._presence.start()
         self._tray.show()
         self._scheduler.start()
+        self._peer_timer.start()
+        self._peer.tick()
         if "--show-window" in sys.argv:
             self._show_window()
 
@@ -337,7 +353,7 @@ class EvolverApp:
             "Windows session end requested:",
             f"allowsInteraction={manager.allowsInteraction()}\n",
         )
-        self._quit()
+        self._shutdown()
 
     def _confirm_quit(self):
         result = QMessageBox.question(
@@ -348,7 +364,7 @@ class EvolverApp:
             QMessageBox.StandardButton.No,
         )
         if result == QMessageBox.StandardButton.Yes:
-            self._quit()
+            self._quit_by_request()
 
     def _restart(self):
         cmd = [sys.executable, str(config.PROJECT_DIR / "tray_app.py")]
@@ -361,11 +377,24 @@ class EvolverApp:
         )
         if show:
             ctypes.windll.user32.AllowSetForegroundWindow(proc.pid)
-        self._quit()
+        self._shutdown()
 
-    def _quit(self):
+    def _quit_by_request(self):
+        """Quit because the user asked for it — the one quit the broker honors.
+
+        Every other way Evolver goes down leaves no mark and is undone within the
+        quarter hour: a crash, a kill from the task list, the quit above that
+        Windows asks for when it announces a session end and then, sometimes,
+        cancels. This one leaves a mark, so closing Evolver on purpose is not
+        argued with. Starting it again clears the mark; see start().
+        """
+        peer_watch.stand_evolver_down()
+        self._shutdown()
+
+    def _shutdown(self):
         if self._worker is not None and self._worker.isRunning():
             self._worker.wait(5000)
         self._scheduler.stop()
+        self._peer_timer.stop()
         self._tray.hide()
         self._app.quit()

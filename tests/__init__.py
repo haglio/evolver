@@ -21,3 +21,16 @@ content.LOCAL_CONTENT = content.EXAMPLE_CONTENT
 # has no Windows — which made this gag, not the platform, the thing that decided
 # whether the suite collected at all.
 patch("util.windows_alert._message_box_w", return_value=1).start()
+
+# No test may write or delete the stand-down marker. It lives under LOCALAPPDATA,
+# outside every checkout, and it is the file that tells the broker whether the
+# Evolver the user is running was closed on purpose -- so a suite run that
+# cleared one would put their app back up half an hour after they closed it.
+# Tests that assert on these patch them again themselves, which nests fine.
+# Never stopped -- an invariant, not a fixture.
+#
+# gui.peer_watch's other half, launching the broker, needs no gag: it starts a
+# launcher found through the overlay pinned above, and the example overlay's
+# project root does not exist. A test that wants it stubbed patches it.
+patch("gui.peer_watch.stand_evolver_down").start()
+patch("gui.peer_watch.clear_evolver_stand_down").start()

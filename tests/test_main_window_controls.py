@@ -548,7 +548,7 @@ class TestToolbarAppWiring:
     def test_the_quit_button_asks_first_and_a_yes_quits(self, app):
         box, mock_box = self._quit_confirmation(QMessageBox.StandardButton.Yes)
         try:
-            with patch.object(app, "_quit") as mock_quit:
+            with patch.object(app, "_shutdown") as mock_quit:
                 app._window.quit_action.trigger()
         finally:
             box.stop()
@@ -558,7 +558,7 @@ class TestToolbarAppWiring:
     def test_a_no_to_the_quit_confirmation_changes_nothing(self, app):
         box, _ = self._quit_confirmation(QMessageBox.StandardButton.No)
         try:
-            with patch.object(app, "_quit") as mock_quit:
+            with patch.object(app, "_shutdown") as mock_quit:
                 app._window.quit_action.trigger()
         finally:
             box.stop()
@@ -618,7 +618,7 @@ class TestToolbarAppWiring:
 
     def test_the_restart_button_relaunches_the_app_and_quits_this_one(self, app):
         with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_quit") as mock_quit:
+             patch.object(app, "_shutdown") as mock_quit:
             app._window.restart_action.trigger()
         argv = mock_popen.call_args.args[0]
         assert any("tray_app.py" in str(part) for part in argv)
@@ -626,7 +626,7 @@ class TestToolbarAppWiring:
 
     def test_the_trays_restart_item_relaunches_too(self, app):
         with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_quit") as mock_quit:
+             patch.object(app, "_shutdown") as mock_quit:
             app._tray.restart_action.trigger()
         argv = mock_popen.call_args.args[0]
         assert any("tray_app.py" in str(part) for part in argv)

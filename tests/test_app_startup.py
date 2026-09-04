@@ -343,7 +343,7 @@ class TestSessionManagement:
         app = build_evolver_app(request)
 
         mock_manager = MagicMock()
-        with patch.object(app, "_quit") as mock_quit, \
+        with patch.object(app, "_shutdown") as mock_quit, \
              patch("gui.app.crash_log.write_info"):
             app._on_session_end(mock_manager)
 
@@ -357,7 +357,7 @@ class TestRestart:
         app = build_evolver_app(request)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_quit") as mock_quit:
+             patch.object(app, "_shutdown") as mock_quit:
             app._restart()
             mock_popen.assert_called_once()
             mock_quit.assert_called_once()
@@ -370,7 +370,7 @@ class TestRestart:
         app = build_evolver_app(request)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_quit"):
+             patch.object(app, "_shutdown"):
             app._restart()
             args = mock_popen.call_args[0][0]
             assert args[0] == real_sys.executable
@@ -380,7 +380,7 @@ class TestRestart:
         app = build_evolver_app(request)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_quit"), \
+             patch.object(app, "_shutdown"), \
              patch.object(app._window, "isVisible", return_value=True), \
              patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow"):
             app._restart()
@@ -391,7 +391,7 @@ class TestRestart:
         app = build_evolver_app(request)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_quit"), \
+             patch.object(app, "_shutdown"), \
              patch.object(app._window, "isVisible", return_value=False):
             app._restart()
             args = mock_popen.call_args[0][0]
@@ -403,7 +403,7 @@ class TestRestart:
         mock_proc = MagicMock()
         mock_proc.pid = 12345
         with patch("gui.app.subprocess.Popen", return_value=mock_proc), \
-             patch.object(app, "_quit"), \
+             patch.object(app, "_shutdown"), \
              patch.object(app._window, "isVisible", return_value=True), \
              patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as mock_allow:
             app._restart()
@@ -413,7 +413,7 @@ class TestRestart:
         app = build_evolver_app(request)
 
         with patch("gui.app.subprocess.Popen"), \
-             patch.object(app, "_quit"), \
+             patch.object(app, "_shutdown"), \
              patch.object(app._window, "isVisible", return_value=False), \
              patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as mock_allow:
             app._restart()

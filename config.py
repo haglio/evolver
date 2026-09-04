@@ -78,6 +78,12 @@ ORIGENERATOR_DB_PATH = project_dir("origenerator") / "state" / "origenerator.db"
 # transcript splits, and favorites on paths that no longer exist.
 CLIPPER_SESSIONS_DIR = project_dir("clipper") / "sessions"
 SCRIPTURE_SESSIONS_DIR = project_dir("scripture") / "sessions"
+# The OSR2 broker is the sibling Evolver pairs with to stay up: each watches the
+# other and starts it again when it finds it gone (gui/peer_watch.py). This is
+# the launcher Evolver runs to do that. A checkout with no broker beside it —
+# every public one — leaves this pointing at nothing, which is how the watch
+# turns itself off.
+BROKER_TRAY_LAUNCHER = project_dir("broker") / "launch_broker_tray.vbs"
 VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
 # Where to hunt for a video a stored reference has lost track of. Wider than the
 # library itself, because videos also get parked in sibling folders such as
