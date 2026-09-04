@@ -91,6 +91,9 @@ VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
 # to be followed rather than dropped.
 VIDEO_SEARCH_ROOT = BASE_DIR / "videos"
 METADATA_DIR = BASE_DIR / "videos" / "metadata"
+# Warm Gun's journal lands here through the folder sync the library rides,
+# so the phone's viewing is read as a local file (tasks/watch_weights.py).
+WARM_GUN_JOURNAL_DIR = BASE_DIR / "videos" / "warm_gun"
 SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
@@ -215,11 +218,14 @@ NONAI_RETIRED_ROOT = retired_root(_CONTENT)
 # sync service covering the project dir kept renaming the in-flight job file to
 # "nonai_upscale_job [conflicted N].json" mid-run, which orphaned live encodes
 # (they piled up unsupervised and crashed the machine). LOCALAPPDATA is local-only.
-NONAI_STATE_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver"
-NONAI_JOB_STATE_FILE = NONAI_STATE_DIR / "nonai_upscale_job.json"
-NONAI_ATTEMPTS_FILE = NONAI_STATE_DIR / "nonai_upscale_attempts.json"
-NONAI_COOLDOWN_FILE = NONAI_STATE_DIR / "nonai_upscale_cooldown.json"
-NONAI_FFMPEG_LOG = NONAI_STATE_DIR / "nonai_upscale_ffmpeg.log"
+LOCAL_STATE_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver"
+NONAI_JOB_STATE_FILE = LOCAL_STATE_DIR / "nonai_upscale_job.json"
+NONAI_ATTEMPTS_FILE = LOCAL_STATE_DIR / "nonai_upscale_attempts.json"
+NONAI_COOLDOWN_FILE = LOCAL_STATE_DIR / "nonai_upscale_cooldown.json"
+NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
+# The last phone favorite applied to Fun Time's favorites, so one is applied
+# exactly once and Fun Time can undo it (tasks/watch_weights.py).
+WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
 NONAI_SKIP_MANIFEST = PROJECT_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
 # The counterpart to the skip list: videos to encode next, in the order listed.
 # A pin outranks every ordering heuristic and re-queues a video the bucket

@@ -39,6 +39,7 @@ def _stage_mocks() -> dict:
         "clip_scripts_run": Mock(),
         "scene_scripts_run": Mock(),
         "reference_sync_run": Mock(return_value=Mock(ok=True)),
+        "watch_weights_run": Mock(return_value=Mock(ok=True)),
         "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
         "correspondence_run": Mock(return_value=Mock(ok=True)),
         "has_pending_work": Mock(return_value=False),
@@ -60,6 +61,7 @@ _STAGE_PATCHES = [
     ("evolver.nonai_upscale.run", "nonai_run"),
     ("evolver.nonai_group.run", "nonai_group_run"),
     ("evolver.reference_sync.run", "reference_sync_run"),
+    ("evolver.watch_weights.run", "watch_weights_run"),
     ("evolver.bookmarks_sync.run", "bookmarks_sync_run"),
     ("evolver.check_correspondence.run", "correspondence_run"),
     ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
@@ -278,7 +280,7 @@ class TestRunPipeline:
         )
         with stack:
             result = evolver.run_pipeline()
-        assert len(result.stages) == 16
+        assert len(result.stages) == len(ALL_STAGES)
         for stage in result.stages:
             assert stage.status != "skipped", \
                 f"stage {stage.name!r} must actually run in this test"
@@ -584,7 +586,7 @@ class TestCooperativeStop:
         with _patched_stages(mocks):
             result = evolver.run_pipeline(should_stop=lambda: False)
 
-        assert len(result.stages) == 16
+        assert len(result.stages) == len(ALL_STAGES)
 
 
 class TestCheckDependenciesWindowSuppression:

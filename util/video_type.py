@@ -44,6 +44,8 @@ part of the library already done without probing four hundred files a tick.
 
 from __future__ import annotations
 
+from util import watch
+
 GENAU_CLIP = "genau_clip"
 EXCERPT = "excerpt"
 SHORT = "short"
@@ -142,7 +144,7 @@ def only_the_video_itself(payload: dict) -> bool:
     adding a second automatic field cannot quietly turn a bare sidecar back
     into evidence — which is exactly what the running time would have done.
     """
-    if set(payload) != {BLOCK}:
+    if set(payload) - watch.STAMPED_KEYS != {BLOCK}:
         return False
     block = payload[BLOCK]
     return isinstance(block, dict) and set(block) <= _OWN_FIELDS

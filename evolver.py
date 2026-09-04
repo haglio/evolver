@@ -38,6 +38,7 @@ from tasks import (
     stray_files,
     upscale,
     video_types,
+    watch_weights,
 )
 from util import processes, run_log, system_resources
 
@@ -68,6 +69,7 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "genau_deliver": lambda r: bool(r.failed),
     "verify": lambda r: not r.ok,
     "references": lambda r: not r.ok,
+    "watch_weights": lambda r: not r.ok,
     "bookmarks": lambda r: not r.ok,
     "scripts": lambda r: not r.ok,
     "dupes": lambda r: not r.ok,
@@ -294,6 +296,9 @@ def run_pipeline(
         # touch favs.csv, and bookmarks drops the rows whose file is missing, so a
         # favorite has to be repointed before it can be mistaken for a dead one.
         _run_stage("references", reference_sync.run)
+        # Between the two: it reads favs.csv only once the references stage has
+        # repointed it, and adds the phone's favorites for bookmarks to pick up.
+        _run_stage("watch_weights", watch_weights.run)
         _run_stage("bookmarks", bookmarks_sync.run)
         # Before the scripts sync: these write new funscripts into the tree, and the
         # sync is what settles them across a clip's version family. The two carry a

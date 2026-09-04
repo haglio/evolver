@@ -127,6 +127,13 @@ class TestTellingABareSidecarApart(unittest.TestCase):
             {"video": {"type": video_type.SHORT, "duration_seconds": 4.0}}
         ))
 
+    def test_the_viewing_stamped_beside_them_is_still_nothing_else(self):
+        self.assertTrue(video_type.only_the_video_itself({
+            "video": {"type": video_type.SHORT},
+            "watch": {"completions": 2, "skips": 0, "locks": 0, "weight": 1.5874},
+            "favorite": True,
+        }))
+
     def test_a_generation_beside_them_is_something_else(self):
         self.assertFalse(video_type.only_the_video_itself(
             {"video": {"type": video_type.SHORT, "prompt": "a prompt"}}
