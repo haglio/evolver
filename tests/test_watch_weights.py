@@ -24,7 +24,7 @@ class _Setting(LaneLibrary):
 
     def config(self, **extra):
         return super().config(
-            WARM_GUN_JOURNAL_DIR=self.journal_dir,
+            WARM_GUN_JOURNAL_DIRS=(self.journal_dir,),
             FUN_TIME_WATCH_STATS_FILE=self.stats,
             FUN_TIME_FAVS_FILE=self.favs,
             WARM_GUN_FAVORITES_CURSOR_FILE=self.cursor,

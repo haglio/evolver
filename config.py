@@ -91,9 +91,29 @@ VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
 # to be followed rather than dropped.
 VIDEO_SEARCH_ROOT = BASE_DIR / "videos"
 METADATA_DIR = BASE_DIR / "videos" / "metadata"
-# Warm Gun's journal lands here through the folder sync the library rides,
-# so the phone's viewing is read as a local file (tasks/watch_weights.py).
-WARM_GUN_JOURNAL_DIR = BASE_DIR / "videos" / "warm_gun"
+
+
+def warm_gun_journal_dirs(content: dict[str, Any], base_dir: Path) -> tuple[Path, ...]:
+    """Every folder Warm Gun's journal is read from, in order.
+
+    Inside the library is where it belongs: the folder sync that carries the
+    videos carries the journal too, so the phone's viewing arrives as an
+    ordinary local file. ``warm_gun_outbox`` names the folder of its own the
+    phone's app writes to instead, outside the library and shared by some other
+    route; it is read as well, so the phone's viewing lands here whichever
+    folder the app has been taught to write to, and a line reached through both
+    still counts once. The key exists so that the app can be changed and the
+    folder retired without a day where the two sides disagree; drop it once the
+    folder is gone.
+    """
+    dirs = [base_dir / "videos" / "warm_gun"]
+    outbox = content.get("warm_gun_outbox")
+    if outbox:
+        dirs.append(Path(outbox))
+    return tuple(dirs)
+
+
+WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, BASE_DIR)
 SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"

@@ -27,21 +27,24 @@ class TestReadJournal(unittest.TestCase):
             ])
             _journal(root / "b.jsonl", [{"t": 15, "event": "lock", "path": "genau/clips/loop.mp4"}])
 
-            self.assertEqual(warm_gun.read_journal(root), [
+            self.assertEqual(warm_gun.read_journal([root]), [
                 Event(10, "completion", "1_sorted/provider2/portrait/a.mp4"),
                 Event(15, "lock", "genau/clips/loop.mp4"),
                 Event(20, "skip", "1_sorted/provider2/portrait/b.mp4"),
             ])
 
     def test_a_line_present_in_two_journals_counts_once(self):
-        """A copy seeded beside the phone's own file, or the phone re-uploading
-        its whole history, must not double every count."""
+        """A copy seeded beside the phone's own file, the phone re-uploading its
+        whole history, or the same journal reached through two folders, must not
+        double every count."""
         with workspace_temp_dir() as root:
             line = {"t": 10, "event": "completion", "path": "1_sorted/provider2/portrait/a.mp4"}
-            _journal(root / "seeded.jsonl", [line])
-            _journal(root / "phone.jsonl", [line, line])
+            _journal(root / "library" / "seeded.jsonl", [line])
+            _journal(root / "outbox" / "phone.jsonl", [line, line])
 
-            self.assertEqual(len(warm_gun.read_journal(root)), 1)
+            self.assertEqual(
+                len(warm_gun.read_journal([root / "library", root / "outbox"])), 1
+            )
 
     def test_a_line_that_is_not_a_record_is_skipped(self):
         with workspace_temp_dir() as root:
@@ -55,13 +58,13 @@ class TestReadJournal(unittest.TestCase):
             ])
 
             self.assertEqual(
-                warm_gun.read_journal(root),
+                warm_gun.read_journal([root]),
                 [Event(4, "skip", "1_sorted/provider2/portrait/a.mp4")],
             )
 
     def test_no_folder_means_no_events(self):
         with workspace_temp_dir() as root:
-            self.assertEqual(warm_gun.read_journal(root / "absent"), [])
+            self.assertEqual(warm_gun.read_journal([root / "absent"]), [])
 
 
 class TestLibraryVideo(unittest.TestCase):
