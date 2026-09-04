@@ -18,7 +18,7 @@ from gui import main_window
 from gui.stats_window import STAGE_COLORS
 from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 from tests.color_support import band_fill, delta_e
-from tests.test_dead_code import PROJECT_ROOT, _source_files
+from tests.product_sources import PROJECT_ROOT, product_sources
 from tests.test_evolver import _patched_stages, _stage_mocks
 
 # The stages with no `_STAGE_FAILED` rule, and why each one has none: nothing
@@ -207,7 +207,7 @@ class TestStageRegistry(unittest.TestCase):
         worst of it was: twenty "Stage N" mentions across a module list and a
         page of notes, in two numbering schemes, neither the registry's.
         """
-        scanned = _source_files(PROJECT_ROOT) + ["README.md", "docs/maintenance_notes.md"]
+        scanned = product_sources(PROJECT_ROOT) + ["README.md", "docs/maintenance_notes.md"]
         offenders = sorted(
             f"{name}:{i}"
             for name in scanned

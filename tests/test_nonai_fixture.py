@@ -19,8 +19,8 @@ import ast
 import unittest
 from pathlib import Path
 
+from tests.product_sources import PROJECT_ROOT
 from tests.temp_helpers import nonai_library_overrides, workspace_temp_dir
-from tests.test_dead_code import PROJECT_ROOT
 
 # The stage, its queue, its progress accounting, the library shape they read it
 # through, and the three helpers that resolve a library file's path or launch
