@@ -212,14 +212,5 @@ class TestGenauDeliverResultSurface(unittest.TestCase):
         )
 
 
-class TestGenauDeliverResultSurface(unittest.TestCase):
-    def test_the_result_carries_only_what_a_reader_consults(self):
-        """Every field lands in a run record; one nothing reads is dead weight."""
-        self.assertEqual(
-            {f.name for f in dataclasses.fields(genau_deliver.GenauDeliverResult)},
-            {"delivered", "failed"},
-        )
-
-
 if __name__ == "__main__":
     unittest.main()
