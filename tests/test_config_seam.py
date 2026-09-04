@@ -63,6 +63,10 @@ CONFIG_REFERENCE_LEDGER = {
     "evolver.py": 9,
     "gui/app.py": 7,
     "gui/main_window.py": 2,
+    # The broker's launcher, so a check that finds the broker gone has something
+    # to start. Where the sibling checkout is is config's business, not this
+    # module's.
+    "gui/peer_watch.py": 1,
     "gui/presence_throttle.py": 1,
     "gui/process_identity.py": 2,
     "gui/settings.py": 2,

@@ -52,12 +52,13 @@ def build_evolver_app(owner):
 def retire_evolver_app(app) -> None:
     """Stop what an ``EvolverApp`` started and let go of the shared application.
 
-    Not ``_quit()``: that asks the real application to exit, which would take the
-    suite's own QApplication with it. This undoes construction instead -- both
-    timers, the session-end connection, the tray and the window.
+    Not ``_shutdown()``: that asks the real application to exit, which would take
+    the suite's own QApplication with it. This undoes construction instead -- all
+    three timers, the session-end connection, the tray and the window.
     """
     app._presence.stop()
     app._watchdog.stop()
+    app._peer_timer.stop()
     app._scheduler.stop()
     try:
         app._app.commitDataRequest.disconnect(app._on_session_end)
