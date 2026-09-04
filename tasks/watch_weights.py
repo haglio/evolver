@@ -45,7 +45,7 @@ class WatchWeightsResult:
 def run() -> WatchWeightsResult:
     result = WatchWeightsResult()
     log.info("=== Stage: watch weights ===")
-    events = warm_gun.read_journal(config.WARM_GUN_JOURNAL_DIR)
+    events = warm_gun.read_journal(config.WARM_GUN_JOURNAL_DIRS)
     videos = {event.path: warm_gun.library_video(event.path) for event in events}
     result.unmapped = sum(1 for event in events if videos[event.path] is None)
     _apply_phone_favorites(events, videos, result)

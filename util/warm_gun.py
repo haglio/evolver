@@ -5,6 +5,7 @@ video by the lane it was played from — ``1_sorted/<source>/<orientation>/x.mp4
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,15 +22,21 @@ class Event:
     path: str
 
 
-def read_journal(directory: Path) -> list[Event]:
-    if not directory.is_dir():
-        return []
+def read_journal(directories: Iterable[Path]) -> list[Event]:
+    """Every event the journals under *directories* record, in time order.
+
+    A set, so a line reached twice — the same journal read through two folders,
+    or the phone re-uploading its whole history — counts once.
+    """
     events: set[Event] = set()
-    for journal in sorted(directory.glob(JOURNAL_PATTERN)):
-        for line in journal.read_text(encoding="utf-8").splitlines():
-            event = _event(line)
-            if event is not None:
-                events.add(event)
+    for directory in directories:
+        if not directory.is_dir():
+            continue
+        for journal in sorted(directory.glob(JOURNAL_PATTERN)):
+            for line in journal.read_text(encoding="utf-8").splitlines():
+                event = _event(line)
+                if event is not None:
+                    events.add(event)
     return sorted(events)
 
 

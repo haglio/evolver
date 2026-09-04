@@ -131,3 +131,22 @@ class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestWarmGunJournalDirs(unittest.TestCase):
+    def test_the_library_holds_the_journal_when_the_overlay_says_nothing(self):
+        self.assertEqual(
+            config.warm_gun_journal_dirs({}, Path("L:/library")),
+            (Path("L:/library/videos/warm_gun"),),
+        )
+
+    def test_the_folder_the_phone_still_writes_to_is_read_as_well(self):
+        self.assertEqual(
+            config.warm_gun_journal_dirs({"warm_gun_outbox": "S:/WarmGun"}, Path("L:/library")),
+            (Path("L:/library/videos/warm_gun"), Path("S:/WarmGun")),
+        )
+
+    def test_an_empty_value_counts_as_unset(self):
+        self.assertEqual(
+            len(config.warm_gun_journal_dirs({"warm_gun_outbox": ""}, Path("L:/library"))), 1
+        )

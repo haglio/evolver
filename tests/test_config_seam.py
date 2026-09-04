@@ -123,11 +123,12 @@ OVERLAY_KEYS = {
     "scrape_provider",
     "scrape_provider.base_url",
     "scrape_provider.source",
+    "warm_gun_outbox",
 }
 
-# The two the overlay may leave out; both are documented as optional and both
-# have a fallback, so the committed example does not carry them.
-OPTIONAL_OVERLAY_KEYS = {"project_roots", "retired_root"}
+# The three the overlay may leave out; each is documented as optional and each
+# has a fallback, so the committed example does not carry them.
+OPTIONAL_OVERLAY_KEYS = {"project_roots", "retired_root", "warm_gun_outbox"}
 
 
 def _config_references(tree: ast.AST) -> int:
