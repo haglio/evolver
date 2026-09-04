@@ -89,7 +89,9 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/sort.py": 2,
     "tasks/stray_files.py": 8,
     "tasks/upscale.py": 17,
-    "tasks/video_types.py": 14,
+    "tasks/video_types.py": 5,
+    # The lane walk it used to do itself.
+    "util/lanes.py": 9,
     "util/funscript.py": 3,
     "util/media_files.py": 1,
     "util/nonai_library.py": 5,
