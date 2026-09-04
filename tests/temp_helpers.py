@@ -90,6 +90,38 @@ def library_tree(**config_extra):
             yield tree
 
 
+class LaneLibrary:
+    """The folders a library spans across its three lanes, wired into config together."""
+
+    def __init__(self, root: Path):
+        videos = root / "videos"
+        self.library = videos / "videos"
+        self.ai = self.library / "2D" / "AI"
+        self.sorted_dir = self.ai / "1_sorted"
+        self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
+        self.non_ai = self.library / "2D" / "non_AI"
+        self.genau_clips = videos / "genau" / "clips"
+        self.metadata = videos / "metadata"
+        self.search_root = videos
+
+    def config(self, genau_source="example-loop-clips", **extra):
+        settings = {
+            "VIDEO_LIBRARY_DIR": self.library, "VIDEO_SEARCH_ROOT": self.search_root,
+            "METADATA_DIR": self.metadata, "SORTED_DIR": self.sorted_dir,
+            "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
+            "GENAU_CLIPS_DIR": self.genau_clips, "GENAU_SOURCE": genau_source,
+            "EXCERPT_FOLDERS": (),
+        }
+        settings.update(extra)
+        return override_config(**settings)
+
+
+def touch_video(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"video")
+    return path
+
+
 def make_video(path: Path) -> Path:
     """A file at *path* that every "is this a video" check will accept."""
     path.parent.mkdir(parents=True, exist_ok=True)

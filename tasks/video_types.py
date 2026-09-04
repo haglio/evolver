@@ -46,10 +46,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import sidecar, video_type
+from util import lanes, sidecar, video_type
 from util.ffprobe import duration_seconds
-from util.media_files import is_finalized_video_file, iter_finalized_videos
-from util.sidecar import upscaled_video_path
 
 log = logging.getLogger(__name__)
 
@@ -140,33 +138,18 @@ def _library_videos():
 
 
 def _genau_clips():
-    """Genau's delivered loops, which the folder alone identifies."""
-    if not config.GENAU_CLIPS_DIR.is_dir():
-        return
-    for video in sorted(config.GENAU_CLIPS_DIR.iterdir()):
-        if is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
-            path = sidecar.sidecar_path(video)
-            yield video, path, sidecar.read(path), True, False
+    for video in lanes.genau_clips():
+        path = sidecar.sidecar_path(video)
+        yield video, path, sidecar.read(path), True, False
 
 
 def _ai_clips():
-    """The generated clips, read off ``1_sorted`` rather than off the outbox.
-
-    ``1_sorted`` holds the whole AI library — the correspondence check exists to
-    keep it that way — while the outbox holds only what has been upscaled so
-    far.  The sidecar sits at the *upscale's* mirrored path either way, which is
-    the pairing :func:`util.sidecar.upscaled_video_path` names.
-    """
-    if not config.SORTED_DIR.is_dir():
-        return
-    for source_dir in sorted(p for p in config.SORTED_DIR.iterdir() if p.is_dir()):
-        for orient_dir in sorted(p for p in source_dir.iterdir() if p.is_dir()):
-            for video in sorted(iter_finalized_videos(orient_dir, config.VIDEO_EXTENSIONS)):
-                path = sidecar.sidecar_path(
-                    upscaled_video_path(source_dir.name, orient_dir.name, video.stem)
-                )
-                yield (video, path, sidecar.read(path),
-                       source_dir.name == config.GENAU_SOURCE, False)
+    """Read off ``1_sorted``, which holds the whole AI library while the outbox
+    holds only what has been upscaled so far; the sidecar sits at the upscale's
+    mirrored path either way."""
+    for clip in lanes.ai_clips():
+        path = sidecar.sidecar_path(clip.upscale)
+        yield clip.video, path, sidecar.read(path), clip.source == config.GENAU_SOURCE, False
 
 
 def _non_ai_videos():
@@ -181,9 +164,7 @@ def _non_ai_videos():
     exclusions are about what to group and what to re-encode, and Nau plays
     every one of these, so every one of them is asked what it is.
     """
-    if not config.NON_AI_DIR.is_dir():
-        return
-    videos = sorted(iter_finalized_videos(config.NON_AI_DIR, config.VIDEO_EXTENSIONS))
+    videos = lanes.non_ai_videos()
     payloads = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
     carved = {video for video, payload in payloads.items() if _was_carved(video, payload)}
     cuts = _cut_folders(

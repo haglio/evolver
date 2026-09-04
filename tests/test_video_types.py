@@ -4,46 +4,12 @@ import unittest
 from pathlib import Path
 
 from tasks import video_types
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
 from util import sidecar, video_type
 
 # Fabricated: the real folder name is library vocabulary and lives in the
 # overlay, so a test names its own and overrides the config with it.
 GENAU_SOURCE = "example-loop-clips"
-
-
-class _Library:
-    """The folders one test's library spans, wired into config together."""
-
-    def __init__(self, root: Path):
-        videos = root / "videos"
-        self.library = videos / "videos"
-        self.ai = self.library / "2D" / "AI"
-        self.sorted_dir = self.ai / "1_sorted"
-        self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
-        self.non_ai = self.library / "2D" / "non_AI"
-        self.genau_clips = videos / "genau" / "clips"
-        self.metadata = videos / "metadata"
-        self.search_root = videos
-
-    def config(self, **extra):
-        # Every setting the stage reads, so a test says what its library is and
-        # nothing leaks in from the overlay the checkout happens to carry.
-        settings = {
-            "VIDEO_LIBRARY_DIR": self.library, "VIDEO_SEARCH_ROOT": self.search_root,
-            "METADATA_DIR": self.metadata, "SORTED_DIR": self.sorted_dir,
-            "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
-            "GENAU_CLIPS_DIR": self.genau_clips, "GENAU_SOURCE": GENAU_SOURCE,
-            "EXCERPT_FOLDERS": (),
-        }
-        settings.update(extra)
-        return override_config(**settings)
-
-
-def _touch(path: Path) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b"video")
-    return path
 
 
 def _probe(durations: dict[str, float]):
@@ -54,9 +20,9 @@ def _probe(durations: dict[str, float]):
 class TestAiLane(unittest.TestCase):
     def test_a_sorted_clip_is_recorded_on_the_sidecar_at_its_upscale_path(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                video = _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_a.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_a.mp4")
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4"
                 )
@@ -71,9 +37,9 @@ class TestAiLane(unittest.TestCase):
 
     def test_a_long_generated_clip_is_full_length(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                video = _touch(lib.sorted_dir / "provider2" / "landscape" / "clip_b.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.sorted_dir / "provider2" / "landscape" / "clip_b.mp4")
                 path = sidecar.sidecar_path(
                     lib.outbox / "landscape" / "provider2" / "clip_b_topaz.mp4"
                 )
@@ -88,9 +54,9 @@ class TestAiLane(unittest.TestCase):
         """It is bound for Genau's folder, and its kind does not wait on a
         running time — the measurement here fails and the kind lands anyway."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                _touch(lib.sorted_dir / GENAU_SOURCE / "portrait" / "loop_1.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                touch_video(lib.sorted_dir / GENAU_SOURCE / "portrait" / "loop_1.mp4")
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / GENAU_SOURCE / "loop_1_topaz.mp4"
                 )
@@ -105,9 +71,9 @@ class TestAiLane(unittest.TestCase):
 class TestGenauLane(unittest.TestCase):
     def test_a_delivered_loop_gets_a_record_of_its_own(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                clip = _touch(lib.genau_clips / "loop_2_topaz.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                clip = touch_video(lib.genau_clips / "loop_2_topaz.mp4")
 
                 result = video_types.run(probe=_unmeasurable)
 
@@ -122,9 +88,9 @@ class TestNonAiLane(unittest.TestCase):
 
     def test_a_scene_carved_out_of_a_longer_one_is_an_excerpt(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                video = _touch(self._bucket(lib) / "0 unsorted" / "Jane-Doe-scene-2.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(self._bucket(lib) / "0 unsorted" / "Jane-Doe-scene-2.mp4")
                 path = sidecar.sidecar_path(video)
                 sidecar.write(path, {"clip": {"index": 2, "count": 9}})
 
@@ -136,9 +102,9 @@ class TestNonAiLane(unittest.TestCase):
 
     def test_a_folder_the_overlay_declares_holds_excerpts_needs_no_record(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config(EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
-                video = _touch(self._bucket(lib) / "excerpts" / "0 unsorted" / "Ada-Roe-7.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
+                video = touch_video(self._bucket(lib) / "excerpts" / "0 unsorted" / "Ada-Roe-7.mp4")
 
                 video_types.run(probe=_probe({video.stem: 900.0}))
 
@@ -149,9 +115,9 @@ class TestNonAiLane(unittest.TestCase):
 
     def test_an_ordinary_scene_is_full_length(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                video = _touch(self._bucket(lib) / "3_good_to_go" / "Jane-Doe-scene-1.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(self._bucket(lib) / "3_good_to_go" / "Jane-Doe-scene-1.mp4")
 
                 video_types.run(probe=_probe({video.stem: 1800.0}))
 
@@ -164,9 +130,9 @@ class TestNonAiLane(unittest.TestCase):
 class TestRunningItAgain(unittest.TestCase):
     def test_a_record_already_complete_is_left_alone_and_never_measured(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                video = _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_c.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_c.mp4")
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_c_topaz.mp4"
                 )
@@ -185,9 +151,9 @@ class TestRunningItAgain(unittest.TestCase):
         """The sidecars this stage wrote before it began keeping the
         measurement have a kind and no running time; one run each fills it in."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_i.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_i.mp4")
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_i_topaz.mp4"
                 )
@@ -201,9 +167,9 @@ class TestRunningItAgain(unittest.TestCase):
 
     def test_a_second_run_writes_nothing(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                video = _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_d.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_d.mp4")
 
                 video_types.run(probe=_probe({video.stem: 6.0}))
                 again = video_types.run(probe=_refuses_to_be_called)
@@ -225,9 +191,9 @@ class TestKeepingTheRunningTime(unittest.TestCase):
 
     def test_the_running_time_lands_beside_the_kind(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                video = _touch(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-4.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-4.mp4")
 
                 video_types.run(probe=_probe({video.stem: 1800.0}))
 
@@ -239,9 +205,9 @@ class TestKeepingTheRunningTime(unittest.TestCase):
         """Two thirds of the videos the non-AI upscale project accounts for are
         excerpts, and it weighs the queue by running time."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                video = _touch(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-5.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-5.mp4")
                 path = sidecar.sidecar_path(video)
                 sidecar.write(path, {"clip": {"index": 5, "count": 9}})
 
@@ -254,10 +220,10 @@ class TestKeepingTheRunningTime(unittest.TestCase):
     def test_measuring_a_free_kind_still_counts_against_the_batch_limit(self):
         """It is an ffprobe like any other, and the pipeline has a wall clock."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
+            lib = LaneLibrary(root)
             with lib.config(VIDEO_TYPE_BATCH_LIMIT=1):
                 for index in (1, 2):
-                    _touch(lib.genau_clips / f"loop_{index}_topaz.mp4")
+                    touch_video(lib.genau_clips / f"loop_{index}_topaz.mp4")
                 measured = []
 
                 video_types.run(probe=lambda video: measured.append(video) or 4.0)
@@ -266,9 +232,9 @@ class TestKeepingTheRunningTime(unittest.TestCase):
 
     def test_a_free_kind_still_lands_when_nothing_can_measure_it(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                clip = _touch(lib.genau_clips / "loop_4_topaz.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                clip = touch_video(lib.genau_clips / "loop_4_topaz.mp4")
 
                 result = video_types.run(probe=_unmeasurable)
 
@@ -281,9 +247,9 @@ class TestKeepingTheRunningTime(unittest.TestCase):
 class TestWhatItRefusesToGuess(unittest.TestCase):
     def test_a_clip_nothing_can_measure_waits_for_a_run_that_can(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_e.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_e.mp4")
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_e_topaz.mp4"
                 )
@@ -299,9 +265,9 @@ class TestReachingEveryVideoNauPlays(unittest.TestCase):
         """The exclusion keeps pipeline-output videos out of the grouping and
         the encoder, but Nau plays them, so they are asked what they are too."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
+            lib = LaneLibrary(root)
             with lib.config(NONAI_EXCLUDED_BUCKETS={"parked_ai"}):
-                video = _touch(lib.non_ai / "parked_ai" / "landscape" / "clip_f_topaz.mp4")
+                video = touch_video(lib.non_ai / "parked_ai" / "landscape" / "clip_f_topaz.mp4")
 
                 video_types.run(probe=_probe({video.stem: 4.0}))
 
@@ -320,10 +286,10 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
 
     def test_a_run_measures_no_more_than_the_batch_limit(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
+            lib = LaneLibrary(root)
             with lib.config(VIDEO_TYPE_BATCH_LIMIT=2):
                 for index in range(5):
-                    _touch(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
+                    touch_video(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
                 measured = []
 
                 first = video_types.run(probe=lambda video: measured.append(video) or 4.0)
@@ -335,10 +301,10 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
 
     def test_the_ones_it_did_not_reach_are_not_counted_as_known(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
+            lib = LaneLibrary(root)
             with lib.config(VIDEO_TYPE_BATCH_LIMIT=1):
                 for index in range(3):
-                    _touch(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
+                    touch_video(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
 
                 result = video_types.run(probe=_probe({f"clip_{i}": 4.0 for i in range(3)}))
 
@@ -347,10 +313,10 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
     def test_the_free_answers_are_not_held_back_by_it(self):
         """Only measuring costs anything, so only measuring is counted."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
+            lib = LaneLibrary(root)
             with lib.config(VIDEO_TYPE_BATCH_LIMIT=0):
-                clip = _touch(lib.genau_clips / "loop_3_topaz.mp4")
-                _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_g.mp4")
+                clip = touch_video(lib.genau_clips / "loop_3_topaz.mp4")
+                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_g.mp4")
 
                 result = video_types.run(probe=_refuses_to_be_called)
 
@@ -371,17 +337,17 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
 
     def test_a_scene_the_overlay_later_declares_an_excerpt_is_corrected(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
+            lib = LaneLibrary(root)
             video = lib.non_ai / "alpha" / "excerpts" / "0 unsorted" / "Ada-Roe-7.mp4"
-            with lib.config():
-                _touch(video)
+            with lib.config(GENAU_SOURCE):
+                touch_video(video)
                 video_types.run(probe=_probe({video.stem: 900.0}))
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
                     video_type.FULL_LENGTH,
                 )
 
-            with lib.config(EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
+            with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 result = video_types.run(probe=_refuses_to_be_called)
 
                 self.assertEqual(
@@ -394,10 +360,10 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
         """The `clip` record arrives when something splits the video, which is
         long after this stage first saw it."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
+            lib = LaneLibrary(root)
             video = lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-3.mp4"
-            with lib.config():
-                _touch(video)
+            with lib.config(GENAU_SOURCE):
+                touch_video(video)
                 video_types.run(probe=_probe({video.stem: 900.0}))
 
                 path = sidecar.sidecar_path(video)
@@ -410,13 +376,13 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
         """Undeclaring the folder puts the running time back in charge, and the
         one already on file answers — nothing is measured a second time."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
+            lib = LaneLibrary(root)
             video = lib.non_ai / "alpha" / "excerpts" / "0 unsorted" / "Ada-Roe-8.mp4"
-            with lib.config(EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
-                _touch(video)
+            with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
+                touch_video(video)
                 video_types.run(probe=_probe({video.stem: 900.0}))
 
-            with lib.config():
+            with lib.config(GENAU_SOURCE):
                 video_types.run(probe=_refuses_to_be_called)
 
                 self.assertEqual(
@@ -426,9 +392,9 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
 
     def test_a_measured_kind_is_still_never_measured_twice(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
-                _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_h.mp4")
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_h.mp4")
 
                 video_types.run(probe=_probe({"clip_h": 4.0}))
                 again = video_types.run(probe=_refuses_to_be_called)
@@ -445,16 +411,16 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
     """
 
     def _batch(self, lib, folder, name, carved=False):
-        video = _touch(lib.non_ai / "alpha" / folder / "0 unsorted" / name)
+        video = touch_video(lib.non_ai / "alpha" / folder / "0 unsorted" / name)
         if carved:
-            with lib.config():
+            with lib.config(GENAU_SOURCE):
                 sidecar.write(sidecar.sidecar_path(video), {"clip": {"index": 1}})
         return video
 
     def test_a_folder_holding_the_batchs_carved_scenes_takes_the_rest_with_it(self):
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
                 carved = [self._batch(lib, "cuts", f"carved-{i}.mp4", carved=True) for i in range(2)]
                 unrecorded = self._batch(lib, "cuts", "carved-3.mp4")
                 wholes = [self._batch(lib, "wholes", f"whole-{i}.mp4") for i in range(3)]
@@ -473,8 +439,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
         of the library, so a batch with one carved scene among its scenes says
         nothing about the rest."""
         with workspace_temp_dir() as root:
-            lib = _Library(root)
-            with lib.config():
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
                 carved = self._batch(lib, "batch", "carved-1.mp4", carved=True)
                 wholes = [self._batch(lib, "batch", f"whole-{i}.mp4") for i in range(3)]
 
