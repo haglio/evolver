@@ -82,7 +82,7 @@ class TestLibraryVideo(unittest.TestCase):
     def test_a_delivered_loop_sits_in_genau_s_folder(self):
         with override_config(GENAU_CLIPS_DIR=Path("C:/lib/genau/clips")):
             self.assertEqual(
-                warm_gun.library_video("genau\clips\loop_topaz.mp4"),
+                warm_gun.library_video(r"genau\clips\loop_topaz.mp4"),
                 Path("C:/lib/genau/clips/loop_topaz.mp4"),
             )
 
