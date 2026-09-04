@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util.alert import show_error
 from util.media_files import is_finalized_video_file
 from util.variants import UPSCALE_SUFFIX
-from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def run() -> PurgeWeirdResult:
         log.info("Deleted weird:  %s", weird_file.name)
 
     if result.missing_sorted:
-        _show_error_window(result.missing_sorted)
+        _report_missing_sources(result.missing_sorted)
 
     log.info(
         "Purge done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
@@ -93,7 +93,7 @@ def _source_name(outbox_file: Path) -> str:
     return source_stem(outbox_file.stem) + outbox_file.suffix
 
 
-def _show_error_window(missing: list[str]) -> None:
+def _report_missing_sources(missing: list[str]) -> None:
     lines = "\n".join(missing[:30])
     ellipsis = "\n..." if len(missing) > 30 else ""
     msg = (
@@ -103,4 +103,4 @@ def _show_error_window(missing: list[str]) -> None:
         f"Check the log for full details:\n{config.LOG_FILE}\n\n"
         f"Affected files:\n{lines}{ellipsis}"
     )
-    show_error_window("Evolver - Missing Sources", msg)
+    show_error("Evolver - Missing Sources", msg)

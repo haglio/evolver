@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util.alert import show_error
 from util.media_files import library_videos
 from util.variants import UPSCALE_SUFFIX, upscaled_stem
-from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ def run(
 
     if show_popup and not result.ok:
         log.info("Showing error popup for correspondence failure")
-        show_error_window("Evolver - Correspondence Error", _popup_message(result))
+        show_error("Evolver - Correspondence Error", _popup_message(result))
         log.info("Error popup dismissed")
 
     return result

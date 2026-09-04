@@ -219,7 +219,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
                 with patch("tasks.upscale._run_ffmpeg") as ffmpeg_mock, \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=1), \
-                     patch("tasks.upscale.show_error_window"):
+                     patch("tasks.upscale.show_error"):
                     result = upscale.run(max_items=5)
 
             self.assertTrue(result.deferred_low_disk)

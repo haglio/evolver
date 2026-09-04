@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util.alert import show_error
 from util.media_files import library_videos
-from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def run(show_popup: bool = False, *, non_ai_dir: Path | None = None) -> Duplicat
 
     if show_popup and not result.ok:
         log.info("Showing error popup for duplicate-size scan failure")
-        show_error_window("Evolver - Likely Duplicate Videos", _popup_message(result))
+        show_error("Evolver - Likely Duplicate Videos", _popup_message(result))
         log.info("Error popup dismissed")
 
     return result

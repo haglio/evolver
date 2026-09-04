@@ -26,7 +26,7 @@ from gui.stats_window import StatsWindow
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
 from util import crash_log, run_log
-from util.windows_alert import show_error_window
+from util.alert import show_error
 
 log = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ class EvolverApp:
                 "Already running:", "duplicate launch handed to the running instance\n",
             )
             if not single_instance.request_show():
-                show_error_window(
+                show_error(
                     "Evolver",
                     "Evolver is already running but did not respond, so its window "
                     "could not be opened.\n\nQuit it from the tray icon, or end the "

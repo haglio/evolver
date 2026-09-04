@@ -172,7 +172,7 @@ class TestStartupCrashIsVisible(unittest.TestCase):
 
     def test_startup_crash_is_written_to_the_log(self):
         with patch.object(crash_log, "write_crash") as mock_write, \
-             patch("tray_app.show_error_window"):
+             patch("tray_app.show_error"):
             tray_app.report_startup_crash("Traceback...\nValueError: no module named x\n")
 
         mock_write.assert_called_once()
@@ -180,7 +180,7 @@ class TestStartupCrashIsVisible(unittest.TestCase):
 
     def test_startup_crash_opens_a_dialog_naming_the_error(self):
         with patch.object(crash_log, "write_crash"), \
-             patch("tray_app.show_error_window") as mock_alert:
+             patch("tray_app.show_error") as mock_alert:
             tray_app.report_startup_crash(
                 "Traceback...\nModuleNotFoundError: No module named 'qtawesome'\n"
             )

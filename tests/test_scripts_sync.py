@@ -132,12 +132,12 @@ class TestScriptsSync(unittest.TestCase):
             script_path.write_text("{}", encoding="utf-8")
 
             with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.show_error_window") as show_error_window:
+                with patch("tasks.scripts_sync.show_error") as show_error:
                     result = scripts_sync.run(show_popup=True)
 
             self.assertFalse(result.ok)
             self.assertEqual(result.unmatched, 1)
-            show_error_window.assert_called_once()
+            show_error.assert_called_once()
 
     def test_copies_ai_script_from_sorted_to_outbox_variant(self):
         with workspace_temp_dir() as root:

@@ -34,7 +34,7 @@ class TestDuplicateSizes:
             (sorted_dir / "sourceB" / "portrait" / "clip-c.mp4").write_bytes(b"different-size")
 
             with override_config(NON_AI_DIR=sorted_dir), \
-                 patch("check_duplicate_sizes.show_error_window") as show_error_window:
+                 patch("check_duplicate_sizes.show_error") as show_error:
                 result = check_duplicate_sizes.run(show_popup=True)
 
             assert not result.ok
@@ -44,7 +44,7 @@ class TestDuplicateSizes:
                 "sourceA\\landscape\\clip-a.mp4",
                 "sourceB\\portrait\\clip-b.mp4",
             ]
-            show_error_window.assert_called_once()
+            show_error.assert_called_once()
 
     def test_zero_byte_files_are_not_duplicates_of_each_other(self):
         """A crashed download leaves empty files; two of them share a size for

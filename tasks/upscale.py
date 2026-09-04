@@ -10,6 +10,7 @@ from pathlib import Path
 
 import config
 from util import orientation, sidecar, system_resources, topaz, video_type
+from util.alert import show_error
 from util.media_files import (
     child_dirs,
     is_finalized_video_file,
@@ -17,7 +18,6 @@ from util.media_files import (
     remove_partial_video_files,
 )
 from util.sidecar import sidecar_path, upscaled_video_path
-from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
@@ -287,7 +287,7 @@ def _is_low_disk(outbox_dir: Path, floor_gb: float) -> bool:
 
 def _show_low_disk_warning(outbox_dir: Path, floor_gb: float) -> None:
     free_gb = system_resources.free_bytes(outbox_dir) / (1024 ** 3)
-    show_error_window(
+    show_error(
         "Evolver - Low Disk Space",
         (
             "Evolver paused the upscale stage because free disk space is below the configured safety floor.\n\n"
