@@ -257,12 +257,12 @@ def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> b
     except ValueError:
         return False
     # An absent or unreadable sidecar reads back empty, and a sidecar holding
-    # nothing but the video's kind (util.video_type.only_the_kind) records no
-    # generation at all: neither says text-to-video, so both take the default
-    # recipe -- the wrong Topaz model is baked into a finished encode nobody
-    # re-runs.
+    # nothing but the video's own kind and running time
+    # (util.video_type.only_the_video_itself) records no generation at all:
+    # neither says text-to-video, so both take the default recipe -- the wrong
+    # Topaz model is baked into a finished encode nobody re-runs.
     payload = sidecar.read(meta_path)
-    if not payload or video_type.only_the_kind(payload):
+    if not payload or video_type.only_the_video_itself(payload):
         return False
     return "source_image" not in payload
 

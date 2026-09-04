@@ -13,7 +13,7 @@ from tests.temp_helpers import (
     override_config,
     workspace_temp_dir,
 )
-from util import funscript, sidecar
+from util import funscript, sidecar, video_type
 
 
 def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
@@ -1017,6 +1017,75 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
                 nonai_upscale.run(allow_start=False)
 
                 self.assertNotIn("version", sidecar.read(sidecar.sidecar_path(out)))
+
+
+class TestReportingHowFarAlongItIs(unittest.TestCase):
+    """The stage says how much of the project is left, not just how many clips.
+
+    The arithmetic is :mod:`tasks.nonai_progress`'s; what is checked here is
+    that the queue the stage reports on and the queue it weighs are the same
+    one, and that the numbers reach the result the window reads.
+    """
+
+    def _lasting(self, video, seconds):
+        path = sidecar.sidecar_path(video)
+        sidecar.write(path, video_type.timed(sidecar.read(path), seconds))
+        return video
+
+    def test_reports_the_percentage_and_the_hours_left_beside_the_count(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+
+            stack, _ = probes()
+            with override_config(**overrides), stack:
+                self._lasting(
+                    make_video(non_ai / "larkin" / "0 unsorted" / "queued.mp4"), 900.0)
+                self._lasting(
+                    make_video(non_ai / "larkin" / "3_good_to_go" / "processed"
+                               / "older_apo8_iris2.mp4"), 300.0)
+
+                result = nonai_upscale.run(allow_start=False)
+
+            self.assertEqual(result.pending, 1)
+            self.assertEqual(result.remaining_seconds, 900.0)
+            self.assertEqual(result.percent_complete, 25)
+            self.assertEqual(result.unmeasured_videos, 0)
+
+    def test_a_clip_retired_to_the_skip_manifest_leaves_both_the_count_and_the_hours(self):
+        """The queue is collected again after a start attempt for exactly this
+        reason, and the running times have to come off that same collection."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+
+            stack, mocks = probes()
+            mocks["videoai"].side_effect = ["Enhanced using iris-2", ""]
+            with override_config(**overrides), stack:
+                self._lasting(
+                    make_video(non_ai / "larkin" / "0 unsorted" / "a tagged.mp4"), 3600.0)
+                self._lasting(
+                    make_video(non_ai / "larkin" / "0 unsorted" / "b fresh.mp4"), 900.0)
+
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "larkin/0 unsorted/b fresh.mp4")
+            self.assertEqual(result.pending, 1)
+            self.assertEqual(result.remaining_seconds, 900.0)
+
+    def test_a_library_nothing_has_measured_yet_has_no_percentage(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            make_video(non_ai / "larkin" / "0 unsorted" / "unmeasured.mp4")
+
+            stack, _ = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False)
+
+            self.assertEqual(result.pending, 1)
+            self.assertIsNone(result.percent_complete)
+            self.assertEqual(result.unmeasured_videos, 1)
 
 
 class TestRepairRetiredMetadata(unittest.TestCase):

@@ -1,4 +1,8 @@
-"""What kind of video this is — the one question every app in the family asks.
+"""What kind of video this is and how long it runs — the ``video`` block.
+
+Two facts about the file itself, recorded together on its metadata sidecar
+because one is read off the other, and owned here so that the block has a
+single author: :mod:`tasks.video_types` writes both, and everything else reads.
 
 Four kinds, and every video in the library is exactly one of them.  The answer
 lives on the video's metadata sidecar, in the ``video`` block beside the act and
@@ -30,6 +34,12 @@ them is the earlier one):
     watch as one.  An unknown running time lands here too: a video nothing can
     measure is far likelier to be a scene than a loop, and the alternative is a
     fifth kind meaning "we never found out".
+
+The running time is kept rather than thrown away once it has settled a kind.
+An ffprobe is a process spawn, and a video does not change length, so the one
+measurement answers every later question about how long something runs — which
+is how :mod:`tasks.nonai_progress` weighs the non-AI upscale queue against the
+part of the library already done without probing four hundred files a tick.
 """
 
 from __future__ import annotations
@@ -51,6 +61,14 @@ SHORT_MAX_SECONDS = 10.0
 #: Where the kind sits on the sidecar: ``payload["video"]["type"]``.
 BLOCK = "video"
 FIELD = "type"
+
+#: And the running time beside it: ``payload["video"]["duration_seconds"]``.
+DURATION_FIELD = "duration_seconds"
+
+#: Everything this module records, which is what tells a sidecar holding
+#: nothing but these from one that holds a scrape or a generation
+#: (:func:`only_the_video_itself`).
+_OWN_FIELDS = frozenset({FIELD, DURATION_FIELD})
 
 
 def free_kind(*, genau: bool, excerpt: bool) -> str:
@@ -97,19 +115,37 @@ def type_of(payload: dict) -> str:
     return recorded if recorded in TYPES else ""
 
 
-def only_the_kind(payload: dict) -> bool:
-    """Whether *payload* holds a kind and nothing else.
+def duration_of(payload: dict) -> float | None:
+    """The running time *payload* records, or ``None`` when it records none.
+
+    ``None`` for a sidecar written before the field existed, and for one whose
+    video could not be measured — both mean "ask ffprobe", which is what
+    :mod:`tasks.video_types` does with the one measurement it is allowed.
+    """
+    block = payload.get(BLOCK)
+    if not isinstance(block, dict):
+        return None
+    seconds = block.get(DURATION_FIELD)
+    return float(seconds) if isinstance(seconds, (int, float)) else None
+
+
+def only_the_video_itself(payload: dict) -> bool:
+    """Whether *payload* holds what this module records and nothing else.
 
     A sidecar :mod:`tasks.video_types` created for a video nothing else has
     recorded anything about.  It exists, and that is all it says — so the two
     stages that used to read a sidecar's mere existence as evidence of
     something else ("this clip has been scraped", "this clip is
     text-to-video") ask this first.
+
+    Against :data:`_OWN_FIELDS` rather than against the kind alone, so that
+    adding a second automatic field cannot quietly turn a bare sidecar back
+    into evidence — which is exactly what the running time would have done.
     """
     if set(payload) != {BLOCK}:
         return False
     block = payload[BLOCK]
-    return isinstance(block, dict) and set(block) == {FIELD}
+    return isinstance(block, dict) and set(block) <= _OWN_FIELDS
 
 
 def stamped(payload: dict, video_type: str) -> dict:
@@ -121,9 +157,20 @@ def stamped(payload: dict, video_type: str) -> dict:
     """
     if video_type not in TYPES:
         raise ValueError(f"not a video type: {video_type!r}")
-    stamped_payload = dict(payload)
-    block = stamped_payload.get(BLOCK)
+    return _recorded(payload, FIELD, video_type)
+
+
+def timed(payload: dict, duration_seconds: float) -> dict:
+    """*payload* with *duration_seconds* recorded on it — a copy, as above."""
+    if duration_seconds < 0:
+        raise ValueError(f"not a running time: {duration_seconds!r}")
+    return _recorded(payload, DURATION_FIELD, float(duration_seconds))
+
+
+def _recorded(payload: dict, field: str, value) -> dict:
+    written = dict(payload)
+    block = written.get(BLOCK)
     block = dict(block) if isinstance(block, dict) else {}
-    block[FIELD] = video_type
-    stamped_payload[BLOCK] = block
-    return stamped_payload
+    block[field] = value
+    written[BLOCK] = block
+    return written

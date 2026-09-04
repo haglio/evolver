@@ -270,8 +270,31 @@ def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
         parts.append("held back: low disk")
     elif result.get("start_deferred") and not result.get("in_flight"):
         parts.append(f"waiting ({result['start_deferred']})")
-    parts.append(f"{result.get('pending', 0)} queued")
+    parts.append(_whats_left(result))
     return ", ".join(parts)
+
+
+def _whats_left(result: dict[str, Any]) -> str:
+    """What is left of the project: clips, running time, and how far along.
+
+    A clip count on its own says very little here. The queue runs from forty
+    seconds to an hour a clip, and the short ones went first, so the library
+    was 59% upscaled by clip and 29% by running time on the day this was
+    written — the count moves twice as fast as the work does. The percentage is
+    what moves at a rate worth reading, and the hours are what a person plans
+    around.
+    """
+    left = f"{result.get('pending', 0)} queued"
+    percent = result.get("percent_complete")
+    if percent is None:
+        # Nothing in the library has a running time recorded yet (the video
+        # kinds stage writes them, a batch a run), so there is no percentage to
+        # give and the count is all there is.
+        return left
+    hours = (result.get("remaining_seconds") or 0.0) / 3600
+    unmeasured = result.get("unmeasured_videos") or 0
+    missing = f", {unmeasured} not yet measured" if unmeasured else ""
+    return f"{left} ({hours:.1f}h left, {percent}% done{missing})"
 
 
 def _encode_state(result: dict[str, Any]) -> str:

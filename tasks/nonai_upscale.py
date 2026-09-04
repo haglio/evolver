@@ -18,8 +18,9 @@ where it left off). A fast GUI poll — ``throttle_to_presence`` — parks and
 thaws it between ticks so returning to the machine takes effect in seconds.
 
 Which clip is next, and why it beat the others, is
-:mod:`tasks.nonai_queue`'s; what is left here is the stage: repair, supervise,
-maybe start, report.
+:mod:`tasks.nonai_queue`'s, and how far through the whole project the library
+is, is :mod:`tasks.nonai_progress`'s; what is left here is the stage: repair,
+supervise, maybe start, report.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from tasks import nonai_encode
+from tasks import nonai_encode, nonai_progress
 from tasks.nonai_queue import (
     Candidate,
     add_to_skip_manifest,
@@ -66,6 +67,14 @@ class NonAiUpscaleResult:
     start_deferred: str = ""
     failed: str = ""  # the clip whose encode died or came up short, if any
     pending: int = 0
+    # How far along the project is, weighed by running time rather than by clip
+    # count -- the two say different things, and by half (tasks.nonai_progress).
+    # None until something in the library has a running time recorded.
+    percent_complete: int | None = None
+    remaining_seconds: float = 0.0
+    # Project videos nothing has measured yet, and so in neither total; falls to
+    # zero once the video-kinds stage has been over the library.
+    unmeasured_videos: int = 0
     deferred_low_disk: bool = False
     # Upscales promoted before their sidecar was carried across, handed it back
     # off the retired original — see :func:`repair_retired_metadata`.
@@ -159,7 +168,9 @@ def run(allow_start: bool = True, stop: bool = False,
     # the skip manifest, and the count reported is the queue as it stands after
     # that. The doubled walk is finding tasks/design/008's; merging the two
     # would change what `pending` means, so it stays and stays visible.
-    result.pending = len(_collect(files))
+    queued = _collect(files)
+    result.pending = len(queued)
+    _report_progress(result, queued)
     in_flight = result.in_flight or "-"
     if result.in_flight and result.in_flight_percent is not None:
         in_flight = f"{result.in_flight} ({result.in_flight_percent}% encoded)"
@@ -167,12 +178,27 @@ def run(allow_start: bool = True, stop: bool = False,
         in_flight = f"{in_flight} [suspended: user present]"
     log.info(
         "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s "
-        "failed=%s pending=%d repaired=%d sidecar(s)",
+        "failed=%s pending=%d left=%.1fh done=%s unmeasured=%d repaired=%d sidecar(s)",
         result.started or "-", in_flight, result.promoted or "-",
         result.stopped or "-", result.start_deferred or "-",
-        result.failed or "-", result.pending, result.repaired_sidecars,
+        result.failed or "-", result.pending, result.remaining_seconds / 3600,
+        "-" if result.percent_complete is None else f"{result.percent_complete}%",
+        result.unmeasured_videos, result.repaired_sidecars,
     )
     return result
+
+
+def _report_progress(result: NonAiUpscaleResult, queued: list[Candidate]) -> None:
+    """Put how far along the project is on *result*, in running time.
+
+    Handed the queue the stage just collected rather than collecting it again:
+    :mod:`tasks.nonai_progress` reads sidecars and walks the buckets for what is
+    already upscaled, and there is no reason for it to redo this walk too.
+    """
+    progress = nonai_progress.so_far(candidate.path for candidate in queued)
+    result.percent_complete = progress.percent
+    result.remaining_seconds = progress.remaining_seconds
+    result.unmeasured_videos = progress.unmeasured
 
 
 def throttle_to_presence(*, job_file: Path | None = None) -> str:

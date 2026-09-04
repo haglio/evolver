@@ -283,7 +283,8 @@ class TestNonAiUpscaleSummary:
             "started": "", "in_flight": "", "in_flight_percent": None,
             "suspended": False, "promoted": "", "stopped": "",
             "start_deferred": "", "failed": "", "pending": 395,
-            "deferred_low_disk": False,
+            "percent_complete": None, "remaining_seconds": 0.0,
+            "unmeasured_videos": 0, "deferred_low_disk": False,
         }
         result.update(overrides)
         return _summarize_result(result, None, "upscale_non_ai")
@@ -329,6 +330,27 @@ class TestNonAiUpscaleSummary:
         assert "395 queued" in self._result(
             in_flight="larkin/1 clips/Delia Moss.mp4", in_flight_percent=72,
         )
+
+    def test_says_how_far_along_the_project_is_and_not_only_the_count(self):
+        """A count alone reads as progress it is not: the queue runs from forty
+        seconds to an hour a clip, so the clips fall away twice as fast as the
+        work does."""
+        summary = self._result(pending=180, percent_complete=29,
+                               remaining_seconds=149_400.0)
+        assert "180 queued" in summary
+        assert "29% done" in summary
+        assert "41.5h left" in summary
+
+    def test_a_library_nothing_has_measured_yet_still_says_the_count(self):
+        """Running times are recorded a batch a run, so the first runs against
+        a library that has never been asked have no percentage to give."""
+        summary = self._result(pending=180, percent_complete=None)
+        assert summary.endswith("180 queued")
+
+    def test_a_part_measured_library_says_how_much_it_cannot_see(self):
+        summary = self._result(pending=180, percent_complete=29,
+                               remaining_seconds=149_400.0, unmeasured_videos=12)
+        assert "12 not yet measured" in summary
 
     def test_a_stopped_encode_says_the_clip_keeps_its_place(self):
         """Stopping is no fault of the video, unlike failing — it stays queued."""
