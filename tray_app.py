@@ -9,7 +9,7 @@ import sys
 import traceback
 
 from util import crash_log
-from util.windows_alert import show_error_window
+from util.alert import show_error
 
 
 def _name_this_process() -> None:
@@ -57,7 +57,7 @@ def report_startup_crash(detail: str) -> None:
     missing dependency once went unnoticed for a day.
     """
     crash_log.write_crash("Startup crash:", detail)
-    show_error_window(
+    show_error(
         "Evolver failed to start",
         f"{detail.strip().splitlines()[-1]}\n\nFull details: {crash_log.CRASH_LOG}",
     )

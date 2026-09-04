@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
+from util.alert import show_error
 from util.funscript import script_path_for_video
 from util.media_files import library_videos, remove_empty_dirs
 from util.variants import strip_processing_suffixes
-from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
         log.error("Scripts sync failed. See log entries above for unresolved funscript alignment issues.")
         if show_popup:
             log.info("Showing error popup for scripts-sync failure")
-            show_error_window("Evolver - Funscript Match Error", _popup_message(result))
+            show_error("Evolver - Funscript Match Error", _popup_message(result))
             log.info("Error popup dismissed")
     return result
 

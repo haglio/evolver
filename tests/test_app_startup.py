@@ -429,7 +429,7 @@ class TestDuplicateLaunchHandoff:
 
         with patch("gui.app.single_instance.is_first_instance", return_value=False), \
              patch("gui.app.single_instance.request_show", return_value=handoff_taken) as show_request, \
-             patch("gui.app.show_error_window") as alert, \
+             patch("gui.app.show_error") as alert, \
              patch("gui.app.crash_log.write_info") as logged:
             exit_code = app.run()
 

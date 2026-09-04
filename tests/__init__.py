@@ -11,16 +11,16 @@ import content
 
 content.LOCAL_CONTENT = content.EXAMPLE_CONTENT
 
-# No test may open a real modal dialog. MessageBoxW blocks until a human clicks
-# it, so one unguarded call hangs an unattended suite forever instead of failing
-# it. Tests that assert on an alert patch it themselves; this defuses the ones
-# that reach it by accident. Never stopped — it is an invariant, not a fixture.
-# Gagged at the one name in this repo that reaches MessageBoxW rather than at
-# ctypes.windll.user32: this line runs before any test module is read, and the
-# dotted path through ctypes.windll cannot be resolved on an interpreter that
-# has no Windows — which made this gag, not the platform, the thing that decided
-# whether the suite collected at all.
-patch("util.windows_alert._message_box_w", return_value=1).start()
+# No test may open a real modal dialog. Both of these block until a human clicks,
+# so one unguarded call hangs an unattended suite forever instead of failing it.
+# Tests that assert on an alert patch it themselves; this defuses the ones that
+# reach it by accident. Never stopped -- it is an invariant, not a fixture.
+# Gagged at the two calls util/alert.py makes rather than inside them: this line
+# runs before any test module is read, and both are importable on an interpreter
+# with no Windows, so the gag never becomes the thing that decides whether the
+# suite collects at all.
+patch("shared_ui.alert.show_alert").start()
+patch("app_support.win32.show_error_popup").start()
 
 # No test may write or delete the stand-down marker. It lives under LOCALAPPDATA,
 # outside every checkout, and it is the file that tells the broker whether the

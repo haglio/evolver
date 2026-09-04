@@ -78,7 +78,7 @@ class TestPurgeWeird(unittest.TestCase):
             json_file.write_text('{"video":{"prompt":"test"}}', encoding="utf-8")
 
             with override_config(SORTED_DIR=sorted_dir, WEIRD_DIR=weird_dir, METADATA_DIR=metadata_dir):
-                with patch("tasks.purge_weird.show_error_window"):
+                with patch("tasks.purge_weird.show_error"):
                     result = purge_weird.run()
 
             self.assertEqual(result.deleted_weird, 1)
@@ -94,13 +94,13 @@ class TestPurgeWeird(unittest.TestCase):
             weird_file.write_bytes(b"weird")
 
             with override_config(SORTED_DIR=sorted_dir, WEIRD_DIR=weird_dir):
-                with patch("tasks.purge_weird.show_error_window") as show_error_window:
+                with patch("tasks.purge_weird.show_error") as show_error:
                     result = purge_weird.run()
 
             self.assertEqual(result.deleted_weird, 1)
             self.assertEqual(result.deleted_sorted, 0)
             self.assertEqual(result.missing_sorted, ["missing_topaz.mp4"])
-            show_error_window.assert_called_once()
+            show_error.assert_called_once()
             self.assertFalse(weird_file.exists())
 
     def test_run_deletes_every_sorted_copy_matching_the_source_name(self):

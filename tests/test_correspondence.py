@@ -78,7 +78,7 @@ class TestCorrespondence:
             (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-b_topaz_cfr.mp4").write_bytes(b"c")
 
             with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
-                with patch("check_correspondence.show_error_window") as show_error_window:
+                with patch("check_correspondence.show_error") as show_error:
                     result = check_correspondence.run(show_popup=True)
 
             assert not result.ok
@@ -87,7 +87,7 @@ class TestCorrespondence:
             assert len(result.orphan_outbox) == 2
             assert len(result.orphan_sorted) == 1
             assert result.duplicates == {}
-            show_error_window.assert_called_once()
+            show_error.assert_called_once()
 
     def test_run_detects_two_outbox_files_sharing_a_basename(self):
         """The duplicate map is a named failure mode of the stage -- it fails
