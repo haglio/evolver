@@ -123,11 +123,7 @@ def _rewrite_json_object_keys(path: Path, moves: dict[str, str]) -> None:
 
 
 def _read_favorite_paths(path: Path) -> list[str]:
-    fieldnames, rows = favs_csv.read_rows(path)
-    column = favs_csv.file_column_name(fieldnames)
-    if column is None:
-        return []
-    return [str(local) for local in _favorite_locals(rows, column, path.parent).values()]
+    return [str(video) for video in favs_csv.favorite_videos(path)]
 
 
 def _rewrite_favorite_paths(path: Path, moves: dict[str, str]) -> None:

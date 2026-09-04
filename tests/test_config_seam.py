@@ -94,7 +94,9 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/stray_files.py": 8,
     "tasks/upscale.py": 17,
     "tasks/video_types.py": 5,
-    # The lane walk it used to do itself.
+    # The lane walk it used to do itself, and the stage that walks the lanes
+    # after it to stamp the viewing on the same sidecars.
+    "tasks/watch_weights.py": 9,
     "util/lanes.py": 9,
     "util/funscript.py": 3,
     "util/media_files.py": 1,
@@ -104,6 +106,7 @@ CONFIG_REFERENCE_LEDGER = {
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
     "util/video_locator.py": 3,
+    "util/warm_gun.py": 3,
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or
