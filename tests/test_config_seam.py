@@ -45,6 +45,13 @@ from tests.test_dead_code import PROJECT_ROOT, _source_files
 # of VIDEO_EXTENSIONS in the module that owns "what is a video", replacing
 # eleven that were threaded through call sites and five identical one-line
 # wrappers to say the same thing.
+#
+# gui/app.py's 7th is the third shape: a value a NEW feature needs that no
+# module read before. One read, at the layer whose whole job is wiring, and
+# handed on as a parameter -- LOG_FILE reaches util/log_excerpt.py and
+# gui/log_window.py that way, so neither of the two new modules reads config at
+# all. A feature paying one read at the composition root is the seam working;
+# paying it in the two modules that do the work would not be.
 CONFIG_REFERENCE_LEDGER = {
     "backfill/decisions.py": 3,
     "backfill/mic.py": 1,
@@ -54,7 +61,7 @@ CONFIG_REFERENCE_LEDGER = {
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
     "evolver.py": 9,
-    "gui/app.py": 6,
+    "gui/app.py": 7,
     "gui/main_window.py": 2,
     "gui/presence_throttle.py": 1,
     "gui/process_identity.py": 2,

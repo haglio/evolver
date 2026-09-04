@@ -69,6 +69,30 @@ class RunRecord:
 _PACIFIC = ZoneInfo("America/Los_Angeles")
 
 
+def utc_time(stamp: str) -> datetime:
+    """One of a record's timestamps as an aware datetime.
+
+    A record stores them naive and means UTC by them -- the convention every
+    reader has to know, and now knows in one place rather than at each of them.
+    """
+    return datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc)
+
+
+def run_span(record: RunRecord) -> tuple[datetime, datetime]:
+    """When the run began and ended, as aware datetimes.
+
+    The start is measured back from the finish rather than read off
+    ``started_at``. Records written before ``from_pipeline_result`` derived
+    that field stamped BOTH ends with the finish, and every record on disk
+    predating it still says so -- a 660-second run reads as having begun the
+    moment it ended. The duration is the one thing both conventions recorded
+    honestly, and under the current one this is exactly what ``started_at``
+    already says, so the span is built from it either way.
+    """
+    finished = utc_time(record.finished_at)
+    return finished - timedelta(seconds=record.duration_seconds), finished
+
+
 def format_run_label(started_at: str, duration_seconds: float) -> str:
     """When a run started and how long it took, e.g. "2026/03/30 22:20 (5s)".
 
@@ -77,8 +101,7 @@ def format_run_label(started_at: str, duration_seconds: float) -> str:
     :mod:`gui.status_symbols`), so coloring the verdict cannot color the
     timestamp along with it.
     """
-    utc_dt = datetime.fromisoformat(started_at).replace(tzinfo=timezone.utc)
-    pacific_dt = utc_dt.astimezone(_PACIFIC)
+    pacific_dt = utc_time(started_at).astimezone(_PACIFIC)
     return f"{pacific_dt.strftime('%Y/%m/%d %H:%M')} ({duration_seconds:.0f}s)"
 
 

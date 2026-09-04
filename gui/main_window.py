@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 import qtawesome as qta
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -51,16 +51,28 @@ class _NoFocusRectDelegate(QItemDelegate):
 class RunDetailWidget(QWidget):
     """Shows details of a completed run."""
 
+    # The run whose log to show. What the stage table holds is a summary of
+    # each stage's counters; the words the stages actually wrote -- which file,
+    # which error -- only ever existed in the log, and this is the way there.
+    log_requested = pyqtSignal(object)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
+
+        self._record: RunRecord | None = None
 
         self._header = QLabel("Select a run to view details")
         font = self._header.font()
         font.setPointSize(font.pointSize() + 1)
         font.setBold(True)
         self._header.setFont(font)
+        # The title carries an <a href> once a run is in hand, so the format is
+        # stated rather than guessed at from the string -- the same reason the
+        # info line below sets it.
+        self._header.setTextFormat(Qt.TextFormat.RichText)
+        self._header.linkActivated.connect(self._on_title_clicked)
         layout.addWidget(self._header)
 
         self._info_label = QLabel("")
@@ -85,7 +97,11 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._table)
 
     def show_record(self, record: RunRecord):
-        self._header.setText(f"Run: {record.started_at}")
+        self._record = record
+        # No color of its own: the link wears the palette's, so it reads as a
+        # link in whichever theme Qt has given the rest of the window.
+        self._header.setText(f'<a href="log">Run: {record.started_at}</a>')
+        self._header.setToolTip("Show what this run wrote to the log")
         glyph, color = mark_for(record.status)
         # Rich text so the mark alone is colored; the rest of the line stays
         # the label's own color, matching the history list beside it.
@@ -138,9 +154,15 @@ class RunDetailWidget(QWidget):
             self._table.setItem(i, 4, details_item)
 
     def clear(self):
+        self._record = None
         self._header.setText("Select a run to view details")
+        self._header.setToolTip("")
         self._info_label.setText("")
         self._table.setRowCount(0)
+
+    def _on_title_clicked(self, _href: str):
+        if self._record is not None:
+            self.log_requested.emit(self._record)
 
 
 # Fields always shown for a stage even when zero, so "0 succeeded" stays visible
@@ -264,6 +286,11 @@ def _encode_state(result: dict[str, Any]) -> str:
 class EvolverMainWindow(QMainWindow):
     """Main window: run history list on the left, detail/progress on the right."""
 
+    # Passed straight out of the detail pane. The app owns every window this
+    # one opens beside it, the stats window included, so the view asks rather
+    # than opens.
+    log_requested = pyqtSignal(object)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Evolver")
@@ -297,6 +324,7 @@ class EvolverMainWindow(QMainWindow):
         splitter.addWidget(left)
 
         self._detail_widget = RunDetailWidget()
+        self._detail_widget.log_requested.connect(self.log_requested)
         splitter.addWidget(self._detail_widget)
 
         splitter.setSizes([300, 700])
