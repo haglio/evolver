@@ -85,7 +85,8 @@ class TestAiLane(unittest.TestCase):
                 )
 
     def test_a_clip_in_the_genau_source_is_a_genau_loop_before_it_is_delivered(self):
-        """It is bound for Genau's folder, and nothing measures it on the way."""
+        """It is bound for Genau's folder, and its kind does not wait on a
+        running time — the measurement here fails and the kind lands anyway."""
         with workspace_temp_dir() as root:
             lib = _Library(root)
             with lib.config():
@@ -161,7 +162,7 @@ class TestNonAiLane(unittest.TestCase):
 
 
 class TestRunningItAgain(unittest.TestCase):
-    def test_a_kind_already_on_file_is_left_alone_and_never_measured(self):
+    def test_a_record_already_complete_is_left_alone_and_never_measured(self):
         with workspace_temp_dir() as root:
             lib = _Library(root)
             with lib.config():
@@ -169,7 +170,8 @@ class TestRunningItAgain(unittest.TestCase):
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_c_topaz.mp4"
                 )
-                sidecar.write(path, video_type.stamped({}, video_type.FULL_LENGTH))
+                sidecar.write(path, video_type.timed(
+                    video_type.stamped({}, video_type.FULL_LENGTH), 240.0))
 
                 result = video_types.run(probe=_refuses_to_be_called)
 
@@ -178,6 +180,24 @@ class TestRunningItAgain(unittest.TestCase):
                 )
             self.assertEqual((result.recorded, result.already), (0, 1))
             self.assertEqual(video.name, "clip_c.mp4")
+
+    def test_a_kind_recorded_before_running_times_were_kept_is_measured_once(self):
+        """The sidecars this stage wrote before it began keeping the
+        measurement have a kind and no running time; one run each fills it in."""
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config():
+                _touch(lib.sorted_dir / "provider2" / "portrait" / "clip_i.mp4")
+                path = sidecar.sidecar_path(
+                    lib.outbox / "portrait" / "provider2" / "clip_i_topaz.mp4"
+                )
+                sidecar.write(path, video_type.stamped({}, video_type.FULL_LENGTH))
+
+                first = video_types.run(probe=_probe({"clip_i": 240.0}))
+                again = video_types.run(probe=_refuses_to_be_called)
+
+                self.assertEqual(video_type.duration_of(sidecar.read(path)), 240.0)
+            self.assertEqual((first.recorded, again.already), (1, 1))
 
     def test_a_second_run_writes_nothing(self):
         with workspace_temp_dir() as root:
@@ -197,6 +217,65 @@ def _unmeasurable(_video):
 
 def _refuses_to_be_called(video):
     raise AssertionError(f"nothing should have been measured: {video}")
+
+
+class TestKeepingTheRunningTime(unittest.TestCase):
+    """The measurement is written down rather than thrown away once it has
+    settled a kind, and it is taken even where no kind needed it."""
+
+    def test_the_running_time_lands_beside_the_kind(self):
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config():
+                video = _touch(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-4.mp4")
+
+                video_types.run(probe=_probe({video.stem: 1800.0}))
+
+                payload = sidecar.read(sidecar.sidecar_path(video))
+            self.assertEqual(video_type.duration_of(payload), 1800.0)
+            self.assertEqual(video_type.type_of(payload), video_type.FULL_LENGTH)
+
+    def test_an_excerpt_is_measured_even_though_its_kind_was_free(self):
+        """Two thirds of the videos the non-AI upscale project accounts for are
+        excerpts, and it weighs the queue by running time."""
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config():
+                video = _touch(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-5.mp4")
+                path = sidecar.sidecar_path(video)
+                sidecar.write(path, {"clip": {"index": 5, "count": 9}})
+
+                video_types.run(probe=_probe({video.stem: 240.0}))
+
+                payload = sidecar.read(path)
+            self.assertEqual(video_type.type_of(payload), video_type.EXCERPT)
+            self.assertEqual(video_type.duration_of(payload), 240.0)
+
+    def test_measuring_a_free_kind_still_counts_against_the_batch_limit(self):
+        """It is an ffprobe like any other, and the pipeline has a wall clock."""
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config(VIDEO_TYPE_BATCH_LIMIT=1):
+                for index in (1, 2):
+                    _touch(lib.genau_clips / f"loop_{index}_topaz.mp4")
+                measured = []
+
+                video_types.run(probe=lambda video: measured.append(video) or 4.0)
+
+            self.assertEqual(len(measured), 1)
+
+    def test_a_free_kind_still_lands_when_nothing_can_measure_it(self):
+        with workspace_temp_dir() as root:
+            lib = _Library(root)
+            with lib.config():
+                clip = _touch(lib.genau_clips / "loop_4_topaz.mp4")
+
+                result = video_types.run(probe=_unmeasurable)
+
+                payload = sidecar.read(sidecar.sidecar_path(clip))
+            self.assertEqual(video_type.type_of(payload), video_type.GENAU_CLIP)
+            self.assertIsNone(video_type.duration_of(payload))
+            self.assertEqual((result.recorded, result.skipped), (1, 0))
 
 
 class TestWhatItRefusesToGuess(unittest.TestCase):
@@ -327,16 +406,18 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
 
                 self.assertEqual(video_type.type_of(sidecar.read(path)), video_type.EXCERPT)
 
-    def test_a_scene_that_is_no_longer_an_excerpt_is_measured_again(self):
+    def test_a_scene_that_is_no_longer_an_excerpt_is_reclassified(self):
+        """Undeclaring the folder puts the running time back in charge, and the
+        one already on file answers — nothing is measured a second time."""
         with workspace_temp_dir() as root:
             lib = _Library(root)
             video = lib.non_ai / "alpha" / "excerpts" / "0 unsorted" / "Ada-Roe-8.mp4"
             with lib.config(EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 _touch(video)
-                video_types.run(probe=_refuses_to_be_called)
+                video_types.run(probe=_probe({video.stem: 900.0}))
 
             with lib.config():
-                video_types.run(probe=_probe({video.stem: 900.0}))
+                video_types.run(probe=_refuses_to_be_called)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),

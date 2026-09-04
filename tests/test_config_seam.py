@@ -77,6 +77,7 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/genau_deliver.py": 5,
     "tasks/nonai_encode.py": 12,
     "tasks/nonai_group.py": 4,
+    "tasks/nonai_progress.py": 1,
     "tasks/nonai_queue.py": 3,
     "tasks/nonai_upscale.py": 27,
     "tasks/origenerator_metadata.py": 1,

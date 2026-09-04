@@ -22,11 +22,13 @@ from pathlib import Path
 from tests.temp_helpers import nonai_library_overrides, workspace_temp_dir
 from tests.test_dead_code import PROJECT_ROOT
 
-# The stage, its queue, the library shape they read it through, and the three
-# helpers that resolve a library file's path or launch the encoder.
+# The stage, its queue, its progress accounting, the library shape they read it
+# through, and the three helpers that resolve a library file's path or launch
+# the encoder.
 MODULES = (
     "tasks/nonai_upscale.py",
     "tasks/nonai_encode.py",
+    "tasks/nonai_progress.py",
     "tasks/nonai_queue.py",
     "util/nonai_job.py",
     "util/nonai_library.py",

@@ -81,7 +81,7 @@ STAGES: tuple[Stage, ...] = (
           "Record each 2D/non_AI clip's version family (original + processed variants) in a mirrored metadata sidecar",
           (0x6F, 0xDB, 0x9A)),
     Stage("video_types", "Video Kinds",
-          "Record what kind each library video is -- a generation, an excerpt, a Genau clip -- on its mirrored sidecar",
+          "Record what kind each library video is -- a generation, an excerpt, a Genau clip -- and how long it runs, on its mirrored sidecar",
           (0x2B, 0x2B, 0xE8)),
     Stage("dupes", "Duplicate Check",
           "Scan non_AI folder for likely duplicate videos, using exact filesize",

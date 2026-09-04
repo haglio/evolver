@@ -1,9 +1,9 @@
-"""Stage: record what kind every library video is on its metadata sidecar.
+"""Stage: record what kind every library video is, and how long it runs.
 
-One field, ``video.type`` (:mod:`util.video_type`), written once per video and
-read by every app in the family in place of the five different tests they each
-used to run.  This stage is the only thing that writes it, so the vocabulary
-has one author.
+Two fields, ``video.type`` and ``video.duration_seconds``
+(:mod:`util.video_type`), written once per video and read by every app in the
+family in place of the five different tests they each used to run.  This stage
+is the only thing that writes them, so the vocabulary has one author.
 
 It is a *backfill that never ends*: it walks the whole library every run, so
 the videos already in the library and the ones that arrive tomorrow are
@@ -16,6 +16,14 @@ record self-correcting: declare a folder of excerpts in the overlay, or split a
 video and write it a ``clip`` record, and the next run fixes what it wrote
 before it knew.  A running time costs an ffprobe, so that answer is remembered
 once and never asked again; a video does not change length.
+
+Every video is measured, not only the ones a running time has to settle.  A
+free kind — an excerpt, a Genau clip — is named without asking how long the
+video is, but the answer is worth having for its own sake: it is what
+:mod:`tasks.nonai_progress` weighs the non-AI upscale queue by, and two thirds
+of the videos that stage accounts for are excerpts.  Measuring them here costs
+one ffprobe apiece, once, against the same batch limit; leaving them to be
+measured wherever they are needed costs one per reader forever.
 
 Which means the first run over a library that has never been asked is the
 expensive one, and it runs inside a pipeline with a wall clock.  So a run
@@ -45,14 +53,18 @@ from util.sidecar import upscaled_video_path
 
 log = logging.getLogger(__name__)
 
-# The kinds a running time settles, and so the ones worth remembering: a video
-# does not change length, and re-deriving these would be an ffprobe per video
-# per run.
-_MEASURED_KINDS = (video_type.SHORT, video_type.FULL_LENGTH)
-
 
 @dataclass
 class VideoTypesResult:
+    """What one run reached, counting each video once.
+
+    ``recorded`` wrote a sidecar, ``already`` found nothing left to ask,
+    ``skipped`` could not be measured and so has no kind to write down, and
+    ``deferred`` still owes a later run something — a measurement this run had
+    none left to spend, or one that failed on a video whose kind was free
+    anyway.
+    """
+
     recorded: int = 0
     already: int = 0
     skipped: int = 0
@@ -60,43 +72,54 @@ class VideoTypesResult:
 
 
 def run(probe=duration_seconds) -> VideoTypesResult:
-    """Record what kind every library video is, measuring only where it must.
+    """Record what kind every library video is and how long it runs.
 
     *probe* reads a video's running time; it is the one thing here that costs
-    anything, and a test seam.
+    anything, so it is the only thing the batch limit counts, and it is a test
+    seam.
+
+    A video is measured once — the first run that reaches it and has a
+    measurement left to spend — and thereafter its sidecar answers.  The kind
+    is then re-derived every run from that recorded time and from the two free
+    signals, so a folder declared an excerpt after the fact corrects itself.
     """
     log.info("=== Stage: record video kinds ===")
     result = VideoTypesResult()
     measured = 0
     for video, path, payload, genau, excerpt in _library_videos():
-        recorded = video_type.type_of(payload)
         free = video_type.free_kind(genau=genau, excerpt=excerpt)
-        if free:
-            # Free to reach, so asked again every run rather than remembered.
-            if recorded == free:
-                result.already += 1
-                continue
-            sidecar.write(path, video_type.stamped(payload, free))
+        seconds = video_type.duration_of(payload)
+        out_of_measurements = seconds is None and measured >= config.VIDEO_TYPE_BATCH_LIMIT
+        unmeasurable = False
+        if seconds is None and not out_of_measurements:
+            measured += 1
+            seconds = probe(video)
+            unmeasurable = seconds is None
+            if unmeasurable:
+                log.info("Could not measure %s; leaving it for the next run", video)
+        if seconds is None and not free:
+            # Nothing free says what this is and no running time did either, so
+            # it is left alone: the sidecar's silence is recoverable on a later
+            # run, and a wrong answer written into it is not.
+            if unmeasurable:
+                result.skipped += 1
+            else:
+                result.deferred += 1
+            continue
+        written = video_type.stamped(
+            payload, video_type.classify(genau=genau, excerpt=excerpt,
+                                         duration_seconds=seconds))
+        if seconds is not None:
+            written = video_type.timed(written, seconds)
+        if written != payload:
+            sidecar.write(path, written)
             result.recorded += 1
-            continue
-        if recorded in _MEASURED_KINDS:
-            result.already += 1
-            continue
-        # Nothing free says what this is, so it has to be measured — the only
-        # cost here, so the only thing the batch limit counts, and the only
-        # answer that can fail to be reached at all.
-        if measured >= config.VIDEO_TYPE_BATCH_LIMIT:
+        elif seconds is None:
+            # A free kind already on file, still owing the running time that
+            # this run had no measurement left for, or could not take.
             result.deferred += 1
-            continue
-        measured += 1
-        seconds = probe(video)
-        if seconds is None:
-            log.info("Could not measure %s; leaving it for the next run", video)
-            result.skipped += 1
-            continue
-        kind = video_type.classify(genau=False, excerpt=False, duration_seconds=seconds)
-        sidecar.write(path, video_type.stamped(payload, kind))
-        result.recorded += 1
+        else:
+            result.already += 1
     log.info(
         "Video kinds: recorded %d, already known %d, skipped %d, deferred %d.",
         result.recorded, result.already, result.skipped, result.deferred,

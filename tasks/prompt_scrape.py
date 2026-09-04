@@ -130,13 +130,14 @@ def _already_scraped(output_path: Path) -> bool:
     """Whether the sidecar at *output_path* already holds what this stage writes.
 
     The test used to be the file's existence, and that stopped being the same
-    question when ``tasks.video_types`` began recording a kind on every library
-    video — including the ones nothing has scraped yet.  A sidecar holding
-    nothing but that kind is not a scrape, and reading it as one would lose the
-    prompts for good: a video this stage has skipped once is never looked at
-    again.
+    question when ``tasks.video_types`` began recording a kind and a running
+    time on every library video — including the ones nothing has scraped yet.
+    A sidecar holding nothing but those is not a scrape, and reading it as one
+    would lose the prompts for good: a video this stage has skipped once is
+    never looked at again.
     """
-    return output_path.exists() and not video_type.only_the_kind(sidecar.read(output_path))
+    return output_path.exists() and not video_type.only_the_video_itself(
+        sidecar.read(output_path))
 
 
 def _failure_marker_path(output_path: Path) -> Path:
