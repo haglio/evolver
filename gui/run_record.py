@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
 
+from util import run_log
+
 log = logging.getLogger(__name__)
 
 
@@ -24,24 +26,37 @@ class RunRecord:
     trigger: str  # "scheduled" or "manual"
     status: str   # "success" or "error"
     stages: list[dict[str, Any]] = field(default_factory=list)
+    # Where this run's lines sit in the log, from the offset of the banner it
+    # opened with to the offset past its last line. None on every record
+    # written before runs marked themselves, and on any run whose log could not
+    # be measured -- so both carry a default, and a record saved without them
+    # still loads.
+    log_start: int | None = None
+    log_end: int | None = None
 
     @classmethod
     def from_pipeline_result(cls, result, trigger: str = "scheduled") -> RunRecord:
         """Build a RunRecord from a PipelineResult, called as the run ends.
 
-        The start is derived from the finish rather than captured, so
-        ``finished_at - started_at == duration_seconds`` holds by construction
-        and the three cannot drift apart. Both used to be stamped with the
-        finish, which made every view that trusts the name -- the history
-        label, the chart's x axis -- wrong by the run's whole duration; at the
-        660-second watchdog ceiling that is eleven minutes, a full slot past
-        the ten-minute schedule, so a run read as belonging to the next tick.
+        The start is the pipeline's own, captured at its first instant, and the
+        finish is that plus the duration -- so ``finished_at - started_at ==
+        duration_seconds`` holds by construction and the three cannot drift
+        apart. Both used to be stamped with the FINISH, which made every view
+        that trusts the name -- the history label, the chart's x axis -- wrong
+        by the run's whole duration; at the 660-second watchdog ceiling that is
+        eleven minutes, a full slot past the ten-minute schedule, so a run read
+        as belonging to the next tick. The 11,105 records already on disk were
+        repaired once by hand -- ``finished_at`` minus ``duration_seconds`` is
+        the true start, and both were recorded honestly under either
+        convention. Deliberately by hand and not by the app: a one-shot
+        migration wired into a scheduler tick becomes a permanent walk of the
+        whole history, run forever to find nothing.
         """
-        now = datetime.now(timezone.utc)
-        started = now - timedelta(seconds=result.duration_seconds)
-        run_id = started.strftime("%Y-%m-%dT%H-%M-%S")
+        started = result.started_at
+        finished = started + timedelta(seconds=result.duration_seconds)
+        run_id = run_log.run_id(started)
         started_at = started.strftime("%Y-%m-%dT%H:%M:%S")
-        finished_at = now.strftime("%Y-%m-%dT%H:%M:%S")
+        finished_at = finished.strftime("%Y-%m-%dT%H:%M:%S")
 
         stages = []
         for sr in result.stages:
@@ -63,6 +78,8 @@ class RunRecord:
             trigger=trigger,
             status="error" if result.has_errors else "success",
             stages=stages,
+            log_start=result.log_start,
+            log_end=result.log_end,
         )
 
 
@@ -76,21 +93,6 @@ def utc_time(stamp: str) -> datetime:
     reader has to know, and now knows in one place rather than at each of them.
     """
     return datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc)
-
-
-def run_span(record: RunRecord) -> tuple[datetime, datetime]:
-    """When the run began and ended, as aware datetimes.
-
-    The start is measured back from the finish rather than read off
-    ``started_at``. Records written before ``from_pipeline_result`` derived
-    that field stamped BOTH ends with the finish, and every record on disk
-    predating it still says so -- a 660-second run reads as having begun the
-    moment it ended. The duration is the one thing both conventions recorded
-    honestly, and under the current one this is exactly what ``started_at``
-    already says, so the span is built from it either way.
-    """
-    finished = utc_time(record.finished_at)
-    return finished - timedelta(seconds=record.duration_seconds), finished
 
 
 def format_run_label(started_at: str, duration_seconds: float) -> str:

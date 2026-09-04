@@ -18,6 +18,7 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 import check_correspondence
 import check_duplicate_sizes
@@ -38,7 +39,7 @@ from tasks import (
     upscale,
     video_types,
 )
-from util import processes, system_resources
+from util import processes, run_log, system_resources
 
 
 @dataclass
@@ -106,6 +107,17 @@ class PipelineResult:
     stages: list[StageRecord] = field(default_factory=list)
     has_errors: bool = False
     duration_seconds: float = 0.0
+    # When the run began, captured at its first instant rather than worked out
+    # from its finish afterwards -- the run's name is this, and so is the
+    # banner it wrote, so the two agree by construction.
+    started_at: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc))
+    # The bytes of the log this run wrote, from the offset its banner sits at
+    # to the offset past its last line. None when the log could not be read at
+    # one end or the other, which is the whole reason both are optional: a run
+    # nobody can point at in the log is still a run.
+    log_start: int | None = None
+    log_end: int | None = None
 
 
 class _StopRequested(Exception):
@@ -175,6 +187,16 @@ def run_pipeline(
     """
     log = logging.getLogger(__name__)
     pipeline_t0 = time.monotonic()
+    started_at = datetime.now(timezone.utc)
+    # Read once and carried: the two marks either side of the run and the
+    # reader that uses them all take the path rather than reach for it.
+    log_path = config.LOG_FILE
+    run_id = run_log.run_id(started_at)
+    log_start = run_log.size(log_path)
+    # The line that makes this run findable afterwards. Every view of a run is
+    # a summary of counters; what the stages actually said is only ever here,
+    # and a log nothing rotates is far too long to find a run in by reading.
+    log.info(run_log.banner(run_id))
     records: list[StageRecord] = []
 
     def _run_stage(name, fn, **kwargs):
@@ -291,10 +313,17 @@ def run_pipeline(
             "Stop requested; dropping the remaining stages after %d ran.", len(records),
         )
 
+    duration_seconds = time.monotonic() - pipeline_t0
+    # After everything this run had to say, so the offset closes the stretch
+    # the banner opened.
+    log_end = run_log.size(log_path)
     return PipelineResult(
         stages=records,
         has_errors=any(record.status == "error" for record in records),
-        duration_seconds=time.monotonic() - pipeline_t0,
+        duration_seconds=duration_seconds,
+        started_at=started_at,
+        log_start=log_start,
+        log_end=log_end,
     )
 
 

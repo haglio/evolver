@@ -15,19 +15,29 @@ import config
 from gui import peer_watch, process_identity, single_instance
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
+from gui.palette import apply_accent
 from gui.presence_throttle import PresenceThrottle
 from gui.progress_popup import ProgressPopup
-from gui.run_record import RunRecord, format_run_label, load_runs, run_span
+from gui.run_record import RunRecord, format_run_label, load_runs
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
 from gui.stats_window import StatsWindow
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
-from util import crash_log, log_excerpt
+from util import crash_log, run_log
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
+
+
+def _unmarked_note(record, log_path) -> str:
+    """Why a run's lines are not on screen, in the window's own words."""
+    if record.log_start is None:
+        return ("This run predates Evolver marking its runs in the log, so "
+                "there is no mark to find its lines by.")
+    return (f"{log_path} no longer holds this run's lines: the file has been "
+            "replaced or trimmed since the run wrote them.")
 
 
 def _wire(view, slots: dict) -> None:
@@ -65,6 +75,7 @@ class EvolverApp:
         self._app = QApplication(sys.argv)
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("Evolver")
+        apply_accent(self._app)
 
         self._settings = EvolverSettings.load()
         self._worker: PipelineWorker | None = None
@@ -219,13 +230,15 @@ class EvolverApp:
         if self._log_window is not None:
             self._log_window.close()
             self._log_window.deleteLater()
-        # Read once and handed on: the window and the excerpt both take the
-        # path, so neither has to reach for the ambient config itself.
+        # Read once and handed on: the reader takes the path, so it does not
+        # have to reach for the ambient config itself.
         log_path = config.LOG_FILE
-        text = log_excerpt.excerpt(log_path, *run_span(record))
+        text = run_log.read_run(
+            log_path, record.id, record.log_start, record.log_end)
+        note = "" if text is not None else _unmarked_note(record, log_path)
         self._log_window = RunLogWindow(
             format_run_label(record.started_at, record.duration_seconds),
-            text, log_path, self._window,
+            text or "", note, self._window,
         )
         self._log_window.show()
         self._log_window.raise_()

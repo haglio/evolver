@@ -46,12 +46,13 @@ from tests.test_dead_code import PROJECT_ROOT, _source_files
 # eleven that were threaded through call sites and five identical one-line
 # wrappers to say the same thing.
 #
-# gui/app.py's 7th is the third shape: a value a NEW feature needs that no
-# module read before. One read, at the layer whose whole job is wiring, and
-# handed on as a parameter -- LOG_FILE reaches util/log_excerpt.py and
-# gui/log_window.py that way, so neither of the two new modules reads config at
-# all. A feature paying one read at the composition root is the seam working;
-# paying it in the two modules that do the work would not be.
+# gui/app.py's 7th and evolver.py's 10th are the third shape: a value a NEW
+# feature needs that no module read before. LOG_FILE, read once on each side
+# of the run-log link -- the pipeline marks where in the log it wrote, the
+# window reads back what it marked -- and handed on as a parameter from
+# there, so util/run_log.py and gui/log_window.py read config not at all. A
+# feature paying one read where the wiring already lives is the seam working;
+# paying it in the modules that do the work would not be.
 CONFIG_REFERENCE_LEDGER = {
     "backfill/decisions.py": 3,
     "backfill/mic.py": 1,
@@ -60,7 +61,7 @@ CONFIG_REFERENCE_LEDGER = {
     "backfill/voice.py": 5,
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
-    "evolver.py": 9,
+    "evolver.py": 10,
     "gui/app.py": 7,
     "gui/main_window.py": 2,
     # The broker's launcher, so a check that finds the broker gone has something
