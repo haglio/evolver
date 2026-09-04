@@ -35,6 +35,9 @@ nonai_upscale_cooldown*.json
 
 # GUI runtime state
 runs/
+# The branch preview's own tree: its launcher log, and the running times it
+# measures rather than reading off the library's sidecars (preview_branch.py).
+state/
 gui_settings.json
 tray_crash.log
 

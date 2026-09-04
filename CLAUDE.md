@@ -39,6 +39,32 @@ migration, not regression guards. **Keep `_carry_metadata`**, which is the promo
 makes the repair unnecessary. Roughly −75 production lines. `git revert` restores the pass in seconds
 if it is ever wanted again. Full write-up: `audit/CHANGELOG.md`, the 2026-08-30 item 27 entry.
 
+## Judging a branch before it lands
+
+Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it
+opens THAT worktree's Evolver window on what the branch reports about the real
+library — the run-detail table, off the branch's code, with the live app left
+running. It never runs the pipeline: Evolver's job is moving files in the one
+library and its non-AI stage supervises a detached encode by a pid in a file, so
+a second instance would move the same files and adopt the same encode. What each
+preview reports is one function per stage in `preview_branch.py`; add one there
+when a change makes a stage's report worth judging.
+
+The first launch after a change spends a couple of minutes measuring running
+times the library has not recorded yet, and later ones are immediate. The
+launcher re-copies the primary's `content.local.json` every time — a stale copy
+resolves a library that has moved and the preview comes up empty.
+
+**The preview is part of delivering a user-facing change, not an extra, and it
+comes BEFORE the pull request** — opening one here lands the change hands-off
+within about twenty minutes, so a preview handed over beside an open PR is a
+notice, not a review. Push the branch and open it with `gh pr create --fill
+--draft` if it should be visible first, then `gh pr ready` once he says it is
+good. **Never launch the preview yourself** — a window over his work gets closed
+in irritation and takes whatever else he was running with it. The windowless
+pre-handoff check is `python -m pytest tests/test_launch_smoke.py`, which
+replays the launch's whole import phase.
+
 ## Repo-specific gotchas
 
 (None yet — add entries here when they materially affect launches, tests, or architectural decisions.)
