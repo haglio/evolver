@@ -24,8 +24,8 @@ from tests.test_dead_code import PROJECT_ROOT, _source_files
 # told from an import of a third-party library or the standard one.
 _OURS = (
     "backfill", "backfill_app", "check_correspondence", "check_duplicate_sizes",
-    "config", "content", "evolver", "gui", "tasks", "tray_app", "util",
-    "vulture_whitelist",
+    "config", "content", "evolver", "gui", "preview_branch", "tasks",
+    "tray_app", "util", "vulture_whitelist",
 )
 
 # What each may import. ``gui`` may reach exactly one thing under ``tasks``:
@@ -41,6 +41,11 @@ ALLOWED = {
     "evolver": {"check_correspondence", "check_duplicate_sizes", "config",
                 "tasks", "util"},
     "gui": {"config", "evolver", "tasks.stages", "util"},
+    # The branch preview assembles a window out of the stages' reads without
+    # running any of them, so it reaches both layers at once -- the one place
+    # that is allowed, and only because it is an entry point of its own that
+    # the app never imports.
+    "preview_branch": {"config", "evolver", "gui", "tasks", "util"},
     "tasks": {"config", "util"},
     "tray_app": {"gui", "util"},
     "util": {"config"},

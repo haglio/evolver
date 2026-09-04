@@ -73,6 +73,10 @@ CONFIG_REFERENCE_LEDGER = {
     "gui/settings.py": 2,
     "gui/tray.py": 1,
     "gui/worker.py": 1,
+    # The branch preview reads the library the way a stage does, and points two
+    # of these somewhere else -- the run record and the running times it takes
+    # stay in the worktree rather than in the live install (preview_branch.py).
+    "preview_branch.py": 7,
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 5,

@@ -52,6 +52,11 @@ LAUNCH_FILES = (
     REPO_ROOT / "tray_app.py",
     REPO_ROOT / "gui" / "app.py",
     REPO_ROOT / "backfill_app.py",
+    # The branch preview, whose whole point is being clicked by someone judging
+    # a change: it is started by a vbs through pythonw exactly as the tray is,
+    # so an import break in it is the same invisible dead icon -- and the one
+    # that costs a review cycle rather than a run.
+    REPO_ROOT / "preview_branch.py",
 )
 
 # Reached only from inside main(), so a module-level import test never saw it.
