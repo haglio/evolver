@@ -1,14 +1,17 @@
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import make_run_record, workspace_temp_dir
 
-from gui.run_record import RunRecord, result_to_dict, save_run, load_runs, format_run_label
+from gui.run_record import (
+    RunRecord, format_run_label, load_runs, result_to_dict, run_span, save_run,
+)
 
 
 @dataclass
@@ -285,6 +288,32 @@ class TestRunRecordFromPipelineResult:
         record = RunRecord.from_pipeline_result(pr)
 
         assert record.id == record.started_at.replace(":", "-")
+
+
+class TestRunSpan:
+    """The stretch of wall clock a run occupied, for reading the log by."""
+
+    def test_the_span_is_the_duration_ending_at_the_finish(self):
+        start, end = run_span(make_run_record(
+            started_at="2026-07-15T03:20:00", finished_at="2026-07-15T03:20:12",
+            duration_seconds=12.0,
+        ))
+
+        assert (end - start) == timedelta(seconds=12)
+        assert end == datetime(2026, 7, 15, 3, 20, 12, tzinfo=timezone.utc)
+
+    def test_a_record_that_stamped_both_ends_with_the_finish_still_spans(self):
+        """Every record written before from_pipeline_result derived started_at
+        says the run began the moment it ended. Trusting that field would make
+        an eleven-minute run's span two seconds long, and its excerpt of the
+        log the two seconds after the run rather than the run."""
+        start, end = run_span(make_run_record(
+            started_at="2026-07-15T03:31:00", finished_at="2026-07-15T03:31:00",
+            duration_seconds=660.0,
+        ))
+
+        assert start == datetime(2026, 7, 15, 3, 20, 0, tzinfo=timezone.utc)
+        assert end == datetime(2026, 7, 15, 3, 31, 0, tzinfo=timezone.utc)
 
 
 class TestFormatRunLabel:

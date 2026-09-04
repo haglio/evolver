@@ -13,17 +13,18 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 import config
 from gui import process_identity, single_instance
+from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.presence_throttle import PresenceThrottle
 from gui.progress_popup import ProgressPopup
-from gui.run_record import load_runs
+from gui.run_record import RunRecord, format_run_label, load_runs, run_span
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
 from gui.stats_window import StatsWindow
 from gui.tray import EvolverTray
 from gui.worker import PipelineWorker
-from util import crash_log
+from util import crash_log, log_excerpt
 from util.windows_alert import show_error_window
 
 log = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ class EvolverApp:
         self._settings = EvolverSettings.load()
         self._worker: PipelineWorker | None = None
         self._stats_window: StatsWindow | None = None
+        self._log_window: RunLogWindow | None = None
         self._progress_popup: ProgressPopup | None = None
         self._show_requests: QLocalServer | None = None
 
@@ -113,6 +115,9 @@ class EvolverApp:
             "restart": self._restart,
             "quit": self._confirm_quit,
         })
+        # Not one of the window's commands: those are the toolbar's, named the
+        # same on the tray. This one carries the run that was clicked.
+        self._window.log_requested.connect(self._show_run_log)
 
     def start(self) -> None:
         """Everything the app does to the machine, in the order it must happen.
@@ -187,6 +192,28 @@ class EvolverApp:
         records = load_runs(config.RUNS_DIR)
         self._stats_window = StatsWindow(records, self._window)
         self._stats_window.show()
+
+    def _show_run_log(self, record: RunRecord):
+        """Open the log where this run wrote, rather than at its top.
+
+        Rebuilt each time rather than raised like the stats window: a different
+        run is different content, and the one before it is closed and dropped
+        so a window per click cannot pile up behind the main one.
+        """
+        if self._log_window is not None:
+            self._log_window.close()
+            self._log_window.deleteLater()
+        # Read once and handed on: the window and the excerpt both take the
+        # path, so neither has to reach for the ambient config itself.
+        log_path = config.LOG_FILE
+        text = log_excerpt.excerpt(log_path, *run_span(record))
+        self._log_window = RunLogWindow(
+            format_run_label(record.started_at, record.duration_seconds),
+            text, log_path, self._window,
+        )
+        self._log_window.show()
+        self._log_window.raise_()
+        self._log_window.activateWindow()
 
     def _launch_backfill(self):
         """Start the metadata backfill tool as its own process.
