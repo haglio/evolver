@@ -10,23 +10,22 @@ lands on them.
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
 
-import config
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow, RunDetailWidget
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import make_run_record, override_config, workspace_temp_dir
+from util import run_log
 
 
-def _line(moment: datetime, message: str) -> str:
-    """One log line, stamped the way logging stamps them: local, to the second."""
-    local = moment.astimezone().replace(tzinfo=None)
-    return f"[{local.strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
+def _log_bytes(lines) -> bytes:
+    """Log lines as the file really holds them: stamped, CRLF, UTF-8."""
+    body = "".join(f"[2026-07-25 {at}] {text}\r\n" for at, text in lines)
+    return body.encode("utf-8")
 
 
 class TestRunTitleIsALink(unittest.TestCase):
@@ -113,7 +112,7 @@ class TestRunTitleIsALink(unittest.TestCase):
 
 
 class TestLogWindowOpens(unittest.TestCase):
-    """What the app does with the ask: cut the run's stretch out of the log."""
+    """What the app does with the ask: read the bytes the run's mark names."""
 
     def setUp(self):
         self._workspace = workspace_temp_dir()
@@ -128,45 +127,48 @@ class TestLogWindowOpens(unittest.TestCase):
             self.app._log_window.close()
             self.app._log_window.deleteLater()
 
-    def _record_and_log(self, duration_seconds=4.0):
-        """A run, and a log holding its lines between two other runs' lines."""
-        finished = datetime.now(timezone.utc).replace(microsecond=0)
-        started = finished - timedelta(seconds=duration_seconds)
+    def _marked_record(self, run_id="2026-07-25T15-20-02"):
+        """A log with this run's lines between two other runs', and its mark.
 
-        self.log.write_text("".join([
-            _line(started - timedelta(seconds=600), "an earlier run"),
-            _line(started, "=== Stage 1: strays ==="),
-            _line(finished, "Stage 8 done."),
-            _line(finished + timedelta(seconds=600), "a later run"),
-        ]), encoding="utf-8")
-        return make_run_record(
-            started_at=started.strftime("%Y-%m-%dT%H:%M:%S"),
-            finished_at=finished.strftime("%Y-%m-%dT%H:%M:%S"),
-            duration_seconds=duration_seconds,
-        )
+        Written as bytes, CRLF, because that is what ``logging`` writes on this
+        platform and the mark is a byte offset: a fixture in whichever newline
+        the test file happens to use puts every offset out by a byte a line.
+        """
+        before = _log_bytes([("08:10:02", run_log.banner("2026-07-25T15-10-02"))])
+        mine = _log_bytes([
+            ("08:20:02", run_log.banner(run_id)),
+            ("08:20:02", "=== Stage 1: strays ==="),
+            ("08:20:05", "Stage 8 done."),
+        ])
+        after = _log_bytes([("08:30:02", run_log.banner("2026-07-25T15-30-02"))])
+        self.log.write_bytes(before + mine + after)
+        return make_run_record(id=run_id, log_start=len(before),
+                               log_end=len(before) + len(mine))
+
+    def _shown(self):
+        return self.app._log_window._view.toPlainText()
 
     def test_the_window_holds_this_runs_lines_and_not_its_neighbors(self):
-        record = self._record_and_log()
+        record = self._marked_record()
 
         with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
 
-        shown = self.app._log_window._view.toPlainText()
-        self.assertIn("=== Stage 1: strays ===", shown)
-        self.assertIn("Stage 8 done.", shown)
-        self.assertNotIn("an earlier run", shown)
-        self.assertNotIn("a later run", shown)
+        self.assertIn("=== Stage 1: strays ===", self._shown())
+        self.assertIn("Stage 8 done.", self._shown())
+        self.assertNotIn("2026-07-25T15-10-02", self._shown())
+        self.assertNotIn("2026-07-25T15-30-02", self._shown())
 
     def test_the_title_says_which_run_is_on_screen(self):
-        record = self._record_and_log()
+        record = self._marked_record()
 
         with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
 
-        self.assertIn("(4s)", self.app._log_window.windowTitle())
+        self.assertIn("(12s)", self.app._log_window.windowTitle())
 
     def test_a_second_click_replaces_the_window_rather_than_stacking_one(self):
-        record = self._record_and_log()
+        record = self._marked_record()
 
         with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
@@ -175,53 +177,47 @@ class TestLogWindowOpens(unittest.TestCase):
 
         self.assertIsNot(self.app._log_window, first)
 
-    def test_a_run_the_log_has_nothing_for_opens_and_says_where_it_looked(self):
-        """The history outlives the log -- it is a directory of files nothing
-        prunes, and the log can be deleted under it. An empty window that names
-        the file it read beats one that just looks broken."""
-        record = self._record_and_log()
-
-        with override_config(LOG_FILE=self.root / "no-such.log"):
-            self.app._show_run_log(record)
-
-        self.assertEqual(self.app._log_window._view.toPlainText(), "")
-        self.assertIn("no-such.log", self.app._log_window._view.placeholderText())
-
-    def test_a_record_that_stamped_both_ends_with_the_finish_still_lands(self):
-        """Every record on disk predates the fix that derives started_at, and
-        says the run began the moment it ended. Read literally, a long run's
-        excerpt would be the two seconds after it finished and none of it."""
-        finished = datetime.now(timezone.utc).replace(microsecond=0)
-
-        self.log.write_text("".join([
-            _line(finished - timedelta(seconds=300), "=== Stage 1: strays ==="),
-            _line(finished, "Stage 8 done."),
-        ]), encoding="utf-8")
-        stamped = finished.strftime("%Y-%m-%dT%H:%M:%S")
-        record = make_run_record(started_at=stamped, finished_at=stamped,
-                                 duration_seconds=300.0)
+    def test_a_run_from_before_the_mark_says_that_is_why(self):
+        """Every record written before runs marked themselves has no mark, and
+        the history keeps them for months. Saying so beats an empty window."""
+        self._marked_record()
+        record = make_run_record(log_start=None, log_end=None)
 
         with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
 
-        self.assertIn("=== Stage 1: strays ===",
-                      self.app._log_window._view.toPlainText())
+        self.assertEqual(self._shown(), "")
+        self.assertIn("predates", self.app._log_window._view.placeholderText())
 
-    def test_it_reads_the_configured_log_and_not_a_path_of_its_own(self):
-        record = self._record_and_log()
+    def test_a_mark_the_log_no_longer_answers_to_says_that_instead(self):
+        """The offsets are only as good as the file under them. A log deleted
+        and started again leaves marks pointing into a stranger's lines, and
+        the banner is what catches it -- so the window says the log lost them
+        rather than showing somebody else's run under this run's title."""
+        record = self._marked_record()
+        self.log.write_bytes(_log_bytes([("08:20:02", "a fresh log")] * 40))
 
-        with override_config(LOG_FILE=self.log), \
-                patch("gui.app.log_excerpt.excerpt", return_value="") as excerpt:
+        with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
 
-        self.assertEqual(excerpt.call_args.args[0], self.log)
+        self.assertEqual(self._shown(), "")
+        self.assertIn("no longer holds", self.app._log_window._view.placeholderText())
+
+    def test_it_reads_the_configured_log_and_not_a_path_of_its_own(self):
+        record = self._marked_record()
+
+        with override_config(LOG_FILE=self.log), \
+                patch("gui.app.run_log.read_run", return_value="") as read:
+            self.app._show_run_log(record)
+
+        self.assertEqual(read.call_args.args[0], self.log)
 
 
 class TestLogWindowWidget(unittest.TestCase):
     def test_long_lines_scroll_rather_than_wrap(self):
         """A log line carries a full path. Wrapped, one stage's line becomes
         three and the column of timestamps stops lining up."""
-        window = RunLogWindow("2026/07/25 08:20 (12s)", "a line", config.LOG_FILE)
+        window = RunLogWindow("2026/07/25 08:20 (12s)", "a line")
         self.addCleanup(window.deleteLater)
 
         self.assertEqual(window._view.lineWrapMode(),

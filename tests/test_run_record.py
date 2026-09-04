@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from tests.temp_helpers import make_run_record, workspace_temp_dir
 
 from gui.run_record import (
-    RunRecord, format_run_label, load_runs, result_to_dict, run_span, save_run,
+    RunRecord, format_run_label, load_runs, result_to_dict, save_run,
 )
 
 
@@ -268,17 +268,43 @@ class TestRunRecordFromPipelineResult:
         wrong by the run's whole duration -- and at the 660-second watchdog
         ceiling that is eleven minutes, a full slot past the ten-minute
         schedule, which reads as belonging to the following tick."""
-        from datetime import datetime
-
         from evolver import PipelineResult
 
-        pr = PipelineResult(stages=[], has_errors=False, duration_seconds=699.7)
+        pr = PipelineResult(
+            stages=[], has_errors=False, duration_seconds=699.7,
+            started_at=datetime(2026, 7, 15, 3, 20, 0, tzinfo=timezone.utc),
+        )
 
         record = RunRecord.from_pipeline_result(pr)
 
-        started = datetime.fromisoformat(record.started_at)
-        finished = datetime.fromisoformat(record.finished_at)
-        assert (finished - started).total_seconds() == pytest.approx(699.7, abs=1.0)
+        assert record.started_at == "2026-07-15T03:20:00"
+        assert record.finished_at == "2026-07-15T03:31:39"
+
+    def test_the_start_is_the_pipelines_own_not_one_worked_out_afterwards(self):
+        """The pipeline stamps its start as it begins and names its log banner
+        with it. Recomputing the start here from the finish would drift from
+        that banner by however long the record took to save, and a run whose
+        record and banner disagree is one nothing can find in the log."""
+        from evolver import PipelineResult
+        from util import run_log
+
+        started = datetime(2026, 7, 15, 3, 20, 0, tzinfo=timezone.utc)
+        pr = PipelineResult(stages=[], has_errors=False, duration_seconds=699.7,
+                            started_at=started)
+
+        record = RunRecord.from_pipeline_result(pr)
+
+        assert record.id == run_log.run_id(started)
+
+    def test_the_log_mark_rides_along_onto_the_record(self):
+        from evolver import PipelineResult
+
+        pr = PipelineResult(stages=[], has_errors=False, duration_seconds=1.0,
+                            log_start=1024, log_end=4096)
+
+        record = RunRecord.from_pipeline_result(pr)
+
+        assert (record.log_start, record.log_end) == (1024, 4096)
 
     def test_the_id_names_the_start_so_the_history_sorts_by_it(self):
         from evolver import PipelineResult
@@ -289,31 +315,22 @@ class TestRunRecordFromPipelineResult:
 
         assert record.id == record.started_at.replace(":", "-")
 
+    def test_a_record_with_no_mark_still_loads_back(self):
+        """Every record on disk was written before the mark existed, so the two
+        fields have to be optional at BOTH ends -- load_runs drops a record
+        whose file is missing a field the dataclass requires."""
+        with workspace_temp_dir() as runs_dir:
+            (runs_dir / "2026-01-01T00-00-00.json").write_text(json.dumps({
+                "id": "2026-01-01T00-00-00",
+                "started_at": "2026-01-01T00:00:00",
+                "finished_at": "2026-01-01T00:00:03",
+                "duration_seconds": 3.0, "trigger": "scheduled",
+                "status": "success", "stages": [],
+            }), encoding="utf-8")
 
-class TestRunSpan:
-    """The stretch of wall clock a run occupied, for reading the log by."""
+            loaded = load_runs(runs_dir)
 
-    def test_the_span_is_the_duration_ending_at_the_finish(self):
-        start, end = run_span(make_run_record(
-            started_at="2026-07-15T03:20:00", finished_at="2026-07-15T03:20:12",
-            duration_seconds=12.0,
-        ))
-
-        assert (end - start) == timedelta(seconds=12)
-        assert end == datetime(2026, 7, 15, 3, 20, 12, tzinfo=timezone.utc)
-
-    def test_a_record_that_stamped_both_ends_with_the_finish_still_spans(self):
-        """Every record written before from_pipeline_result derived started_at
-        says the run began the moment it ended. Trusting that field would make
-        an eleven-minute run's span two seconds long, and its excerpt of the
-        log the two seconds after the run rather than the run."""
-        start, end = run_span(make_run_record(
-            started_at="2026-07-15T03:31:00", finished_at="2026-07-15T03:31:00",
-            duration_seconds=660.0,
-        ))
-
-        assert start == datetime(2026, 7, 15, 3, 20, 0, tzinfo=timezone.utc)
-        assert end == datetime(2026, 7, 15, 3, 31, 0, tzinfo=timezone.utc)
+        assert [r.log_start for r in loaded] == [None]
 
 
 class TestFormatRunLabel:

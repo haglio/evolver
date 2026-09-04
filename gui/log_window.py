@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from PyQt6.QtGui import QFontDatabase
 from PyQt6.QtWidgets import QDialog, QPlainTextEdit, QVBoxLayout
 
@@ -13,11 +11,12 @@ class RunLogWindow(QDialog):
 
     The run's stretch rather than the file: evolver's log is one appending file
     nothing rotates, hundreds of megabytes of it, and putting that in a widget
-    is not something a window recovers from. The excerpt is cut before it gets
-    here (:mod:`util.log_excerpt`); this only shows it.
+    is not something a window recovers from. The lines are cut out before they
+    get here (:mod:`util.run_log`); this only shows them, and shows *note* in
+    their place when the run's mark led nowhere.
     """
 
-    def __init__(self, title: str, text: str, log_path: Path, parent=None):
+    def __init__(self, title: str, text: str, note: str = "", parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Evolver — Log for {title}")
         self.setMinimumSize(600, 300)
@@ -33,11 +32,10 @@ class RunLogWindow(QDialog):
         self._view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self._view.setFont(
             QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
-        # Shown only when the excerpt is empty, which is a real outcome: the
-        # log does not reach back to every run the history still lists. Saying
-        # which file was looked in is the difference between "no log here" and
-        # "the app is broken".
-        self._view.setPlaceholderText(
-            f"Nothing in {log_path} was written while this run ran.")
+        # Shown only when there is nothing to show, which is a real outcome:
+        # the history outlives the log, and runs older than the mark cannot be
+        # pointed at in it at all. Saying which of those it was is the
+        # difference between an explanation and a window that looks broken.
+        self._view.setPlaceholderText(note)
         self._view.setPlainText(text)
         layout.addWidget(self._view)

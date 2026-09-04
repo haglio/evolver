@@ -6,8 +6,14 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from pathlib import Path
+
 import config
 import evolver
+
+# What logging writes at the end of every line on this platform, and so what
+# a byte offset into the log has to be counted in.
+CRLF = (chr(13) + chr(10)).encode("ascii")
 from tasks.stages import ALL_STAGES
 
 
@@ -289,6 +295,46 @@ class TestRunPipeline:
         assert isinstance(result, evolver.PipelineResult)
         assert not result.has_errors
         assert len(result.stages) > 0
+
+    def test_the_run_marks_where_in_the_log_it_wrote(self, tmp_path):
+        """Two offsets and a banner, so a run's lines can be pointed at rather
+        than searched for in a file nothing rotates. The offsets are taken
+        either side of the run, so the stretch between them is the run's own."""
+        from util import run_log
+
+        log = tmp_path / "evolver.log"
+        log.write_bytes(b"[2026-07-25 08:10:02] an earlier run" + CRLF)
+        stack, _ = self._patch_all_stages()
+        handler = logging.FileHandler(log, encoding="utf-8")
+        logger = logging.getLogger("evolver")
+        logger.addHandler(handler)
+        # The suite leaves the root logger at WARNING, and the banner is logged
+        # at INFO -- unset, it never reaches the file and the mark points at
+        # nothing.
+        previous_level = logger.level
+        logger.setLevel(logging.INFO)
+        try:
+            with stack, patch.object(config, "LOG_FILE", log):
+                result = evolver.run_pipeline()
+        finally:
+            logger.setLevel(previous_level)
+            logger.removeHandler(handler)
+            handler.close()
+
+        text = run_log.read_run(log, run_log.run_id(result.started_at),
+                                result.log_start, result.log_end)
+        assert text is not None
+        assert "an earlier run" not in text
+
+    def test_a_log_it_cannot_measure_leaves_the_mark_unset(self):
+        """A run nobody can point at in the log is still a run: the record is
+        saved either way, and the GUI says why the link leads nowhere."""
+        missing = Path("no-such-directory") / "evolver.log"
+        stack, _ = self._patch_all_stages()
+        with stack, patch.object(config, "LOG_FILE", missing):
+            result = evolver.run_pipeline()
+
+        assert (result.log_start, result.log_end) == (None, None)
 
     def test_stage_records_have_correct_names(self):
         stack, _ = self._patch_all_stages()

@@ -217,11 +217,13 @@ def make_run_record(**overrides):
     fields = dict(
         id="2026-07-25T15-20-02",
         started_at="2026-07-25T15:20:02",
-        finished_at="2026-07-25T15:20:02",
+        finished_at="2026-07-25T15:20:14",
         duration_seconds=12.0,
         trigger="scheduled",
         status="success",
         stages=[],
+        log_start=None,
+        log_end=None,
     )
     fields.update(overrides)
     return RunRecord(**fields)
