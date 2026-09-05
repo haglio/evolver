@@ -63,6 +63,35 @@ class TestPurgeWeird(unittest.TestCase):
             self.assertFalse(weird_file.exists())
             self.assertFalse(sorted_file.exists())
 
+    def test_a_name_with_glob_characters_still_finds_its_source(self):
+        # The lookup handed the file name to rglob as a pattern, so a name with
+        # `[`, `*` or `?` in it matched nothing: the stage said no source was
+        # found, popped its dialog, and deleted the weird file anyway, orphaning
+        # the source forever (bug 17).
+        with workspace_temp_dir() as root:
+            weird_dir = root / "weird"
+            sorted_dir = root / "sorted"
+            metadata_dir = root / "metadata"
+            weird_dir.mkdir(parents=True)
+            sorted_file = sorted_dir / "sourceA" / "landscape" / "clip [1].mp4"
+            sorted_file.parent.mkdir(parents=True)
+            sorted_file.write_bytes(b"sorted")
+            json_file = metadata_dir / "2_outbox" / "clip [1]_topaz.json"
+            json_file.parent.mkdir(parents=True)
+            json_file.write_text("{}", encoding="utf-8")
+            weird_file = weird_dir / "clip [1]_topaz.mp4"
+            weird_file.write_bytes(b"weird")
+
+            with override_config(SORTED_DIR=sorted_dir, WEIRD_DIR=weird_dir, METADATA_DIR=metadata_dir):
+                result = purge_weird.run()
+
+            self.assertEqual(result.missing_sorted, [])
+            self.assertEqual(result.deleted_sorted, 1)
+            self.assertEqual(result.deleted_metadata, 1)
+            self.assertFalse(sorted_file.exists())
+            self.assertFalse(json_file.exists())
+            self.assertFalse(weird_file.exists())
+
     def test_run_deletes_orphaned_metadata_json(self):
         with workspace_temp_dir() as root:
             weird_dir = root / "weird"
