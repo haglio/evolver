@@ -7,42 +7,28 @@ Launch with: pythonw.exe tray_app.py
 import atexit
 import sys
 import traceback
+from pathlib import Path
+
+from app_support.process_identity import ProcessNamer
 
 from util import crash_log
 from util.alert import show_error
 
+_ICON = Path(__file__).resolve().parent / "icon.ico"
+
 
 def _name_this_process() -> None:
-    """Leave the shortcut an interpreter that says "Evolver" next time.
-
-    Windows takes what it shows about a process from the file it was started
-    from -- the Details tab's name, the Processes tab's description, the icon
-    beside it -- so a plain ``pythonw.exe`` puts Evolver in the task list as one
-    more anonymous "Python".  That costs nothing until something strands a
-    process, and then the task list is the only way back and cannot say which
-    row is safe to end.
-
-    Naming this process on the way in is the one thing that cannot be done:
-    writing the copy takes the very interpreter being named.  So each run makes
-    it for the run after, and its pinned shortcut points at it once it exists.
-    """
-    try:
-        from pathlib import Path as _Path
-
-        from app_support.process_identity import ProcessNamer
-
-        icon = _Path(__file__).resolve().parent / "icon.ico"
-        ProcessNamer("Evolver", icon=icon).prepare_launcher("Evolver")
-    except Exception:
-        # Cosmetic: costs a name in the task list, never a launch. But say so
-        # somewhere, or the task list fills with anonymous Pythons and nothing
-        # anywhere records why -- which is the state this exists to end.
-        crash_log.write_info(
-            "Could not name this process:", f"{traceback.format_exc()}\n")
+    """Leave the pinned shortcut an interpreter that says "Evolver" next time.
+    Why it is one launch behind, and why it can never cost the launch:
+    :meth:`ProcessNamer.name_this_process`.  A failure is logged, and main()
+    routes warnings into the crash log, so the task list filling with anonymous
+    Pythons is never a thing nothing anywhere records."""
+    ProcessNamer("Evolver", icon=_ICON).name_this_process("Evolver")
 
 
 def main():
     crash_log.install_excepthook()
+    crash_log.record_warnings()
     _name_this_process()
     atexit.register(crash_log.on_exit)
     from gui.app import EvolverApp
