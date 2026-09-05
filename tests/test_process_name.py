@@ -1,69 +1,52 @@
 """Evolver says its own name in the Windows task list.
 
-Windows takes what it shows about a process -- the Details tab's name, the
-Processes tab's description, the icon beside it -- from the file the process was
-started from, so a plain ``pythonw.exe`` puts Evolver in the task list as one more
-anonymous "Python".  That costs nothing until something strands a process, and
-then the task list is the only way back and cannot say which row is safe to end
-among half a dozen identical ones belonging to different apps.
-
-``app_support.process_identity`` makes a copy of the interpreter named,
-described and marked for this app.  This process cannot be named on the way in
--- writing the copy takes the very interpreter being named -- so each run makes
-it for the run after, and the shortcut is pointed at it once it exists.
+Why an app names its processes, and why its own is the one it can only name for
+the run after, is :mod:`app_support.process_identity`'s to say.  What is left
+here is what only this repo can be wrong about: that the app makes the copy its
+shortcut starts it through, run against a throwaway venv rather than read off
+``tray_app.py``, and that a failure to make it leaves a trace where this app
+keeps its traces.
 """
 from __future__ import annotations
 
+import logging
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
-from app_support.process_identity import ProcessNamer
+import pytest
+from app_support.process_identity_check import assert_the_app_names_its_process
 
 import tray_app
+from util import crash_log
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 APP_NAME = "Evolver"
 ROLE = "Evolver"
 
 
-def test_the_app_prepares_the_copy_for_next_time():
-    # By calling the code, not by grepping tray_app.py's source for the call
-    # string -- a reformat or a rename used to turn this red with the behaviour
-    # unchanged.
-    with patch("app_support.process_identity.ProcessNamer") as namer:
-        tray_app._name_this_process()
-
-    namer.assert_called_once_with("Evolver", icon=PROJECT_DIR / "icon.ico")
-    namer.return_value.prepare_launcher.assert_called_once_with("Evolver")
-
-
-def test_the_row_reads_as_the_app_and_nothing_more():
-    # One app with one window, so the row is its name, not its name twice.
-    assert ProcessNamer(APP_NAME).description(ROLE) == APP_NAME
+def test_the_app_prepares_the_copy_for_next_time(tmp_path: Path):
+    """From the windowed interpreter, which is what the shortcut starts;
+    described as the app's name alone -- one app with one window, so the row is
+    its name, not its name twice; carrying the app's own mark; and never taking
+    a launch down when there is nothing to copy from."""
+    assert_the_app_names_its_process(
+        tray_app._name_this_process, tmp_path, app_name=APP_NAME, role=ROLE,
+        interpreter="pythonw.exe", row=APP_NAME, icon=PROJECT_DIR / "icon.ico")
 
 
-def test_it_stamps_its_own_mark():
-    assert (PROJECT_DIR / "icon.ico").is_file()
-
-
-def test_naming_never_takes_a_launch_down():
-    """A read-only venv or an antivirus hold must cost the name in the task list
-    and nothing else -- this app has no console for a failure to land in."""
-    with patch(
-        "app_support.process_identity.ProcessNamer",
-        side_effect=OSError("read-only venv"),
-    ):
-        tray_app._name_this_process()  # returning at all is the contract
-
-
-def test_a_failure_to_name_leaves_a_trace():
+def test_a_failure_to_name_leaves_a_trace(monkeypatch: pytest.MonkeyPatch):
     """Silently, the task list is full of anonymous Pythons and nothing anywhere
-    says why -- which is the state this whole mechanism exists to end."""
-    with patch(
-        "app_support.process_identity.ProcessNamer",
-        side_effect=OSError("read-only venv"),
-    ), patch("tray_app.crash_log.write_info") as write_info:
-        tray_app._name_this_process()
+    says why -- which is the state this whole mechanism exists to end.  The
+    naming logs its failure, and main() routes warnings into the crash log,
+    because under pythonw a warning nobody routed goes nowhere."""
+    monkeypatch.setattr(sys, "executable", "")  # nothing to copy from
+    handler = crash_log.record_warnings()
+    try:
+        with patch("util.crash_log.write_info") as write_info:
+            tray_app._name_this_process()
+    finally:
+        logging.getLogger().removeHandler(handler)
 
     write_info.assert_called_once()
-    assert "name" in " ".join(str(arg) for arg in write_info.call_args[0]).lower()
+    assert "naming" in " ".join(str(arg) for arg in write_info.call_args[0]).lower()
