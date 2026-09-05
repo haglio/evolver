@@ -15,9 +15,10 @@ controls, how phrases are combined — is logic and stays in the module.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
+
+from app_support.overlay import read_overlay
 
 PROJECT_DIR = Path(__file__).resolve().parent
 LOCAL_CONTENT = PROJECT_DIR / "content.local.json"
@@ -32,5 +33,4 @@ def load_content() -> dict[str, Any]:
     them (see ``tests/__init__.py``) and behave exactly as a public checkout
     would. They were parameters until nothing was left that passed one.
     """
-    path = LOCAL_CONTENT if LOCAL_CONTENT.exists() else EXAMPLE_CONTENT
-    return json.loads(path.read_text(encoding="utf-8"))
+    return read_overlay(LOCAL_CONTENT, EXAMPLE_CONTENT)

@@ -2,14 +2,17 @@ import os
 from pathlib import Path
 from typing import Any
 
-from content_overlay import load_content
+from app_support import siblings
+from app_support.overlay import overlay_value
+
+from content_overlay import LOCAL_CONTENT, load_content
 
 # Machine-specific and private: every value below that names something outside
 # this repo comes from the git-ignored content overlay (content.example.json
 # shows the shape and documents each key).
 _CONTENT = load_content()
 
-BASE_DIR     = Path(_CONTENT["library_root"])
+BASE_DIR     = Path(overlay_value(_CONTENT, "library_root", path=LOCAL_CONTENT))
 
 
 def project_roots(content: dict[str, Any], base_dir: Path) -> tuple[Path, ...]:
@@ -21,10 +24,7 @@ def project_roots(content: dict[str, Any], base_dir: Path) -> tuple[Path, ...]:
     a part-finished move resolves — each checkout is found wherever it actually
     is right now, with no window where half the suite is unreachable.
     """
-    roots = content.get("project_roots")
-    if not roots:
-        return (base_dir / "projects",)
-    return tuple(Path(root) for root in roots)
+    return siblings.project_roots(content.get("project_roots"), fallback=base_dir / "projects")
 
 
 PROJECT_ROOTS = project_roots(_CONTENT, BASE_DIR)
@@ -51,12 +51,7 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     isn't installed is every consumer's ordinary case (they all guard on
     existence), so it must not be an import-time crash.
     """
-    roots = PROJECT_ROOTS if roots is None else roots
-    for root in roots:
-        candidate = root / name
-        if candidate.is_dir():
-            return candidate
-    return roots[0] / name
+    return siblings.project_dir(name, PROJECT_ROOTS if roots is None else roots)
 
 
 # This repo, located from the source file rather than the library root: the
@@ -118,7 +113,7 @@ SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
 AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
 CHROME_USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"
-CHROME_PROFILE_NAME = _CONTENT["chrome_profile"]
+CHROME_PROFILE_NAME = overlay_value(_CONTENT, "chrome_profile", path=LOCAL_CONTENT)
 CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
 
 INBOX_DIR    = AI_DIR / "0_inbox"
@@ -139,7 +134,7 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 # of a public commit — so hardcoding one here writes it into the tracked tree.
 # Origenerator reads the same key from its own overlay; the two must agree, the
 # folder being the only thing that passes between them.
-GENAU_SOURCE    = _CONTENT["genau_source"]
+GENAU_SOURCE    = overlay_value(_CONTENT, "genau_source", path=LOCAL_CONTENT)
 GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
 
 # The scraped provider: the 0_inbox folder its clips arrive under, and the site
@@ -155,7 +150,7 @@ GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
 # is what it does for any tile with no pin anyway.
 CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 
-_SCRAPE_PROVIDER = _CONTENT["scrape_provider"]
+_SCRAPE_PROVIDER = overlay_value(_CONTENT, "scrape_provider", path=LOCAL_CONTENT)
 PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
 PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]
 # Non-AI folders holding scenes carved out of longer videos and nothing else,

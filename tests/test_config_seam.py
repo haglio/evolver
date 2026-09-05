@@ -221,6 +221,19 @@ class _OverlayKeys(ast.NodeVisitor):
             return self.paths.get(node.id)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "load_content":
             return ""
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "overlay_value" and node.args):
+            # app_support.overlay.overlay_value(<overlay>, "key", "subkey", ...):
+            # the named read, which refuses by name where a subscript would
+            # raise a bare KeyError; the keys are its positional arguments.
+            base = self._path_of(node.args[0])
+            if base is None:
+                return None
+            keys = node.args[1:]
+            if all(isinstance(key, ast.Constant) and isinstance(key.value, str) for key in keys):
+                return ".".join([base, *(key.value for key in keys)]).lstrip(".")
+            self.unreadable.append(node.lineno)
+            return None
         if isinstance(node, ast.Subscript):
             base = self._path_of(node.value)
             if base is None:
@@ -257,6 +270,10 @@ class _OverlayKeys(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call):
         func = node.func
+        if isinstance(func, ast.Name) and func.id == "overlay_value":
+            path = self._path_of(node)
+            if path:
+                self.keys.add(path)
         if isinstance(func, ast.Attribute) and (base := self._path_of(func.value)) is not None:
             # ``get`` is the one call this can read a key out of. Every other
             # method on the mapping — ``pop``, ``setdefault``, ``keys`` — either
