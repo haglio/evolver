@@ -10,11 +10,15 @@ on, which is why they are here and not in a constructor.
 
 from __future__ import annotations
 
-import ctypes
+import logging
 import sys
+
+from app_support.win32 import set_app_user_model_id
 
 import config
 from gui.taskbar import set_taskbar_properties
+
+log = logging.getLogger(__name__)
 
 # The Windows identity contract. A pinned shortcut belongs to whatever this
 # says, so it is the one string that must not drift.
@@ -23,8 +27,15 @@ DISPLAY_NAME = "Evolver"
 
 
 def claim(hwnd: int) -> None:
-    """Name this process to the shell, and *hwnd* to the taskbar."""
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_MODEL_ID)
+    """Name this process to the shell, and *hwnd* to the taskbar.
+
+    A refusal is logged, not raised: a button wearing Python's icon is still a
+    button, and an icon is never worth failing to start over.
+    """
+    try:
+        set_app_user_model_id(APP_MODEL_ID)
+    except OSError:
+        log.warning("Could not claim the taskbar identity", exc_info=True)
     set_taskbar_properties(
         hwnd,
         APP_MODEL_ID,
