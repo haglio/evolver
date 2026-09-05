@@ -10,6 +10,7 @@ the flag one copy sets is not the flag the other copy reads.
 
 from __future__ import annotations
 
+import logging
 import sys
 import traceback
 from datetime import datetime
@@ -18,6 +19,28 @@ from pathlib import Path
 CRASH_LOG = Path(__file__).resolve().parent.parent / "tray_crash.log"
 
 _crash_logged = False
+
+
+class _WarningsIntoTheCrashLog(logging.Handler):
+    """Under pythonw a warning nobody routed goes nowhere, so it goes here, where
+    every other trace of this process goes."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        write_info(f"{record.levelname} from {record.name}:", self.format(record) + "\n")
+
+
+def record_warnings() -> logging.Handler:
+    """Route every warning and error logged in this process into the crash log.
+
+    The tray app configures no logging of its own, so a library that logs why it
+    could not do something -- naming this process for the task list, say -- was
+    saying it to a stderr pythonw does not have.  The handler is handed back so a
+    test can take it off again.
+    """
+    handler = _WarningsIntoTheCrashLog(level=logging.WARNING)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logging.getLogger().addHandler(handler)
+    return handler
 
 
 def write_crash(header: str, detail: str) -> None:
