@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 from backfill.queue import BackfillQueue, unlabeled_videos
-from tests.temp_helpers import library_tree
+from tests.temp_helpers import library_tree, override_config
 
 
 class TestUnlabeledVideos(unittest.TestCase):
@@ -32,6 +32,17 @@ class TestUnlabeledVideos(unittest.TestCase):
             lib.video("landscape", "origenerator", "b_topaz.mp4")
 
             self.assertEqual(unlabeled_videos(), [])
+
+    def test_the_scraped_provider_is_whoever_the_overlay_names(self):
+        # The provider's source name is the overlay's, and the deployed one is
+        # not the committed placeholder: compared against a literal, every one
+        # of the real provider's unlabeled clips was queued for dictation --
+        # exactly what the skip exists to prevent (bug 12).
+        with library_tree() as lib, override_config(PROVIDER_SOURCE="examplesource"):
+            lib.video("portrait", "examplesource", "a_topaz.mp4")
+            placeholder = lib.video("portrait", "provider", "b_topaz.mp4")
+
+            self.assertEqual(unlabeled_videos(), [placeholder])
 
     def test_a_half_written_upscale_is_never_offered(self):
         with library_tree() as lib:
