@@ -431,6 +431,12 @@ class TestToolbarStateUpdates:
         window.update_schedule_status(False, False, next_run)
         assert window.run_now_action.isEnabled()
 
+    def test_a_run_in_flight_outranks_a_pause_here_as_in_the_tray(self, window):
+        # Pausing mid-run used to read "Running..." in the tray and "inactive"
+        # here at the same moment (bug 48); both read the one decision now.
+        window.update_schedule_status(True, True, None)
+        assert window._next_run_label.text() == "Running..."
+
     def test_toggle_unchecked_when_paused(self, window):
         window.update_schedule_status(False, True, None)
         assert not window.active_toggle.isChecked()

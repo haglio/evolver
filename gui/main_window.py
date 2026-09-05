@@ -31,6 +31,7 @@ from shared_ui.toggle_switch import ToggleSwitch
 import config
 from gui.icons import quit_icon, restart_icon, run_now_icon
 from gui.run_record import RunRecord, format_run_label, load_runs
+from gui.schedule_state import PAUSED, RUNNING, SCHEDULED, schedule_state
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
@@ -438,11 +439,12 @@ class EvolverMainWindow(QMainWindow):
         self.run_now_action.setEnabled(not is_running)
         self.active_toggle.setChecked(not is_paused)
 
-        if is_paused:
-            self._next_run_label.setText("No upcoming runs scheduled (inactive)")
-        elif is_running:
+        state = schedule_state(is_running, is_paused, next_run_at)
+        if state == RUNNING:
             self._next_run_label.setText("Running...")
-        elif next_run_at:
+        elif state == PAUSED:
+            self._next_run_label.setText("No upcoming runs scheduled (inactive)")
+        elif state == SCHEDULED:
             self._next_run_label.setText(f"Next run: {next_run_at.strftime('%H:%M')}")
         else:
             self._next_run_label.setText("")

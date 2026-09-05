@@ -12,6 +12,7 @@ from shared_ui.colors import TEXT_SECONDARY
 
 import config
 from gui.icons import quit_icon, restart_icon, run_now_icon
+from gui.schedule_state import PAUSED, RUNNING, SCHEDULED, schedule_state
 
 # The marks sit on the family's dark menu now, so they are its light text.
 _ICON_COLOR = TEXT_SECONDARY.name()
@@ -136,25 +137,30 @@ class EvolverTray(QSystemTrayIcon):
         self._update_tooltip()
         self._update_status_actions()
 
+    def _state(self) -> str:
+        return schedule_state(self._is_running, self._is_paused, self._next_run_at)
+
     def _update_tooltip(self):
         parts = ["Evolver"]
-        if self._is_running:
+        state = self._state()
+        if state == RUNNING:
             parts.append("Running...")
-        elif self._is_paused:
+        elif state == PAUSED:
             parts.append("Paused")
-        elif self._next_run_at:
+        elif state == SCHEDULED:
             parts.append(f"Next run: {self._next_run_at.strftime('%H:%M')}")
         self.setToolTip(" - ".join(parts))
 
     def _update_status_actions(self):
-        if self._is_running:
+        state = self._state()
+        if state == RUNNING:
             self._status_action.setText("Status: Running")
-        elif self._is_paused:
+        elif state == PAUSED:
             self._status_action.setText("Status: Paused")
         else:
             self._status_action.setText("Status: Scheduled")
 
-        if self._next_run_at and not self._is_running and not self._is_paused:
+        if state == SCHEDULED:
             self._next_run_action.setText(f"Next run: {self._next_run_at.strftime('%H:%M')}")
             self._next_run_action.setVisible(True)
         else:
