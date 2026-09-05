@@ -5,7 +5,7 @@ from tasks import bookmarks_sync
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 
-def chrome_profile(root, profile="Profile 2", name="Blair"):
+def chrome_profile(root, profile="Profile 2", name="Jane Doe"):
     """A User Data tree with one named profile; the shape every sync test built
     by hand. Returns (user_data_dir, bookmarks_path)."""
     user_data_dir = root / "User Data"
@@ -101,7 +101,7 @@ class TestBookmarksSync(unittest.TestCase):
             with override_config(
                 FUN_TIME_FAVS_FILE=favs_path,
                 CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Blair",
+                CHROME_PROFILE_NAME="Jane Doe",
                 CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
             ):
                 result = bookmarks_sync.run()
@@ -138,7 +138,7 @@ class TestBookmarksSync(unittest.TestCase):
             with override_config(
                 FUN_TIME_FAVS_FILE=favs_path,
                 CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Blair",
+                CHROME_PROFILE_NAME="Jane Doe",
                 CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
             ):
                 result = bookmarks_sync.run()
@@ -173,7 +173,7 @@ class TestBookmarksSync(unittest.TestCase):
             with override_config(
                 FUN_TIME_FAVS_FILE=favs_path,
                 CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Blair",
+                CHROME_PROFILE_NAME="Jane Doe",
                 CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
             ):
                 result = bookmarks_sync.run()
@@ -207,7 +207,7 @@ class TestBookmarksSync(unittest.TestCase):
             with override_config(
                 FUN_TIME_FAVS_FILE=favs_path,
                 CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Blair",
+                CHROME_PROFILE_NAME="Jane Doe",
                 CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
             ):
                 result = bookmarks_sync.run()
@@ -233,7 +233,7 @@ class TestBookmarksSync(unittest.TestCase):
             with override_config(
                 FUN_TIME_FAVS_FILE=favs_path,
                 CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Blair",
+                CHROME_PROFILE_NAME="Jane Doe",
             ):
                 result = bookmarks_sync.run()
 
