@@ -56,7 +56,9 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 CONFIG_REFERENCE_LEDGER = {
     "backfill/decisions.py": 3,
     "backfill/mic.py": 1,
-    "backfill/queue.py": 1,
+    # The provider's source name, read at the call: a literal agreed with the
+    # overlay only by happening to (bug 12).
+    "backfill/queue.py": 2,
     "backfill/thumbnails.py": 3,
     "backfill/voice.py": 5,
     "check_correspondence.py": 6,
@@ -92,7 +94,8 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/scripts_sync.py": 19,
     "tasks/sort.py": 2,
     "tasks/stray_files.py": 8,
-    "tasks/upscale.py": 17,
+    # One more for the provider's source name in the recipe guard (bug 7).
+    "tasks/upscale.py": 18,
     "tasks/video_types.py": 5,
     # The lane walk it used to do itself, and the stage that walks the lanes
     # after it to stamp the viewing on the same sidecars.

@@ -1,11 +1,10 @@
 """Delete every file in kinda_weird, and its source file in 1_sorted."""
 
+import glob
 import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-
-import glob
 
 import config
 from util.alert import show_error
