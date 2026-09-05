@@ -55,11 +55,9 @@ class TestTrayScheduleDisplay:
         assert tray.run_now_action.isEnabled()
 
     def test_running_outranks_paused_in_the_tray(self):
-        """Pinned as it behaves today. The window decides the same state the
-        other way around (paused before running), so pausing mid-run shows
-        "Running" here and "inactive" there -- recorded as a divergence in the
-        changelog, not resolved by this test.
-        """
+        """A run on screen is the fact the user is looking at; the pause stops
+        the schedule after it.  The window decides it the same way now, from
+        the one helper both read (bug 48)."""
         tray = EvolverTray()
         tray.set_paused(True)
         tray.set_running(True)
