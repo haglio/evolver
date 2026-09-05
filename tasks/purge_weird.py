@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import glob
+
 import config
 from util.alert import show_error
 from util.media_files import is_finalized_video_file
@@ -40,7 +42,9 @@ def run() -> PurgeWeirdResult:
 
     for weird_file in sorted(weird_files):
         src_name = _source_name(weird_file)
-        matches = list(config.SORTED_DIR.rglob(src_name))
+        # By name, not by pattern: a `[`, `*` or `?` in a file name is a
+        # character of the name, and handed to rglob raw it matched nothing.
+        matches = list(config.SORTED_DIR.rglob(glob.escape(src_name)))
         matches = [p for p in matches if p.is_file()]
 
         if not matches:
@@ -52,7 +56,7 @@ def run() -> PurgeWeirdResult:
                 result.deleted_sorted += 1
                 log.info("Deleted source: %s", match)
 
-        for json_file in config.METADATA_DIR.rglob(weird_file.stem + ".json"):
+        for json_file in config.METADATA_DIR.rglob(glob.escape(weird_file.stem + ".json")):
             json_file.unlink()
             result.deleted_metadata += 1
             log.info("Deleted metadata: %s", json_file)
