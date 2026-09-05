@@ -40,11 +40,10 @@ from tasks.nonai_queue import (
     collect_candidates,
     relpath,
 )
-from util import ffprobe, nonai_job, orientation, processes, sidecar, system_resources
-from util.media_files import is_finalized_video_file, is_partial_video_path
+from util import ffprobe, nonai_job, orientation, processes, system_resources
+from util.media_files import is_partial_video_path
 from util.nonai_library import buckets, stage_dirs
-from util.nonai_retire import archived_original, carry_metadata, retire_original
-from util.variants import is_processed_stem, strip_processing_suffixes
+from util.nonai_retire import carry_metadata, retire_original
 
 log = logging.getLogger(__name__)
 
@@ -75,9 +74,6 @@ class NonAiUpscaleResult:
     # zero once the video-kinds stage has been over the library.
     unmeasured_videos: int = 0
     deferred_low_disk: bool = False
-    # Upscales promoted before their sidecar was carried across, handed it back
-    # off the retired original — see :func:`repair_retired_metadata`.
-    repaired_sidecars: int = 0
 
 
 @dataclass(frozen=True)
@@ -149,8 +145,6 @@ def run(allow_start: bool = True, stop: bool = False,
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
-    repair_retired_metadata(result)
-
     with _throttle_lock:
         job = nonai_job.load_job(files.job)
         if job is None:
@@ -177,12 +171,12 @@ def run(allow_start: bool = True, stop: bool = False,
         in_flight = f"{in_flight} [suspended: user present]"
     log.info(
         "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s "
-        "failed=%s pending=%d left=%.1fh done=%s unmeasured=%d repaired=%d sidecar(s)",
+        "failed=%s pending=%d left=%.1fh done=%s unmeasured=%d",
         result.started or "-", in_flight, result.promoted or "-",
         result.stopped or "-", result.start_deferred or "-",
         result.failed or "-", result.pending, result.remaining_seconds / 3600,
         "-" if result.percent_complete is None else f"{result.percent_complete}%",
-        result.unmeasured_videos, result.repaired_sidecars,
+        result.unmeasured_videos,
     )
     return result
 
@@ -303,39 +297,6 @@ def _conclude(job: dict, result: NonAiUpscaleResult, files: StageFiles) -> None:
         add_to_skip_manifest(files.skip_manifest, source,
                              f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
         nonai_job.clear_attempts(files.attempts, relpath(source))
-
-
-def repair_retired_metadata(result: NonAiUpscaleResult) -> None:
-    """Hand back what upscales promoted before :func:`_carry_metadata` existed lost.
-
-    Their originals were archived whole — video and sidecar together — so
-    nothing was destroyed, only moved out of reach: this finds each stranded
-    upscale's original in the archive and carries the record across now, as
-    promotion would have.  Idempotent, so it costs a scan and nothing else once
-    the library is whole; it runs ahead of the clip-scripts stage, which needs
-    the record restored to cut a clip its own funscript.
-
-    Only an upscale with no ``clip`` record is a candidate.  A cut is the only
-    kind of video that carries one, so a whole video that never had a record has
-    nothing here to be missing, and one that has its record is already sound.
-    """
-    if config.NONAI_RETIRED_ROOT is None or not config.NONAI_RETIRED_ROOT.is_dir():
-        return
-    for bucket in buckets():
-        archived = config.NONAI_RETIRED_ROOT / bucket.relative_to(config.NON_AI_DIR)
-        if not archived.is_dir():
-            continue
-        for video in sorted(bucket.rglob("*")):
-            if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
-                continue
-            if not is_processed_stem(video.stem):
-                continue
-            if isinstance(sidecar.read(sidecar.sidecar_path(video)).get("clip"), dict):
-                continue
-            original = archived_original(archived, strip_processing_suffixes(video.stem))
-            if original is None:
-                continue
-            result.repaired_sidecars += int(carry_metadata(original, video))
 
 
 def _sweep_orphaned_partials(keep: Path | None) -> None:

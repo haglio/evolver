@@ -86,7 +86,8 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/nonai_group.py": 4,
     "tasks/nonai_progress.py": 1,
     "tasks/nonai_queue.py": 3,
-    "tasks/nonai_upscale.py": 27,
+    # Five fewer with the retired-metadata repair pass gone (item 27's last piece).
+    "tasks/nonai_upscale.py": 22,
     "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 5,
     "tasks/purge_weird.py": 5,
@@ -104,7 +105,8 @@ CONFIG_REFERENCE_LEDGER = {
     "util/funscript.py": 3,
     "util/media_files.py": 1,
     "util/nonai_library.py": 5,
-    "util/nonai_retire.py": 3,
+    # One fewer with the archive lookup gone (item 27's last piece).
+    "util/nonai_retire.py": 2,
     "util/reference_stores.py": 6,
     "util/sidecar.py": 4,
     "util/topaz.py": 3,

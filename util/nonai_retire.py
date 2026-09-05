@@ -23,7 +23,6 @@ from pathlib import Path
 
 import config
 from util import funscript, sidecar
-from util.media_files import is_finalized_video_file
 from util.nonai_library import bucket_of, stage_dirs
 
 log = logging.getLogger(__name__)
@@ -91,32 +90,6 @@ def retire_original(source: Path, *, archive_root: Path | None) -> None:
     source.replace(dest)
     _move_mirrored_files(source, dest)
     log.info("Retired original: %s -> %s", source, dest)
-
-
-def archived_original(archived: Path, stem: str) -> Path | None:
-    """The retired original named *stem* under *archived*, if exactly one is.
-
-    The archive mirrors the library path an original was retired FROM, which is
-    a triage folder rather than the ``3*/processed/`` the upscale now sits in,
-    so it is found by name within the bucket rather than at a computed path.
-    Two of a name is not a tie to break: nothing here can say which of them the
-    upscale came from, and guessing would write one clip's provenance onto
-    another's footage.
-
-    Matched by comparing stems rather than by globbing one: a title is free to
-    hold the characters a glob reserves, and ``[Studio] scene one`` read as a
-    pattern is a character class that matches none of its own name.
-    """
-    matches = sorted(
-        path for path in archived.rglob("*")
-        if path.stem == stem and is_finalized_video_file(path, config.VIDEO_EXTENSIONS)
-    )
-    if len(matches) == 1:
-        return matches[0]
-    if matches:
-        log.warning("Ambiguous archived original for %s: %d matches, leaving it alone.",
-                    stem, len(matches))
-    return None
 
 
 def _sidecar_beside_or_mirrored(video: Path) -> Path:
