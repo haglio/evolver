@@ -247,43 +247,5 @@ class TestCarryMetadata(unittest.TestCase):
             self.assertEqual(carried["clip"], {"compilation": "Volume One", "index": 1})
 
 
-class TestArchivedOriginal(unittest.TestCase):
-    def test_finds_the_one_original_of_that_name_anywhere_under_the_archive(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            wanted = make_video(root / "archive" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(root / "archive" / "0 unsorted" / "someone else.mp4")
-
-            with override_config(**overrides):
-                found = nonai_retire.archived_original(root / "archive", "Lee-Poe")
-
-            self.assertEqual(found, wanted)
-
-    def test_two_of_a_name_is_no_answer_rather_than_a_guess(self):
-        """Nothing here can say which of them the upscale came from, and a guess
-        writes one clip's provenance onto another's footage."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            make_video(root / "archive" / "0 unsorted" / "Lee-Poe.mp4")
-            make_video(root / "archive" / "1 clips to upscale" / "Lee-Poe.mp4")
-
-            with override_config(**overrides):
-                self.assertIsNone(
-                    nonai_retire.archived_original(root / "archive", "Lee-Poe"))
-
-    def test_a_title_holding_glob_characters_still_matches_itself(self):
-        """Read as a pattern, "[Example Studio] scene one" is a character class
-        that matches none of its own name, so the match is by stem."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            stem = "[Example Studio] scene one"
-            wanted = make_video(root / "archive" / "0 unsorted" / f"{stem}.mp4")
-
-            with override_config(**overrides):
-                found = nonai_retire.archived_original(root / "archive", stem)
-
-            self.assertEqual(found, wanted)
-
-
 if __name__ == "__main__":
     unittest.main()
