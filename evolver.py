@@ -20,6 +20,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from app_support.subprocess_utils import hidden_subprocess_kwargs
+
 import check_correspondence
 import check_duplicate_sizes
 import config
@@ -143,7 +145,7 @@ def check_dependencies():
     # into the RuntimeError this function raises for every missing dependency,
     # rather than a CalledProcessError from one of them.
     probe = subprocess.run(["ffprobe", "-version"], capture_output=True, check=False,
-                           creationflags=subprocess.CREATE_NO_WINDOW)
+                           **hidden_subprocess_kwargs())
     if probe.returncode != 0:
         raise RuntimeError("ffprobe not found in PATH")
 

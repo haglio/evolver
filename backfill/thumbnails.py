@@ -27,6 +27,8 @@ import subprocess
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+from app_support.subprocess_utils import hidden_subprocess_kwargs
+
 import config
 from backfill.queue import iter_library_videos
 from backfill.vocabulary import scoped_grid
@@ -117,7 +119,7 @@ def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTI
             ],
             capture_output=True,
             check=False,
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            **hidden_subprocess_kwargs(),
         )
     except OSError:
         log.exception("Could not build a thumbnail for %s", clip)
