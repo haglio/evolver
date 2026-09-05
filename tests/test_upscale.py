@@ -114,10 +114,8 @@ class TestUpscaleHelpers(unittest.TestCase):
         exactly as it does for a clip that simply has no sidecar; it must not
         take the stage down before it has processed anything.
         """
-        # The guard is reached only for a clip whose source name passes
-        # `_is_t2v_provider`'s own hardcoded "provider" check (bug 7, held), so
-        # the source is named here rather than taken from the overlay, which
-        # agrees with that literal only by happening to.
+        # The guard is reached only for a clip under the provider's own source
+        # name, which is the overlay's to say.
         with workspace_temp_dir() as root, override_config(PROVIDER_SOURCE="provider"):
             sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / config.PROVIDER_SOURCE / "landscape" / "clip one.mp4"
@@ -271,8 +269,7 @@ class TestIsT2vProvider(unittest.TestCase):
         # The sidecar is a valid t2v one, so only the source-name guard can
         # answer False here -- with no sidecar on disk the second check
         # answered False anyway and the guard could be deleted unseen (audit
-        # probe P4b). Pins the current hardcoded "provider" comparison as it
-        # behaves (bug 7, held for sign-off -- not fixed here).
+        # probe P4b).
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider2" / "clip_topaz.json"
@@ -281,6 +278,21 @@ class TestIsT2vProvider(unittest.TestCase):
 
             with override_config(METADATA_DIR=meta_dir):
                 self.assertFalse(upscale._is_t2v_provider("provider2", "landscape", "clip", config.OUT_UPSCALED_DIR))
+
+    def test_the_provider_is_whoever_the_overlay_names(self):
+        # The source name comes from the git-ignored overlay, and the deployed
+        # one is not the committed placeholder.  Compared against a literal
+        # "provider", every text-to-video clip of the real provider took the
+        # default recipe and the wrong tag -- silently wrong output (bug 7).
+        with workspace_temp_dir() as root:
+            meta_dir = root / "meta"
+            json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "examplesource" / "clip_topaz.json"
+            json_path.parent.mkdir(parents=True)
+            json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
+
+            with override_config(METADATA_DIR=meta_dir, PROVIDER_SOURCE="examplesource"):
+                self.assertTrue(upscale._is_t2v_provider("examplesource", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
     def test_false_when_the_sidecar_is_not_readable_as_json(self):
         """A half-written sidecar must take the default recipe, not the t2v one:

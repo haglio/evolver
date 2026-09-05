@@ -249,7 +249,7 @@ def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> b
     question with no answer rather than a failure: the clip takes the default
     recipe, exactly as one with no sidecar on disk already does.
     """
-    if source != "provider":
+    if source != config.PROVIDER_SOURCE:
         return False
     try:
         meta_path = sidecar_path(upscaled_video_path(source, orient, stem, outbox_dir))
