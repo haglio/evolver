@@ -15,11 +15,17 @@ from util.sidecar import action_of, read, sidecar_path, wrong_action_of
 # human about, and most of the unlabeled queue is portrait.
 _ORIENTATIONS = (orientation.PORTRAIT, orientation.LANDSCAPE)
 
-# Sources the scrape stage already has a metadata strategy for (see
-# :mod:`tasks.prompt_scrape`): Provider from its website, Origenerator from its gallery
-# database.  Every other source arrives with no upstream record of what it shows, so
-# its act is the one a human has to dictate.
-SCRAPED_SOURCES = frozenset({"provider", "origenerator"})
+
+def scraped_sources() -> frozenset[str]:
+    """Sources the scrape stage already has a metadata strategy for (see
+    :mod:`tasks.prompt_scrape`): the provider from its website, Origenerator from
+    its gallery database.  Every other source arrives with no upstream record of
+    what it shows, so its act is the one a human has to dictate.
+
+    Read at the call rather than at import: the provider's name is the
+    overlay's, and a literal agreed with it only by happening to.
+    """
+    return frozenset({config.PROVIDER_SOURCE, "origenerator"})
 
 
 def iter_library_videos() -> Iterator[tuple[str, Path]]:
@@ -57,7 +63,7 @@ def unlabeled_videos() -> list[Path]:
             continue
         if wrong_action_of(payload):
             rejected.append(video)
-        elif source not in SCRAPED_SOURCES:
+        elif source not in scraped_sources():
             never_labeled.append(video)
     return rejected + never_labeled
 
