@@ -7,9 +7,9 @@ import time.
 """
 from unittest.mock import patch
 
-import content
+import content_overlay
 
-content.LOCAL_CONTENT = content.EXAMPLE_CONTENT
+content_overlay.LOCAL_CONTENT = content_overlay.EXAMPLE_CONTENT
 
 # No test may open a real modal dialog. Both of these block until a human clicks,
 # so one unguarded call hangs an unattended suite forever instead of failing it.
