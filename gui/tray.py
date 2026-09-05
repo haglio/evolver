@@ -7,11 +7,14 @@ from datetime import datetime
 import qtawesome as qta
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
+from shared_ui.chrome import menu_rules
+from shared_ui.colors import TEXT_SECONDARY
 
 import config
 from gui.icons import quit_icon, restart_icon, run_now_icon
 
-_ICON_COLOR = "#333"
+# The marks sit on the family's dark menu now, so they are its light text.
+_ICON_COLOR = TEXT_SECONDARY.name()
 
 
 def _make_icon() -> QIcon:
@@ -33,6 +36,9 @@ class EvolverTray(QSystemTrayIcon):
         self._update_tooltip()
 
         self._menu = QMenu()
+        # A tray menu has no window to take the family's rules from; without
+        # them it rendered native, beside the broker's dark one.
+        self._menu.setStyleSheet(menu_rules())
 
         self._status_action = QAction("", self._menu)
         self._status_action.setEnabled(False)

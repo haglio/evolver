@@ -7,9 +7,9 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
 from PyQt6.QtWidgets import QMessageBox, QToolBar
+from shared_ui.toggle_switch import ToggleSwitch
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
-from gui.toggle_switch import ToggleSwitch
 from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import make_run_record
@@ -440,108 +440,6 @@ class TestToolbarStateUpdates:
         window.update_schedule_status(False, False, datetime.now())
         assert window.active_toggle.isChecked()
 
-
-# Well outside the 44x22 track, so a release there is unambiguously off it.
-_OFF_THE_SWITCH = 200
-
-
-class TestToggleSwitch:
-    """The pause control: what a click does, and what the user sees.
-
-    mousePressEvent and paintEvent were both entirely uncovered -- 'clicking
-    Active pauses the pipeline' had no test at any level while three tests
-    exercised the two trivial accessors.
-    """
-
-    def test_starts_unchecked_and_set_checked_round_trips(self):
-        toggle = ToggleSwitch()
-        assert not toggle.isChecked()
-        toggle.setChecked(True)
-        assert toggle.isChecked()
-        toggle.setChecked(False)
-        assert not toggle.isChecked()
-
-    def test_a_click_flips_the_state_and_announces_the_new_value(self):
-        from PyQt6.QtTest import QTest
-
-        toggle = ToggleSwitch()
-        announced = []
-        toggle.clicked.connect(announced.append)
-        QTest.mouseClick(toggle, Qt.MouseButton.LeftButton)
-        assert toggle.isChecked()
-        assert announced == [True]
-        QTest.mouseClick(toggle, Qt.MouseButton.LeftButton)
-        assert not toggle.isChecked()
-        assert announced == [True, False]
-
-    def test_only_the_left_button_flips_it(self):
-        """In the main window this switch IS the pause control, so a right-click
-        on it stopped the pipeline schedule -- and a right-click is what a user
-        does looking for a context menu."""
-        from PyQt6.QtTest import QTest
-
-        toggle = ToggleSwitch()
-        announced = []
-        toggle.clicked.connect(announced.append)
-
-        QTest.mouseClick(toggle, Qt.MouseButton.RightButton)
-        QTest.mouseClick(toggle, Qt.MouseButton.MiddleButton)
-
-        assert not toggle.isChecked()
-        assert announced == []
-
-    def test_a_press_dragged_off_the_switch_does_not_flip_it(self):
-        """The other half of the button protocol: a press is not a click until
-        it is released on the widget, which is how a user takes back a click
-        they did not mean."""
-        from PyQt6.QtCore import QPoint
-        from PyQt6.QtTest import QTest
-
-        toggle = ToggleSwitch()
-        announced = []
-        toggle.clicked.connect(announced.append)
-
-        QTest.mousePress(toggle, Qt.MouseButton.LeftButton, pos=QPoint(22, 11))
-        QTest.mouseRelease(toggle, Qt.MouseButton.LeftButton,
-                           pos=QPoint(_OFF_THE_SWITCH, 11))
-
-        assert not toggle.isChecked()
-        assert announced == []
-
-    def test_the_switch_states_its_size_once(self):
-        """`setFixedSize` pins minimum and maximum, so the layout takes 44x22
-        from it and a `sizeHint` override could not change any outcome. One of
-        the two, never both — a second statement of the size can only disagree
-        with the first."""
-        from PyQt6.QtWidgets import QHBoxLayout, QWidget
-
-        host = QWidget()
-        QHBoxLayout(host).addWidget(ToggleSwitch())
-        host.resize(400, 200)
-        host.layout().activate()
-
-        toggle = host.layout().itemAt(0).widget()
-        assert (toggle.width(), toggle.height()) == (44, 22)
-        assert "sizeHint" not in ToggleSwitch.__dict__
-
-    def test_the_knob_and_track_show_which_state_it_is_in(self):
-        """The paint is the only thing that tells the user the pipeline runs:
-        on is a blue track with the knob right, off a gray track, knob left."""
-        from PyQt6.QtGui import QImage
-
-        def rendered(toggle):
-            image = QImage(44, 22, QImage.Format.Format_ARGB32)
-            image.fill(0xFFFF00FF)
-            toggle.render(image)
-            return image
-
-        off = rendered(ToggleSwitch())
-        assert off.pixelColor(11, 11).getRgb()[:3] == (255, 255, 255)  # knob left
-        assert off.pixelColor(33, 11).getRgb()[:3] == (176, 176, 176)  # gray track
-
-        on = rendered(ToggleSwitch(checked=True))
-        assert on.pixelColor(11, 11).getRgb()[:3] == (48, 128, 224)  # blue track
-        assert on.pixelColor(33, 11).getRgb()[:3] == (255, 255, 255)  # knob right
 
 
 class TestToolbarAppWiring:

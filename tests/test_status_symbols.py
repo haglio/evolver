@@ -3,6 +3,8 @@
 import inspect
 import unittest
 
+from shared_ui.colors import GREEN, TEXT_MUTED
+
 from gui import status_symbols
 from gui.status_symbols import mark_for
 
@@ -12,12 +14,12 @@ class TestMarkFor(unittest.TestCase):
     def test_a_completed_stage_is_a_green_check(self):
         glyph, color = mark_for("completed")
         self.assertEqual(glyph, "✔")
-        self.assertEqual(color.name(), "#30a030")
+        self.assertEqual(color.name(), GREEN.name())
 
     def test_a_skipped_stage_is_an_empty_gray_circle(self):
         glyph, color = mark_for("skipped")
         self.assertEqual(glyph, "○")
-        self.assertEqual(color.name(), "#808080")
+        self.assertEqual(color.name(), TEXT_MUTED.name())
 
     def test_a_held_back_stage_is_an_empty_gray_circle(self):
         """A low-disk hold must not draw the failure's mark. Free space stays
@@ -25,7 +27,7 @@ class TestMarkFor(unittest.TestCase):
         run of those days over a condition with nothing in it to fix."""
         glyph, color = mark_for("warning")
         self.assertEqual(glyph, "○")
-        self.assertEqual(color.name(), "#808080")
+        self.assertEqual(color.name(), TEXT_MUTED.name())
         self.assertEqual(mark_for("warning"), mark_for("skipped"))
 
     def test_an_errored_stage_is_a_red_cross(self):

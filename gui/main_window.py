@@ -24,16 +24,17 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.spacing import BUTTON_ICON
+from shared_ui.toggle_switch import ToggleSwitch
 
 import config
 from gui.icons import quit_icon, restart_icon, run_now_icon
 from gui.run_record import RunRecord, format_run_label, load_runs
 from gui.status_symbols import GRAY, mark_for, mark_icon
-from gui.toggle_switch import ToggleSwitch
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
-_ICON_COLOR = "#ddd"
+_ICON_COLOR = TEXT_SECONDARY.name()
 
 
 class _NoFocusRectDelegate(QItemDelegate):
@@ -367,7 +368,8 @@ class EvolverMainWindow(QMainWindow):
         left_pad.setFixedWidth(6)
         toolbar.addWidget(left_pad)
 
-        self.active_toggle = ToggleSwitch(checked=True)
+        self.active_toggle = ToggleSwitch()
+        self.active_toggle.setChecked(True)
         toolbar.addWidget(self.active_toggle)
 
         toolbar.addSeparator()
