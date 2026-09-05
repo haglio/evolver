@@ -50,6 +50,17 @@ class TestRegisterStartup:
         assert f'oLink.WorkingDirectory = "{project_dir}"' in script
         assert "oLink.Save" in script
 
+    def test_a_quote_in_a_path_is_doubled_the_way_vbscript_reads_it(self, startup_dir):
+        # The four paths were dropped straight inside VBScript string literals,
+        # so a path with a quote in it produced a broken script and a shortcut
+        # that was silently wrong (bug 49).  VBScript doubles a quote to mean one.
+        captured = {}
+        with patch("gui.startup.subprocess.run", side_effect=_capture_cscript(captured)), \
+             patch("gui.startup.sys.executable", 'C:\\odd"name\\python.exe'):
+            startup.register_startup()
+
+        assert 'oLink.TargetPath = "C:\\odd""name\\python.exe"' in captured["script"]
+
     def test_the_script_is_run_through_cscript_quietly(self, startup_dir):
         captured = {}
         with patch("gui.startup.subprocess.run", side_effect=_capture_cscript(captured)):

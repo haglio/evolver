@@ -25,6 +25,11 @@ def is_registered() -> bool:
     return _shortcut_path().exists()
 
 
+def _vbs_string(value) -> str:
+    """*value* as a VBScript string literal: a quote inside one is written twice."""
+    return '"' + str(value).replace('"', '""') + '"'
+
+
 def register_startup():
     """Create a .lnk shortcut in the Windows Startup folder."""
     project_dir = Path(__file__).resolve().parent.parent
@@ -35,10 +40,10 @@ def register_startup():
 
     vbs = (
         'Set oWS = WScript.CreateObject("WScript.Shell")\n'
-        f'Set oLink = oWS.CreateShortCut("{shortcut_path}")\n'
-        f'oLink.TargetPath = "{target}"\n'
-        f'oLink.Arguments = "{arguments}"\n'
-        f'oLink.WorkingDirectory = "{working_dir}"\n'
+        f'Set oLink = oWS.CreateShortCut({_vbs_string(shortcut_path)})\n'
+        f'oLink.TargetPath = {_vbs_string(target)}\n'
+        f'oLink.Arguments = {_vbs_string(arguments)}\n'
+        f'oLink.WorkingDirectory = {_vbs_string(working_dir)}\n'
         'oLink.Description = "Evolver Tray Application"\n'
         'oLink.Save\n'
     )
