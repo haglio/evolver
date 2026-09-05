@@ -37,6 +37,7 @@ import sys
 import time
 from pathlib import Path
 
+from app_support.subprocess_utils import hidden_subprocess_kwargs
 from PyQt6.QtWidgets import QApplication
 
 import config
@@ -157,7 +158,7 @@ def branch_name() -> str:
     try:
         done = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
                               cwd=PROJECT_ROOT, capture_output=True, text=True,
-                              check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+                              check=False, **hidden_subprocess_kwargs())
     except OSError:
         return "this worktree"
     return done.stdout.strip() or "this worktree"

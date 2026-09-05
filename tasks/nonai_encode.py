@@ -28,6 +28,8 @@ import subprocess
 import time
 from pathlib import Path
 
+from app_support.subprocess_utils import hidden_subprocess_kwargs
+
 import config
 from util import ffprobe, nonai_job, orientation, processes, topaz
 
@@ -188,6 +190,6 @@ def launch(source: Path, tmp: Path, orient: str) -> int:
             env=topaz.environment(),
             stdout=subprocess.DEVNULL,
             stderr=ffmpeg_log,
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS,
+            **hidden_subprocess_kwargs(creationflags=subprocess.BELOW_NORMAL_PRIORITY_CLASS),
         )
     return proc.pid
