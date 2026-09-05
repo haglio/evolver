@@ -12,10 +12,10 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
+from shared_ui.colors import GREEN, RED, TEXT_MUTED
 
-GREEN = QColor(0x30, 0xA0, 0x30)
-RED = QColor(0xFF, 0x3C, 0x3C)
-GRAY = QColor(0x80, 0x80, 0x80)
+# No work happened here: the muted gray everything else inert wears.
+GRAY = TEXT_MUTED
 
 # The pixmap a mark is drawn into for a list item's icon. One size, because one
 # view draws them and nothing has ever asked for another.
