@@ -24,7 +24,7 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 # told from an import of a third-party library or the standard one.
 _OURS = (
     "backfill", "backfill_app", "check_correspondence", "check_duplicate_sizes",
-    "config", "content", "evolver", "gui", "preview_branch", "tasks",
+    "config", "content_overlay", "evolver", "gui", "preview_branch", "tasks",
     "tray_app", "util", "vulture_whitelist",
 )
 
@@ -33,11 +33,11 @@ _OURS = (
 # implementations so the headless CLI can read it and which the two windows
 # read their labels, tooltips and band colours out of. Not a stage.
 ALLOWED = {
-    "backfill": {"config", "content", "util"},
+    "backfill": {"config", "content_overlay", "util"},
     "backfill_app": {"backfill", "evolver"},
     "check_correspondence": {"config", "util"},
     "check_duplicate_sizes": {"config", "util"},
-    "config": {"content"},
+    "config": {"content_overlay"},
     "evolver": {"check_correspondence", "check_duplicate_sizes", "config",
                 "tasks", "util"},
     "gui": {"config", "evolver", "tasks.stages", "util"},

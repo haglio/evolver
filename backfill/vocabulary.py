@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from content import load_content
+from content_overlay import load_content
 
 
 @dataclass(frozen=True)

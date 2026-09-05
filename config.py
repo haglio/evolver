@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from content import load_content
+from content_overlay import load_content
 
 # Machine-specific and private: every value below that names something outside
 # this repo comes from the git-ignored content overlay (content.example.json
