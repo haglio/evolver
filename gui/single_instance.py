@@ -16,39 +16,36 @@ the caller learns both answers and can say so rather than exiting into silence.
 
 from __future__ import annotations
 
-import ctypes
 import logging
 from collections.abc import Callable
 
+from app_support.win32 import try_acquire_mutex
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
-
-from util.win32_loader import load_dll
 
 log = logging.getLogger(__name__)
 
+# Neither name can change: an Evolver started before a change is not refused by
+# one started after it, and its window cannot be handed a launch.
 _MUTEX_NAME = "EvolverTrayApp_SingleInstance"
 _PIPE_NAME = "EvolverTrayApp_ShowWindow"
 
 _CONNECT_TIMEOUT_MS = 3000
 
-_kernel32 = load_dll("kernel32", use_last_error=True)
-_CreateMutexW = _kernel32.CreateMutexW
-_CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
-_CreateMutexW.restype = ctypes.c_void_p
+# The handle that IS the claim.  Windows lets a named mutex go when the last
+# handle to it closes, so it is held here for the process's life.
+_mutex_handle: int | None = None
 
 
 def is_first_instance() -> bool:
     """Claim the named mutex. True when no other Evolver holds it.
 
-    Uses use_last_error=True + ctypes.get_last_error() so the error code is
-    captured atomically at the C level, immune to clobbering by injected DLLs
-    (e.g. Windhawk) that may call Win32 functions inside CreateMutexW hooks.
+    False also when Windows would not make the mutex at all.  "Could not check"
+    is not "checked": a second scheduler is the failure this guards against, so
+    a refusal to create the mutex is a refusal to run, not a licence to.
     """
-    _ERROR_ALREADY_EXISTS = 183
-    handle = _CreateMutexW(None, False, _MUTEX_NAME)
-    if not handle:
-        return True  # CreateMutex failed entirely; proceed anyway
-    return ctypes.get_last_error() != _ERROR_ALREADY_EXISTS
+    global _mutex_handle
+    _mutex_handle = try_acquire_mutex(_MUTEX_NAME)
+    return _mutex_handle is not None
 
 
 def serve_show_requests(on_show: Callable[[], None]) -> QLocalServer:
