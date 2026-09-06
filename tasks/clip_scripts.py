@@ -57,7 +57,7 @@ def run() -> ClipScriptsResult:
             continue
 
         trimmed = funscript.trim(funscript.read(scene_script), offset, duration)
-        # One action is a position the device holds, not a stroke: a script of
+        # One action is a position the device holds, not a motion: a script of
         # it would drive nothing, and having one stops anybody scripting the
         # clip properly later.
         if len(trimmed["actions"]) < 2:
