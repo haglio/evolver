@@ -30,7 +30,7 @@ class TestEvolverSettings(unittest.TestCase):
             self.assertTrue(loaded.enable_toasts)
 
     def test_a_hand_edited_interval_below_one_loads_as_one(self):
-        """The spin box is clamped to 1..120, but the file is plain JSON in the
+        """The spinner is clamped to 1..120, but the file is plain JSON in the
         project folder and nothing stopped a 0 from reaching the scheduler's
         clock-alignment arithmetic, which divides by it."""
         with workspace_temp_dir() as tmp:

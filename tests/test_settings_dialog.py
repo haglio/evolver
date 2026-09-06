@@ -32,8 +32,8 @@ class TestDialogShowsCurrentSettings:
         assert dialog._toasts_check.isChecked()
         assert dialog._startup_check.isChecked()
 
-    def test_the_startup_box_reflects_the_real_shortcut(self):
-        """The shortcut can be deleted behind the app's back, so the box asks
+    def test_the_startup_check_reflects_the_real_shortcut(self):
+        """The shortcut can be deleted behind the app's back, so the check asks
         the Startup folder — which is the only record of it there is."""
         with patch("gui.startup.is_registered", return_value=False):
             dialog = SettingsDialog(EvolverSettings())
