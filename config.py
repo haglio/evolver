@@ -205,10 +205,14 @@ NONAI_EXCLUDED_BUCKETS = {"actually_AI_but_funscripted"}  # AI-pipeline outputs 
 # Maps that stem to the stem of the video it is a version of — both must sit in
 # the same bucket, and with three versions point them all at the same one.
 NONAI_VERSION_OVERRIDES = {
-    # A 4K60 upscale of the best eight minutes of a 19.6-minute scene, kept
-    # alongside the full-length original because the upscale is better than
-    # anything the pipeline produces.
-    "redacted POV BJ 4k 60fps": "redacted_540-pacI21CK",
+    # Both stems below are invented, so this entry declares nothing: an
+    # override applies only when both of its stems are videos in the same
+    # bucket. It is here for its shape — a 4K60 upscale of the best minutes
+    # of a longer scene, kept alongside the full-length original because the
+    # upscale is better than anything the pipeline produces. Replace it with
+    # a real pair, or add one beside it, to declare a family the naming rule
+    # cannot see.
+    "Jane Doe Scene Two 4k 60fps": "jane-doe_540-Qv3Tn8Rd",
 }
 # vram=0.5 and instances=0 (vs the AI stage's vram=1/instances=1): an unattended
 # multi-hour encode shares the machine with whatever else is running, so it gets
