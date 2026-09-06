@@ -26,7 +26,7 @@ class PipelineScheduler(QObject):
         self._interval_minutes = interval_minutes
         # The clock is a seam: a test parks it just short of a slot boundary
         # and gets a real timer firing in milliseconds. The interval is never
-        # one — the spin box offers 1..120 and EvolverSettings.load clamps a
+        # one — the spinner offers 1..120 and EvolverSettings.load clamps a
         # hand-edited file to the same floor, because _schedule_next divides
         # by it.
         self._now = now

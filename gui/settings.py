@@ -40,7 +40,7 @@ class EvolverSettings:
             log.warning("Could not read settings from %s; using the defaults.",
                         path, exc_info=True)
             return cls()
-        # The dialog's spin box cannot go below 1, but this file is plain JSON
+        # The dialog's spinner cannot go below 1, but this file is plain JSON
         # in the project folder: a hand-edited 0 reaches the scheduler's
         # clock alignment, which divides by it.
         settings.interval_minutes = max(settings.interval_minutes, 1)
