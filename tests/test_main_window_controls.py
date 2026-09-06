@@ -567,7 +567,7 @@ class TestToolbarAppWiring:
         # attribute cannot intercept it; the observable end of _quit is the
         # QApplication being asked to exit.
         with patch.object(app._app, "quit") as mock_app_quit, \
-             patch("gui.app.QMessageBox") as mock_box:
+             patch("gui.app.QMessageBox") as mock_alert:
             app._tray.quit_action.trigger()
         mock_app_quit.assert_called_once()
-        mock_box.question.assert_not_called()
+        mock_alert.question.assert_not_called()

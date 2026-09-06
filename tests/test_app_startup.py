@@ -313,7 +313,7 @@ class TestSessionManagement:
 
         This used to assert ``hasattr(app, "_on_session_end")``, which stays
         true with the connect line deleted — and then Windows shutdown
-        force-kills the tray with a running pipeline still going. The signal
+        force-kills the tray with a pipeline still running. The signal
         cannot be emitted from a test (QSessionManager is not constructible),
         so pin the connection itself: disconnect names the exact receiver and
         raises TypeError when it was never connected.

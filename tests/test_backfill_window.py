@@ -20,7 +20,7 @@ def _every_grid_command():
 
 class FakeSession:
     """Stands in for BackfillSession: each scripted outcome is the note a phrase
-    returns, plus the queue it leaves (None when the queue is untouched)."""
+    returns, plus the queue it leaves in place (None when the queue is untouched)."""
 
     def __init__(self, clips, outcomes=()):
         self._clips = list(clips)
