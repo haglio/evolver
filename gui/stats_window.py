@@ -38,7 +38,7 @@ _LEGEND_SWATCH = 10
 _LEGEND_PADDING = 6
 _LEGEND_TEXT_GAP = 6
 _LEGEND_LINE_HEIGHT = 16
-_LEGEND_INSET = 10  # between the legend box and both the chart and the widget edge
+_LEGEND_INSET = 10  # between the legend panel and both the chart and the widget edge
 
 
 def _legend_font() -> QFont:
@@ -48,7 +48,7 @@ def _legend_font() -> QFont:
 
 
 def legend_width() -> int:
-    """The legend box's width: enough for the longest stage label, measured.
+    """The legend panel's width: enough for the longest stage label, measured.
 
     Not a fixed number, because the labels run half again the width of the
     stage keys they replaced and by how much depends on the machine's font —
@@ -315,7 +315,7 @@ class StackedAreaChart(QWidget):
     def _draw_legend(self, painter: QPainter, widget_w: int, top_y: int):
         painter.setFont(_legend_font())
 
-        box_size = _LEGEND_SWATCH
+        swatch_size = _LEGEND_SWATCH
         line_height = _LEGEND_LINE_HEIGHT
         padding = _LEGEND_PADDING
         legend_w = legend_width()
@@ -335,10 +335,10 @@ class StackedAreaChart(QWidget):
             y_pos = ly + padding + i * line_height
             painter.setBrush(color)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRect(lx + padding, y_pos, box_size, box_size)
+            painter.drawRect(lx + padding, y_pos, swatch_size, swatch_size)
             painter.setPen(QColor(0x30, 0x30, 0x30))
-            painter.drawText(lx + padding + box_size + _LEGEND_TEXT_GAP, y_pos + box_size - 1,
-                             STAGE_LABELS[stage_key])
+            painter.drawText(lx + padding + swatch_size + _LEGEND_TEXT_GAP,
+                             y_pos + swatch_size - 1, STAGE_LABELS[stage_key])
 
 
 class StatsWindow(QDialog):
