@@ -39,7 +39,7 @@ def trim(script: dict, start_seconds: float, duration_seconds: float) -> dict:
 
     The action preceding the window is carried forward to ``at == 0`` when the
     window opens between two actions: without it the device holds whatever
-    position it was left in and lurches at the clip's first stroke, where the
+    position it was left in and lurches at the clip's first motion, where the
     scene had it already travelling.
     """
     start_ms = round(start_seconds * 1000)

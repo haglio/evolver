@@ -30,7 +30,7 @@ def restart_icon(color: str) -> QIcon:
 
 
 def quit_icon(color: str) -> QIcon:
-    """The family's power mark -- and restart is built from its ring and stroke,
+    """The family's power mark -- and restart is built from its ring and bar,
     so the two read as relatives where they sit beside each other."""
     return glyph_icon("power", color=color)
 
