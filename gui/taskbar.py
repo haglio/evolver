@@ -1,4 +1,4 @@
-"""Set Windows taskbar pin properties so the app pins as 'Evolver' with the pink E icon.
+"""Set Windows taskbar pin properties so the app pins as 'Evolver' with the magenta E icon.
 
 When a PyQt app runs via pythonw.exe, Windows associates pinned shortcuts with
 Python rather than the app.  Setting IPropertyStore relaunch properties on the
