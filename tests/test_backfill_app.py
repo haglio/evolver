@@ -17,7 +17,7 @@ class TestMain(unittest.TestCase):
         patches = dict(
             setup_logging=patch("backfill_app.evolver.setup_logging"),
             qapplication=patch("backfill_app.QApplication"),
-            message_box=patch("backfill_app.QMessageBox"),
+            alert=patch("backfill_app.QMessageBox"),
             unlabeled=patch("backfill_app.unlabeled_videos", return_value=videos),
             thumbnails=patch("backfill_app._ready_thumbnails", return_value={}),
             window=patch("backfill_app.BackfillWindow"),
@@ -30,19 +30,19 @@ class TestMain(unittest.TestCase):
     def test_an_empty_queue_reports_and_exits_zero_without_a_window(self):
         patches = self._patched([])
         with patches["setup_logging"], patches["qapplication"], \
-             patches["message_box"] as box, patches["unlabeled"], \
+             patches["alert"] as alert, patches["unlabeled"], \
              patches["window"] as window:
             exit_code = backfill_app.main()
 
         self.assertEqual(exit_code, 0)
-        box.information.assert_called_once()
-        self.assertIn("already has an action", box.information.call_args[0][2])
+        alert.information.assert_called_once()
+        self.assertIn("already has an action", alert.information.call_args[0][2])
         window.assert_not_called()
 
     def test_a_session_stops_the_listener_and_worker_on_the_way_out(self):
         patches = self._patched([Path("a_topaz.mp4")])
         with patches["setup_logging"], patches["qapplication"] as qapp, \
-             patches["message_box"], patches["unlabeled"], patches["thumbnails"], \
+             patches["alert"], patches["unlabeled"], patches["thumbnails"], \
              patches["window"] as window, patches["listener"] as listener, \
              patches["worker"] as worker:
             qapp.return_value.exec.return_value = 0
@@ -67,7 +67,7 @@ class TestMain(unittest.TestCase):
         microphone open and the worker thread alive."""
         patches = self._patched([Path("a_topaz.mp4")])
         with patches["setup_logging"], patches["qapplication"] as qapp, \
-             patches["message_box"], patches["unlabeled"], patches["thumbnails"], \
+             patches["alert"], patches["unlabeled"], patches["thumbnails"], \
              patches["window"], patches["listener"] as listener, \
              patches["worker"] as worker:
             qapp.return_value.exec.side_effect = RuntimeError("backend gone")

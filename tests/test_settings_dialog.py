@@ -80,10 +80,10 @@ class TestAccept:
         register.side_effect = OSError("Startup folder is read-only")
         dialog._startup_check.setChecked(True)
 
-        with patch("gui.settings_dialog.QMessageBox") as box:
+        with patch("gui.settings_dialog.QMessageBox") as alert:
             dialog.accept()
 
-        box.warning.assert_called_once()
-        assert "read-only" in box.warning.call_args[0][2]
+        alert.warning.assert_called_once()
+        assert "read-only" in alert.warning.call_args[0][2]
         save.assert_called_once()
         assert dialog.result() == QDialog.DialogCode.Accepted
