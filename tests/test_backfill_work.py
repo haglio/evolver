@@ -57,7 +57,7 @@ class TestSerialWorker(unittest.TestCase):
 
         log.exception.assert_called_once()
 
-    def test_a_failing_task_does_not_stop_the_ones_behind_it(self):
+    def test_a_failing_task_does_not_stop_the_ones_after_it(self):
         worker = self._worker()
         done = []
 

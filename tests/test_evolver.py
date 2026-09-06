@@ -485,7 +485,7 @@ class TestRunPipeline:
         """Skipping is how the pipeline stays out of the way, not how it fails.
 
         A Topaz encode already owning the GPU parks the AI upscale, which parks
-        the correspondence check behind it — two skipped stages on a run where
+        the correspondence check after it — two skipped stages on a run where
         nothing at all went wrong.
         """
         stack, _ = self._patch_all_stages(

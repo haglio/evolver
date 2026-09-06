@@ -26,7 +26,7 @@ def lasting(video, seconds):
     return video
 
 
-class TestWhatIsBehindAndAhead(unittest.TestCase):
+class TestWhatIsDoneAndAhead(unittest.TestCase):
     def test_adds_up_the_queue_and_the_upscales_the_library_already_has(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)

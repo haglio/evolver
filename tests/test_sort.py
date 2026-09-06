@@ -50,7 +50,7 @@ class TestSortHelpers(unittest.TestCase):
             self.assertFalse(src.exists())
 
     def test_run_clears_the_source_folder_it_emptied(self):
-        """The inbox is swept behind every run, not behind a switch."""
+        """The inbox is swept after every run, not after a switch."""
         with workspace_temp_dir() as td_path:
             inbox = td_path / "0_inbox"
             sorted_dir = td_path / "1_sorted"

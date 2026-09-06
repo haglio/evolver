@@ -19,7 +19,7 @@ _ICON = Path(__file__).resolve().parent / "icon.ico"
 
 def _name_this_process() -> None:
     """Leave the pinned shortcut an interpreter that says "Evolver" next time.
-    Why it is one launch behind, and why it can never cost the launch:
+    Why it is one launch late, and why it can never cost the launch:
     :meth:`ProcessNamer.name_this_process`.  A failure is logged, and main()
     routes warnings into the crash log, so the task list filling with anonymous
     Pythons is never a thing nothing anywhere records."""
