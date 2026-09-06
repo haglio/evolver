@@ -47,7 +47,7 @@ class TestGenauDeliver(unittest.TestCase):
             self.assertTrue(delivered.is_file())
             self.assertEqual(delivered.read_text(encoding="utf-8"), "upscaled")
             self.assertFalse(upscaled.exists())
-            # The source goes with it: left behind, the upscale stage would remake
+            # The source goes with it: left in place, the upscale stage would remake
             # this clip every run and the correspondence check would call it a
             # mismatch (see the module docstring).
             self.assertFalse(original.exists())

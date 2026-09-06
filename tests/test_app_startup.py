@@ -39,7 +39,7 @@ class TestBuildingIsNotStarting:
     It used to name this process to the shell, set taskbar properties on a
     window handle, read the whole run-history directory off disk and begin a
     twenty-second presence poll -- so a test that wanted any one part paid for
-    all of them, and left a live timer behind for the rest of the session.
+    all of them, and left a live timer running for the rest of the session.
     """
 
     def test_construction_claims_no_identity(self, request):

@@ -52,7 +52,7 @@ class TestUnlabeledVideos(unittest.TestCase):
 
     def test_a_clip_whose_act_was_called_wrong_is_asked_about_first(self):
         """Fun Time strikes a mislabeled act out of the sidecar and leaves
-        ``wrong_action`` behind.  Someone said that clip is wrong *just now*, so
+        ``wrong_action`` in its place.  Someone said that clip is wrong *just now*, so
         it goes to the head of the queue rather than the back of a library walk
         they may never reach."""
         with library_tree() as lib:

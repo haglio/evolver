@@ -26,7 +26,7 @@ class TestRecordAction(unittest.TestCase):
     def test_naming_the_act_answers_a_viewers_rejection_of_the_old_one(self):
         """``wrong_action`` is a standing question — "this clip is mislabeled,
         ask me again" — and recording an act is the answer, so the marker goes
-        with it.  Left behind it would jump the queue on every future open."""
+        with it.  Left in place it would jump the queue on every future open."""
         with library_tree() as lib:
             video = lib.video()
             path = sidecar_path(video)
