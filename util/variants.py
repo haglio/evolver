@@ -10,7 +10,7 @@ is how originals and their processed variants are matched across the tree.
 # library's most-depended-on naming rule -- three stages, the backfill tool and
 # two sibling repos read a file's provenance out of it -- and it was written
 # out as a bare literal at six sites, each expressing it differently (append,
-# endswith, slice by len, regex-strip, membership in a tuple).
+# endswith, slice by len, regex-strip, containment in a tuple).
 UPSCALE_SUFFIX = "_topaz"
 
 

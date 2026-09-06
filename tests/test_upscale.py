@@ -310,8 +310,8 @@ class TestIsT2vProvider(unittest.TestCase):
                     "provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
     def test_false_when_the_sidecar_holds_something_other_than_a_record(self):
-        """Valid JSON that is not an object: the membership test would raise on
-        a number, and that is a malformed sidecar like any other."""
+        """Valid JSON that is not an object: the containment test would raise
+        on a number, and that is a malformed sidecar like any other."""
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = (meta_dir / "2D" / "AI" / "2_outbox"

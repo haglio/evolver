@@ -49,7 +49,7 @@ class TestTheUpscaleNamingRule:
     Three stages, one utility, the backfill tool and two sibling repos read a
     file's provenance out of this rule, and it had no constant: six sites spelt
     it as a literal, each expressing it differently -- append, endswith, slice
-    by len, regex-strip, membership in a suffix tuple.
+    by len, regex-strip, containment in a suffix tuple.
     """
 
     def test_the_two_directions_are_inverses(self):
