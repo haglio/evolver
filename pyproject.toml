@@ -27,9 +27,9 @@ dev = ["pytest", "pytest-timeout", "vulture", "ruff==0.16.6"]
 # process start and import on Windows. Its own child guard in
 # tests/test_imports_without_win32.py is 180 s, so that one still trips this
 # rather than its own message. --timeout-method=thread is the half that pays
-# for itself: it dumps the hung stack, which turns a stalled required check
-# into a one-line diagnosis. tests/test_timeouts.py holds all three halves of
-# it.
+# for itself: it dumps the stack of the test that stopped, which turns a
+# stalled required check into a one-line diagnosis. tests/test_timeouts.py
+# holds all three halves of it.
 addopts = "--timeout=120 --timeout-method=thread -p app_support.sanitize.pytest_plugin"
 testpaths = ["tests"]
 
