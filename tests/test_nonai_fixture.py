@@ -6,7 +6,7 @@ not hypothetical: ``NONAI_RETIRED_ROOT`` comes from the git-ignored overlay and
 pinned here, four tests that retire an original moved their fixture videos into
 the developer's real archive and then failed the assertion that the video had
 gone to the bucket's ``2*`` folder. They were green on this Mac and on CI only
-because neither has an overlay — which is the shape of hole a fixture cannot be
+because neither has an overlay — which is the shape of gap a fixture cannot be
 trusted to close by care.
 
 So the two sets below are held as an equality against what the stage's modules
