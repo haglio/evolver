@@ -151,7 +151,7 @@ def load_runs(runs_dir: Path, limit: int | None = None) -> list[RunRecord]:
 
     Only the keys the dataclass declares are read off a record, so a field
     added to the format later does not make every record written since
-    unreadable -- which, behind a bare ``except: continue``, emptied the
+    unreadable -- which, hidden by a bare ``except: continue``, emptied the
     history list and the stats chart with nothing said. A file that genuinely
     cannot be read is skipped and named in the log instead of vanishing.
 
