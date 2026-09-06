@@ -136,7 +136,7 @@ The OSR2 broker next door already had one: a scheduled task relaunching its tray
 
 Most sources publish nothing about what a clip actually shows. Provider exposes an action on its site and Origenerator has its gallery database, so the metadata scrape fills those in on its own; a clip from Provider2, Provider3, Candy, ComfyUI or Provider4 arrives with no `video.action` at all, and Fun Time cannot group or filter it.
 
-**Backfill Metadata...** in the tray menu opens a separate window that plays every such clip — looping and muted, in the stable order it found them so a reopened session resumes where the last left off — until you say what it is. The clip changes the instant you speak, and the sidecar is written behind it.
+**Backfill Metadata...** in the tray menu opens a separate window that plays every such clip — looping and muted, in the stable order it found them so a reopened session resumes where the last left off — until you say what it is. The clip changes the instant you speak, and the sidecar is written after it.
 
 Clips whose act was **rejected** jump that order and are asked about first. Fun Time's "wrong action" command empties a mislabeled clip's `video.action` and leaves `video.wrong_action` holding what it said, which is how this tool tells a clip someone just looked at and corrected from one nobody ever labeled — and why a rejection also overrides the scraped-source skip above, since re-scraping would only assert the wrong act again. Naming the act retires the marker along with the question it stands for.
 

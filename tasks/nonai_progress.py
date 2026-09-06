@@ -57,7 +57,7 @@ class Progress:
 
 
 def so_far(queued: Iterable[Path]) -> Progress:
-    """What the project has behind it and ahead of it.
+    """What the project has done and what is ahead of it.
 
     *queued* is the queue as the stage just collected it.  Passed in rather than
     gathered again: collecting it opens three files and walks every bucket, and
