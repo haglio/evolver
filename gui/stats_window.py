@@ -26,7 +26,7 @@ _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
 _LIMIT_SECONDS = 600.0
 _MARGIN_LEFT = 70
 _MARGIN_TOP = 20
-_MARGIN_BOTTOM = 50
+_MARGIN_LOWER = 50
 
 # What a band is painted with. Named because the tests compare stage colors as
 # the bands the eye actually sees — translucent over white, which draws them
@@ -148,7 +148,7 @@ class StackedAreaChart(QWidget):
         chart_x = _MARGIN_LEFT
         chart_y = _MARGIN_TOP
         chart_w = w - _MARGIN_LEFT - chart_right_margin()
-        chart_h = h - _MARGIN_TOP - _MARGIN_BOTTOM
+        chart_h = h - _MARGIN_TOP - _MARGIN_LOWER
 
         if chart_w <= 0 or chart_h <= 0:
             painter.end()

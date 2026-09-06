@@ -174,15 +174,15 @@ class TestStackedAreaChartPainting:
     def test_a_run_paints_each_stage_as_a_band_of_its_own_color(self):
         # Which of the two stacks first is the registry's to say, so the test
         # asks it rather than assuming: bands go up in registry order, so the
-        # bottom 200 s belongs to whichever of the two comes earlier in it.
-        bottom, top = sorted(("purge", "sort"), key=ALL_STAGES.index)
+        # lower 200 s belongs to whichever of the two comes earlier in it.
+        lower, upper = sorted(("purge", "sort"), key=ALL_STAGES.index)
         chart = StackedAreaChart(
-            _two_runs({bottom: 200.0, top: 200.0}, {bottom: 200.0, top: 200.0})
+            _two_runs({lower: 200.0, upper: 200.0}, {lower: 200.0, upper: 200.0})
         )
         image = _render(chart)
 
-        assert _is_band_fill(_rgb(image, 380, 300), bottom)
-        assert _is_band_fill(_rgb(image, 380, 230), top)
+        assert _is_band_fill(_rgb(image, 380, 300), lower)
+        assert _is_band_fill(_rgb(image, 380, 230), upper)
         assert _rgb(image, 380, 120) == _WHITE  # above the stack: bare ground
 
     def test_an_empty_chart_says_so_instead_of_going_blank(self):
@@ -190,9 +190,9 @@ class TestStackedAreaChartPainting:
         assert _ink_count(image, range(71, 690, 2), range(21, 350, 2)) > 20
 
     def test_fit_mode_rescales_the_bands_to_fill_the_chart(self):
-        # 50 s of work is 7 % of the fixed 700 s scale -- a sliver at the very
-        # bottom. Fit mode rescales to the tallest run plus headroom, so the
-        # same band then covers most of the chart's height.
+        # 50 s of work is 7 % of the fixed 700 s scale -- a sliver along the
+        # chart's lower edge. Fit mode rescales to the tallest run plus
+        # headroom, so the same band then covers most of the chart's height.
         normal = _render(StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0})))
         fitted_chart = StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0}))
         fitted_chart.set_fit(True)
