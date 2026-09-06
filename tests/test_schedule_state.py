@@ -1,4 +1,4 @@
-"""The one decision behind every surface that shows the schedule."""
+"""The one decision under every surface that shows the schedule."""
 
 from datetime import datetime
 
