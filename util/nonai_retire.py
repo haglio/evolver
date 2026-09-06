@@ -112,7 +112,7 @@ def _archive_original(source: Path, archive_root: Path) -> None:
 
     Its sidecar and funscript come along and sit beside it rather than in the
     mirrored trees, which only cover the library: an archived video is a cold
-    copy that has to describe itself. Leaving the funscript behind is the worse
+    copy that has to describe itself. Leaving the funscript in place is the worse
     half — it still matches the video by name, so the scripts sync would try to
     relocate it onto a destination the clip-scripts stage has already written,
     and fail the run on a collision nothing can resolve.
@@ -139,10 +139,10 @@ def _move_mirrored_files(source: Path, dest: Path) -> None:
     """Carry a retired original's sidecar and funscript to its new path.
 
     The metadata and script trees both mirror the video tree, so both of a
-    moved video's files must move with it. A left-behind sidecar is orphaned
+    moved video's files must move with it. A stranded sidecar is orphaned
     and pruned, losing the ``clip`` family metadata Nau navigates by (the
     grouping stage re-stamps ``version`` on the next run; this keeps
-    ``clip``/``video`` from vanishing). A left-behind funscript is worse than
+    ``clip``/``video`` from vanishing). A stranded funscript is worse than
     orphaned: the scripts sync would relocate it, but the clip-scripts stage
     runs first and writes the clip a fresh script at the new path, so the sync
     finds its destination taken and fails the run on an unresolvable collision.

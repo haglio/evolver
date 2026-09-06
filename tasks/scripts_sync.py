@@ -117,7 +117,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     it, because the script tree mirrors only the library: a video outside it has
     to describe itself, script beside it rather than in a tree that no longer
     covers it. This stage follows rather than trusting the retiring to have done
-    it, because the archive also fills by hand: a funscript left behind by a
+    it, because the archive also fills by hand: a funscript stranded by a
     video swept in matches no video, fails this stage, and would fail it
     identically on every run afterward.
 
@@ -201,7 +201,7 @@ def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Pa
 
 
 def _discard_or_keep_duplicate(script_path: Path, dest: Path, result: ScriptsSyncResult) -> None:
-    """Delete the left-behind script when the archived video already has its own.
+    """Delete the stranded script when the archived video already has its own.
 
     Two library scripts can name the same archived video — the same funscript
     filed under both a "1 could use work" and a "2 do not need work" folder, say

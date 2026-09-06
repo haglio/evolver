@@ -87,7 +87,7 @@ def action_of(payload: dict) -> str:
     return _video_field(payload, "action")
 
 
-# The key Fun Time leaves behind when its "wrong action" command empties
+# The key Fun Time writes in its place when its "wrong action" command empties
 # ``video.action`` (see ``fun_time/media_metadata.py``).  It is written by that
 # app and read by this one; only :func:`backfill.decisions.record_action` clears
 # it, once the viewer has finally named the act.

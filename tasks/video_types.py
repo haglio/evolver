@@ -211,7 +211,7 @@ def _cut_folders(
     So a batch is absent from this unless its librarian drew the line on disk,
     and one carved scene sitting in a stage folder full of whole videos can
     never turn that stage folder into a folder of cuts.  Dominant rather than
-    unanimous, so one straggler left behind by a move cannot undo a batch that
+    unanimous, so one straggler stranded by a move cannot undo a batch that
     HAS been separated.
 
     Fun Time reads a library the same way when it has no kind to go on

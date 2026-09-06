@@ -47,7 +47,7 @@ def unlabeled_videos() -> list[Path]:
     """Every upscaled clip whose sidecar records no ``video.action``.
 
     The ones a viewer *rejected* come first.  Fun Time's "wrong action" empties
-    ``video.action`` and leaves ``video.wrong_action`` behind, which says a
+    ``video.action`` and leaves ``video.wrong_action`` in its place, which says a
     person just looked at that clip and told us its label was wrong: they are
     owed an answer now, not at whatever depth of the library walk the clip
     happens to sit at.  For the same reason a rejection overrides the

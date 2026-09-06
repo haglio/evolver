@@ -273,7 +273,7 @@ class TestFollowRetiredVideos(unittest.TestCase):
     """A script whose video was archived should follow it out, not fail forever.
 
     Retiring an original moves it out of the library, and the script tree mirrors
-    only the library — so a funscript left behind matches no video on every run
+    only the library — so a stranded funscript matches no video on every run
     from then on, and the stage can never go green again by itself.
     """
 

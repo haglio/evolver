@@ -95,7 +95,7 @@ class TestRetireToAnArchive(unittest.TestCase):
 
     The bucket's ``2*`` folder sits on the working drive inside the file-sync
     pair, so every finished encode left roughly a gigabyte of superseded source
-    behind and the drive filled up. An archive root points those files at
+    in place and the drive filled up. An archive root points those files at
     somewhere else — cloud storage, another volume — and the library keeps only
     what is watched.
     """
@@ -116,7 +116,7 @@ class TestRetireToAnArchive(unittest.TestCase):
                 (archive / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
             )
 
-    def test_the_funscript_goes_with_it_rather_than_being_left_behind(self):
+    def test_the_funscript_goes_with_it_rather_than_being_stranded(self):
         """A script left in the library still matches the archived video by name,
         so the scripts sync tries to relocate it — and the clip-scripts stage has
         already written a fresh script at that destination, so the sync fails the
@@ -142,7 +142,7 @@ class TestRetireToAnArchive(unittest.TestCase):
 
     def test_the_sidecar_goes_with_it_so_the_archive_describes_itself(self):
         """The metadata tree mirrors the library, and the grouping stage prunes
-        any sidecar no library video maps to — so a sidecar left behind is
+        any sidecar no library video maps to — so a stranded sidecar is
         deleted on the next run, taking the clip's provenance with it."""
         with workspace_temp_dir() as root:
             archive = root / "archive"
