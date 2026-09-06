@@ -511,14 +511,14 @@ class TestTheStepContract(unittest.TestCase):
     a Protocol now, and this is what says the three still answer to it.
     """
 
-    def test_every_decision_kind_carries_all_five_members(self):
+    def test_every_decision_kind_carries_all_five_attributes(self):
         for kind in (session._Labelled, session._Discarded, session._Deferred):
             with self.subTest(kind=kind.__name__):
-                for member in ("note", "take_effect", "put_back", "commit", "roll_back"):
-                    self.assertTrue(hasattr(kind, member), member)
+                for attribute in ("note", "take_effect", "put_back", "commit", "roll_back"):
+                    self.assertTrue(hasattr(kind, attribute), attribute)
 
     def test_the_protocol_names_exactly_those_five(self):
-        """So a sixth member added to one kind and not the others cannot quietly
+        """So a sixth attribute added to one kind and not the others cannot quietly
         become something the session calls."""
         declared = {
             name for name in vars(session._Step)

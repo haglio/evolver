@@ -1,7 +1,7 @@
 """How far through the non-AI upscale project the library is, by running time.
 
 The stage could always say how many clips were queued, and a count is the wrong
-unit for a queue whose members run from forty seconds to an hour: when this was
+unit for a queue whose clips run from forty seconds to an hour: when this was
 written the library was 59% upscaled by clip and 29% by running time, because
 what went first was the short stuff.  Hours left is the number a person wants,
 and a percentage of hours is the one that moves at a rate they can believe.
