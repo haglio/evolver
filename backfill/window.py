@@ -28,10 +28,10 @@ _THUMBNAIL_SIZE = 96
 _TILE_HEIGHT = _THUMBNAIL_SIZE + 30
 
 
-def _aspect_locked_icon(path: str, box: int) -> QIcon:
-    """An icon of exactly *box*×*box* holding *path*'s frame at its true aspect.
+def _aspect_locked_icon(path: str, side: int) -> QIcon:
+    """An icon of exactly *side*×*side* holding *path*'s frame at its true aspect.
 
-    The frame is scaled to fit the box keeping its ratio, then centred on a
+    The frame is scaled to fit the square keeping its ratio, then centred on a
     transparent square canvas. Because the icon pixmap is already the icon size, no
     platform button style can stretch it to fill — the fix for portrait/landscape
     frames coming out squished to square on native Windows.
@@ -40,12 +40,13 @@ def _aspect_locked_icon(path: str, box: int) -> QIcon:
     if source.isNull():
         return QIcon()
     scaled = source.scaled(
-        box, box, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+        side, side, Qt.AspectRatioMode.KeepAspectRatio,
+        Qt.TransformationMode.SmoothTransformation,
     )
-    canvas = QPixmap(box, box)
+    canvas = QPixmap(side, side)
     canvas.fill(Qt.GlobalColor.transparent)
     painter = QPainter(canvas)
-    painter.drawPixmap((box - scaled.width()) // 2, (box - scaled.height()) // 2, scaled)
+    painter.drawPixmap((side - scaled.width()) // 2, (side - scaled.height()) // 2, scaled)
     painter.end()
     return QIcon(canvas)
 
