@@ -176,7 +176,7 @@ Acts are voiced in plain-English words because the vosk lexicon has none of the 
 
 ## Non-AI library upscaling
 
-The `2D/non_AI` buckets (`larkin`, `other`, …) hold full-length real-footage scenes that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the recipe the already-processed clips record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), unlike the silent AI clips. The encode runs at half the AI stage's Topaz memory budget (`vram=0.5`, no extra model instance) — slower, but a background job never gets to push the box toward memory exhaustion.
+The `2D/non_AI` buckets (`larkin`, `other`, …) hold full-length real-footage scenes that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the recipe the already-processed clips record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), unlike the silent AI clips. The encode runs at half the AI stage's Topaz memory budget (`vram=0.5`, no extra model instance) — slower, but a background job never gets to push the machine toward memory exhaustion.
 
 It follows the bucket conventions already in use:
 
@@ -320,7 +320,7 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 - Upscale runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick, and is conservative by default: at most `config.UPSCALE_BATCH_LIMIT` videos per run.
 - If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips the upscale for that scheduler tick instead of competing with other work.
 - If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops the upscale early and warns instead of continuing toward a full disk.
-- Upscale non-AI always runs so it can check on its detached encode — suspending or resuming it to match the user's presence — but only launches a new one when the AI queue is drained, the user is away, and the box is otherwise quiet.
+- Upscale non-AI always runs so it can check on its detached encode — suspending or resuming it to match the user's presence — but only launches a new one when the AI queue is drained, the user is away, and the machine is otherwise quiet.
 - Duplicate Check flags likely duplicates by exact filesize, and the Correspondence Check is the final integrity check; either popup points you to `evolver.log` for the full details.
 - Errors are shown via Windows message box.
 - Existing output checks prevent duplicate processing.
