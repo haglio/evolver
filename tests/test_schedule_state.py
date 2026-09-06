@@ -10,7 +10,7 @@ _AT = datetime(2026, 3, 29, 14, 30)
 
 
 @pytest.mark.parametrize(("running", "paused", "next_run", "expected"), [
-    (True, True, _AT, RUNNING),     # a run on screen outranks the pause behind it
+    (True, True, _AT, RUNNING),     # a run on screen outranks the pause under it
     (True, False, None, RUNNING),
     (False, True, _AT, PAUSED),     # paused with a run that would have been next
     (False, False, _AT, SCHEDULED),

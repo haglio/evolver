@@ -225,7 +225,7 @@ class EvolverApp:
 
         Rebuilt each time rather than raised like the stats window: a different
         run is different content, and the one before it is closed and dropped
-        so a window per click cannot pile up behind the main one.
+        so a window per click cannot pile up under the main one.
         """
         if self._log_window is not None:
             self._log_window.close()
