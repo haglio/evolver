@@ -322,5 +322,5 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 - If free disk space drops below `config.LOW_DISK_WARNING_GB`, Evolver stops the upscale early and warns instead of continuing toward a full disk.
 - Upscale non-AI always runs so it can check on its detached encode — suspending or resuming it to match the user's presence — but only launches a new one when the AI queue is drained, the user is away, and the machine is otherwise quiet.
 - Duplicate Check flags likely duplicates by exact filesize, and the Correspondence Check is the final integrity check; either popup points you to `evolver.log` for the full details.
-- Errors are shown via Windows message box.
+- Errors are shown in a Windows alert dialog.
 - Existing output checks prevent duplicate processing.

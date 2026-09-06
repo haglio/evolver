@@ -463,30 +463,30 @@ class TestToolbarAppWiring:
         return build_evolver_app(request)
 
     def _quit_confirmation(self, answer):
-        box = patch("gui.app.QMessageBox")
-        mock_box = box.start()
-        mock_box.StandardButton.Yes = QMessageBox.StandardButton.Yes
-        mock_box.StandardButton.No = QMessageBox.StandardButton.No
-        mock_box.question.return_value = answer
-        return box, mock_box
+        patcher = patch("gui.app.QMessageBox")
+        mock_alert = patcher.start()
+        mock_alert.StandardButton.Yes = QMessageBox.StandardButton.Yes
+        mock_alert.StandardButton.No = QMessageBox.StandardButton.No
+        mock_alert.question.return_value = answer
+        return patcher, mock_alert
 
     def test_the_quit_button_asks_first_and_a_yes_quits(self, app):
-        box, mock_box = self._quit_confirmation(QMessageBox.StandardButton.Yes)
+        patcher, mock_alert = self._quit_confirmation(QMessageBox.StandardButton.Yes)
         try:
             with patch.object(app, "_shutdown") as mock_quit:
                 app._window.quit_action.trigger()
         finally:
-            box.stop()
-        mock_box.question.assert_called_once()
+            patcher.stop()
+        mock_alert.question.assert_called_once()
         mock_quit.assert_called_once()
 
     def test_a_no_to_the_quit_confirmation_changes_nothing(self, app):
-        box, _ = self._quit_confirmation(QMessageBox.StandardButton.No)
+        patcher, _ = self._quit_confirmation(QMessageBox.StandardButton.No)
         try:
             with patch.object(app, "_shutdown") as mock_quit:
                 app._window.quit_action.trigger()
         finally:
-            box.stop()
+            patcher.stop()
         mock_quit.assert_not_called()
 
     def test_run_now_starts_a_manual_pipeline_run(self, app):
