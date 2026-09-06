@@ -135,7 +135,7 @@ def _read_memory(handle, address: int, size: int) -> bytes | None:
 
 
 def image_path(pid: int) -> str | None:
-    """The executable path behind *pid*, or None when it cannot be read."""
+    """The executable path for *pid*, or None when it cannot be read."""
     handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     if not handle:
         return None
