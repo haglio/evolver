@@ -1,6 +1,6 @@
 """Tests for util.system_resources.
 
-The two live tests at the bottom read the real machine and only prove the
+The two live tests at the end read the real machine and only prove the
 numbers are in-range on Windows. The unit conversions -- bytes to GB, tick
 stamps to seconds, the 32-bit wrap -- feed the non-AI stage's decision to
 start or suspend a multi-hour encode, so they are pinned exactly at the
