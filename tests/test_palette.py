@@ -1,7 +1,7 @@
 """The colors are the family's, not the ones the machine happens to be set to.
 
-Qt takes Link, Highlight and their kin from the Windows accent color, so a box
-set to orange drew this app's run-title links a pale orange and its selections
+Qt takes Link, Highlight and their kin from the Windows accent color, so a
+machine set to orange drew this app's run-title links a pale orange and its selections
 an orange red -- shades in no palette any app of this family reads.
 """
 
