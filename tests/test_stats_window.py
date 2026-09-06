@@ -258,7 +258,7 @@ class TestStackedAreaChartPainting:
 
     def test_the_legend_is_wide_enough_for_the_longest_label(self):
         """The words are up to half again the width of the keys they replaced,
-        and by how much is the machine's font's business, so the box is
+        and by how much is the machine's font's business, so the panel is
         measured from them rather than set to a number picked on one machine."""
         metrics = QFontMetrics(_legend_font())
         widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())
