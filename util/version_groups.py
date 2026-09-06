@@ -45,10 +45,11 @@ def group_ids(stems: list[str], overrides: Mapping[str, str] | None = None) -> d
     single stable, readable id.
 
     *overrides* names the pairs the rule cannot see: a version renamed by hand
-    shares no prefix with its original (a 4K upscale of the best eight minutes,
-    saved as "Performer POV BJ 4k 60fps"), so it has to be declared. Each entry
-    maps such a stem to the stem of the video it is a version of; with three
-    versions, point them all at the same one rather than at each other.
+    shares no prefix with its original (a 4K upscale of the best minutes of a
+    scene, saved as "Jane Doe Scene Two 4k 60fps"), so it has to be declared.
+    Each entry maps such a stem to the stem of the video it is a version of;
+    with three versions, point them all at the same one rather than at each
+    other.
     """
     order = {stem: i for i, stem in enumerate(stems)}
     tokens = {stem: group_key_tokens(stem) for stem in stems}

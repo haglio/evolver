@@ -140,13 +140,13 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata,
                 NONAI_VERSION_OVERRIDES={
-                    "redacted POV BJ 4k 60fps": "redacted_540-pacI21CK",
+                    "Jane Doe Scene Two 4k 60fps": "jane-doe_540-Qv3Tn8Rd",
                 },
             ):
-                original = _touch(non_ai / "larkin" / "0 unsorted" / "redacted_540-pacI21CK.mp4")
+                original = _touch(non_ai / "larkin" / "0 unsorted" / "jane-doe_540-Qv3Tn8Rd.mp4")
                 upscale = _touch(
                     non_ai / "larkin" / "3_good_to_go" / "processed"
-                    / "redacted POV BJ 4k 60fps.mp4"
+                    / "Jane Doe Scene Two 4k 60fps.mp4"
                 )
 
                 nonai_group.run()
