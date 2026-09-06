@@ -273,7 +273,7 @@ def run_pipeline(
 
         # The non-AI stage always runs (it may have a detached encode to check on),
         # but only starts a new multi-hour encode when the tray toggle is on, the
-        # AI pipeline is drained, and the box is otherwise quiet.
+        # AI pipeline is drained, and the machine is otherwise quiet.
         ai_drained = not upscale_skipped and (
             upscale_result is None or upscale_result.pending_after_run == 0
         )

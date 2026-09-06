@@ -3,7 +3,7 @@
 One in-flight record (which encode is running, since when, and whether it is
 frozen), one attempt counter per clip (so a video that fails repeatedly stops
 being retried), and one cooldown stamp (when the last encode ended, so an
-unattended night does not run the box flat out end to end).
+unattended night does not run the machine flat out end to end).
 
 Every function takes the file it works on rather than reading ``config``: the
 stage owns which paths these are, and a caller — a test, or a second entry

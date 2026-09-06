@@ -52,7 +52,7 @@ def legend_width() -> int:
 
     Not a fixed number, because the labels run half again the width of the
     stage keys they replaced and by how much depends on the machine's font —
-    one picked here would clip the legend on a box with a wider one.
+    a number picked here would clip the legend wherever that font is wider.
     """
     metrics = QFontMetrics(_legend_font())
     widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())

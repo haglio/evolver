@@ -125,7 +125,7 @@ def run(allow_start: bool = True, stop: bool = False,
         attempts_file: Path | None = None, cooldown_file: Path | None = None,
         skip_manifest: Path | None = None, pin_manifest: Path | None = None,
         watch_stats_file: Path | None = None) -> NonAiUpscaleResult:
-    """Check on the in-flight encode, then start the next one if the box is free.
+    """Check on the in-flight encode, then start the next one if the machine is free.
 
     With *stop* (the tray toggle is off), a still-running encode is killed and
     its video keeps its place in the queue; an already-finished one is still
@@ -386,7 +386,7 @@ def _machine_busy_reason(cooldown_file: Path) -> str:
     starting while someone is at the keyboard. Any live Topaz ffmpeg — an
     orphaned encode or the user's own GUI export — already owns the GPU, and CPU
     sampling never sees that. RAM and a post-encode cooldown keep an unattended
-    night from running the box flat out end to end.
+    night from running the machine flat out end to end.
     """
     if _user_present():
         return "user_present"

@@ -9,8 +9,8 @@ from shared_ui.colors import BLUE, TEXT_PRIMARY
 def apply_accent(app) -> None:
     """Put the family's blue where Qt would put the machine's accent color.
 
-    Qt takes Link, Highlight and their kin from the Windows accent, so a box
-    set to orange draws this app's links and selections orange -- a color that
+    Qt takes Link, Highlight and their kin from the Windows accent, so a
+    machine set to orange draws this app's links and selections orange -- a color that
     is in no palette any app of this family reads, sitting beside marks that
     are. The accent is a per-machine setting nobody chose for Evolver, and it
     changes under the app while it runs; the family's blue is the one this

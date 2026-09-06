@@ -213,7 +213,7 @@ NONAI_VERSION_OVERRIDES = {
 # vram=0.5 and instances=0 (vs the AI stage's vram=1/instances=1): an unattended
 # multi-hour encode shares the machine with whatever else is running, so it gets
 # half the VRAM budget and no extra model instance — slower, but far harder to
-# push the box into memory exhaustion.
+# push the machine into memory exhaustion.
 NONAI_UPSCALE_FILTER_TEMPLATE = (
     "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=0.5:instances=0,"
     "tvai_up=model=iris-2:scale=0:w={width}:h={height}:preblur=0:noise=0:details=0:"
