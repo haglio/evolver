@@ -1,5 +1,6 @@
 """Tests for the Settings dialog — where the two saved settings are written
 and the Startup shortcut is created or removed."""
+from __future__ import annotations
 
 from unittest.mock import patch
 

@@ -6,6 +6,7 @@ they decide the same three-state display (Running / Paused / Next run)
 that EvolverMainWindow.update_schedule_status decides, and until now only
 the window half was tested.
 """
+from __future__ import annotations
 
 from datetime import datetime
 

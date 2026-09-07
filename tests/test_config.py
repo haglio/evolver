@@ -6,6 +6,7 @@ the repos were moved out of the file-synced tree the library still lives in, so
 their root is its own setting. These tests pin the resolution rules, including
 the half-migrated state where some checkouts have moved and some have not.
 """
+from __future__ import annotations
 
 import unittest
 from pathlib import Path

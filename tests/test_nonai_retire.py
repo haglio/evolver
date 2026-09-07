@@ -5,6 +5,7 @@ no longer say where an original goes by overriding config: the archive root is
 an argument, so each case names the answer it is about — a path, or None for
 the bucket's own ``2*`` folder.
 """
+from __future__ import annotations
 
 import json
 import unittest

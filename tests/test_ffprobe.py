@@ -8,6 +8,7 @@ parseable at all, were invisible (audit probes 36-39 corrupted both with the
 suite green). The stand-in below answers by selector, the way ffprobe does,
 and records the argv so the tests can pin what was asked.
 """
+from __future__ import annotations
 
 import subprocess
 import unittest

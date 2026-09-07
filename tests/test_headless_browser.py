@@ -1,4 +1,5 @@
 """Driving an installed browser headless to get a page's rendered DOM."""
+from __future__ import annotations
 
 import subprocess
 import unittest

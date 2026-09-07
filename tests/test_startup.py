@@ -5,6 +5,7 @@ cscript, so the observable surface off Windows is the script text and the
 cscript invocation; both are captured at the subprocess boundary. The
 Startup folder itself is redirected through APPDATA into a temp tree.
 """
+from __future__ import annotations
 
 import subprocess
 import sys

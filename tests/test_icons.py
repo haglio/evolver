@@ -6,6 +6,7 @@ their geometry, their disabled rendering, their relative ink weights -- is
 shared_ui's contract, pinned in shared_ui's own suite; re-asserting it here
 turned a legitimate glyph redesign into a red evolver suite.
 """
+from __future__ import annotations
 
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QIcon, QImage

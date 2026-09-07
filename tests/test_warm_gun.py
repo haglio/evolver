@@ -1,4 +1,5 @@
 """Warm Gun's journal: the phone's viewing, and where each line's video is here."""
+from __future__ import annotations
 
 import json
 import unittest

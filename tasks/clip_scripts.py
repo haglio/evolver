@@ -1,4 +1,5 @@
 """Stage: give a carved clip the part of its source scene's funscript it was cut from."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass

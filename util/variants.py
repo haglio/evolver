@@ -5,6 +5,7 @@ made it: ``foo_apo8_iris2.mp4`` is ``foo.mp4`` after apo-8 interpolation and an
 iris-2 upscale.  Stripping those suffixes recovers the original's stem, which
 is how originals and their processed variants are matched across the tree.
 """
+from __future__ import annotations
 
 # What the AI upscale stage appends to a 1_sorted video's stem. It is the
 # library's most-depended-on naming rule -- three stages, the backfill tool and

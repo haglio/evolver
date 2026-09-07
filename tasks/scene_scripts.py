@@ -1,4 +1,5 @@
 """Stage: give an unscripted scene the funscript of the clip carved out of it."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass

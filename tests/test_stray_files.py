@@ -1,4 +1,5 @@
 """The stage that clears non-video files out of the video tree."""
+from __future__ import annotations
 
 import unittest
 from pathlib import Path

@@ -10,6 +10,7 @@ This pins the other outcome.  The child interpreter below deletes the Windows
 half of ``ctypes`` and then collects the suite, so it asks the same question on
 Windows as it does anywhere else.
 """
+from __future__ import annotations
 
 import os
 import subprocess

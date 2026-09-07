@@ -1,4 +1,5 @@
 """Upscale videos from 1_sorted/<source>/<orientation>/ using Topaz."""
+from __future__ import annotations
 
 import logging
 import subprocess

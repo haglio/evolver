@@ -5,6 +5,7 @@ folder names four stages walk were three separate spellings of the same three
 strings across six modules, with nothing connecting them: a typo in any one was
 a silently empty listing rather than an error.
 """
+from __future__ import annotations
 
 import ast
 import unittest

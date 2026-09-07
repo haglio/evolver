@@ -4,6 +4,7 @@ The unit these are about is seconds of video, not clips: the number that made
 this worth writing is that the real library was 59% upscaled by clip and 29% by
 running time, because the short clips went first.
 """
+from __future__ import annotations
 
 import unittest
 

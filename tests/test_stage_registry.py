@@ -4,6 +4,7 @@ The pipeline's order, the popup's bars, the detail table's names, tooltips
 and numbers and the chart's palette all come off ``tasks/stages.py``. What
 is left to check is that the list really is the one the pipeline runs.
 """
+from __future__ import annotations
 
 import ast
 import itertools

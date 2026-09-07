@@ -1,4 +1,5 @@
 """The one decision under every surface that shows the schedule."""
+from __future__ import annotations
 
 from datetime import datetime
 

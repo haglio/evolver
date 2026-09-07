@@ -14,6 +14,7 @@ actually read, taken from the syntax tree: a new ambient read has to be filed
 either as a place the fixture redirects or as one it deliberately leaves alone,
 with the reason written down.
 """
+from __future__ import annotations
 
 import ast
 import unittest

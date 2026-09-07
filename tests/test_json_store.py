@@ -1,4 +1,5 @@
 """The small JSON files the app keeps, and the one way they are written."""
+from __future__ import annotations
 
 import json
 import unittest

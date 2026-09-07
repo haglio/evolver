@@ -5,6 +5,7 @@ Every function here takes the file it works on, so this module reads no
 point of the seam: the stage's persistence used to be reachable only by
 constructing the whole stage and steering it with ``override_config``.
 """
+from __future__ import annotations
 
 import json
 import time

@@ -7,6 +7,7 @@ start or suspend a multi-hour encode, so they are pinned exactly at the
 Win32 boundary with the structures filled by hand; those tests run on any
 platform.
 """
+from __future__ import annotations
 
 import inspect
 import unittest

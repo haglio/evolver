@@ -5,6 +5,7 @@ backfill's discard both put an outbox video, and the one beside Genau's clips
 folder, where Genau puts a clip a session condemns. A condemned video takes its
 ``1_sorted`` source and its metadata sidecar with it.
 """
+from __future__ import annotations
 
 import glob
 import logging

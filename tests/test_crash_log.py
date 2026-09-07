@@ -1,4 +1,5 @@
 """Tests for the crash log, and for the entry point that has to surface one."""
+from __future__ import annotations
 
 import sys
 import unittest

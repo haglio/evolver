@@ -1,4 +1,5 @@
 """Tests for the main window toolbar controls (quit, settings, toggle, next run, run now)."""
+from __future__ import annotations
 
 from datetime import datetime
 from unittest.mock import patch

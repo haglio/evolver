@@ -6,6 +6,7 @@ Everything here pins the consequences: the worker stays the re-entry guard so
 no second pipeline can start on top of the first, the scheduler and tray keep
 showing a run in flight, and the pipeline is asked to stop cooperatively.
 """
+from __future__ import annotations
 
 import unittest
 from unittest.mock import Mock, patch
