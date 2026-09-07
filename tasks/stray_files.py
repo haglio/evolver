@@ -40,6 +40,15 @@ class StrayFilesResult:
         return not self.reported
 
 
+@dataclass(frozen=True)
+class _Handled:
+    """What one non-video file in the video tree came to."""
+
+    renamed: bool = False
+    rehomed: bool = False
+    reported: str = ""
+
+
 def run() -> StrayFilesResult:
     """Walk the video library, and only it.
 
@@ -59,8 +68,15 @@ def run() -> StrayFilesResult:
     log.info("VIDEOS: %s", root)
 
     for path in sorted(root.rglob("*")):
-        if path.is_file():
-            _handle(path, result)
+        if not path.is_file():
+            continue
+        handled = _handle(path)
+        if handled.renamed:
+            result.renamed += 1
+        if handled.rehomed:
+            result.rehomed_scripts += 1
+        if handled.reported:
+            result.reported.append(handled.reported)
 
     log.info(
         "Stray files done. Renamed: %d, Rehomed scripts: %d, Reported: %d",
@@ -69,19 +85,19 @@ def run() -> StrayFilesResult:
     return result
 
 
-def _handle(path: Path, result: StrayFilesResult) -> None:
+def _handle(path: Path) -> _Handled:
     if _is_video(path) or path.name.lower() in _OS_NOISE:
-        return
+        return _Handled()
 
-    repaired = _repair_extension(path, result)
+    repaired, renamed = _repair_extension(path)
     if repaired is None:
-        return
+        return _Handled(reported=_reportable(path))
     if _is_video(repaired):
-        return
+        return _Handled(renamed=renamed)
     if repaired.suffix.lower() == config.FUNSCRIPT_EXTENSION:
-        _rehome_script(repaired, result)
-        return
-    _report(repaired, result)
+        blocked = _rehome_script(repaired)
+        return _Handled(renamed=renamed, rehomed=not blocked, reported=blocked)
+    return _Handled(renamed=renamed, reported=_reportable(repaired))
 
 
 def _is_video(path: Path) -> bool:
@@ -94,22 +110,24 @@ def _is_video(path: Path) -> bool:
     return path.suffix.lower() in config.VIDEO_EXTENSIONS
 
 
-def _repair_extension(path: Path, result: StrayFilesResult) -> Path | None:
-    """*path* under its repaired name, itself if nothing to repair, None if blocked."""
+def _repair_extension(path: Path) -> tuple[Path | None, bool]:
+    """Where *path* is now, and whether it had to be renamed to get there.
+
+    Itself when there was nothing to repair, and None when the repaired name is
+    taken -- which is the caller's to report, under the name the file still has.
+    """
     repaired = _repaired_name(path.name)
     if repaired is None:
-        return path
+        return path, False
 
     dest = path.with_name(repaired)
     if dest.exists():
         log.warning("MALFORMED NAME (repaired name is taken, leaving it): %s", path)
-        _report(path, result)
-        return None
+        return None, False
 
     log.info("REPAIR NAME  %s  ->  %s", path.name, dest.name)
     path.rename(dest)
-    result.renamed += 1
-    return dest
+    return dest, True
 
 
 def _repaired_name(name: str) -> str | None:
@@ -138,7 +156,7 @@ def _known_extensions() -> set[str]:
     return config.VIDEO_EXTENSIONS | {config.FUNSCRIPT_EXTENSION}
 
 
-def _rehome_script(path: Path, result: StrayFilesResult) -> None:
+def _rehome_script(path: Path) -> str:
     """Move a funscript out of the video tree to its mirror path under the scripts.
 
     Its home is decided by name, not by folder, and the stage that decides it
@@ -146,18 +164,19 @@ def _rehome_script(path: Path, result: StrayFilesResult) -> None:
     has to be for anything to look at it at all.  Landing there is not a claim
     that it belongs there: a script naming no video fails the scripts sync and
     raises a popup, which is the point.
+
+    Answers "" once it has moved, and the path to report when it could not.
     """
     dest = config.SCRIPT_LIBRARY_DIR / path.relative_to(config.VIDEO_LIBRARY_DIR)
     if dest.exists():
         log.warning("STRAY SCRIPT (mirror path is taken, leaving it): %s -> %s", path, dest)
-        _report(path, result)
-        return
+        return _reportable(path)
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     log.info("REHOME SCRIPT  %s  ->  %s", path, dest)
     path.rename(dest)
-    result.rehomed_scripts += 1
+    return ""
 
 
-def _report(path: Path, result: StrayFilesResult) -> None:
-    result.reported.append(str(path.relative_to(config.VIDEO_LIBRARY_DIR)))
+def _reportable(path: Path) -> str:
+    return str(path.relative_to(config.VIDEO_LIBRARY_DIR))
