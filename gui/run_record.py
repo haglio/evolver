@@ -9,8 +9,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
+import config
 from util import run_log
 
 log = logging.getLogger(__name__)
@@ -83,9 +83,6 @@ class RunRecord:
         )
 
 
-_PACIFIC = ZoneInfo("America/Los_Angeles")
-
-
 def utc_time(stamp: str) -> datetime:
     """One of a record's timestamps as an aware datetime.
 
@@ -98,13 +95,14 @@ def utc_time(stamp: str) -> datetime:
 def format_run_label(started_at: str, duration_seconds: float) -> str:
     """When a run started and how long it took, e.g. "2026/03/30 22:20 (5s)".
 
-    Converts UTC *started_at* to Pacific time. The verdict is deliberately not
-    in here: it rides beside this text as a colored mark (see
+    Shown in the zone the overlay names, or the machine's own when it names
+    none -- read at the call, so a test can point it somewhere. The verdict is
+    deliberately not in here: it rides beside this text as a colored mark (see
     :mod:`gui.status_symbols`), so coloring the verdict cannot color the
     timestamp along with it.
     """
-    pacific_dt = utc_time(started_at).astimezone(_PACIFIC)
-    return f"{pacific_dt.strftime('%Y/%m/%d %H:%M')} ({duration_seconds:.0f}s)"
+    shown = utc_time(started_at).astimezone(config.DISPLAY_TIMEZONE)
+    return f"{shown.strftime('%Y/%m/%d %H:%M')} ({duration_seconds:.0f}s)"
 
 
 def result_to_dict(result: Any) -> dict[str, Any] | None:

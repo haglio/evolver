@@ -7,6 +7,7 @@ from dataclasses import field as dataclass_field
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
+from zoneinfo import ZoneInfo
 
 from gui.run_record import (
     RunRecord,
@@ -15,7 +16,7 @@ from gui.run_record import (
     result_to_dict,
     save_run,
 )
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir
 
 
 @dataclass
@@ -338,17 +339,33 @@ class TestRunRecordFromPipelineResult:
 
 
 class TestFormatRunLabel:
+    """A record stores UTC; a person reads local time."""
 
-    def test_formats_utc_to_pacific_standard_time(self):
-        # 2026-01-15T06:05:00 UTC = 2025-01-14 22:05 PST (UTC-8)
-        label = format_run_label("2026-01-15T06:05:00", 5.0)
-        assert label == "2026/01/14 22:05 (5s)"
+    def _in_pacific(self):
+        return override_config(DISPLAY_TIMEZONE=ZoneInfo("America/Los_Angeles"))
 
-    def test_formats_utc_to_pacific_daylight_time(self):
+    def test_formats_utc_to_the_configured_zone_in_winter(self):
+        # 2026-01-15T06:05:00 UTC = 2026-01-14 22:05 PST (UTC-8)
+        with self._in_pacific():
+            assert format_run_label("2026-01-15T06:05:00", 5.0) == "2026/01/14 22:05 (5s)"
+
+    def test_formats_utc_to_the_configured_zone_in_summer(self):
+        """The zone, not a fixed offset: the same name is an hour apart across
+        the year, and a record read in January must not shift in July."""
         # 2026-07-15T03:20:00 UTC = 2026-07-14 20:20 PDT (UTC-7)
-        label = format_run_label("2026-07-15T03:20:00", 12.0)
-        assert label == "2026/07/14 20:20 (12s)"
+        with self._in_pacific():
+            assert format_run_label("2026-07-15T03:20:00", 12.0) == "2026/07/14 20:20 (12s)"
 
     def test_rounds_duration_to_integer(self):
-        label = format_run_label("2026-03-30T05:20:00", 83.7)
-        assert label == "2026/03/29 22:20 (84s)"
+        with self._in_pacific():
+            assert format_run_label("2026-03-30T05:20:00", 83.7) == "2026/03/29 22:20 (84s)"
+
+    def test_an_unset_zone_reads_the_machine_s_own(self):
+        """What a public checkout gets, and what the setting exists to override
+        on the machine whose clock is not the one its user reads times in."""
+        stamp = "2026-03-30T05:20:00"
+        expected = (datetime.fromisoformat(stamp).replace(tzinfo=UTC)
+                    .astimezone().strftime("%Y/%m/%d %H:%M"))
+
+        with override_config(DISPLAY_TIMEZONE=None):
+            assert format_run_label(stamp, 1.0) == f"{expected} (1s)"

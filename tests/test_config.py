@@ -54,6 +54,42 @@ class TestRetiredRoot(unittest.TestCase):
         )
 
 
+class TestTopazPaths(unittest.TestCase):
+    """Where Topaz Video is installed, which decides whether either upscale
+    stage can run at all: they drive its own ffmpeg build and no other."""
+
+    def test_an_overlay_that_says_nothing_gets_the_installer_s_own_paths(self):
+        ffmpeg, models = config.topaz_paths({})
+
+        self.assertEqual(ffmpeg.name, "ffmpeg.exe")
+        self.assertEqual(models.name, "models")
+        self.assertTrue(ffmpeg.is_absolute())
+        self.assertTrue(models.is_absolute())
+
+    def test_an_empty_value_counts_as_unset(self):
+        self.assertEqual(
+            config.topaz_paths({"topaz_ffmpeg": "", "topaz_models": ""}),
+            config.topaz_paths({}),
+        )
+
+    def test_a_machine_that_installed_it_elsewhere_says_so_in_the_overlay(self):
+        ffmpeg, models = config.topaz_paths({
+            "topaz_ffmpeg": "D:/Apps/Topaz Video/ffmpeg.exe",
+            "topaz_models": "E:/topaz-models",
+        })
+
+        self.assertEqual(ffmpeg, Path("D:/Apps/Topaz Video/ffmpeg.exe"))
+        self.assertEqual(models, Path("E:/topaz-models"))
+
+    def test_either_one_can_move_without_the_other(self):
+        """They sit in different trees on a stock install, so an overlay that
+        moves one is not saying anything about the other."""
+        ffmpeg, models = config.topaz_paths({"topaz_models": "E:/topaz-models"})
+
+        self.assertEqual(ffmpeg, config.topaz_paths({})[0])
+        self.assertEqual(models, Path("E:/topaz-models"))
+
+
 class TestProjectDir(unittest.TestCase):
     def test_finds_a_checkout_in_the_only_root(self):
         with workspace_temp_dir() as temp:
