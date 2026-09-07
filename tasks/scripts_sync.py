@@ -6,6 +6,7 @@ import logging
 import shutil
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum, auto
 from pathlib import Path
 
 import config
@@ -39,6 +40,13 @@ class ScriptsSyncResult:
     @property
     def ok(self) -> bool:
         return not (self.unmatched or self.ambiguous or self.collisions or self.variant_copy_errors)
+
+
+class _Duplicate(Enum):
+    """What became of a script whose archived video already had one."""
+
+    DISCARDED = auto()
+    COLLIDED = auto()
 
 
 def run(show_popup: bool = False) -> ScriptsSyncResult:
@@ -139,7 +147,10 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
 
         dest = videos[0].with_suffix(config.FUNSCRIPT_EXTENSION)
         if dest.exists():
-            _discard_or_keep_duplicate(script_path, dest, result)
+            if _discard_or_keep_duplicate(script_path, dest) is _Duplicate.DISCARDED:
+                result.discarded_duplicates += 1
+            else:
+                result.collisions += 1
             continue
 
         try:
@@ -201,7 +212,7 @@ def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Pa
     return True
 
 
-def _discard_or_keep_duplicate(script_path: Path, dest: Path, result: ScriptsSyncResult) -> None:
+def _discard_or_keep_duplicate(script_path: Path, dest: Path) -> _Duplicate:
     """Delete the stranded script when the archived video already has its own.
 
     Two library scripts can name the same archived video — the same funscript
@@ -213,11 +224,10 @@ def _discard_or_keep_duplicate(script_path: Path, dest: Path, result: ScriptsSyn
     """
     if filecmp.cmp(str(script_path), str(dest), shallow=False):
         script_path.unlink()
-        result.discarded_duplicates += 1
         log.info("DISCARD DUPLICATE SCRIPT (archive already has it)  %s", script_path)
-        return
+        return _Duplicate.DISCARDED
     log.warning("ARCHIVED SCRIPT COLLISION (destination exists and differs): %s -> %s", script_path, dest)
-    result.collisions += 1
+    return _Duplicate.COLLIDED
 
 
 def _index_archived_videos() -> dict[str, list[Path]]:
