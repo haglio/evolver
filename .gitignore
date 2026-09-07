@@ -18,7 +18,8 @@ venv/
 .coverage.*
 htmlcov/
 
-# Repo-local temp artifacts
+# The prompt-scrape browser profile now lives in the system temp dir; the glob
+# stays to cover a leftover copy in a checkout that ran the older code.
 .tmp-prompt-browser-profile/
 
 # Regen-mode runtime state

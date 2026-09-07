@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -158,6 +159,12 @@ CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 _SCRAPE_PROVIDER = overlay_value(_CONTENT, "scrape_provider", path=LOCAL_CONTENT)
 PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
 PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]
+# The scratch profile the metadata stage hands its headless browser: a whole
+# Chrome user-data tree, written from nothing on each scrape and worth keeping
+# for none of it. In the system temp dir because it defaulted to one under
+# PROJECT_DIR, which had the running app filling its own git working tree with a
+# live browser profile every ten minutes.
+PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-browser-profile"
 # Non-AI folders holding scenes carved out of longer videos and nothing else,
 # as paths relative to the video library ("2D/non_AI/<bucket>/<folder>").
 # ``tasks.video_types`` reads them as excerpts whether or not each one carries
