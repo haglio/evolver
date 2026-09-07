@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -83,6 +85,77 @@ def _pick_y_ticks(y_max: float) -> list[float]:
     return ticks
 
 
+def _label_count(chart_w: int) -> int:
+    """How many dates fit along an axis this wide, between two and a dozen."""
+    return min(12, max(2, chart_w // 70))
+
+
+def _x_axis_labels(t_min: float, t_max: float, count: int) -> list[str]:
+    """*count* evenly spaced dates across the span, disambiguated by time.
+
+    A library that ran the pipeline every ten minutes puts several labels on
+    one date, and a row of identical dates says nothing about where a run sits;
+    those get their clock time on a second line. A label with a distinct date
+    does not, because the date is the thing being read.
+    """
+    span = t_max - t_min or 1.0
+    moments = [datetime.fromtimestamp(t_min + span * i / (count - 1))
+               for i in range(count)]
+    dates = [moment.strftime("%m/%d") for moment in moments]
+    return [
+        moment.strftime("%m/%d\n%H:%M")
+        if dates.count(date) > 1 else date
+        for moment, date in zip(moments, dates, strict=True)
+    ]
+
+
+def _duration_of(record: RunRecord, stage_key: str) -> float:
+    """How long *stage_key* took in *record* -- zero when it did not run."""
+    for stage in record.stages:
+        if stage.get("name") == stage_key:
+            return stage.get("duration_seconds", 0.0)
+    return 0.0
+
+
+def _running_means(values: list[float]) -> list[float]:
+    """The mean of everything up to and including each value."""
+    means: list[float] = []
+    total = 0.0
+    for index, value in enumerate(values):
+        total += value
+        means.append(total / (index + 1))
+    return means
+
+
+@dataclass(frozen=True)
+class _Plot:
+    """Where the chart sits in the widget, and how a value becomes a pixel."""
+
+    left: int
+    top: int
+    width: int
+    height: int
+    timestamps: list[float]
+    series: list[list[float]]
+    y_max: float
+
+    @property
+    def t_min(self) -> float:
+        return min(self.timestamps, default=0.0)
+
+    @property
+    def t_max(self) -> float:
+        return max(self.timestamps, default=0.0)
+
+    def x_of(self, run_index: int) -> float:
+        """Where the run at *run_index* sits, by when it ran."""
+        span = self.t_max - self.t_min or 1.0
+        return self.left + self.width * (self.timestamps[run_index] - self.t_min) / span
+
+    def y_of(self, seconds: float) -> float:
+        return self.top + self.height * (1 - seconds / self.y_max)
+
+
 class StackedAreaChart(QWidget):
     """Custom-painted stacked area chart of stage durations across runs."""
 
@@ -102,32 +175,18 @@ class StackedAreaChart(QWidget):
         self.update()
 
     def _compute_series(self) -> list[list[float]]:
-        """Return one list of floats per stage, one value per run.
+        """One list of values per stage, one value per run, oldest first."""
+        return [self._values_for(stage_key) for stage_key in ALL_STAGES]
 
-        In normal mode the values are raw durations.  In averages mode
-        each value is the running cumulative mean up to that run.
+    def _values_for(self, stage_key: str) -> list[float]:
+        """What one stage's band is drawn from: its seconds, or its trend.
+
+        Averages mode is a running mean rather than the whole history's, so a
+        stage that has been getting slower shows as a band that climbs -- the
+        one number cannot.
         """
-        series: list[list[float]] = []
-        for stage_key in ALL_STAGES:
-            raw = []
-            for rec in self._records:
-                dur = 0.0
-                for s in rec.stages:
-                    if s.get("name") == stage_key:
-                        dur = s.get("duration_seconds", 0.0)
-                        break
-                raw.append(dur)
-
-            if self._mode == "averages":
-                avgs: list[float] = []
-                cumsum = 0.0
-                for i, v in enumerate(raw):
-                    cumsum += v
-                    avgs.append(cumsum / (i + 1))
-                series.append(avgs)
-            else:
-                series.append(raw)
-        return series
+        durations = [_duration_of(record, stage_key) for record in self._records]
+        return _running_means(durations) if self._mode == "averages" else durations
 
     def _parse_timestamps(self) -> list[float]:
         """Parse started_at into epoch seconds for each record."""
@@ -141,65 +200,85 @@ class StackedAreaChart(QWidget):
         return timestamps
 
     def paintEvent(self, event):
+        """The chart, in the order the layers sit: ground, bands, then axes.
+
+        Each layer is its own function taking the one :class:`_Plot` that says
+        where the chart is and how a value becomes a pixel. It was a single
+        method holding the geometry, the scale, the stacking, both axes, the
+        tick rule and the legend in one set of locals -- so the widget's whole
+        drawing had to be read to change any of it, and the only thing that
+        could be tested was the pixels that came out.
+        """
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        w, h = self.width(), self.height()
-        chart_x = _MARGIN_LEFT
-        chart_y = _MARGIN_TOP
-        chart_w = w - _MARGIN_LEFT - chart_right_margin()
-        chart_h = h - _MARGIN_TOP - _MARGIN_LOWER
-
-        if chart_w <= 0 or chart_h <= 0:
-            painter.end()
-            return
-
-        n = len(self._records)
-
-        # Background
         painter.fillRect(self.rect(), QColor(255, 255, 255))
 
-        if n == 0:
+        plot = self._plot()
+        if plot is None:
+            painter.end()
+            return
+        if not self._records:
             painter.setPen(QColor(0x80, 0x80, 0x80))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No run data")
             painter.end()
             return
 
-        series = self._compute_series()
+        self._paint_bands(painter, plot)
+        self._paint_limit_line(painter, plot)
+        self._paint_y_axis(painter, plot)
+        self._paint_x_axis(painter, plot)
+        self._draw_legend(painter, self.width(), plot.top)
+        painter.end()
+
+    def _plot(self) -> _Plot | None:
+        """Where the chart sits and how a run and a duration become a point.
+
+        None when the widget is too small to hold one, which is the only case
+        the drawing below cannot handle.
+        """
+        chart_w = self.width() - _MARGIN_LEFT - chart_right_margin()
+        chart_h = self.height() - _MARGIN_TOP - _MARGIN_LOWER
+        if chart_w <= 0 or chart_h <= 0:
+            return None
+
         timestamps = self._parse_timestamps()
-        t_min = min(timestamps)
-        t_max = max(timestamps)
-        t_range = t_max - t_min or 1.0
+        series = self._compute_series()
+        return _Plot(
+            left=_MARGIN_LEFT,
+            top=_MARGIN_TOP,
+            width=chart_w,
+            height=chart_h,
+            timestamps=timestamps,
+            series=series,
+            y_max=self._y_max(series),
+        )
 
-        if self._fit:
-            # Compute max stacked total across all runs
-            max_stack = 0.0
-            for i in range(n):
-                total = sum(s[i] for s in series)
-                max_stack = max(max_stack, total)
-            y_max = max(max_stack * 1.15, 1.0)  # 15% headroom
-        else:
-            y_max = _Y_MAX
+    def _y_max(self, series: list[list[float]]) -> float:
+        """The top of the scale: the watchdog's ceiling, or the tallest run.
 
-        def to_x(t: float) -> float:
-            return chart_x + chart_w * (t - t_min) / t_range
+        The fixed scale is what makes two runs comparable at a glance -- a band
+        the same height means the same seconds, on any chart. Fit mode gives
+        that up on purpose, for a library whose runs are all far below it.
+        """
+        if not self._fit:
+            return _Y_MAX
+        tallest = max((sum(stage[i] for stage in series)
+                       for i in range(len(self._records))), default=0.0)
+        return max(tallest * 1.15, 1.0)  # 15% headroom
 
-        def to_y(val: float) -> float:
-            return chart_y + chart_h * (1 - val / y_max)
-
-        # Cumulative baselines for stacking
-        prev_cum = [0.0] * n
-
+    def _paint_bands(self, painter: QPainter, plot: _Plot):
+        """One filled band per stage, stacked in registry order."""
+        baselines = [0.0] * len(plot.timestamps)
         for stage_idx, stage_key in enumerate(ALL_STAGES):
-            vals = series[stage_idx]
+            values = plot.series[stage_idx]
             color = STAGE_COLORS[stage_key]
 
             path = QPainterPath()
-            path.moveTo(to_x(timestamps[0]), to_y(prev_cum[0]))
-            for i in range(1, n):
-                path.lineTo(to_x(timestamps[i]), to_y(prev_cum[i]))
-            for i in range(n - 1, -1, -1):
-                path.lineTo(to_x(timestamps[i]), to_y(prev_cum[i] + vals[i]))
+            path.moveTo(plot.x_of(0), plot.y_of(baselines[0]))
+            for i in range(1, len(plot.timestamps)):
+                path.lineTo(plot.x_of(i), plot.y_of(baselines[i]))
+            for i in reversed(range(len(plot.timestamps))):
+                path.lineTo(plot.x_of(i), plot.y_of(baselines[i] + values[i]))
             path.closeSubpath()
 
             fill = QColor(color)
@@ -210,107 +289,65 @@ class StackedAreaChart(QWidget):
 
             painter.setPen(QPen(color, 1))
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            for i in range(n - 1):
+            for i in range(len(plot.timestamps) - 1):
                 painter.drawLine(
-                    int(to_x(timestamps[i])),
-                    int(to_y(prev_cum[i] + vals[i])),
-                    int(to_x(timestamps[i + 1])),
-                    int(to_y(prev_cum[i + 1] + vals[i + 1])),
+                    int(plot.x_of(i)), int(plot.y_of(baselines[i] + values[i])),
+                    int(plot.x_of(i + 1)), int(plot.y_of(baselines[i + 1] + values[i + 1])),
                 )
 
-            for i in range(n):
-                prev_cum[i] += vals[i]
+            for i in range(len(plot.timestamps)):
+                baselines[i] += values[i]
 
-        # 10-minute dotted line (only if visible)
+    def _paint_limit_line(self, painter: QPainter, plot: _Plot):
+        """The watchdog's ten minutes, dotted -- only when the scale reaches it."""
         font = QFont()
         font.setPointSize(8)
         painter.setFont(font)
-        if y_max >= _LIMIT_SECONDS:
-            limit_y = int(to_y(_LIMIT_SECONDS))
-            pen = QPen(QColor(0x80, 0x80, 0x80), 1, Qt.PenStyle.DotLine)
-            painter.setPen(pen)
-            painter.drawLine(chart_x, limit_y, chart_x + chart_w, limit_y)
-            painter.setPen(QColor(0x80, 0x80, 0x80))
-            painter.drawText(chart_x + chart_w - 40, limit_y - 4, "10 min")
+        if plot.y_max < _LIMIT_SECONDS:
+            return
+        limit_y = int(plot.y_of(_LIMIT_SECONDS))
+        painter.setPen(QPen(QColor(0x80, 0x80, 0x80), 1, Qt.PenStyle.DotLine))
+        painter.drawLine(plot.left, limit_y, plot.left + plot.width, limit_y)
+        painter.setPen(QColor(0x80, 0x80, 0x80))
+        painter.drawText(plot.left + plot.width - 40, limit_y - 4, "10 min")
 
-        # Y-axis ticks and labels
+    def _paint_y_axis(self, painter: QPainter, plot: _Plot):
+        """The duration ticks, their labels, and the rotated axis name."""
         painter.setPen(QColor(0x60, 0x60, 0x60))
-        tick_values = _pick_y_ticks(y_max)
-        for secs in tick_values:
-            y = int(to_y(secs))
-            painter.drawLine(chart_x - 4, y, chart_x, y)
-            if secs >= 60:
-                painter.drawText(chart_x - 35, y + 4, f"{secs / 60:.0f}m")
-            else:
-                painter.drawText(chart_x - 35, y + 4, f"{secs:.0f}s")
+        for secs in _pick_y_ticks(plot.y_max):
+            y = int(plot.y_of(secs))
+            painter.drawLine(plot.left - 4, y, plot.left, y)
+            painter.drawText(plot.left - 35, y + 4,
+                             f"{secs / 60:.0f}m" if secs >= 60 else f"{secs:.0f}s")
 
-        # Y-axis label (rotated)
         painter.save()
         painter.setPen(QColor(0x50, 0x50, 0x50))
         label_font = QFont()
         label_font.setPointSize(9)
         painter.setFont(label_font)
-        mid_y = chart_y + chart_h // 2
-        painter.translate(14, mid_y)
+        painter.translate(14, plot.top + plot.height // 2)
         painter.rotate(-90)
         painter.drawText(-40, 0, "run duration")
         painter.restore()
 
-        # X-axis line
+    def _paint_x_axis(self, painter: QPainter, plot: _Plot):
+        """The baseline, the left border, and the dates under the runs."""
+        baseline_y = int(plot.y_of(0))
         painter.setPen(QColor(0xA0, 0xA0, 0xA0))
-        baseline_y = int(to_y(0))
-        painter.drawLine(chart_x, baseline_y, chart_x + chart_w, baseline_y)
+        painter.drawLine(plot.left, baseline_y, plot.left + plot.width, baseline_y)
+        painter.drawLine(plot.left, plot.top, plot.left, baseline_y)
 
-        # X-axis date labels
-        self._draw_x_labels(painter, t_min, t_max, chart_x, chart_w, baseline_y)
-
-        # Chart border (left axis)
-        painter.setPen(QColor(0xA0, 0xA0, 0xA0))
-        painter.drawLine(chart_x, chart_y, chart_x, baseline_y)
-
-        # Legend (in right margin, outside chart area)
-        self._draw_legend(painter, w, chart_y)
-
-        painter.end()
-
-    def _draw_x_labels(self, painter: QPainter, t_min: float, t_max: float,
-                       chart_x: int, chart_w: int, baseline_y: int):
         font = QFont()
         font.setPointSize(8)
         painter.setFont(font)
         painter.setPen(QColor(0x60, 0x60, 0x60))
-
-        num_labels = min(12, max(2, chart_w // 70))
-        t_range = t_max - t_min or 1.0
-
-        label_times: list[float] = []
-        for i in range(num_labels):
-            t = t_min + t_range * i / (num_labels - 1)
-            label_times.append(t)
-
-        # Format as dates, add times where dates collide
-        dates = [datetime.fromtimestamp(t) for t in label_times]
-        date_strs = [d.strftime("%m/%d") for d in dates]
-
-        # Check for duplicate dates — add time to disambiguate
-        labels: list[str] = []
-        for i, ds in enumerate(date_strs):
-            needs_time = False
-            if i > 0 and date_strs[i - 1] == ds:
-                needs_time = True
-            if i < len(date_strs) - 1 and date_strs[i + 1] == ds:
-                needs_time = True
-            if needs_time:
-                labels.append(dates[i].strftime("%m/%d\n%H:%M"))
-            else:
-                labels.append(ds)
-
+        labels = _x_axis_labels(plot.t_min, plot.t_max, _label_count(plot.width))
         for i, label in enumerate(labels):
-            x = int(chart_x + chart_w * i / (num_labels - 1))
-            lines = label.split("\n")
-            painter.drawText(x - 15, baseline_y + 14, lines[0])
-            if len(lines) > 1:
-                painter.drawText(x - 12, baseline_y + 26, lines[1])
+            x = int(plot.left + plot.width * i / (len(labels) - 1))
+            date, _, time = label.partition("\n")
+            painter.drawText(x - 15, baseline_y + 14, date)
+            if time:
+                painter.drawText(x - 12, baseline_y + 26, time)
 
     def _draw_legend(self, painter: QPainter, widget_w: int, top_y: int):
         painter.setFont(_legend_font())
@@ -341,6 +378,22 @@ class StackedAreaChart(QWidget):
                              y_pos + swatch_size - 1, STAGE_LABELS[stage_key])
 
 
+def _toggle(label: str, *, checked: bool = False) -> QPushButton:
+    button = QPushButton(label)
+    button.setCheckable(True)
+    button.setChecked(checked)
+    return button
+
+
+def _either_or(parent, *buttons: QPushButton) -> QButtonGroup:
+    """A group where exactly one of *buttons* is checked, whichever is clicked."""
+    group = QButtonGroup(parent)
+    group.setExclusive(True)
+    for button in buttons:
+        group.addButton(button)
+    return group
+
+
 class StatsWindow(QDialog):
     """Non-modal dialog showing pipeline run statistics."""
 
@@ -352,23 +405,21 @@ class StatsWindow(QDialog):
 
         layout = QVBoxLayout(self)
 
-        # Toggle buttons
+        # Two either-or pairs: what the bands measure, and what the scale is.
+        # Held exclusive by Qt rather than by four slots that each checked one
+        # button and unchecked the other by hand.
         btn_row = QHBoxLayout()
-        self._normal_btn = QPushButton("Normal")
-        self._normal_btn.setCheckable(True)
-        self._normal_btn.setChecked(True)
-        self._averages_btn = QPushButton("Averages")
-        self._averages_btn.setCheckable(True)
-        btn_row.addWidget(self._normal_btn)
-        btn_row.addWidget(self._averages_btn)
+        self._normal_btn = _toggle("Normal", checked=True)
+        self._averages_btn = _toggle("Averages")
+        self._10m_btn = _toggle("10m", checked=True)
+        self._fit_btn = _toggle("Fit")
+        self._measure = _either_or(self, self._normal_btn, self._averages_btn)
+        self._scale = _either_or(self, self._10m_btn, self._fit_btn)
+        for button in (self._normal_btn, self._averages_btn):
+            btn_row.addWidget(button)
         btn_row.addSpacing(20)
-        self._10m_btn = QPushButton("10m")
-        self._10m_btn.setCheckable(True)
-        self._10m_btn.setChecked(True)
-        self._fit_btn = QPushButton("Fit")
-        self._fit_btn.setCheckable(True)
-        btn_row.addWidget(self._10m_btn)
-        btn_row.addWidget(self._fit_btn)
+        for button in (self._10m_btn, self._fit_btn):
+            btn_row.addWidget(button)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
@@ -381,31 +432,14 @@ class StatsWindow(QDialog):
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(placeholder, stretch=1)
 
-        self._normal_btn.clicked.connect(self._on_normal)
-        self._averages_btn.clicked.connect(self._on_averages)
-        self._10m_btn.clicked.connect(self._on_10m)
-        self._fit_btn.clicked.connect(self._on_fit)
+        self._measure.buttonClicked.connect(self._on_measure_chosen)
+        self._scale.buttonClicked.connect(self._on_scale_chosen)
 
-    def _on_normal(self):
-        self._normal_btn.setChecked(True)
-        self._averages_btn.setChecked(False)
-        if self._chart:
-            self._chart.set_mode("normal")
+    def _on_measure_chosen(self, button):
+        if self._chart is not None:
+            self._chart.set_mode(
+                "averages" if button is self._averages_btn else "normal")
 
-    def _on_averages(self):
-        self._averages_btn.setChecked(True)
-        self._normal_btn.setChecked(False)
-        if self._chart:
-            self._chart.set_mode("averages")
-
-    def _on_10m(self):
-        self._10m_btn.setChecked(True)
-        self._fit_btn.setChecked(False)
-        if self._chart:
-            self._chart.set_fit(False)
-
-    def _on_fit(self):
-        self._fit_btn.setChecked(True)
-        self._10m_btn.setChecked(False)
-        if self._chart:
-            self._chart.set_fit(True)
+    def _on_scale_chosen(self, button):
+        if self._chart is not None:
+            self._chart.set_fit(button is self._fit_btn)

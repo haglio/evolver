@@ -1,6 +1,7 @@
 """Tests for the stats window and stacked area chart."""
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,7 @@ from gui.stats_window import (
     StatsWindow,
     _legend_font,
     _pick_y_ticks,
+    _x_axis_labels,
     chart_right_margin,
     legend_width,
 )
@@ -319,6 +321,43 @@ class TestStatsWindow:
     def test_empty_records_shows_placeholder(self):
         window = StatsWindow([])
         assert window._chart is None
+
+
+class TestXAxisLabels:
+    """The dates under the runs, and when a date is not enough on its own."""
+
+    def _at(self, *moments):
+        return [datetime(*moment).timestamp() for moment in moments]
+
+    def test_spans_the_whole_range_end_to_end(self):
+        first, last = self._at((2026, 3, 30), (2026, 4, 4))
+
+        labels = _x_axis_labels(first, last, 3)
+
+        assert labels == ["03/30", "04/01", "04/04"]
+
+    def test_runs_inside_one_day_get_their_clock_time_too(self):
+        """A library that runs the pipeline every ten minutes puts several
+        labels on one date, and a row of identical dates says nothing about
+        where a run sits."""
+        first, last = self._at((2026, 3, 30, 12, 0), (2026, 3, 30, 13, 0))
+
+        labels = _x_axis_labels(first, last, 3)
+
+        assert labels == ["03/30\n12:00", "03/30\n12:30", "03/30\n13:00"]
+
+    def test_only_the_dates_that_repeat_are_disambiguated(self):
+        first, last = self._at((2026, 3, 30, 0, 0), (2026, 3, 31, 0, 0))
+
+        labels = _x_axis_labels(first, last, 3)
+
+        assert labels == ["03/30\n00:00", "03/30\n12:00", "03/31"]
+
+    def test_a_single_moment_still_yields_a_label_per_tick(self):
+        """Every run at the same instant is a degenerate span, not a crash."""
+        (only,) = self._at((2026, 3, 30, 9, 0))
+
+        assert _x_axis_labels(only, only, 4) == ["03/30\n09:00"] * 4
 
 
 class TestPickYTicks:
