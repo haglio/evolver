@@ -491,13 +491,13 @@ class TestToolbarAppWiring:
         mock_quit.assert_not_called()
 
     def test_run_now_starts_a_manual_pipeline_run(self, app):
-        with patch("gui.app.PipelineWorker") as mock_worker:
+        with patch("gui.run_controller.PipelineWorker") as mock_worker:
             app._window.run_now_action.trigger()
         assert mock_worker.call_args.kwargs["trigger"] == "manual"
         mock_worker.return_value.start.assert_called_once()
 
     def test_the_trays_run_now_starts_a_manual_run_too(self, app):
-        with patch("gui.app.PipelineWorker") as mock_worker:
+        with patch("gui.run_controller.PipelineWorker") as mock_worker:
             app._tray.run_now_action.trigger()
         assert mock_worker.call_args.kwargs["trigger"] == "manual"
         mock_worker.return_value.start.assert_called_once()

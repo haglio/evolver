@@ -47,7 +47,7 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 # eleven that were threaded through call sites and five identical one-line
 # wrappers to say the same thing.
 #
-# gui/app.py's 7th and evolver.py's 10th are the third shape: a value a NEW
+# gui/app.py's 5th and evolver.py's 10th are the third shape: a value a NEW
 # feature needs that no module read before. LOG_FILE, read once on each side
 # of the run-log link -- the pipeline marks where in the log it wrote, the
 # window reads back what it marked -- and handed on as a parameter from
@@ -65,7 +65,7 @@ CONFIG_REFERENCE_LEDGER = {
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
     "evolver.py": 9,
-    "gui/app.py": 7,
+    "gui/app.py": 5,
     "gui/main_window.py": 2,
     # The broker's launcher, so a check that finds the broker gone has something
     # to start. Where the sibling checkout is is config's business, not this
@@ -73,6 +73,9 @@ CONFIG_REFERENCE_LEDGER = {
     "gui/peer_watch.py": 1,
     "gui/presence_throttle.py": 1,
     "gui/process_identity.py": 2,
+    # The wall-clock ceiling one run is watched against: read where the
+    # watchdog is armed, and again in what the overrun says.
+    "gui/run_controller.py": 2,
     "gui/settings.py": 2,
     "gui/tray.py": 1,
     "gui/worker.py": 1,

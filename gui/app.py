@@ -17,14 +17,13 @@ from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.palette import apply_accent
 from gui.presence_throttle import PresenceThrottle
-from gui.progress_popup import ProgressPopup
+from gui.run_controller import RunController
 from gui.run_record import RunRecord, format_run_label, load_runs
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
 from gui.stats_window import StatsWindow
 from gui.tray import EvolverTray
-from gui.worker import PipelineWorker
 from util import crash_log, run_log
 from util.alert import show_error
 
@@ -78,15 +77,9 @@ class EvolverApp:
         apply_accent(self._app)
 
         self._settings = EvolverSettings.load()
-        self._worker: PipelineWorker | None = None
         self._stats_window: StatsWindow | None = None
         self._log_window: RunLogWindow | None = None
-        self._progress_popup: ProgressPopup | None = None
         self._show_requests: QLocalServer | None = None
-
-        self._watchdog = QTimer()
-        self._watchdog.setSingleShot(True)
-        self._watchdog.timeout.connect(self._on_watchdog)
 
         # Parks and thaws the in-flight non-AI encode between the slow pipeline
         # ticks, so returning to the machine suspends it in seconds. Reads the
@@ -105,7 +98,6 @@ class EvolverApp:
         self._peer_timer.timeout.connect(self._peer.tick)
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
-        self._scheduler.run_requested.connect(self._start_run)
         self._scheduler.status_changed.connect(self._update_status_display)
 
         self._tray = EvolverTray()
@@ -139,6 +131,17 @@ class EvolverApp:
         # Not one of the window's commands: those are the toolbar's, named the
         # same on the tray. This one carries the run that was clicked.
         self._window.log_requested.connect(self._show_run_log)
+
+        # The non-AI toggle is read at every start rather than held from
+        # construction: the tray flips it between runs.
+        self._runs = RunController(
+            self._window, lambda: self._settings.nonai_upscale_enabled)
+        self._scheduler.run_requested.connect(self._runs.start)
+        self._runs.run_started.connect(self._on_run_started)
+        self._runs.run_ended.connect(self._on_run_ended)
+        self._runs.run_finished.connect(self._on_finished)
+        self._runs.run_failed.connect(self._on_error)
+        self._runs.run_overran.connect(self._on_overrun)
 
     def start(self) -> None:
         """Everything the app does to the machine, in the order it must happen.
@@ -265,42 +268,13 @@ class EvolverApp:
             self._scheduler.next_run_at,
         )
 
-    def _start_run(self, trigger: str):
-        if self._worker is not None and self._worker.isRunning():
-            return
-
+    def _on_run_started(self):
         self._scheduler.mark_running()
         self._tray.set_running(True)
 
-        self._worker = PipelineWorker(
-            trigger=trigger, nonai_enabled=self._settings.nonai_upscale_enabled,
-        )
-        self._worker.pipeline_finished.connect(self._on_finished)
-        self._worker.pipeline_error.connect(self._on_error)
-
-        if self._window.isVisible():
-            self._progress_popup = ProgressPopup(parent=self._window)
-            self._worker.stage_started.connect(self._progress_popup.on_stage_started)
-            self._worker.stage_completed.connect(self._progress_popup.on_stage_completed)
-            self._worker.stage_progress.connect(self._progress_popup.on_stage_progress)
-            self._progress_popup.show_over(self._window)
-
-        self._worker.start()
-        self._watchdog.start(config.PIPELINE_WALL_TIMEOUT_SECONDS * 1000)
-
-    def _finish_run(self):
-        """The five things ending a run has to do, whichever way it ended.
-
-        Letting go of the popup is one of them: it is closed by now, and held,
-        the next run started while the window is hidden calls
-        ``on_pipeline_finished()`` on last run's dead one.
-        """
-        self._watchdog.stop()
+    def _on_run_ended(self):
         self._scheduler.mark_idle()
         self._tray.set_running(False)
-        if self._progress_popup is not None:
-            self._progress_popup.on_pipeline_finished()
-            self._progress_popup = None
         self._window.refresh_history()
 
     def _notify(self, body: str, icon: QSystemTrayIcon.MessageIcon, msecs: int):
@@ -310,7 +284,6 @@ class EvolverApp:
         self._tray.showMessage("Evolver", body, icon, msecs)
 
     def _on_finished(self, record):
-        self._finish_run()
         succeeded = record.status == "success"
         status = "completed" if succeeded else "completed with errors"
         self._notify(
@@ -321,30 +294,15 @@ class EvolverApp:
         )
 
     def _on_error(self, message: str):
-        self._finish_run()
         self._notify(f"Pipeline error: {message}",
                      QSystemTrayIcon.MessageIcon.Critical, 8000)
-        log.error("Pipeline error: %s", message)
 
-    def _on_watchdog(self):
-        if self._worker is None or not self._worker.isRunning():
-            return  # Run finished just before the timer fired
+    def _on_overrun(self):
+        """An overrun is news and nothing else: the run really is still going.
 
-        log.critical(
-            "Watchdog fired: pipeline exceeded %d-second wall-clock limit; "
-            "asking it to stop after the current stage",
-            config.PIPELINE_WALL_TIMEOUT_SECONDS,
-        )
-
-        # The run really is still going, so nothing here may pretend otherwise.
-        # The worker stays referenced and its signals stay connected: it is the
-        # re-entry guard in _start_run (dropping a running QThread's last
-        # reference can abort the process), and its eventual finish is what
-        # tears down and re-opens scheduling. The stop is cooperative —
-        # run_pipeline checks between stages, so a stage mid-move finishes its
-        # current file rather than being cut.
-        self._worker.requestInterruption()
-
+        No mark_idle and no set_running(False) -- either would re-enable Run
+        Now and let the scheduler tick into a run that cannot start.
+        """
         self._notify(
             f"Pipeline still running past the {config.PIPELINE_WALL_TIMEOUT_SECONDS // 60}-minute "
             "limit; stopping after the current stage. New runs wait until it exits.",
@@ -405,8 +363,7 @@ class EvolverApp:
         self._shutdown()
 
     def _shutdown(self):
-        if self._worker is not None and self._worker.isRunning():
-            self._worker.wait(5000)
+        self._runs.wait_for_exit(5000)
         self._scheduler.stop()
         self._peer_timer.stop()
         self._tray.hide()
