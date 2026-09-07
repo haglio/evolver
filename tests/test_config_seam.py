@@ -90,12 +90,18 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 5,
-    "tasks/nonai_encode.py": 12,
+    # One fewer: the runtime cap is a field of the EncodeSettings this
+    # module now declares, rather than a number it looks up.
+    "tasks/nonai_encode.py": 11,
     "tasks/nonai_group.py": 4,
     "tasks/nonai_progress.py": 1,
     "tasks/nonai_queue.py": 3,
-    # Five fewer with the retired-metadata repair pass gone (item 27's last piece).
-    "tasks/nonai_upscale.py": 22,
+    # Five fewer with the retired-metadata repair pass gone (item 27's last
+    # piece), then seven with the six numbers governing one encode collected
+    # into tasks.nonai_encode.EncodeSettings -- which is where they belong:
+    # how long an encode may run and how much of the machine it may take are
+    # this app's policy, not anything the machine or the overlay says.
+    "tasks/nonai_upscale.py": 15,
     "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 5,
     "tasks/purge_weird.py": 3,

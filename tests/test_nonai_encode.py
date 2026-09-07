@@ -5,7 +5,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import config
 from tasks import nonai_encode
 from tests.temp_helpers import workspace_temp_dir
 
@@ -130,26 +129,29 @@ class TestActiveRuntime(unittest.TestCase):
 
 
 class TestOverran(unittest.TestCase):
+    SETTINGS = nonai_encode.EncodeSettings(max_runtime_hours=3)
+    CAP_SECONDS = 3 * 3600
+
     def test_under_the_cap_is_not_an_overrun(self):
         started = 1_000.0
         job = {"started_at": started}
-        cap_seconds = config.NONAI_MAX_RUNTIME_HOURS * 3600
 
-        self.assertFalse(nonai_encode.overran(job, now=started + cap_seconds))
+        self.assertFalse(nonai_encode.overran(
+            job, self.SETTINGS, now=started + self.CAP_SECONDS))
 
     def test_past_the_cap_is(self):
         started = 1_000.0
         job = {"started_at": started}
-        cap_seconds = config.NONAI_MAX_RUNTIME_HOURS * 3600
 
-        self.assertTrue(nonai_encode.overran(job, now=started + cap_seconds + 1))
+        self.assertTrue(nonai_encode.overran(
+            job, self.SETTINGS, now=started + self.CAP_SECONDS + 1))
 
     def test_a_long_freeze_keeps_a_slow_encode_under_the_cap(self):
         started = 1_000.0
-        cap_seconds = config.NONAI_MAX_RUNTIME_HOURS * 3600
-        job = {"started_at": started, "suspended_seconds": cap_seconds}
+        job = {"started_at": started, "suspended_seconds": self.CAP_SECONDS}
 
-        self.assertFalse(nonai_encode.overran(job, now=started + 2 * cap_seconds))
+        self.assertFalse(nonai_encode.overran(
+            job, self.SETTINGS, now=started + 2 * self.CAP_SECONDS))
 
 
 if __name__ == "__main__":

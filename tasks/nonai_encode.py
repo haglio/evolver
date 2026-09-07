@@ -8,10 +8,10 @@ and resuming it as the user comes and goes, reading how far it has got off the
 partial it is still writing, and killing it.
 
 Whether any of that should happen is :mod:`tasks.nonai_upscale`'s -- the
-tick's decision, written into the stage's result. The functions that make it
-(``_supervise``, ``_conclude``, ``_stop_in_flight``) take that result as an
-out-parameter and so cannot move here without the shape change finding
-tasks/design/013 describes; they stayed.
+tick's decision. What that decision is weighed against is :class:`EncodeSettings`,
+which lives here rather than in ``config``: how long an encode may run and how
+much of the machine it may take are this app's own policy, not anything the
+machine or the overlay says, and ``config`` is for the second kind.
 
 The encode recipe -- the target edges, the filter template, the videoai tag --
 and the encoder's own log stay ambient config here, the way VIDEO_EXTENSIONS
@@ -26,6 +26,7 @@ import logging
 import re
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
@@ -34,6 +35,34 @@ import config
 from util import ffprobe, nonai_job, orientation, processes, topaz
 
 log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class EncodeSettings:
+    """What one unattended non-AI encode may cost the machine, and when.
+
+    Six numbers the stage used to reach for off ``config`` one at a time, so
+    its signature said nothing about what governed it and a test moving one
+    patched a module attribute rather than passing a value. They are one record
+    because they are one policy: how long an encode may run, how complete its
+    output has to be to be believed, how many tries a clip gets, and the two
+    conditions the machine has to meet before the next one starts.
+    """
+
+    max_runtime_hours: float = 24
+    max_attempts: int = 2
+    # How much of the source's running time the output has to cover to be
+    # believed. Short of it, the encode is treated as having died partway.
+    complete_duration_fraction: float = 0.98
+    min_available_ram_gb: float = 8.0
+    cooldown_minutes: int = 30
+    # Presence throttle: once the toggle is on, Evolver auto-manages the encode
+    # by how long the user has been away from the keyboard/mouse. Below this
+    # idle threshold the user counts as present -- no new encode starts and any
+    # in-flight one is suspended (frozen, zero compute); past it the machine is
+    # "away" and an encode may start or resume. Five minutes rides out ordinary
+    # reading/watching pauses without treating them as the user leaving.
+    user_idle_threshold_seconds: float = 300.0
 
 
 def adopt_orphan(job_file: Path) -> dict | None:
@@ -120,8 +149,8 @@ def resume_job(job: dict, job_file: Path) -> None:
              job.get("source"))
 
 
-def overran(job: dict, *, now: float | None = None) -> bool:
-    return active_runtime(job, now=now) > config.NONAI_MAX_RUNTIME_HOURS * 3600
+def overran(job: dict, settings: EncodeSettings, *, now: float | None = None) -> bool:
+    return active_runtime(job, now=now) > settings.max_runtime_hours * 3600
 
 
 def active_runtime(job: dict, *, now: float | None = None) -> float:
