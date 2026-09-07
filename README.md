@@ -41,6 +41,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `tasks/clip_scripts.py` - carving a clip's funscript out of its scene's
   - `tasks/scene_scripts.py` - giving an unscripted scene a funscript holding its clip's
   - `tasks/nonai_group.py` - recording a non-AI clip's version family in its sidecar
+  - `tasks/clip_match.py` - the batch that finds which scene each carved clip came out of, and where in it
   - `tasks/bookmarks_sync.py` - favorites -> Chrome bookmarks sync
   - `tasks/prompt_scrape.py` - prompt scraping into mirrored JSON files
   - `tasks/upscale.py` - Topaz processing
@@ -56,6 +57,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `util/watch.py` - the `watch` block and the weight formula, in one place
   - `util/warm_gun.py` - the phone's journal, and which library video each line means
   - `util/lanes.py` - every video the library holds, lane by lane
+  - `util/frame_hashes.py` - a video read down to comparable frames, and one run of them found inside another
   - `util/weird_piles.py` - the two piles a condemned video waits in, and where its source is
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
   - `util/favs_csv.py` - Fun Time's favorites CSV: its rows, and the local path each cell links to
@@ -253,6 +255,36 @@ Alternative (direct Python command):
 ```bash
 python evolver.py
 ```
+
+## Matching carved clips to their scenes
+
+A clip carved out of a compilation is a literal excerpt of a library scene, but
+the filenames cannot say which one: the scenes are named for a performer and a
+hash, with no movie title to match against. So the answer comes from the
+pictures. `tasks/clip_match.py` samples both sides down to small gray
+thumbnails, hashes each frame as a grid of light and dark cells, and looks for
+the offset at which a clip's run of hashes sits inside a scene's; black bars are
+cropped off first, since a hash says where things are in the frame and a
+pillarboxed clip has moved its whole picture inward. What it finds is written
+into the clip's sidecar as `clip.full_video` and `clip.scene_offset`, which is
+what the Clip Scripts and Scene Scripts stages carry a funscript by, and what
+Nau steps from a clip to its scene by.
+
+It is not a pipeline stage: it reads every candidate video end to end, which
+takes minutes over a library of hundreds, where the pipeline holds itself to
+eleven and runs every ten. Run it by hand after the library has gained scenes or
+clips worth matching:
+
+```bash
+python tools/run_stage.py clip_match
+```
+
+Only the `2D/non_AI` library is searched, that being where carved clips and the
+scenes they came from both live. A scene is any video with no `clip` record on
+its sidecar; every version of one cut is folded together so only the cheapest is
+decoded, and a clip's own version family (the one `tasks/nonai_group.py`
+records) is offered the winner's answer rather than told it, since a family read
+off names can hold two genuinely different cuts.
 
 ## One-time correspondence check
 

@@ -1,4 +1,4 @@
-from util.version_groups import group_ids, group_key_tokens
+from util.version_groups import group_ids, group_key_tokens, stable_title
 
 
 class TestGroupKeyTokens:
@@ -83,3 +83,29 @@ class TestGroupIds:
         assert len(set(ids.values())) == 3
         for n in (1, 2, 3):
             assert ids[f"clip-{n}_apo8_iris2"] == ids[f"clip-{n}"]
+
+
+class TestStableTitle:
+    """The stricter reading of a name: two files agree exactly when they are one
+    cut re-encoded. Where ``group_ids`` folds a bucket into families on a token
+    prefix -- deliberately wide, so a hand-tagged copy joins its original -- a
+    prefix is too wide to say two files hold the same footage, which is what a
+    frame-by-frame search has to be told before it decodes only one of them."""
+
+    def test_a_processing_suffix_and_a_quality_tag_leave_the_same_title(self):
+        assert stable_title("Ada-Roe-Beta-Cut_apo8_iris2") == stable_title(
+            "Ada-Roe-Beta-Cut-1080p_60fps"
+        )
+
+    def test_a_trailing_hash_comes_off(self):
+        assert stable_title("Jane-Doe_540-xq3k9v2w") == "jane doe"
+
+    def test_two_scenes_of_one_performer_keep_different_titles(self):
+        """The prefix rule folds these two; a title has to keep them apart, or a
+        sweep decodes one and leaves the other unmatchable."""
+        assert stable_title("Jane-Doe_540-xq3k9v2w") != stable_title(
+            "Jane Doe Beta Cut 4k 60fps"
+        )
+
+    def test_a_name_of_nothing_but_tags_reduces_to_nothing(self):
+        assert stable_title("1080p_60fps_topaz") == ""
