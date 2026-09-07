@@ -3,7 +3,7 @@
 Evolver is a video collection maintenance pipeline that runs as a system tray application and:
 
 1. **Stray Files** — puts right the files in the video tree that are not videos. Every stage below finds a video by a positive test — the extension is one of `config.VIDEO_EXTENSIONS` — so a file that fails it is skipped as though it were not there. A name whose extension separator is a space, underscore or hyphen instead of a dot (`clip mp4`) is repaired to the extension it meant; a `.funscript` dropped among the videos is moved to its mirror path under `videos/scripts/scripts`; everything else is reported by path and left where it is, a warning rather than an error. It runs first, because anything it repairs or rehomes is invisible to every stage below until it has.
-2. **Purge Weird** — deletes `kinda_weird/` outputs from `2_outbox`, each weird file's matching source in `1_sorted/`, and their metadata. A Windows error dialog pops up if any source file cannot be found.
+2. **Purge Weird** — deletes the videos condemned into `2_outbox/kinda_weird/` and into `videos/genau/weird/`, the pile Genau moves a clip to when a session marks it, along with each one's matching source in `1_sorted/` and its metadata. A Windows error dialog pops up when an outbox video's source cannot be found; a condemned Genau clip has none to find, the delivery stage having retired it, so that pile reports nothing.
 3. **Metadata Scrape** — scrapes prompt metadata for AI videos in `1_sorted` into `videos/metadata`, mirroring the outbox tree. The scan is idempotent: a video that already has a metadata JSON is skipped, and one whose scrape fails is marked so it is not retried every run.
 4. **Sort Inbox** — moves videos from `0_inbox/<source>/` into `1_sorted/<source>/<orientation>/`.
 5. **Upscale** — upscales and interpolates sorted videos with Topaz Video AI ffmpeg. Work is capped per scheduler run and newly sorted inbox files go first.
@@ -36,7 +36,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `tasks/stages.py` - the one declaration of the stages: key, shown name, description, chart color, order
   - `tasks/stray_files.py` - non-videos in the video tree: malformed extensions repaired, funscripts rehomed, the rest reported
   - `tasks/sort.py` - inbox sorting
-  - `tasks/purge_weird.py` - kinda_weird cleanup
+  - `tasks/purge_weird.py` - condemned-clip cleanup, in the outbox's pile and Genau's
   - `tasks/scripts_sync.py` - funscript/video tree alignment and processed/original variant copying
   - `tasks/clip_scripts.py` - carving a clip's funscript out of its scene's
   - `tasks/scene_scripts.py` - giving an unscripted scene a funscript holding its clip's

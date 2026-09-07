@@ -136,6 +136,11 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 # folder being the only thing that passes between them.
 GENAU_SOURCE    = overlay_value(_CONTENT, "genau_source", path=LOCAL_CONTENT)
 GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
+# Where Genau moves a clip it is told to condemn. Beside the folder it plays
+# from, which is the rule player_core states
+# (``clip_folder.weird_dir_for_clips_folder``) and Genau follows; this is the
+# other end of it, and the two have to agree on a directory neither owns.
+GENAU_WEIRD_DIR = GENAU_CLIPS_DIR.parent / "weird"
 
 # The scraped provider: the 0_inbox folder its clips arrive under, and the site
 # root the metadata stage fetches their prompt pages from. Both are private, so

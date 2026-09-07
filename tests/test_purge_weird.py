@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from tasks import purge_weird
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
 
 
 class TestPurgeWeird(unittest.TestCase):
@@ -157,6 +157,76 @@ class TestPurgeWeird(unittest.TestCase):
             self.assertEqual(result.missing_sorted, [])
             self.assertFalse(copy_a.exists())
             self.assertFalse(copy_b.exists())
+
+
+class TestPurgeGenausPile(unittest.TestCase):
+    """Genau condemns a clip into a pile of its own, beside the folder it plays
+    from. The sweep reaches that pile too -- for years it reached only the
+    outbox's, and every clip Genau condemned sat there forever (bug 11)."""
+
+    def test_a_clip_genau_condemned_goes_with_its_sidecar_and_its_sorted_source(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                condemned = touch_video(lib.genau_weird / "loop_7_topaz.mp4")
+                source = touch_video(
+                    lib.sorted_dir / "example-loop-clips" / "landscape" / "loop_7.mp4"
+                )
+                sidecar = lib.metadata / "genau" / "clips" / "loop_7_topaz.json"
+                sidecar.parent.mkdir(parents=True, exist_ok=True)
+                sidecar.write_text("{}", encoding="utf-8")
+
+                result = purge_weird.run()
+
+                self.assertEqual(result.deleted_weird, 1)
+                self.assertEqual(result.deleted_sorted, 1)
+                self.assertEqual(result.deleted_metadata, 1)
+                self.assertEqual(result.missing_sorted, [])
+                self.assertFalse(condemned.exists())
+                self.assertFalse(source.exists())
+                self.assertFalse(sidecar.exists())
+
+    def test_only_the_genau_lanes_own_corner_of_sorted_is_searched(self):
+        """A condemned loop takes the lane's sorted copy and nothing else.
+
+        The outbox pile's files come from any source folder, so its lookup
+        searches the whole of ``1_sorted`` by name; a Genau clip's source can
+        only ever be under the lane's own source folder, and a video that
+        merely shares its stem elsewhere is another lane's."""
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                touch_video(lib.genau_weird / "loop_7_topaz.mp4")
+                lane_source = touch_video(
+                    lib.sorted_dir / "example-loop-clips" / "landscape" / "loop_7.mp4"
+                )
+                namesake = touch_video(
+                    lib.sorted_dir / "other-source" / "portrait" / "loop_7.mp4"
+                )
+
+                result = purge_weird.run()
+
+                self.assertEqual(result.deleted_sorted, 1)
+                self.assertFalse(lane_source.exists())
+                self.assertTrue(namesake.exists())
+
+    def test_a_condemned_loop_with_no_sorted_source_left_raises_no_alert(self):
+        """The lane retires a loop's ``1_sorted`` copy the moment it delivers
+        it (``tasks.genau_deliver``), so a condemned loop with no source is the
+        ordinary case in this pile -- not the orphan the outbox pile reports.
+        Counting it would pop a Windows dialog for every clip Genau condemns."""
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                condemned = touch_video(lib.genau_weird / "loop_9_topaz.mp4")
+
+                with patch("tasks.purge_weird.show_error") as show_error:
+                    result = purge_weird.run()
+
+                self.assertEqual(result.deleted_weird, 1)
+                self.assertEqual(result.missing_sorted, [])
+                show_error.assert_not_called()
+                self.assertFalse(condemned.exists())
 
 
 if __name__ == "__main__":

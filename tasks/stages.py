@@ -42,7 +42,7 @@ STAGES: tuple[Stage, ...] = (
           "Repair a video whose extension separator is not a dot, send a funscript found in the video tree to its mirror path under the scripts, and report every other non-video file found there",
           (0x0A, 0x12, 0x2C)),
     Stage("purge", "Purge Weird",
-          "Delete 2_outbox/kinda_weird AI vids, their matching sources in 1_sorted, and their metadata",
+          "Delete the videos condemned into 2_outbox/kinda_weird and into the pile beside Genau's clips folder, along with their matching sources in 1_sorted and their metadata",
           (0xF2, 0x8E, 0x2B)),
     Stage("metadata", "Metadata Scrape",
           "Scrape AI prompt metadata into mirrored JSON files",

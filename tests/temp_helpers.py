@@ -100,7 +100,9 @@ class LaneLibrary:
         self.sorted_dir = self.ai / "1_sorted"
         self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
         self.non_ai = self.library / "2D" / "non_AI"
+        self.weird = self.ai / "2_outbox" / "kinda_weird"
         self.genau_clips = videos / "genau" / "clips"
+        self.genau_weird = videos / "genau" / "weird"
         self.metadata = videos / "metadata"
         self.search_root = videos
 
@@ -109,7 +111,9 @@ class LaneLibrary:
             "VIDEO_LIBRARY_DIR": self.library, "VIDEO_SEARCH_ROOT": self.search_root,
             "METADATA_DIR": self.metadata, "SORTED_DIR": self.sorted_dir,
             "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
+            "WEIRD_DIR": self.weird,
             "GENAU_CLIPS_DIR": self.genau_clips, "GENAU_SOURCE": genau_source,
+            "GENAU_WEIRD_DIR": self.genau_weird,
             "EXCERPT_FOLDERS": (),
         }
         settings.update(extra)
