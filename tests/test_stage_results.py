@@ -38,7 +38,6 @@ _MUTATORS = frozenset({
 # commit that converts it.
 STILL_AN_OUT_PARAMETER = [
     "tasks/nonai_upscale.py:_conclude",
-    "tasks/nonai_upscale.py:_report_progress",
     "tasks/nonai_upscale.py:_start_next_candidate",
     "tasks/nonai_upscale.py:_stop_in_flight",
     "tasks/nonai_upscale.py:_supervise",

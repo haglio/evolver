@@ -163,7 +163,12 @@ def run(allow_start: bool = True, stop: bool = False,
     # would change what `pending` means, so it stays and stays visible.
     queued = _collect(files)
     result.pending = len(queued)
-    _report_progress(result, queued)
+    # Handed the queue just collected: nonai_progress reads sidecars and walks
+    # the buckets for what is upscaled, and need not redo this walk too.
+    progress = nonai_progress.so_far(candidate.path for candidate in queued)
+    result.percent_complete = progress.percent
+    result.remaining_seconds = progress.remaining_seconds
+    result.unmeasured_videos = progress.unmeasured
     in_flight = result.in_flight or "-"
     if result.in_flight and result.in_flight_percent is not None:
         in_flight = f"{result.in_flight} ({result.in_flight_percent}% encoded)"
@@ -179,19 +184,6 @@ def run(allow_start: bool = True, stop: bool = False,
         result.unmeasured_videos,
     )
     return result
-
-
-def _report_progress(result: NonAiUpscaleResult, queued: list[Candidate]) -> None:
-    """Put how far along the project is on *result*, in running time.
-
-    Handed the queue the stage just collected rather than collecting it again:
-    :mod:`tasks.nonai_progress` reads sidecars and walks the buckets for what is
-    already upscaled, and there is no reason for it to redo this walk too.
-    """
-    progress = nonai_progress.so_far(candidate.path for candidate in queued)
-    result.percent_complete = progress.percent
-    result.remaining_seconds = progress.remaining_seconds
-    result.unmeasured_videos = progress.unmeasured
 
 
 def throttle_to_presence(*, job_file: Path | None = None) -> str:
