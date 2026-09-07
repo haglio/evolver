@@ -3,7 +3,7 @@ from __future__ import annotations
 import itertools
 import logging
 import subprocess
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -16,6 +16,7 @@ import evolver
 # a byte offset into the log has to be counted in.
 CRLF = (chr(13) + chr(10)).encode("ascii")
 from tasks.stages import ALL_STAGES
+from tests.temp_helpers import override_config, workspace_temp_dir
 
 
 def _stage_mocks() -> dict:
@@ -627,3 +628,47 @@ class TestCpuBusySkip:
         probe = Mock(return_value=0.0)
         self._verdict(probe)
         probe.assert_called_once_with(config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
+
+
+@contextmanager
+def _isolated_root_logger():
+    """The root logger as the test found it, whatever the test does to it."""
+    root = logging.getLogger()
+    before, level = list(root.handlers), root.level
+    try:
+        yield root
+    finally:
+        for handler in list(root.handlers):
+            if handler not in before:
+                root.removeHandler(handler)
+                handler.close()
+        root.handlers[:] = before
+        root.setLevel(level)
+
+
+class TestSetupLogging:
+    """Every popup sends the user to the log, so the log has to be written."""
+
+    def test_writes_the_log_even_when_something_configured_logging_first(self):
+        with workspace_temp_dir() as folder, _isolated_root_logger() as root:
+            root.addHandler(logging.NullHandler())
+            log_file = folder / "evolver.log"
+            with override_config(LOG_FILE=log_file):
+                evolver.setup_logging()
+            logging.getLogger("evolver.test").info("a line the pipeline wrote")
+            for handler in root.handlers:
+                handler.flush()
+
+            assert "a line the pipeline wrote" in log_file.read_text(encoding="utf-8")
+
+    def test_a_second_run_does_not_write_every_line_twice(self):
+        with workspace_temp_dir() as folder, _isolated_root_logger() as root:
+            log_file = folder / "evolver.log"
+            with override_config(LOG_FILE=log_file):
+                evolver.setup_logging()
+                evolver.setup_logging()
+            logging.getLogger("evolver.test").info("one line")
+            for handler in root.handlers:
+                handler.flush()
+
+            assert log_file.read_text(encoding="utf-8").count("one line") == 1
