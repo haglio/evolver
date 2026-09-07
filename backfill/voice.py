@@ -23,11 +23,14 @@ log = logging.getLogger(__name__)
 _UNKNOWN = "[unk]"
 _BLOCK_SIZE = 8000
 
-# How long stop() waits for the listening thread. The loop polls the stop event
-# every 0.5 s through the audio queue's timeout, so this is four chances to
-# notice -- long enough that a live thread always makes it, short enough that a
-# wedged one does not hold a closing window.
-_STOP_TIMEOUT_SECONDS = 2.0
+# How often the listening loop comes up for air to look at the stop event. It
+# is the audio queue's read timeout, so silence costs no more than speech does.
+_QUEUE_POLL_SECONDS = 0.5
+
+# How long stop() waits for the listening thread -- four chances to notice the
+# event above: long enough that a live thread always makes it, short enough
+# that a wedged one does not hold a closing window.
+_STOP_TIMEOUT_SECONDS = 4 * _QUEUE_POLL_SECONDS
 
 
 def build_grammar(phrases: list[str]) -> str:
@@ -76,6 +79,32 @@ def recognized_phrase(raw_result: str, *, threshold: float) -> str | None:
     return text
 
 
+def _reason(exc: Exception) -> str:
+    """What to show for a failure: its message, or its type when it has none."""
+    return str(exc) or type(exc).__name__
+
+
+def _open_stream(on_audio):
+    """The open microphone, as a context manager the caller holds for the loop.
+
+    Picks a live mic rather than the (possibly dead) system default;
+    ``resolve_input_device`` logs which one it settled on. sounddevice is
+    imported here for the same reason vosk is imported where it is used.
+    """
+    import sounddevice
+
+    device = resolve_input_device()
+    log.info("Listening (model=%s, device=%s)", config.VOICE_MODEL_NAME, device)
+    return sounddevice.RawInputStream(
+        samplerate=config.VOICE_SAMPLE_RATE,
+        blocksize=_BLOCK_SIZE,
+        dtype="int16",
+        channels=1,
+        device=device,
+        callback=on_audio,
+    )
+
+
 class VoiceListener(QObject):
     """Listens on the microphone, emitting both the live guess and each settled phrase.
 
@@ -122,6 +151,17 @@ class VoiceListener(QObject):
             thread.join(timeout=_STOP_TIMEOUT_SECONDS)
 
     def _run(self) -> None:
+        """Build the recognizer, open the microphone, then listen until stopped.
+
+        Three steps, three handlers, because they fail for three different
+        reasons and one blanket ``except`` around all of them could not tell a
+        model that would not load from a recognizer that threw on the
+        thousandth block -- which is the whole of what the window is told.
+
+        The stream stays open for the listening loop, so it is opened here and
+        the loop runs inside it; the audio callback stays in this closure,
+        where the queue it fills is.
+        """
         audio: queue.Queue[bytes] = queue.Queue()
 
         def on_audio(indata, _frames, _time, status):
@@ -130,48 +170,66 @@ class VoiceListener(QObject):
             audio.put(bytes(indata))
 
         try:
-            import sounddevice
-            import vosk
-
-            model = vosk.Model(model_name=config.VOICE_MODEL_NAME)
-            recognizer = vosk.KaldiRecognizer(
-                model, config.VOICE_SAMPLE_RATE, build_grammar(self._phrases)
-            )
-            # Pick a live mic, not the (possibly dead) system default — resolve logs
-            # which device it settled on.
-            device = resolve_input_device()
-            log.info("Listening (model=%s, device=%s)", config.VOICE_MODEL_NAME, device)
-
-            with sounddevice.RawInputStream(
-                samplerate=config.VOICE_SAMPLE_RATE,
-                blocksize=_BLOCK_SIZE,
-                dtype="int16",
-                channels=1,
-                device=device,
-                callback=on_audio,
-            ):
-                last_partial = ""
-                while not self._stop.is_set():
-                    try:
-                        block = audio.get(timeout=0.5)
-                    except queue.Empty:
-                        continue
-                    if not recognizer.AcceptWaveform(block):
-                        partial = partial_text(recognizer.PartialResult())
-                        if partial != last_partial:
-                            last_partial = partial
-                            self.hearing.emit(partial)
-                        continue
-                    # The utterance ended: whatever the live guess was, it is stale now.
-                    if last_partial:
-                        last_partial = ""
-                        self.hearing.emit("")
-                    phrase = recognized_phrase(
-                        recognizer.Result(), threshold=config.VOICE_CONFIDENCE_THRESHOLD
-                    )
-                    if phrase:
-                        log.info("Heard: %s", phrase)
-                        self.heard.emit(phrase)
+            recognizer = self._build_recognizer()
         except Exception as exc:
             log.exception("Voice listener crashed")
-            self.failed.emit(str(exc) or type(exc).__name__)
+            self.failed.emit(_reason(exc))
+            return
+
+        try:
+            stream = _open_stream(on_audio)
+        except Exception as exc:
+            log.exception("Microphone could not be opened")
+            self.failed.emit(_reason(exc))
+            return
+
+        try:
+            with stream:
+                self._consume(recognizer, audio)
+        except Exception as exc:
+            log.exception("Voice listener stopped listening")
+            self.failed.emit(_reason(exc))
+
+    def _build_recognizer(self):
+        """The vosk recognizer, restricted to the grammar this listener was given.
+
+        vosk is imported here rather than at module scope so the pure grammar
+        and parsing above stay importable on a machine with no audio backend.
+        """
+        import vosk
+
+        model = vosk.Model(model_name=config.VOICE_MODEL_NAME)
+        return vosk.KaldiRecognizer(
+            model, config.VOICE_SAMPLE_RATE, build_grammar(self._phrases)
+        )
+
+    def _consume(self, recognizer, audio: queue.Queue[bytes]) -> None:
+        """Feed blocks to *recognizer* until stopped, emitting what it hears.
+
+        Two things come out: the still-forming hypothesis while a phrase is
+        being said, and the phrase once the recognizer commits to one. The
+        queue read times out rather than waiting, so the stop event is seen
+        within half a second even in silence.
+        """
+        last_partial = ""
+        while not self._stop.is_set():
+            try:
+                block = audio.get(timeout=_QUEUE_POLL_SECONDS)
+            except queue.Empty:
+                continue
+            if not recognizer.AcceptWaveform(block):
+                partial = partial_text(recognizer.PartialResult())
+                if partial != last_partial:
+                    last_partial = partial
+                    self.hearing.emit(partial)
+                continue
+            # The utterance ended: whatever the live guess was, it is stale now.
+            if last_partial:
+                last_partial = ""
+                self.hearing.emit("")
+            phrase = recognized_phrase(
+                recognizer.Result(), threshold=config.VOICE_CONFIDENCE_THRESHOLD
+            )
+            if phrase:
+                log.info("Heard: %s", phrase)
+                self.heard.emit(phrase)
