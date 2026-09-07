@@ -11,6 +11,12 @@ starts with her name, so a stem that is only her name anchors all of them.
 
 A version renamed rather than suffixed keeps no such thread back to its
 original, so those pairs are declared instead (``config.NONAI_VERSION_OVERRIDES``).
+
+:func:`stable_title` is the same question asked strictly. The prefix rule above
+is deliberately wide, so a copy the user tagged by hand joins its original; that
+width is exactly wrong for a caller that has to know two files hold the same
+footage before it decodes only one of them, so the strict reading requires the
+whole reduced title to agree.
 """
 from __future__ import annotations
 
@@ -21,11 +27,63 @@ from util.variants import is_variant_marker, strip_processing_suffixes
 
 _SEPARATORS = re.compile(r"[-_ .]+")
 
+# Tokens dropped anywhere in a title because they name a quality, upscaler,
+# codec, resolution or container rather than content. Deliberately a list
+# rather than a rule: it can over-group (folding two different videos) or
+# under-group (missing a tag nobody has listed), and is meant to be edited as
+# new tags turn up in the library.
+_QUALITY_TOKENS = frozenset({
+    "topaz", "iris2", "old_iris2", "upscale", "upscaled", "remux",
+    "x264", "x265", "hevc", "av1",
+    "60fps", "30fps", "24fps",
+    "480p", "540", "540p", "720p", "1080p", "1440p", "2160p", "4k",
+    "mp4", "mkv", "web", "webrip",
+})
+
+# "old_iris2" carries an underscore, so it has to go before the separator split
+# breaks it in two. Every multi-part quality token belongs here.
+_MULTIPART_QUALITY = tuple(token for token in _QUALITY_TOKENS if "_" in token)
+
+_HASH_TOKEN = re.compile(r"[a-z0-9]{6,12}")
+
 
 def group_key_tokens(stem: str) -> tuple[str, ...]:
     """A stem reduced to its original's identifying tokens (lowercased)."""
     base = strip_processing_suffixes(stem).lower()
     return tuple(token for token in _SEPARATORS.split(base) if token)
+
+
+def _is_hash_token(token: str) -> bool:
+    """Whether *token* is one of the library's short alphanumeric file hashes.
+
+    Both a letter and a digit are required, which is what keeps a plain word
+    (``compilation``) and a plain number (a scene index) from reading as one.
+    """
+    if not _HASH_TOKEN.fullmatch(token):
+        return False
+    return any(c.isalpha() for c in token) and any(c.isdigit() for c in token)
+
+
+def normalize_title(stem: str) -> str:
+    """*stem* with its quality tags dropped and its trailing hash cut off."""
+    text = stem.lower()
+    for token in _MULTIPART_QUALITY:
+        text = text.replace(token, " ")
+    tokens = [t for t in _SEPARATORS.split(text) if t and t not in _QUALITY_TOKENS]
+    while tokens and _is_hash_token(tokens[-1]):
+        tokens.pop()
+    return " ".join(tokens)
+
+
+def stable_title(stem: str) -> str:
+    """*stem* reduced to what stays the same across versions of one cut.
+
+    :func:`normalize_title` drops the tags a name may already carry; this also
+    drops the ones the upscale stages append, so two stems are equal exactly
+    when they are one video re-encoded. Empty for a name that is nothing but
+    tags and a hash -- such a file is a version of nothing but itself.
+    """
+    return normalize_title(strip_processing_suffixes(stem))
 
 
 def _is_variant_of(anchor: tuple[str, ...], stem: tuple[str, ...]) -> bool:
