@@ -13,11 +13,8 @@ invisible until someone tries to move the helper. A helper may still *read* a
 result — formatting a message out of one is what a result is for — but the
 counters go up in the function that owns them.
 
-The ledger below is what is left, held exactly rather than as a ceiling: a
-conversion that does not lower it fails here, and so does a new out-parameter
-written while it is still non-empty. It is named by function rather than by
-line so that editing around one does not move it. It ends at nothing, and the
-ledger goes with it.
+They were converted one at a time under a ledger of what was left, which
+reached nothing and went with them; what stands is the plain rule.
 """
 from __future__ import annotations
 
@@ -33,12 +30,6 @@ _MUTATORS = frozenset({
     "insert", "intersection_update", "pop", "popitem", "remove", "reverse",
     "setdefault", "sort", "update",
 })
-
-# Helpers still handed their stage's result to fill in. Take one off in the
-# commit that converts it.
-STILL_AN_OUT_PARAMETER = [
-]
-
 
 def _result_types(trees: dict[str, ast.AST]) -> set[str]:
     """The stage-result dataclasses this repo declares, by name."""
@@ -119,9 +110,9 @@ class TestStageResults(unittest.TestCase):
 
         self.assertEqual(
             offenders,
-            STILL_AN_OUT_PARAMETER,
+            [],
             "return what the helper learned and let the caller that owns the "
-            "result add it up, then take it off the ledger",
+            "result add it up",
         )
 
 
