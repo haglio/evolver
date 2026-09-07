@@ -34,6 +34,7 @@ from pathlib import Path
 
 import config
 from tasks import nonai_encode, nonai_progress
+from tasks.nonai_encode import EncodeSettings
 from tasks.nonai_queue import (
     Candidate,
     add_to_skip_manifest,
@@ -168,7 +169,8 @@ def run(allow_start: bool = True, stop: bool = False,
         presence_managed: bool = False, *, job_file: Path | None = None,
         attempts_file: Path | None = None, cooldown_file: Path | None = None,
         skip_manifest: Path | None = None, pin_manifest: Path | None = None,
-        watch_stats_file: Path | None = None) -> NonAiUpscaleResult:
+        watch_stats_file: Path | None = None,
+        settings: EncodeSettings | None = None) -> NonAiUpscaleResult:
     """Check on the in-flight encode, then start the next one if the machine is free.
 
     With *stop* (the tray toggle is off), a still-running encode is killed and
@@ -182,10 +184,13 @@ def run(allow_start: bool = True, stop: bool = False,
     and simply lets an in-flight encode run.
 
     Every file the stage touches is named at this boundary and resolved once;
-    see :class:`StageFiles`.
+    see :class:`StageFiles`. So is what one encode may cost the machine, which
+    is :class:`tasks.nonai_encode.EncodeSettings` -- six numbers this stage
+    used to reach for off ``config`` one at a time.
     """
     files = _configured_files(job_file, attempts_file, cooldown_file,
                               skip_manifest, pin_manifest, watch_stats_file)
+    settings = EncodeSettings() if settings is None else settings
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
@@ -195,7 +200,7 @@ def run(allow_start: bool = True, stop: bool = False,
             job = nonai_encode.adopt_orphan(files.job)
         _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
         if job is not None:
-            supervised = _supervise(job, files, stop=stop,
+            supervised = _supervise(job, files, settings, stop=stop,
                                     presence_managed=presence_managed)
             result.in_flight = supervised.in_flight
             result.in_flight_percent = supervised.in_flight_percent
@@ -206,7 +211,7 @@ def run(allow_start: bool = True, stop: bool = False,
             result.deferred_low_disk = supervised.deferred_low_disk
 
         if not result.in_flight and allow_start and not stop:
-            attempt = _start_next_candidate(files)
+            attempt = _start_next_candidate(files, settings)
             result.started = attempt.started
             result.start_deferred = attempt.deferred
             result.deferred_low_disk |= attempt.deferred_low_disk
@@ -240,7 +245,8 @@ def run(allow_start: bool = True, stop: bool = False,
     return result
 
 
-def throttle_to_presence(*, job_file: Path | None = None) -> str:
+def throttle_to_presence(*, job_file: Path | None = None,
+                         settings: EncodeSettings | None = None) -> str:
     """Between full pipeline ticks, keep the in-flight encode in step with the
     user: suspend it the moment they return, resume it once they idle out.
 
@@ -250,6 +256,7 @@ def throttle_to_presence(*, job_file: Path | None = None) -> str:
     has the candidate scan and resource checks; this only parks and thaws.
     """
     job_file = config.NONAI_JOB_STATE_FILE if job_file is None else job_file
+    settings = EncodeSettings() if settings is None else settings
     with _throttle_lock:
         job = nonai_job.load_job(job_file)
         if job is None:
@@ -257,7 +264,7 @@ def throttle_to_presence(*, job_file: Path | None = None) -> str:
         pid = job.get("pid", 0)
         if not pid or not processes.is_running(pid):
             return ""
-        present = _user_present()
+        present = _user_present(settings)
         if present and not job.get("suspended"):
             nonai_encode.suspend_job(job, job_file)
             return "suspended"
@@ -273,8 +280,8 @@ def _collect(files: StageFiles) -> list[Candidate]:
                               watch_stats_file=files.watch_stats)
 
 
-def _supervise(job: dict, files: StageFiles, *, stop: bool = False,
-               presence_managed: bool = False) -> Supervision:
+def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
+               stop: bool = False, presence_managed: bool = False) -> Supervision:
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
@@ -282,24 +289,25 @@ def _supervise(job: dict, files: StageFiles, *, stop: bool = False,
             return Supervision(
                 stopped=_stop_in_flight(job, "the non-AI upscale toggle is off", files))
         if _is_low_disk():
-            # The 250 GB floor was clear at start, but a 4K60 output plus
-            # whatever else writes overnight can cross it mid-encode.
+            # The floor was clear at start, but a 4K60 output plus whatever
+            # else writes overnight can cross it mid-encode.
             return Supervision(
                 deferred_low_disk=True,
                 stopped=_stop_in_flight(
                     job, "free disk fell below the safety floor mid-encode", files),
             )
-        if presence_managed and _user_present():
+        if presence_managed and _user_present(settings):
             nonai_encode.suspend_job(job, files.job)
             return Supervision(in_flight=relpath(source), suspended=True,
                                in_flight_percent=nonai_encode.percent_encoded(job))
         if presence_managed:
             nonai_encode.resume_job(job, files.job)  # a no-op unless it was frozen
-        if not nonai_encode.overran(job):
+        if not nonai_encode.overran(job, settings):
             return Supervision(in_flight=relpath(source),
                                in_flight_percent=nonai_encode.percent_encoded(job))
-        nonai_encode.terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
-    conclusion = _conclude(job, files)
+        nonai_encode.terminate_ffmpeg(
+            pid, f"it exceeded the {settings.max_runtime_hours}h runtime cap")
+    conclusion = _conclude(job, files, settings)
     nonai_job.clear_job(files.job)
     return Supervision(promoted=conclusion.promoted, failed=conclusion.failed)
 
@@ -318,7 +326,7 @@ def _stop_in_flight(job: dict, reason: str, files: StageFiles) -> str:
     return relpath(source)
 
 
-def _conclude(job: dict, files: StageFiles) -> Conclusion:
+def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclusion:
     source = Path(job.get("source", ""))
     tmp = Path(job.get("tmp", ""))
     out = Path(job.get("out", ""))
@@ -326,7 +334,7 @@ def _conclude(job: dict, files: StageFiles) -> Conclusion:
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
 
     nonai_job.stamp_encode_ended(files.cooldown)
-    if actual and expected and actual >= config.NONAI_COMPLETE_DURATION_FRACTION * expected:
+    if actual and expected and actual >= settings.complete_duration_fraction * expected:
         tmp.replace(out)
         # Before the original leaves, and it takes its sidecar with it.
         carry_metadata(source, out)
@@ -338,9 +346,9 @@ def _conclude(job: dict, files: StageFiles) -> Conclusion:
     log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
     nonai_encode.delete_tmp(tmp)
-    if nonai_job.attempts_of(files.attempts, relpath(source)) >= config.NONAI_MAX_ATTEMPTS:
+    if nonai_job.attempts_of(files.attempts, relpath(source)) >= settings.max_attempts:
         add_to_skip_manifest(files.skip_manifest, source,
-                             f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
+                             f"failed {settings.max_attempts} attempts")
         nonai_job.clear_attempts(files.attempts, relpath(source))
     return Conclusion(failed=relpath(source))
 
@@ -369,11 +377,11 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
                 log.info("Removed %d stale partial output file(s) from %s", removed, done_dir)
 
 
-def _start_next_candidate(files: StageFiles) -> StartAttempt:
+def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartAttempt:
     if _is_low_disk():
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
         return StartAttempt(deferred_low_disk=True)
-    busy = _machine_busy_reason(files.cooldown)
+    busy = _machine_busy_reason(files.cooldown, settings)
     if busy:
         log.info("Deferring non-AI upscale start: %s.", busy)
         return StartAttempt(deferred=busy)
@@ -425,7 +433,7 @@ def _is_low_disk() -> bool:
     return free_gb < config.LOW_DISK_WARNING_GB
 
 
-def _machine_busy_reason(cooldown_file: Path) -> str:
+def _machine_busy_reason(cooldown_file: Path, settings: EncodeSettings) -> str:
     """Why the machine cannot take a new encode right now — "" when it can.
 
     A present user comes first: an unattended multi-hour encode has no business
@@ -434,19 +442,19 @@ def _machine_busy_reason(cooldown_file: Path) -> str:
     sampling never sees that. RAM and a post-encode cooldown keep an unattended
     night from running the machine flat out end to end.
     """
-    if _user_present():
+    if _user_present(settings):
         return "user_present"
     if processes.pids_of_image(config.FFMPEG):
         return "topaz_busy"
-    if system_resources.available_ram_gb() < config.NONAI_MIN_AVAILABLE_RAM_GB:
+    if system_resources.available_ram_gb() < settings.min_available_ram_gb:
         return "low_ram"
     if (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
-            < config.NONAI_COOLDOWN_MINUTES * 60):
+            < settings.cooldown_minutes * 60):
         return "cooldown"
     return ""
 
 
-def _user_present() -> bool:
+def _user_present(settings: EncodeSettings) -> bool:
     """Whether the user has touched the machine recently.
 
     On any failure to read the idle time, err toward present: holding back an
@@ -456,4 +464,4 @@ def _user_present() -> bool:
         idle = system_resources.seconds_since_last_input()
     except OSError:
         return True
-    return idle < config.NONAI_USER_IDLE_THRESHOLD_SECONDS
+    return idle < settings.user_idle_threshold_seconds

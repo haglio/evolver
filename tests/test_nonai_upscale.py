@@ -8,7 +8,7 @@ from contextlib import ExitStack
 from unittest.mock import Mock, patch
 
 import config
-from tasks import nonai_upscale
+from tasks import nonai_encode, nonai_upscale
 from tests.temp_helpers import (
     make_video,
     override_config,
@@ -227,7 +227,7 @@ class TestStartGuards(unittest.TestCase):
             self._one_candidate(overrides)
 
             stack, _mocks = probes(
-                idle_seconds=config.NONAI_USER_IDLE_THRESHOLD_SECONDS + 60)
+                idle_seconds=nonai_encode.EncodeSettings().user_idle_threshold_seconds + 60)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=True)
 
@@ -255,7 +255,7 @@ class TestStartGuards(unittest.TestCase):
             overrides = library_overrides(root)
             self._one_candidate(overrides)
             overrides["NONAI_COOLDOWN_FILE"].write_text(
-                json.dumps({"ended_at": time.time() - config.NONAI_COOLDOWN_MINUTES * 60 - 60}),
+                json.dumps({"ended_at": time.time() - nonai_encode.EncodeSettings().cooldown_minutes * 60 - 60}),
                 encoding="utf-8",
             )
 
@@ -493,7 +493,7 @@ class TestPresenceThrottle(unittest.TestCase):
             # Wall-clock past the cap, but most of it spent frozen.
             write_job(
                 root, overrides,
-                started_seconds_ago=config.NONAI_MAX_RUNTIME_HOURS * 3600 + 3600,
+                started_seconds_ago=nonai_encode.EncodeSettings().max_runtime_hours * 3600 + 3600,
                 suspended_seconds=2 * 3600,
             )
 
@@ -857,7 +857,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             overrides = library_overrides(root)
             _source, _tmp, _out = write_job(root, overrides, expected=100.0)
             overrides["NONAI_ATTEMPTS_FILE"].write_text(
-                json.dumps({"larkin/0 unsorted/busy.mp4": config.NONAI_MAX_ATTEMPTS}),
+                json.dumps({"larkin/0 unsorted/busy.mp4": nonai_encode.EncodeSettings().max_attempts}),
                 encoding="utf-8",
             )
 
@@ -876,7 +876,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             overrides = library_overrides(root)
             _source, _tmp, _out = write_job(
                 root, overrides,
-                started_seconds_ago=config.NONAI_MAX_RUNTIME_HOURS * 3600 + 60,
+                started_seconds_ago=nonai_encode.EncodeSettings().max_runtime_hours * 3600 + 60,
             )
 
             stack, mocks = probes(is_running=True, duration=1.0,
@@ -944,7 +944,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             overrides = library_overrides(root)
             write_job(
                 root, overrides,
-                started_seconds_ago=config.NONAI_MAX_RUNTIME_HOURS * 3600 + 60,
+                started_seconds_ago=nonai_encode.EncodeSettings().max_runtime_hours * 3600 + 60,
             )
 
             stack, mocks = probes(is_running=True, duration=1.0,

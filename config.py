@@ -301,18 +301,11 @@ NONAI_SKIP_MANIFEST = PROJECT_DIR / ".nonai-upscale-skip.txt"  # user-editable, 
 # already holds an older processed variant of, which is the only way to ask for
 # a redo under a newer recipe.
 NONAI_PRIORITY_MANIFEST = PROJECT_DIR / ".nonai-upscale-next.txt"
-NONAI_MAX_RUNTIME_HOURS = 24
-NONAI_MAX_ATTEMPTS = 2
-NONAI_COMPLETE_DURATION_FRACTION = 0.98
-NONAI_MIN_AVAILABLE_RAM_GB = 8.0
-NONAI_COOLDOWN_MINUTES = 30
-# Presence throttle: once the toggle is on, Evolver auto-manages the encode by
-# how long the user has been away from the keyboard/mouse. Below this idle
-# threshold the user counts as present — no new encode starts and any in-flight
-# one is suspended (frozen, zero compute); past it the machine is "away" and an
-# encode may start or resume. Five minutes rides out ordinary reading/watching
-# pauses without treating them as the user leaving.
-NONAI_USER_IDLE_THRESHOLD_SECONDS = 300.0
+# What one non-AI encode may cost the machine and when is
+# tasks.nonai_encode.EncodeSettings, not here: those six numbers are this app's
+# own policy, and what belongs in this file is what the machine and the overlay
+# say. LOW_DISK_WARNING_GB stays, because free space is the drive's fact and
+# the AI upscale stage reads the same floor.
 # The GUI polls presence far more often than the 10-minute pipeline tick, so a
 # returning user parks the encode within seconds instead of minutes.
 NONAI_PRESENCE_POLL_SECONDS = 20.0
