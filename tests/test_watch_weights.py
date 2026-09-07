@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from tasks import watch_weights
-from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
+from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
 from util import favs_csv, sidecar
 
 
@@ -109,7 +109,7 @@ class TestCounts(unittest.TestCase):
         with _setting() as s:
             _, upscale = s.sorted_clip("clip_a")
             path = sidecar.sidecar_path(upscale)
-            sidecar.write(path, {"video": {"type": "short", "action": "Alpha"}})
+            write_sidecar(path, {"video": {"type": "short", "action": "Alpha"}})
             s.journal((10, "lock", "1_sorted/provider2/portrait/clip_a.mp4"))
 
             watch_weights.run()
@@ -132,7 +132,7 @@ class TestCounts(unittest.TestCase):
         with _setting() as s:
             _, upscale = s.sorted_clip("clip_a")
             path = sidecar.sidecar_path(upscale)
-            sidecar.write(path, {"video": {"type": "short"},
+            write_sidecar(path, {"video": {"type": "short"},
                                  "watch": {"completions": 1, "skips": 0, "locks": 0, "weight": 1.26}})
 
             watch_weights.run()
@@ -164,7 +164,7 @@ class TestFavorites(unittest.TestCase):
         with _setting() as s:
             _, upscale = s.sorted_clip("clip_a")
             favs_csv.add_favorite(s.favs, upscale)
-            sidecar.write(sidecar.sidecar_path(upscale), {"video": {"type": "short"}, "favorite": True})
+            write_sidecar(sidecar.sidecar_path(upscale), {"video": {"type": "short"}, "favorite": True})
             s.journal((10, "unfavorite", "1_sorted/provider2/portrait/clip_a.mp4"))
 
             result = watch_weights.run()

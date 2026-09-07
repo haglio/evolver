@@ -12,6 +12,7 @@ from tests.temp_helpers import (
     make_video,
     override_config,
     workspace_temp_dir,
+    write_sidecar,
 )
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
@@ -22,7 +23,7 @@ from util import sidecar, video_type
 def lasting(video, seconds):
     """*video*, with *seconds* recorded on its sidecar as the kinds stage would."""
     path = sidecar.sidecar_path(video)
-    sidecar.write(path, video_type.timed(sidecar.read(path), seconds))
+    write_sidecar(path, video_type.timed(sidecar.read(path), seconds))
     return video
 
 

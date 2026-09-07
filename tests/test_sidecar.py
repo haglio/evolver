@@ -1,7 +1,11 @@
+import threading
 import unittest
 
+from app_support.json_store import locked_update
+
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util.sidecar import sidecar_path, upscaled_video_path
+from util import sidecar
+from util.sidecar import WRONG_ACTION_FIELD, sidecar_path, upscaled_video_path
 
 
 class TestUpscaledVideoPath(unittest.TestCase):
@@ -71,6 +75,77 @@ class TestSidecarPath(unittest.TestCase):
             VIDEO_SEARCH_ROOT=root / "videos", METADATA_DIR=root / "metadata",
         ), self.assertRaises(ValueError):
             sidecar_path(root / "elsewhere" / "clip.mp4")
+
+
+class TestUpdate(unittest.TestCase):
+    """The one write, and the lock it holds while it reads and changes.
+
+    Two apps write these documents -- this app's pipeline on a ten-minute
+    timer, Fun Time the moment a viewer strikes an act out -- and each used to
+    read, change and write on its own, so whichever wrote second erased the
+    field the first had just put in.
+    """
+
+    def test_no_other_writer_gets_in_while_one_is_inside(self):
+        """The lock is taken on the document's own name, which is the name Fun
+        Time's writer takes: it is kept out, rather than writing alongside."""
+        with workspace_temp_dir() as root:
+            path = root / "clip.json"
+            refused = []
+
+            def look_for_a_way_in(payload):
+                try:
+                    locked_update(path, lambda other: other, wait_s=0)
+                except TimeoutError:
+                    refused.append(True)
+                return {"video": {"action": "alpha"}}
+
+            sidecar.update(path, look_for_a_way_in)
+
+            self.assertEqual(refused, [True])
+
+    def test_it_changes_the_document_the_other_writer_left(self):
+        """The lost update itself: a pass whose turn comes after a rejection
+        writes onto the rejection, not onto what it read before waiting."""
+        with workspace_temp_dir() as root:
+            path = root / "clip.json"
+            sidecar.update(path, lambda _: {"video": {"action": "alpha"}})
+            inside = threading.Event()
+            let_go = threading.Event()
+
+            def strike_the_act_out(payload):
+                inside.set()
+                let_go.wait(5)
+                return {"video": {WRONG_ACTION_FIELD: payload["video"]["action"]}}
+
+            viewer = threading.Thread(
+                target=locked_update, args=(path, strike_the_act_out), daemon=True)
+            viewer.start()
+            self.assertTrue(inside.wait(5))
+            stamped = []
+            pipeline = threading.Thread(
+                target=lambda: stamped.append(
+                    sidecar.update(path, lambda payload: {**payload, "favorite": True})),
+                daemon=True)
+            pipeline.start()
+            let_go.set()
+            viewer.join(5)
+            pipeline.join(5)
+
+            self.assertEqual(
+                sidecar.read(path),
+                {"video": {WRONG_ACTION_FIELD: "alpha"}, "favorite": True},
+            )
+            self.assertEqual(stamped, [sidecar.read(path)])
+
+    def test_a_writer_with_nothing_to_change_leaves_the_file_alone(self):
+        with workspace_temp_dir() as root:
+            path = root / "clip.json"
+            sidecar.update(path, lambda _: {"video": {"action": "alpha"}})
+            written = path.read_text(encoding="utf-8")
+
+            self.assertIsNone(sidecar.update(path, lambda payload: None))
+            self.assertEqual(path.read_text(encoding="utf-8"), written)
 
 
 if __name__ == "__main__":

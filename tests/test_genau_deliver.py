@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from tasks import genau_deliver
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir, write_sidecar
 from util import sidecar, video_type
 
 # Fabricated: the real folder name is library vocabulary and lives in the
@@ -63,7 +63,7 @@ class TestGenauDeliver(unittest.TestCase):
                                  GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
                                  VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
                                  METADATA_DIR=metadata):
-                sidecar.write(sidecar.sidecar_path(upscaled),
+                write_sidecar(sidecar.sidecar_path(upscaled),
                               {"video": {"prompt": "a prompt", "seed": "1"}})
 
                 genau_deliver.run()

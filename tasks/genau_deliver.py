@@ -97,7 +97,10 @@ def _move_sidecar(upscaled: Path, destination: Path) -> None:
     """
     try:
         was, now = sidecar.sidecar_path(upscaled), sidecar.sidecar_path(destination)
-        sidecar.write(now, video_type.stamped(sidecar.read(was), video_type.GENAU_CLIP))
+        sidecar.update(
+            now,
+            lambda _: video_type.stamped(sidecar.read(was), video_type.GENAU_CLIP),
+        )
         was.unlink(missing_ok=True)
     except (ValueError, OSError):
         log.warning("Could not re-file the metadata for %s", upscaled.name, exc_info=True)

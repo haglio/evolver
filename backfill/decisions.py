@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 import config
-from util.sidecar import WRONG_ACTION_FIELD, read, sidecar_path, write
+from util.sidecar import WRONG_ACTION_FIELD, read, sidecar_path, update
 
 # The window moves to the next clip the instant a phrase lands, so the media player
 # can still be letting go of the old file when the move runs. Windows refuses to
@@ -28,12 +28,13 @@ def record_action(video: Path, action: str) -> None:
     retires it.  Left in place it would send the clip to the head of this queue
     every time the tool opened.
     """
-    path = sidecar_path(video)
-    payload = read(path)
-    block = payload.setdefault("video", {})
-    block["action"] = action
-    block.pop(WRONG_ACTION_FIELD, None)
-    write(path, payload)
+    def name_the_act(payload: dict) -> dict:
+        block = payload.setdefault("video", {})
+        block["action"] = action
+        block.pop(WRONG_ACTION_FIELD, None)
+        return payload
+
+    update(sidecar_path(video), name_the_act)
 
 
 def sidecar_snapshot(video: Path) -> dict | None:
@@ -52,7 +53,7 @@ def restore_sidecar(video: Path, snapshot: dict | None) -> None:
     if snapshot is None:
         path.unlink(missing_ok=True)
     else:
-        write(path, snapshot)
+        update(path, lambda _: snapshot)
 
 
 def discard_as_weird(video: Path) -> Path:

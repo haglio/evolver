@@ -13,6 +13,7 @@ from tests.temp_helpers import (
     make_video,
     override_config,
     workspace_temp_dir,
+    write_sidecar,
 )
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
@@ -49,7 +50,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
             make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
-                sidecar.write(
+                write_sidecar(
                     sidecar.sidecar_path(source),
                     {"clip": {"compilation": "Vol6", "index": 1}},
                 )
@@ -151,7 +152,7 @@ class TestRetireToAnArchive(unittest.TestCase):
             source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
 
             with override_config(**overrides):
-                sidecar.write(
+                write_sidecar(
                     sidecar.sidecar_path(source),
                     {"clip": {"compilation": "Volume One", "index": 1}},
                 )
@@ -181,7 +182,7 @@ class TestCarryMetadata(unittest.TestCase):
             )
 
             with override_config(**overrides):
-                sidecar.write(sidecar.sidecar_path(source), {
+                write_sidecar(sidecar.sidecar_path(source), {
                     "version": {"group": "Lee-Poe", "processed": False},
                     "video": {"action": "alpha"},
                     "clip": {"compilation": "Volume One", "index": 1},
@@ -207,7 +208,7 @@ class TestCarryMetadata(unittest.TestCase):
             )
 
             with override_config(**overrides):
-                sidecar.write(sidecar.sidecar_path(source),
+                write_sidecar(sidecar.sidecar_path(source),
                               {"clip": {"compilation": "Volume One", "index": 1}})
 
                 self.assertTrue(nonai_retire.carry_metadata(source, out))

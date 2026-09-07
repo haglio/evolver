@@ -11,11 +11,13 @@ write, then mapping that path through :func:`sidecar_path`.
 
 from __future__ import annotations
 
-import json
+from collections.abc import Callable
 from pathlib import Path
 
+from app_support.json_store import locked_update
+
 import config
-from util.json_store import atomic_write_text, read_dict
+from util.json_store import read_dict
 from util.variants import upscaled_stem
 
 
@@ -65,14 +67,20 @@ def read(path: Path) -> dict:
     return read_dict(path)
 
 
-def write(path: Path, payload: dict) -> None:
-    """Serialize *payload* to *path*, creating the mirrored directory if need be.
+def update(path: Path, change: Callable[[dict], dict | None]) -> dict | None:
+    """Rewrite *path* through *change*, with no other writer inside the file.
 
-    Written atomically because this is the one format three apps write: Fun
-    Time stamps a watch onto one while a pipeline stage is rewriting it, and a
-    reader must see the old file or the new one, never half of either.
+    This is the one format two apps write -- a pipeline stage on a ten-minute
+    timer here, Fun Time the moment a viewer strikes an act out -- and each of
+    them reads a document, changes it and writes it back.  Without a lock the
+    second to write erases the field the first had just added, so the read, the
+    change and the write all happen holding ``<path>.lock``, the lock Fun Time's
+    writer takes on the same name.  *change* is therefore handed the document as
+    it stands at that moment, never one read before the wait, and returns what to
+    write or ``None`` to leave the file as it is.  Returns what was written, or
+    ``None`` when *change* declined.
     """
-    atomic_write_text(path, json.dumps(payload, indent=2) + "\n")
+    return locked_update(path, change)
 
 
 def _video_field(payload: dict, field: str) -> str:

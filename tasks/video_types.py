@@ -104,13 +104,18 @@ def run(probe=duration_seconds) -> VideoTypesResult:
             else:
                 result.deferred += 1
             continue
-        written = video_type.stamped(
-            payload, video_type.classify(genau=genau, excerpt=excerpt,
-                                         duration_seconds=seconds))
-        if seconds is not None:
-            written = video_type.timed(written, seconds)
-        if written != payload:
-            sidecar.write(path, written)
+
+        def record_the_kind(
+            current: dict, genau=genau, excerpt=excerpt, seconds=seconds,
+        ) -> dict | None:
+            written = video_type.stamped(
+                current, video_type.classify(genau=genau, excerpt=excerpt,
+                                             duration_seconds=seconds))
+            if seconds is not None:
+                written = video_type.timed(written, seconds)
+            return written if written != current else None
+
+        if sidecar.update(path, record_the_kind) is not None:
             result.recorded += 1
         elif seconds is None:
             # A free kind already on file, still owing the running time that

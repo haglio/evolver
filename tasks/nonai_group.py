@@ -69,18 +69,24 @@ def run() -> NonAiGroupResult:
             if isinstance(clip, dict):
                 clip_by_origin.setdefault(strip_processing_suffixes(video.stem), clip)
         for video in videos:
-            payload = dict(existing_by_video[video])
-            payload["version"] = {
+            version = {
                 "group": ids[video.stem],
                 "processed": is_processed_stem(video.stem),
             }
             origin_clip = clip_by_origin.get(strip_processing_suffixes(video.stem))
-            if origin_clip is not None:
-                payload["clip"] = origin_clip
+
+            def record_the_family(
+                payload: dict, version=version, origin_clip=origin_clip,
+            ) -> dict | None:
+                grouped = dict(payload)
+                grouped["version"] = version
+                if origin_clip is not None:
+                    grouped["clip"] = origin_clip
+                return grouped if grouped != payload else None
+
             path = sidecar.sidecar_path(video)
             expected.add(path)
-            if existing_by_video[video] != payload:
-                sidecar.write(path, payload)
+            if sidecar.update(path, record_the_family) is not None:
                 result.written += 1
         result.grouped += len(videos)
         result.families += len(set(ids.values()))

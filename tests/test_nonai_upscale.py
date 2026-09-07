@@ -11,6 +11,7 @@ from tests.temp_helpers import (
     make_video,
     override_config,
     workspace_temp_dir,
+    write_sidecar,
 )
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
@@ -982,7 +983,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
 
             stack, _mocks = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                sidecar.write(sidecar.sidecar_path(source), {
+                write_sidecar(sidecar.sidecar_path(source), {
                     "version": {"group": "Lee-Poe", "processed": False},
                     "video": {"action": "alpha"},
                     "clip": {"compilation": "Volume One", "index": 1, "count": 4},
@@ -1011,7 +1012,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
 
             stack, _mocks = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                sidecar.write(sidecar.sidecar_path(source), {
+                write_sidecar(sidecar.sidecar_path(source), {
                     "version": {"group": "Lee-Poe", "processed": False},
                     "clip": {"compilation": "Volume One", "index": 1},
                 })
@@ -1031,7 +1032,7 @@ class TestReportingHowFarAlongItIs(unittest.TestCase):
 
     def _lasting(self, video, seconds):
         path = sidecar.sidecar_path(video)
-        sidecar.write(path, video_type.timed(sidecar.read(path), seconds))
+        write_sidecar(path, video_type.timed(sidecar.read(path), seconds))
         return video
 
     def test_reports_the_percentage_and_the_hours_left_beside_the_count(self):

@@ -26,7 +26,7 @@ from util.html_query import (
     text_content,
 )
 from util.media_files import child_dirs, library_videos
-from util.sidecar import sidecar_path, upscaled_video_path, write
+from util.sidecar import sidecar_path, update, upscaled_video_path
 
 log = logging.getLogger(__name__)
 
@@ -108,8 +108,11 @@ def run(*, sorted_dir: Path | None = None,
             # A kind recorded before the scrape landed stays on: the sidecar is
             # replaced wholesale here, and dropping it would cost another
             # ffprobe to learn the same thing again.
-            recorded = video_type.type_of(sidecar.read(output_path))
-            write(output_path, video_type.stamped(payload, recorded) if recorded else payload)
+            def keep_the_kind(current: dict, payload=payload) -> dict:
+                recorded = video_type.type_of(current)
+                return video_type.stamped(payload, recorded) if recorded else payload
+
+            update(output_path, keep_the_kind)
             result.newly_scraped += 1
             log.info("Wrote metadata: %s", output_path)
 
