@@ -82,16 +82,30 @@ class TestMain(unittest.TestCase):
 class TestReadyThumbnails(unittest.TestCase):
     def test_hands_the_window_every_built_thumbnail_as_strings(self):
         built = [("Side Beta", Path("/c/side_beta.jpg")), ("POV Alpha", Path("/c/pov_alpha.jpg"))]
+        scan = []
         with patch("backfill_app.build_thumbnails", return_value=built) as build, \
              patch("backfill_app.example_clips", return_value={}) as examples:
-            ready = backfill_app._ready_thumbnails()
+            ready = backfill_app._ready_thumbnails(scan)
 
         self.assertEqual(
             ready,
             {"Side Beta": str(Path("/c/side_beta.jpg")), "POV Alpha": str(Path("/c/pov_alpha.jpg"))},
         )
         build.assert_called_once()
-        examples.assert_called_once()
+        examples.assert_called_once_with(scan)
+
+    def test_the_library_is_walked_once_for_both_of_startup_s_questions(self):
+        """The work queue and the example clips are two projections of one
+        scan. Two walks and two sidecar parses is a tray-launched tool sitting
+        with no window on screen for twice as long as it needs to."""
+        with patch("backfill_app.library_scan", return_value=[]) as scan, \
+                patch("backfill_app.unlabeled_videos", return_value=[]), \
+                patch("backfill_app.QApplication"), \
+                patch("backfill_app.QMessageBox"), \
+                patch("backfill_app.evolver.setup_logging"):
+            backfill_app.main()
+
+        scan.assert_called_once_with()
 
 
 if __name__ == "__main__":
