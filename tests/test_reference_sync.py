@@ -179,6 +179,51 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class TestUnwritableStore(unittest.TestCase):
+    def test_a_store_that_cannot_be_rewritten_is_counted_and_the_rest_are_followed(self):
+        """One unwritable file must not abort the stage, and must not pass as ok.
+
+        The stores are other apps' files, and one of them open in the app that
+        owns it is an ordinary Tuesday -- so a failed rewrite is news about that
+        store, not the end of the run.
+        """
+        with workspace_temp_dir() as temp:
+            moved_to = _write_video(temp / "videos" / "2D" / "non_AI" / "other" / "clip.mp4")
+            was_at = temp / "videos" / "2D" / "other" / "clip.mp4"
+            locked = _write_json(
+                temp / "sessions" / "Locked.json",
+                {"session_name": "Locked", "video_path": str(was_at)},
+            )
+            writable = _write_json(
+                temp / "sessions" / "Writable.json",
+                {"session_name": "Writable", "video_path": str(was_at)},
+            )
+            real_rewrite = reference_stores._rewrite_video_path_field
+
+            def refuse_the_locked_one(path: Path, moves: dict[str, str]) -> None:
+                if path == locked:
+                    raise OSError("the app that owns it has it open")
+                real_rewrite(path, moves)
+
+            patched = patch.object(
+                reference_stores, "_rewrite_video_path_field", refuse_the_locked_one
+            )
+            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"), patched:
+                result = reference_sync.run()
+
+            self.assertEqual(result.write_errors, 1)
+            self.assertFalse(result.ok)
+            self.assertEqual(result.relocated, 1)
+            self.assertEqual(
+                json.loads(writable.read_text(encoding="utf-8"))["video_path"],
+                str(moved_to),
+            )
+            self.assertEqual(
+                json.loads(locked.read_text(encoding="utf-8"))["video_path"],
+                str(was_at),
+            )
+
+
 class TestReferenceStoreSurface(unittest.TestCase):
     """A store asks its own file, rather than being handed it back.
 

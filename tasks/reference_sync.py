@@ -37,6 +37,7 @@ class _Reconciled:
     checked: int
     relocated: int
     unresolved: int
+    write_errors: int
 
 
 def run() -> ReferenceSyncResult:
@@ -49,6 +50,7 @@ def run() -> ReferenceSyncResult:
         result.checked += reconciled.checked
         result.relocated += reconciled.relocated
         result.unresolved += reconciled.unresolved
+        result.write_errors += reconciled.write_errors
 
     log.info(
         "References done. Checked: %d, Relocated: %d, Unresolved: %d, Write errors: %d",
@@ -80,10 +82,18 @@ def _reconcile(
         moves[reference] = str(now_at)
         log.info("REPOINT %s  %s  ->  %s", store.label, reference, now_at)
 
+    relocated = 0
+    write_errors = 0
     if moves:
-        store.rewrite(moves)
-    return _Reconciled(checked=len(references), relocated=len(moves),
-                       unresolved=unresolved)
+        try:
+            store.rewrite(moves)
+        except OSError:
+            log.exception("FAILED TO REWRITE %s (%s)", store.label, store.path)
+            write_errors = 1
+        else:
+            relocated = len(moves)
+    return _Reconciled(checked=len(references), relocated=relocated,
+                       unresolved=unresolved, write_errors=write_errors)
 
 
 def _renamed(store: reference_stores.ReferenceStore, was_at: Path) -> Path | None:
