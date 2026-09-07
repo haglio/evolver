@@ -5,18 +5,27 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "evolver"
 version = "0.1.0"
-requires-python = ">=3.10"
+# 3.12, not 3.10: every gate in the family runs 3.12 and nothing has ever
+# collected a suite on anything older, so >=3.10 was a promise no run backed.
+# The README already said 3.14+ while this line said 3.10.
+requires-python = ">=3.12"
+# Every requirement carries a ceiling. Without one each run installs whatever
+# PyPI served that morning, which is how this family's gates came to run a major
+# version of the imaging stack past the one the machines have. Floors are what
+# this repo's venv holds today. tzdata is the exception and says so in
+# tests/test_dependencies.py: it is the time zone database, and a ceiling on it
+# would pin a fact about the world.
 dependencies = [
-    "numpy",
-    "PyQt6",
-    "qtawesome",
-    "sounddevice",
+    "numpy>=2.4,<3",
+    "PyQt6>=6,<7",
+    "qtawesome>=1,<2",
+    "sounddevice>=0.5,<0.6",
     "tzdata",
-    "vosk",
+    "vosk>=0.3,<0.4",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-timeout", "vulture", "ruff==0.16.6"]
+dev = ["pytest>=9,<10", "pytest-timeout>=2.4,<3", "vulture>=2.16,<3", "ruff==0.16.6"]
 
 [tool.pytest.ini_options]
 # A ceiling on a hang, not a performance budget. The slowest test on a
@@ -33,6 +42,14 @@ dev = ["pytest", "pytest-timeout", "vulture", "ruff==0.16.6"]
 # holds all three halves of it.
 addopts = "--timeout=120 --timeout-method=thread -p app_support.sanitize.pytest_plugin"
 testpaths = ["tests"]
+
+# The family checkouts this one is installed beside. Both were imported and
+# named nowhere -- this file said nothing about either while the tray and the
+# stages reach for both. Neither is published, so neither can go in
+# [project.dependencies]; tests/test_dependencies.py holds this list against the
+# tree instead.
+[tool.haglio]
+siblings = ["app_support", "shared_ui"]
 
 [tool.setuptools.packages.find]
 include = ["evolver*"]
