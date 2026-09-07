@@ -7,6 +7,7 @@ is left to check is that the list really is the one the pipeline runs.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import itertools
 import re
 import unittest
@@ -17,6 +18,8 @@ from PyQt6.QtGui import QColor
 import evolver
 from gui import main_window
 from gui.stats_window import STAGE_COLORS
+from tasks.nonai_upscale import NonAiUpscaleResult
+from tasks.scripts_sync import ScriptsSyncResult
 from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 from tests.color_support import band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
@@ -29,6 +32,28 @@ from tests.test_evolver import _patched_stages, _stage_mocks
 # leave every existing one alone; `group_non_ai` is bookkeeping over whatever
 # files happen to be there.
 CANNOT_FAIL = frozenset({"strays", "sort", "clip_scripts", "scene_scripts", "group_non_ai", "video_types"})
+
+
+def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
+    """Every literal key the named window functions read off a result dict.
+
+    Read from the syntax tree rather than by running them: the summarizers
+    branch, so no one set of values reaches every field, and a key missed by a
+    probe would look exactly like a key nothing reads.
+    """
+    tree = ast.parse(Path(PROJECT_ROOT, "gui", "main_window.py").read_text(encoding="utf-8"))
+    keys: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name not in function_names:
+            continue
+        for inner in ast.walk(node):
+            if isinstance(inner, ast.Subscript) and isinstance(inner.slice, ast.Constant):
+                keys.add(inner.slice.value)
+            elif (isinstance(inner, ast.Call) and isinstance(inner.func, ast.Attribute)
+                    and inner.func.attr == "get" and inner.args
+                    and isinstance(inner.args[0], ast.Constant)):
+                keys.add(inner.args[0].value)
+    return {key for key in keys if isinstance(key, str)}
 
 
 class TestStageRegistry(unittest.TestCase):
@@ -156,6 +181,36 @@ class TestStageRegistry(unittest.TestCase):
         ):
             with self.subTest(table=name):
                 self.assertEqual(sorted(set(table) - set(ALL_STAGES)), [])
+
+    def test_every_counter_a_summarized_stage_declares_reaches_the_detail_view(self):
+        """A counter no summarizer names is invisible, and stays invisible.
+
+        The detail view reads these two results as plain dicts -- they arrive
+        through `dataclasses.asdict` and a JSON file months older than the
+        build reading it -- so a field added on the stage's side reaches the
+        window as a key nothing asks for, and the run reports doing nothing
+        where it did something. It had already happened twice: a run that
+        rehomed seven scripts to their library variants and left two variant
+        groups too ambiguous to copy from said "no funscripts".
+
+        Held by reading the keys out of the window's own source rather than by
+        listing them here, so this cannot drift from what the code asks for.
+        """
+        for result_type, functions, tables in (
+            (ScriptsSyncResult,
+             ("_summarize_scripts_sync",),
+             (main_window._SCRIPTS_PROBLEMS, main_window._SCRIPTS_ROUTINE)),
+            (NonAiUpscaleResult,
+             ("_summarize_nonai_upscale", "_whats_left", "_encode_state"),
+             ()),
+        ):
+            with self.subTest(result=result_type.__name__):
+                shown = _result_keys_read(functions)
+                shown |= {key for table in tables for key, _label in table}
+                self.assertEqual(
+                    sorted(shown),
+                    sorted(field.name for field in dataclasses.fields(result_type)),
+                )
 
     def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
         """Delivery runs straight after the AI upscale, so a clip made this run

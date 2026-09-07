@@ -198,17 +198,24 @@ def _summarize_result(
     return ", ".join(parts[:5])
 
 
-# What each scripts-sync counter means, in words. The first group is what makes
-# the stage red; the second is the work it got done.
+# What each scripts-sync counter means, in words. The first group is what a
+# person has to deal with, the second the work the stage got done. Every
+# counter the stage declares is in one of them, and a gate says so: one left
+# out is a run reporting it did nothing where it did something.
+#
+# Ambiguous variant groups are the one problem here that does not also make the
+# stage red -- whether they should is the stage's call, not the view's.
 _SCRIPTS_PROBLEMS = (
     ("unmatched", "match no video"),
     ("ambiguous", "match more than one video"),
     ("collisions", "cannot move — a different script holds the destination"),
+    ("ambiguous_variant_groups", "variant groups whose scripts differ — none copied"),
     ("variant_copy_errors", "failed to copy to a variant"),
 )
 _SCRIPTS_ROUTINE = (
     ("moved", "moved into place"),
     ("copied_variants", "copied to a variant"),
+    ("rehomed_to_variants", "rehomed to a variant still in the library"),
     ("followed_to_archive", "followed a retired video out of the library"),
     ("discarded_duplicates", "duplicate discarded"),
     ("already_aligned", "already aligned"),
