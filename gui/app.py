@@ -199,10 +199,8 @@ class EvolverApp:
     def _toggle_pause(self):
         if self._scheduler.is_paused:
             self._scheduler.resume()
-            self._tray.set_paused(False)
         else:
             self._scheduler.pause()
-            self._tray.set_paused(True)
 
     def _set_nonai_enabled(self, enabled: bool):
         """Persist the one-time opt-in; presence polling and the next tick act on it."""
@@ -265,22 +263,16 @@ class EvolverApp:
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
 
-    def _update_status_display(self):
+    def _update_status_display(self, status):
         """Push scheduling state to tray and window."""
-        self._tray.set_next_run_at(self._scheduler.next_run_at)
-        self._window.update_schedule_status(
-            self._scheduler.is_running,
-            self._scheduler.is_paused,
-            self._scheduler.next_run_at,
-        )
+        self._tray.show_schedule(status)
+        self._window.show_schedule(status)
 
     def _on_run_started(self):
         self._scheduler.mark_running()
-        self._tray.set_running(True)
 
     def _on_run_ended(self):
         self._scheduler.mark_idle()
-        self._tray.set_running(False)
         self._window.refresh_history()
 
     def _notify(self, body: str, icon: QSystemTrayIcon.MessageIcon, msecs: int):

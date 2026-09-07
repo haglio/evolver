@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 import qtawesome as qta
@@ -31,7 +30,7 @@ from shared_ui.toggle_switch import ToggleSwitch
 import config
 from gui.icons import quit_icon, restart_icon, run_now_icon
 from gui.run_record import RunRecord, format_run_label, load_runs
-from gui.schedule_state import PAUSED, RUNNING, SCHEDULED, schedule_state
+from gui.schedule_state import ScheduleStatus
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
@@ -441,20 +440,11 @@ class EvolverMainWindow(QMainWindow):
         if 0 <= row < len(self._records):
             self._detail_widget.show_record(self._records[row])
 
-    def update_schedule_status(self, is_running: bool, is_paused: bool, next_run_at: datetime | None):
-        """Update toolbar controls with current scheduling state."""
-        self.run_now_action.setEnabled(not is_running)
-        self.active_toggle.setChecked(not is_paused)
-
-        state = schedule_state(is_running, is_paused, next_run_at)
-        if state == RUNNING:
-            self._next_run_label.setText("Running...")
-        elif state == PAUSED:
-            self._next_run_label.setText("No upcoming runs scheduled (inactive)")
-        elif state == SCHEDULED:
-            self._next_run_label.setText(f"Next run: {next_run_at.strftime('%H:%M')}")
-        else:
-            self._next_run_label.setText("")
+    def show_schedule(self, status: ScheduleStatus):
+        """Put the schedule on the toolbar's three surfaces."""
+        self.run_now_action.setEnabled(not status.is_running)
+        self.active_toggle.setChecked(not status.is_paused)
+        self._next_run_label.setText(status.toolbar_label())
 
     def closeEvent(self, event):
         """Hide instead of close — the tray icon keeps the app alive."""
