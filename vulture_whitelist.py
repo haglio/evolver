@@ -28,7 +28,7 @@ _.dwLength  # noqa: F821  — _MemoryStatusEx.dwLength (required by GlobalMemory
 _.cbSize  # noqa: F821  — _LastInputInfo.cbSize (required by GetLastInputInfo)
 
 # -- Dataclass fields consumed via dataclasses.asdict() --
-_.timed_out  # noqa: F821  — UpscaleResult.timed_out, serialized to run records
+_.stopped_at_budget  # noqa: F821  — UpscaleResult.stopped_at_budget, serialized to run records
 
 # -- Written-but-never-read on purpose: the reference IS the job --
 _._show_requests  # noqa: F821  — anchors the QLocalServer; collecting it closes the pipe
