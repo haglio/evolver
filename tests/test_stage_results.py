@@ -42,9 +42,6 @@ STILL_AN_OUT_PARAMETER = [
     "tasks/nonai_upscale.py:_start_next_candidate",
     "tasks/nonai_upscale.py:_stop_in_flight",
     "tasks/nonai_upscale.py:_supervise",
-    "tasks/scripts_sync.py:_copy_missing_variant_scripts",
-    "tasks/scripts_sync.py:_follow_retired_videos",
-    "tasks/scripts_sync.py:_rehome_to_library_variant",
 ]
 
 
