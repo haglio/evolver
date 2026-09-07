@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import QMessageBox, QToolBar
 from shared_ui.toggle_switch import ToggleSwitch
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
+from gui.schedule_state import ScheduleStatus
 from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import make_run_record
@@ -408,43 +409,43 @@ class TestMainWindowToolbarExists:
 
 
 class TestToolbarStateUpdates:
-    """update_schedule_status should keep toolbar widgets in sync."""
+    """show_schedule should keep toolbar widgets in sync."""
 
     def test_next_run_shown_when_scheduled(self, window):
         next_run = datetime(2026, 3, 29, 14, 30)
-        window.update_schedule_status(False, False, next_run)
+        window.show_schedule(ScheduleStatus(next_run_at=next_run))
         assert "14:30" in window._next_run_label.text()
 
     def test_inactive_message_when_paused(self, window):
-        window.update_schedule_status(False, True, None)
+        window.show_schedule(ScheduleStatus(is_paused=True))
         assert "inactive" in window._next_run_label.text().lower()
 
     def test_running_message_when_running(self, window):
-        window.update_schedule_status(True, False, None)
+        window.show_schedule(ScheduleStatus(is_running=True))
         assert "Running" in window._next_run_label.text()
 
     def test_run_now_disabled_when_running(self, window):
-        window.update_schedule_status(True, False, None)
+        window.show_schedule(ScheduleStatus(is_running=True))
         assert not window.run_now_action.isEnabled()
 
     def test_run_now_enabled_when_idle(self, window):
         next_run = datetime(2026, 3, 29, 15, 0)
-        window.update_schedule_status(False, False, next_run)
+        window.show_schedule(ScheduleStatus(next_run_at=next_run))
         assert window.run_now_action.isEnabled()
 
     def test_a_run_in_flight_outranks_a_pause_here_as_in_the_tray(self, window):
         # Pausing mid-run used to read "Running..." in the tray and "inactive"
-        # here at the same moment (bug 48); both read the one decision now.
-        window.update_schedule_status(True, True, None)
+        # here at the same moment (bug 48); both read the one status now.
+        window.show_schedule(ScheduleStatus(is_running=True, is_paused=True))
         assert window._next_run_label.text() == "Running..."
 
     def test_toggle_unchecked_when_paused(self, window):
-        window.update_schedule_status(False, True, None)
+        window.show_schedule(ScheduleStatus(is_paused=True))
         assert not window.active_toggle.isChecked()
 
     def test_toggle_checked_when_active(self, window):
-        window.update_schedule_status(False, True, None)
-        window.update_schedule_status(False, False, datetime.now())
+        window.show_schedule(ScheduleStatus(is_paused=True))
+        window.show_schedule(ScheduleStatus(next_run_at=datetime.now()))
         assert window.active_toggle.isChecked()
 
 

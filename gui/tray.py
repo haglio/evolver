@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import qtawesome as qta
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
@@ -12,7 +10,7 @@ from shared_ui.colors import TEXT_SECONDARY
 
 import config
 from gui.icons import quit_icon, restart_icon, run_now_icon
-from gui.schedule_state import PAUSED, RUNNING, SCHEDULED, schedule_state
+from gui.schedule_state import ScheduleStatus
 
 # The marks sit on the family's dark menu now, so they are its light text.
 _ICON_COLOR = TEXT_SECONDARY.name()
@@ -31,10 +29,6 @@ class EvolverTray(QSystemTrayIcon):
 
     def __init__(self, parent=None):
         super().__init__(_make_icon(), parent)
-        self._is_running = False
-        self._is_paused = False
-        self._next_run_at: datetime | None = None
-        self._update_tooltip()
 
         self._menu = QMenu()
         # A tray menu has no window to take the family's rules from; without
@@ -91,7 +85,9 @@ class EvolverTray(QSystemTrayIcon):
 
         self.setContextMenu(self._menu)
 
-        self._update_status_actions()
+        # An idle schedule until the scheduler says otherwise, which it does as
+        # soon as it starts -- but the icon is in the tray before that.
+        self.show_schedule(ScheduleStatus())
 
         # Double-click opens the window
         self.activated.connect(self._on_activated)
@@ -120,51 +116,21 @@ class EvolverTray(QSystemTrayIcon):
         """Show the saved state of the non-AI opt-in, without re-announcing it."""
         self.nonai_action.setChecked(enabled)
 
-    def set_running(self, running: bool):
-        self._is_running = running
-        self.run_now_action.setEnabled(not running)
-        self._update_tooltip()
-        self._update_status_actions()
+    def show_schedule(self, status: ScheduleStatus):
+        """Put the schedule on all five of the tray's surfaces at once.
 
-    def set_paused(self, paused: bool):
-        self._is_paused = paused
-        self.pause_action.setText("Resume Scheduling" if paused else "Pause Scheduling")
-        self._update_tooltip()
-        self._update_status_actions()
-
-    def set_next_run_at(self, next_run_at: datetime | None):
-        self._next_run_at = next_run_at
-        self._update_tooltip()
-        self._update_status_actions()
-
-    def _state(self) -> str:
-        return schedule_state(self._is_running, self._is_paused, self._next_run_at)
-
-    def _update_tooltip(self):
-        parts = ["Evolver"]
-        state = self._state()
-        if state == RUNNING:
-            parts.append("Running...")
-        elif state == PAUSED:
-            parts.append("Paused")
-        elif state == SCHEDULED:
-            parts.append(f"Next run: {self._next_run_at.strftime('%H:%M')}")
-        self.setToolTip(" - ".join(parts))
-
-    def _update_status_actions(self):
-        state = self._state()
-        if state == RUNNING:
-            self._status_action.setText("Status: Running")
-        elif state == PAUSED:
-            self._status_action.setText("Status: Paused")
-        else:
-            self._status_action.setText("Status: Scheduled")
-
-        if state == SCHEDULED:
-            self._next_run_action.setText(f"Next run: {self._next_run_at.strftime('%H:%M')}")
-            self._next_run_action.setVisible(True)
-        else:
-            self._next_run_action.setVisible(False)
+        Every one of them changes together on every change, so they are set
+        together: the two that used to be updated in separate passes are how
+        the tooltip and the menu could disagree about the same moment.
+        """
+        self.run_now_action.setEnabled(not status.is_running)
+        self.pause_action.setText(
+            "Resume Scheduling" if status.is_paused else "Pause Scheduling")
+        self.setToolTip(" - ".join(
+            part for part in ("Evolver", status.activity()) if part))
+        self._status_action.setText(f"Status: {status.headline()}")
+        self._next_run_action.setText(status.next_run_text())
+        self._next_run_action.setVisible(bool(status.next_run_text()))
 
     def _on_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:

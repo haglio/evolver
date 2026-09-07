@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
+from gui.schedule_state import ScheduleStatus
+
 
 class PipelineScheduler(QObject):
     """Fires run_requested at clock-aligned intervals (e.g. :00, :10, :20).
@@ -15,8 +17,8 @@ class PipelineScheduler(QObject):
     that arrives mid-run is ignored). Pause/resume controls the timer.
     """
 
-    run_requested = pyqtSignal(str)  # "scheduled" or "manual"
-    status_changed = pyqtSignal()    # emitted when state changes that affect display
+    run_requested = pyqtSignal(str)     # "scheduled" or "manual"
+    status_changed = pyqtSignal(object)  # a ScheduleStatus, whenever it changes
 
     def __init__(self, interval_minutes: int = 10, parent=None,
                  now: Callable[[], datetime] = datetime.now):
@@ -42,13 +44,13 @@ class PipelineScheduler(QObject):
     def stop(self):
         self._timer.stop()
         self._next_run_at = None
-        self.status_changed.emit()
+        self._announce()
 
     def pause(self):
         self._paused = True
         self._timer.stop()
         self._next_run_at = None
-        self.status_changed.emit()
+        self._announce()
 
     def resume(self):
         self._paused = False
@@ -60,7 +62,7 @@ class PipelineScheduler(QObject):
 
     def mark_running(self):
         self._running = True
-        self.status_changed.emit()
+        self._announce()
 
     def mark_idle(self):
         self._running = False
@@ -74,6 +76,13 @@ class PipelineScheduler(QObject):
     @property
     def interval_minutes(self) -> int:
         return self._interval_minutes
+
+    @property
+    def status(self) -> ScheduleStatus:
+        return ScheduleStatus(self._running, self._paused, self._next_run_at)
+
+    def _announce(self):
+        self.status_changed.emit(self.status)
 
     @property
     def is_running(self) -> bool:
@@ -109,7 +118,7 @@ class PipelineScheduler(QObject):
         ms_until = max(0, int((target - now).total_seconds() * 1000))
         self._next_run_at = target
         self._timer.start(ms_until)
-        self.status_changed.emit()
+        self._announce()
 
     def tick(self):
         """What one firing of the interval timer does.

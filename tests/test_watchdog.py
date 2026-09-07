@@ -53,16 +53,17 @@ class TestWatchdog(unittest.TestCase):
         worker.requestInterruption.assert_called_once_with()
 
     def test_the_ui_keeps_showing_a_run_in_flight(self):
-        """mark_idle()/set_running(False) here would re-enable Run Now and let
-        the scheduler tick into a run that cannot start — the UI must keep
-        saying what is true: a run is still in flight."""
+        """mark_idle() here would re-enable Run Now and let the scheduler tick
+        into a run that cannot start — the UI must keep saying what is true: a
+        run is still in flight."""
         app, _, _ = self._app_mid_overrun()
 
-        with patch.object(app._tray, "set_running") as set_running:
+        with patch.object(app._tray, "show_schedule") as shown:
             app._runs._on_watchdog()
 
         self.assertTrue(app._scheduler.is_running)
-        set_running.assert_not_called()
+        self.assertTrue(app._tray.toolTip().endswith("Running..."))
+        shown.assert_not_called()
 
     def test_the_toast_says_the_run_is_still_going_not_killed(self):
         """The old toast claimed "Pipeline killed" while nothing was killed."""
