@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from PyQt6.QtCore import Qt
@@ -14,7 +15,7 @@ from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_resul
 from gui.schedule_state import ScheduleStatus
 from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
 from tests.gui_support import build_evolver_app
-from tests.temp_helpers import make_run_record
+from tests.temp_helpers import make_run_record, override_config
 
 
 class TestRunDetailRendering:
@@ -87,7 +88,11 @@ class TestRunHistoryMarks:
         assert not self._item("error").icon().isNull()
 
     def test_the_label_itself_is_just_the_time_and_duration(self):
-        assert self._item("success").text() == "2026/07/25 08:20 (12s)"
+        """In the zone the overlay names -- pinned here, because a record
+        stores UTC and an unset zone reads the machine's own, which is not the
+        gate's."""
+        with override_config(DISPLAY_TIMEZONE=ZoneInfo("America/Los_Angeles")):
+            assert self._item("success").text() == "2026/07/25 08:20 (12s)"
 
     def test_refreshing_selects_the_newest_run_and_shows_its_detail(self):
         """This selection is what populates the detail pane when the window
