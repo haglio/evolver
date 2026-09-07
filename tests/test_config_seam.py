@@ -90,10 +90,7 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/nonai_upscale.py": 22,
     "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 5,
-    # Two more for the second pile: the directory Genau condemns a clip to, and
-    # the lane's own source folder, which is the only corner of 1_sorted a
-    # clip out of that pile can have come from (bug 11).
-    "tasks/purge_weird.py": 7,
+    "tasks/purge_weird.py": 3,
     "tasks/scene_scripts.py": 1,
     "tasks/scripts_sync.py": 19,
     "tasks/sort.py": 2,
@@ -113,8 +110,12 @@ CONFIG_REFERENCE_LEDGER = {
     "util/reference_stores.py": 6,
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
-    "util/video_locator.py": 3,
+    "util/video_locator.py": 2,
     "util/warm_gun.py": 3,
+    # Where the two condemned piles are, and the corner of 1_sorted each one's
+    # files came from. The stage that empties them and the index that has to
+    # leave them out both read it here instead of the library layout (bug 11).
+    "util/weird_piles.py": 4,
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or

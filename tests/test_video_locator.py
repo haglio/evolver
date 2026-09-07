@@ -40,6 +40,19 @@ class TestRelocate(unittest.TestCase):
 
             self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
 
+    def test_ignores_a_clip_awaiting_deletion_in_the_pile_genau_condemns_to(self):
+        """The purge stage sweeps that pile too, so a reference repointed at one
+        of its clips would be re-broken on the very next run."""
+        with workspace_temp_dir() as temp:
+            genau_weird = temp / "videos" / "genau" / "weird"
+            _write_video(genau_weird / "loop.mp4")
+            with override_config(VIDEO_SEARCH_ROOT=temp / "videos",
+                                 WEIRD_DIR=temp / "videos" / "2_outbox" / "kinda_weird",
+                                 GENAU_WEIRD_DIR=genau_weird):
+                index = video_locator.build_index()
+
+            self.assertIsNone(video_locator.relocate(temp / "gone" / "loop.mp4", index))
+
 
 class TestRenamedInPlace(unittest.TestCase):
     def test_finds_the_renamed_file_by_its_frame_fingerprint(self):

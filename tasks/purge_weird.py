@@ -16,40 +16,9 @@ import config
 from util.alert import show_error
 from util.media_files import is_finalized_video_file
 from util.variants import UPSCALE_SUFFIX
+from util.weird_piles import WeirdPile, weird_piles
 
 log = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class WeirdPile:
-    """A pile of condemned videos, and the tree their sources are looked for in."""
-
-    directory: Path
-    sorted_dir: Path
-    report_missing_sources: bool
-
-
-def weird_piles() -> tuple[WeirdPile, ...]:
-    """Every pile of condemned videos this stage sweeps.
-
-    The outbox pile takes files from every source folder, so the whole of
-    ``1_sorted`` answers for it. Genau's pile takes only what the Genau lane
-    delivered, and the lane files its sorted copies under its own source folder
-    (``tasks.genau_deliver``) -- a video elsewhere under ``1_sorted`` that
-    merely shares a stem with one of them belongs to a different lane.
-
-    Only the outbox pile reports a source it cannot find. An outbox file still
-    has its ``1_sorted`` copy beside it by construction, so a missing one is an
-    orphan worth a dialog; the lane retires a loop's copy the moment it delivers
-    it, so a condemned loop has no source to find and the same dialog would pop
-    for every clip Genau condemns.
-    """
-    sorted_dir = config.SORTED_DIR
-    return (
-        WeirdPile(config.WEIRD_DIR, sorted_dir, report_missing_sources=True),
-        WeirdPile(config.GENAU_WEIRD_DIR, sorted_dir / config.GENAU_SOURCE,
-                  report_missing_sources=False),
-    )
 
 
 @dataclass
