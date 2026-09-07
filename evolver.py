@@ -14,6 +14,7 @@ syntax tree, one runs the pipeline with its stages mocked.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -130,13 +131,24 @@ class _StopRequested(Exception):
 
 
 def setup_logging():
-    config.LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[logging.FileHandler(config.LOG_FILE, encoding="utf-8")],
-    )
+    """Send this process's logging to the pipeline log, however often it is asked.
+
+    Not ``logging.basicConfig``: it does nothing at all once the root logger has
+    a handler, and the tray app installs one before the worker ever gets here.
+    """
+    log_file = config.LOG_FILE
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if any(isinstance(handler, logging.FileHandler)
+           and handler.baseFilename == os.path.abspath(log_file)
+           for handler in root.handlers):
+        return
+
+    handler = logging.FileHandler(log_file, encoding="utf-8")
+    handler.setFormatter(logging.Formatter(
+        "[%(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+    root.addHandler(handler)
 
 
 def check_dependencies():

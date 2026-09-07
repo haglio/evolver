@@ -64,7 +64,7 @@ CONFIG_REFERENCE_LEDGER = {
     "backfill/voice.py": 5,
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
-    "evolver.py": 10,
+    "evolver.py": 9,
     "gui/app.py": 7,
     "gui/main_window.py": 2,
     # The broker's launcher, so a check that finds the broker gone has something
