@@ -90,7 +90,10 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/nonai_upscale.py": 22,
     "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 5,
-    "tasks/purge_weird.py": 5,
+    # Two more for the second pile: the directory Genau condemns a clip to, and
+    # the lane's own source folder, which is the only corner of 1_sorted a
+    # clip out of that pile can have come from (bug 11).
+    "tasks/purge_weird.py": 7,
     "tasks/scene_scripts.py": 1,
     "tasks/scripts_sync.py": 19,
     "tasks/sort.py": 2,

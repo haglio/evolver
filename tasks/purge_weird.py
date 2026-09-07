@@ -1,4 +1,10 @@
-"""Delete every file in kinda_weird, and its source file in 1_sorted."""
+"""Delete every condemned video in the piles this family keeps, and its source.
+
+Two piles: ``2_outbox/kinda_weird``, where a viewer's "mark as weird" and the
+backfill's discard both put an outbox video, and the one beside Genau's clips
+folder, where Genau puts a clip a session condemns. A condemned video takes its
+``1_sorted`` source and its metadata sidecar with it.
+"""
 
 import glob
 import logging
@@ -14,6 +20,38 @@ from util.variants import UPSCALE_SUFFIX
 log = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class WeirdPile:
+    """A pile of condemned videos, and the tree their sources are looked for in."""
+
+    directory: Path
+    sorted_dir: Path
+    report_missing_sources: bool
+
+
+def weird_piles() -> tuple[WeirdPile, ...]:
+    """Every pile of condemned videos this stage sweeps.
+
+    The outbox pile takes files from every source folder, so the whole of
+    ``1_sorted`` answers for it. Genau's pile takes only what the Genau lane
+    delivered, and the lane files its sorted copies under its own source folder
+    (``tasks.genau_deliver``) -- a video elsewhere under ``1_sorted`` that
+    merely shares a stem with one of them belongs to a different lane.
+
+    Only the outbox pile reports a source it cannot find. An outbox file still
+    has its ``1_sorted`` copy beside it by construction, so a missing one is an
+    orphan worth a dialog; the lane retires a loop's copy the moment it delivers
+    it, so a condemned loop has no source to find and the same dialog would pop
+    for every clip Genau condemns.
+    """
+    sorted_dir = config.SORTED_DIR
+    return (
+        WeirdPile(config.WEIRD_DIR, sorted_dir, report_missing_sources=True),
+        WeirdPile(config.GENAU_WEIRD_DIR, sorted_dir / config.GENAU_SOURCE,
+                  report_missing_sources=False),
+    )
+
+
 @dataclass
 class PurgeWeirdResult:
     deleted_weird: int = 0
@@ -24,31 +62,47 @@ class PurgeWeirdResult:
 
 def run() -> PurgeWeirdResult:
     result = PurgeWeirdResult()
-    weird_root = config.WEIRD_DIR
-    if not weird_root.is_dir():
-        return result
+    for pile in weird_piles():
+        _purge_pile(pile, result)
+
+    if result.missing_sorted:
+        _report_missing_sources(result.missing_sorted)
+
+    log.info(
+        "Purge done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
+        result.deleted_weird, result.deleted_sorted, result.deleted_metadata, len(result.missing_sorted),
+    )
+    return result
+
+
+def _purge_pile(pile: WeirdPile, result: PurgeWeirdResult) -> None:
+    """Delete every condemned video in *pile*, counting what went."""
+    if not pile.directory.is_dir():
+        return
 
     weird_files = [
-        p for p in weird_root.iterdir()
+        p for p in pile.directory.iterdir()
         if is_finalized_video_file(p, config.VIDEO_EXTENSIONS)
     ]
     if not weird_files:
-        return result
+        return
 
-    log.info("=== Stage: purge kinda_weird ===")
-    log.info("WEIRD:  %s", weird_root)
+    log.info("=== Stage: purge weird ===")
+    log.info("WEIRD:  %s", pile.directory)
     log.info("Found %d file(s) to purge", len(weird_files))
 
     for weird_file in sorted(weird_files):
         src_name = _source_name(weird_file)
         # By name, not by pattern: a `[`, `*` or `?` in a file name is a
         # character of the name, and handed to rglob raw it matched nothing.
-        matches = list(config.SORTED_DIR.rglob(glob.escape(src_name)))
+        matches = list(pile.sorted_dir.rglob(glob.escape(src_name)))
         matches = [p for p in matches if p.is_file()]
 
         if not matches:
-            log.warning("No source found in 1_sorted for: %s  (expected: %s)", weird_file.name, src_name)
-            result.missing_sorted.append(weird_file.name)
+            if pile.report_missing_sources:
+                log.warning("No source found in 1_sorted for: %s  (expected: %s)",
+                            weird_file.name, src_name)
+                result.missing_sorted.append(weird_file.name)
         else:
             for match in matches:
                 match.unlink()
@@ -63,15 +117,6 @@ def run() -> PurgeWeirdResult:
         weird_file.unlink()
         result.deleted_weird += 1
         log.info("Deleted weird:  %s", weird_file.name)
-
-    if result.missing_sorted:
-        _report_missing_sources(result.missing_sorted)
-
-    log.info(
-        "Purge done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
-        result.deleted_weird, result.deleted_sorted, result.deleted_metadata, len(result.missing_sorted),
-    )
-    return result
 
 
 def source_stem(stem: str) -> str:
