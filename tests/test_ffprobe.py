@@ -19,7 +19,7 @@ from unittest.mock import patch
 from util.ffprobe import (
     duration_seconds,
     frame_fingerprint,
-    get_orientation,
+    orientation_of,
     video_dimensions,
     videoai_tag,
 )
@@ -108,7 +108,7 @@ class TestFfprobeOrientation(unittest.TestCase):
     def _orientation(self, width, height, rotate="", calls=None):
         fake = _ffprobe_answering({GEOMETRY: _geometry_csv(width, height, rotate)}, calls)
         with patch("util.ffprobe.subprocess.run", side_effect=fake):
-            return get_orientation(Path("x.mp4"))
+            return orientation_of(Path("x.mp4"))
 
     def test_one_process_answers_width_height_and_rotation(self):
         """It was three, and the sort stage calls this once per incoming file --
@@ -179,7 +179,7 @@ class TestFfprobeInvocation(unittest.TestCase):
             self.assertIsNone(duration_seconds(Path("x.mp4")))
             self.assertIsNone(video_dimensions(Path("x.mp4")))
             self.assertIsNone(frame_fingerprint(Path("x.mp4")))
-            self.assertEqual(get_orientation(Path("x.mp4")), "unknown")
+            self.assertEqual(orientation_of(Path("x.mp4")), "unknown")
             self.assertEqual(videoai_tag(Path("x.mp4")), "")
 
     def test_ffprobe_never_flashes_a_console_window(self):

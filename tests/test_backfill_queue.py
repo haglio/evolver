@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from backfill.queue import BackfillQueue, unlabeled_videos
+from backfill.queue import BackfillQueue, unlabeled_clips
 from tests.temp_helpers import library_tree, override_config
 
 
@@ -12,28 +12,28 @@ class TestUnlabeledVideos(unittest.TestCase):
         with library_tree() as lib:
             video = lib.video("portrait", "provider2", "a_topaz.mp4")
 
-            self.assertEqual(unlabeled_videos(), [video])
+            self.assertEqual(unlabeled_clips(), [video])
 
     def test_a_sidecar_without_an_action_leaves_the_video_unlabeled(self):
         with library_tree() as lib:
             video = lib.video("portrait", "provider2", "a_topaz.mp4")
             lib.sidecar("portrait", "provider2", "a_topaz", {"video": {"prompt": "p"}})
 
-            self.assertEqual(unlabeled_videos(), [video])
+            self.assertEqual(unlabeled_clips(), [video])
 
     def test_a_sidecar_with_an_action_labels_the_video(self):
         with library_tree() as lib:
             lib.video("portrait", "provider2", "a_topaz.mp4")
             lib.sidecar("portrait", "provider2", "a_topaz", {"video": {"action": "Alpha"}})
 
-            self.assertEqual(unlabeled_videos(), [])
+            self.assertEqual(unlabeled_clips(), [])
 
     def test_the_scraped_sources_are_never_offered(self):
         with library_tree() as lib:
             lib.video("portrait", "provider", "a_topaz.mp4")
             lib.video("landscape", "origenerator", "b_topaz.mp4")
 
-            self.assertEqual(unlabeled_videos(), [])
+            self.assertEqual(unlabeled_clips(), [])
 
     def test_the_scraped_provider_is_whoever_the_overlay_names(self):
         # The provider's source name is the overlay's, and the deployed one is
@@ -44,13 +44,13 @@ class TestUnlabeledVideos(unittest.TestCase):
             lib.video("portrait", "examplesource", "a_topaz.mp4")
             placeholder = lib.video("portrait", "provider", "b_topaz.mp4")
 
-            self.assertEqual(unlabeled_videos(), [placeholder])
+            self.assertEqual(unlabeled_clips(), [placeholder])
 
     def test_a_half_written_upscale_is_never_offered(self):
         with library_tree() as lib:
             lib.video("portrait", "provider2", "a.partial.deadbeef.mp4")
 
-            self.assertEqual(unlabeled_videos(), [])
+            self.assertEqual(unlabeled_clips(), [])
 
     def test_a_clip_whose_act_was_called_wrong_is_asked_about_first(self):
         """Fun Time strikes a mislabeled act out of the sidecar and leaves
@@ -65,7 +65,7 @@ class TestUnlabeledVideos(unittest.TestCase):
             lib.sidecar("landscape", "provider2", "b_topaz",
                                {"video": {"prompt": "p", "wrong_action": "Alpha"}})
 
-            self.assertEqual(unlabeled_videos(), [rejected, plain])
+            self.assertEqual(unlabeled_clips(), [rejected, plain])
 
     def test_a_scraped_clip_whose_act_was_called_wrong_is_offered_anyway(self):
         """A scraped act is skipped because the scrape stage knows what the clip
@@ -76,14 +76,14 @@ class TestUnlabeledVideos(unittest.TestCase):
             lib.sidecar("portrait", "origenerator", "a_topaz",
                                {"video": {"wrong_action": "Alpha"}})
 
-            self.assertEqual(unlabeled_videos(), [rejected])
+            self.assertEqual(unlabeled_clips(), [rejected])
 
     def test_both_orientations_are_swept(self):
         with library_tree() as lib:
             portrait = lib.video("portrait", "provider2", "a_topaz.mp4")
             landscape = lib.video("landscape", "provider3", "b_topaz.mp4")
 
-            self.assertEqual(sorted(unlabeled_videos()), sorted([portrait, landscape]))
+            self.assertEqual(sorted(unlabeled_clips()), sorted([portrait, landscape]))
 
 
 class TestBackfillQueue(unittest.TestCase):

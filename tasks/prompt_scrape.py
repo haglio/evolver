@@ -26,7 +26,7 @@ from util.html_query import (
     text_content,
 )
 from util.media_files import child_dirs, library_videos
-from util.sidecar import sidecar_path, update, upscaled_video_path
+from util.sidecar import sidecar_path, upscaled_video_path
 
 log = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ def run(*, sorted_dir: Path | None = None,
                 recorded = video_type.type_of(current)
                 return video_type.stamped(payload, recorded) if recorded else payload
 
-            update(output_path, keep_the_kind)
+            sidecar.update(output_path, keep_the_kind)
             result.newly_scraped += 1
             log.info("Wrote metadata: %s", output_path)
 

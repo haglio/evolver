@@ -44,7 +44,7 @@ class TestSortHelpers(unittest.TestCase):
             src.write_bytes(b"video")
 
             with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir):
-                with patch("tasks.sort.get_orientation", return_value="landscape"):
+                with patch("tasks.sort.orientation_of", return_value="landscape"):
                     result = sort_task.run()
 
             self.assertEqual(result.moved, 1)
@@ -61,7 +61,7 @@ class TestSortHelpers(unittest.TestCase):
             (source_dir / "clip.mp4").write_bytes(b"video")
 
             with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir):
-                with patch("tasks.sort.get_orientation", return_value="landscape"):
+                with patch("tasks.sort.orientation_of", return_value="landscape"):
                     sort_task.run()
 
             self.assertFalse(source_dir.exists())
@@ -84,7 +84,7 @@ class TestSortHelpers(unittest.TestCase):
             ambient = td_path / "ambient"
 
             with override_config(INBOX_DIR=ambient / "0_inbox", SORTED_DIR=ambient / "1_sorted"):
-                with patch("tasks.sort.get_orientation", return_value="portrait"):
+                with patch("tasks.sort.orientation_of", return_value="portrait"):
                     result = sort_task.run(inbox_dir=inbox, sorted_dir=sorted_dir)
 
             self.assertEqual(result.moved, 1)

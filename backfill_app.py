@@ -12,7 +12,7 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import evolver
-from backfill.queue import BackfillQueue, ScannedClip, library_scan, unlabeled_videos
+from backfill.queue import BackfillQueue, ScannedClip, library_scan, unlabeled_clips
 from backfill.session import BackfillSession
 from backfill.thumbnails import build_thumbnails, example_clips, extract_frame, thumbnail_cache_path
 from backfill.vocabulary import grammar_phrases
@@ -43,13 +43,13 @@ def main() -> int:
     # One walk of the library, one parse of each sidecar: the work queue and
     # the example clips are two projections of it (util_backfill/design/005).
     scan = library_scan()
-    videos = unlabeled_videos(scan)
-    if not videos:
+    clips = unlabeled_clips(scan)
+    if not clips:
         QMessageBox.information(None, _TITLE, "Every clip already has an action.")
         return 0
 
     worker = SerialWorker()
-    session = BackfillSession(BackfillQueue(videos), worker)
+    session = BackfillSession(BackfillQueue(clips), worker)
 
     window = BackfillWindow(session, thumbnails=_ready_thumbnails(scan))
 
