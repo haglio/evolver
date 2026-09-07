@@ -106,7 +106,11 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/prompt_scrape.py": 5,
     "tasks/purge_weird.py": 3,
     "tasks/scene_scripts.py": 1,
-    "tasks/scripts_sync.py": 19,
+    # The three trees this stage aligns between are its arguments now, so the
+    # four bucket classifiers take the roots rather than looking them up:
+    # what is left is those three resolutions, the funscript extension and
+    # the log path the failure popup points at.
+    "tasks/scripts_sync.py": 7,
     "tasks/sort.py": 2,
     "tasks/stray_files.py": 8,
     # One more for the provider's source name in the recipe guard (bug 7).
