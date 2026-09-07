@@ -37,8 +37,6 @@ _MUTATORS = frozenset({
 # Helpers still handed their stage's result to fill in. Take one off in the
 # commit that converts it.
 STILL_AN_OUT_PARAMETER = [
-    "tasks/bookmarks_sync.py:_load_and_prune_rows",
-    "tasks/bookmarks_sync.py:_read_urls",
     "tasks/nonai_upscale.py:_conclude",
     "tasks/nonai_upscale.py:_report_progress",
     "tasks/nonai_upscale.py:_start_next_candidate",
