@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -36,6 +36,17 @@ class BookmarksSyncResult:
     @property
     def ok(self) -> bool:
         return not (self.profile_missing or self.write_error)
+
+
+@dataclass(frozen=True)
+class _Favorites:
+    """The web addresses the favorites file yielded, and what reading it found."""
+
+    urls: list[str] = field(default_factory=list)
+    pruned: int = 0
+    no_url: int = 0
+    bad_url: int = 0
+    source_missing: bool = False
 
 
 def run(
@@ -71,7 +82,11 @@ def run(
     log.info("SOURCE CSV: %s", favs_file)
     log.info("CHROME USER DATA: %s", chrome_user_data_dir)
 
-    urls = _read_urls(result, favs_file)
+    favorites = _read_urls(favs_file)
+    result.pruned = favorites.pruned
+    result.no_url = favorites.no_url
+    result.bad_url = favorites.bad_url
+    result.source_missing = favorites.source_missing
     if result.source_missing:
         log.info("Favorites CSV not found. Skipping bookmarks sync.")
         return result
@@ -89,7 +104,7 @@ def run(
     bookmarks_path = profile_dir / "Bookmarks"
     try:
         data = _load_bookmarks(bookmarks_path)
-        added = _upsert_folder(data, urls, bookmarks_folder_name)
+        added = _upsert_folder(data, favorites.urls, bookmarks_folder_name)
         _atomic_write_json(bookmarks_path, data)
     except OSError as exc:
         result.write_error = str(exc)
@@ -111,24 +126,25 @@ def run(
     return result
 
 
-def _read_urls(result: BookmarksSyncResult, path: Path) -> list[str]:
+def _read_urls(path: Path) -> _Favorites:
     if not path.is_file():
-        result.source_missing = True
-        return []
+        return _Favorites(source_missing=True)
 
-    fieldnames, rows = _load_and_prune_rows(path, result)
+    fieldnames, rows, pruned = _load_and_prune_rows(path)
 
     urls: list[str] = []
     seen: set[str] = set()
+    no_url = 0
+    bad_url = 0
     for row in rows:
         raw_value = (row.get("web_url") or "").strip()
         if not raw_value:
-            result.no_url += 1
+            no_url += 1
             continue
 
         url = _extract_url(raw_value)
         if url is None:
-            result.bad_url += 1
+            bad_url += 1
             log.warning("Skipping invalid web_url cell: %s", raw_value)
             continue
         if url in seen:
@@ -136,13 +152,13 @@ def _read_urls(result: BookmarksSyncResult, path: Path) -> list[str]:
         seen.add(url)
         urls.append(url)
 
-    if result.pruned:
+    if pruned:
         favs_csv.write_rows(path, fieldnames, rows)
-        log.info("Removed %d stale favorite row(s) whose source file is gone.", result.pruned)
-    return urls
+        log.info("Removed %d stale favorite row(s) whose source file is gone.", pruned)
+    return _Favorites(urls=urls, pruned=pruned, no_url=no_url, bad_url=bad_url)
 
 
-def _load_and_prune_rows(path: Path, result: BookmarksSyncResult) -> tuple[list[str], list[dict[str, str]]]:
+def _load_and_prune_rows(path: Path) -> tuple[list[str], list[dict[str, str]], int]:
     """Read the favorites, dropping rows whose local file is really gone.
 
     "Really" gone: the references stage runs first and has already followed
@@ -152,16 +168,17 @@ def _load_and_prune_rows(path: Path, result: BookmarksSyncResult) -> tuple[list[
     fieldnames, rows = favs_csv.read_rows(path)
     file_column = favs_csv.file_column_name(fieldnames)
     if file_column is None:
-        return fieldnames, rows
+        return fieldnames, rows, 0
 
     kept_rows: list[dict[str, str]] = []
+    pruned = 0
     for row in rows:
         local = favs_csv.local_path((row.get(file_column) or "").strip(), path.parent)
         if local is not None and not local.exists():
-            result.pruned += 1
+            pruned += 1
             continue
         kept_rows.append(row)
-    return fieldnames, kept_rows
+    return fieldnames, kept_rows, pruned
 
 
 def _extract_url(value: str) -> str | None:
