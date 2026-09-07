@@ -42,13 +42,25 @@ class WatchWeightsResult:
         return not self.write_errors
 
 
+@dataclass(frozen=True)
+class _PhoneFavorites:
+    """What carrying the phone's favorites into Fun Time's file came to."""
+
+    added: int = 0
+    removed: int = 0
+    write_errors: int = 0
+
+
 def run() -> WatchWeightsResult:
     result = WatchWeightsResult()
     log.info("=== Stage: watch weights ===")
     events = warm_gun.read_journal(config.WARM_GUN_JOURNAL_DIRS)
     videos = {event.path: warm_gun.library_video(event.path) for event in events}
     result.unmapped = sum(1 for event in events if videos[event.path] is None)
-    _apply_phone_favorites(events, videos, result)
+    phone_favorites = _apply_phone_favorites(events, videos)
+    result.favorites_added = phone_favorites.added
+    result.favorites_removed = phone_favorites.removed
+    result.write_errors = phone_favorites.write_errors
     phone_counts = _phone_counts(events, videos)
     fun_time_counts = read_dict(config.FUN_TIME_WATCH_STATS_FILE)
     favorites = {_key(video) for video in favs_csv.favorite_videos(config.FUN_TIME_FAVS_FILE)}
@@ -93,13 +105,16 @@ def _phone_counts(
 
 
 def _apply_phone_favorites(
-    events: list[warm_gun.Event], videos: dict[str, Path | None], result: WatchWeightsResult
-) -> None:
+    events: list[warm_gun.Event], videos: dict[str, Path | None]
+) -> _PhoneFavorites:
     if not config.FUN_TIME_FAVS_FILE.parent.is_dir():
         log.info("Fun Time is not installed here; the phone's favorites wait.")
-        return
+        return _PhoneFavorites()
     cursor = read_dict(config.WARM_GUN_FAVORITES_CURSOR_FILE).get(_CURSOR_FIELD, -1)
     applied_through = cursor
+    added = 0
+    removed = 0
+    write_errors = 0
     for event in events:
         if event.event not in _FAVORITE_EVENTS or event.t <= cursor:
             continue
@@ -107,12 +122,12 @@ def _apply_phone_favorites(
         if video is not None and video.exists():
             try:
                 if _FAVORITE_EVENTS[event.event]:
-                    result.favorites_added += favs_csv.add_favorite(config.FUN_TIME_FAVS_FILE, video)
+                    added += favs_csv.add_favorite(config.FUN_TIME_FAVS_FILE, video)
                 else:
-                    result.favorites_removed += favs_csv.remove_favorite(config.FUN_TIME_FAVS_FILE, video)
+                    removed += favs_csv.remove_favorite(config.FUN_TIME_FAVS_FILE, video)
             except OSError:
                 log.exception("Could not write %s", config.FUN_TIME_FAVS_FILE)
-                result.write_errors += 1
+                write_errors += 1
                 break
         elif video is not None and warm_gun.played_video(event.path).exists():
             log.info("Phone %s of %s waits for its upscale.", event.event, video)
@@ -122,3 +137,4 @@ def _apply_phone_favorites(
         atomic_write_text(
             config.WARM_GUN_FAVORITES_CURSOR_FILE, json.dumps({_CURSOR_FIELD: applied_through})
         )
+    return _PhoneFavorites(added, removed, write_errors)

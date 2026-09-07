@@ -46,7 +46,6 @@ STILL_AN_OUT_PARAMETER = [
     "tasks/scripts_sync.py:_discard_or_keep_duplicate",
     "tasks/scripts_sync.py:_follow_retired_videos",
     "tasks/scripts_sync.py:_rehome_to_library_variant",
-    "tasks/watch_weights.py:_apply_phone_favorites",
 ]
 
 
