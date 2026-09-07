@@ -7,7 +7,7 @@ from pathlib import Path
 
 import config
 from util import orientation
-from util.ffprobe import get_orientation
+from util.ffprobe import orientation_of
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
 
 log = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> Sor
         log.info("--- Sorting source: %s ---", source)
 
         for src in library_videos(src_root):
-            orient = get_orientation(src)
+            orient = orientation_of(src)
 
             if orient not in orientation.SORTED:
                 log.info("UNKNOWN (leaving in inbox): %s", src)

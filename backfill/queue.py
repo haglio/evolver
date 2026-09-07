@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import orientation
+from util import orientation, sidecar
 from util.media_files import library_videos
-from util.sidecar import action_of, read, sidecar_path, wrong_action_of
+from util.sidecar import action_of, sidecar_path, wrong_action_of
 from util.variants import sorted_stem_of
 
 # Portrait first, and that is not cosmetic: it is the order the tool asks a
@@ -77,11 +77,11 @@ def library_scan() -> list[ScannedClip]:
             clip_id=sorted_stem_of(video.stem),
         )
         for source, video in iter_library_videos()
-        if (payload := read(sidecar_path(video))) is not None
+        if (payload := sidecar.read(sidecar_path(video))) is not None
     ]
 
 
-def unlabeled_videos(scan: list[ScannedClip] | None = None) -> list[Path]:
+def unlabeled_clips(scan: list[ScannedClip] | None = None) -> list[Path]:
     """Every upscaled clip whose sidecar records no ``video.action``.
 
     The ones a viewer *rejected* come first.  Fun Time's "wrong action" empties
@@ -122,8 +122,8 @@ class BackfillQueue:
     run of decisions back to front rewinds the queue to the order it had.
     """
 
-    def __init__(self, videos: list[Path]) -> None:
-        self._pending = deque(videos)
+    def __init__(self, clips: list[Path]) -> None:
+        self._pending = deque(clips)
 
     @property
     def remaining(self) -> int:

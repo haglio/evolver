@@ -381,7 +381,7 @@ def _start_next_candidate(files: StageFiles) -> StartAttempt:
     for candidate in _collect(files):
         source = candidate.path
         expected_duration = ffprobe.duration_seconds(source)
-        orient = ffprobe.get_orientation(source)
+        orient = ffprobe.orientation_of(source)
         if ffprobe.videoai_tag(source):
             add_to_skip_manifest(files.skip_manifest, source,
                                  "already carries a Topaz videoai tag")

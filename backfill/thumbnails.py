@@ -41,8 +41,13 @@ _THUMBNAIL_HEIGHT = 96
 # far enough that the act — and the anchor — is actually in frame, not just beginning.
 _SAMPLE_FRACTION = 0.4
 
-def _tile_actions() -> list[str]:
-    """Every act a tile is built for, in grid order — the labels a thumbnail fills."""
+def _tile_labels() -> list[str]:
+    """Every tile's face, in grid order — the labels a thumbnail fills.
+
+    Labels, not actions: the grid holds control tiles ("Skip", "Weird") that
+    are no act at all, and an act tile's label is what the library's
+    ``video.action`` is matched against rather than what it is.
+    """
     return [command.label for row in scoped_grid() for command in row]
 
 
@@ -65,27 +70,28 @@ def _lookups(scan: list[ScannedClip]) -> tuple[dict[str, Path], dict[str, Path]]
 
 
 def example_clips(scan: list[ScannedClip] | None = None) -> dict[str, Path]:
-    """One example clip per tile that has one, as ``tile action -> clip``.
+    """One example clip per tile that has one, as ``tile label -> clip``.
 
-    A curated pin wins; otherwise the tile takes the first library clip whose action
-    matches it. Tiles with neither are simply absent, and stay text-only.
+    A curated pin wins; otherwise the tile takes the first library clip whose
+    action matches its label. Tiles with neither are simply absent, and stay
+    text-only.
 
     Takes the scan startup already made when there is one, so the library is
     walked and its sidecars parsed once rather than once per projection.
     """
     by_action, by_id = _lookups(library_scan() if scan is None else scan)
     examples: dict[str, Path] = {}
-    for action in _tile_actions():
-        clip = (by_id.get(config.CURATED_EXAMPLES.get(action, ""))
-                or by_action.get(action.lower()))
+    for label in _tile_labels():
+        clip = (by_id.get(config.CURATED_EXAMPLES.get(label, ""))
+                or by_action.get(label.lower()))
         if clip is not None:
-            examples[action] = clip
+            examples[label] = clip
     return examples
 
 
-def thumbnail_cache_path(action: str) -> Path:
-    """Where *action*'s cached thumbnail lives — one stable file name per tile."""
-    slug = re.sub(r"[^a-z0-9]+", "_", action.lower()).strip("_") or "unnamed"
+def thumbnail_cache_path(label: str) -> Path:
+    """Where *label*'s cached thumbnail lives — one stable file name per tile."""
+    slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "unnamed"
     return config.BACKFILL_THUMBNAIL_DIR / f"{slug}.jpg"
 
 
@@ -129,12 +135,12 @@ def build_thumbnails(
     extract: Callable[[Path, Path], bool],
     cache_path_for: Callable[[str], Path],
 ):
-    """Yield ``(action, thumbnail path)`` for each example that has, or gets, one.
+    """Yield ``(tile label, thumbnail path)`` for each example that has, or gets, one.
 
     A cached frame is reused; otherwise one is extracted and cached. An act whose
     extraction fails is skipped, so its tile simply stays text-only.
     """
-    for action, clip in examples.items():
-        dest = cache_path_for(action)
+    for label, clip in examples.items():
+        dest = cache_path_for(label)
         if dest.is_file() or extract(clip, dest):
-            yield action, dest
+            yield label, dest

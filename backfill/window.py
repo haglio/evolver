@@ -99,8 +99,8 @@ class BackfillWindow(QWidget):
         layout.addLayout(stage, stretch=1)
         layout.addWidget(self._build_command_panel())
 
-        for action, path in (thumbnails or {}).items():
-            self.set_thumbnail(action, path)
+        for label, path in (thumbnails or {}).items():
+            self.set_thumbnail(label, path)
 
         self._audio = QAudioOutput()
         self._audio.setMuted(True)
@@ -199,9 +199,9 @@ class BackfillWindow(QWidget):
         wanted = label.lower()
         return next((tile for tile in self._tiles.values() if tile.text().lower() == wanted), None)
 
-    def set_thumbnail(self, action: str, path: str) -> None:
-        """Put *action*'s example frame on its tile, aspect-locked so it never stretches."""
-        tile = self._tile_labelled(action)
+    def set_thumbnail(self, label: str, path: str) -> None:
+        """Put *label*'s example frame on its tile, aspect-locked so it never stretches."""
+        tile = self._tile_labelled(label)
         if tile is None or not path:
             return
         icon = _aspect_locked_icon(path, _THUMBNAIL_SIZE)

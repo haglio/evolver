@@ -50,13 +50,13 @@ def video_dimensions(file: Path) -> tuple[int, int] | None:
     """The (width, height) of a file's first video stream, or None if unavailable.
 
     Raw stored dimensions — rotation is not applied. Callers that need display
-    orientation (see :func:`get_orientation`) fold the rotate tag in themselves.
+    orientation (see :func:`orientation_of`) fold the rotate tag in themselves.
     """
     geometry = _stream_geometry(file)
     return None if geometry is None else geometry[:2]
 
 
-def get_orientation(file: Path) -> str:
+def orientation_of(file: Path) -> str:
     """Return 'landscape', 'portrait', or 'unknown' based on the first video stream."""
     geometry = _stream_geometry(file)
     if geometry is None:

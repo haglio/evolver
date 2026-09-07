@@ -80,7 +80,7 @@ def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**1
         "videoai": stack.enter_context(
             patch("util.ffprobe.videoai_tag", return_value=videoai)),
         "orientation": stack.enter_context(
-            patch("util.ffprobe.get_orientation", return_value=orientation)),
+            patch("util.ffprobe.orientation_of", return_value=orientation)),
         "duration": stack.enter_context(
             patch("util.ffprobe.duration_seconds", return_value=duration)),
         "free_bytes": stack.enter_context(

@@ -19,7 +19,7 @@ class TestMain(unittest.TestCase):
             setup_logging=patch("backfill_app.evolver.setup_logging"),
             qapplication=patch("backfill_app.QApplication"),
             alert=patch("backfill_app.QMessageBox"),
-            unlabeled=patch("backfill_app.unlabeled_videos", return_value=videos),
+            unlabeled=patch("backfill_app.unlabeled_clips", return_value=videos),
             thumbnails=patch("backfill_app._ready_thumbnails", return_value={}),
             window=patch("backfill_app.BackfillWindow"),
             listener=patch("backfill_app.VoiceListener"),
@@ -99,7 +99,7 @@ class TestReadyThumbnails(unittest.TestCase):
         scan. Two walks and two sidecar parses is a tray-launched tool sitting
         with no window on screen for twice as long as it needs to."""
         with patch("backfill_app.library_scan", return_value=[]) as scan, \
-                patch("backfill_app.unlabeled_videos", return_value=[]), \
+                patch("backfill_app.unlabeled_clips", return_value=[]), \
                 patch("backfill_app.QApplication"), \
                 patch("backfill_app.QMessageBox"), \
                 patch("backfill_app.evolver.setup_logging"):
