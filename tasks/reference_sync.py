@@ -30,13 +30,25 @@ class ReferenceSyncResult:
         return not self.write_errors
 
 
+@dataclass(frozen=True)
+class _Reconciled:
+    """What following one store's references came to."""
+
+    checked: int
+    relocated: int
+    unresolved: int
+
+
 def run() -> ReferenceSyncResult:
     result = ReferenceSyncResult()
     log.info("=== Stage: follow videos that moved ===")
 
     index = video_locator.build_index()
     for store in reference_stores.discover():
-        _reconcile(store, index, result)
+        reconciled = _reconcile(store, index)
+        result.checked += reconciled.checked
+        result.relocated += reconciled.relocated
+        result.unresolved += reconciled.unresolved
 
     log.info(
         "References done. Checked: %d, Relocated: %d, Unresolved: %d, Write errors: %d",
@@ -51,28 +63,27 @@ def run() -> ReferenceSyncResult:
 def _reconcile(
     store: reference_stores.ReferenceStore,
     index: dict[str, list[Path]],
-    result: ReferenceSyncResult,
-) -> None:
+) -> _Reconciled:
     references = store.read()
-    result.checked += len(references)
 
     moves: dict[str, str] = {}
+    unresolved = 0
     for reference in references:
         was_at = Path(reference)
         if was_at.exists():
             continue
         now_at = video_locator.relocate(was_at, index) or _renamed(store, was_at)
         if now_at is None:
-            result.unresolved += 1
+            unresolved += 1
             log.warning("UNRESOLVED %s reference (%s): %s", store.label, store.path.name, reference)
             continue
         moves[reference] = str(now_at)
         log.info("REPOINT %s  %s  ->  %s", store.label, reference, now_at)
 
-    if not moves:
-        return
-    store.rewrite(moves)
-    result.relocated += len(moves)
+    if moves:
+        store.rewrite(moves)
+    return _Reconciled(checked=len(references), relocated=len(moves),
+                       unresolved=unresolved)
 
 
 def _renamed(store: reference_stores.ReferenceStore, was_at: Path) -> Path | None:
