@@ -5,7 +5,7 @@ import filecmp
 import logging
 import shutil
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 
@@ -49,6 +49,38 @@ class _Duplicate(Enum):
     COLLIDED = auto()
 
 
+@dataclass(frozen=True)
+class _VariantRehome:
+    """What sending an orphan script to a library variant came to.
+
+    The two are independent: the archived original can get its self-describing
+    copy and the move to the variant still fail.
+    """
+
+    moved: bool = False
+    archived_copy: bool = False
+
+
+@dataclass(frozen=True)
+class _FollowedRetired:
+    """What became of the scripts whose videos are no longer in the library."""
+
+    unmatched_paths: list[str] = field(default_factory=list)
+    followed_to_archive: int = 0
+    rehomed_to_variants: int = 0
+    collisions: int = 0
+    discarded_duplicates: int = 0
+
+
+@dataclass(frozen=True)
+class _VariantCopies:
+    """What giving every scriptless variant its sibling's funscript came to."""
+
+    copied: int = 0
+    ambiguous_groups: int = 0
+    copy_errors: int = 0
+
+
 def run(show_popup: bool = False) -> ScriptsSyncResult:
     result = ScriptsSyncResult()
     config.SCRIPT_LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
@@ -84,9 +116,18 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
         script_path.rename(dest)
         result.moved += 1
 
-    _follow_retired_videos(orphans, video_index, result)
+    followed = _follow_retired_videos(orphans, video_index)
+    result.unmatched += len(followed.unmatched_paths)
+    result.unmatched_paths += followed.unmatched_paths
+    result.followed_to_archive += followed.followed_to_archive
+    result.rehomed_to_variants += followed.rehomed_to_variants
+    result.collisions += followed.collisions
+    result.discarded_duplicates += followed.discarded_duplicates
     remove_empty_dirs(config.SCRIPT_LIBRARY_DIR)
-    _copy_missing_variant_scripts(video_index, result)
+    variants = _copy_missing_variant_scripts(video_index)
+    result.copied_variants += variants.copied
+    result.ambiguous_variant_groups += variants.ambiguous_groups
+    result.variant_copy_errors += variants.copy_errors
     log.info(
         "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d, Rehomed to variants: %d, Followed to archive: %d, Discarded duplicates: %d",
         result.moved,
@@ -110,8 +151,8 @@ def run(show_popup: bool = False) -> ScriptsSyncResult:
     return result
 
 
-def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path]],
-                           result: ScriptsSyncResult) -> None:
+def _follow_retired_videos(orphans: list[Path],
+                           video_index: dict[str, list[Path]]) -> _FollowedRetired:
     """Send each script whose video left the library for the archive after it.
 
     With one exception, checked first: when an upscaled sibling of the retired
@@ -134,23 +175,31 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     is a guess about which video the script belongs to, and no archived video at
     all is the real unmatched case this stage exists to report.
     """
+    unmatched_paths: list[str] = []
+    followed_to_archive = 0
+    rehomed_to_variants = 0
+    collisions = 0
+    discarded_duplicates = 0
     archived = _index_archived_videos() if orphans else {}
     for script_path in orphans:
-        if _rehome_to_library_variant(script_path, video_index, archived, result):
+        rehome = _rehome_to_library_variant(script_path, video_index, archived)
+        if rehome.archived_copy:
+            followed_to_archive += 1
+        if rehome.moved:
+            rehomed_to_variants += 1
             continue
         videos = archived.get(script_path.stem, [])
         if len(videos) != 1:
             log.info("UNMATCHED script (no video basename match): %s", script_path)
-            result.unmatched += 1
-            result.unmatched_paths.append(str(script_path.relative_to(config.SCRIPT_LIBRARY_DIR)))
+            unmatched_paths.append(str(script_path.relative_to(config.SCRIPT_LIBRARY_DIR)))
             continue
 
         dest = videos[0].with_suffix(config.FUNSCRIPT_EXTENSION)
         if dest.exists():
             if _discard_or_keep_duplicate(script_path, dest) is _Duplicate.DISCARDED:
-                result.discarded_duplicates += 1
+                discarded_duplicates += 1
             else:
-                result.collisions += 1
+                collisions += 1
             continue
 
         try:
@@ -159,22 +208,23 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
             shutil.move(str(script_path), str(dest))
         except OSError:
             log.exception("FAILED TO FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
-            result.unmatched += 1
-            result.unmatched_paths.append(str(script_path.relative_to(config.SCRIPT_LIBRARY_DIR)))
+            unmatched_paths.append(str(script_path.relative_to(config.SCRIPT_LIBRARY_DIR)))
             continue
-        result.followed_to_archive += 1
+        followed_to_archive += 1
         log.info("FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
+
+    return _FollowedRetired(unmatched_paths, followed_to_archive,
+                            rehomed_to_variants, collisions, discarded_duplicates)
 
 
 def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Path]],
-                               archived: dict[str, list[Path]],
-                               result: ScriptsSyncResult) -> bool:
+                               archived: dict[str, list[Path]]) -> _VariantRehome:
     """Move an orphan script to a still-in-library variant of its video.
 
-    True when handled. The scriptless sibling is found by the same
-    normalized-stem-within-bucket rule the variant-copy pass uses; the archived
-    original, when it is unambiguous and bare, gets a copy before the move so
-    it can still describe itself.
+    The scriptless sibling is found by the same normalized-stem-within-bucket
+    rule the variant-copy pass uses; the archived original, when it is
+    unambiguous and bare, gets a copy before the move so it can still describe
+    itself.
     """
     script_bucket = _variant_bucket(config.VIDEO_LIBRARY_DIR / script_path.relative_to(config.SCRIPT_LIBRARY_DIR))
     normalized = strip_processing_suffixes(script_path.stem)
@@ -187,15 +237,16 @@ def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Pa
         and not script_path_for_video(video_path).exists()
     ]
     if not siblings:
-        return False
+        return _VariantRehome()
 
+    archived_copy = False
     archived_videos = archived.get(script_path.stem, [])
     if len(archived_videos) == 1:
         archive_dest = archived_videos[0].with_suffix(config.FUNSCRIPT_EXTENSION)
         if not archive_dest.exists():
             try:
                 shutil.copy2(script_path, archive_dest)
-                result.followed_to_archive += 1
+                archived_copy = True
                 log.info("COPY SCRIPT TO ARCHIVE  %s  ->  %s", script_path, archive_dest)
             except OSError:
                 log.exception("FAILED TO COPY SCRIPT TO ARCHIVE  %s  ->  %s", script_path, archive_dest)
@@ -206,10 +257,9 @@ def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Pa
         shutil.move(str(script_path), str(dest))
     except OSError:
         log.exception("FAILED TO REHOME SCRIPT TO VARIANT  %s  ->  %s", script_path, dest)
-        return False
-    result.rehomed_to_variants += 1
+        return _VariantRehome(archived_copy=archived_copy)
     log.info("REHOME SCRIPT TO LIBRARY VARIANT  %s  ->  %s", script_path, dest)
-    return True
+    return _VariantRehome(moved=True, archived_copy=archived_copy)
 
 
 def _discard_or_keep_duplicate(script_path: Path, dest: Path) -> _Duplicate:
@@ -268,7 +318,10 @@ def _matching_videos_for_script(script_path: Path, video_index: dict[str, list[P
     return [video_path for video_path in matches if _video_match_bucket(video_path) == bucket]
 
 
-def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: ScriptsSyncResult) -> None:
+def _copy_missing_variant_scripts(video_index: dict[str, list[Path]]) -> _VariantCopies:
+    copied = 0
+    ambiguous_groups = 0
+    copy_errors = 0
     groups: dict[tuple[tuple[str, ...], str], list[Path]] = defaultdict(list)
     for matches in video_index.values():
         for video_path in matches:
@@ -295,7 +348,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: Sc
                     normalized_stem,
                     ", ".join(str(script_path_for_video(video)) for video in sorted(existing_sources)),
                 )
-                result.ambiguous_variant_groups += 1
+                ambiguous_groups += 1
                 continue
 
             source_script = script_path_for_video(source_video)
@@ -304,12 +357,14 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]], result: Sc
                 dest_script.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_script, dest_script)
             except OSError:
-                result.variant_copy_errors += 1
+                copy_errors += 1
                 log.exception("FAILED TO COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
                 continue
-            result.copied_variants += 1
+            copied += 1
             existing_sources.append(target_video)
             log.info("COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
+
+    return _VariantCopies(copied, ambiguous_groups, copy_errors)
 
 
 def _pick_variant_source(target_video: Path, existing_sources: list[Path]) -> Path | None:
