@@ -26,11 +26,11 @@ class TestWatchdog(unittest.TestCase):
 
         worker = Mock()
         worker.isRunning.return_value = True
-        patcher = patch("gui.app.PipelineWorker", return_value=worker)
+        patcher = patch("gui.run_controller.PipelineWorker", return_value=worker)
         worker_cls = patcher.start()
         self.addCleanup(patcher.stop)
 
-        app._start_run("scheduled")
+        app._runs.start("scheduled")
         return app, worker, worker_cls
 
     def test_no_second_run_starts_while_the_overrun_pipeline_still_runs(self):
@@ -38,8 +38,8 @@ class TestWatchdog(unittest.TestCase):
         second pipeline must NOT start while the first still owns the library."""
         app, _worker, worker_cls = self._app_mid_overrun()
 
-        app._on_watchdog()
-        app._start_run("scheduled")
+        app._runs._on_watchdog()
+        app._runs.start("scheduled")
 
         self.assertEqual(worker_cls.call_count, 1)
 
@@ -48,7 +48,7 @@ class TestWatchdog(unittest.TestCase):
         cooperative: the pipeline honors it between stages."""
         app, worker, _ = self._app_mid_overrun()
 
-        app._on_watchdog()
+        app._runs._on_watchdog()
 
         worker.requestInterruption.assert_called_once_with()
 
@@ -59,7 +59,7 @@ class TestWatchdog(unittest.TestCase):
         app, _, _ = self._app_mid_overrun()
 
         with patch.object(app._tray, "set_running") as set_running:
-            app._on_watchdog()
+            app._runs._on_watchdog()
 
         self.assertTrue(app._scheduler.is_running)
         set_running.assert_not_called()
@@ -69,7 +69,7 @@ class TestWatchdog(unittest.TestCase):
         app, _, _ = self._app_mid_overrun(enable_toasts=True)
 
         with patch.object(app._tray, "showMessage") as toast:
-            app._on_watchdog()
+            app._runs._on_watchdog()
 
         message = toast.call_args[0][1]
         self.assertIn("still running", message.lower())
@@ -80,7 +80,7 @@ class TestWatchdog(unittest.TestCase):
         re-opens scheduling — so its finished/error signals must stay wired."""
         app, worker, _ = self._app_mid_overrun()
 
-        app._on_watchdog()
+        app._runs._on_watchdog()
 
         worker.pipeline_finished.disconnect.assert_not_called()
         worker.pipeline_error.disconnect.assert_not_called()
@@ -90,9 +90,9 @@ class TestWatchdog(unittest.TestCase):
         worker really exits, the next tick may start a fresh run."""
         app, worker, worker_cls = self._app_mid_overrun()
 
-        app._on_watchdog()
+        app._runs._on_watchdog()
         worker.isRunning.return_value = False
-        app._start_run("scheduled")
+        app._runs.start("scheduled")
 
         self.assertEqual(worker_cls.call_count, 2)
 
@@ -101,7 +101,7 @@ class TestWatchdog(unittest.TestCase):
 
         worker.isRunning.return_value = False
         with patch.object(app._tray, "showMessage") as toast:
-            app._on_watchdog()
+            app._runs._on_watchdog()
 
         worker.requestInterruption.assert_not_called()
         toast.assert_not_called()

@@ -57,7 +57,7 @@ def retire_evolver_app(app) -> None:
     three timers, the session-end connection, the tray and the window.
     """
     app._presence.stop()
-    app._watchdog.stop()
+    app._runs._watchdog.stop()
     app._peer_timer.stop()
     app._scheduler.stop()
     try:

@@ -51,7 +51,7 @@ class TestBuildingIsNotStarting:
     def test_construction_starts_neither_timer(self, request):
         app = build_evolver_app(request)
         assert not app._presence.is_running
-        assert not app._watchdog.isActive()
+        assert not app._runs._watchdog.isActive()
 
     def test_construction_reads_no_run_history(self, request):
         with patch("gui.main_window.load_runs") as load:
@@ -127,42 +127,42 @@ class TestRunTeardown:
         hidden calls on_pipeline_finished() on last run's dead popup."""
         app = build_evolver_app(request)
         popup = MagicMock()
-        app._progress_popup = popup
+        app._runs._progress_popup = popup
 
-        app._on_finished(self._finished_record())
+        app._runs._on_finished(self._finished_record())
 
         popup.on_pipeline_finished.assert_called_once_with()
-        assert app._progress_popup is None
+        assert app._runs._progress_popup is None
 
     def test_an_errored_run_lets_go_of_it_too(self, request):
         app = build_evolver_app(request)
         popup = MagicMock()
-        app._progress_popup = popup
+        app._runs._progress_popup = popup
 
-        app._on_error("something went wrong")
+        app._runs._on_error("something went wrong")
 
         popup.on_pipeline_finished.assert_called_once_with()
-        assert app._progress_popup is None
+        assert app._runs._progress_popup is None
 
     def test_a_finished_run_stops_the_watchdog_and_re_opens_scheduling(self, request):
         app = build_evolver_app(request)
-        with patch("gui.app.PipelineWorker"):
-            app._start_run("manual")
-        assert app._watchdog.isActive()
+        with patch("gui.run_controller.PipelineWorker"):
+            app._runs.start("manual")
+        assert app._runs._watchdog.isActive()
 
-        app._on_finished(self._finished_record())
+        app._runs._on_finished(self._finished_record())
 
-        assert not app._watchdog.isActive()
+        assert not app._runs._watchdog.isActive()
         assert not app._scheduler.is_running
 
     def test_an_errored_run_does_the_same(self, request):
         app = build_evolver_app(request)
-        with patch("gui.app.PipelineWorker"):
-            app._start_run("manual")
+        with patch("gui.run_controller.PipelineWorker"):
+            app._runs.start("manual")
 
-        app._on_error("something went wrong")
+        app._runs._on_error("something went wrong")
 
-        assert not app._watchdog.isActive()
+        assert not app._runs._watchdog.isActive()
         assert not app._scheduler.is_running
 
 
@@ -183,27 +183,27 @@ class TestToastPolicy:
 
     def test_toasts_off_silences_the_finish_the_error_and_the_overrun(self, request):
         app = self._app(request, enable_toasts=False)
-        with patch("gui.app.PipelineWorker") as worker_cls:
+        with patch("gui.run_controller.PipelineWorker") as worker_cls:
             worker_cls.return_value.isRunning.return_value = True
-            app._start_run("manual")
+            app._runs.start("manual")
 
         with patch.object(app._tray, "showMessage") as toast:
-            app._on_watchdog()
-            app._on_error("boom")
-            app._on_finished(self._record())
+            app._runs._on_watchdog()
+            app._runs._on_error("boom")
+            app._runs._on_finished(self._record())
 
         toast.assert_not_called()
 
     def test_toasts_on_says_something_for_each_of_the_three(self, request):
         app = self._app(request, enable_toasts=True)
-        with patch("gui.app.PipelineWorker") as worker_cls:
+        with patch("gui.run_controller.PipelineWorker") as worker_cls:
             worker_cls.return_value.isRunning.return_value = True
-            app._start_run("manual")
+            app._runs.start("manual")
 
         with patch.object(app._tray, "showMessage") as toast:
-            app._on_watchdog()
-            app._on_error("boom")
-            app._on_finished(self._record())
+            app._runs._on_watchdog()
+            app._runs._on_error("boom")
+            app._runs._on_finished(self._record())
 
         assert toast.call_count == 3
 
@@ -259,8 +259,8 @@ class TestNonAiUpscaleToggle:
     def test_worker_receives_the_toggle_state(self, request):
         app = self._app_with_fresh_settings(request)
         app._settings.nonai_upscale_enabled = True
-        with patch("gui.app.PipelineWorker") as mock_worker:
-            app._start_run("manual")
+        with patch("gui.run_controller.PipelineWorker") as mock_worker:
+            app._runs.start("manual")
         assert mock_worker.call_args.kwargs["nonai_enabled"]
 
 
