@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import time
 import unittest
 from unittest.mock import patch
 
@@ -35,6 +36,17 @@ class TestIsFirstInstance(unittest.TestCase):
             kernel32.CloseHandle(h)
 
 
+def _pump_until(condition, deadline_seconds: float = 10.0) -> bool:
+    """Spin the shared event loop until *condition* holds, or the deadline passes."""
+    deadline = time.monotonic() + deadline_seconds
+    while time.monotonic() < deadline:
+        QAPP.processEvents()
+        if condition():
+            return True
+        time.sleep(0.01)
+    return condition()
+
+
 class TestRequestShow(unittest.TestCase):
     """A duplicate launch asks the running instance to open its window."""
 
@@ -52,7 +64,7 @@ class TestRequestShow(unittest.TestCase):
             server = single_instance.serve_show_requests(lambda: shown.append(True))
             try:
                 self.assertTrue(single_instance.request_show())
-                QAPP.processEvents()
+                _pump_until(lambda: shown)
             finally:
                 server.close()
 
