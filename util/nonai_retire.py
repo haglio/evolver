@@ -58,12 +58,14 @@ def carry_metadata(source: Path, out: Path) -> bool:
     }
     if not carried:
         return False
+
+    def carry_them_over(existing: dict) -> dict | None:
+        merged = {**existing, **carried}
+        return merged if merged != existing else None
+
     destination = _sidecar_beside_or_mirrored(out)
-    existing = sidecar.read(destination)
-    merged = {**existing, **carried}
-    if merged == existing:
+    if sidecar.update(destination, carry_them_over) is None:
         return False
-    sidecar.write(destination, merged)
     log.info("Carried metadata onto upscale: %s -> %s", source.name, out.name)
     return True
 

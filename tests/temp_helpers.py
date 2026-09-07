@@ -67,6 +67,18 @@ class _LibraryTree:
         return path
 
 
+def write_sidecar(path: Path, payload: dict) -> dict:
+    """A sidecar as a test finds it, written outright.
+
+    Setting a fixture up is not the contention :func:`util.sidecar.update`
+    exists for -- nothing else is in the file yet -- so a test says what the
+    document holds rather than how it got there.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return payload
+
+
 @contextmanager
 def library_tree(**config_extra):
     """The AI-library temp tree and the config pointing at it, together.

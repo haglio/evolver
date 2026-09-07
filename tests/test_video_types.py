@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from tasks import video_types
-from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
+from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
 from util import sidecar, video_type
 
 # Fabricated: the real folder name is library vocabulary and lives in the
@@ -26,7 +26,7 @@ class TestAiLane(unittest.TestCase):
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4"
                 )
-                sidecar.write(path, {"video": {"prompt": "a prompt"}})
+                write_sidecar(path, {"video": {"prompt": "a prompt"}})
 
                 result = video_types.run(probe=_probe({video.stem: 5.0}))
 
@@ -34,6 +34,33 @@ class TestAiLane(unittest.TestCase):
             self.assertEqual(video_type.type_of(payload), video_type.SHORT)
             self.assertEqual(payload["video"]["prompt"], "a prompt")
             self.assertEqual(result.recorded, 1)
+
+    def test_an_act_struck_out_while_the_stage_measures_is_still_there_after(self):
+        """Bug 8's lost update, from the stage's side.
+
+        Measuring a clip takes seconds, and Fun Time can strike an act out of
+        the same sidecar in the middle of one.  The kind is written onto the
+        document as it stands when the write comes, so the rejection stays.
+        """
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_c.mp4")
+                path = sidecar.sidecar_path(
+                    lib.outbox / "portrait" / "provider2" / "clip_c_topaz.mp4"
+                )
+                write_sidecar(path, {"video": {"action": "Alpha"}})
+
+                def measure_while_a_viewer_rejects(clip):
+                    write_sidecar(path, {"video": {"wrong_action": "Alpha"}})
+                    return 5.0
+
+                video_types.run(probe=measure_while_a_viewer_rejects)
+
+                payload = sidecar.read(path)
+            self.assertEqual(payload["video"]["wrong_action"], "Alpha")
+            self.assertNotIn("action", payload["video"])
+            self.assertEqual(video_type.type_of(payload), video_type.SHORT)
 
     def test_a_long_generated_clip_is_full_length(self):
         with workspace_temp_dir() as root:
@@ -92,7 +119,7 @@ class TestNonAiLane(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 video = touch_video(self._bucket(lib) / "0 unsorted" / "Jane-Doe-scene-2.mp4")
                 path = sidecar.sidecar_path(video)
-                sidecar.write(path, {"clip": {"index": 2, "count": 9}})
+                write_sidecar(path, {"clip": {"index": 2, "count": 9}})
 
                 video_types.run(probe=_unmeasurable)
 
@@ -136,7 +163,7 @@ class TestRunningItAgain(unittest.TestCase):
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_c_topaz.mp4"
                 )
-                sidecar.write(path, video_type.timed(
+                write_sidecar(path, video_type.timed(
                     video_type.stamped({}, video_type.FULL_LENGTH), 240.0))
 
                 result = video_types.run(probe=_refuses_to_be_called)
@@ -157,7 +184,7 @@ class TestRunningItAgain(unittest.TestCase):
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_i_topaz.mp4"
                 )
-                sidecar.write(path, video_type.stamped({}, video_type.FULL_LENGTH))
+                write_sidecar(path, video_type.stamped({}, video_type.FULL_LENGTH))
 
                 first = video_types.run(probe=_probe({"clip_i": 240.0}))
                 again = video_types.run(probe=_refuses_to_be_called)
@@ -209,7 +236,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-5.mp4")
                 path = sidecar.sidecar_path(video)
-                sidecar.write(path, {"clip": {"index": 5, "count": 9}})
+                write_sidecar(path, {"clip": {"index": 5, "count": 9}})
 
                 video_types.run(probe=_probe({video.stem: 240.0}))
 
@@ -367,7 +394,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 video_types.run(probe=_probe({video.stem: 900.0}))
 
                 path = sidecar.sidecar_path(video)
-                sidecar.write(path, dict(sidecar.read(path), clip={"index": 3}))
+                write_sidecar(path, dict(sidecar.read(path), clip={"index": 3}))
                 video_types.run(probe=_refuses_to_be_called)
 
                 self.assertEqual(video_type.type_of(sidecar.read(path)), video_type.EXCERPT)
@@ -414,7 +441,7 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
         video = touch_video(lib.non_ai / "alpha" / folder / "0 unsorted" / name)
         if carved:
             with lib.config(GENAU_SOURCE):
-                sidecar.write(sidecar.sidecar_path(video), {"clip": {"index": 1}})
+                write_sidecar(sidecar.sidecar_path(video), {"clip": {"index": 1}})
         return video
 
     def test_a_folder_holding_the_batchs_carved_scenes_takes_the_rest_with_it(self):

@@ -55,11 +55,12 @@ def run() -> WatchWeightsResult:
     for video in _played_videos():
         key = _key(video)
         counts = watch.add_counts(fun_time_counts.get(key), phone_counts.get(key))
-        path = sidecar.sidecar_path(video)
-        payload = sidecar.read(path)
-        stamped = watch.stamped(payload, counts, favorite=key in favorites)
-        if stamped != payload:
-            sidecar.write(path, stamped)
+
+        def stamp_the_watching(payload: dict, counts=counts, key=key) -> dict | None:
+            stamped = watch.stamped(payload, counts, favorite=key in favorites)
+            return stamped if stamped != payload else None
+
+        if sidecar.update(sidecar.sidecar_path(video), stamp_the_watching) is not None:
             result.stamped += 1
     log.info(
         "Watch weights: stamped %d sidecar(s); phone favorites added %d, removed %d; "

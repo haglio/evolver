@@ -108,7 +108,7 @@ def _seed_running_times(preview_metadata: Path, videos: list[Path]) -> None:
         if seconds is None:
             seconds = video_type.duration_of(sidecar.read(path)) or duration_seconds(video)
         if seconds is not None:
-            sidecar.write(path, video_type.timed({}, seconds))
+            sidecar.update(path, lambda _, seconds=seconds: video_type.timed({}, seconds))
 
 
 def nonai_upscale_report(preview_metadata: Path, primary: Path) -> StageRecord:

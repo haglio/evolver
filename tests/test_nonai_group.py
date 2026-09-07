@@ -3,7 +3,7 @@ from pathlib import Path
 
 import evolver
 from tasks import nonai_group
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir, write_sidecar
 from util import sidecar
 
 
@@ -71,7 +71,7 @@ class TestNonAiGroup(unittest.TestCase):
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
                 clip = _touch(non_ai / "larkin" / "1 clips" / "Ann Bly - POV.mp4")
-                sidecar.write(
+                write_sidecar(
                     sidecar.sidecar_path(clip),
                     {"video": {"action": "Alpha"},
                      "clip": {"compilation": "Vol6", "index": 9}},
@@ -97,7 +97,7 @@ class TestNonAiGroup(unittest.TestCase):
                     non_ai / "larkin" / "3_good_to_go" / "processed"
                     / "Lee-Poe_apo8_iris2.mp4"
                 )
-                sidecar.write(
+                write_sidecar(
                     sidecar.sidecar_path(original),
                     {"clip": {"compilation": "Vol6", "index": 1}},
                 )
@@ -125,7 +125,7 @@ class TestNonAiGroup(unittest.TestCase):
                     non_ai / "larkin" / "0 unsorted"
                     / "Ann Bly - Scene Two (2009) Enhanced.mp4"
                 )
-                sidecar.write(sidecar.sidecar_path(clip), {"clip": {"compilation": "Vol6", "index": 9}})
+                write_sidecar(sidecar.sidecar_path(clip), {"clip": {"compilation": "Vol6", "index": 9}})
 
                 nonai_group.run()
 

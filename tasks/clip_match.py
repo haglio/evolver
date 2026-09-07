@@ -62,10 +62,11 @@ def record(clip: Path, scene: Path, *, offset: float) -> None:
     it is still in hand. ``tasks.scene_scripts`` and ``tasks.clip_scripts``
     shift by it.
     """
-    path = sidecar.sidecar_path(clip)
-    payload = sidecar.read(path)
-    payload.setdefault("clip", {}).update(full_video=str(scene), scene_offset=offset)
-    sidecar.write(path, payload)
+    def record_the_scene(payload: dict) -> dict:
+        payload.setdefault("clip", {}).update(full_video=str(scene), scene_offset=offset)
+        return payload
+
+    sidecar.update(sidecar.sidecar_path(clip), record_the_scene)
 
 
 def forget(clip: Path, scene: Path) -> None:
@@ -76,14 +77,15 @@ def forget(clip: Path, scene: Path) -> None:
     records is left alone: the sweep only ever measured this one scene, and a
     match to another is not its to overrule.
     """
-    path = sidecar.sidecar_path(clip)
-    payload = sidecar.read(path)
-    recorded = payload.get("clip")
-    if not isinstance(recorded, dict) or recorded.get("full_video") != str(scene):
-        return
-    recorded.pop("full_video", None)
-    recorded.pop("scene_offset", None)
-    sidecar.write(path, payload)
+    def drop_the_match(payload: dict) -> dict | None:
+        recorded = payload.get("clip")
+        if not isinstance(recorded, dict) or recorded.get("full_video") != str(scene):
+            return None
+        recorded.pop("full_video", None)
+        recorded.pop("scene_offset", None)
+        return payload
+
+    sidecar.update(sidecar.sidecar_path(clip), drop_the_match)
 
 
 def run(
