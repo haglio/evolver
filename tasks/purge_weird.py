@@ -33,7 +33,11 @@ class PurgeWeirdResult:
 def run() -> PurgeWeirdResult:
     result = PurgeWeirdResult()
     for pile in weird_piles():
-        _purge_pile(pile, result)
+        purged = _purge_pile(pile)
+        result.deleted_weird += purged.deleted_weird
+        result.deleted_sorted += purged.deleted_sorted
+        result.deleted_metadata += purged.deleted_metadata
+        result.missing_sorted += purged.missing_sorted
 
     if result.missing_sorted:
         _report_missing_sources(result.missing_sorted)
@@ -45,22 +49,30 @@ def run() -> PurgeWeirdResult:
     return result
 
 
-def _purge_pile(pile: WeirdPile, result: PurgeWeirdResult) -> None:
-    """Delete every condemned video in *pile*, counting what went."""
+def _purge_pile(pile: WeirdPile) -> PurgeWeirdResult:
+    """What emptying *pile* deleted, and what source it could not find.
+
+    A stage result rather than a record of its own: every field of one is a
+    per-pile fact, and run() is the sum over the piles.
+    """
     if not pile.directory.is_dir():
-        return
+        return PurgeWeirdResult()
 
     weird_files = [
         p for p in pile.directory.iterdir()
         if is_finalized_video_file(p, config.VIDEO_EXTENSIONS)
     ]
     if not weird_files:
-        return
+        return PurgeWeirdResult()
 
     log.info("=== Stage: purge weird ===")
     log.info("WEIRD:  %s", pile.directory)
     log.info("Found %d file(s) to purge", len(weird_files))
 
+    deleted_weird = 0
+    deleted_sorted = 0
+    deleted_metadata = 0
+    missing_sorted: list[str] = []
     for weird_file in sorted(weird_files):
         src_name = _source_name(weird_file)
         # By name, not by pattern: a `[`, `*` or `?` in a file name is a
@@ -72,21 +84,24 @@ def _purge_pile(pile: WeirdPile, result: PurgeWeirdResult) -> None:
             if pile.report_missing_sources:
                 log.warning("No source found in 1_sorted for: %s  (expected: %s)",
                             weird_file.name, src_name)
-                result.missing_sorted.append(weird_file.name)
+                missing_sorted.append(weird_file.name)
         else:
             for match in matches:
                 match.unlink()
-                result.deleted_sorted += 1
+                deleted_sorted += 1
                 log.info("Deleted source: %s", match)
 
         for json_file in config.METADATA_DIR.rglob(glob.escape(weird_file.stem + ".json")):
             json_file.unlink()
-            result.deleted_metadata += 1
+            deleted_metadata += 1
             log.info("Deleted metadata: %s", json_file)
 
         weird_file.unlink()
-        result.deleted_weird += 1
+        deleted_weird += 1
         log.info("Deleted weird:  %s", weird_file.name)
+
+    return PurgeWeirdResult(deleted_weird, deleted_sorted, deleted_metadata,
+                            missing_sorted)
 
 
 def source_stem(stem: str) -> str:
