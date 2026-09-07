@@ -12,6 +12,12 @@ Two mechanisms, answering two different questions — keep both:
 
 A wedged instance still holds the mutex while answering nothing on the pipe, so
 the caller learns both answers and can say so rather than exiting into silence.
+
+Both are one object because both are held for the process's life: Windows lets
+a named mutex go when the last handle to it closes, and a collected server
+closes the pipe with it. Held as two loose module globals, the second was a
+return value the caller had to remember to keep -- which is a rule no reader of
+the caller can see, and one nothing would have failed on.
 """
 
 from __future__ import annotations
@@ -31,56 +37,56 @@ _PIPE_NAME = "EvolverTrayApp_ShowWindow"
 
 _CONNECT_TIMEOUT_MS = 3000
 
-# The handle that IS the claim.  Windows lets a named mutex go when the last
-# handle to it closes, so it is held here for the process's life.
-_mutex_handle: int | None = None
 
+class InstanceGateway:
+    """This process's claim on being *the* Evolver, and the pipe under it."""
 
-def is_first_instance() -> bool:
-    """Claim the named mutex. True when no other Evolver holds it.
+    def __init__(self):
+        # Each handle IS the thing it claims, so both live as long as this does.
+        self._mutex_handle: int | None = None
+        self._show_requests: QLocalServer | None = None
 
-    False also when Windows would not make the mutex at all.  "Could not check"
-    is not "checked": a second scheduler is the failure this guards against, so
-    a refusal to create the mutex is a refusal to run, not a licence to.
-    """
-    global _mutex_handle
-    _mutex_handle = try_acquire_mutex(_MUTEX_NAME)
-    return _mutex_handle is not None
+    def claim(self) -> bool:
+        """Claim the named mutex. True when no other Evolver holds it.
 
+        False also when Windows would not make the mutex at all.  "Could not
+        check" is not "checked": a second scheduler is the failure this guards
+        against, so a refusal to create the mutex is a refusal to run, not a
+        licence to.
+        """
+        self._mutex_handle = try_acquire_mutex(_MUTEX_NAME)
+        return self._mutex_handle is not None
 
-def serve_show_requests(on_show: Callable[[], None]) -> QLocalServer:
-    """Listen for duplicate launches and run *on_show* for each one.
+    def serve_show_requests(self, on_show: Callable[[], None]) -> None:
+        """Listen for duplicate launches and run *on_show* for each one."""
+        server = QLocalServer()
+        QLocalServer.removeServer(_PIPE_NAME)  # only ours to take: we hold the mutex
+        if not server.listen(_PIPE_NAME):
+            # Not fatal — this instance still works. But nothing can hand a
+            # launch to it, so say why here rather than in a dialog the user
+            # cannot act on.
+            log.error("Cannot listen on %s: %s", _PIPE_NAME, server.errorString())
 
-    The caller must hold the returned server: dropping it closes the pipe, and
-    every later launch then falls through to the "not responding" dialog.
-    """
-    server = QLocalServer()
-    QLocalServer.removeServer(_PIPE_NAME)  # only ours to take: we hold the mutex
-    if not server.listen(_PIPE_NAME):
-        # Not fatal — this instance still works. But nothing can hand a launch
-        # to it, so say why here rather than in a dialog the user cannot act on.
-        log.error("Cannot listen on %s: %s", _PIPE_NAME, server.errorString())
+        def _accept():
+            connection = server.nextPendingConnection()
+            if connection is not None:
+                connection.disconnectFromServer()
+                connection.deleteLater()
+            on_show()
 
-    def _accept():
-        connection = server.nextPendingConnection()
-        if connection is not None:
-            connection.disconnectFromServer()
-            connection.deleteLater()
-        on_show()
+        server.newConnection.connect(_accept)
+        self._show_requests = server
 
-    server.newConnection.connect(_accept)
-    return server
+    def hand_off(self) -> bool:
+        """Ask the running instance to open its window. True if it took it.
 
-
-def request_show() -> bool:
-    """Ask the running instance to open its window. True if it took the request.
-
-    The connection itself is the whole message — there is no payload to get
-    wrong, and a refused connection is exactly the case the caller must handle.
-    """
-    socket = QLocalSocket()
-    socket.connectToServer(_PIPE_NAME)
-    if not socket.waitForConnected(_CONNECT_TIMEOUT_MS):
-        return False
-    socket.disconnectFromServer()
-    return True
+        The connection itself is the whole message — there is no payload to get
+        wrong, and a refused connection is exactly the case the caller must
+        handle.
+        """
+        socket = QLocalSocket()
+        socket.connectToServer(_PIPE_NAME)
+        if not socket.waitForConnected(_CONNECT_TIMEOUT_MS):
+            return False
+        socket.disconnectFromServer()
+        return True

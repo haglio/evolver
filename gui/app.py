@@ -8,11 +8,10 @@ import subprocess
 import sys
 
 from PyQt6.QtCore import QTimer
-from PyQt6.QtNetwork import QLocalServer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 import config
-from gui import peer_watch, process_identity, single_instance
+from gui import peer_watch, process_identity
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.palette import apply_accent
@@ -22,6 +21,7 @@ from gui.run_record import RunRecord, format_run_label, load_runs
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
+from gui.single_instance import InstanceGateway
 from gui.stats_window import StatsWindow
 from gui.tray import EvolverTray
 from util import crash_log, run_log
@@ -79,7 +79,7 @@ class EvolverApp:
         self._settings = EvolverSettings.load()
         self._stats_window: StatsWindow | None = None
         self._log_window: RunLogWindow | None = None
-        self._show_requests: QLocalServer | None = None
+        self._instance = InstanceGateway()
 
         # Parks and thaws the in-flight non-AI encode between the slow pipeline
         # ticks, so returning to the machine suspends it in seconds. Reads the
@@ -165,25 +165,31 @@ class EvolverApp:
             self._show_window()
 
     def run(self) -> int:
-        if not single_instance.is_first_instance():
-            crash_log.write_info(
-                "Already running:", "duplicate launch handed to the running instance\n",
-            )
-            if not single_instance.request_show():
-                show_error(
-                    "Evolver",
-                    "Evolver is already running but did not respond, so its window "
-                    "could not be opened.\n\nQuit it from the tray icon, or end the "
-                    "pythonw.exe process, then start Evolver again.",
-                )
+        if not self._instance.claim():
+            self._hand_this_launch_over()
             return 0
 
-        # Held for the process's life: if this is collected the pipe closes with
-        # it, and every later launch fails the handoff instead of taking it.
-        self._show_requests = single_instance.serve_show_requests(self._show_window)
-
+        self._instance.serve_show_requests(self._show_window)
         self.start()
         return self._app.exec()
+
+    def _hand_this_launch_over(self):
+        """Give this launch to the Evolver already running, or say why not.
+
+        A wedged instance holds the mutex while answering nothing, and exiting
+        into silence there looks exactly like a shortcut that does nothing.
+        """
+        crash_log.write_info(
+            "Already running:", "duplicate launch handed to the running instance\n",
+        )
+        if self._instance.hand_off():
+            return
+        show_error(
+            "Evolver",
+            "Evolver is already running but did not respond, so its window "
+            "could not be opened.\n\nQuit it from the tray icon, or end the "
+            "pythonw.exe process, then start Evolver again.",
+        )
 
     def _show_window(self):
         self._window.show()

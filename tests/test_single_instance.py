@@ -18,7 +18,7 @@ class TestIsFirstInstance(unittest.TestCase):
     def test_first_instance_returns_true(self):
         unique = f"TestMutex_{os.getpid()}"
         with patch.object(single_instance, "_MUTEX_NAME", unique):
-            self.assertTrue(single_instance.is_first_instance())
+            self.assertTrue(single_instance.InstanceGateway().claim())
 
     def test_second_instance_returns_false(self):
         unique = f"TestMutex_Dup_{os.getpid()}"
@@ -31,7 +31,7 @@ class TestIsFirstInstance(unittest.TestCase):
         self.assertTrue(h, "Setup: CreateMutexW should succeed")
         try:
             with patch.object(single_instance, "_MUTEX_NAME", unique):
-                self.assertFalse(single_instance.is_first_instance())
+                self.assertFalse(single_instance.InstanceGateway().claim())
         finally:
             kernel32.CloseHandle(h)
 
@@ -54,21 +54,35 @@ class TestRequestShow(unittest.TestCase):
         with patch.object(
             single_instance, "_PIPE_NAME", f"EvolverTest_Absent_{os.getpid()}"
         ):
-            self.assertFalse(single_instance.request_show())
+            self.assertFalse(single_instance.InstanceGateway().hand_off())
 
     def test_reaches_a_listening_instance_and_triggers_its_callback(self):
         shown = []
         with patch.object(
             single_instance, "_PIPE_NAME", f"EvolverTest_Live_{os.getpid()}"
         ):
-            server = single_instance.serve_show_requests(lambda: shown.append(True))
+            listener = single_instance.InstanceGateway()
+            listener.serve_show_requests(lambda: shown.append(True))
             try:
-                self.assertTrue(single_instance.request_show())
+                self.assertTrue(single_instance.InstanceGateway().hand_off())
                 _pump_until(lambda: shown)
             finally:
-                server.close()
+                listener._show_requests.close()
 
         self.assertEqual(shown, [True])
+
+    def test_the_listener_is_held_past_the_call_that_made_it(self):
+        """A QLocalServer nothing refers to is collected, and the pipe closes
+        with it — the handoff would then fail for reasons no log would show."""
+        gateway = single_instance.InstanceGateway()
+        with patch.object(
+            single_instance, "_PIPE_NAME", f"EvolverTest_Held_{os.getpid()}"
+        ):
+            gateway.serve_show_requests(lambda: None)
+            try:
+                self.assertTrue(gateway._show_requests.isListening())
+            finally:
+                gateway._show_requests.close()
 
 
 if __name__ == "__main__":
