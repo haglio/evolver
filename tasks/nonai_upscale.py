@@ -77,6 +77,50 @@ class NonAiUpscaleResult:
 
 
 @dataclass(frozen=True)
+class Supervision:
+    """What checking on the in-flight encode came to, this tick.
+
+    Either the encode is still going -- named, with how far through it is, and
+    frozen or not -- or it has ended, in one of three ways: stopped through no
+    fault of its video, promoted over the original, or failed.
+    """
+
+    in_flight: str = ""
+    in_flight_percent: int | None = None
+    suspended: bool = False
+    stopped: str = ""
+    promoted: str = ""
+    failed: str = ""
+    deferred_low_disk: bool = False
+
+
+@dataclass(frozen=True)
+class StartAttempt:
+    """What trying to start the next encode came to, this tick.
+
+    Either a clip was started, or it was held back -- ``deferred`` naming which
+    of the machine's four reasons, and ``deferred_low_disk`` the one that is
+    about the library's drive rather than the machine's load.
+    """
+
+    started: str = ""
+    deferred: str = ""
+    deferred_low_disk: bool = False
+
+
+@dataclass(frozen=True)
+class Conclusion:
+    """The verdict on an encode that is no longer running.
+
+    Exactly one of the two is set: the output covered enough of the source and
+    was promoted over the original, or it did not and the clip failed.
+    """
+
+    promoted: str = ""
+    failed: str = ""
+
+
+@dataclass(frozen=True)
 class StageFiles:
     """The six files the stage touches, resolved once at its boundary.
 
@@ -151,11 +195,21 @@ def run(allow_start: bool = True, stop: bool = False,
             job = nonai_encode.adopt_orphan(files.job)
         _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
         if job is not None:
-            _supervise(job, result, files, stop=stop,
-                       presence_managed=presence_managed)
+            supervised = _supervise(job, files, stop=stop,
+                                    presence_managed=presence_managed)
+            result.in_flight = supervised.in_flight
+            result.in_flight_percent = supervised.in_flight_percent
+            result.suspended = supervised.suspended
+            result.stopped = supervised.stopped
+            result.promoted = supervised.promoted
+            result.failed = supervised.failed
+            result.deferred_low_disk = supervised.deferred_low_disk
 
         if not result.in_flight and allow_start and not stop:
-            _start_next_candidate(result, files)
+            attempt = _start_next_candidate(files)
+            result.started = attempt.started
+            result.start_deferred = attempt.deferred
+            result.deferred_low_disk |= attempt.deferred_low_disk
 
     # Collected a second time on purpose: a start attempt can retire clips to
     # the skip manifest, and the count reported is the queue as it stands after
@@ -219,51 +273,52 @@ def _collect(files: StageFiles) -> list[Candidate]:
                               watch_stats_file=files.watch_stats)
 
 
-def _supervise(job: dict, result: NonAiUpscaleResult, files: StageFiles, *,
-               stop: bool = False, presence_managed: bool = False) -> None:
+def _supervise(job: dict, files: StageFiles, *, stop: bool = False,
+               presence_managed: bool = False) -> Supervision:
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
         if stop:
-            _stop_in_flight(job, result, "the non-AI upscale toggle is off", files)
-            return
+            return Supervision(
+                stopped=_stop_in_flight(job, "the non-AI upscale toggle is off", files))
         if _is_low_disk():
             # The 250 GB floor was clear at start, but a 4K60 output plus
             # whatever else writes overnight can cross it mid-encode.
-            result.deferred_low_disk = True
-            _stop_in_flight(job, result,
-                            "free disk fell below the safety floor mid-encode", files)
-            return
+            return Supervision(
+                deferred_low_disk=True,
+                stopped=_stop_in_flight(
+                    job, "free disk fell below the safety floor mid-encode", files),
+            )
         if presence_managed and _user_present():
             nonai_encode.suspend_job(job, files.job)
-            result.in_flight = relpath(source)
-            result.in_flight_percent = nonai_encode.percent_encoded(job)
-            result.suspended = True
-            return
+            return Supervision(in_flight=relpath(source), suspended=True,
+                               in_flight_percent=nonai_encode.percent_encoded(job))
         if presence_managed:
             nonai_encode.resume_job(job, files.job)  # a no-op unless it was frozen
         if not nonai_encode.overran(job):
-            result.in_flight = relpath(source)
-            result.in_flight_percent = nonai_encode.percent_encoded(job)
-            return
+            return Supervision(in_flight=relpath(source),
+                               in_flight_percent=nonai_encode.percent_encoded(job))
         nonai_encode.terminate_ffmpeg(pid, f"it exceeded the {config.NONAI_MAX_RUNTIME_HOURS}h runtime cap")
-    _conclude(job, result, files)
+    conclusion = _conclude(job, files)
     nonai_job.clear_job(files.job)
+    return Supervision(promoted=conclusion.promoted, failed=conclusion.failed)
 
 
-def _stop_in_flight(job: dict, result: NonAiUpscaleResult, reason: str,
-                    files: StageFiles) -> None:
-    """End the encode through no fault of its video — no retry penalty."""
+def _stop_in_flight(job: dict, reason: str, files: StageFiles) -> str:
+    """End the encode through no fault of its video — no retry penalty.
+
+    Answers the clip that was stopped, which keeps its place in the queue.
+    """
     source = Path(job.get("source", ""))
     nonai_encode.terminate_ffmpeg(job.get("pid", 0), reason)
     nonai_encode.delete_tmp(Path(job.get("tmp", "")))
     nonai_job.clear_attempts(files.attempts, relpath(source))
     nonai_job.clear_job(files.job)
-    result.stopped = relpath(source)
     log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
+    return relpath(source)
 
 
-def _conclude(job: dict, result: NonAiUpscaleResult, files: StageFiles) -> None:
+def _conclude(job: dict, files: StageFiles) -> Conclusion:
     source = Path(job.get("source", ""))
     tmp = Path(job.get("tmp", ""))
     out = Path(job.get("out", ""))
@@ -277,11 +332,9 @@ def _conclude(job: dict, result: NonAiUpscaleResult, files: StageFiles) -> None:
         carry_metadata(source, out)
         retire_original(source, archive_root=config.NONAI_RETIRED_ROOT)
         nonai_job.clear_attempts(files.attempts, relpath(source))
-        result.promoted = relpath(source)
         log.info("Promoted finished non-AI upscale: %s", out)
-        return
+        return Conclusion(promoted=relpath(source))
 
-    result.failed = relpath(source)
     log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
     nonai_encode.delete_tmp(tmp)
@@ -289,6 +342,7 @@ def _conclude(job: dict, result: NonAiUpscaleResult, files: StageFiles) -> None:
         add_to_skip_manifest(files.skip_manifest, source,
                              f"failed {config.NONAI_MAX_ATTEMPTS} attempts")
         nonai_job.clear_attempts(files.attempts, relpath(source))
+    return Conclusion(failed=relpath(source))
 
 
 def _sweep_orphaned_partials(keep: Path | None) -> None:
@@ -315,15 +369,14 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
                 log.info("Removed %d stale partial output file(s) from %s", removed, done_dir)
 
 
-def _start_next_candidate(result: NonAiUpscaleResult, files: StageFiles) -> None:
+def _start_next_candidate(files: StageFiles) -> StartAttempt:
     if _is_low_disk():
-        result.deferred_low_disk = True
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
-        return
-    result.start_deferred = _machine_busy_reason(files.cooldown)
-    if result.start_deferred:
-        log.info("Deferring non-AI upscale start: %s.", result.start_deferred)
-        return
+        return StartAttempt(deferred_low_disk=True)
+    busy = _machine_busy_reason(files.cooldown)
+    if busy:
+        log.info("Deferring non-AI upscale start: %s.", busy)
+        return StartAttempt(deferred=busy)
 
     for candidate in _collect(files):
         source = candidate.path
@@ -351,9 +404,10 @@ def _start_next_candidate(result: NonAiUpscaleResult, files: StageFiles) -> None
             "expected_duration": expected_duration,
             "started_at": time.time(),
         })
-        result.started = relpath(source)
         log.info("Started detached non-AI upscale (pid %d): %s -> %s", pid, source, out)
-        return
+        return StartAttempt(started=relpath(source))
+
+    return StartAttempt()
 
 
 def _output_path(candidate: Candidate) -> Path:

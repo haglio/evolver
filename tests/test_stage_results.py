@@ -37,10 +37,6 @@ _MUTATORS = frozenset({
 # Helpers still handed their stage's result to fill in. Take one off in the
 # commit that converts it.
 STILL_AN_OUT_PARAMETER = [
-    "tasks/nonai_upscale.py:_conclude",
-    "tasks/nonai_upscale.py:_start_next_candidate",
-    "tasks/nonai_upscale.py:_stop_in_flight",
-    "tasks/nonai_upscale.py:_supervise",
 ]
 
 
