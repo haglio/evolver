@@ -404,7 +404,7 @@ class TestOnProgressCallback(unittest.TestCase):
 
 
 class TestSubprocessTimeout(unittest.TestCase):
-    def test_run_records_timeout_when_ffmpeg_times_out(self):
+    def test_an_encode_the_budget_stopped_is_not_counted_a_failure(self):
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
@@ -416,8 +416,8 @@ class TestSubprocessTimeout(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
 
-            self.assertEqual(result.timed_out, 1)
-            self.assertEqual(result.failed, 1)
+            self.assertEqual(result.stopped_at_budget, 1)
+            self.assertEqual(result.failed, 0)
             self.assertEqual(result.processed, 0)
 
 
@@ -435,11 +435,35 @@ class TestSubprocessTimeout(unittest.TestCase):
                     result = upscale.run(max_items=10)
 
             mock_ffmpeg.assert_called_once()
-            self.assertEqual(result.timed_out, 1)
-            self.assertEqual(result.failed, 1)
+            self.assertEqual(result.stopped_at_budget, 1)
+            self.assertEqual(result.failed, 0)
+            self.assertEqual(result.pending_after_run, 2)
+
+    def test_the_video_the_budget_cut_off_is_still_pending(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            for name in ("a", "b"):
+                f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_bytes(b"video")
+
+            encodes = []
+
+            def encode_then_run_out_of_time(in_file, tmp, *args, **kwargs):
+                encodes.append(in_file)
+                if len(encodes) == 1:
+                    return fake_run_ffmpeg(in_file, tmp, *args, **kwargs)
+                raise subprocess.TimeoutExpired("ffmpeg", 5)
+
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+                with patch("tasks.upscale._run_ffmpeg", side_effect=encode_then_run_out_of_time),                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    result = upscale.run(max_items=5)
+
+            self.assertEqual(result.processed, 1)
+            self.assertEqual(result.stopped_at_budget, 1)
             self.assertEqual(result.pending_after_run, 1)
 
-    def test_on_progress_called_for_timed_out_item(self):
+    def test_on_progress_reports_where_the_run_stopped(self):
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
@@ -454,7 +478,7 @@ class TestSubprocessTimeout(unittest.TestCase):
                     upscale.run(max_items=5, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
 
             self.assertEqual(len(progress_calls), 1)
-            self.assertEqual(progress_calls[0], (1, 1))
+            self.assertEqual(progress_calls[0], (0, 1))
 
 
 class TestFfmpegWindowSuppression(unittest.TestCase):
@@ -532,7 +556,7 @@ class TestUpscaleResultSurface(unittest.TestCase):
         """A counter nothing increments reads as a tally and is always a lie."""
         self.assertEqual(
             {f.name for f in dataclasses.fields(upscale.UpscaleResult)},
-            {"processed", "failed", "timed_out", "deferred_low_disk", "pending_after_run"},
+            {"processed", "failed", "stopped_at_budget", "deferred_low_disk", "pending_after_run"},
         )
 
 

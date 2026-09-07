@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 class UpscaleResult:
     processed: int = 0
     failed: int = 0
-    timed_out: int = 0
+    stopped_at_budget: int = 0
     deferred_low_disk: bool = False
     pending_after_run: int = 0
 
@@ -125,11 +125,13 @@ def run(
         try:
             ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, filter_complex, videoai_tag, timeout=ffmpeg_timeout)
         except subprocess.TimeoutExpired:
-            elapsed_at_timeout = time.monotonic() - started_at
-            log.info("FAILED (timed out after %.1fs): %s", elapsed_at_timeout, in_file)
+            elapsed_at_stop = time.monotonic() - started_at
+            log.info(
+                "Run budget spent after %.1fs; stopped this encode and left the video queued: %s",
+                elapsed_at_stop, in_file,
+            )
             tmp.unlink(missing_ok=True)
-            result.timed_out += 1
-            result.failed += 1
+            result.stopped_at_budget += 1
             if on_progress:
                 on_progress(result.processed + result.failed, len(candidates))
             break
