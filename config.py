@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 import tempfile
+from datetime import tzinfo
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from app_support import siblings
 from app_support.overlay import overlay_value
@@ -178,8 +180,46 @@ CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 # record is the only test.
 EXCERPT_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
 
-FFMPEG         = Path(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe")
-TVAI_MODEL_DIR = Path(r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models")
+# Where the Windows installer puts Topaz Video's own ffmpeg build and its
+# models. Not private -- an installer's default path names nothing of this
+# machine or this library -- so they sit in source as the fallback the overlay
+# overrides.
+_INSTALLED_TOPAZ_FFMPEG = r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe"
+_INSTALLED_TOPAZ_MODELS = r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models"
+
+
+def topaz_paths(content: dict[str, Any]) -> tuple[Path, Path]:
+    """Topaz Video's own ffmpeg build, and the models it reads.
+
+    Both upscale stages drive that build and no other -- the tvai_* filters
+    exist in nothing else -- so where it is installed decides whether the
+    pipeline can run at all, and the paths above were the only answer there
+    was: ``evolver.check_dependencies`` raised on any machine whose installer
+    had put it elsewhere. Two keys rather than one root, because the two sit in
+    different trees.
+    """
+    return (
+        Path(content.get("topaz_ffmpeg") or _INSTALLED_TOPAZ_FFMPEG),
+        Path(content.get("topaz_models") or _INSTALLED_TOPAZ_MODELS),
+    )
+
+
+FFMPEG, TVAI_MODEL_DIR = topaz_paths(_CONTENT)
+
+def display_timezone(content: dict[str, Any]) -> tzinfo | None:
+    """The zone a run's timestamps are shown in — None for the machine's own.
+
+    A run record stores UTC; what a person reads is local time, and which local
+    was one zone name written into ``gui/run_record`` at import. The setting
+    exists for the machine that is not in the zone its user reads times in;
+    unset, ``astimezone`` answers with whatever Windows says the machine is,
+    which is the right answer everywhere else.
+    """
+    name = content.get("display_timezone")
+    return ZoneInfo(name) if name else None
+
+
+DISPLAY_TIMEZONE = display_timezone(_CONTENT)
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm", ".m4v"}
 FUNSCRIPT_EXTENSION = ".funscript"
@@ -214,11 +254,16 @@ VIDEOAI_TAG_T2V_provider = "Processed using apo-8 for 60 fps interpolation and p
 # launches one detached ffmpeg at a time and checks on it each scheduler tick.
 NONAI_EXCLUDED_BUCKETS = {"actually_AI_but_funscripted"}  # AI-pipeline outputs parked in non_AI
 # Version families the naming rule cannot see. It reunites an original with a
-# variant whose stem is the original's plus a Topaz suffix; a version saved under
-# a name of its own keeps no such thread back, so it is declared here instead.
+# variant whose stem is the original's plus a Topaz suffix; a version saved
+# under a name of its own keeps no such thread back, so it is declared instead.
 # Maps that stem to the stem of the video it is a version of — both must sit in
 # the same bucket, and with three versions point them all at the same one.
-NONAI_VERSION_OVERRIDES: dict[str, str] = {}
+# From the overlay for the same reason GENAU_SOURCE is: both halves of a pair
+# are library filenames, and a filename in source is library vocabulary. It was
+# declared here, and the pairs were redacted in place when that was noticed --
+# which left a map that matched no real file and a feature inert as tracked.
+# Optional; absent means the naming rule is the only thread there is.
+NONAI_VERSION_OVERRIDES: dict[str, str] = _CONTENT.get("version_overrides") or {}
 # vram=0.5 and instances=0 (vs the AI stage's vram=1/instances=1): an unattended
 # multi-hour encode shares the machine with whatever else is running, so it gets
 # half the VRAM budget and no extra model instance — slower, but far harder to

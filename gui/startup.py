@@ -14,7 +14,15 @@ from pathlib import Path
 
 
 def _startup_dir() -> Path:
-    return Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+    """The Startup folder, from the environment or from where it always is.
+
+    ``.get`` with a real fallback rather than an index: ``%APPDATA%`` is the
+    roaming profile and the path below is where Windows puts it, so a process
+    started without it -- a service, a stripped shell -- still finds the folder
+    instead of dying on a KeyError in a tray app with no console.
+    """
+    roaming = os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming"
+    return Path(roaming) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
 
 
 def _shortcut_path() -> Path:

@@ -73,6 +73,10 @@ CONFIG_REFERENCE_LEDGER = {
     "gui/peer_watch.py": 1,
     "gui/presence_throttle.py": 1,
     "gui/process_identity.py": 2,
+    # The second shape again: the zone a run's timestamp is shown in was
+    # ZoneInfo("America/Los_Angeles") bound at this module's own import,
+    # which no test and no machine could reach. One read buys the seam.
+    "gui/run_record.py": 1,
     # The wall-clock ceiling one run is watched against: read where the
     # watchdog is armed, and again in what the overrun says.
     "gui/run_controller.py": 2,
@@ -128,6 +132,7 @@ OVERLAY_KEYS = {
     "acts",
     "chrome_profile",
     "curated_examples",
+    "display_timezone",
     "excerpt_folders",
     "genau_source",
     "library_root",
@@ -136,12 +141,21 @@ OVERLAY_KEYS = {
     "scrape_provider",
     "scrape_provider.base_url",
     "scrape_provider.source",
+    "topaz_ffmpeg",
+    "topaz_models",
+    "version_overrides",
     "warm_gun_outbox",
 }
 
-# The three the overlay may leave out; each is documented as optional and each
-# has a fallback, so the committed example does not carry them.
-OPTIONAL_OVERLAY_KEYS = {"project_roots", "retired_root", "warm_gun_outbox"}
+# The ones the overlay may leave out; each is documented as optional and each
+# has a fallback, so the committed example does not carry them. The two Topaz
+# paths are absent for a second reason: the fallback is where the installer
+# puts them, and an example naming one machine's install would read as the
+# answer rather than as the override it is.
+OPTIONAL_OVERLAY_KEYS = {
+    "display_timezone", "project_roots", "retired_root", "topaz_ffmpeg",
+    "topaz_models", "version_overrides", "warm_gun_outbox",
+}
 
 
 def _config_references(tree: ast.AST) -> int:
