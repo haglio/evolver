@@ -30,11 +30,9 @@ from pathlib import Path
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 import config
-from backfill.queue import iter_library_videos
+from backfill.queue import ScannedClip, library_scan
 from backfill.vocabulary import scoped_grid
 from util.ffprobe import duration_seconds
-from util.sidecar import action_of, read, sidecar_path
-from util.variants import sorted_stem_of
 
 log = logging.getLogger(__name__)
 
@@ -48,8 +46,8 @@ def _tile_actions() -> list[str]:
     return [command.label for row in scoped_grid() for command in row]
 
 
-def _scan_library() -> tuple[dict[str, Path], dict[str, Path]]:
-    """One library pass, returning two lookups the examples are resolved through.
+def _lookups(scan: list[ScannedClip]) -> tuple[dict[str, Path], dict[str, Path]]:
+    """The two lookups the examples are resolved through.
 
     ``by_action`` maps each action (and each part of a compound tag), lower-cased, to
     the first clip that carries it; ``by_id`` maps each clip's id — its stem without
@@ -57,26 +55,25 @@ def _scan_library() -> tuple[dict[str, Path], dict[str, Path]]:
     """
     by_action: dict[str, Path] = {}
     by_id: dict[str, Path] = {}
-    for _source, video in iter_library_videos():
-        stem = video.stem
-        clip_id = sorted_stem_of(stem)
-        by_id.setdefault(clip_id, video)
-        action = action_of(read(sidecar_path(video)))
-        if action:
-            for part in action.split(","):
-                part = part.strip().lower()
-                if part:
-                    by_action.setdefault(part, video)
+    for clip in scan:
+        by_id.setdefault(clip.clip_id, clip.path)
+        for part in clip.action.split(","):
+            part = part.strip().lower()
+            if part:
+                by_action.setdefault(part, clip.path)
     return by_action, by_id
 
 
-def example_clips() -> dict[str, Path]:
+def example_clips(scan: list[ScannedClip] | None = None) -> dict[str, Path]:
     """One example clip per tile that has one, as ``tile action -> clip``.
 
     A curated pin wins; otherwise the tile takes the first library clip whose action
     matches it. Tiles with neither are simply absent, and stay text-only.
+
+    Takes the scan startup already made when there is one, so the library is
+    walked and its sidecars parsed once rather than once per projection.
     """
-    by_action, by_id = _scan_library()
+    by_action, by_id = _lookups(library_scan() if scan is None else scan)
     examples: dict[str, Path] = {}
     for action in _tile_actions():
         clip = (by_id.get(config.CURATED_EXAMPLES.get(action, ""))

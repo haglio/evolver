@@ -12,7 +12,7 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import evolver
-from backfill.queue import BackfillQueue, unlabeled_videos
+from backfill.queue import BackfillQueue, ScannedClip, library_scan, unlabeled_videos
 from backfill.session import BackfillSession
 from backfill.thumbnails import build_thumbnails, example_clips, extract_frame, thumbnail_cache_path
 from backfill.vocabulary import grammar_phrases
@@ -23,7 +23,7 @@ from backfill.work import SerialWorker
 _TITLE = "Backfill Metadata"
 
 
-def _ready_thumbnails() -> dict[str, str]:
+def _ready_thumbnails(scan: list[ScannedClip]) -> dict[str, str]:
     """Every tile's cached thumbnail, ready to hand the window at construction.
 
     Cached frames are read straight back; only an act whose frame was never made
@@ -31,7 +31,8 @@ def _ready_thumbnails() -> dict[str, str]:
     """
     return {
         action: str(path)
-        for action, path in build_thumbnails(example_clips(), extract_frame, thumbnail_cache_path)
+        for action, path in build_thumbnails(
+            example_clips(scan), extract_frame, thumbnail_cache_path)
     }
 
 
@@ -39,7 +40,10 @@ def main() -> int:
     evolver.setup_logging()
     app = QApplication(sys.argv)
 
-    videos = unlabeled_videos()
+    # One walk of the library, one parse of each sidecar: the work queue and
+    # the example clips are two projections of it (util_backfill/design/005).
+    scan = library_scan()
+    videos = unlabeled_videos(scan)
     if not videos:
         QMessageBox.information(None, _TITLE, "Every clip already has an action.")
         return 0
@@ -47,7 +51,7 @@ def main() -> int:
     worker = SerialWorker()
     session = BackfillSession(BackfillQueue(videos), worker)
 
-    window = BackfillWindow(session, thumbnails=_ready_thumbnails())
+    window = BackfillWindow(session, thumbnails=_ready_thumbnails(scan))
 
     listener = VoiceListener(grammar_phrases(), parent=window)
     listener.heard.connect(window.on_phrase)

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 import config
 from util import orientation
 from util.media_files import library_videos
 from util.sidecar import action_of, read, sidecar_path, wrong_action_of
+from util.variants import sorted_stem_of
 
 # Portrait first, and that is not cosmetic: it is the order the tool asks a
 # human about, and most of the unlabeled queue is portrait.
@@ -43,7 +45,43 @@ def iter_library_videos() -> Iterator[tuple[str, Path]]:
                 yield source_dir.name, video
 
 
-def unlabeled_videos() -> list[Path]:
+@dataclass(frozen=True)
+class ScannedClip:
+    """One library clip, as the tool's two startup passes read it."""
+
+    source: str
+    path: Path
+    action: str
+    wrong_action: str
+    clip_id: str
+
+
+def library_scan() -> list[ScannedClip]:
+    """Every upscaled clip, walked once and its sidecar parsed once.
+
+    Startup wants two different projections of the same data -- the clips with
+    no action, and the first clip per action plus an index by clip id -- and
+    used to take a full walk and a full sidecar read for each. On a library of
+    thousands, that is a tray-launched tool sitting with no window on screen
+    for twice as long as it needs to.
+
+    In ``iter_library_videos``' order, which is what lets a reopened session
+    resume where it left off: it is not re-sorted here, and must not be.
+    """
+    return [
+        ScannedClip(
+            source=source,
+            path=video,
+            action=action_of(payload),
+            wrong_action=wrong_action_of(payload),
+            clip_id=sorted_stem_of(video.stem),
+        )
+        for source, video in iter_library_videos()
+        if (payload := read(sidecar_path(video))) is not None
+    ]
+
+
+def unlabeled_videos(scan: list[ScannedClip] | None = None) -> list[Path]:
     """Every upscaled clip whose sidecar records no ``video.action``.
 
     The ones a viewer *rejected* come first.  Fun Time's "wrong action" empties
@@ -55,16 +93,17 @@ def unlabeled_videos() -> list[Path]:
     thing being contradicted, and re-running the scrape would only assert it
     again.
     """
+    scan = library_scan() if scan is None else scan
+    scraped = scraped_sources()
     rejected: list[Path] = []
     never_labeled: list[Path] = []
-    for source, video in iter_library_videos():
-        payload = read(sidecar_path(video))
-        if action_of(payload):
+    for clip in scan:
+        if clip.action:
             continue
-        if wrong_action_of(payload):
-            rejected.append(video)
-        elif source not in scraped_sources():
-            never_labeled.append(video)
+        if clip.wrong_action:
+            rejected.append(clip.path)
+        elif clip.source not in scraped:
+            never_labeled.append(clip.path)
     return rejected + never_labeled
 
 
