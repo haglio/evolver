@@ -32,11 +32,6 @@ log = logging.getLogger(__name__)
 
 _CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.font-regular"
 
-# The headless browser's scratch profile, under the checkout by default because
-# that is where it has always been; a caller passing its own keeps a running
-# app's scratch state out of a git working tree entirely.
-_BROWSER_PROFILE_DIR_NAME = ".tmp-prompt-browser-profile"
-
 
 @dataclass
 class PromptScrapeResult:
@@ -63,7 +58,7 @@ def run(*, sorted_dir: Path | None = None,
     """
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     browser_profile_dir = (
-        config.PROJECT_DIR / _BROWSER_PROFILE_DIR_NAME if browser_profile_dir is None
+        config.PROMPT_BROWSER_PROFILE_DIR if browser_profile_dir is None
         else browser_profile_dir
     )
     result = PromptScrapeResult()

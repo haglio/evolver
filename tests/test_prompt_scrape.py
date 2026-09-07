@@ -488,8 +488,7 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
 
     A sentinel wired to the wrong place -- or resolved once at import, past
     override_config -- would leave the stage walking the configured tree and
-    writing the browser's profile into the checkout anyway, and nothing would
-    say so.
+    handing the browser the configured profile anyway, and nothing would say so.
     """
 
     def _override(self, root):
@@ -534,8 +533,27 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
                                           browser_profile_dir=profile)
 
             self.assertEqual(fetch.call_args.kwargs["profile_dir"], profile)
-            self.assertFalse(
-                (config.PROJECT_DIR / ".tmp-prompt-browser-profile").exists())
+
+    def test_the_default_scratch_profile_is_not_inside_the_checkout(self):
+        """Nothing passes one in where it matters: evolver.py runs this stage
+        unparameterized every ten minutes, so the default is what the browser
+        really writes its user-data tree into. Under PROJECT_DIR that is a live
+        Chrome profile in a git working tree, rewritten all day."""
+        with workspace_temp_dir() as root:
+            elsewhere = root / "elsewhere"
+            video = elsewhere / config.PROVIDER_SOURCE / "portrait" / "abc.mp4"
+            video.parent.mkdir(parents=True)
+            video.write_text("x", encoding="utf-8")
+
+            with self._override(root):
+                with patch("tasks.prompt_scrape.find_browser_executable",
+                           return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom",
+                               return_value="<html></html>") as fetch:
+                        prompt_scrape.run(sorted_dir=elsewhere)
+
+            self.assertNotIn(config.PROJECT_DIR,
+                             fetch.call_args.kwargs["profile_dir"].parents)
 
 
 class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
