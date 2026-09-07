@@ -1,4 +1,5 @@
 """The library's three lanes, walked once for every stage that asks."""
+from __future__ import annotations
 
 import unittest
 

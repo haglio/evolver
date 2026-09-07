@@ -1,4 +1,5 @@
 """Move videos from 0_inbox/<source>/ -> 1_sorted/<source>/<orientation>/"""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field

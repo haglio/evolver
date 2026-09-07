@@ -19,6 +19,7 @@ Both halves leave together, and that is not tidiness:
 Nothing unique is lost with the sorted copy: it was itself a copy, and the clip
 still sits in ComfyUI's output folder and in Origenerator's gallery.
 """
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass

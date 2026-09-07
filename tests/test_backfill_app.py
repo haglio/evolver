@@ -4,6 +4,7 @@ The tray spawns it DETACHED, so a failure in here has no console to land in;
 until this module existed, main() and _ready_thumbnails() were entirely
 unexercised and backfill_app.py appeared in no coverage report at all.
 """
+from __future__ import annotations
 
 import unittest
 from pathlib import Path

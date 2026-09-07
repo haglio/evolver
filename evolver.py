@@ -11,6 +11,7 @@ are held in step by ``tests/test_stage_registry.py`` rather than by one of them
 being derived from the other. Two gates: one reads the names out of this file's
 syntax tree, one runs the pipeline with its stages mocked.
 """
+from __future__ import annotations
 
 import logging
 import subprocess

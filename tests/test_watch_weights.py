@@ -1,4 +1,5 @@
 """The stage that puts both apps' viewing on every sidecar, and passes favorites both ways."""
+from __future__ import annotations
 
 import json
 import unittest

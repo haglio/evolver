@@ -1,4 +1,5 @@
 """System resource helpers used by the scheduled pipeline."""
+from __future__ import annotations
 
 import ctypes
 import shutil

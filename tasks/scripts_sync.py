@@ -1,4 +1,5 @@
 """Stage: align .funscript files to mirror the video library tree."""
+from __future__ import annotations
 
 import filecmp
 import logging

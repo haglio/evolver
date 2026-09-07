@@ -19,6 +19,7 @@ overlay, and the folder it names is the only thing that passes between the two
 apps; the rest name a machine whose shape nobody here can see. A rename is a
 silent break on somebody else's machine, so it fails here instead.
 """
+from __future__ import annotations
 
 import ast
 import json

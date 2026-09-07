@@ -1,4 +1,5 @@
 """The detached encode, asked about directly rather than through a pipeline tick."""
+from __future__ import annotations
 
 import unittest
 from pathlib import Path

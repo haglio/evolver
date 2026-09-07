@@ -5,6 +5,8 @@ git-ignored content.local.json, so a run here matches a public checkout. This
 must happen before any test module imports the app, which loads content at
 import time.
 """
+from __future__ import annotations
+
 from unittest.mock import patch
 
 import content_overlay

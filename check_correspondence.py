@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Verify 1_sorted and the active outbox set are in 1-to-1 correspondence."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field

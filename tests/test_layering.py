@@ -13,6 +13,7 @@ raises nothing. So the edges are listed, and held as an equality. A new one
 fails here; an edge nobody uses any more fails too, and is lowered in the
 commit that removed it.
 """
+from __future__ import annotations
 
 import ast
 import unittest

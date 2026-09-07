@@ -1,4 +1,5 @@
 """The tray's Backfill Metadata... item launches the tool as its own process."""
+from __future__ import annotations
 
 import subprocess
 import sys

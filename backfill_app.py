@@ -5,6 +5,7 @@ Plays every clip that still lacks a ``video.action``, looping in a stable order,
 and records the act the viewer speaks.  Runs as its own process so an open
 microphone or a wedged media backend can never take the tray down with it.
 """
+from __future__ import annotations
 
 import sys
 

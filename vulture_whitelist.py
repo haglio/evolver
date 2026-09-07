@@ -4,6 +4,7 @@ Each entry tells vulture the name is used, suppressing the report.
 Only add names here that are *provably* called by a framework or
 accessed dynamically at runtime.
 """
+from __future__ import annotations
 
 # -- Qt virtual-method overrides (called by the event loop) --
 # mousePressEvent and mouseReleaseEvent are not here: each calls the other's

@@ -10,6 +10,7 @@ scripts sync never walks.  This stage repairs the first, sends the second to the
 mirror path the scripts sync does walk, and reports anything else by path
 without touching it.
 """
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field

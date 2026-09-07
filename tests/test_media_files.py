@@ -3,6 +3,7 @@
 These moved out of tests/test_sort.py, where they had ended up because the sort
 stage was the first caller: none of them is about sorting.
 """
+from __future__ import annotations
 
 import inspect
 import logging

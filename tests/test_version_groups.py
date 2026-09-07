@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from util.version_groups import group_ids, group_key_tokens, stable_title
 
 

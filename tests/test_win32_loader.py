@@ -5,6 +5,7 @@ and every handle is the real one — so these cases force the flag down and driv
 the refusal directly.  They are the only thing keeping that refusal honest; a
 stand-in that quietly returned zero would pass every other test in the repo.
 """
+from __future__ import annotations
 
 import ctypes
 import ctypes.wintypes

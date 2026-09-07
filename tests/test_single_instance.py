@@ -1,4 +1,5 @@
 """Tests for single-instance ownership and duplicate-launch handoff."""
+from __future__ import annotations
 
 import ctypes
 import os

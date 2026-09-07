@@ -1,4 +1,5 @@
 """Where the non-AI stages think a bucket is."""
+from __future__ import annotations
 
 import unittest
 from pathlib import Path

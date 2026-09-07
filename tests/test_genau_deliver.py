@@ -1,4 +1,5 @@
 """The Genau lane's last step: an upscaled loop leaves the outbox for Genau's folder."""
+from __future__ import annotations
 
 import dataclasses
 import unittest

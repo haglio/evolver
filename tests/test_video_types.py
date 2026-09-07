@@ -1,4 +1,5 @@
 """The stage that records what kind every library video is."""
+from __future__ import annotations
 
 import unittest
 from pathlib import Path

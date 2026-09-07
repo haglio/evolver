@@ -4,6 +4,7 @@ These moved out of tests/test_nonai_upscale.py with the queue itself. They no
 longer construct the stage to ask it: the three files a queue is built from are
 arguments, so each test names the manifest or the stats file it wrote.
 """
+from __future__ import annotations
 
 import json
 import unittest

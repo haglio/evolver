@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Find likely duplicate videos by exact filesize within the non-AI library."""
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field

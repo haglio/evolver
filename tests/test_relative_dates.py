@@ -4,6 +4,7 @@ These moved out of tests/test_prompt_scrape.py with the parser. The clock is
 fixed by patching the module's own ``today``, which is the reason that function
 exists rather than a bare ``datetime.date.today()`` inline.
 """
+from __future__ import annotations
 
 import datetime
 import unittest

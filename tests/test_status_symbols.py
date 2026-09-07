@@ -1,4 +1,5 @@
 """A status is drawn as one colored symbol, the same one wherever it appears."""
+from __future__ import annotations
 
 import inspect
 import unittest
