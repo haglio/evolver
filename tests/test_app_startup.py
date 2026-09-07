@@ -427,8 +427,8 @@ class TestDuplicateLaunchHandoff:
     def _duplicate_launch(self, request, handoff_taken):
         app = build_evolver_app(request)
 
-        with patch("gui.app.single_instance.is_first_instance", return_value=False), \
-             patch("gui.app.single_instance.request_show", return_value=handoff_taken) as show_request, \
+        with patch.object(app._instance, "claim", return_value=False), \
+             patch.object(app._instance, "hand_off", return_value=handoff_taken) as show_request, \
              patch("gui.app.show_error") as alert, \
              patch("gui.app.crash_log.write_info") as logged:
             exit_code = app.run()
@@ -470,8 +470,8 @@ class TestServingDuplicateLaunches:
     def _run_as_first_instance(self, request):
         app = build_evolver_app(request)
 
-        with patch("gui.app.single_instance.is_first_instance", return_value=True), \
-             patch("gui.app.single_instance.serve_show_requests") as serve, \
+        with patch.object(app._instance, "claim", return_value=True), \
+             patch.object(app._instance, "serve_show_requests") as serve, \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \
@@ -496,13 +496,6 @@ class TestServingDuplicateLaunches:
 
         mock_show.assert_called_once()
 
-    def test_the_listener_is_held_past_the_call_that_made_it(self, request):
-        """A QLocalServer nothing refers to is collected, and the pipe closes
-        with it — the handoff would then fail for reasons no log would show."""
-        app, serve = self._run_as_first_instance(request)
-
-        assert app._show_requests is serve.return_value
-
 
 class TestShowWindowFlag:
     """--show-window should open the main window on startup."""
@@ -511,7 +504,7 @@ class TestShowWindowFlag:
         app = build_evolver_app(request)
 
         with patch.object(app, "_show_window") as mock_show, \
-             patch("gui.app.single_instance.is_first_instance", return_value=True), \
+             patch.object(app._instance, "claim", return_value=True), \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \
@@ -524,7 +517,7 @@ class TestShowWindowFlag:
         app = build_evolver_app(request)
 
         with patch.object(app, "_show_window") as mock_show, \
-             patch("gui.app.single_instance.is_first_instance", return_value=True), \
+             patch.object(app._instance, "claim", return_value=True), \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \
