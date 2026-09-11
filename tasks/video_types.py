@@ -166,7 +166,7 @@ def _non_ai_videos():
     nothing else (:func:`_cut_folders`), or one the overlay declares outright.
 
     The whole tree, including the buckets the other non-AI stages exclude: those
-    exclusions are about what to group and what to re-encode, and Nau plays
+    exclusions are about what to group and what to re-encode, and the main player plays
     every one of these, so every one of them is asked what it is.
     """
     videos = lanes.non_ai_videos()

@@ -288,10 +288,10 @@ class TestWhatItRefusesToGuess(unittest.TestCase):
             self.assertEqual((result.recorded, result.skipped), (0, 1))
 
 
-class TestReachingEveryVideoNauPlays(unittest.TestCase):
+class TestReachingEveryVideoMainPlayerPlays(unittest.TestCase):
     def test_a_bucket_the_non_ai_stages_skip_still_gets_its_kind(self):
         """The exclusion keeps pipeline-output videos out of the grouping and
-        the encoder, but Nau plays them, so they are asked what they are too."""
+        the encoder, but the main player plays them, so they are asked what they are too."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(NONAI_EXCLUDED_BUCKETS={"parked_ai"}):

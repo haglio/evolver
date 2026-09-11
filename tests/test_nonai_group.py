@@ -88,7 +88,7 @@ class TestNonAiGroup(unittest.TestCase):
 
     def test_propagates_clip_across_the_version_family(self):
         """The upscaled variant of a clip inherits the original's `clip` metadata,
-        so Nau still treats the enhanced file as a navigable short."""
+        so the main player still treats the enhanced file as a navigable short."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(

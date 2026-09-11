@@ -142,7 +142,7 @@ def _move_mirrored_files(source: Path, dest: Path) -> None:
 
     The metadata and script trees both mirror the video tree, so both of a
     moved video's files must move with it. A stranded sidecar is orphaned
-    and pruned, losing the ``clip`` family metadata Nau navigates by (the
+    and pruned, losing the ``clip`` family metadata the main player navigates by (the
     grouping stage re-stamps ``version`` on the next run; this keeps
     ``clip``/``video`` from vanishing). A stranded funscript is worse than
     orphaned: the scripts sync would relocate it, but the clip-scripts stage

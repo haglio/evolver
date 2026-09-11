@@ -55,7 +55,7 @@ FULL_LENGTH = "full_length"
 TYPES = (GENAU_CLIP, EXCERPT, SHORT, FULL_LENGTH)
 
 #: A video runs short when it is no longer than this.  One number for the whole
-#: family: Nau split its library at 60 seconds and Warm Gun at 10, so a clip
+#: family: the main player split its library at 60 seconds and Warm Gun at 10, so a clip
 #: between the two was a short on the phone and a full-length scene on the
 #: desktop — the disagreement this field exists to end.
 SHORT_MAX_SECONDS = 10.0

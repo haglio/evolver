@@ -1,6 +1,6 @@
 """Stage: record each non-AI clip's version family in a metadata sidecar.
 
-Real-footage clips carry no generation metadata, but Fun Time's Nau player
+Real-footage clips carry no generation metadata, but Fun Time's main player
 still wants to fold an original together with its Topaz-enhanced variants into
 one rotation slot. This stage is the source of truth for that grouping: it
 scans every non_AI bucket, families the clips by name (:mod:`util.version_groups`)
