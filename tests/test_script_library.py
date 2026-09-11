@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from tests.temp_helpers import override_config
-from util import funscript
+from util import script_library
 
 
 class TestTrim(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestTrim(unittest.TestCase):
             ],
         }
 
-        trimmed = funscript.trim(script, start_seconds=10.0, duration_seconds=2.0)
+        trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=2.0)
 
         self.assertEqual(
             trimmed["actions"],
@@ -35,7 +35,7 @@ class TestTrim(unittest.TestCase):
             ],
         }
 
-        trimmed = funscript.trim(script, start_seconds=10.0, duration_seconds=2.0)
+        trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=2.0)
 
         self.assertEqual(
             trimmed["actions"],
@@ -51,7 +51,7 @@ class TestTrim(unittest.TestCase):
             "metadata": {"creator": "someone", "type": "basic", "duration": 1402},
         }
 
-        trimmed = funscript.trim(script, start_seconds=10.0, duration_seconds=126.5)
+        trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=126.5)
 
         self.assertFalse(trimmed["inverted"])
         self.assertEqual(trimmed["range"], 90)
@@ -71,7 +71,7 @@ class TestTrim(unittest.TestCase):
             },
         }
 
-        trimmed = funscript.trim(script, start_seconds=10.0, duration_seconds=2.0)
+        trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=2.0)
 
         self.assertEqual(trimmed["metadata"]["bookmarks"], [])
         self.assertEqual(trimmed["metadata"]["chapters"], [])
@@ -84,7 +84,7 @@ class TestScriptPathForVideo(unittest.TestCase):
         scripts = Path("C:/lib/scripts")
 
         with override_config(VIDEO_LIBRARY_DIR=videos, SCRIPT_LIBRARY_DIR=scripts):
-            path = funscript.script_path_for_video(videos / "2D" / "non_AI" / "larkin" / "clip.mkv")
+            path = script_library.script_path_for_video(videos / "2D" / "non_AI" / "larkin" / "clip.mkv")
 
         self.assertEqual(path, scripts / "2D" / "non_AI" / "larkin" / "clip.funscript")
 

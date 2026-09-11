@@ -2,7 +2,9 @@
 
 The library keeps metadata out of the video tree: a clip under ``VIDEO_LIBRARY_DIR``
 has its JSON at the same relative path beneath ``METADATA_DIR``.  That mirroring is
-the contract the downstream browser reads by, so it is expressed here once.
+the contract the downstream browser reads by, and the rule itself is
+:mod:`app_support.mirrored_tree` -- three apps had written it out for
+themselves.  What is said here is which roots this one measures from.
 
 Stages that must locate a sidecar before the upscaled clip exists — prompt scraping
 runs against ``1_sorted`` — reach it by naming the clip the upscale stage *will*
@@ -15,9 +17,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app_support.json_store import locked_update
+from app_support.mirrored_tree import mirrored_path
 
 import config
-from util.json_store import read_dict
+from util.json_reads import read_dict
 from util.variants import upscaled_stem
 
 
@@ -53,13 +56,15 @@ def sidecar_path(video: Path) -> Path:
 
     Raises ``ValueError`` for a video under neither.
     """
-    for root in (config.VIDEO_LIBRARY_DIR, config.VIDEO_SEARCH_ROOT):
-        try:
-            relative = video.relative_to(root)
-        except ValueError:
-            continue
-        return (config.METADATA_DIR / relative).with_suffix(".json")
-    raise ValueError(f"{video} is not in the video library")
+    path = mirrored_path(
+        video,
+        roots=(config.VIDEO_LIBRARY_DIR, config.VIDEO_SEARCH_ROOT),
+        mirror_root=config.METADATA_DIR,
+        suffix=".json",
+    )
+    if path is None:
+        raise ValueError(f"{video} is not in the video library")
+    return path
 
 
 def read(path: Path) -> dict:

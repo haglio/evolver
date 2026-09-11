@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import unittest
 
+from app_support import funscript
+
 from tests.temp_helpers import (
     make_video,
     override_config,
@@ -19,7 +21,7 @@ from tests.temp_helpers import (
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
-from util import funscript, nonai_retire, sidecar
+from util import nonai_retire, script_library, sidecar
 
 
 class TestRetireIntoTheBucket(unittest.TestCase):
@@ -79,7 +81,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
             make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
-                script = funscript.script_path_for_video(source)
+                script = script_library.script_path_for_video(source)
                 funscript.write(script, {"actions": [{"at": 0, "pos": 20}]})
 
                 nonai_retire.retire_original(source, archive_root=None)
@@ -87,7 +89,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
                 dest = non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4"
                 self.assertFalse(script.exists())
                 self.assertEqual(
-                    funscript.read(funscript.script_path_for_video(dest)),
+                    funscript.read(script_library.script_path_for_video(dest)),
                     {"actions": [{"at": 0, "pos": 20}]},
                 )
 
@@ -130,7 +132,7 @@ class TestRetireToAnArchive(unittest.TestCase):
             source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
 
             with override_config(**overrides):
-                script = funscript.script_path_for_video(source)
+                script = script_library.script_path_for_video(source)
                 funscript.write(script, {"actions": [{"at": 0, "pos": 20}]})
 
                 nonai_retire.retire_original(source, archive_root=archive)

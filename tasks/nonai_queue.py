@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import funscript
+from util import script_library
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets, stage_dirs
 from util.variants import is_processed_stem, strip_processing_suffixes
@@ -146,7 +146,7 @@ def _watch_scores(path: Path) -> dict[str, float]:
 
 
 def _has_funscript(video: Path) -> bool:
-    return funscript.script_path_for_video(video).is_file()
+    return script_library.script_path_for_video(video).is_file()
 
 
 def _pin_rank(pinned: list[str], video: Path) -> int:

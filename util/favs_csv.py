@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from util.json_store import atomic_write_text
+from app_support.file_channel import write_whole
 
 _HYPERLINK_RE = re.compile(r'^=HYPERLINK\("([^"]+)"[;,]"([^"]*)"\)\s*$', re.IGNORECASE)
 _HYPERLINK_URL_RE = re.compile(r'^=HYPERLINK\("([^"]+)"[;,]', re.IGNORECASE)
@@ -51,7 +51,7 @@ def write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) ->
     writer = csv.DictWriter(buffer, fieldnames=fieldnames)
     writer.writeheader()
     writer.writerows(rows)
-    atomic_write_text(path, buffer.getvalue(), newline="")
+    write_whole(path, buffer.getvalue(), newline="")
 
 
 def local_path(value: str, base_dir: Path) -> Path | None:

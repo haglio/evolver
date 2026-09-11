@@ -5,8 +5,10 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support import funscript
+
 import config
-from util import ffprobe, funscript, sidecar
+from util import ffprobe, script_library, sidecar
 from util.media_files import library_videos
 
 log = logging.getLogger(__name__)
@@ -57,12 +59,12 @@ def run() -> SceneScriptsResult:
             result.scene_gone += 1
             continue
 
-        destination = funscript.script_path_for_video(scene)
+        destination = script_library.script_path_for_video(scene)
         if destination.exists():
             result.already_scripted += 1
             continue
 
-        clip_script = funscript.script_path_for_video(video)
+        clip_script = script_library.script_path_for_video(video)
         if not clip_script.is_file():
             result.no_clip_script += 1
             continue
@@ -75,7 +77,8 @@ def run() -> SceneScriptsResult:
             log.warning("UNPROBEABLE scene, cannot time its script: %s", scene)
             continue
 
-        funscript.write(destination, funscript.place(funscript.read(clip_script), offset, duration))
+        funscript.write(
+            destination, script_library.place(funscript.read(clip_script), offset, duration))
         result.written += 1
         log.info("PLACE SCRIPT  %s  ->  %s", clip_script, destination)
 

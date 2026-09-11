@@ -270,10 +270,95 @@ class TestReferenceStoreSurface(unittest.TestCase):
         self.assertIsNone(store.fingerprint())
 
 
+class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
+    """Each of these files belongs to a repo that never hears about this one, so
+    a format it changes arrives here as a file that still parses and still looks
+    rewritable. Rewriting one blind is how this app corrupts another's saved
+    work, and the reference it would have followed is stranded either way -- so
+    the file is left exactly as it is and somebody is told."""
+
+    def test_a_session_stamped_with_a_version_this_stage_does_not_know_is_left_alone(self):
+        with workspace_temp_dir() as temp:
+            _write_video(temp / "videos" / "2D" / "other" / "moved" / "clip.mp4")
+            was_at = str(temp / "videos" / "2D" / "other" / "clip.mp4")
+            session = _write_json(
+                temp / "sessions" / "Clip.json",
+                {"version": 2, "session_name": "Clip", "video_path": was_at},
+            )
+
+            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
+                result = reference_sync.run()
+
+            self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], was_at)
+            self.assertEqual(result.refused, 1)
+            self.assertEqual(result.relocated, 0)
+            self.assertTrue(result.needs_an_eye)
+            self.assertTrue(result.ok)
+
+    def test_a_session_written_before_the_stamp_existed_is_the_first_version(self):
+        """Every session and project on disk today was written without one."""
+        with workspace_temp_dir() as temp:
+            moved_to = _write_video(temp / "videos" / "2D" / "other" / "moved" / "clip.mp4")
+            session = _write_json(
+                temp / "sessions" / "Clip.json",
+                {"session_name": "Clip",
+                 "video_path": str(temp / "videos" / "2D" / "other" / "clip.mp4")},
+            )
+
+            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
+                result = reference_sync.run()
+
+            self.assertEqual(
+                json.loads(session.read_text(encoding="utf-8"))["video_path"], str(moved_to))
+            self.assertEqual(result.refused, 0)
+
+    def test_a_project_stamped_with_a_version_this_stage_does_not_know_is_left_alone(self):
+        with workspace_temp_dir() as temp:
+            _write_video(temp / "videos" / "2D" / "other" / "moved" / "clip.mp4")
+            was_at = str(temp / "videos" / "2D" / "other" / "clip.mp4")
+            project = _write_json(
+                temp / "projects" / "Clip.scripture", {"version": 7, "video_path": was_at})
+
+            with _stores_under(temp, SCRIPTURE_SESSIONS_DIR=temp / "projects"):
+                result = reference_sync.run()
+
+            self.assertEqual(json.loads(project.read_text(encoding="utf-8"))["video_path"], was_at)
+            self.assertEqual(result.refused, 1)
+
+    def test_watch_counts_that_are_not_counts_are_left_alone(self):
+        """These carry no version and cannot: every key there is a video path.
+        Their shape is the contract instead."""
+        with workspace_temp_dir() as temp:
+            _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
+            was_at = str(temp / "videos" / "other" / "clip.mp4").lower()
+            stats = _write_json(temp / "state" / "watch_stats.json", {was_at: 9})
+
+            with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats):
+                result = reference_sync.run()
+
+            self.assertEqual(json.loads(stats.read_text(encoding="utf-8")), {was_at: 9})
+            self.assertEqual(result.refused, 1)
+
+    def test_a_favorites_file_with_no_local_path_column_is_left_alone(self):
+        """The header row is this one's version, and a rewrite without that
+        column silently repoints nothing at all."""
+        with workspace_temp_dir() as temp:
+            _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
+            favs = temp / "favs.csv"
+            favs.write_text("web_url\nhttps://example.test/clip\n", encoding="utf-8")
+            before = favs.read_text(encoding="utf-8")
+
+            with _stores_under(temp, FUN_TIME_FAVS_FILE=favs):
+                result = reference_sync.run()
+
+            self.assertEqual(favs.read_text(encoding="utf-8"), before)
+            self.assertEqual(result.refused, 1)
+
+
 class TestReferenceSyncResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
         """Every field lands in a run record; one nothing reads is dead weight."""
         self.assertEqual(
             {f.name for f in dataclasses.fields(reference_sync.ReferenceSyncResult)},
-            {"checked", "relocated", "unresolved", "write_errors"},
+            {"checked", "relocated", "unresolved", "write_errors", "refused"},
         )

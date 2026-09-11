@@ -5,8 +5,10 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support import funscript
+
 import config
-from util import ffprobe, funscript, sidecar
+from util import ffprobe, script_library, sidecar
 from util.media_files import library_videos
 
 log = logging.getLogger(__name__)
@@ -38,12 +40,12 @@ def run() -> ClipScriptsResult:
             result.unmatched_clip += 1
             continue
 
-        destination = funscript.script_path_for_video(video)
+        destination = script_library.script_path_for_video(video)
         if destination.exists():
             result.already_scripted += 1
             continue
 
-        scene_script = funscript.script_path_for_video(Path(scene))
+        scene_script = script_library.script_path_for_video(Path(scene))
         if not scene_script.is_file():
             result.no_scene_script += 1
             continue
@@ -57,7 +59,7 @@ def run() -> ClipScriptsResult:
             log.warning("UNPROBEABLE clip, cannot size its script window: %s", video)
             continue
 
-        trimmed = funscript.trim(funscript.read(scene_script), offset, duration)
+        trimmed = script_library.trim(funscript.read(scene_script), offset, duration)
         # One action is a position the device holds, not a motion: a script of
         # it would drive nothing, and having one stops anybody scripting the
         # clip properly later.

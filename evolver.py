@@ -87,6 +87,7 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
 # failing at it.
 _STAGE_WARNED: dict[str, Callable[[object], bool]] = {
     "strays": lambda r: not r.ok,
+    "references": lambda r: r.needs_an_eye,
     "upscale": lambda r: r.deferred_low_disk,
     "upscale_non_ai": lambda r: r.deferred_low_disk,
 }

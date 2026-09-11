@@ -35,7 +35,7 @@ MODULES = (
     "util/nonai_library.py",
     "util/nonai_retire.py",
     "util/sidecar.py",
-    "util/funscript.py",
+    "util/script_library.py",
     "util/topaz.py",
 )
 

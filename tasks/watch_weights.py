@@ -18,9 +18,11 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.file_channel import write_whole
+
 import config
 from util import favs_csv, lanes, sidecar, warm_gun, watch
-from util.json_store import atomic_write_text, read_dict
+from util.json_reads import read_dict
 
 log = logging.getLogger(__name__)
 
@@ -134,7 +136,7 @@ def _apply_phone_favorites(
             break
         applied_through = event.t
     if applied_through != cursor:
-        atomic_write_text(
+        write_whole(
             config.WARM_GUN_FAVORITES_CURSOR_FILE, json.dumps({_CURSOR_FIELD: applied_through})
         )
     return _PhoneFavorites(added, removed, write_errors)

@@ -11,9 +11,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
+from app_support.file_channel import write_whole
+
 import config
 from util import favs_csv
-from util.json_store import atomic_write_text
 
 log = logging.getLogger(__name__)
 
@@ -324,4 +325,4 @@ def _chrome_timestamp() -> str:
 def _atomic_write_json(path: Path, data: dict) -> None:
     # indent=3 and newline="\n" because that is how Chrome writes this file,
     # and it is Chrome's to read back.
-    atomic_write_text(path, json.dumps(data, indent=3) + "\n", newline="\n")
+    write_whole(path, json.dumps(data, indent=3) + "\n", newline="\n")

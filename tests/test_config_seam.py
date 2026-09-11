@@ -120,7 +120,7 @@ CONFIG_REFERENCE_LEDGER = {
     # after it to stamp the viewing on the same sidecars.
     "tasks/watch_weights.py": 9,
     "util/lanes.py": 9,
-    "util/funscript.py": 3,
+    "util/script_library.py": 3,
     "util/media_files.py": 1,
     "util/nonai_library.py": 5,
     # One fewer with the archive lookup gone (item 27's last piece).
