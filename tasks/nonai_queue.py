@@ -129,7 +129,7 @@ def _watch_scores(path: Path) -> dict[str, float]:
 
     Mirrors the breeding score its playlist weighting uses: completions plus
     three per lock, minus skips. Empty until Fun Time starts tracking primary
-    (Nau) plays; satellite entries all point at the AI outbox and simply never
+    (the main player) plays; satellite entries all point at the AI outbox and simply never
     match a non-AI candidate.
     """
     try:

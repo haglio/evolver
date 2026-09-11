@@ -165,7 +165,7 @@ class TestCollectCandidates(unittest.TestCase):
             self.assertEqual([c.path for c in candidates], [fresh])
 
     def test_watched_videos_outrank_funscripted_ones(self):
-        """Fun Time's watch stats (once its Nau tracking records them) are the
+        """Fun Time's watch stats (once its main player tracking records them) are the
         strongest popularity signal; funscripts break ties among the unwatched."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)

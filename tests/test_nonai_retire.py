@@ -43,7 +43,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
 
     def test_carries_the_sidecar_to_the_retire_folder(self):
         """A clip's `clip` metadata must follow the file when it is retired, or
-        it is orphaned and pruned — losing Nau's navigation data."""
+        it is orphaned and pruned — losing the main player's navigation data."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]

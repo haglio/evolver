@@ -6,7 +6,7 @@ of is answerable only from the pictures -- :mod:`util.frame_hashes` samples both
 sides, hashes them and looks for the offset that lines them up. What it finds
 goes into the clip's sidecar as ``clip.full_video`` and ``clip.scene_offset``,
 where ``tasks.clip_scripts`` and ``tasks.scene_scripts`` read it back to carry a
-funscript between the two, and where Nau reads it to step from a clip to the
+funscript between the two, and where the main player reads it to step from a clip to the
 scene it belongs to.
 
 Not a pipeline stage, and deliberately: it reads every candidate video end to
