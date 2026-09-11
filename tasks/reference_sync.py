@@ -5,6 +5,12 @@ library gets reorganized by hand between runs too. Every sibling app that saved
 a video's path (Clipper's clip bounds, Fun Time's favorites and watch counts)
 is left pointing at where the file used to be. This stage walks those stores
 each run and follows the move.
+
+Each of those files belongs to a repo that has never heard of this one, so a
+format one of them changes would arrive here as a file that still parses and
+still looks rewritable. A store whose shape this stage was not written for is
+therefore left exactly as it is and reported for a person to look at
+(:meth:`util.reference_stores.ReferenceStore.shape_complaint`).
 """
 
 from __future__ import annotations
@@ -24,20 +30,32 @@ class ReferenceSyncResult:
     relocated: int = 0
     unresolved: int = 0
     write_errors: int = 0
+    refused: int = 0
 
     @property
     def ok(self) -> bool:
         return not self.write_errors
+
+    @property
+    def needs_an_eye(self) -> bool:
+        """A sibling's file is no longer the shape this stage was written for.
+
+        Not a failure: leaving it alone is this stage doing its job. It is a
+        person's to look at, because until somebody does, the references in
+        that file stop following the videos they point at.
+        """
+        return bool(self.refused)
 
 
 @dataclass(frozen=True)
 class _Reconciled:
     """What following one store's references came to."""
 
-    checked: int
-    relocated: int
-    unresolved: int
-    write_errors: int
+    checked: int = 0
+    relocated: int = 0
+    unresolved: int = 0
+    write_errors: int = 0
+    refused: int = 0
 
 
 def run() -> ReferenceSyncResult:
@@ -51,13 +69,16 @@ def run() -> ReferenceSyncResult:
         result.relocated += reconciled.relocated
         result.unresolved += reconciled.unresolved
         result.write_errors += reconciled.write_errors
+        result.refused += reconciled.refused
 
     log.info(
-        "References done. Checked: %d, Relocated: %d, Unresolved: %d, Write errors: %d",
+        "References done. Checked: %d, Relocated: %d, Unresolved: %d, Write errors: %d, "
+        "Refused: %d",
         result.checked,
         result.relocated,
         result.unresolved,
         result.write_errors,
+        result.refused,
     )
     return result
 
@@ -66,6 +87,15 @@ def _reconcile(
     store: reference_stores.ReferenceStore,
     index: dict[str, list[Path]],
 ) -> _Reconciled:
+    complaint = store.shape_complaint()
+    if complaint is not None:
+        log.warning(
+            "REFUSING %s (%s): %s. Its references are not being followed until "
+            "this stage is taught the new shape.",
+            store.label, store.path.name, complaint,
+        )
+        return _Reconciled(refused=1)
+
     references = store.read()
 
     moves: dict[str, str] = {}

@@ -9,7 +9,7 @@ verbs in whatever imports them.
 
 The last is the one a gate can hold. ``util.sidecar`` is the format two apps
 write, and a bare ``read(path)`` in a module that also reads settings, a CSV
-and a browser profile says nothing about which. Its sibling ``util.funscript``
+and a browser profile says nothing about which. Its sibling ``util.script_library``
 was always reached module-qualified and never had the problem, so the rule is
 that shape rather than a rename: ``sidecar.read``, not ``read``.
 """

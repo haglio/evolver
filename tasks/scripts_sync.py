@@ -11,8 +11,8 @@ from pathlib import Path
 
 import config
 from util.alert import show_error
-from util.funscript import script_path_for_video
 from util.media_files import library_videos, remove_empty_dirs
+from util.script_library import script_path_for_video
 from util.variants import strip_processing_suffixes
 
 log = logging.getLogger(__name__)
