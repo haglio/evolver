@@ -6,8 +6,9 @@ different from Provider: Evolver *pulls* what it needs and Origenerator never re
 back. Where the Provider strategy scrapes prompts from a website, this one reads them
 straight from Origenerator's ``generations`` database (read-only) — the same
 authoritative record its own gallery groups by — and shapes them into the sidecar
-schema the downstream browser consumes (a ``video`` block, plus a ``source_image``
-block for the start frame an image-to-video clip was animated from).
+schema the downstream browser consumes (a ``video`` block, a ``provenance`` stamp
+naming the workflow and the version of it that made the clip, plus a
+``source_image`` block for the start frame an image-to-video clip was animated from).
 
 The only knowledge of Origenerator's schema that lives here is the handful of
 column/param names read below; keeping that knowledge on Evolver's side is the
@@ -23,15 +24,19 @@ import sqlite3
 from pathlib import Path
 
 import config
+from util import provenance
 from util.ffprobe import video_dimensions
 from util.media_files import strip_uniquifier
 
 # Columns read from Origenerator's ``generations`` table. ``params_json`` carries
 # the model/LoRA/input_image a run used; the prompts and seed are first-class.
-_SELECT = (
-    "SELECT prompt_id, positive_prompt, negative_prompt, seed, "
-    "params_json, output_files, created_at FROM generations"
-)
+_COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
+            "negative_prompt", "seed", "params_json", "output_files", "created_at")
+
+# The stamp a gallery that records its own generations keeps on each row. Read
+# where the table has it; where it does not, the two workflow columns are all
+# there is to reconstruct one from.
+_OWN_PROVENANCE = "provenance"
 
 # Param keys naming the model a run used, most-specific first — covers every
 # Origenerator workflow (WAN i2v/t2i use unet_high, Flux uses unet, SDXL uses
@@ -67,7 +72,10 @@ def build_metadata(video_path, db_path=None) -> dict:
     if row is None:
         raise LookupError(f"No Origenerator generation produced {video_path.name}")
 
-    payload: dict = {"video": _video_block(row, video_path)}
+    payload: dict = {
+        "video": _video_block(row, video_path),
+        provenance.BLOCK: {provenance.GENERATION: _generation_provenance(row)},
+    }
     image_row = _find_source_image_row(row, rows)
     if image_row is not None:
         source_block = _source_image_block(image_row)
@@ -85,8 +93,9 @@ def _load_rows(db_path: Path) -> list[dict]:
     """
     conn = _connect_ro(db_path)
     try:
-        cursor = conn.execute(_SELECT)
-        columns = [column[0] for column in cursor.description]
+        present = {column[1] for column in conn.execute("PRAGMA table_info(generations)")}
+        columns = [*_COLUMNS, _OWN_PROVENANCE] if _OWN_PROVENANCE in present else list(_COLUMNS)
+        cursor = conn.execute(f"SELECT {', '.join(columns)} FROM generations")
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
     finally:
         conn.close()
@@ -140,6 +149,26 @@ def _video_block(row: dict, video_path: Path) -> dict:
     return block
 
 
+# What Origenerator's importer writes into the two workflow columns of a clip it
+# found rather than generated (origenerator/importer.py): placeholders, not a
+# workflow or a version of one.
+_IMPORT_PLACEHOLDERS = frozenset({"unknown", "imported"})
+
+
+def _generation_provenance(row: dict) -> dict:
+    its_own = _decoded(row.get(_OWN_PROVENANCE), dict)
+    if its_own:
+        return its_own
+    return provenance.reconstructed(
+        "origenerator",
+        recipe=_named(row.get("workflow_name")),
+        recipe_version=_named(row.get("workflow_version")))
+
+
+def _named(column: str | None) -> str | None:
+    return None if not column or column in _IMPORT_PLACEHOLDERS else column
+
+
 def _source_image_block(row: dict) -> dict:
     block: dict = {}
     _put(block, "positive_prompt", row.get("positive_prompt"))
@@ -191,15 +220,18 @@ def _aspect_ratio(width: int, height: int) -> str:
 
 
 def _parse_params(row: dict) -> dict:
-    """Parse a row's ``params_json`` into a dict, tolerating bad data."""
-    raw = row.get("params_json")
+    return _decoded(row.get("params_json"), dict)
+
+
+def _decoded(raw: str | None, kind: type[dict] | type[list]):
+    """A JSON column's value, or an empty *kind* when it holds nothing of that shape."""
     if not raw:
-        return {}
+        return kind()
     try:
-        params = json.loads(raw)
+        value = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
-        return {}
-    return params if isinstance(params, dict) else {}
+        return kind()
+    return value if isinstance(value, kind) else kind()
 
 
 def _output_frame_names(row: dict) -> set[str]:
@@ -212,15 +244,7 @@ def _output_frame_names(row: dict) -> set[str]:
 
 
 def _row_output_files(row: dict) -> list:
-    """Parse a row's ``output_files`` JSON into a list, tolerating bad data."""
-    raw = row.get("output_files")
-    if not raw:
-        return []
-    try:
-        files = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return []
-    return files if isinstance(files, list) else []
+    return _decoded(row.get("output_files"), list)
 
 
 def _frame_name(ref: str | None) -> str:
