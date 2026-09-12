@@ -62,10 +62,7 @@ def _fingerprint(recipe: topaz.Recipe) -> str:
 
 class TestARetunedRecipeOwesANewVersion(unittest.TestCase):
     def test_each_recipe_runs_the_settings_its_version_shipped_with(self):
-        running = {
-            (recipe.name, recipe.version): _fingerprint(recipe)
-            for recipe in (topaz.AI_UPSCALE, topaz.AI_UPSCALE_T2V, topaz.NON_AI_UPSCALE)
-        }
+        running = {(recipe.name, recipe.version): _fingerprint(recipe) for recipe in topaz.RECIPES}
 
         self.assertEqual(
             {key: SHIPPED.get(key) for key in running},
@@ -73,6 +70,30 @@ class TestARetunedRecipeOwesANewVersion(unittest.TestCase):
             "a recipe's settings changed under a version outputs already record: bump its "
             "version in util/topaz.py, then add the new version's fingerprint to SHIPPED",
         )
+
+
+class TestWhatAFilesNoteSaysMadeIt(unittest.TestCase):
+    def test_a_note_in_a_recipes_own_words_names_that_recipe(self):
+        for recipe in topaz.RECIPES:
+            with self.subTest(recipe=recipe.name):
+                self.assertIs(topaz.recipe_noted(recipe.videoai_tag), recipe)
+
+    def test_a_note_differing_only_in_the_name_in_parentheses_at_its_end_names_it_too(self):
+        """The text-to-video recipe's note once named a site in those parentheses,
+        and the files written then still say which recipe made them."""
+        note = topaz.AI_UPSCALE_T2V.videoai_tag
+        written_then = note[:note.rindex("(")] + "(t2v examplesite)"
+
+        self.assertNotEqual(written_then, note)
+        self.assertIs(topaz.recipe_noted(written_then), topaz.AI_UPSCALE_T2V)
+
+    def test_a_note_in_topazs_own_words_or_no_note_at_all_names_no_recipe(self):
+        """Topaz describes an export made by hand in its own phrasing; that, or a
+        file carrying no note, was not made by any recipe here."""
+        for note in (("Processed using apo-8 replacing duplicate frames. Enhanced using gcg-5. "
+                      "4x upscale"), ""):
+            with self.subTest(note=note):
+                self.assertIsNone(topaz.recipe_noted(note))
 
 
 class TestEnvironment(unittest.TestCase):
