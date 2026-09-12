@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -69,6 +70,19 @@ NON_AI_UPSCALE = Recipe(
     keep_audio=True,
     frame=(3840, 2160),
 )
+
+RECIPES = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE)
+
+# A name in parentheses closing a note: the one part of a recipe's note that has
+# been reworded while the recipe stayed the same.
+_CLOSING_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
+
+
+def recipe_noted(note: str) -> Recipe | None:
+    """The recipe whose note Topaz wrote into a file is *note*, or None."""
+    said = _CLOSING_PARENTHETICAL.sub("", note)
+    return next((recipe for recipe in RECIPES
+                 if _CLOSING_PARENTHETICAL.sub("", recipe.videoai_tag) == said), None)
 
 
 def framed(recipe: Recipe, orient: str) -> Recipe:

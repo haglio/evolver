@@ -87,7 +87,7 @@ STAGES: tuple[Stage, ...] = (
           "Record what kind each library video is -- a generation, an excerpt, a Genau clip -- and how long it runs, on its mirrored sidecar",
           (0x2B, 0x2B, 0xE8)),
     Stage("provenance", "Provenance",
-          "Record on each library video's sidecar what made it -- which app, which version of its code, which recipe -- looking up what Origenerator's gallery still knows for the videos made before this was recorded, and marking the rest unknown",
+          "Record on each library video's sidecar what made it -- which app, which version of its code, which recipe -- looking its clips up in Origenerator's gallery and reading the note Topaz wrote into each upscale, and marking unknown whatever neither can say",
           (0xEE, 0x00, 0xBB)),
     Stage("dupes", "Duplicate Check",
           "Scan non_AI folder for likely duplicate videos, using exact filesize",
