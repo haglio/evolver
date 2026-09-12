@@ -60,7 +60,7 @@ def _purge_pile(pile: WeirdPile) -> PurgeWeirdResult:
 
     weird_files = [
         p for p in pile.directory.iterdir()
-        if is_finalized_video_file(p, config.VIDEO_EXTENSIONS)
+        if is_finalized_video_file(p)
     ]
     if not weird_files:
         return PurgeWeirdResult()

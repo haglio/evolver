@@ -86,16 +86,15 @@ CONFIG_REFERENCE_LEDGER = {
     # The branch preview reads the library the way a stage does, and points two
     # of these somewhere else -- the run record and the running times it takes
     # stay in the worktree rather than in the live install (preview_branch.py).
-    "preview_branch.py": 7,
+    "preview_branch.py": 6,
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 5,
     # One fewer: the runtime cap is a field of the EncodeSettings this
     # module now declares, rather than a number it looks up.
     "tasks/nonai_encode.py": 11,
-    "tasks/nonai_group.py": 4,
-    "tasks/nonai_progress.py": 1,
-    "tasks/nonai_queue.py": 3,
+    "tasks/nonai_group.py": 3,
+    "tasks/nonai_queue.py": 1,
     # Five fewer with the retired-metadata repair pass gone (item 27's last
     # piece), then seven with the six numbers governing one encode collected
     # into tasks.nonai_encode.EncodeSettings -- which is where they belong:
@@ -104,7 +103,7 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/nonai_upscale.py": 14,
     "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 5,
-    "tasks/purge_weird.py": 3,
+    "tasks/purge_weird.py": 2,
     "tasks/scene_scripts.py": 1,
     # The three trees this stage aligns between are its arguments now, so the
     # four bucket classifiers take the roots rather than looking them up:
@@ -114,12 +113,12 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/sort.py": 2,
     "tasks/stray_files.py": 8,
     # One more for the provider's source name in the recipe guard (bug 7).
-    "tasks/upscale.py": 17,
+    "tasks/upscale.py": 16,
     "tasks/video_types.py": 5,
     # The lane walk it used to do itself, and the stage that walks the lanes
     # after it to stamp the viewing on the same sidecars.
     "tasks/watch_weights.py": 9,
-    "util/lanes.py": 9,
+    "util/lanes.py": 6,
     "util/script_library.py": 3,
     "util/media_files.py": 1,
     "util/nonai_library.py": 5,
@@ -128,7 +127,7 @@ CONFIG_REFERENCE_LEDGER = {
     "util/reference_stores.py": 6,
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
-    "util/video_locator.py": 2,
+    "util/video_locator.py": 1,
     "util/warm_gun.py": 3,
     # Where the two condemned piles are, and the corner of 1_sorted each one's
     # files came from. The stage that empties them and the index that has to

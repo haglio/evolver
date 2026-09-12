@@ -50,7 +50,7 @@ def run() -> NonAiGroupResult:
         videos = [
             video
             for video in sorted(bucket.rglob("*"))
-            if is_finalized_video_file(video, config.VIDEO_EXTENSIONS)
+            if is_finalized_video_file(video)
         ]
         if not videos:
             continue

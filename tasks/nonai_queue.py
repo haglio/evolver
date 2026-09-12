@@ -52,7 +52,7 @@ def collect_candidates(*, skip_manifest: Path, pin_manifest: Path,
         for triage_digit, triage_dir in stage_dirs(bucket, digits=(0, 1)):
             for scan_dir in _upscale_ready_dirs(triage_dir):
                 for video in sorted(scan_dir.iterdir()):
-                    if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
+                    if not is_finalized_video_file(video):
                         continue
                     rel = relpath(video)
                     if is_processed_stem(video.stem):
@@ -119,7 +119,7 @@ def _processed_stems(bucket: Path) -> set[str]:
     """Original stems that already have a processed variant somewhere in *bucket*."""
     stems = set()
     for video in bucket.rglob("*"):
-        if is_finalized_video_file(video, config.VIDEO_EXTENSIONS) and is_processed_stem(video.stem):
+        if is_finalized_video_file(video) and is_processed_stem(video.stem):
             stems.add(strip_processing_suffixes(video.stem))
     return stems
 

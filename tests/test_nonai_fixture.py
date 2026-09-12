@@ -75,7 +75,6 @@ LEFT_AMBIENT = {
     "TVAI_MODEL_DIR": "the Topaz install; goes into the encoder's environment, "
                       "and no test launches one",
     "VIDEOAI_TAG_NONAI": "not a place",
-    "VIDEO_EXTENSIONS": "not a place; one repo-wide answer to what counts as a video",
 }
 
 

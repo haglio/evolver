@@ -215,7 +215,7 @@ def collect_candidates(
         source, orient = rel.parts[0], rel.parts[1]
         if orient not in orientation.SORTED:
             continue
-        if is_finalized_video_file(in_file, config.VIDEO_EXTENSIONS):
+        if is_finalized_video_file(in_file):
             if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
                 return candidates
 
