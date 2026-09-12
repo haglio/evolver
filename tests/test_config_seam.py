@@ -105,6 +105,9 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/nonai_upscale.py": 14,
     "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 5,
+    # The name the non-AI lane gives its outputs, which is how a hand export
+    # made before the stage existed is told from an original.
+    "tasks/provenance_sweep.py": 1,
     "tasks/purge_weird.py": 2,
     "tasks/scene_scripts.py": 1,
     # The three trees this stage aligns between are its arguments now, so the

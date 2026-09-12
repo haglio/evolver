@@ -21,6 +21,7 @@ import json
 import math
 import re
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 import config
@@ -63,11 +64,7 @@ def build_metadata(video_path, db_path=None) -> dict:
     ``FileNotFoundError`` when the database is absent.
     """
     video_path = Path(video_path)
-    db_path = Path(db_path) if db_path is not None else config.ORIGENERATOR_DB_PATH
-    if not db_path.exists():
-        raise FileNotFoundError(f"Origenerator database not found: {db_path}")
-
-    rows = _load_rows(db_path)
+    rows = _load_rows(_database(db_path))
     row = _match_video_row(video_path, rows)
     if row is None:
         raise LookupError(f"No Origenerator generation produced {video_path.name}")
@@ -82,6 +79,31 @@ def build_metadata(video_path, db_path=None) -> dict:
         if source_block:
             payload["source_image"] = source_block
     return payload
+
+
+def _database(db_path) -> Path:
+    """The gallery database to read -- *db_path*, else the configured one -- which must exist."""
+    db_path = Path(db_path) if db_path is not None else config.ORIGENERATOR_DB_PATH
+    if not db_path.exists():
+        raise FileNotFoundError(f"Origenerator database not found: {db_path}")
+    return db_path
+
+
+def generation_records(db_path=None) -> Callable[[Path], dict]:
+    """What made each of Origenerator's videos, answered from one read of its gallery.
+
+    Raises ``FileNotFoundError`` when the database is absent, as
+    :func:`build_metadata` does.
+    """
+    rows = _load_rows(_database(db_path))
+
+    def generation_of(video: Path) -> dict:
+        row = _match_video_row(Path(video), rows)
+        if row is None:
+            return provenance.reconstructed("origenerator")
+        return _generation_provenance(row)
+
+    return generation_of
 
 
 def _load_rows(db_path: Path) -> list[dict]:

@@ -34,7 +34,7 @@ def by_evolver(*, recipe: str | None = None, recipe_version: str | None = None) 
 
 def recorded(payload: dict, act: str, stamp: dict) -> dict:
     """*payload* with *stamp* filed under *act*, beside its other stamps -- a copy."""
-    return {**payload, BLOCK: {**_stamps_of(payload), act: stamp}}
+    return {**payload, BLOCK: {**stamps_of(payload), act: stamp}}
 
 
 def carried_forward(earlier: dict, later: dict) -> dict:
@@ -43,11 +43,12 @@ def carried_forward(earlier: dict, later: dict) -> dict:
     Where both record the same act, *later*'s stands: it is the newer word on
     what made the file.
     """
-    stamps = {**_stamps_of(earlier), **_stamps_of(later)}
+    stamps = {**stamps_of(earlier), **stamps_of(later)}
     return {**later, BLOCK: stamps} if stamps else later
 
 
-def _stamps_of(payload: dict) -> dict:
+def stamps_of(payload: dict) -> dict:
+    """The stamps *payload* records, by act -- none when it records none."""
     stamps = payload.get(BLOCK)
     return stamps if isinstance(stamps, dict) else {}
 

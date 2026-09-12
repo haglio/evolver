@@ -34,6 +34,7 @@ from tasks import (
     nonai_group,
     nonai_upscale,
     prompt_scrape,
+    provenance_sweep,
     purge_weird,
     reference_sync,
     scene_scripts,
@@ -328,6 +329,10 @@ def run_pipeline(
         # the kind then joins a record that is already there rather than making a
         # second one for the same video in the same run.
         _run_stage("video_types", video_types.run)
+        # After every stage that makes or moves a video, so it only ever fills in
+        # what they left unrecorded, and after the kinds, so a video it records
+        # already has the sidecar the kinds stage made for it.
+        _run_stage("provenance", provenance_sweep.run)
         _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
     except _StopRequested:
         log.warning(
