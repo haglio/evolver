@@ -15,10 +15,10 @@ The shared helpers for this contract live in `util/media_files.py`:
 - `partial_path()` and `partial_stem()`
 - `is_partial_path()`
 - `is_finalized_video_file()`
-- `iter_finalized_videos()`
+- `library_videos()`
 - `remove_partial_files()`
 
-If a future change adds a new stage that scans video trees, prefer `iter_finalized_videos(...)` instead of open-coding `rglob("*")` plus an extension check.
+If a future change adds a new stage that scans video trees, prefer `library_videos(...)` instead of open-coding `rglob("*")` plus an extension check.
 
 `tasks/stray_files.py` is the one deliberate exception. It exists to look at what those helpers filter *out*, so it walks `rglob("*")` itself, and skips partial files by name: an in-flight write is neither a stray to fix nor news to report.
 

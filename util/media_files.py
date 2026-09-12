@@ -28,19 +28,15 @@ def is_partial_path(path: Path) -> bool:
     return ".partial." in path.name.lower()
 
 
-def is_finalized_video_file(path: Path, video_extensions: set[str]) -> bool:
-    return path.is_file() and path.suffix.lower() in video_extensions and not is_partial_path(path)
-
-
-def iter_finalized_videos(root: Path, video_extensions: set[str]):
-    for path in root.rglob("*"):
-        if is_finalized_video_file(path, video_extensions):
-            yield path
+def is_finalized_video_file(path: Path) -> bool:
+    return path.suffix.lower() in config.VIDEO_EXTENSIONS and not is_partial_path(path) and path.is_file()
 
 
 def library_videos(root: Path):
     """Every finished video under *root*, at any depth, unordered."""
-    yield from iter_finalized_videos(root, config.VIDEO_EXTENSIONS)
+    for path in root.rglob("*"):
+        if is_finalized_video_file(path):
+            yield path
 
 
 # How a name collision is uniquified: "stem", then "stem (2)", "stem (3)"...

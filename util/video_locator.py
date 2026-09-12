@@ -48,7 +48,7 @@ def renamed_in_place(was_at: Path, fingerprint: tuple[float, int]) -> Path | Non
     matches = [
         candidate
         for candidate in sorted(was_at.parent.glob("*"))
-        if is_finalized_video_file(candidate, config.VIDEO_EXTENSIONS)
+        if is_finalized_video_file(candidate)
         and _same_footage(ffprobe.frame_fingerprint(candidate), fingerprint)
     ]
     return matches[0] if len(matches) == 1 else None

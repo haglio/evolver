@@ -78,7 +78,7 @@ def _upscales() -> list[Path]:
         video
         for bucket in buckets()
         for video in sorted(bucket.rglob("*"))
-        if is_finalized_video_file(video, config.VIDEO_EXTENSIONS)
+        if is_finalized_video_file(video)
         and is_processed_stem(video.stem)
     ]
 

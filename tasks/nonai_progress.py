@@ -28,7 +28,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-import config
 from util import sidecar, video_type
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
@@ -94,7 +93,7 @@ def _upscaled() -> dict[str, float | None]:
     found: dict[str, float | None] = {}
     for bucket in buckets():
         for video in sorted(bucket.rglob("*")):
-            if not is_finalized_video_file(video, config.VIDEO_EXTENSIONS):
+            if not is_finalized_video_file(video):
                 continue
             if not is_processed_stem(video.stem):
                 continue
