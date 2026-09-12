@@ -10,6 +10,9 @@ import config
 from util.media_files import is_finalized_video_file, library_videos
 from util.sidecar import upscaled_video_path
 
+#: The source folder Origenerator's videos arrive under, in 0_inbox and 1_sorted.
+ORIGENERATOR_SOURCE = "origenerator"
+
 
 @dataclass(frozen=True)
 class AiClip:

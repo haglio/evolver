@@ -30,8 +30,10 @@ from tests.test_evolver import _patched_stages, _stage_mocks
 # `sort` moves what it can identify and leaves the rest in the inbox;
 # `clip_scripts` and `scene_scripts` write a funscript where one is missing and
 # leave every existing one alone; `group_non_ai` is bookkeeping over whatever
-# files happen to be there.
-CANNOT_FAIL = frozenset({"strays", "sort", "clip_scripts", "scene_scripts", "group_non_ai", "video_types"})
+# files happen to be there; `provenance` only fills in a record where none is,
+# and a gallery it cannot read leaves its clips for a later run.
+CANNOT_FAIL = frozenset({"strays", "sort", "clip_scripts", "scene_scripts", "group_non_ai",
+                         "video_types", "provenance"})
 
 
 def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:

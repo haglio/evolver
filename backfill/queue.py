@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import orientation, sidecar
+from util import lanes, orientation, sidecar
 from util.media_files import library_videos
 from util.sidecar import action_of, sidecar_path, wrong_action_of
 from util.variants import sorted_stem_of
@@ -27,7 +27,7 @@ def scraped_sources() -> frozenset[str]:
     Read at the call rather than at import: the provider's name is the
     overlay's, and a literal agreed with it only by happening to.
     """
-    return frozenset({config.PROVIDER_SOURCE, "origenerator"})
+    return frozenset({config.PROVIDER_SOURCE, lanes.ORIGENERATOR_SOURCE})
 
 
 def iter_library_videos() -> Iterator[tuple[str, Path]]:

@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 import config
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
-from util import orientation, provenance, relative_dates, sidecar, video_type
+from util import lanes, orientation, provenance, relative_dates, sidecar, video_type
 from util.headless_browser import fetch_dom, find_browser_executable
 from util.html_query import (
     Node,
@@ -277,7 +277,7 @@ def _build_strategies(browser, profile_dir):
     """
     provider_source = config.PROVIDER_SOURCE
     base_url = config.PROVIDER_BASE_URL
-    strategies = {"origenerator": origenerator_metadata.build_metadata}
+    strategies = {lanes.ORIGENERATOR_SOURCE: origenerator_metadata.build_metadata}
     if browser is not None:
         strategies[provider_source] = lambda video: _scrape_provider_video(
             video, _provider_image_url(video, base_url), browser, base_url, profile_dir
