@@ -6,20 +6,25 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from app_support import provenance
+
 from tasks import origenerator_metadata as om
 from tests.temp_helpers import workspace_temp_dir
 
 _SCHEMA = (
     "CREATE TABLE generations ("
-    " prompt_id TEXT, positive_prompt TEXT, negative_prompt TEXT, seed INTEGER,"
+    " prompt_id TEXT, workflow_name TEXT, workflow_version TEXT,"
+    " positive_prompt TEXT, negative_prompt TEXT, seed INTEGER,"
     " params_json TEXT, output_files TEXT, created_at TEXT)"
 )
 
 
-def _row(prompt_id, *, pos=None, neg=None, seed=None, params=None,
-         outputs=(), created=None):
+def _row(prompt_id, *, workflow="wan22_i2v", version="v001", pos=None, neg=None,
+         seed=None, params=None, outputs=(), created=None):
     return {
         "prompt_id": prompt_id,
+        "workflow_name": workflow,
+        "workflow_version": version,
         "positive_prompt": pos,
         "negative_prompt": neg,
         "seed": seed,
@@ -35,12 +40,22 @@ def _make_db(path, rows):
     conn = sqlite3.connect(path)
     conn.execute(_SCHEMA)
     conn.executemany(
-        "INSERT INTO generations (prompt_id, positive_prompt, negative_prompt,"
-        " seed, params_json, output_files, created_at)"
-        " VALUES (:prompt_id, :positive_prompt, :negative_prompt, :seed,"
-        " :params_json, :output_files, :created_at)",
+        "INSERT INTO generations (prompt_id, workflow_name, workflow_version,"
+        " positive_prompt, negative_prompt, seed, params_json, output_files, created_at)"
+        " VALUES (:prompt_id, :workflow_name, :workflow_version, :positive_prompt,"
+        " :negative_prompt, :seed, :params_json, :output_files, :created_at)",
         rows,
     )
+    conn.commit()
+    conn.close()
+
+
+def _stamp_row(path, prompt_id, stamp):
+    """The column a gallery that stamps its own generations keeps its stamp in."""
+    conn = sqlite3.connect(path)
+    conn.execute("ALTER TABLE generations ADD COLUMN provenance TEXT")
+    conn.execute("UPDATE generations SET provenance = ? WHERE prompt_id = ?",
+                 (json.dumps(stamp), prompt_id))
     conn.commit()
     conn.close()
 
@@ -48,6 +63,55 @@ def _make_db(path, rows):
 def _no_probe():
     """Patch away ffprobe so resolution is omitted (temp files aren't real videos)."""
     return patch("tasks.origenerator_metadata.video_dimensions", return_value=None)
+
+
+class TestWhatMadeTheVideo(unittest.TestCase):
+    def test_the_generation_s_workflow_and_its_version_are_recorded_as_what_made_it(self):
+        with workspace_temp_dir() as root:
+            db = root / "origenerator.db"
+            _make_db(db, [_row("vid-1", workflow="wan22_i2v", version="v007",
+                               outputs=["wan22_i2v_00001_.mp4"])])
+            with _no_probe():
+                payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
+
+        self.assertEqual(payload["provenance"], {"generation": {
+            "schema": provenance.SCHEMA, "app": "origenerator",
+            "app_commit": None, "app_dirty": None,
+            "recipe": "wan22_i2v", "recipe_version": "v007", "stamped_at": None,
+        }})
+
+    def test_what_an_import_writes_in_place_of_a_workflow_is_recorded_as_unknown(self):
+        """Origenerator fills both columns of a clip it imported rather than
+        generated with placeholders. Carried as they are, "imported" would read
+        as a version, and a sweep comparing versions would take it for one."""
+        with workspace_temp_dir() as root:
+            db = root / "origenerator.db"
+            _make_db(db, [_row("vid-1", workflow="unknown", version="imported",
+                               outputs=["wan22_i2v_00001_.mp4"])])
+            with _no_probe():
+                payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
+
+        generation = payload["provenance"]["generation"]
+        self.assertEqual((generation["recipe"], generation["recipe_version"]), (None, None))
+
+    def test_a_record_the_gallery_keeps_of_its_own_is_carried_as_it_stands(self):
+        """Once Origenerator stamps its own rows it knows what nothing here can
+        work out from the two workflow columns: the commit it ran at, and when."""
+        its_own = {
+            "schema": provenance.SCHEMA, "app": "origenerator",
+            "app_commit": "0123abc", "app_dirty": False,
+            "recipe": "wan22_i2v", "recipe_version": "v007",
+            "stamped_at": "2026-09-01T20:15:00+00:00",
+        }
+        with workspace_temp_dir() as root:
+            db = root / "origenerator.db"
+            _make_db(db, [_row("vid-1", workflow="wan22_i2v", version="v007",
+                               outputs=["wan22_i2v_00001_.mp4"])])
+            _stamp_row(db, "vid-1", its_own)
+            with _no_probe():
+                payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
+
+        self.assertEqual(payload["provenance"]["generation"], its_own)
 
 
 class TestBuildMetadata(unittest.TestCase):
@@ -61,13 +125,11 @@ class TestBuildMetadata(unittest.TestCase):
             ])
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
-        self.assertEqual(payload, {
-            "video": {
-                "prompt": "a woman dancing",
-                "model": "wan2.2_i2v_high_noise",
-                "seed": "42",
-                "created": "2026-03-28",
-            }
+        self.assertEqual(payload["video"], {
+            "prompt": "a woman dancing",
+            "model": "wan2.2_i2v_high_noise",
+            "seed": "42",
+            "created": "2026-03-28",
         })
 
     def test_resolves_source_image_block(self):
@@ -142,7 +204,7 @@ class TestBuildMetadata(unittest.TestCase):
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
         # No prompt, no seed, no model, no created -> an empty video block, not keys with "".
-        self.assertEqual(payload, {"video": {}})
+        self.assertEqual(payload["video"], {})
 
 
 class TestModelLabel(unittest.TestCase):

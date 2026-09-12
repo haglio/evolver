@@ -19,6 +19,11 @@ from util import orientation
 # its own -- this file.
 _OWNER = "util/orientation.py"
 
+# The same word meaning something else, as (module, string). Origenerator's
+# importer writes "unknown" into the workflow name of a clip it found rather
+# than generated, which is no orientation at all.
+_SAME_WORD_ELSEWHERE = {("tasks/origenerator_metadata.py", orientation.UNKNOWN)}
+
 
 class TestTheOrientations(unittest.TestCase):
     def test_the_walk_order_is_the_two_folder_names(self):
@@ -42,7 +47,7 @@ class TestOnlyOneModuleSpellsThem(unittest.TestCase):
             tree = ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
             offenders += [
                 f"{name}:{node.lineno}" for node in _string_constants(tree)
-                if node.value in wanted
+                if node.value in wanted and (name, node.value) not in _SAME_WORD_ELSEWHERE
             ]
 
         self.assertEqual(
