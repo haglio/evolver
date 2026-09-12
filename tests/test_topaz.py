@@ -3,15 +3,19 @@ from __future__ import annotations
 import hashlib
 import json
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 import config
-from util import topaz
+from util import orientation, topaz
+
+_EXAMPLE = topaz.Recipe(name="example", version="v000",
+                        filter_complex="the-filter", videoai_tag="the-tag")
 
 
 class TestCommand(unittest.TestCase):
     def test_builds_silent_video_command(self):
-        cmd = topaz.command(Path("in.mp4"), Path("tmp.mp4"), "the-filter", "the-tag")
+        cmd = topaz.command(Path("in.mp4"), Path("tmp.mp4"), _EXAMPLE)
         self.assertEqual(cmd[0], str(config.FFMPEG))
         self.assertIn("in.mp4", cmd)
         self.assertIn("the-filter", cmd)
@@ -20,13 +24,18 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd[-1], "tmp.mp4")
 
     def test_keep_audio_reencodes_instead_of_stripping(self):
-        cmd = topaz.command(Path("in.mp4"), Path("tmp.mp4"), "f", "t", keep_audio=True)
+        cmd = topaz.command(Path("in.mp4"), Path("tmp.mp4"), replace(_EXAMPLE, keep_audio=True))
         self.assertNotIn("-an", cmd)
         self.assertIn("aac", cmd)
 
     def test_names_the_container_outright_since_the_file_it_writes_has_no_extension(self):
-        cmd = topaz.command(Path("in.mp4"), Path("scene one.partial.ab12"), "f", "t")
+        cmd = topaz.command(Path("in.mp4"), Path("scene one.partial.ab12"), _EXAMPLE)
         self.assertEqual(cmd[cmd.index("-f") + 1], "mp4")
+
+    def test_a_recipe_aimed_at_a_frame_is_refused_until_it_is_turned_to_the_video(self):
+        """Unframed, its filter would reach Topaz still asking for {width}."""
+        with self.assertRaises(ValueError):
+            topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.NON_AI_UPSCALE)
 
 
 # Every version a recipe has shipped under, and a fingerprint of everything that
@@ -34,23 +43,28 @@ class TestCommand(unittest.TestCase):
 # and adds a line here for the new one; it never edits a line already here,
 # because outputs on disk already name that version as what made them.
 SHIPPED = {
-    ("ai_upscale", "v001"): "00eb1be19cace017",
-    ("ai_upscale_t2v", "v001"): "31e64e774fa2e8f4",
+    ("ai_upscale", "v001"): "ba105a7372baef8f",
+    ("ai_upscale_t2v", "v001"): "433ce5942b2b7849",
+    ("non_ai_upscale", "v001"): "7abba8acb076bb73",
 }
 
 
 def _fingerprint(recipe: topaz.Recipe) -> str:
-    """The whole command a recipe runs, bar the two file paths and the path to
-    Topaz itself, which are the machine's rather than the recipe's."""
-    argv = topaz.command(Path("in"), Path("out"), recipe.filter_complex, recipe.videoai_tag)
-    return hashlib.sha256(json.dumps(argv[1:]).encode("utf-8")).hexdigest()[:16]
+    """Every command a recipe runs -- one per orientation -- bar the two file
+    paths and the path to Topaz itself, which are the machine's, not the recipe's."""
+    argvs = [
+        topaz.command(Path("in"), Path("out"),
+                      topaz.framed(recipe, orient) if recipe.frame else recipe)[1:]
+        for orient in orientation.SORTED
+    ]
+    return hashlib.sha256(json.dumps(argvs).encode("utf-8")).hexdigest()[:16]
 
 
 class TestARetunedRecipeOwesANewVersion(unittest.TestCase):
     def test_each_recipe_runs_the_settings_its_version_shipped_with(self):
         running = {
             (recipe.name, recipe.version): _fingerprint(recipe)
-            for recipe in (topaz.AI_UPSCALE, topaz.AI_UPSCALE_T2V)
+            for recipe in (topaz.AI_UPSCALE, topaz.AI_UPSCALE_T2V, topaz.NON_AI_UPSCALE)
         }
 
         self.assertEqual(

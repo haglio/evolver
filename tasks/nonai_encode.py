@@ -13,11 +13,10 @@ which lives here rather than in ``config``: how long an encode may run and how
 much of the machine it may take are this app's own policy, not anything the
 machine or the overlay says, and ``config`` is for the second kind.
 
-The encode recipe -- the target edges, the filter template, the videoai tag --
-and the encoder's own log stay ambient config here, the way VIDEO_EXTENSIONS
-does: one repo-wide answer to "what does a non-AI upscale look like", not
-something a caller varies. The job record's file is a parameter, because the
-stage owns where its state lives.
+The encode recipe is :data:`util.topaz.NON_AI_UPSCALE`, named and versioned
+beside its settings so that every upscale made with it can say which; the
+encoder's own log stays ambient config, the way VIDEO_EXTENSIONS does. The job
+record's file is a parameter, because the stage owns where its state lives.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ from pathlib import Path
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 import config
-from util import ffprobe, nonai_job, orientation, processes, topaz
+from util import ffprobe, nonai_job, processes, provenance, topaz
 from util.media_files import is_partial_path, partial_stem
 
 log = logging.getLogger(__name__)
@@ -64,6 +63,13 @@ class EncodeSettings:
     # "away" and an encode may start or resume. Five minutes rides out ordinary
     # reading/watching pauses without treating them as the user leaving.
     user_idle_threshold_seconds: float = 300.0
+
+
+def unrecorded_start() -> dict:
+    """What made an encode of ours whose start nobody recorded -- one adopted
+    after its record was lost, or begun before encodes kept a stamp: our recipe,
+    but which version of it, and under which commit, is gone."""
+    return provenance.reconstructed("evolver", recipe=topaz.NON_AI_UPSCALE.name)
 
 
 def adopt_orphan(job_file: Path) -> dict | None:
@@ -98,6 +104,7 @@ def adopt_orphan(job_file: Path) -> dict | None:
         "suspended": False,
         "suspended_at": 0.0,
         "suspended_seconds": 0.0,
+        "provenance": unrecorded_start(),
     }
     # A crash could have left the encode frozen; thaw it so adoption never
     # inherits a permanently-suspended process. resume() no-ops if it is
@@ -206,13 +213,7 @@ def delete_tmp(tmp: Path) -> None:
 
 
 def launch(source: Path, tmp: Path, orient: str) -> int:
-    width, height = (
-        (config.NONAI_TARGET_LONG_EDGE, config.NONAI_TARGET_SHORT_EDGE)
-        if orient == orientation.LANDSCAPE
-        else (config.NONAI_TARGET_SHORT_EDGE, config.NONAI_TARGET_LONG_EDGE)
-    )
-    filter_complex = config.NONAI_UPSCALE_FILTER_TEMPLATE.format(width=width, height=height)
-    cmd = topaz.command(source, tmp, filter_complex, config.VIDEOAI_TAG_NONAI, keep_audio=True)
+    cmd = topaz.command(source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orient))
     with open(config.NONAI_FFMPEG_LOG, "w", encoding="utf-8") as ffmpeg_log:
         proc = subprocess.Popen(
             cmd,

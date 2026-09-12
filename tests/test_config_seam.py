@@ -91,8 +91,10 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 5,
     # One fewer: the runtime cap is a field of the EncodeSettings this
-    # module now declares, rather than a number it looks up.
-    "tasks/nonai_encode.py": 11,
+    # module now declares, rather than a number it looks up. Then six fewer: the
+    # recipe it launches is util.topaz's NON_AI_UPSCALE, named and versioned
+    # beside its settings, not a template, two edges and a tag looked up here.
+    "tasks/nonai_encode.py": 5,
     "tasks/nonai_group.py": 3,
     "tasks/nonai_queue.py": 1,
     # Five fewer with the retired-metadata repair pass gone (item 27's last

@@ -15,6 +15,13 @@ BLOCK = "provenance"
 #: The acts a stamp is filed under.
 GENERATION = "generation"
 UPSCALE = "upscale"
+UPSCALE_NON_AI = "upscale_non_ai"
+
+# The checkout is read here, as this module is imported with the rest of the
+# app, rather than at the first stamp: the tray runs for days on the code it
+# loaded while the checkout under it moves on, and a stamp taken a day later
+# would otherwise name a commit that is not what is running.
+app_support.provenance.stamp("evolver", anchor=__file__)
 
 
 def by_evolver(*, recipe: str | None = None, recipe_version: str | None = None) -> dict:

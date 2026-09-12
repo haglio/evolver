@@ -18,18 +18,22 @@ from tests.temp_helpers import (
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
-from util import sidecar, video_type
+from util import provenance, sidecar, video_type
 from util.media_files import partial_path
+
+STARTED_UNDER = provenance.reconstructed("evolver", recipe="non_ai_upscale",
+                                         recipe_version="v000")
 
 
 def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
               source=None, tmp_bytes=b"partial", suspended=False, suspended_at=0.0,
-              suspended_seconds=0.0, job_file=None):
+              suspended_seconds=0.0, job_file=None, stamp=STARTED_UNDER):
     """A persisted in-flight job whose tmp file exists under the bucket.
 
     *job_file* writes the record somewhere other than the configured path, which
     is how the tests for the state-file parameters put the record where only a
-    caller passing that path could find it.
+    caller passing that path could find it. *stamp* None is a record written
+    before encodes kept one.
     """
     non_ai = overrides["NON_AI_DIR"]
     source = source or make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
@@ -49,6 +53,8 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
         "suspended_at": suspended_at,
         "suspended_seconds": suspended_seconds,
     }
+    if stamp is not None:
+        job["provenance"] = stamp
     job_file = job_file or overrides["NONAI_JOB_STATE_FILE"]
     job_file.parent.mkdir(parents=True, exist_ok=True)
     job_file.write_text(json.dumps(job), encoding="utf-8")
@@ -326,7 +332,8 @@ class TestRunStopsAJob(unittest.TestCase):
 # is still running: a renamed key orphans it mid-run, and the stage then sees
 # no job, leaves the ffmpeg unsupervised and starts another on top of it --
 # which is the failure the adoption path below exists to recover from.
-JOB_KEYS_AT_START = {"pid", "source", "tmp", "out", "expected_duration", "started_at"}
+JOB_KEYS_AT_START = {"pid", "source", "tmp", "out", "expected_duration", "started_at",
+                     "provenance"}
 # Adoption knows three more, because it takes over an encode already in flight
 # and must be able to say it is not frozen.
 JOB_KEYS_ON_ADOPTION = JOB_KEYS_AT_START | {
@@ -349,7 +356,7 @@ class TestTheJobFilesKeys(unittest.TestCase):
             self.assertEqual(set(written), JOB_KEYS_AT_START)
 
     def test_an_adopted_encode_writes_exactly_these(self):
-        from util import topaz
+        from util import orientation, topaz
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -357,9 +364,8 @@ class TestTheJobFilesKeys(unittest.TestCase):
             tmp = (non_ai / "larkin" / "3_good_to_go" / "processed"
                    / "busy.partial.deadbeefcafe.mp4")
             make_video(tmp)
-            cmdline = subprocess.list2cmdline(
-                topaz.command(source, tmp, "the-filter", "the-tag", keep_audio=True)
-            )
+            cmdline = subprocess.list2cmdline(topaz.command(
+                source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orientation.LANDSCAPE)))
 
             stack, _ = probes(topaz_pids=(31337,), cmdline=cmdline, duration=581.0)
             with override_config(**overrides), stack:
@@ -385,6 +391,52 @@ class TestTheJobFilesKeys(unittest.TestCase):
             self.assertEqual(set(written), JOB_KEYS_ON_ADOPTION)
 
 
+class TestWhatMadeTheUpscale(unittest.TestCase):
+    def test_a_started_encode_keeps_the_stamp_of_the_recipe_and_code_that_started_it(self):
+        """An encode runs for hours and concludes on a later tick -- sometimes
+        after a restart onto newer code -- so what made it is taken when it
+        starts, not when it is promoted."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+
+            stack, _ = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=True)
+
+            stamp = json.loads(
+                overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))["provenance"]
+            self.assertEqual((stamp["app"], stamp["recipe"], stamp["recipe_version"]),
+                             ("evolver", "non_ai_upscale", "v001"))
+
+    def test_a_promoted_upscale_files_the_stamp_its_encode_started_under(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            _source, _tmp, out = write_job(root, overrides, expected=100.0)
+
+            stack, _ = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=False)
+
+                stamps = sidecar.read(sidecar.sidecar_path(out)).get(provenance.BLOCK)
+            self.assertEqual(stamps, {provenance.UPSCALE_NON_AI: STARTED_UNDER})
+
+    def test_an_encode_started_before_stamps_were_kept_files_one_that_says_so(self):
+        """The encode in flight on the day this lands has a record with no stamp
+        in it: it was ours, on our recipe, and nothing more is known."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            _source, _tmp, out = write_job(root, overrides, expected=100.0, stamp=None)
+
+            stack, _ = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=False)
+
+                stamps = sidecar.read(sidecar.sidecar_path(out)).get(provenance.BLOCK)
+            self.assertEqual(stamps, {provenance.UPSCALE_NON_AI: provenance.reconstructed(
+                "evolver", recipe="non_ai_upscale")})
+
+
 class TestOrphanAdoption(unittest.TestCase):
     """A lost job file must not orphan a live encode.
 
@@ -396,7 +448,7 @@ class TestOrphanAdoption(unittest.TestCase):
     """
 
     def test_a_lone_topaz_process_is_adopted_back_into_a_job(self):
-        from util import topaz
+        from util import orientation, topaz
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -404,9 +456,8 @@ class TestOrphanAdoption(unittest.TestCase):
             processed = non_ai / "larkin" / "3_good_to_go" / "processed"
             tmp = processed / "busy.partial.deadbeefcafe.mp4"
             make_video(tmp)
-            cmdline = subprocess.list2cmdline(
-                topaz.command(source, tmp, "the-filter", "the-tag", keep_audio=True)
-            )
+            cmdline = subprocess.list2cmdline(topaz.command(
+                source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orientation.LANDSCAPE)))
 
             stack, mocks = probes(topaz_pids=(31337,), cmdline=cmdline, duration=581.0)
             with override_config(**overrides), stack:
