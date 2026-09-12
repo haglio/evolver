@@ -9,7 +9,7 @@ from unittest.mock import patch
 import config
 from tasks import prompt_scrape
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util import html_query, sidecar, video_type
+from util import html_query, provenance, sidecar, video_type
 
 
 class TestPromptScrape(unittest.TestCase):
@@ -216,6 +216,53 @@ class TestPromptScrape(unittest.TestCase):
             self.assertEqual(
                 video_type.type_of(sidecar.read(existing)), video_type.SHORT,
             )
+
+    def test_a_record_of_what_made_the_clip_that_landed_first_survives_the_scrape(self):
+        """The scrape replaces the sidecar wholesale, and the upscale can have
+        stamped it first: a scrape that failed and was let retry lands after its
+        clip was upscaled. Dropping that stamp leaves an upscale nothing says
+        anything about."""
+        upscaled = provenance.reconstructed("evolver", recipe="ai_upscale")
+        with workspace_temp_dir() as root:
+            sorted_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
+            existing.parent.mkdir(parents=True, exist_ok=True)
+            existing.write_text(json.dumps({
+                "video": {"type": video_type.SHORT},
+                provenance.BLOCK: {"upscale": upscaled},
+            }), encoding="utf-8")
+
+            with self._override(root):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
+                    with patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only):
+                        result = prompt_scrape.run()
+
+            self.assertEqual(result.newly_scraped, 1)
+            self.assertEqual(sidecar.read(existing)[provenance.BLOCK], {"upscale": upscaled})
+
+    def test_the_stamp_a_scrape_brings_joins_the_ones_already_there(self):
+        upscaled = provenance.reconstructed("evolver", recipe="ai_upscale")
+        generated = provenance.reconstructed("origenerator", recipe="wan22_i2v",
+                                             recipe_version="v007")
+        with workspace_temp_dir() as root:
+            sorted_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, "origenerator", "portrait", "wan22_i2v_00001_.mp4")
+            existing = self._mirror_path(metadata_dir, "portrait", "origenerator", "wan22_i2v_00001_")
+            existing.parent.mkdir(parents=True, exist_ok=True)
+            existing.write_text(json.dumps({provenance.BLOCK: {"upscale": upscaled}}),
+                                encoding="utf-8")
+            payload = {"video": {"prompt": "a scene"},
+                       provenance.BLOCK: {provenance.GENERATION: generated}}
+
+            with self._override(root):
+                with patch("tasks.prompt_scrape.find_browser_executable", return_value=None):
+                    with patch("tasks.prompt_scrape.origenerator_metadata.build_metadata",
+                               return_value=payload):
+                        prompt_scrape.run()
+
+            self.assertEqual(sidecar.read(existing)[provenance.BLOCK],
+                             {"upscale": upscaled, provenance.GENERATION: generated})
 
     def test_skips_video_with_failure_marker(self):
         with workspace_temp_dir() as root:
