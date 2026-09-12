@@ -44,7 +44,7 @@ part of the library already done without probing four hundred files a tick.
 
 from __future__ import annotations
 
-from util import watch
+from util import provenance, watch
 
 GENAU_CLIP = "genau_clip"
 EXCERPT = "excerpt"
@@ -143,8 +143,16 @@ def only_the_video_itself(payload: dict) -> bool:
     Against :data:`_OWN_FIELDS` rather than against the kind alone, so that
     adding a second automatic field cannot quietly turn a bare sidecar back
     into evidence — which is exactly what the running time would have done.
+
+    A stamp saying what made the file is no evidence either: an upscale is
+    stamped the moment it is written, which can be before its clip's scrape has
+    landed, or its kind.  A document holding nothing at all still is, because
+    that is also what an unreadable one reads as.
     """
-    if set(payload) - watch.STAMPED_KEYS != {BLOCK}:
+    besides_the_stamps = set(payload) - watch.STAMPED_KEYS - {provenance.BLOCK}
+    if not besides_the_stamps:
+        return provenance.BLOCK in payload
+    if besides_the_stamps != {BLOCK}:
         return False
     block = payload[BLOCK]
     return isinstance(block, dict) and set(block) <= _OWN_FIELDS

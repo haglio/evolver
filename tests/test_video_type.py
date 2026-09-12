@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from util import video_type
+from util import provenance, video_type
 
 
 class TestClassify(unittest.TestCase):
@@ -135,6 +135,23 @@ class TestTellingABareSidecarApart(unittest.TestCase):
             "watch": {"completions": 2, "skips": 0, "locks": 0, "weight": 1.5874},
             "favorite": True,
         }))
+
+    def test_a_record_of_what_made_the_file_beside_them_is_still_nothing_else(self):
+        """An upscale is stamped the moment it is written, which can be before
+        the scrape of the clip it came from has landed -- and a scrape that read
+        the stamp as its own work would never look at the clip again."""
+        self.assertTrue(video_type.only_the_video_itself({
+            "video": {"type": video_type.SHORT},
+            provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")},
+        }))
+
+    def test_a_record_of_what_made_the_file_on_its_own_is_nothing_else_either(self):
+        """The upscale's stamp can be the first thing a clip's sidecar ever
+        holds: the kind lands later in the same run, and only when the kinds
+        stage had a measurement left to spend on that clip."""
+        self.assertTrue(video_type.only_the_video_itself(
+            {provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}}
+        ))
 
     def test_a_generation_beside_them_is_something_else(self):
         self.assertFalse(video_type.only_the_video_itself(

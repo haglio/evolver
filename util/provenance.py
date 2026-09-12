@@ -16,6 +16,21 @@ BLOCK = "provenance"
 GENERATION = "generation"
 
 
+def carried_forward(earlier: dict, later: dict) -> dict:
+    """*later*, holding every stamp *earlier* did beside its own -- a copy.
+
+    Where both record the same act, *later*'s stands: it is the newer word on
+    what made the file.
+    """
+    stamps = {**_stamps_of(earlier), **_stamps_of(later)}
+    return {**later, BLOCK: stamps} if stamps else later
+
+
+def _stamps_of(payload: dict) -> dict:
+    stamps = payload.get(BLOCK)
+    return stamps if isinstance(stamps, dict) else {}
+
+
 def reconstructed(app: str | None, *, recipe: str | None = None,
                   recipe_version: str | None = None) -> dict:
     return {"schema": SCHEMA, "app": app, "app_commit": None, "app_dirty": None,

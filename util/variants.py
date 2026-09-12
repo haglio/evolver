@@ -9,7 +9,7 @@ from __future__ import annotations
 
 # What the AI upscale stage appends to a 1_sorted video's stem. It is the
 # library's most-depended-on naming rule -- three stages, the backfill tool and
-# two sibling repos read a file's provenance out of it -- and it was written
+# two sibling repos read which video a file came from out of it -- and it was written
 # out as a bare literal at six sites, each expressing it differently (append,
 # endswith, slice by len, regex-strip, containment in a tuple).
 UPSCALE_SUFFIX = "_topaz"

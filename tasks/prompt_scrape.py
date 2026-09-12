@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 import config
 from tasks import origenerator_metadata
 from tasks.purge_weird import source_stem
-from util import orientation, relative_dates, sidecar, video_type
+from util import orientation, provenance, relative_dates, sidecar, video_type
 from util.headless_browser import fetch_dom, find_browser_executable
 from util.html_query import (
     Node,
@@ -48,7 +48,7 @@ class PromptScrapeResult:
 
 def run(*, sorted_dir: Path | None = None,
         browser_profile_dir: Path | None = None) -> PromptScrapeResult:
-    """Scrape each newly sorted video's provenance into its mirrored sidecar.
+    """Scrape each newly sorted video's generation metadata into its mirrored sidecar.
 
     *sorted_dir* is the tree walked; *browser_profile_dir* is the scratch
     profile the headless browser is given. Both are sentinels rather than
@@ -100,14 +100,16 @@ def run(*, sorted_dir: Path | None = None,
                 log.exception("Metadata build failed for: %s", video)
                 continue
 
-            # A kind recorded before the scrape landed stays on: the sidecar is
-            # replaced wholesale here, and dropping it would cost another
-            # ffprobe to learn the same thing again.
-            def keep_the_kind(current: dict, payload=payload) -> dict:
+            # What landed before the scrape stays on, though the sidecar is
+            # replaced wholesale here: a kind, which would cost another ffprobe
+            # to learn again, and a stamp saying what made the upscale, which
+            # nothing could learn again at all.
+            def keep_what_landed_first(current: dict, payload=payload) -> dict:
                 recorded = video_type.type_of(current)
-                return video_type.stamped(payload, recorded) if recorded else payload
+                kept = video_type.stamped(payload, recorded) if recorded else payload
+                return provenance.carried_forward(current, kept)
 
-            sidecar.update(output_path, keep_the_kind)
+            sidecar.update(output_path, keep_what_landed_first)
             result.newly_scraped += 1
             log.info("Wrote metadata: %s", output_path)
 
