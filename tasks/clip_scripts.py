@@ -8,7 +8,7 @@ from pathlib import Path
 from app_support import funscript
 
 import config
-from util import ffprobe, script_library, sidecar
+from util import ffprobe, provenance, script_library, sidecar
 from util.media_files import library_videos
 
 log = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ def run() -> ClipScriptsResult:
             log.info("NO MOTION for clip window, leaving unscripted: %s", video)
             continue
 
-        funscript.write(destination, trimmed)
+        funscript.write(destination, script_library.stamped(trimmed, provenance.CLIP_SCRIPTS))
         result.written += 1
         log.info("TRIM SCRIPT  %s  ->  %s", scene_script, destination)
 

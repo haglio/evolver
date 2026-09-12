@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from tasks import scene_scripts
 from tests.temp_helpers import LARKIN, CarvedClipLibraryCase
+from util import provenance
 
 
 class SceneScriptsCase(CarvedClipLibraryCase):
@@ -38,6 +39,17 @@ class TestSceneScripts(SceneScriptsCase):
                 {"at": 534_783, "pos": 48},
             ],
         )
+
+    def test_a_placed_script_says_in_itself_that_this_stage_placed_it(self):
+        scene = self.make_scene()
+        self.make_clip(scene, scene_offset=300.0, actions=[{"at": 0, "pos": 0}, {"at": 900, "pos": 90}])
+
+        self.run_stage()
+
+        written = json.loads(self.scene_script().read_text(encoding="utf-8"))
+        stamp = written["metadata"][provenance.BLOCK][provenance.SCENE_SCRIPTS]
+        self.assertEqual((stamp["app"], stamp["recipe"], stamp["recipe_version"]),
+                         ("evolver", None, None))
 
     def test_the_rest_of_the_scene_is_left_unscripted(self):
         """A scene runs for an hour and the clip covers a minute of it. Nothing

@@ -16,6 +16,8 @@ BLOCK = "provenance"
 GENERATION = "generation"
 UPSCALE = "upscale"
 UPSCALE_NON_AI = "upscale_non_ai"
+CLIP_SCRIPTS = "clip_scripts"
+SCENE_SCRIPTS = "scene_scripts"
 
 # The checkout is read here, as this module is imported with the rest of the
 # app, rather than at the first stamp: the tray runs for days on the code it

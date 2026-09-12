@@ -1,5 +1,6 @@
 """Where a funscript lives, and how to carry one between a clip and its scene —
-cut out of the scene's, or placed back into the scene's timeline.
+cut out of the scene's, or placed back into the scene's timeline — saying in the
+script itself which of those acts wrote it.
 
 What a funscript *is* belongs to every app in this family that reads or writes
 one and lives in :mod:`app_support.funscript`; this module used to say it again.
@@ -13,6 +14,7 @@ from app_support.funscript import actions_of
 from app_support.mirrored_tree import mirrored_path
 
 import config
+from util import provenance
 
 
 def script_path_for_video(video: Path) -> Path:
@@ -82,6 +84,19 @@ def place(script: dict, start_seconds: float, duration_seconds: float) -> dict:
     if isinstance(metadata, dict):
         placed["metadata"] = _retime_metadata(metadata, duration_seconds)
     return placed
+
+
+def stamped(script: dict, act: str) -> dict:
+    """*script* saying in its own metadata that this app's *act* wrote it -- a copy.
+
+    In the file rather than on its video's sidecar: a funscript is replaced by
+    hand, copied onto a video's other versions and followed into the archive,
+    and a stamp left on the sidecar through any of that would go on naming a
+    script that is no longer the one there.
+    """
+    metadata = script.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    return {**script, "metadata": provenance.recorded(metadata, act, provenance.by_evolver())}
 
 
 def _retime_metadata(metadata: dict, duration_seconds: float) -> dict:
