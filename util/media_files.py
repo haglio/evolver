@@ -3,25 +3,33 @@
 ``VIDEO_EXTENSIONS`` is read here rather than passed in: it is one repo-wide
 answer to "what is a video", not something a caller varies, and it was being
 threaded through eleven call sites and five identical one-line wrappers to say
-so. The two functions that DO take it are the ones a caller genuinely narrows
--- the partial sweep, and the predicate it shares.
+so.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+import uuid
 from pathlib import Path
 
 import config
 
 
-def is_partial_video_path(path: Path) -> bool:
+def partial_path(final: Path, stem: str) -> Path:
+    return final.with_name(f"{stem}.partial.{uuid.uuid4().hex}")
+
+
+def partial_stem(partial: Path) -> str:
+    return partial.name.split(".partial.")[0]
+
+
+def is_partial_path(path: Path) -> bool:
     return ".partial." in path.name.lower()
 
 
 def is_finalized_video_file(path: Path, video_extensions: set[str]) -> bool:
-    return path.is_file() and path.suffix.lower() in video_extensions and not is_partial_video_path(path)
+    return path.is_file() and path.suffix.lower() in video_extensions and not is_partial_path(path)
 
 
 def iter_finalized_videos(root: Path, video_extensions: set[str]):
@@ -94,13 +102,13 @@ def remove_empty_dirs(root: Path) -> None:
                 pass
 
 
-def remove_partial_video_files(root: Path, video_extensions: set[str], logger: logging.Logger) -> int:
+def remove_partial_files(root: Path, logger: logging.Logger, *, keep: Path | None = None) -> int:
     if not root.is_dir():
         return 0
 
     removed = 0
     for path in root.rglob("*"):
-        if not (path.is_file() and is_partial_video_path(path) and path.suffix.lower() in video_extensions):
+        if path == keep or not (is_partial_path(path) and path.is_file()):
             continue
         try:
             path.unlink()

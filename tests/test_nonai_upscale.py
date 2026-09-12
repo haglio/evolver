@@ -19,6 +19,7 @@ from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
 from util import sidecar, video_type
+from util.media_files import partial_path
 
 
 def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
@@ -33,7 +34,7 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
     non_ai = overrides["NON_AI_DIR"]
     source = source or make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
     out = non_ai / "larkin" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
-    tmp = out.with_name(f"{source.stem}.partial.abc123.mp4")
+    tmp = partial_path(out, source.stem)
     if tmp_bytes is not None:
         tmp.parent.mkdir(parents=True, exist_ok=True)
         tmp.write_bytes(tmp_bytes)
@@ -127,6 +128,19 @@ class TestRunStartsAJob(unittest.TestCase):
             self.assertEqual(job["pid"], 4242)
             self.assertEqual(job["source"], str(video))
             self.assertEqual(job["expected_duration"], 100.0)
+
+    def test_the_file_an_encode_writes_until_promotion_carries_no_video_extension(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+
+            stack, mocks = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=True)
+
+            job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertEqual(mocks["popen"].call_args.args[0][-1], job["tmp"])
+            self.assertFalse(job["tmp"].lower().endswith(tuple(config.VIDEO_EXTENSIONS)))
 
     def test_already_tagged_candidate_is_manifested_and_the_next_one_starts(self):
         with workspace_temp_dir() as root:
@@ -926,11 +940,9 @@ class TestRunSupervisesAJob(unittest.TestCase):
     def test_orphaned_partials_are_swept_but_the_live_jobs_tmp_survives(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-            _source, tmp, _ = write_job(root, overrides)
-            orphan = make_video(
-                non_ai / "larkin" / "3_good_to_go" / "processed" / "old.partial.dead.mp4"
-            )
+            _source, tmp, out = write_job(root, overrides)
+            orphan = partial_path(out, "old")
+            orphan.write_bytes(b"partial")
 
             stack, _ = probes(is_running=True)
             with override_config(**overrides), stack:

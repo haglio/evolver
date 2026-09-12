@@ -22,6 +22,10 @@ class TestCommand(unittest.TestCase):
         self.assertNotIn("-an", cmd)
         self.assertIn("aac", cmd)
 
+    def test_names_the_container_outright_since_the_file_it_writes_has_no_extension(self):
+        cmd = topaz.command(Path("in.mp4"), Path("scene one.partial.ab12"), "f", "t")
+        self.assertEqual(cmd[cmd.index("-f") + 1], "mp4")
+
 
 class TestEnvironment(unittest.TestCase):
     def test_points_topaz_at_the_model_directory(self):

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tasks import stray_files
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util.media_files import partial_path
 
 
 class TestMalformedExtensions(unittest.TestCase):
@@ -152,7 +153,7 @@ class TestEverythingElse(unittest.TestCase):
         with workspace_temp_dir() as root:
             videos = root / "videos"
             videos.mkdir()
-            partial = videos / "clip.partial.abc123.mp4"
+            partial = partial_path(videos / "clip_topaz.mp4", "clip")
             partial.write_bytes(b"in flight")
 
             with override_config(VIDEO_LIBRARY_DIR=videos):

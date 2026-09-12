@@ -337,7 +337,7 @@ What is covered:
 
 The upscale writes Topaz output to a temporary filename before promoting it to the final `_topaz` path.
 
-- Temp files use the pattern `*.partial.<uuid>.mp4`
+- Temp files are named `<stem>.partial.<uuid>`, with no video extension, so no player lists an unfinished encode
 - Temp files are not considered valid library videos
 - Shared filtering and cleanup lives in `util/media_files.py`
 - On each upscale run, stale partial outputs under the upscale target are deleted before new work starts

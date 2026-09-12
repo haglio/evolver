@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 import subprocess
 import time
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,7 +15,8 @@ from util.media_files import (
     child_dirs,
     is_finalized_video_file,
     library_videos,
-    remove_partial_video_files,
+    partial_path,
+    remove_partial_files,
 )
 from util.sidecar import sidecar_path, upscaled_video_path
 
@@ -64,7 +64,7 @@ def run(
     for orient in orientation.SORTED:
         (outbox_dir / orient).mkdir(parents=True, exist_ok=True)
     weird_dir.mkdir(parents=True, exist_ok=True)
-    removed_partial_outputs = remove_partial_video_files(outbox_dir, config.VIDEO_EXTENSIONS, logger=log)
+    removed_partial_outputs = remove_partial_files(outbox_dir, logger=log)
 
     log.info("=== Stage: upscale from 1_sorted ===")
     log.info("OUT: %s/{landscape,portrait}/<source>/", outbox_dir)
@@ -109,7 +109,7 @@ def run(
 
         out = upscaled_video_path(source, orient, in_file.stem, outbox_dir)
         out.parent.mkdir(parents=True, exist_ok=True)
-        tmp = out.with_name(f"{in_file.stem}.partial.{uuid.uuid4().hex}.mp4")
+        tmp = partial_path(out, in_file.stem)
 
         log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
 
