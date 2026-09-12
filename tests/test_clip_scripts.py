@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from tasks import clip_scripts
 from tests.temp_helpers import CarvedClipLibraryCase
+from util import provenance
 
 
 class ClipScriptsCase(CarvedClipLibraryCase):
@@ -35,6 +36,38 @@ class TestClipScripts(ClipScriptsCase):
             written["actions"],
             [{"at": 0, "pos": 0}, {"at": 500, "pos": 90}, {"at": 1_500, "pos": 10}],
         )
+
+    def test_a_trimmed_script_says_in_itself_that_this_stage_cut_it(self):
+        """In the script rather than on the clip's sidecar: a script is replaced
+        by hand, copied onto a clip's other versions and followed into the
+        archive, and a stamp left on the sidecar would go on claiming this stage
+        cut a script somebody has since rewritten."""
+        scene = self.make_scene(actions=[{"at": 10_000, "pos": 0}, {"at": 10_500, "pos": 90}])
+        self.make_clip(scene, scene_offset=10.0)
+
+        self.run_stage(duration=2.0)
+
+        written = json.loads(self.clip_script().read_text(encoding="utf-8"))
+        stamp = written["metadata"][provenance.BLOCK][provenance.CLIP_SCRIPTS]
+        self.assertEqual((stamp["app"], stamp["recipe"], stamp["recipe_version"]),
+                         ("evolver", None, None))
+
+    def test_what_made_the_scene_script_comes_along_into_the_clips(self):
+        """A clip's script is only as current as the scene script it was cut
+        from, so a sweep remaking what an old scene script fed has to be able to
+        find the clips that were cut from it."""
+        placed = provenance.reconstructed("evolver")
+        scene = self.make_scene()
+        self.write_scene_script(
+            scene, [{"at": 10_000, "pos": 0}, {"at": 10_500, "pos": 90}],
+            metadata={provenance.BLOCK: {provenance.SCENE_SCRIPTS: placed}})
+        self.make_clip(scene, scene_offset=10.0)
+
+        self.run_stage(duration=2.0)
+
+        stamps = json.loads(self.clip_script().read_text(encoding="utf-8"))["metadata"][provenance.BLOCK]
+        self.assertEqual(set(stamps), {provenance.SCENE_SCRIPTS, provenance.CLIP_SCRIPTS})
+        self.assertEqual(stamps[provenance.SCENE_SCRIPTS], placed)
 
     def test_leaves_a_clip_alone_when_its_scene_has_no_script(self):
         scene = self.make_scene()
