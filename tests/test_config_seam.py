@@ -112,8 +112,10 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/scripts_sync.py": 7,
     "tasks/sort.py": 2,
     "tasks/stray_files.py": 8,
-    # One more for the provider's source name in the recipe guard (bug 7).
-    "tasks/upscale.py": 16,
+    # One more for the provider's source name in the recipe guard (bug 7), then
+    # four fewer: the two recipes it chooses between are util.topaz's, named and
+    # versioned beside the settings they run with, not four loose strings here.
+    "tasks/upscale.py": 12,
     "tasks/video_types.py": 5,
     # The lane walk it used to do itself, and the stage that walks the lanes
     # after it to stamp the viewing on the same sidecars.

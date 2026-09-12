@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import orientation, sidecar, system_resources, topaz, video_type
+from util import orientation, provenance, sidecar, system_resources, topaz, video_type
 from util.alert import show_error
 from util.media_files import (
     child_dirs,
@@ -113,17 +113,13 @@ def run(
 
         log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
 
-        if _is_t2v_provider(source, orient, in_file.stem, outbox_dir):
-            filter_complex = config.UPSCALE_FILTER_T2V_provider
-            videoai_tag = config.VIDEOAI_TAG_T2V_provider
-        else:
-            filter_complex = config.UPSCALE_FILTER_DEFAULT
-            videoai_tag = config.VIDEOAI_TAG_DEFAULT
+        recipe = (topaz.AI_UPSCALE_T2V if _is_t2v_provider(source, orient, in_file.stem, outbox_dir)
+                  else topaz.AI_UPSCALE)
 
         ffmpeg_timeout = max(remaining_budget, 1) if run_budget_seconds else None
         ffmpeg_ok = False
         try:
-            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, filter_complex, videoai_tag, timeout=ffmpeg_timeout)
+            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, recipe, timeout=ffmpeg_timeout)
         except subprocess.TimeoutExpired:
             elapsed_at_stop = time.monotonic() - started_at
             log.info(
@@ -146,6 +142,7 @@ def run(
                     tmp.unlink(missing_ok=True)
                 result.processed += 1
                 log.info("Wrote: %s", out)
+                _record_the_upscale(out, recipe)
             else:
                 tmp.unlink(missing_ok=True)
                 result.failed += 1
@@ -232,15 +229,28 @@ def collect_candidates(
     return candidates
 
 
-def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, filter_complex: str, videoai_tag: str, timeout: float | None = None) -> bool:
+def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, recipe: topaz.Recipe,
+                timeout: float | None = None) -> bool:
     # check=False, said out loud: a non-zero exit is this function's answer --
     # the caller counts the clip failed, deletes the partial and moves on --
     # not an exception for the loop to catch around every encode.
     return subprocess.run(
-        topaz.command(in_file, tmp, filter_complex, videoai_tag), env=env, timeout=timeout,
+        topaz.command(in_file, tmp, recipe.filter_complex, recipe.videoai_tag),
+        env=env, timeout=timeout,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
         creationflags=subprocess.CREATE_NO_WINDOW,
     ).returncode == 0
+
+
+def _record_the_upscale(out: Path, recipe: topaz.Recipe) -> None:
+    """File what made *out* on its sidecar, which an outbox given from outside
+    the library does not have (see :func:`_is_t2v_provider`)."""
+    try:
+        path = sidecar_path(out)
+    except ValueError:
+        return
+    stamp = provenance.by_evolver(recipe=recipe.name, recipe_version=recipe.version)
+    sidecar.update(path, lambda current: provenance.recorded(current, provenance.UPSCALE, stamp))
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> bool:

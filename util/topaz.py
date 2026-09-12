@@ -1,15 +1,52 @@
-"""The Topaz Video AI ffmpeg invocation shared by both upscale stages.
+"""How both upscale stages run Topaz: the recipes, and the ffmpeg invocation that carries one.
 
-One encode recipe, two callers: the AI stage strips audio (generated clips
-have none worth keeping), the non-AI stage keeps the original soundtrack.
+The AI stage strips audio (generated clips have none worth keeping), the non-AI
+stage keeps the original soundtrack.
 """
 
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import config
+
+
+@dataclass(frozen=True)
+class Recipe:
+    """One way of running Topaz over a video, under the name and version every
+    output made with it records (:mod:`util.provenance`)."""
+
+    name: str
+    version: str
+    filter_complex: str
+    videoai_tag: str
+
+
+# A change to anything a recipe runs with owes it a new version: that is how a
+# later sweep tells what it made before the change from what it made after, and
+# tests/test_topaz.py holds each version to the settings it shipped with.
+AI_UPSCALE = Recipe(
+    name="ai_upscale",
+    version="v001",
+    filter_complex=(
+        "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
+        "tvai_up=model=gcg-5:scale=4:device=0:vram=1:instances=1"
+    ),
+    videoai_tag="Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale",
+)
+AI_UPSCALE_T2V = Recipe(
+    name="ai_upscale_t2v",
+    version="v001",
+    filter_complex=(
+        "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
+        "tvai_up=model=prob-4:scale=4:preblur=0:noise=0.33:details=0.33:"
+        "halo=0:blur=0.67:compression=0:estimate=20:device=0:vram=1:instances=1"
+    ),
+    videoai_tag=("Processed using apo-8 for 60 fps interpolation and prob-4 for 4x upscale "
+                 "(t2v provider)"),
+)
 
 
 def environment() -> dict:
