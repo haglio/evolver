@@ -101,7 +101,7 @@ CONFIG_REFERENCE_LEDGER = {
     # into tasks.nonai_encode.EncodeSettings -- which is where they belong:
     # how long an encode may run and how much of the machine it may take are
     # this app's policy, not anything the machine or the overlay says.
-    "tasks/nonai_upscale.py": 15,
+    "tasks/nonai_upscale.py": 14,
     "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 5,
     "tasks/purge_weird.py": 3,
@@ -114,7 +114,7 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/sort.py": 2,
     "tasks/stray_files.py": 8,
     # One more for the provider's source name in the recipe guard (bug 7).
-    "tasks/upscale.py": 18,
+    "tasks/upscale.py": 17,
     "tasks/video_types.py": 5,
     # The lane walk it used to do itself, and the stage that walks the lanes
     # after it to stamp the viewing on the same sidecars.

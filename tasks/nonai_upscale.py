@@ -28,7 +28,6 @@ from __future__ import annotations
 import logging
 import threading
 import time
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,7 +41,7 @@ from tasks.nonai_queue import (
     relpath,
 )
 from util import ffprobe, nonai_job, orientation, processes, system_resources
-from util.media_files import is_partial_video_path
+from util.media_files import partial_path, remove_partial_files
 from util.nonai_library import buckets, stage_dirs
 from util.nonai_retire import carry_metadata, retire_original
 
@@ -362,17 +361,7 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
     """
     for bucket in buckets():
         for _, done_dir in stage_dirs(bucket, digits=(3,)):
-            removed = 0
-            for path in done_dir.rglob("*.partial.*"):
-                if keep is not None and path == keep:
-                    continue
-                if not is_partial_video_path(path) or path.suffix.lower() not in config.VIDEO_EXTENSIONS:
-                    continue
-                try:
-                    path.unlink()
-                    removed += 1
-                except OSError:
-                    log.exception("Failed to delete stale partial output: %s", path)
+            removed = remove_partial_files(done_dir, log, keep=keep)
             if removed:
                 log.info("Removed %d stale partial output file(s) from %s", removed, done_dir)
 
@@ -401,7 +390,7 @@ def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartA
 
         out = _output_path(candidate)
         out.parent.mkdir(parents=True, exist_ok=True)
-        tmp = out.with_name(f"{source.stem}.partial.{uuid.uuid4().hex}.mp4")
+        tmp = partial_path(out, source.stem)
         nonai_job.bump_attempts(files.attempts, relpath(source))
         pid = nonai_encode.launch(source, tmp, orient)
         nonai_job.save_job(files.job, {

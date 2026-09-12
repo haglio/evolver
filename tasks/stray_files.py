@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util.media_files import is_partial_path
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ def run() -> StrayFilesResult:
 
 
 def _handle(path: Path) -> _Handled:
-    if _is_video(path) or path.name.lower() in _OS_NOISE:
+    if _is_video(path) or is_partial_path(path) or path.name.lower() in _OS_NOISE:
         return _Handled()
 
     repaired, renamed = _repair_extension(path)
@@ -101,12 +102,6 @@ def _handle(path: Path) -> _Handled:
 
 
 def _is_video(path: Path) -> bool:
-    """Whether *path* is a video by name — partial outputs included.
-
-    Deliberately looser than :func:`util.media_files.is_finalized_video_file`:
-    a ``*.partial.<uuid>.mp4`` is the upscale stage's own in-flight write, so it
-    belongs here and is neither a stray nor news.
-    """
     return path.suffix.lower() in config.VIDEO_EXTENSIONS
 
 

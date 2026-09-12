@@ -33,6 +33,7 @@ from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 import config
 from util import ffprobe, nonai_job, orientation, processes, topaz
+from util.media_files import is_partial_path, partial_stem
 
 log = logging.getLogger(__name__)
 
@@ -79,18 +80,17 @@ def adopt_orphan(job_file: Path) -> dict | None:
     if len(pids) != 1:
         return None
     source, tmp = _parse_topaz_command(processes.command_line(pids[0]) or "")
-    if source is None or tmp is None or ".partial." not in tmp.name:
+    if source is None or tmp is None or not is_partial_path(tmp):
         return None
     try:
         tmp.relative_to(config.NON_AI_DIR)
     except ValueError:
         return None  # some other Topaz run, e.g. a manual GUI export
-    stem = tmp.name.split(".partial.")[0]
     job = {
         "pid": pids[0],
         "source": str(source),
         "tmp": str(tmp),
-        "out": str(tmp.with_name(f"{stem}{config.NONAI_OUTPUT_SUFFIX}.mp4")),
+        "out": str(tmp.with_name(f"{partial_stem(tmp)}{config.NONAI_OUTPUT_SUFFIX}.mp4")),
         "expected_duration": ffprobe.duration_seconds(source) or 0.0,
         # The true start time is unknown; counting the runtime cap from
         # adoption is the conservative reading.

@@ -11,13 +11,16 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import config
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util.media_files import (
     child_dirs,
-    is_partial_video_path,
+    is_partial_path,
     library_videos,
+    partial_path,
+    partial_stem,
     remove_empty_dirs,
-    remove_partial_video_files,
+    remove_partial_files,
     strip_uniquifier,
     unique_path,
 )
@@ -36,7 +39,7 @@ class TestLibraryVideos(unittest.TestCase):
                 found = list(library_videos(root))
 
         self.assertEqual(found, [good])
-        self.assertTrue(is_partial_video_path(partial))
+        self.assertTrue(is_partial_path(partial))
 
     def test_what_counts_as_a_video_is_read_when_it_is_asked_not_at_import(self):
         """Five stages threaded config.VIDEO_EXTENSIONS through one-line
@@ -54,6 +57,28 @@ class TestLibraryVideos(unittest.TestCase):
     def test_a_root_that_is_not_there_yields_nothing(self):
         with workspace_temp_dir() as root, override_config(VIDEO_EXTENSIONS={".mp4"}):
             self.assertEqual(list(library_videos(root / "nope")), [])
+
+
+class TestPartialPath(unittest.TestCase):
+    def test_a_partial_is_named_so_nothing_that_lists_videos_takes_it_for_one(self):
+        final = Path("processed") / "scene one_apo8_iris2.mp4"
+
+        partial = partial_path(final, "scene one")
+
+        self.assertEqual(partial.parent, final.parent)
+        self.assertTrue(partial.name.startswith("scene one"))
+        self.assertTrue(is_partial_path(partial))
+        self.assertNotIn(partial.suffix.lower(), config.VIDEO_EXTENSIONS)
+
+    def test_a_retry_never_writes_over_a_partial_a_dead_encode_still_holds_open(self):
+        final = Path("processed") / "scene one_apo8_iris2.mp4"
+
+        self.assertNotEqual(partial_path(final, "scene one"), partial_path(final, "scene one"))
+
+    def test_the_stem_a_partial_was_named_for_reads_back_off_it(self):
+        final = Path("processed") / "scene one_apo8_iris2.mp4"
+
+        self.assertEqual(partial_stem(partial_path(final, "scene one")), "scene one")
 
 
 class TestChildDirs(unittest.TestCase):
@@ -135,21 +160,21 @@ class TestRemoveEmptyDirs(unittest.TestCase):
             self.assertTrue(nonempty_sub.exists())
 
 
-class TestRemovePartialVideoFiles(unittest.TestCase):
+class TestRemovePartialFiles(unittest.TestCase):
     def test_takes_the_partials_and_leaves_the_rest(self):
-        """Its one caller always hands it a logger, so it does not carry a
-        branch for the case where it has none."""
+        """Every caller hands it a logger, so it does not carry a branch for
+        the case where it has none."""
         self.assertIs(
-            inspect.signature(remove_partial_video_files).parameters["logger"].default,
+            inspect.signature(remove_partial_files).parameters["logger"].default,
             inspect.Parameter.empty,
         )
         with workspace_temp_dir() as root:
-            partial = root / "clip.partial.deadbeef.mp4"
+            partial = partial_path(root / "clip_topaz.mp4", "clip")
             finished = root / "clip.mp4"
             partial.write_bytes(b"partial")
             finished.write_bytes(b"video")
 
-            removed = remove_partial_video_files(root, {".mp4"}, logging.getLogger(__name__))
+            removed = remove_partial_files(root, logging.getLogger(__name__))
 
             self.assertEqual(removed, 1)
             self.assertFalse(partial.exists())
@@ -157,12 +182,12 @@ class TestRemovePartialVideoFiles(unittest.TestCase):
 
     def test_a_partial_that_will_not_delete_is_reported_and_not_counted(self):
         with workspace_temp_dir() as root:
-            (root / "clip.partial.deadbeef.mp4").write_bytes(b"partial")
+            partial_path(root / "clip_topaz.mp4", "clip").write_bytes(b"partial")
             log = logging.getLogger(__name__)
 
             with patch.object(Path, "unlink", side_effect=OSError("held open")), \
                  self.assertLogs(log, level="ERROR"):
-                removed = remove_partial_video_files(root, {".mp4"}, log)
+                removed = remove_partial_files(root, log)
 
             self.assertEqual(removed, 0)
 

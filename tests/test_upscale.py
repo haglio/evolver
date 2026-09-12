@@ -10,6 +10,7 @@ import config
 from tasks import upscale
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import video_type
+from util.media_files import partial_path
 
 
 def library_dirs(root):
@@ -160,7 +161,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            stale_partial = out_dir / "landscape" / source / "clip.partial.deadbeef.mp4"
+            stale_partial = partial_path(out_dir / "landscape" / source / "clip_topaz.mp4", "clip")
             stale_partial.parent.mkdir(parents=True)
             stale_partial.write_bytes(b"partial")
 
@@ -173,6 +174,20 @@ class TestUpscaleHelpers(unittest.TestCase):
             self.assertFalse(stale_partial.exists())
             self.assertTrue((out_dir / "landscape" / source / "clip_topaz.mp4").exists())
 
+    def test_the_file_an_encode_writes_until_promotion_carries_no_video_extension(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            in_file = sorted_dir / "examplesource" / "landscape" / "clip one.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg) as run_ffmpeg, \
+                 patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                upscale.run(max_items=1, sorted_dir=sorted_dir, outbox_dir=out_dir,
+                            weird_dir=weird_dir, low_disk_floor_gb=1)
+
+            written_to = run_ffmpeg.call_args.args[1]
+            self.assertNotIn(written_to.suffix.lower(), config.VIDEO_EXTENSIONS)
 
     def test_run_records_failure_when_ffmpeg_returns_false(self):
         with workspace_temp_dir() as root:
