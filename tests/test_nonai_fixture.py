@@ -67,14 +67,10 @@ LEFT_AMBIENT = {
     "NONAI_FALLBACK_DONE_DIR_NAME": "a folder name, resolved under NON_AI_DIR",
     "NONAI_OUTPUT_SUFFIX": "not a place",
     "NONAI_PROCESSED_DIR_NAME": "a folder name, resolved under NON_AI_DIR",
-    "NONAI_TARGET_LONG_EDGE": "not a place",
-    "NONAI_TARGET_SHORT_EDGE": "not a place",
-    "NONAI_UPSCALE_FILTER_TEMPLATE": "not a place",
     "OUT_UPSCALED_DIR": "the AI outbox, reached only by sidecar.upscaled_video_path, "
                         "which no non-AI code path calls",
     "TVAI_MODEL_DIR": "the Topaz install; goes into the encoder's environment, "
                       "and no test launches one",
-    "VIDEOAI_TAG_NONAI": "not a place",
 }
 
 

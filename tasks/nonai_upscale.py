@@ -40,7 +40,16 @@ from tasks.nonai_queue import (
     collect_candidates,
     relpath,
 )
-from util import ffprobe, nonai_job, orientation, processes, system_resources
+from util import (
+    ffprobe,
+    nonai_job,
+    orientation,
+    processes,
+    provenance,
+    sidecar,
+    system_resources,
+    topaz,
+)
 from util.media_files import partial_path, remove_partial_files
 from util.nonai_library import buckets, stage_dirs
 from util.nonai_retire import carry_metadata, retire_original
@@ -337,6 +346,9 @@ def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclus
         tmp.replace(out)
         # Before the original leaves, and it takes its sidecar with it.
         carry_metadata(source, out)
+        stamp = job.get("provenance") or nonai_encode.unrecorded_start()
+        sidecar.update(sidecar.sidecar_path(out), lambda current: provenance.recorded(
+            current, provenance.UPSCALE_NON_AI, stamp))
         retire_original(source, archive_root=config.NONAI_RETIRED_ROOT)
         nonai_job.clear_attempts(files.attempts, relpath(source))
         log.info("Promoted finished non-AI upscale: %s", out)
@@ -400,6 +412,8 @@ def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartA
             "out": str(out),
             "expected_duration": expected_duration,
             "started_at": time.time(),
+            "provenance": provenance.by_evolver(recipe=topaz.NON_AI_UPSCALE.name,
+                                                recipe_version=topaz.NON_AI_UPSCALE.version),
         })
         log.info("Started detached non-AI upscale (pid %d): %s -> %s", pid, source, out)
         return StartAttempt(started=relpath(source))

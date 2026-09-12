@@ -1,16 +1,13 @@
-"""How both upscale stages run Topaz: the recipes, and the ffmpeg invocation that carries one.
-
-The AI stage strips audio (generated clips have none worth keeping), the non-AI
-stage keeps the original soundtrack.
-"""
+"""How both upscale stages run Topaz: the recipes, and the ffmpeg invocation that carries one."""
 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import config
+from util import orientation
 
 
 @dataclass(frozen=True)
@@ -22,6 +19,11 @@ class Recipe:
     version: str
     filter_complex: str
     videoai_tag: str
+    keep_audio: bool = False
+    # The long and short edge of the frame a recipe aims at, where it aims at one
+    # rather than at a scale. Its filter names them {width} and {height}, which
+    # only the video's orientation settles: see framed().
+    frame: tuple[int, int] | None = None
 
 
 # A change to anything a recipe runs with owes it a new version: that is how a
@@ -47,6 +49,35 @@ AI_UPSCALE_T2V = Recipe(
     videoai_tag=("Processed using apo-8 for 60 fps interpolation and prob-4 for 4x upscale "
                  "(t2v provider)"),
 )
+# What the non-AI clips processed by hand in the Topaz GUI carry in their videoai
+# tags: apo-8 60 fps interpolation, then an iris-2 upscale in auto mode with
+# recover-original-detail at 100 (blend=1), aimed at a 4K frame, keeping the
+# soundtrack. vram=0.5 and instances=0 where the AI recipes have 1 and 1: an
+# unattended multi-hour encode shares the machine with whatever else is running,
+# so it gets half the VRAM budget and no extra model instance -- slower, but far
+# harder to push the machine into memory exhaustion.
+NON_AI_UPSCALE = Recipe(
+    name="non_ai_upscale",
+    version="v001",
+    filter_complex=(
+        "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=0.5:instances=0,"
+        "tvai_up=model=iris-2:scale=0:w={width}:h={height}:preblur=0:noise=0:details=0:"
+        "halo=0:blur=0:compression=0:estimate=20:blend=1:device=0:vram=0.5:instances=0"
+    ),
+    videoai_tag=("Processed using apo-8 for 60 fps interpolation and iris-2 in auto mode "
+                 "with recover original detail at 100 for upscale toward 4K"),
+    keep_audio=True,
+    frame=(3840, 2160),
+)
+
+
+def framed(recipe: Recipe, orient: str) -> Recipe:
+    """*recipe* with its frame turned to *orient*: wide for landscape, tall otherwise."""
+    long_edge, short_edge = recipe.frame
+    width, height = ((long_edge, short_edge) if orient == orientation.LANDSCAPE
+                     else (short_edge, long_edge))
+    return replace(recipe, frame=None,
+                   filter_complex=recipe.filter_complex.format(width=width, height=height))
 
 
 def environment() -> dict:
@@ -58,10 +89,11 @@ def environment() -> dict:
     }
 
 
-def command(in_file: Path, out_file: Path, filter_complex: str, videoai_tag: str,
-            keep_audio: bool = False) -> list[str]:
+def command(in_file: Path, out_file: Path, recipe: Recipe) -> list[str]:
     """The full Topaz ffmpeg argv for one video."""
-    audio_args = ["-c:a", "aac", "-b:a", "192k"] if keep_audio else ["-an"]
+    if recipe.frame is not None:
+        raise ValueError(f"{recipe.name} aims at a frame: turn it to the video with framed()")
+    audio_args = ["-c:a", "aac", "-b:a", "192k"] if recipe.keep_audio else ["-an"]
     return [
         str(config.FFMPEG),
         "-hide_banner", "-nostdin", "-y",
@@ -69,7 +101,7 @@ def command(in_file: Path, out_file: Path, filter_complex: str, videoai_tag: str
         "-hwaccel", "cuda",
         "-i", str(in_file),
         "-sws_flags", "spline+accurate_rnd+full_chroma_int",
-        "-filter_complex", filter_complex,
+        "-filter_complex", recipe.filter_complex,
         "-c:v", "hevc_nvenc",
         "-profile:v", "main",
         "-pix_fmt", "yuv420p",
@@ -90,7 +122,7 @@ def command(in_file: Path, out_file: Path, filter_complex: str, videoai_tag: str
         "-fps_mode:v", "cfr",
         "-movflags", "frag_keyframe+empty_moov+delay_moov+use_metadata_tags+write_colr",
         "-bf", "0",
-        "-metadata", f"videoai={videoai_tag}",
+        "-metadata", f"videoai={recipe.videoai_tag}",
         "-f", "mp4",
         str(out_file),
     ]

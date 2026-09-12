@@ -235,8 +235,7 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, recipe: topaz.Recipe,
     # the caller counts the clip failed, deletes the partial and moves on --
     # not an exception for the loop to catch around every encode.
     return subprocess.run(
-        topaz.command(in_file, tmp, recipe.filter_complex, recipe.videoai_tag),
-        env=env, timeout=timeout,
+        topaz.command(in_file, tmp, recipe), env=env, timeout=timeout,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
         creationflags=subprocess.CREATE_NO_WINDOW,
     ).returncode == 0
