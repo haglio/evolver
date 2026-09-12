@@ -7,13 +7,25 @@ what could still be looked up afterwards.
 """
 from __future__ import annotations
 
-from app_support.provenance import SCHEMA
+import app_support.provenance
 
 #: Where the stamps sit on a record: ``payload["provenance"][<act>]``.
 BLOCK = "provenance"
 
 #: The acts a stamp is filed under.
 GENERATION = "generation"
+UPSCALE = "upscale"
+
+
+def by_evolver(*, recipe: str | None = None, recipe_version: str | None = None) -> dict:
+    """The stamp for something this app is writing now."""
+    return app_support.provenance.stamp(
+        "evolver", anchor=__file__, recipe=recipe, recipe_version=recipe_version)
+
+
+def recorded(payload: dict, act: str, stamp: dict) -> dict:
+    """*payload* with *stamp* filed under *act*, beside its other stamps -- a copy."""
+    return {**payload, BLOCK: {**_stamps_of(payload), act: stamp}}
 
 
 def carried_forward(earlier: dict, later: dict) -> dict:
@@ -33,5 +45,6 @@ def _stamps_of(payload: dict) -> dict:
 
 def reconstructed(app: str | None, *, recipe: str | None = None,
                   recipe_version: str | None = None) -> dict:
-    return {"schema": SCHEMA, "app": app, "app_commit": None, "app_dirty": None,
+    return {"schema": app_support.provenance.SCHEMA, "app": app,
+            "app_commit": None, "app_dirty": None,
             "recipe": recipe, "recipe_version": recipe_version, "stamped_at": None}

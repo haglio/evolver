@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from tasks import genau_deliver
 from tests.temp_helpers import override_config, workspace_temp_dir, write_sidecar
-from util import sidecar, video_type
+from util import provenance, sidecar, video_type
 
 # Fabricated: the real folder name is library vocabulary and lives in the
 # overlay, so a test names its own and overrides the config with it.
@@ -76,6 +76,27 @@ class TestGenauDeliver(unittest.TestCase):
             self.assertFalse(
                 (metadata / "landscape" / GENAU_SOURCE / "loop_1_topaz.json").exists()
             )
+
+    def test_delivery_carries_what_made_the_clip_and_adds_nothing_to_it(self):
+        """Delivering moves a file; it makes none. The stamps a loop was
+        generated and upscaled under go with it, and no new one is filed."""
+        stamps = {
+            provenance.GENERATION: provenance.reconstructed("origenerator", recipe="loop"),
+            provenance.UPSCALE: provenance.reconstructed("evolver", recipe="ai_upscale"),
+        }
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, clips = _lane(root)
+            upscaled, _original = _stage_clip(outbox, sorted_dir)
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
+                                 METADATA_DIR=root / "metadata"):
+                write_sidecar(sidecar.sidecar_path(upscaled), {provenance.BLOCK: stamps})
+
+                genau_deliver.run()
+
+                delivered = sidecar.read(sidecar.sidecar_path(clips / "loop_1_topaz.mp4"))
+            self.assertEqual(delivered[provenance.BLOCK], stamps)
 
     def test_a_clip_delivered_without_any_metadata_still_gets_a_record(self):
         with workspace_temp_dir() as root:

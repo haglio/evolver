@@ -235,17 +235,6 @@ PIPELINE_WALL_TIMEOUT_SECONDS = UPSCALE_RUN_BUDGET_SECONDS + 3 * 60  # 11 min
 LOW_DISK_WARNING_GB = 250
 CPU_BUSY_SKIP_THRESHOLD_PCT = 65.0
 CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
-UPSCALE_FILTER_DEFAULT = (
-    "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
-    "tvai_up=model=gcg-5:scale=4:device=0:vram=1:instances=1"
-)
-UPSCALE_FILTER_T2V_provider = (
-    "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
-    "tvai_up=model=prob-4:scale=4:preblur=0:noise=0.33:details=0.33:"
-    "halo=0:blur=0.67:compression=0:estimate=20:device=0:vram=1:instances=1"
-)
-VIDEOAI_TAG_DEFAULT = "Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale"
-VIDEOAI_TAG_T2V_provider = "Processed using apo-8 for 60 fps interpolation and prob-4 for 4x upscale (t2v provider)"
 
 # Non-AI library upscaling. The recipe replicates what the manually processed
 # clips under 2D/non_AI carry in their videoai tags: apo-8 60 fps interpolation,

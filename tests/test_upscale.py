@@ -8,8 +8,14 @@ from unittest.mock import patch
 
 import config
 from tasks import upscale
-from tests.temp_helpers import override_config, workspace_temp_dir
-from util import video_type
+from tests.temp_helpers import (
+    LaneLibrary,
+    override_config,
+    touch_video,
+    workspace_temp_dir,
+    write_sidecar,
+)
+from util import provenance, sidecar, topaz, video_type
 from util.media_files import partial_path
 
 
@@ -18,7 +24,7 @@ def library_dirs(root):
     return root / "sorted", root / "out", root / "weird"
 
 
-def fake_run_ffmpeg(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
+def fake_run_ffmpeg(_in_file, tmp, _env, _recipe=None, **kwargs):
     """A successful encode: writes the temp output the stage promotes."""
     tmp.write_bytes(b"upscaled")
     return True
@@ -248,7 +254,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            def fake_run_ffmpeg_empty(_in_file, tmp, _env, _filter="", _tag="", **kwargs):
+            def fake_run_ffmpeg_empty(_in_file, tmp, _env, _recipe=None, **kwargs):
                 tmp.write_bytes(b"")
                 return True
 
@@ -259,6 +265,43 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             self.assertEqual(result.processed, 0)
             self.assertEqual(result.failed, 1)
+
+
+class TestWhatMadeTheUpscale(unittest.TestCase):
+    def test_an_upscale_records_the_recipe_and_the_version_of_it_that_made_it(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            touch_video(lib.sorted_dir / "examplesource" / "landscape" / "clip.mp4")
+            upscaled = lib.outbox / "landscape" / "examplesource" / "clip_topaz.mp4"
+
+            with lib.config(), \
+                 patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                 patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                upscale.run(max_items=1)
+
+                stamp = sidecar.read(sidecar.sidecar_path(upscaled))[provenance.BLOCK][provenance.UPSCALE]
+
+        self.assertEqual(
+            (stamp["app"], stamp["recipe"], stamp["recipe_version"]),
+            ("evolver", "ai_upscale", topaz.AI_UPSCALE.version),
+        )
+
+    def test_a_text_to_video_clip_records_the_recipe_it_was_given_instead(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(PROVIDER_SOURCE="exampleprovider"):
+                touch_video(lib.sorted_dir / "exampleprovider" / "portrait" / "clip.mp4")
+                upscaled = lib.outbox / "portrait" / "exampleprovider" / "clip_topaz.mp4"
+                write_sidecar(sidecar.sidecar_path(upscaled), {"video": {"prompt": "a prompt"}})
+
+                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                     patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                    upscale.run(max_items=1)
+
+                stamp = sidecar.read(sidecar.sidecar_path(upscaled))[provenance.BLOCK][provenance.UPSCALE]
+
+        self.assertEqual((stamp["recipe"], stamp["recipe_version"]),
+                         ("ai_upscale_t2v", topaz.AI_UPSCALE_T2V.version))
 
 
 class TestIsT2vProvider(unittest.TestCase):
@@ -503,17 +546,17 @@ class TestFfmpegWindowSuppression(unittest.TestCase):
         with patch("tasks.upscale.subprocess.run") as mock_run:
             mock_run.return_value = unittest.mock.MagicMock(returncode=0)
             upscale._run_ffmpeg(
-                Path("in.mp4"), Path("out.mp4"), {}, "filter", "tag",
+                Path("in.mp4"), Path("out.mp4"), {}, topaz.AI_UPSCALE,
             )
             kwargs = mock_run.call_args.kwargs
             self.assertIn("creationflags", kwargs)
             self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
 
 
-class TestFilterSelection(unittest.TestCase):
-    def _run_capturing_ffmpeg_args(self, root, sidecar_payload):
+class TestRecipeSelection(unittest.TestCase):
+    def _run_capturing_the_recipe(self, root, sidecar_payload):
         """Upscale one provider clip whose sidecar holds *sidecar_payload*, capturing the
-        ffmpeg args.  The video tree nests under VIDEO_LIBRARY_DIR because a
+        recipe it is encoded with.  The video tree nests under VIDEO_LIBRARY_DIR because a
         sidecar mirrors its clip's path relative to that root.
         """
         video_lib = root / "videos"
@@ -534,11 +577,10 @@ class TestFilterSelection(unittest.TestCase):
         json_path.parent.mkdir(parents=True)
         json_path.write_text(json.dumps(sidecar_payload), encoding="utf-8")
 
-        captured_args = {}
+        encoded_with = []
 
-        def fake_run_ffmpeg(_in_file, tmp, _env, filter_complex, videoai_tag, **kwargs):
-            captured_args["filter_complex"] = filter_complex
-            captured_args["videoai_tag"] = videoai_tag
+        def fake_run_ffmpeg(_in_file, tmp, _env, recipe, **kwargs):
+            encoded_with.append(recipe)
             tmp.write_bytes(b"upscaled")
             return True
 
@@ -547,23 +589,21 @@ class TestFilterSelection(unittest.TestCase):
             with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                 upscale.run(max_items=1)
-        return captured_args
+        return encoded_with
 
-    def test_run_uses_t2v_filter_for_t2v_provider(self):
+    def test_run_uses_the_t2v_recipe_for_t2v_provider(self):
         with workspace_temp_dir() as root:
-            captured_args = self._run_capturing_ffmpeg_args(root, {"video": {"prompt": "test"}})
+            encoded_with = self._run_capturing_the_recipe(root, {"video": {"prompt": "test"}})
 
-            self.assertEqual(captured_args["filter_complex"], config.UPSCALE_FILTER_T2V_provider)
-            self.assertEqual(captured_args["videoai_tag"], config.VIDEOAI_TAG_T2V_provider)
+            self.assertEqual(encoded_with, [topaz.AI_UPSCALE_T2V])
 
-    def test_run_uses_default_filter_for_i2v_provider(self):
+    def test_run_uses_the_default_recipe_for_i2v_provider(self):
         with workspace_temp_dir() as root:
-            captured_args = self._run_capturing_ffmpeg_args(
+            encoded_with = self._run_capturing_the_recipe(
                 root, {"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}
             )
 
-            self.assertEqual(captured_args["filter_complex"], config.UPSCALE_FILTER_DEFAULT)
-            self.assertEqual(captured_args["videoai_tag"], config.VIDEOAI_TAG_DEFAULT)
+            self.assertEqual(encoded_with, [topaz.AI_UPSCALE])
 
 
 class TestUpscaleResultSurface(unittest.TestCase):

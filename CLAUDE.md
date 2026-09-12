@@ -40,6 +40,18 @@ replays the launch's whole import phase.
   minutes once it lands — so only a stage whose `run()` takes no arguments
   can be shown this way. Take the `.lnk` back out when the PR merges.
 
+## Retuning a Topaz recipe owes it a new version
+
+Every upscale records the recipe it was made with and that recipe's version
+(`util/topaz.py`), so a later sweep can find whatever an old version made and
+remake it. A version left unbumped after a retune is worse than no record: the
+sweep reads the old files as current and skips them. So a change to anything a
+recipe runs Topaz with -- a filter, a videoai tag, an encoder argument in
+`topaz.command` -- bumps that recipe's version in the same commit.
+`tests/test_topaz.py` fails until it does, and until the new version's
+fingerprint is added to `SHIPPED`. Never edit a fingerprint already there:
+files on disk already name that version.
+
 ## Test fixtures must be fabricated, never copied from the real library
 
 Every fixture value that stands in for library data — a video title, a filename,
