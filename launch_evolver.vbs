@@ -1,37 +1,62 @@
-' Starts Evolver's tray app, hidden, and exits.
-'
-' Evolver already starts from a Startup-folder shortcut at sign-in, which is a
-' shortcut the app writes for itself and points at whatever interpreter wrote
-' it. This is the launcher for everything that is NOT the user clicking: the
-' broker's tray, which starts Evolver again when it finds it gone. Such a caller
-' has one path it can be given and no way to work out which interpreter to use,
-' so the choosing lives here, once.
-'
-' Evolver's own single-instance mutex makes a launch over a live Evolver a
-' no-op, so a caller may run this on a liveness reading it does not fully trust.
+' Rendered from [tool.haglio.launchers."launch_evolver.vbs"] in pyproject.toml.
+' Change the spec, then run  python -m app_support.launcher --write  in this
+' folder: the suite fails on a launcher that differs from its spec.
 
-Set shell = CreateObject("WScript.Shell")
+Option Explicit
+
+Dim fso, shell, root, app, interpreter, directory, arguments
+
 Set fso = CreateObject("Scripting.FileSystemObject")
-
-projectRoot = fso.GetParentFolderName(WScript.ScriptFullName)
-entryPoint = projectRoot & "\tray_app.py"
-
-' pythonw, not python: the tray is a GUI app and must not flash up a console.
-pythonExe = projectRoot & "\.venv\Scripts\pythonw.exe"
-
-' The copy a previous run left named for Evolver, when there is one. Windows
-' identifies a process by the file it was started from, so a bare interpreter
-' puts Evolver in the task list as one more anonymous "Python" -- which is
-' exactly what you need it not to be when something has to be ended by hand.
-' See app_support.process_identity, and tray_app.py's _name_this_process.
-namedExe = projectRoot & "\.venv\Scripts\Evolver-Evolver.exe"
-If fso.FileExists(namedExe) Then
-    pythonExe = namedExe
-End If
-If Not fso.FileExists(pythonExe) Then
-    pythonExe = "pythonw.exe"
+Set shell = CreateObject("WScript.Shell")
+root = fso.GetParentFolderName(WScript.ScriptFullName)
+Decide
+If shell.Environment("Process").Item("HAGLIO_LAUNCHER_DRY_RUN") = "1" Then
+  Report
+Else
+  Launch
 End If
 
-shell.CurrentDirectory = projectRoot
-cmd = """" & pythonExe & """ """ & entryPoint & """"
-shell.Run cmd, 0, False
+Sub Decide()
+  app = "Evolver"
+  arguments = """" & root & "\tray_app.py"""
+  interpreter = fso.BuildPath(root, ".venv\Scripts\pythonw.exe")
+  If fso.FileExists(fso.BuildPath(root, ".venv\Scripts\Evolver-Evolver.exe")) Then interpreter = fso.BuildPath(root, ".venv\Scripts\Evolver-Evolver.exe")
+  directory = root
+End Sub
+
+Sub Report()
+  WScript.Echo "app: " & app
+  WScript.Echo "interpreter: " & interpreter
+  WScript.Echo "directory: " & directory
+  WScript.Echo "arguments: " & arguments
+  WScript.Echo "command: " & Command()
+End Sub
+
+Sub Launch()
+  If Not fso.FileExists(interpreter) Then
+    Refuse app & "'s virtual environment is missing:" & vbCrLf & interpreter, vbCritical
+  End If
+  shell.CurrentDirectory = directory
+  shell.Run Command(), 0, False
+End Sub
+
+Function Command()
+  Command = Quote(interpreter) & " " & arguments
+End Function
+
+Function Quote(text)
+  Quote = Chr(34) & text & Chr(34)
+End Function
+
+Sub Tell(message, icon)
+  If LCase(fso.GetFileName(WScript.FullName)) = "cscript.exe" Then
+    WScript.Echo "dialog: " & message
+  Else
+    MsgBox message, icon, app
+  End If
+End Sub
+
+Sub Refuse(message, icon)
+  Tell message, icon
+  WScript.Quit 1
+End Sub
