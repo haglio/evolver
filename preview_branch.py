@@ -172,6 +172,14 @@ def branch_name() -> str:
     return done.stdout.strip() or "this worktree"
 
 
+# The live window hides to its tray icon when closed. A preview has no tray, so
+# a hidden preview kept running unseen, holding its log open, and the next
+# launch of the preview could not start.
+class PreviewWindow(EvolverMainWindow):
+    def closeEvent(self, event):
+        event.accept()
+
+
 def main() -> int:
     """Build the record, then show it in the real window.
 
@@ -188,7 +196,7 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     SignInNotice().after_run(record, time.monotonic())
-    window = EvolverMainWindow()
+    window = PreviewWindow()
     window.setWindowTitle(f"Evolver — preview of {branch_name()}")
     for action in (window.run_now_action, window.settings_action, window.stats_action,
                    window.restart_action, window.quit_action):

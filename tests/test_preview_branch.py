@@ -20,5 +20,14 @@ class TestSignInDeferral(unittest.TestCase):
         sign_in_expired.assert_not_called()
 
 
+class TestPreviewWindow(unittest.TestCase):
+    def test_closing_the_preview_window_ends_the_preview_rather_than_hiding_it(self):
+        window = preview_branch.PreviewWindow()
+        window.show()
+
+        self.assertTrue(window.close())
+        self.assertFalse(window.isVisible())
+
+
 if __name__ == "__main__":
     unittest.main()
