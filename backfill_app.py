@@ -15,7 +15,7 @@ import evolver
 from backfill.queue import BackfillQueue, ScannedClip, library_scan, unlabeled_clips
 from backfill.session import BackfillSession
 from backfill.thumbnails import build_thumbnails, example_clips, extract_frame, thumbnail_cache_path
-from backfill.vocabulary import grammar_phrases, load_vocabulary
+from backfill.vocabulary import Vocabulary, grammar_phrases, load_vocabulary
 from backfill.voice import VoiceListener
 from backfill.window import BackfillWindow
 from backfill.work import SerialWorker
@@ -23,7 +23,7 @@ from backfill.work import SerialWorker
 _TITLE = "Backfill Metadata"
 
 
-def _ready_thumbnails(scan: list[ScannedClip]) -> dict[str, str]:
+def _ready_thumbnails(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, str]:
     """Every tile's cached thumbnail, ready to hand the window at construction.
 
     Cached frames are read straight back; only an act whose frame was never made
@@ -32,7 +32,7 @@ def _ready_thumbnails(scan: list[ScannedClip]) -> dict[str, str]:
     return {
         action: str(path)
         for action, path in build_thumbnails(
-            example_clips(scan), extract_frame, thumbnail_cache_path)
+            example_clips(vocabulary, scan), extract_frame, thumbnail_cache_path)
     }
 
 
@@ -52,7 +52,7 @@ def main() -> int:
     vocabulary = load_vocabulary()
     session = BackfillSession(BackfillQueue(clips), worker, vocabulary)
 
-    window = BackfillWindow(session, vocabulary, thumbnails=_ready_thumbnails(scan))
+    window = BackfillWindow(session, vocabulary, thumbnails=_ready_thumbnails(vocabulary, scan))
 
     listener = VoiceListener(grammar_phrases(), parent=window)
     listener.heard.connect(window.on_phrase)

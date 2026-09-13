@@ -99,21 +99,26 @@ class TestMain(unittest.TestCase):
         mocks["window"].assert_called_once_with(
             mocks["session"].return_value, mocks["vocabulary"].return_value, thumbnails=ANY)
 
+    def test_the_example_clips_are_picked_for_the_vocabulary_main_loads(self):
+        mocks = self._run_main()
+
+        mocks["thumbnails"].assert_called_once_with(mocks["vocabulary"].return_value, ANY)
+
 
 class TestReadyThumbnails(unittest.TestCase):
     def test_hands_the_window_every_built_thumbnail_as_strings(self):
         built = [("Side Beta", Path("/c/side_beta.jpg")), ("POV Alpha", Path("/c/pov_alpha.jpg"))]
-        scan = []
+        vocabulary, scan = object(), []
         with patch("backfill_app.build_thumbnails", return_value=built) as build, \
              patch("backfill_app.example_clips", return_value={}) as examples:
-            ready = backfill_app._ready_thumbnails(scan)
+            ready = backfill_app._ready_thumbnails(vocabulary, scan)
 
         self.assertEqual(
             ready,
             {"Side Beta": str(Path("/c/side_beta.jpg")), "POV Alpha": str(Path("/c/pov_alpha.jpg"))},
         )
         build.assert_called_once()
-        examples.assert_called_once_with(scan)
+        examples.assert_called_once_with(vocabulary, scan)
 
     def test_the_library_is_walked_once_for_both_of_startup_s_questions(self):
         """The work queue and the example clips are two projections of one
