@@ -24,7 +24,7 @@ from backfill.decisions import (
     sidecar_snapshot,
 )
 from backfill.queue import BackfillQueue
-from backfill.vocabulary import ACTIONS, CONTROLS, SAME, SKIP, UNDO, WEIRD
+from backfill.vocabulary import SAME, SKIP, UNDO, WEIRD, Vocabulary
 from backfill.work import SerialWorker
 
 NOTHING_TO_UNDO = "nothing to undo"
@@ -140,9 +140,10 @@ class BackfillSession:
     next clip starts playing without waiting for it.
     """
 
-    def __init__(self, queue: BackfillQueue, worker: SerialWorker) -> None:
+    def __init__(self, queue: BackfillQueue, worker: SerialWorker, vocabulary: Vocabulary) -> None:
         self._queue = queue
         self._worker = worker
+        self._vocabulary = vocabulary
         self._history: list[_Step] = []
 
     @property
@@ -157,7 +158,7 @@ class BackfillSession:
 
     def apply(self, phrase: str) -> str | None:
         """React to *phrase*; returns what it did, or None if it meant nothing here."""
-        control = CONTROLS.get(phrase)
+        control = self._vocabulary.controls.get(phrase)
         if control == UNDO:
             return self._undo()
         if control == SAME:
@@ -196,10 +197,10 @@ class BackfillSession:
         return None
 
     def _step_for(self, phrase: str, clip: Path) -> _Step | None:
-        action = ACTIONS.get(phrase)
+        action = self._vocabulary.actions.get(phrase)
         if action is not None:
             return _Labelled(clip, action)
-        control = CONTROLS.get(phrase)
+        control = self._vocabulary.controls.get(phrase)
         if control == SKIP:
             return _Deferred(clip)
         if control == WEIRD:

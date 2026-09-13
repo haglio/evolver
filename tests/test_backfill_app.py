@@ -7,8 +7,9 @@ unexercised and backfill_app.py appeared in no coverage report at all.
 from __future__ import annotations
 
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import backfill_app
 
@@ -24,9 +25,18 @@ class TestMain(unittest.TestCase):
             window=patch("backfill_app.BackfillWindow"),
             listener=patch("backfill_app.VoiceListener"),
             worker=patch("backfill_app.SerialWorker"),
+            vocabulary=patch("backfill_app.load_vocabulary"),
+            session=patch("backfill_app.BackfillSession"),
         )
         patches.update(extra)
         return patches
+
+    def _run_main(self, videos=(Path("a_topaz.mp4"),)):
+        with ExitStack() as stack:
+            mocks = {name: stack.enter_context(p) for name, p in self._patched(list(videos)).items()}
+            mocks["qapplication"].return_value.exec.return_value = 0
+            backfill_app.main()
+        return mocks
 
     def test_an_empty_queue_reports_and_exits_zero_without_a_window(self):
         patches = self._patched([])
@@ -45,7 +55,7 @@ class TestMain(unittest.TestCase):
         with patches["setup_logging"], patches["qapplication"] as qapp, \
              patches["alert"], patches["unlabeled"], patches["thumbnails"], \
              patches["window"] as window, patches["listener"] as listener, \
-             patches["worker"] as worker:
+             patches["worker"] as worker, patches["vocabulary"]:
             qapp.return_value.exec.return_value = 0
             exit_code = backfill_app.main()
 
@@ -70,13 +80,18 @@ class TestMain(unittest.TestCase):
         with patches["setup_logging"], patches["qapplication"] as qapp, \
              patches["alert"], patches["unlabeled"], patches["thumbnails"], \
              patches["window"], patches["listener"] as listener, \
-             patches["worker"] as worker:
+             patches["worker"] as worker, patches["vocabulary"]:
             qapp.return_value.exec.side_effect = RuntimeError("backend gone")
             with self.assertRaises(RuntimeError):
                 backfill_app.main()
 
         listener.return_value.stop.assert_called_once()
         worker.return_value.shutdown.assert_called_once()
+
+    def test_the_session_is_handed_the_vocabulary_main_loads(self):
+        mocks = self._run_main()
+
+        mocks["session"].assert_called_once_with(ANY, ANY, mocks["vocabulary"].return_value)
 
 
 class TestReadyThumbnails(unittest.TestCase):

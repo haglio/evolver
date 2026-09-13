@@ -15,7 +15,7 @@ import evolver
 from backfill.queue import BackfillQueue, ScannedClip, library_scan, unlabeled_clips
 from backfill.session import BackfillSession
 from backfill.thumbnails import build_thumbnails, example_clips, extract_frame, thumbnail_cache_path
-from backfill.vocabulary import grammar_phrases
+from backfill.vocabulary import grammar_phrases, load_vocabulary
 from backfill.voice import VoiceListener
 from backfill.window import BackfillWindow
 from backfill.work import SerialWorker
@@ -49,7 +49,8 @@ def main() -> int:
         return 0
 
     worker = SerialWorker()
-    session = BackfillSession(BackfillQueue(clips), worker)
+    vocabulary = load_vocabulary()
+    session = BackfillSession(BackfillQueue(clips), worker, vocabulary)
 
     window = BackfillWindow(session, thumbnails=_ready_thumbnails(scan))
 
