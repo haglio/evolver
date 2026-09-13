@@ -51,6 +51,24 @@ testpaths = ["tests"]
 [tool.haglio]
 siblings = ["app_support", "shared_ui"]
 
+# What Evolver's two launchers start: launch_evolver.vbs, which the broker's tray
+# runs when it finds Evolver gone, and launch_preview_branch.vbs, which opens a
+# worktree's run-detail window. Both are rendered from these by
+# `python -m app_support.launcher --write`.
+[tool.haglio.launchers."launch_evolver.vbs"]
+app = "Evolver"
+interpreter = "pythonw.exe"
+named-interpreter = "Evolver-Evolver.exe"
+run = '"{root}\tray_app.py"'
+
+[tool.haglio.launchers."launch_preview_branch.vbs"]
+app = "Evolver (branch preview)"
+interpreter = "pythonw.exe"
+venv = "primary"
+run = "preview_branch.py"
+log = 'state\preview_branch.log'
+copy-from-primary = ["content.local.json"]
+
 [tool.setuptools.packages.find]
 include = ["evolver*"]
 namespaces = false
