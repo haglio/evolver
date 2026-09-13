@@ -251,16 +251,11 @@ The **Watch Weights** stage sums the two on every library video's sidecar — fo
 
 ## Run manually (CLI)
 
-From repo root:
+From the repo root, on the project venv (a python off PATH has none of the
+sibling packages Evolver imports):
 
 ```bash
-powershell.exe -File evolver.ps1
-```
-
-Alternative (direct Python command):
-
-```bash
-python evolver.py
+.venv/Scripts/python.exe evolver.py
 ```
 
 ## Matching carved clips to their scenes
@@ -321,9 +316,6 @@ Install the dev extras once, then run from repo root:
 pip install -e ".[dev]"
 python -m pytest -q
 ```
-
-The tests are `unittest.TestCase`-based, so `run-tests.ps1` (a `unittest discover`
-wrapper) still works for a quick local run without pytest.
 
 What is covered:
 
