@@ -8,8 +8,12 @@ from unittest.mock import patch
 from backfill import session
 from backfill.queue import BackfillQueue
 from backfill.session import BackfillSession
+from backfill.vocabulary import Act, Vocabulary
 from tests.temp_helpers import library_tree
 from util.sidecar import sidecar_path
+
+# Fabricated, in the committed example's placeholder style.
+VOCABULARY = Vocabulary([Act("beta", "Beta"), Act("dance", "Dancing"), Act("zeta", "Zeta")])
 
 
 class ImmediateWorker:
@@ -40,20 +44,32 @@ class DeferredWorker:
 
 
 class TestBackfillSession(unittest.TestCase):
-    def _session(self, count=3, worker=None):
+    def _session(self, count=3, worker=None, vocabulary=VOCABULARY):
         videos = [Path(f"clip{i}.mp4") for i in range(count)]
         queue = BackfillQueue(videos)
-        return BackfillSession(queue, worker or ImmediateWorker())
+        return BackfillSession(queue, worker or ImmediateWorker(), vocabulary)
+
+    def test_a_phrase_means_what_the_vocabulary_the_session_was_handed_says(self):
+        session = self._session(vocabulary=Vocabulary([Act("kappa", "Kappa")]))
+        clip = session.current
+
+        with patch("backfill.session.record_action") as record, \
+             patch("backfill.session.sidecar_snapshot"):
+            note = session.apply("pov kappa")
+
+        record.assert_called_once_with(clip, "POV Kappa")
+        self.assertEqual(note, f"{clip.name} → POV Kappa")
 
     def test_a_control_the_session_does_not_dispatch_moves_no_file(self):
         """The four controls are dispatched by name. A fifth added to the
         vocabulary and not here has to do nothing: the fallback used to be the
         discard path, which moves the clip on screen into the weird folder."""
-        session = self._session()
+        vocabulary = Vocabulary([Act("beta", "Beta")])
+        vocabulary.controls["reticulate"] = "reticulate"
+        session = self._session(vocabulary=vocabulary)
         clip = session.current
 
-        with patch.dict("backfill.session.CONTROLS", {"reticulate": "reticulate"}):
-            note = session.apply("reticulate")
+        note = session.apply("reticulate")
 
         self.assertIsNone(note)
         self.assertEqual(session.current, clip)
@@ -171,7 +187,7 @@ class TestUndo(unittest.TestCase):
     def _session(self, count=3, worker=None):
         videos = [Path(f"clip{i}.mp4") for i in range(count)]
         queue = BackfillQueue(videos)
-        return BackfillSession(queue, worker or ImmediateWorker())
+        return BackfillSession(queue, worker or ImmediateWorker(), VOCABULARY)
 
     def test_undo_with_nothing_decided_says_so_and_changes_nothing(self):
         session = self._session()
@@ -336,7 +352,7 @@ class TestSame(unittest.TestCase):
 
     def _session(self, lib, count=3):
         videos = [lib.video(name=f"clip{i}_topaz.mp4") for i in range(count)]
-        return BackfillSession(BackfillQueue(videos), ImmediateWorker())
+        return BackfillSession(BackfillQueue(videos), ImmediateWorker(), VOCABULARY)
 
     def _recorded_action(self, clip):
         path = sidecar_path(clip)
@@ -459,7 +475,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
     """The two reversals that actually touch disk, driven end to end."""
 
     def _session(self, video):
-        return BackfillSession(BackfillQueue([video]), ImmediateWorker())
+        return BackfillSession(BackfillQueue([video]), ImmediateWorker(), VOCABULARY)
 
     def test_undoing_an_act_deletes_the_sidecar_it_wrote(self):
         with library_tree() as lib:
