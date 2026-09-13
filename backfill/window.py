@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from backfill.session import BackfillSession
-from backfill.vocabulary import Command, control_commands, scoped_grid
+from backfill.vocabulary import Command, Vocabulary
 
 _DONE = "Nothing left to label."
 _SCROLLBAR_ALLOWANCE = 28
@@ -74,7 +74,9 @@ class BackfillWindow(QWidget):
     soundtrack would be one more thing for the recognizer to mishear.
     """
 
-    def __init__(self, session: BackfillSession, thumbnails: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, session: BackfillSession, vocabulary: Vocabulary, thumbnails: dict[str, str] | None = None,
+    ) -> None:
         super().__init__()
         self._session = session
         self._tiles: dict[str, QToolButton] = {}
@@ -97,7 +99,7 @@ class BackfillWindow(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(stage, stretch=1)
-        layout.addWidget(self._build_command_panel())
+        layout.addWidget(self._build_command_panel(vocabulary))
 
         for label, path in (thumbnails or {}).items():
             self.set_thumbnail(label, path)
@@ -113,12 +115,12 @@ class BackfillWindow(QWidget):
 
         self._play_current()
 
-    def _build_command_panel(self) -> QWidget:
+    def _build_command_panel(self, vocabulary: Vocabulary) -> QWidget:
         """The scrollable right-hand reference: every command as a clickable tile."""
         contents = QVBoxLayout()
 
         acts = QGridLayout()
-        for row, commands in enumerate(scoped_grid()):
+        for row, commands in enumerate(vocabulary.scoped_grid()):
             for column, command in enumerate(commands):
                 acts.addWidget(self._command_tile(command), row, column)
         contents.addLayout(acts)
@@ -128,7 +130,7 @@ class BackfillWindow(QWidget):
         contents.addWidget(divider)
 
         controls = QHBoxLayout()
-        for command in control_commands():
+        for command in vocabulary.control_commands():
             controls.addWidget(self._command_tile(command))
         contents.addLayout(controls)
         contents.addStretch(1)

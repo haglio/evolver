@@ -93,6 +93,12 @@ class TestMain(unittest.TestCase):
 
         mocks["session"].assert_called_once_with(ANY, ANY, mocks["vocabulary"].return_value)
 
+    def test_the_window_is_handed_the_vocabulary_main_loads(self):
+        mocks = self._run_main()
+
+        mocks["window"].assert_called_once_with(
+            mocks["session"].return_value, mocks["vocabulary"].return_value, thumbnails=ANY)
+
 
 class TestReadyThumbnails(unittest.TestCase):
     def test_hands_the_window_every_built_thumbnail_as_strings(self):
