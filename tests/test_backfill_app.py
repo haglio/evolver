@@ -6,12 +6,17 @@ unexercised and backfill_app.py appeared in no coverage report at all.
 """
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 import unittest
 from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import ANY, patch
 
 import backfill_app
+from tests.product_sources import PROJECT_ROOT
 
 
 class TestMain(unittest.TestCase):
@@ -104,6 +109,12 @@ class TestMain(unittest.TestCase):
 
         mocks["thumbnails"].assert_called_once_with(mocks["vocabulary"].return_value, ANY)
 
+    def test_the_recognizer_listens_for_the_phrases_of_the_vocabulary_main_loads(self):
+        mocks = self._run_main()
+
+        mocks["listener"].assert_called_once_with(
+            mocks["vocabulary"].return_value.grammar_phrases.return_value, parent=ANY)
+
 
 class TestReadyThumbnails(unittest.TestCase):
     def test_hands_the_window_every_built_thumbnail_as_strings(self):
@@ -132,6 +143,44 @@ class TestReadyThumbnails(unittest.TestCase):
             backfill_app.main()
 
         scan.assert_called_once_with()
+
+
+# In a fresh interpreter, because an import-time read is a cost this process has
+# already paid. Config reads the overlay as it is imported, so it is imported
+# before the count starts, and what is counted is the tool's own.
+_OVERLAY_READS = """
+import json
+from pathlib import Path
+import content_overlay
+content_overlay.LOCAL_CONTENT = content_overlay.EXAMPLE_CONTENT
+import config
+
+reads = []
+_read_text = Path.read_text
+Path.read_text = lambda self, *a, **k: (reads.append(self.name), _read_text(self, *a, **k))[1]
+import backfill_app
+at_import = [name for name in reads if name.startswith("content.")]
+reads.clear()
+backfill_app.load_vocabulary()
+when_asked = [name for name in reads if name.startswith("content.")]
+print(json.dumps({"at_import": at_import, "when_asked": when_asked}))
+"""
+
+
+class TestTheActTableIsReadWhenMainAsksForIt(unittest.TestCase):
+    def test_importing_the_tool_reads_no_overlay_and_loading_its_vocabulary_reads_one(self):
+        env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        env["QT_QPA_PLATFORM"] = "offscreen"
+        result = subprocess.run(
+            [sys.executable, "-c", _OVERLAY_READS],
+            cwd=PROJECT_ROOT, env=env, capture_output=True, text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            json.loads(result.stdout.splitlines()[-1]),
+            {"at_import": [], "when_asked": ["content.example.json"]},
+        )
 
 
 if __name__ == "__main__":

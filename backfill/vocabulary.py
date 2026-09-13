@@ -140,8 +140,3 @@ def load_vocabulary() -> Vocabulary:
         Act(entry["spoken"], entry["action"], tuple(entry.get("aliases", ())))
         for entry in load_content()["acts"]
     )
-
-
-# What the callers not yet handed a vocabulary still read.
-_DEFAULT = load_vocabulary()
-grammar_phrases = _DEFAULT.grammar_phrases

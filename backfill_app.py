@@ -15,7 +15,7 @@ import evolver
 from backfill.queue import BackfillQueue, ScannedClip, library_scan, unlabeled_clips
 from backfill.session import BackfillSession
 from backfill.thumbnails import build_thumbnails, example_clips, extract_frame, thumbnail_cache_path
-from backfill.vocabulary import Vocabulary, grammar_phrases, load_vocabulary
+from backfill.vocabulary import Vocabulary, load_vocabulary
 from backfill.voice import VoiceListener
 from backfill.window import BackfillWindow
 from backfill.work import SerialWorker
@@ -54,7 +54,7 @@ def main() -> int:
 
     window = BackfillWindow(session, vocabulary, thumbnails=_ready_thumbnails(vocabulary, scan))
 
-    listener = VoiceListener(grammar_phrases(), parent=window)
+    listener = VoiceListener(vocabulary.grammar_phrases(), parent=window)
     listener.heard.connect(window.on_phrase)
     listener.hearing.connect(window.on_hearing)
     listener.failed.connect(window.on_voice_failed)
