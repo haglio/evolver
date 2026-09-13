@@ -14,9 +14,8 @@ The act table itself is content, not logic, so it lives in a JSON overlay
 (``content.local.json``, git-ignored) with a committed ``content.example.json``
 placeholder; the grammar and the grid behave the same whichever is loaded.
 
-The typed tables here are the single source of truth for two consumers: the
-recognizer grammar (:data:`ACTIONS`, :data:`CONTROLS`) and the window's clickable
-reference grid (:func:`scoped_grid`, :func:`control_commands`).  An act voiced
+A :class:`Vocabulary` is the single source of truth for two consumers: the
+recognizer grammar and the window's clickable reference grid.  An act voiced
 more than one way is one ``spoken`` form plus its ``aliases``, so the grammar
 hears every form while the grid shows one tile.  Every act is scoped by a camera word: a clip is always
 tagged Side or POV, never bare.
@@ -24,13 +23,14 @@ tagged Side or POV, never bare.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from content_overlay import load_content
 
 
 @dataclass(frozen=True)
-class _Act:
+class Act:
     """An act, its canonical spoken phrase, and any other way it is voiced."""
 
     spoken: str  # the phrase a click re-emits and the grid tile is built from
@@ -55,7 +55,7 @@ class _Camera:
 
 @dataclass(frozen=True)
 class _Control:
-    """A non-labelling command — skip, discard, undo, repeat — and how it is voiced."""
+    """A non-labeling command — skip, discard, undo, repeat — and how it is voiced."""
 
     spoken: str
     label: str  # the grid tile text, e.g. "Weird"
@@ -78,26 +78,6 @@ class Command:
     phrase: str
     label: str
 
-
-def load_acts() -> tuple[_Act, ...]:
-    """Every act, from the content overlay — the local copy, else the example.
-
-    Each is scoped by a camera word so none stands bare, and the written actions
-    keep the library's existing Title Case, so one Fun Time query reaches new
-    clips and old.
-    """
-    data = load_content()
-    return tuple(
-        _Act(
-            spoken=entry["spoken"],
-            action=entry["action"],
-            aliases=tuple(entry.get("aliases", ())),
-        )
-        for entry in data["acts"]
-    )
-
-
-_ACTS: tuple[_Act, ...] = load_acts()
 
 # "POV" is an initialism: the lexicon's one-word "pov" is a g2p guess at a single
 # syllable, while the three letters are priced as their names (P IY, OW, V IY), so
@@ -124,53 +104,48 @@ _CONTROLS: tuple[_Control, ...] = (
 )
 
 
-def _build_actions() -> dict[str, str]:
-    """Every spoken phrase -> the ``video.action`` it records.
+class Vocabulary:
+    def __init__(self, acts: Iterable[Act]) -> None:
+        self.acts = tuple(acts)
+        self.actions: dict[str, str] = {
+            f"{camera_form} {act_form}": f"{camera.prefix} {act.action}"
+            for act in self.acts
+            for camera in _CAMERAS
+            for camera_form in camera.forms()
+            for act_form in act.forms()
+        }
+        self.controls: dict[str, str] = {
+            form: control.kind for control in _CONTROLS for form in control.forms()
+        }
 
-    Each act is scoped by a camera word; the recognizer hears every camera-form ×
-    act-form pairing — "p o v alpha" and "pov alpha form" alike record
-    ``POV Alpha`` — and no bare, camera-less form is offered.
-    """
-    actions: dict[str, str] = {}
-    for act in _ACTS:
-        for camera in _CAMERAS:
-            for camera_form in camera.forms():
-                for act_form in act.forms():
-                    actions[f"{camera_form} {act_form}"] = f"{camera.prefix} {act.action}"
-    return actions
-
-
-def _build_controls() -> dict[str, str]:
-    return {form: control.kind for control in _CONTROLS for form in control.forms()}
-
-ACTIONS: dict[str, str] = _build_actions()
-CONTROLS: dict[str, str] = _build_controls()
-
-
-def scoped_grid() -> list[list[Command]]:
-    """A row of :class:`Command` per act, one cell per camera word.
-
-    Each cell prepends a camera word, one column per camera in the order
-    :data:`_CAMERAS` lists them; there is no bare column, so an act is only ever
-    Side or POV.  Every cell's ``phrase`` is the canonical spoken form, so a
-    click reaches the same action the spoken phrase would.
-    """
-    rows: list[list[Command]] = []
-    for act in _ACTS:
-        rows.append(
+    def scoped_grid(self) -> list[list[Command]]:
+        """A row per act, one cell per camera word in the order the cameras are listed."""
+        return [
             [
                 Command(f"{camera.spoken} {act.spoken}", f"{camera.prefix} {act.action}")
                 for camera in _CAMERAS
             ]
-        )
-    return rows
+            for act in self.acts
+        ]
+
+    def control_commands(self) -> list[Command]:
+        return [Command(control.spoken, control.label) for control in _CONTROLS]
+
+    def grammar_phrases(self) -> list[str]:
+        return sorted({*self.actions, *self.controls})
 
 
-def control_commands() -> list[Command]:
-    """One tile per control — Skip, Weird, Undo, Same."""
-    return [Command(control.spoken, control.label) for control in _CONTROLS]
+def load_vocabulary() -> Vocabulary:
+    return Vocabulary(
+        Act(entry["spoken"], entry["action"], tuple(entry.get("aliases", ())))
+        for entry in load_content()["acts"]
+    )
 
 
-def grammar_phrases() -> list[str]:
-    """Every phrase the recognizer should listen for, sorted."""
-    return sorted({*ACTIONS, *CONTROLS})
+# What the callers not yet handed a vocabulary still read.
+_DEFAULT = load_vocabulary()
+ACTIONS = _DEFAULT.actions
+CONTROLS = _DEFAULT.controls
+scoped_grid = _DEFAULT.scoped_grid
+control_commands = _DEFAULT.control_commands
+grammar_phrases = _DEFAULT.grammar_phrases
