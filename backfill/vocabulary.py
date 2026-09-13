@@ -144,5 +144,4 @@ def load_vocabulary() -> Vocabulary:
 
 # What the callers not yet handed a vocabulary still read.
 _DEFAULT = load_vocabulary()
-scoped_grid = _DEFAULT.scoped_grid
 grammar_phrases = _DEFAULT.grammar_phrases

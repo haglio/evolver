@@ -30,8 +30,8 @@ from pathlib import Path
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 import config
-from backfill.queue import ScannedClip, library_scan
-from backfill.vocabulary import scoped_grid
+from backfill.queue import ScannedClip
+from backfill.vocabulary import Vocabulary
 from util.ffprobe import duration_seconds
 
 log = logging.getLogger(__name__)
@@ -41,14 +41,14 @@ _THUMBNAIL_HEIGHT = 96
 # far enough that the act — and the anchor — is actually in frame, not just beginning.
 _SAMPLE_FRACTION = 0.4
 
-def _tile_labels() -> list[str]:
+def _tile_labels(vocabulary: Vocabulary) -> list[str]:
     """Every tile's face, in grid order — the labels a thumbnail fills.
 
     Labels, not actions: the grid holds control tiles ("Skip", "Weird") that
     are no act at all, and an act tile's label is what the library's
     ``video.action`` is matched against rather than what it is.
     """
-    return [command.label for row in scoped_grid() for command in row]
+    return [command.label for row in vocabulary.scoped_grid() for command in row]
 
 
 def _lookups(scan: list[ScannedClip]) -> tuple[dict[str, Path], dict[str, Path]]:
@@ -69,19 +69,19 @@ def _lookups(scan: list[ScannedClip]) -> tuple[dict[str, Path], dict[str, Path]]
     return by_action, by_id
 
 
-def example_clips(scan: list[ScannedClip] | None = None) -> dict[str, Path]:
-    """One example clip per tile that has one, as ``tile label -> clip``.
+def example_clips(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, Path]:
+    """One example clip per tile of *vocabulary* that has one, as ``tile label -> clip``.
 
     A curated pin wins; otherwise the tile takes the first library clip whose
     action matches its label. Tiles with neither are simply absent, and stay
     text-only.
 
-    Takes the scan startup already made when there is one, so the library is
-    walked and its sidecars parsed once rather than once per projection.
+    Takes the scan startup already made, so the library is walked and its
+    sidecars parsed once rather than once per projection.
     """
-    by_action, by_id = _lookups(library_scan() if scan is None else scan)
+    by_action, by_id = _lookups(scan)
     examples: dict[str, Path] = {}
-    for label in _tile_labels():
+    for label in _tile_labels(vocabulary):
         clip = (by_id.get(config.CURATED_EXAMPLES.get(label, ""))
                 or by_action.get(label.lower()))
         if clip is not None:
