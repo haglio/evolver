@@ -1,59 +1,126 @@
-' Launch THIS WORKTREE's Evolver -- the whole app, in place of the usual one --
-' so a branch can be judged before it lands. Same tray icon, same window, every
-' command working, the schedule included, on the live library and the usual
-' Evolver's own run history, queue manifests and settings: what the user judges
-' a change by is the app itself, not a window of it filled from a report. The
-' Evolver running when this starts steps aside for it, and comes back when the
-' preview is quit or has run for an hour (see gui/branch_session.py). Running
-' this again replaces a preview already up, so it always shows the branch as
-' it stands.
-'
-' Four things a worktree needs done differently:
-'   - it borrows the primary checkout's .venv (a worktree has none of its own;
-'     the primary is three levels up: <primary>\.claude\worktrees\<name>),
-'   - it marks the run a branch session (EVOLVER_BRANCH_SESSION=1), which is
-'     what points those user files at the live checkout and has the Evolver
-'     already running make way for it (see gui/branch_session.py),
-'   - it re-copies the primary's content.local.json every launch. Not once: the
-'     overlay is where library_root and project_roots live, so a copy taken
-'     weeks ago resolves a library that has moved, and the preview comes up on
-'     the committed example overlay with no library at all,
-'   - its own log lands in this worktree's state\ folder.
-' Named distinctly from launch_evolver.vbs on purpose: handed a launcher
-' sharing the usual Evolver's name, you click the one you run daily and review
-' the old code.
+' Rendered from [tool.haglio.launchers."launch_preview_branch.vbs"] in pyproject.toml.
+' Change the spec, then run  python -m app_support.launcher --write  in this
+' folder: the suite fails on a launcher that differs from its spec.
+
+Option Explicit
+
+Dim fso, shell, root, app, interpreter, directory, arguments, primary, logPath
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
+root = fso.GetParentFolderName(WScript.ScriptFullName)
+Decide
+If shell.Environment("Process").Item("HAGLIO_LAUNCHER_DRY_RUN") = "1" Then
+  Report
+Else
+  Launch
+End If
 
-projectRoot = fso.GetParentFolderName(WScript.ScriptFullName)
-stateDir = projectRoot & "\state"
-If Not fso.FolderExists(stateDir) Then fso.CreateFolder(stateDir)
-launcherLog = stateDir & "\preview_branch.log"
+Sub Decide()
+  app = "Evolver (branch preview)"
+  primary = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolderName(root)))
+  logPath = fso.BuildPath(root, "state\preview_branch.log")
+  arguments = """" & root & "\tray_app.py"" --show-window"
+  interpreter = fso.BuildPath(primary, ".venv\Scripts\pythonw.exe")
+  directory = root
+End Sub
 
-Function Quote(s)
-  Quote = Chr(34) & s & Chr(34)
+Sub Report()
+  WScript.Echo "app: " & app
+  WScript.Echo "primary: " & primary
+  WScript.Echo "interpreter: " & interpreter
+  WScript.Echo "directory: " & directory
+  WScript.Echo "arguments: " & arguments
+  WScript.Echo "log: " & logPath
+  WScript.Echo "environment: " & "EVOLVER_BRANCH_SESSION" & "=" & "1"
+  WScript.Echo "copy: " & fso.BuildPath(primary, "content.local.json") & " > " & fso.BuildPath(root, "content.local.json")
+  WScript.Echo "command: " & Command()
+End Sub
+
+Sub Launch()
+  If Not fso.FileExists(interpreter) Then
+    Refuse "The primary checkout's virtual environment is missing:" & vbCrLf & interpreter, vbCritical
+  End If
+  CopyFromPrimary "content.local.json"
+  shell.Environment("Process").Item("EVOLVER_BRANCH_SESSION") = "1"
+  logPath = FreeLog(logPath)
+  Note logPath, "===== " & Now & " launch: " & Command()
+  shell.Run Command(), 0, False
+End Sub
+
+Function Command()
+  Command = "cmd /c cd /d " & Quote(directory) & " && " & Quote(interpreter) & " " & arguments & " >> " & Quote(logPath) & " 2>&1"
 End Function
 
-' <primary>\.claude\worktrees\<this worktree> -> up three levels to the primary.
-primaryRoot = fso.GetParentFolderName(fso.GetParentFolderName(fso.GetParentFolderName(projectRoot)))
+Function Quote(text)
+  Quote = Chr(34) & text & Chr(34)
+End Function
 
-overlay = primaryRoot & "\content.local.json"
-If fso.FileExists(overlay) Then
-  fso.CopyFile overlay, projectRoot & "\content.local.json", True
-End If
+Sub Tell(message, icon)
+  If LCase(fso.GetFileName(WScript.FullName)) = "cscript.exe" Then
+    WScript.Echo "dialog: " & message
+  Else
+    MsgBox message, icon, app
+  End If
+End Sub
 
-' pythonw, not python: the tray is a GUI app and must not flash up a console.
-' The primary's venv and nothing else -- it is where the siblings this app was
-' built against are installed, so the preview runs the versions the usual one
-' runs rather than whatever sits in the workspace folder.
-pythonExe = primaryRoot & "\.venv\Scripts\pythonw.exe"
-If Not fso.FileExists(pythonExe) Then
-  MsgBox "The primary checkout's virtual environment is missing:" & vbCrLf & pythonExe, _
-         vbCritical, "Evolver (branch preview)"
+Sub Refuse(message, icon)
+  Tell message, icon
   WScript.Quit 1
-End If
+End Sub
 
-cmd = "cmd /c cd /d " & Quote(projectRoot) & " && set EVOLVER_BRANCH_SESSION=1&&" _
-      & Quote(pythonExe) & " tray_app.py --show-window 1>>" & Quote(launcherLog) & " 2>&1"
-shell.Run cmd, 0, False
+Function FreeLog(preferred)
+  Dim folder, candidate, index
+  folder = fso.GetParentFolderName(preferred)
+  If Not fso.FolderExists(folder) Then fso.CreateFolder folder
+  For index = 1 To 9
+    candidate = preferred
+    If index > 1 Then
+      candidate = fso.BuildPath(folder, fso.GetBaseName(preferred) & "-" & index & "." & fso.GetExtensionName(preferred))
+    End If
+    RollIfOversize candidate
+    If CanAppend(candidate) Then
+      FreeLog = candidate
+      Exit Function
+    End If
+  Next
+  FreeLog = preferred
+End Function
+
+Function CanAppend(path)
+  Dim stream
+  On Error Resume Next
+  Set stream = fso.OpenTextFile(path, 8, True)
+  CanAppend = (Err.Number = 0)
+  If CanAppend Then stream.Close
+  Err.Clear
+  On Error GoTo 0
+End Function
+
+Sub RollIfOversize(path)
+  On Error Resume Next
+  If fso.FileExists(path) Then
+    If fso.GetFile(path).Size > 1000000 Then
+      If fso.FileExists(path & ".1") Then fso.DeleteFile path & ".1"
+      fso.MoveFile path, path & ".1"
+    End If
+  End If
+  Err.Clear
+  On Error GoTo 0
+End Sub
+
+Sub Note(path, line)
+  Dim stream
+  On Error Resume Next
+  Set stream = fso.OpenTextFile(path, 8, True)
+  stream.WriteLine line
+  stream.Close
+  Err.Clear
+  On Error GoTo 0
+End Sub
+
+Sub CopyFromPrimary(name)
+  If fso.FileExists(fso.BuildPath(primary, name)) Then
+    fso.CopyFile fso.BuildPath(primary, name), fso.BuildPath(root, name), True
+  End If
+End Sub
