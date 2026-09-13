@@ -9,12 +9,14 @@ from unittest.mock import patch
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QToolButton
 
-from backfill import vocabulary
-from backfill.vocabulary import Command
+from backfill.vocabulary import Act, Vocabulary
 from backfill.window import BackfillWindow
 
+# Fabricated, in the committed example's placeholder style.
+VOCABULARY = Vocabulary([Act("alpha", "Alpha"), Act("beta", "Beta"), Act("dance", "Dancing")])
 
-def _every_grid_command():
+
+def _every_grid_command(vocabulary):
     groups = [*vocabulary.scoped_grid(), vocabulary.control_commands()]
     return [command for group in groups for command in group]
 
@@ -46,8 +48,8 @@ class FakeSession:
 
 
 class TestBackfillWindow(unittest.TestCase):
-    def _window(self, session):
-        window = BackfillWindow(session)
+    def _window(self, session, vocabulary=VOCABULARY):
+        window = BackfillWindow(session, vocabulary)
         self.addCleanup(window.close)
         self.addCleanup(window.deleteLater)
         return window
@@ -183,12 +185,20 @@ class TestBackfillWindow(unittest.TestCase):
         self.assertIn("1 remaining", window.status_text())
         self.assertEqual(window.last_text(), "Last: undid a_topaz.mp4 → Dancing")
 
-    def test_the_window_is_built_from_a_session_and_its_thumbnails(self):
+    def test_the_window_is_built_from_a_session_its_vocabulary_and_its_thumbnails(self):
         """It is the top-level window of its own process — nothing owns it, so
         there is no parent to take."""
         self.assertEqual(
             list(inspect.signature(BackfillWindow.__init__).parameters)[1:],
-            ["session", "thumbnails"],
+            ["session", "vocabulary", "thumbnails"],
+        )
+
+    def test_the_tiles_are_the_commands_of_the_vocabulary_it_was_handed(self):
+        window = self._window(FakeSession([Path("a_topaz.mp4")]), Vocabulary([Act("kappa", "Kappa")]))
+
+        self.assertEqual(
+            sorted(tile.text() for tile in window.findChildren(QToolButton)),
+            ["POV Kappa", "Same", "Side Kappa", "Skip", "Undo", "Weird"],
         )
 
     def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
@@ -196,25 +206,20 @@ class TestBackfillWindow(unittest.TestCase):
 
         self.assertEqual(
             {command.phrase: window.tile_for(command.phrase).text()
-             for command in _every_grid_command()},
-            {command.phrase: command.label for command in _every_grid_command()},
+             for command in _every_grid_command(VOCABULARY)},
+            {command.phrase: command.label for command in _every_grid_command(VOCABULARY)},
         )
 
     def test_every_command_keeps_its_own_tile(self):
         """One command's phrase can equal another's label: the vocabulary is
         private and its acts are named by the user, so a spoken "dancing" and
-        an act labelled "Dancing" can coexist. Neither may take the other's
+        an act labeled "Dancing" can coexist. Neither may take the other's
         tile — the phrase would click the wrong act, and the example frame
         would land on the wrong face."""
-        shadowing = [[
-            Command("side dancing", "Side Dance Move"),
-            Command("side dance", "Side Dancing"),
-        ]]
-        with patch("backfill.window.scoped_grid", return_value=shadowing), \
-             patch("backfill.window.control_commands", return_value=[]):
-            window = self._window(FakeSession([Path("a_topaz.mp4")]))
+        shadowing = Vocabulary([Act("dancing", "Dance Move"), Act("dance", "Dancing")])
+        window = self._window(FakeSession([Path("a_topaz.mp4")]), shadowing)
 
-        for command in shadowing[0]:
+        for command in _every_grid_command(shadowing):
             self.assertEqual(window.tile_for(command.phrase).text(), command.label)
             self.assertEqual(window.tile_for(command.label).text(), command.label)
 
@@ -276,7 +281,8 @@ class TestBackfillWindow(unittest.TestCase):
     def test_thumbnails_passed_at_construction_land_on_their_tiles(self):
         with tempfile.TemporaryDirectory() as tmp:
             window = BackfillWindow(
-                FakeSession([Path("a_topaz.mp4")]), thumbnails={"Side Beta": str(self._png(tmp))}
+                FakeSession([Path("a_topaz.mp4")]), VOCABULARY,
+                thumbnails={"Side Beta": str(self._png(tmp))},
             )
             self.addCleanup(window.close)
             self.addCleanup(window.deleteLater)

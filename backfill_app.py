@@ -52,7 +52,7 @@ def main() -> int:
     vocabulary = load_vocabulary()
     session = BackfillSession(BackfillQueue(clips), worker, vocabulary)
 
-    window = BackfillWindow(session, thumbnails=_ready_thumbnails(scan))
+    window = BackfillWindow(session, vocabulary, thumbnails=_ready_thumbnails(scan))
 
     listener = VoiceListener(grammar_phrases(), parent=window)
     listener.heard.connect(window.on_phrase)
