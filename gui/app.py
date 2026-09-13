@@ -6,6 +6,7 @@ import ctypes
 import logging
 import subprocess
 import sys
+import time
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
@@ -21,6 +22,7 @@ from gui.run_record import RunRecord, format_run_label, load_runs
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
+from gui.sign_in_notice import SignInNotice
 from gui.single_instance import InstanceGateway
 from gui.stats_window import StatsWindow
 from gui.tray import EvolverTray
@@ -80,6 +82,7 @@ class EvolverApp:
         self._stats_window: StatsWindow | None = None
         self._log_window: RunLogWindow | None = None
         self._instance = InstanceGateway()
+        self._sign_in_notice = SignInNotice()
 
         # Parks and thaws the in-flight non-AI encode between the slow pipeline
         # ticks, so returning to the machine suspends it in seconds. Reads the
@@ -290,6 +293,7 @@ class EvolverApp:
             else QSystemTrayIcon.MessageIcon.Warning,
             5000,
         )
+        self._sign_in_notice.after_run(record, time.monotonic())
 
     def _on_error(self, message: str):
         self._notify(f"Pipeline error: {message}",

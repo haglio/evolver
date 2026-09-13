@@ -106,6 +106,8 @@ def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**1
             patch("util.processes.pids_of_image", return_value=list(topaz_pids))),
         "command_line": stack.enter_context(
             patch("util.processes.command_line", return_value=cmdline)),
+        "sign_in_expired": stack.enter_context(
+            patch("util.topaz.sign_in_expired", return_value=False)),
     }
     return stack, mocks
 
@@ -240,6 +242,32 @@ class TestStartGuards(unittest.TestCase):
             self.assertEqual(result.started, "")
             self.assertEqual(result.start_deferred, "user_present")
             mocks["popen"].assert_not_called()
+
+    def test_an_expired_topaz_sign_in_defers_the_start(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            self._one_candidate(overrides)
+
+            stack, mocks = probes()
+            mocks["sign_in_expired"].return_value = True
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "")
+            self.assertEqual(result.start_deferred, "topaz_sign_in_expired")
+            mocks["popen"].assert_not_called()
+
+    def test_the_sign_in_is_only_checked_when_nothing_else_holds_the_start(self):
+        for held in (dict(topaz_pids=(31337,)), dict(idle_seconds=5.0)):
+            with self.subTest(held=sorted(held)), workspace_temp_dir() as root:
+                overrides = library_overrides(root)
+                self._one_candidate(overrides)
+
+                stack, mocks = probes(**held)
+                with override_config(**overrides), stack:
+                    nonai_upscale.run(allow_start=True)
+
+                mocks["sign_in_expired"].assert_not_called()
 
     def test_an_idled_out_user_allows_the_start(self):
         with workspace_temp_dir() as root:

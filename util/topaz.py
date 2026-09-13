@@ -1,14 +1,20 @@
-"""How both upscale stages run Topaz: the recipes, and the ffmpeg invocation that carries one."""
+"""How both upscale stages run Topaz: the recipes, the ffmpeg invocation that carries one, and whether Topaz's sign-in has expired."""
 
 from __future__ import annotations
 
+import logging
 import os
 import re
+import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from app_support.subprocess_utils import hidden_subprocess_kwargs
+
 import config
 from util import orientation
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -77,6 +83,18 @@ RECIPES = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE)
 # been reworded while the recipe stayed the same.
 _CLOSING_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
 
+SIGN_IN_EXPIRED = "topaz_sign_in_expired"
+
+# What Topaz's own program prints, at its verbose log level only, when the
+# sign-in the Topaz Video app saved for it has run out -- and, when renewing it
+# fails, that it is about to watermark everything it makes.
+_EXPIRED_SIGN_IN_MESSAGES = (
+    "Authentication token expired",
+    "Authentication Failure",
+    "Watermark will be enabled",
+)
+_SIGN_IN_CHECK_TIMEOUT_SECONDS = 90
+
 
 def recipe_noted(note: str) -> Recipe | None:
     """The recipe whose note Topaz wrote into a file is *note*, or None."""
@@ -109,7 +127,7 @@ def command(in_file: Path, out_file: Path, recipe: Recipe) -> list[str]:
         raise ValueError(f"{recipe.name} aims at a frame: turn it to the video with framed()")
     audio_args = ["-c:a", "aac", "-b:a", "192k"] if recipe.keep_audio else ["-an"]
     return [
-        str(config.FFMPEG),
+        _ffmpeg(),
         "-hide_banner", "-nostdin", "-y",
         "-strict", "2",
         "-hwaccel", "cuda",
@@ -140,3 +158,30 @@ def command(in_file: Path, out_file: Path, recipe: Recipe) -> list[str]:
         "-f", "mp4",
         str(out_file),
     ]
+
+
+def sign_in_expired() -> bool:
+    try:
+        check = subprocess.run(_sign_in_check_command(), env=environment(), capture_output=True,
+                               text=True, errors="replace", check=False,
+                               timeout=_SIGN_IN_CHECK_TIMEOUT_SECONDS,
+                               **hidden_subprocess_kwargs())
+    except (OSError, subprocess.TimeoutExpired):
+        log.warning("Could not ask Topaz whether its sign-in has expired.", exc_info=True)
+        return False
+    return any(message in check.stderr for message in _EXPIRED_SIGN_IN_MESSAGES)
+
+
+# A real encode at the verbose log level crashes Topaz's ffmpeg a few seconds
+# in, after it has printed the sign-in lines, so the check is a clip of its own.
+def _sign_in_check_command() -> list[str]:
+    return [
+        _ffmpeg(), "-hide_banner", "-nostdin", "-loglevel", "verbose",
+        "-f", "lavfi", "-i", "color=c=gray:s=576x384:r=30:d=0.2",
+        "-vf", "tvai_up=model=iris-2:scale=2:device=0:vram=0.5:instances=0",
+        "-f", "null", "-",
+    ]
+
+
+def _ffmpeg() -> str:
+    return str(config.FFMPEG)

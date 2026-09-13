@@ -45,7 +45,7 @@ from tasks import (
     video_types,
     watch_weights,
 )
-from util import processes, run_log, system_resources
+from util import processes, run_log, system_resources, topaz
 
 
 @dataclass
@@ -268,6 +268,11 @@ def run_pipeline(
             log.info("Skipping upscale because CPU usage is above the configured threshold.")
             upscale_skipped = True
             _skip_stage("upscale", "cpu_busy")
+        elif topaz.sign_in_expired():
+            log.info("Skipping upscale: Topaz's sign-in has expired, and Topaz can watermark "
+                     "what it makes until someone signs in to the Topaz Video app.")
+            upscale_skipped = True
+            _skip_stage("upscale", topaz.SIGN_IN_EXPIRED)
         else:
             upscale_kwargs: dict = dict(
                 priority_files=priority_files, max_items=config.UPSCALE_BATCH_LIMIT,

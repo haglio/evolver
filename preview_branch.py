@@ -44,16 +44,23 @@ import config
 from evolver import PipelineResult, StageRecord
 from gui.main_window import EvolverMainWindow
 from gui.run_record import RunRecord, save_run
+from gui.sign_in_notice import SignInNotice
 from tasks import nonai_progress
 from tasks.nonai_queue import collect_candidates
 from tasks.nonai_upscale import NonAiUpscaleResult
-from util import crash_log, sidecar, video_type
+from util import crash_log, processes, sidecar, topaz, video_type
 from util.ffprobe import duration_seconds
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
 from util.variants import is_processed_stem
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+
+
+def sign_in_deferral() -> str:
+    if processes.count_running(config.FFMPEG) or not topaz.sign_in_expired():
+        return ""
+    return topaz.SIGN_IN_EXPIRED
 
 
 def primary_checkout(project_root: Path = PROJECT_ROOT) -> Path:
@@ -133,6 +140,7 @@ def nonai_upscale_report(preview_metadata: Path, primary: Path) -> StageRecord:
         percent_complete=progress.percent,
         remaining_seconds=progress.remaining_seconds,
         unmeasured_videos=progress.unmeasured,
+        start_deferred=sign_in_deferral(),
     )
     return StageRecord(name="upscale_non_ai", status="completed",
                        duration_seconds=time.monotonic() - started, result=result)
@@ -175,10 +183,11 @@ def main() -> int:
     """
     crash_log.install_excepthook()
     config.RUNS_DIR = PROJECT_ROOT / "runs"
-    save_run(preview_record(PROJECT_ROOT / "state" / "preview-metadata",
-                            primary_checkout()), config.RUNS_DIR)
+    record = preview_record(PROJECT_ROOT / "state" / "preview-metadata", primary_checkout())
+    save_run(record, config.RUNS_DIR)
 
     app = QApplication(sys.argv)
+    SignInNotice().after_run(record, time.monotonic())
     window = EvolverMainWindow()
     window.setWindowTitle(f"Evolver — preview of {branch_name()}")
     for action in (window.run_now_action, window.settings_action, window.stats_action,

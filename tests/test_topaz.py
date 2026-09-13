@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 import config
 from util import orientation, topaz
@@ -101,6 +103,49 @@ class TestEnvironment(unittest.TestCase):
         env = topaz.environment()
         self.assertEqual(env["TVAI_MODEL_DIR"], str(config.TVAI_MODEL_DIR))
         self.assertEqual(env["TVAI_MODEL_DATA_DIR"], str(config.TVAI_MODEL_DIR))
+
+
+def topaz_check_reporting(log: str):
+    return patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, "", log))
+
+
+class TestSignInExpired(unittest.TestCase):
+    def test_topaz_saying_its_sign_in_token_expired_means_the_sign_in_expired(self):
+        log = ("INFO:  Authentication token expired\n"
+               "INFO:  Will attempt to refresh\n"
+               "INFO:  Refresh succeeded. Reusing existing license.\n")
+        with topaz_check_reporting(log):
+            self.assertTrue(topaz.sign_in_expired())
+
+    def test_topaz_failing_to_authenticate_or_turning_its_watermark_on_means_the_same(self):
+        for log in ("ERROR: Authentication Failure: login to your account using the login tool\n",
+                    "WARNING: Refresh failed. Watermark will be enabled\n"):
+            with self.subTest(log=log), topaz_check_reporting(log):
+                self.assertTrue(topaz.sign_in_expired())
+
+    def test_a_check_that_reports_no_expiry_means_the_sign_in_is_good(self):
+        with topaz_check_reporting("INFO:  Relogin valid\nINFO:  Auth Check Watermark: 0 0 0\n"):
+            self.assertFalse(topaz.sign_in_expired())
+
+    def test_the_check_is_a_tiny_verbose_topaz_run_with_no_window_and_a_time_limit(self):
+        with topaz_check_reporting("") as run:
+            topaz.sign_in_expired()
+
+        argv, kwargs = run.call_args.args[0], run.call_args.kwargs
+        self.assertEqual(argv[0], str(config.FFMPEG))
+        self.assertEqual(argv[argv.index("-loglevel") + 1], "verbose")
+        self.assertIn("tvai_up", argv[argv.index("-vf") + 1])
+        self.assertEqual(argv[-3:], ["-f", "null", "-"])
+        self.assertEqual(kwargs["env"]["TVAI_MODEL_DIR"], str(config.TVAI_MODEL_DIR))
+        self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
+        self.assertGreater(kwargs["timeout"], 0)
+
+    def test_a_check_that_cannot_run_does_not_claim_the_sign_in_expired(self):
+        for failure in (OSError("no ffmpeg"), subprocess.TimeoutExpired("ffmpeg", 90)):
+            with self.subTest(failure=failure), \
+                 patch("subprocess.run", side_effect=failure), \
+                 self.assertLogs("util.topaz", level="WARNING"):
+                self.assertFalse(topaz.sign_in_expired())
 
 
 if __name__ == "__main__":
