@@ -70,7 +70,8 @@ class NonAiUpscaleResult:
     suspended: bool = False  # the in-flight encode is frozen because the user is present
     promoted: str = ""
     stopped: str = ""
-    # "user_present" | "topaz_busy" | "low_ram" | "cooldown" when a start was held back
+    # "user_present" | "topaz_busy" | "low_ram" | "cooldown" | "topaz_sign_in_expired"
+    # when a start was held back
     start_deferred: str = ""
     failed: str = ""  # the clip whose encode died or came up short, if any
     pending: int = 0
@@ -108,7 +109,7 @@ class StartAttempt:
     """What trying to start the next encode came to, this tick.
 
     Either a clip was started, or it was held back -- ``deferred`` naming which
-    of the machine's four reasons, and ``deferred_low_disk`` the one that is
+    of the machine's five reasons, and ``deferred_low_disk`` the one that is
     about the library's drive rather than the machine's load.
     """
 
@@ -454,6 +455,8 @@ def _machine_busy_reason(cooldown_file: Path, settings: EncodeSettings) -> str:
     if (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
             < settings.cooldown_minutes * 60):
         return "cooldown"
+    if topaz.sign_in_expired():
+        return topaz.SIGN_IN_EXPIRED
     return ""
 
 

@@ -208,6 +208,23 @@ class TestToastPolicy:
         assert toast.call_count == 3
 
 
+class TestTopazSignInNotice:
+    def test_a_finished_run_held_back_for_the_topaz_sign_in_tells_the_user(self, request):
+        from gui.run_record import RunRecord
+        app = build_evolver_app(request)
+        record = RunRecord(
+            id="r", started_at="2026-01-01T00:00:00", finished_at="2026-01-01T00:00:10",
+            duration_seconds=10.0, trigger="scheduled", status="success",
+            stages=[{"name": "upscale", "status": "skipped", "duration_seconds": 0.0,
+                     "result": None, "skip_reason": "topaz_sign_in_expired"}],
+        )
+
+        with patch("gui.sign_in_notice.show_error") as show_error:
+            app._on_finished(record)
+
+        show_error.assert_called_once()
+
+
 class TestStatsWindowLifetime:
     def test_a_second_stats_window_takes_the_first_one_down(self, request):
         """The dialog is parented to the main window, so one replaced without

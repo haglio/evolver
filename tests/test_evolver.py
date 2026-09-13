@@ -49,6 +49,7 @@ def _stage_mocks() -> dict:
         "has_pending_work": Mock(return_value=False),
         "should_skip_cpu": Mock(return_value=False),
         "count_running": Mock(return_value=0),
+        "topaz_sign_in_expired": Mock(return_value=False),
     }
 
 
@@ -73,6 +74,7 @@ _STAGE_PATCHES = [
     ("evolver.upscale.has_pending_work", "has_pending_work"),
     ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
     ("evolver.processes.count_running", "count_running"),
+    ("util.topaz.sign_in_expired", "topaz_sign_in_expired"),
     ("evolver.prompt_scrape.run", "prompt_scrape_run"),
 ]
 
@@ -368,6 +370,27 @@ class TestRunPipeline:
         upscale_stage = next(s for s in result.stages if s.name == "upscale")
         assert upscale_stage.status == "skipped"
         assert upscale_stage.skip_reason == "no_pending_work"
+
+    def test_upscaling_waits_with_its_reason_while_topaz_is_signed_out(self):
+        stack, mocks = self._patch_all_stages(
+            has_pending_work=Mock(return_value=True),
+            topaz_sign_in_expired=Mock(return_value=True),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+        upscale_stage = next(s for s in result.stages if s.name == "upscale")
+        assert upscale_stage.skip_reason == "topaz_sign_in_expired"
+        mocks["upscale_run"].assert_not_called()
+
+    def test_topaz_is_asked_about_its_sign_in_only_when_an_upscale_could_start(self):
+        for overrides in (
+            dict(has_pending_work=Mock(return_value=False)),
+            dict(has_pending_work=Mock(return_value=True), count_running=Mock(return_value=1)),
+        ):
+            stack, mocks = self._patch_all_stages(**overrides)
+            with stack:
+                evolver.run_pipeline()
+            mocks["topaz_sign_in_expired"].assert_not_called()
 
     def test_on_stage_start_called_for_each_stage(self):
         on_start = Mock()
