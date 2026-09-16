@@ -71,6 +71,20 @@ class TestPipelineWorker(unittest.TestCase):
 
         return started, completed, finished, errors, progress
 
+    def test_a_run_another_evolver_has_the_turn_for_says_why_it_did_not_start(self):
+        """Not a crash: a branch preview's Run Now landing on a scheduled run
+        is the ordinary case, and a traceback would bury the one line that says
+        what happened."""
+        from util.run_lock import Busy
+
+        with self.assertLogs("gui.worker", level="INFO") as logged:
+            _, _, finished, errors, _ = self._run_worker(
+                pipeline_error=Busy("another Evolver (process 42) is running the pipeline"))
+
+        self.assertEqual(finished, [])
+        self.assertEqual(errors, ["another Evolver (process 42) is running the pipeline"])
+        self.assertNotIn("Traceback", "\n".join(logged.output))
+
     def test_emits_stage_started_for_each_stage(self):
         started, _, _, _, _ = self._run_worker()
         self.assertEqual(started, ["sort", "upscale"])
