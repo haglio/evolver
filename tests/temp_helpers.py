@@ -109,6 +109,7 @@ class LaneLibrary:
         videos = root / "videos"
         self.library = videos / "videos"
         self.ai = self.library / "2D" / "AI"
+        self.inbox = self.ai / "0_inbox"
         self.sorted_dir = self.ai / "1_sorted"
         self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
         self.non_ai = self.library / "2D" / "non_AI"
@@ -121,7 +122,8 @@ class LaneLibrary:
     def config(self, genau_source="example-loop-clips", **extra):
         settings = {
             "VIDEO_LIBRARY_DIR": self.library, "VIDEO_SEARCH_ROOT": self.search_root,
-            "METADATA_DIR": self.metadata, "SORTED_DIR": self.sorted_dir,
+            "METADATA_DIR": self.metadata, "INBOX_DIR": self.inbox,
+            "SORTED_DIR": self.sorted_dir,
             "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
             "WEIRD_DIR": self.weird,
             "GENAU_CLIPS_DIR": self.genau_clips, "GENAU_SOURCE": genau_source,

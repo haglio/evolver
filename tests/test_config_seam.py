@@ -105,7 +105,6 @@ CONFIG_REFERENCE_LEDGER = {
     # how long an encode may run and how much of the machine it may take are
     # this app's policy, not anything the machine or the overlay says.
     "tasks/nonai_upscale.py": 14,
-    "tasks/origenerator_metadata.py": 1,
     "tasks/prompt_scrape.py": 5,
     # The name the non-AI lane gives its outputs, which is how a hand export
     # made before the stage existed is told from an original.
@@ -127,7 +126,20 @@ CONFIG_REFERENCE_LEDGER = {
     # The lane walk it used to do itself, and the stage that walks the lanes
     # after it to stamp the viewing on the same sidecars.
     "tasks/watch_weights.py": 9,
-    "util/lanes.py": 6,
+    # Every folder of this library a withdrawn clip can be sitting in by the time
+    # the withdrawal is read -- the inbox, 1_sorted, the outbox, both condemned
+    # piles -- plus the metadata tree its record mirrors into and the extensions
+    # that say which of a row's outputs is a video. A stage that deletes has to
+    # know the whole layout, which is exactly why the app that sent the clip
+    # cannot do it.
+    "tasks/withdrawn.py": 8,
+    # Two more: the Genau lane's folder name and where its clips are delivered,
+    # both read where the lane table is built rather than by the stage reading
+    # that table (tasks/withdrawn.py).
+    "util/lanes.py": 8,
+    # Origenerator's gallery file, read nowhere else now that both stages pulling
+    # from it come through here.
+    "util/origenerator_gallery.py": 1,
     "util/script_library.py": 3,
     "util/media_files.py": 1,
     "util/nonai_library.py": 5,
