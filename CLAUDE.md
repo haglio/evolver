@@ -11,7 +11,10 @@ running. It never runs the pipeline: Evolver's job is moving files in the one
 library and its non-AI stage supervises a detached encode by a pid in a file, so
 a second instance would move the same files and adopt the same encode. What each
 preview reports is one function per stage in `preview_branch.py`; add one there
-when a change makes a stage's report worth judging.
+when a change makes a stage's report worth judging. A change that adds a
+*window* is judged by opening it: the preview's own toolbar opens the upscale
+queue that way, on copies of the live records (`preview_files`), so nothing the
+window writes reaches the running app.
 
 The first launch after a change spends a couple of minutes measuring running
 times the library has not recorded yet, and later ones are immediate. The
