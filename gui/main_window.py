@@ -263,8 +263,9 @@ def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
     held back), so they read as a list rather than a single verdict.
     """
     parts = []
+    asked_for = " at your request" if result.get("on_request") else ""
     if result.get("started"):
-        parts.append(f"started {result['started']}")
+        parts.append(f"started {result['started']}{asked_for}")
     if result.get("in_flight"):
         parts.append(f"encoding {result['in_flight']} ({_encode_state(result)})")
     if result.get("promoted"):
@@ -310,6 +311,8 @@ def _encode_state(result: dict[str, Any]) -> str:
     state = "progress unknown" if percent is None else f"{percent}%"
     if result.get("suspended"):
         state += ", paused: you're at the machine"
+    if result.get("on_request"):
+        state += ", at your request"
     return state
 
 

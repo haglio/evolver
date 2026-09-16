@@ -291,6 +291,7 @@ class TestNonAiUpscaleSummary:
             "start_deferred": "", "failed": "", "pending": 395,
             "percent_complete": None, "remaining_seconds": 0.0,
             "unmeasured_videos": 0, "deferred_low_disk": False,
+            "on_request": False,
         }
         result.update(overrides)
         return _summarize_result(result, None, "upscale_non_ai")
@@ -326,6 +327,17 @@ class TestNonAiUpscaleSummary:
         summary = self._result(started="larkin/1 clips/Scene Three 9.mp4")
         assert "started" in summary
         assert "larkin/1 clips/Scene Three 9.mp4" in summary
+
+    def test_an_encode_you_asked_for_says_so_beside_its_progress(self):
+        """It is the one running while you are at the computer, which the row
+        would otherwise leave looking like a presence check that failed."""
+        summary = self._result(in_flight="larkin/1 clips/Delia Moss.mp4",
+                               in_flight_percent=12, on_request=True)
+        assert "encoding larkin/1 clips/Delia Moss.mp4 (12%, at your request)" in summary
+
+    def test_a_start_you_asked_for_says_so(self):
+        summary = self._result(started="larkin/1 clips/Scene Three 9.mp4", on_request=True)
+        assert "started larkin/1 clips/Scene Three 9.mp4 at your request" in summary
 
     def test_an_idle_stage_says_why_nothing_is_running(self):
         summary = self._result(start_deferred="cooldown")

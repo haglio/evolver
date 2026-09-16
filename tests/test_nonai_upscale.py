@@ -18,7 +18,7 @@ from tests.temp_helpers import (
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
-from util import provenance, sidecar, video_type
+from util import nonai_job, provenance, sidecar, video_type
 from util.media_files import partial_path
 
 STARTED_UNDER = provenance.reconstructed("evolver", recipe="non_ai_upscale",
@@ -27,7 +27,8 @@ STARTED_UNDER = provenance.reconstructed("evolver", recipe="non_ai_upscale",
 
 def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
               source=None, tmp_bytes=b"partial", suspended=False, suspended_at=0.0,
-              suspended_seconds=0.0, job_file=None, stamp=STARTED_UNDER):
+              suspended_seconds=0.0, job_file=None, stamp=STARTED_UNDER,
+              on_request=False):
     """A persisted in-flight job whose tmp file exists under the bucket.
 
     *job_file* writes the record somewhere other than the configured path, which
@@ -55,6 +56,8 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
     }
     if stamp is not None:
         job["provenance"] = stamp
+    if on_request:
+        job["on_request"] = True
     job_file = job_file or overrides["NONAI_JOB_STATE_FILE"]
     job_file.parent.mkdir(parents=True, exist_ok=True)
     job_file.write_text(json.dumps(job), encoding="utf-8")
@@ -315,6 +318,176 @@ class TestStartGuards(unittest.TestCase):
             self.assertEqual(result.start_deferred, "")
 
 
+def ask_for(overrides, video):
+    nonai_job.save_request(overrides["NONAI_REQUEST_FILE"], nonai_job.Request(video))
+
+
+def request_of(overrides):
+    return nonai_job.load_request(overrides["NONAI_REQUEST_FILE"])
+
+
+class TestRunStartsWhatYouAskedFor(unittest.TestCase):
+    """A video asked for from the queue window starts on the next run, even
+    while the user is at the computer -- that is what asking for it now means."""
+
+    def test_the_video_you_asked_for_starts_while_you_are_at_the_computer(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+            ask_for(overrides, "larkin/0 unsorted/b.mp4")
+
+            stack, mocks = probes(idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, take_requests=True)
+
+            self.assertEqual(result.started, "larkin/0 unsorted/b.mp4")
+            self.assertTrue(result.on_request)
+            mocks["popen"].assert_called_once()
+            self.assertIsNone(request_of(overrides))
+
+    def test_an_encode_of_another_video_is_stopped_to_make_way(self):
+        """The window stops it when the video is dropped; a run stops it too,
+        for the encode that was adopted or started after the ask."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            _busy, tmp, _out = write_job(root, overrides)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+            ask_for(overrides, "larkin/0 unsorted/b.mp4")
+
+            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, take_requests=True)
+
+            mocks["terminate"].assert_called_once_with(4242)
+            self.assertFalse(tmp.exists())
+            self.assertEqual(result.stopped, "larkin/0 unsorted/busy.mp4")
+            self.assertEqual(result.started, "larkin/0 unsorted/b.mp4")
+            self.assertTrue(result.on_request)
+
+    def test_a_machine_short_of_memory_holds_it_back_and_says_so(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+            ask_for(overrides, "larkin/0 unsorted/b.mp4")
+
+            stack, mocks = probes(available_ram=2.5)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, take_requests=True)
+
+            self.assertEqual((result.started, result.start_deferred), ("", "low_ram"))
+            mocks["popen"].assert_not_called()
+            self.assertEqual(request_of(overrides),
+                             nonai_job.Request("larkin/0 unsorted/b.mp4", held_back="low_ram"))
+
+    def test_the_breather_after_the_last_encode_does_not_hold_it_back(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+            ask_for(overrides, "larkin/0 unsorted/b.mp4")
+            nonai_job.stamp_encode_ended(overrides["NONAI_COOLDOWN_FILE"])
+
+            stack, _mocks = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, take_requests=True)
+
+            self.assertEqual(result.started, "larkin/0 unsorted/b.mp4")
+
+    def test_a_nearly_full_drive_holds_it_back_and_says_so(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+            ask_for(overrides, "larkin/0 unsorted/b.mp4")
+
+            stack, mocks = probes(free_bytes=10)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, take_requests=True)
+
+            self.assertEqual(result.started, "")
+            self.assertTrue(result.deferred_low_disk)
+            mocks["popen"].assert_not_called()
+            self.assertEqual(request_of(overrides).held_back, "low_disk")
+
+    def test_a_video_that_has_left_the_queue_stops_being_waited_for(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+            ask_for(overrides, "larkin/0 unsorted/gone.mp4")
+
+            stack, mocks = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, take_requests=True)
+
+            self.assertEqual(result.started, "")
+            mocks["popen"].assert_not_called()
+            self.assertIsNone(request_of(overrides))
+
+    def test_new_ai_clips_still_waiting_go_first(self):
+        """An AI clip takes a minute and an asked-for encode takes hours, and
+        once it runs no AI clip can until it ends."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+            ask_for(overrides, "larkin/0 unsorted/b.mp4")
+
+            stack, mocks = probes()
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, take_requests=True,
+                                           ai_waiting=True)
+
+            self.assertEqual((result.started, result.start_deferred),
+                             ("", "ai_clips_waiting"))
+            mocks["popen"].assert_not_called()
+            self.assertEqual(request_of(overrides).held_back, "ai_clips_waiting")
+
+
+class TestAnEncodeYouAskedForRunsOn(unittest.TestCase):
+    """Presence parks the encodes Evolver picked for itself. The one the user
+    asked for is the exception: it was wanted while they were at the computer."""
+
+    def test_a_present_user_does_not_park_it(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, on_request=True)
+
+            stack, mocks = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, presence_managed=True)
+
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
+            self.assertFalse(result.suspended)
+            self.assertTrue(result.on_request)
+            mocks["suspend"].assert_not_called()
+
+    def test_the_fast_presence_poll_leaves_it_alone_too(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, on_request=True)
+
+            stack, mocks = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                changed = nonai_upscale.throttle_to_presence()
+
+            self.assertEqual(changed, "")
+            mocks["suspend"].assert_not_called()
+
+    def test_the_idle_time_toggle_being_off_does_not_kill_it(self):
+        """Off means Evolver picks nothing of its own; it does not take back a
+        video the user asked for while it was off."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            _source, tmp, _out = write_job(root, overrides, on_request=True)
+
+            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False, stop=True)
+
+            self.assertEqual(result.in_flight, "larkin/0 unsorted/busy.mp4")
+            self.assertEqual(result.stopped, "")
+            mocks["terminate"].assert_not_called()
+            self.assertTrue(tmp.exists())
+
+
 class TestRunStopsAJob(unittest.TestCase):
     def test_stop_kills_the_running_encode_without_penalizing_the_video(self):
         with workspace_temp_dir() as root:
@@ -382,6 +555,23 @@ class TestTheJobFilesKeys(unittest.TestCase):
             written = json.loads(
                 overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
             self.assertEqual(set(written), JOB_KEYS_AT_START)
+
+    def test_an_encode_started_on_request_adds_only_the_mark_that_says_so(self):
+        """The mark is what keeps presence and the toggle off it, on every run
+        and every presence poll until it ends."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+            ask_for(overrides, "larkin/0 unsorted/a.mp4")
+
+            stack, _ = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=False, take_requests=True)
+
+            written = json.loads(
+                overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertEqual(set(written), JOB_KEYS_AT_START | {"on_request"})
+            self.assertIs(written["on_request"], True)
 
     def test_an_adopted_encode_writes_exactly_these(self):
         from util import orientation, topaz

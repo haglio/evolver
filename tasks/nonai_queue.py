@@ -17,13 +17,13 @@ answer that no caller varies.
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 import config
 from util import script_library
+from util.json_reads import read_dict
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets, stage_dirs
 from util.variants import is_processed_stem, strip_processing_suffixes
@@ -96,11 +96,15 @@ def manifest_entries(path: Path) -> list[str]:
 
     One path per line; anything past a tab is the user's own note about why.
     """
+    return [video for video, _line in _manifest_lines(path)]
+
+
+def _manifest_lines(path: Path) -> list[tuple[str, str]]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return []
-    return [line.split("\t", 1)[0].strip() for line in lines if line.strip()]
+    return [(line.split("\t", 1)[0].strip(), line) for line in lines if line.strip()]
 
 
 def _upscale_ready_dirs(triage_dir: Path) -> list[Path]:
@@ -132,15 +136,9 @@ def _watch_scores(path: Path) -> dict[str, float]:
     (the main player) plays; satellite entries all point at the AI outbox and simply never
     match a non-AI candidate.
     """
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    if not isinstance(payload, dict):
-        return {}
     return {
         key: entry.get("completions", 0) + 3 * entry.get("locks", 0) - entry.get("skips", 0)
-        for key, entry in payload.items()
+        for key, entry in read_dict(path).items()
         if isinstance(entry, dict)
     }
 

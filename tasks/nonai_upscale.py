@@ -17,6 +17,11 @@ detached ffmpeg the moment they return (frozen, zero compute, resumed exactly
 where it left off). A fast GUI poll — ``throttle_to_presence`` — parks and
 thaws it between ticks so returning to the machine takes effect in seconds.
 
+A video asked for from the queue window is the one exception: it is wanted
+now, so it starts on the next run while the user is at the computer, the toggle
+off or the cooldown not yet over, and nothing parks it until it ends. Asking
+stops whatever other encode is in flight; that video keeps its place in line.
+
 Which clip is next, and why it beat the others, is
 :mod:`tasks.nonai_queue`'s, and how far through the whole project the library
 is, is :mod:`tasks.nonai_progress`'s; what is left here is the stage: repair,
@@ -61,6 +66,8 @@ log = logging.getLogger(__name__)
 # suspend/resume never races a supervise.
 _throttle_lock = threading.Lock()
 
+LOW_DISK = "low_disk"
+
 
 @dataclass
 class NonAiUpscaleResult:
@@ -70,8 +77,8 @@ class NonAiUpscaleResult:
     suspended: bool = False  # the in-flight encode is frozen because the user is present
     promoted: str = ""
     stopped: str = ""
-    # "user_present" | "topaz_busy" | "low_ram" | "cooldown" | "topaz_sign_in_expired"
-    # when a start was held back
+    # "user_present" | "topaz_busy" | "low_ram" | "ai_clips_waiting" | "cooldown"
+    # | "topaz_sign_in_expired" when a start was held back
     start_deferred: str = ""
     failed: str = ""  # the clip whose encode died or came up short, if any
     pending: int = 0
@@ -84,6 +91,9 @@ class NonAiUpscaleResult:
     # zero once the video-kinds stage has been over the library.
     unmeasured_videos: int = 0
     deferred_low_disk: bool = False
+    # Whether the encode in flight, or the one just started, was asked for from
+    # the queue window rather than picked by the stage.
+    on_request: bool = False
 
 
 @dataclass(frozen=True)
@@ -109,7 +119,7 @@ class StartAttempt:
     """What trying to start the next encode came to, this tick.
 
     Either a clip was started, or it was held back -- ``deferred`` naming which
-    of the machine's five reasons, and ``deferred_low_disk`` the one that is
+    of the machine's six reasons, and ``deferred_low_disk`` the one that is
     about the library's drive rather than the machine's load.
     """
 
@@ -132,14 +142,15 @@ class Conclusion:
 
 @dataclass(frozen=True)
 class StageFiles:
-    """The six files the stage touches, resolved once at its boundary.
+    """The seven files the stage touches, resolved once at its boundary.
 
-    Three it writes -- the job record, the attempt counter, the cooldown stamp
-    -- and three the queue reads: the skip and pin manifests, and Fun Time's
-    watch stats. Held as one record rather than threaded separately because
-    every function below is handed the same set, and six separate resolutions
-    put six conditionals in front of the code that supervises a live multi-hour
-    encode -- the one function here that most needs to read straight through.
+    Four it writes -- the job record, the attempt counter, the cooldown stamp,
+    the request from the queue window -- and three the queue reads: the skip
+    and pin manifests, and Fun Time's watch stats. Held as one record rather
+    than threaded separately because every function below is handed the same
+    set, and seven separate resolutions put seven conditionals in front of the
+    code that supervises a live multi-hour encode -- the one function here that
+    most needs to read straight through.
     """
 
     job: Path
@@ -148,37 +159,36 @@ class StageFiles:
     skip_manifest: Path
     pin_manifest: Path
     watch_stats: Path
+    request: Path
 
+    @classmethod
+    def configured(cls, *, job: Path | None = None, attempts: Path | None = None,
+                   cooldown: Path | None = None, skip_manifest: Path | None = None,
+                   pin_manifest: Path | None = None, watch_stats: Path | None = None,
+                   request: Path | None = None) -> StageFiles:
+        """Each path given, or the configured one where none was.
 
-def _configured_files(job_file: Path | None, attempts_file: Path | None,
-                      cooldown_file: Path | None, skip_manifest: Path | None,
-                      pin_manifest: Path | None,
-                      watch_stats_file: Path | None) -> StageFiles:
-    """Each argument, or the configured path when the caller named none.
-
-    The sentinel form -- ``x=None``, then ``config.X if x is None else x`` --
-    rather than signature defaults: a default is evaluated at import, which
-    would freeze whatever ``config`` held then and put the value out of reach
-    of ``override_config``, the seam every stage test steers with.
-    """
-    return StageFiles(
-        job=config.NONAI_JOB_STATE_FILE if job_file is None else job_file,
-        attempts=config.NONAI_ATTEMPTS_FILE if attempts_file is None else attempts_file,
-        cooldown=config.NONAI_COOLDOWN_FILE if cooldown_file is None else cooldown_file,
-        skip_manifest=(config.NONAI_SKIP_MANIFEST if skip_manifest is None
-                       else skip_manifest),
-        pin_manifest=(config.NONAI_PRIORITY_MANIFEST if pin_manifest is None
-                      else pin_manifest),
-        watch_stats=(config.FUN_TIME_WATCH_STATS_FILE if watch_stats_file is None
-                     else watch_stats_file),
-    )
+        Read from ``config`` here rather than as signature defaults: a default
+        is evaluated at import, which would put the value out of reach of
+        ``override_config``, the seam every stage test steers with.
+        """
+        return cls(
+            job=job or config.NONAI_JOB_STATE_FILE,
+            attempts=attempts or config.NONAI_ATTEMPTS_FILE,
+            cooldown=cooldown or config.NONAI_COOLDOWN_FILE,
+            skip_manifest=skip_manifest or config.NONAI_SKIP_MANIFEST,
+            pin_manifest=pin_manifest or config.NONAI_PRIORITY_MANIFEST,
+            watch_stats=watch_stats or config.FUN_TIME_WATCH_STATS_FILE,
+            request=request or config.NONAI_REQUEST_FILE,
+        )
 
 
 def run(allow_start: bool = True, stop: bool = False,
-        presence_managed: bool = False, *, job_file: Path | None = None,
+        presence_managed: bool = False, *, take_requests: bool = False,
+        ai_waiting: bool = False, job_file: Path | None = None,
         attempts_file: Path | None = None, cooldown_file: Path | None = None,
         skip_manifest: Path | None = None, pin_manifest: Path | None = None,
-        watch_stats_file: Path | None = None,
+        watch_stats_file: Path | None = None, request_file: Path | None = None,
         settings: EncodeSettings | None = None) -> NonAiUpscaleResult:
     """Check on the in-flight encode, then start the next one if the machine is free.
 
@@ -197,8 +207,10 @@ def run(allow_start: bool = True, stop: bool = False,
     is :class:`tasks.nonai_encode.EncodeSettings` -- six numbers this stage
     used to reach for off ``config`` one at a time.
     """
-    files = _configured_files(job_file, attempts_file, cooldown_file,
-                              skip_manifest, pin_manifest, watch_stats_file)
+    files = StageFiles.configured(
+        job=job_file, attempts=attempts_file, cooldown=cooldown_file,
+        skip_manifest=skip_manifest, pin_manifest=pin_manifest,
+        watch_stats=watch_stats_file, request=request_file)
     settings = EncodeSettings() if settings is None else settings
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
@@ -208,19 +220,28 @@ def run(allow_start: bool = True, stop: bool = False,
         if job is None:
             job = nonai_encode.adopt_orphan(files.job)
         _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
+        request = nonai_job.load_request(files.request) if take_requests else None
+        if job is not None and request is not None:
+            job, result.stopped = _make_way_for(request.video, job, files)
         if job is not None:
             supervised = _supervise(job, files, settings, stop=stop,
                                     presence_managed=presence_managed)
             result.in_flight = supervised.in_flight
             result.in_flight_percent = supervised.in_flight_percent
             result.suspended = supervised.suspended
-            result.stopped = supervised.stopped
+            result.stopped = result.stopped or supervised.stopped
             result.promoted = supervised.promoted
             result.failed = supervised.failed
             result.deferred_low_disk = supervised.deferred_low_disk
+            result.on_request = bool(result.in_flight and job.get("on_request"))
 
-        if not result.in_flight and allow_start and not stop:
+        attempt = None
+        if not result.in_flight and request is not None:
+            attempt = _start_requested(request, files, settings, ai_waiting=ai_waiting)
+            result.on_request = bool(attempt.started)
+        elif not result.in_flight and allow_start and not stop:
             attempt = _start_next_candidate(files, settings)
+        if attempt is not None:
             result.started = attempt.started
             result.start_deferred = attempt.deferred
             result.deferred_low_disk |= attempt.deferred_low_disk
@@ -264,14 +285,14 @@ def throttle_to_presence(*, job_file: Path | None = None,
     nothing changed. Starting a new encode stays with the pipeline tick, which
     has the candidate scan and resource checks; this only parks and thaws.
     """
-    job_file = config.NONAI_JOB_STATE_FILE if job_file is None else job_file
+    job_file = StageFiles.configured(job=job_file).job
     settings = EncodeSettings() if settings is None else settings
     with _throttle_lock:
         job = nonai_job.load_job(job_file)
         if job is None:
             return ""
         pid = job.get("pid", 0)
-        if not pid or not processes.is_running(pid):
+        if not pid or not processes.is_running(pid) or job.get("on_request"):
             return ""
         present = _user_present(settings)
         if present and not job.get("suspended"):
@@ -294,7 +315,8 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
     pid = job.get("pid", 0)
     source = Path(job.get("source", ""))
     if pid and processes.is_running(pid):
-        if stop:
+        on_request = bool(job.get("on_request"))
+        if stop and not on_request:
             return Supervision(
                 stopped=_stop_in_flight(job, "the non-AI upscale toggle is off", files))
         if _is_low_disk():
@@ -305,11 +327,11 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
                 stopped=_stop_in_flight(
                     job, "free disk fell below the safety floor mid-encode", files),
             )
-        if presence_managed and _user_present(settings):
+        if presence_managed and not on_request and _user_present(settings):
             nonai_encode.suspend_job(job, files.job)
             return Supervision(in_flight=relpath(source), suspended=True,
                                in_flight_percent=nonai_encode.percent_encoded(job))
-        if presence_managed:
+        if presence_managed or on_request:
             nonai_encode.resume_job(job, files.job)  # a no-op unless it was frozen
         if not nonai_encode.overran(job, settings):
             return Supervision(in_flight=relpath(source),
@@ -333,6 +355,29 @@ def _stop_in_flight(job: dict, reason: str, files: StageFiles) -> str:
     nonai_job.clear_job(files.job)
     log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
     return relpath(source)
+
+
+def _make_way_for(video: str, job: dict, files: StageFiles) -> tuple[dict | None, str]:
+    """The job left in flight once *video* has the machine, and what was stopped.
+
+    An encode that has already ended is left alone for supervision to conclude:
+    it may be a finished upscale.
+    """
+    if not (job.get("pid") and processes.is_running(job["pid"])):
+        return job, ""
+    if relpath(Path(job["source"])) == video:
+        _take_over(job, files)
+        nonai_job.clear_request(files.request)
+        return job, ""
+    return None, _stop_in_flight(job, "you asked for another video now", files)
+
+
+def _take_over(job: dict, files: StageFiles) -> None:
+    """Let the encode already running stand as the one that was asked for."""
+    nonai_encode.resume_job(job, files.job)  # a no-op unless the user's presence froze it
+    job["on_request"] = True
+    nonai_job.save_job(files.job, job)
+    log.info("The encode of %s runs on: it is the one asked for.", job.get("source"))
 
 
 def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclusion:
@@ -389,37 +434,63 @@ def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartA
         return StartAttempt(deferred=busy)
 
     for candidate in _collect(files):
-        source = candidate.path
-        expected_duration = ffprobe.duration_seconds(source)
-        orient = ffprobe.orientation_of(source)
-        if ffprobe.videoai_tag(source):
-            add_to_skip_manifest(files.skip_manifest, source,
-                                 "already carries a Topaz videoai tag")
-            continue
-        if expected_duration is None or orient == orientation.UNKNOWN:
-            add_to_skip_manifest(files.skip_manifest, source,
-                                 "ffprobe could not read duration or orientation")
-            continue
-
-        out = _output_path(candidate)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        tmp = partial_path(out, source.stem)
-        nonai_job.bump_attempts(files.attempts, relpath(source))
-        pid = nonai_encode.launch(source, tmp, orient)
-        nonai_job.save_job(files.job, {
-            "pid": pid,
-            "source": str(source),
-            "tmp": str(tmp),
-            "out": str(out),
-            "expected_duration": expected_duration,
-            "started_at": time.time(),
-            "provenance": provenance.by_evolver(recipe=topaz.NON_AI_UPSCALE.name,
-                                                recipe_version=topaz.NON_AI_UPSCALE.version),
-        })
-        log.info("Started detached non-AI upscale (pid %d): %s -> %s", pid, source, out)
-        return StartAttempt(started=relpath(source))
-
+        if _launch(candidate, files):
+            return StartAttempt(started=relpath(candidate.path))
     return StartAttempt()
+
+
+def _start_requested(request: nonai_job.Request, files: StageFiles,
+                     settings: EncodeSettings, *, ai_waiting: bool) -> StartAttempt:
+    low_disk = _is_low_disk()
+    busy = LOW_DISK if low_disk else _machine_busy_reason(
+        files.cooldown, settings, asked_for=True, ai_waiting=ai_waiting)
+    if busy:
+        log.info("Holding back the non-AI upscale asked for: %s.", busy)
+        nonai_job.save_request(files.request, nonai_job.Request(request.video, held_back=busy))
+        return StartAttempt(deferred="" if low_disk else busy, deferred_low_disk=low_disk)
+    candidate = next((candidate for candidate in _collect(files)
+                      if relpath(candidate.path) == request.video), None)
+    nonai_job.clear_request(files.request)
+    if candidate is None or not _launch(candidate, files, on_request=True):
+        return StartAttempt()
+    return StartAttempt(started=request.video)
+
+
+def _launch(candidate: Candidate, files: StageFiles, *, on_request: bool = False) -> bool:
+    """Start *candidate*'s encode, or retire it to the skip manifest unstarted."""
+    source = candidate.path
+    expected_duration = ffprobe.duration_seconds(source)
+    orient = ffprobe.orientation_of(source)
+    if ffprobe.videoai_tag(source):
+        add_to_skip_manifest(files.skip_manifest, source,
+                             "already carries a Topaz videoai tag")
+        return False
+    if expected_duration is None or orient == orientation.UNKNOWN:
+        add_to_skip_manifest(files.skip_manifest, source,
+                             "ffprobe could not read duration or orientation")
+        return False
+
+    out = _output_path(candidate)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = partial_path(out, source.stem)
+    nonai_job.bump_attempts(files.attempts, relpath(source))
+    pid = nonai_encode.launch(source, tmp, orient)
+    job = {
+        "pid": pid,
+        "source": str(source),
+        "tmp": str(tmp),
+        "out": str(out),
+        "expected_duration": expected_duration,
+        "started_at": time.time(),
+        "provenance": provenance.by_evolver(recipe=topaz.NON_AI_UPSCALE.name,
+                                            recipe_version=topaz.NON_AI_UPSCALE.version),
+    }
+    if on_request:
+        job["on_request"] = True
+    nonai_job.save_job(files.job, job)
+    log.info("Started detached non-AI upscale (pid %d%s): %s -> %s",
+             pid, ", asked for" if on_request else "", source, out)
+    return True
 
 
 def _output_path(candidate: Candidate) -> Path:
@@ -437,7 +508,8 @@ def _is_low_disk() -> bool:
     return free_gb < config.LOW_DISK_WARNING_GB
 
 
-def _machine_busy_reason(cooldown_file: Path, settings: EncodeSettings) -> str:
+def _machine_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
+                         asked_for: bool = False, ai_waiting: bool = False) -> str:
     """Why the machine cannot take a new encode right now — "" when it can.
 
     A present user comes first: an unattended multi-hour encode has no business
@@ -445,15 +517,21 @@ def _machine_busy_reason(cooldown_file: Path, settings: EncodeSettings) -> str:
     orphaned encode or the user's own GUI export — already owns the GPU, and CPU
     sampling never sees that. RAM and a post-encode cooldown keep an unattended
     night from running the machine flat out end to end.
+
+    A video *asked_for* from the queue window is wanted now, so the user being
+    at the computer and the cooldown do not hold it back; the rest still do, and
+    so do new AI clips still *ai_waiting*, since none of them can run beside it.
     """
-    if _user_present(settings):
+    if not asked_for and _user_present(settings):
         return "user_present"
     if processes.pids_of_image(config.FFMPEG):
         return "topaz_busy"
     if system_resources.available_ram_gb() < settings.min_available_ram_gb:
         return "low_ram"
-    if (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
-            < settings.cooldown_minutes * 60):
+    if ai_waiting:
+        return "ai_clips_waiting"
+    if not asked_for and (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
+                          < settings.cooldown_minutes * 60):
         return "cooldown"
     if topaz.sign_in_expired():
         return topaz.SIGN_IN_EXPIRED

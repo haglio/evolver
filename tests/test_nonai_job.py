@@ -1,4 +1,4 @@
-"""The three JSON files the non-AI upscale stage keeps its state in.
+"""The four JSON files the non-AI upscale stage keeps its state in.
 
 Every function here takes the file it works on, so this module reads no
 ``config`` at all and a test needs nothing but a temp directory — which is the
@@ -153,6 +153,48 @@ class TestCooldown(unittest.TestCase):
             path.write_text('"nope"', encoding="utf-8")
 
             self.assertEqual(nonai_job.last_encode_ended_at(path), 0.0)
+
+
+class TestRequest(unittest.TestCase):
+    def test_a_saved_request_reads_back_naming_its_video(self):
+        with workspace_temp_dir() as root:
+            path = root / "state" / "request.json"
+
+            nonai_job.save_request(path, nonai_job.Request("larkin/0 unsorted/scene one.mp4"))
+
+            self.assertEqual(nonai_job.load_request(path),
+                             nonai_job.Request("larkin/0 unsorted/scene one.mp4"))
+
+    def test_nothing_was_asked_for_when_the_file_is_absent_or_unreadable(self):
+        """The window writes this while the pipeline reads it, and a reader
+        that crashed on a half-written file would take the tick down with it."""
+        for written in (None, '{"video": "larkin/0 un', "[1, 2]", '{"held_back": "low_ram"}'):
+            with self.subTest(written=written), workspace_temp_dir() as root:
+                path = root / "request.json"
+                if written is not None:
+                    path.write_text(written, encoding="utf-8")
+
+                self.assertIsNone(nonai_job.load_request(path))
+
+    def test_a_request_the_machine_held_back_keeps_the_reason(self):
+        with workspace_temp_dir() as root:
+            path = root / "request.json"
+            held = nonai_job.Request("larkin/0 unsorted/scene one.mp4", held_back="low_ram")
+
+            nonai_job.save_request(path, held)
+
+            self.assertEqual(nonai_job.load_request(path), held)
+
+    def test_clearing_removes_the_request_and_tolerates_it_being_gone(self):
+        with workspace_temp_dir() as root:
+            path = root / "request.json"
+            nonai_job.save_request(path, nonai_job.Request("larkin/0 unsorted/a.mp4"))
+
+            nonai_job.clear_request(path)
+            nonai_job.clear_request(path)
+
+            self.assertIsNone(nonai_job.load_request(path))
+            self.assertFalse(path.exists())
 
 
 if __name__ == "__main__":
