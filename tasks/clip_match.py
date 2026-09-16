@@ -34,6 +34,7 @@ from util.version_groups import stable_title
 log = logging.getLogger(__name__)
 
 _TOKEN = re.compile(r"[a-z0-9]+")
+_REPEATED_CHARACTER = re.compile(r"(.)\1+")
 
 
 @dataclass
@@ -50,8 +51,8 @@ def could_be_cut_from(clip_record: dict, scene: Path) -> bool:
     is the widest net worth casting -- and the set the frame search then narrows
     by looking at the pictures. A clip recording no performer casts none.
     """
-    performer = _tokens(str(clip_record.get("performer", "")))
-    return bool(performer) and performer <= _tokens(scene.stem)
+    performer = _undoubled_tokens(str(clip_record.get("performer", "")))
+    return bool(performer) and performer <= _undoubled_tokens(scene.stem)
 
 
 def record(clip: Path, scene: Path, *, offset: float) -> None:
@@ -231,7 +232,8 @@ def _best_scene_per_clip(matched: dict[Path, Match]) -> dict[Path, Match]:
         held = winner.get(match.clip)
         if held is None or matched[held].score < match.score:
             winner[match.clip] = scene
-    return {scene: matched[scene] for scene in matched if scene in set(winner.values())}
+    winners = set(winner.values())
+    return {scene: match for scene, match in matched.items() if scene in winners}
 
 
 def _largest_first(videos: list[Path]) -> list[Path]:
@@ -245,5 +247,5 @@ def _size(video: Path) -> int:
         return 0
 
 
-def _tokens(text: str) -> set[str]:
-    return set(_TOKEN.findall(text.lower()))
+def _undoubled_tokens(text: str) -> set[str]:
+    return {_REPEATED_CHARACTER.sub(r"\1", token) for token in _TOKEN.findall(text.lower())}

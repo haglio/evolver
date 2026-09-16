@@ -359,6 +359,14 @@ class TestCouldBeCutFrom(unittest.TestCase):
     def test_a_clip_that_names_no_performer_matches_nothing(self):
         assert not clip_match.could_be_cut_from({}, Path("Jane-Doe_540-izb4ykfa.mp4"))
 
+    def test_a_name_spelled_with_its_letters_doubled_differently_is_the_same_name(self):
+        assert clip_match.could_be_cut_from(
+            _clip_record("Mira Vosss"), Path("Mira Voss - studio video original.mp4"),
+        )
+        assert clip_match.could_be_cut_from(
+            _clip_record("Jonna Vale"), Path("Jona-Valle-&-Ada-Roe_540-b4t7k1qz.mp4"),
+        )
+
 
 class TestRecordAndForget(unittest.TestCase):
     def test_record_leaves_the_rest_of_the_sidecar_alone(self):
