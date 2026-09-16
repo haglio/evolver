@@ -288,21 +288,29 @@ def throttle_to_presence(*, job_file: Path | None = None,
     """
     job_file = StageFiles.configured(job=job_file).job
     settings = EncodeSettings() if settings is None else settings
-    with _throttle_lock:
-        job = nonai_job.load_job(job_file)
-        if job is None:
-            return ""
-        pid = job.get("pid", 0)
-        if not pid or not processes.is_running(pid) or job.get("on_request"):
-            return ""
-        present = _user_present(settings)
-        if present and not job.get("suspended"):
-            nonai_encode.suspend_job(job, job_file)
-            return "suspended"
-        if not present and job.get("suspended"):
-            nonai_encode.resume_job(job, job_file)
-            return "resumed"
+    if not _throttle_lock.acquire(blocking=False):
         return ""
+    try:
+        return _match_presence(job_file, settings)
+    finally:
+        _throttle_lock.release()
+
+
+def _match_presence(job_file: Path, settings: EncodeSettings) -> str:
+    job = nonai_job.load_job(job_file)
+    if job is None:
+        return ""
+    pid = job.get("pid", 0)
+    if not pid or not processes.is_running(pid) or job.get("on_request"):
+        return ""
+    present = _user_present(settings)
+    if present and not job.get("suspended"):
+        nonai_encode.suspend_job(job, job_file)
+        return "suspended"
+    if not present and job.get("suspended"):
+        nonai_encode.resume_job(job, job_file)
+        return "resumed"
+    return ""
 
 
 def _collect(files: StageFiles) -> list[Candidate]:
@@ -384,34 +392,56 @@ def _take_over(job: dict, files: StageFiles) -> None:
 def request_now(video: str) -> None:
     """Ask for *video* to be upscaled right away, and clear the way for it.
 
-    The queue window's door, called on the GUI thread the moment a video is
-    dragged to the top of the list or its arrow is clicked. It records the ask
-    and gets the machine out of its way; the encode itself starts on the next
-    pipeline run, which is the one place a Topaz process is ever launched.
+    The queue window's door, called the moment the arrow on a video is
+    switched on. It records the ask and gets the machine out of its way; the
+    encode itself starts on the next pipeline run, which is the one place a
+    Topaz process is ever launched.
 
     An encode of another video is stopped here rather than on that run, so the
     AI clips the run upscales first are not held back by a Topaz process this
-    request is about to end anyway. The stopped video keeps its place in the
-    queue, next after the one asked for.
+    request is about to end anyway.
     """
     files = StageFiles.configured()
     with _throttle_lock:
-        job = nonai_job.load_job(files.job)
-        running = bool(job and job.get("pid") and processes.is_running(job["pid"]))
-        if running and relpath(Path(job["source"])) == video:
-            _take_over(job, files)
+        own = _put_ahead(video, files, "you asked for another video now")
+        if own is not None:
+            _take_over(own, files)
             nonai_job.clear_request(files.request)
-            nonai_queue.pin_ahead(files.pin_manifest, [video])
             return
-
-        next_after = [_stop_in_flight(job, "you asked for another video now", files)] if running else []
-        waiting = nonai_job.load_request(files.request)
-        if waiting is not None and waiting.video != video:
-            next_after.append(waiting.video)
-        nonai_queue.pin_ahead(files.pin_manifest, [video, *next_after])
         nonai_job.save_request(files.request, nonai_job.Request(video))
-        log.info("Asked for the non-AI upscale of %s, ahead of %s.",
-                 video, ", ".join(next_after) or "nothing in flight")
+        log.info("Asked for the non-AI upscale of %s.", video)
+
+
+def put_first(video: str) -> None:
+    """Make *video* the next one upscaled, at the usual moment for starting one.
+
+    The queue window's door for a video dragged to the top of the list.
+    """
+    files = StageFiles.configured()
+    with _throttle_lock:
+        _put_ahead(video, files, "you put another video first")
+        log.info("Put %s first in the non-AI upscale queue.", video)
+
+
+def _put_ahead(video: str, files: StageFiles, why: str) -> dict | None:
+    """Pin *video* first, and move whatever stood there to just after it.
+
+    Another video's encode is stopped, and another video's ask is dropped:
+    only the first video is upscaled, and only the first can be asked for.
+    Answers *video*'s own encode when that is the one in flight.
+    """
+    job = nonai_job.load_job(files.job)
+    running = bool(job and job.get("pid") and processes.is_running(job["pid"]))
+    next_after = []
+    if running and relpath(Path(job["source"])) != video:
+        next_after.append(_stop_in_flight(job, why, files))
+        running = False
+    waiting = nonai_job.load_request(files.request)
+    if waiting is not None and waiting.video != video:
+        next_after.append(waiting.video)
+        nonai_job.clear_request(files.request)
+    nonai_queue.pin_ahead(files.pin_manifest, [video, *next_after])
+    return job if running else None
 
 
 def withdraw_request() -> None:

@@ -88,7 +88,7 @@ class TestWhatItShows:
         (Head(ASKED_FOR, percent=2), "Upscaling at your request — 2% done"),
         (Head(STARTING, held_back="low_ram"),
          "Starting at your request — waiting for memory to free up"),
-        (Head(FINISHING), "Finished encoding; Evolver files it on its next run"),
+        (Head(FINISHING), "Done upscaling; Evolver's next run replaces the original with it"),
     ])
     def test_each_state_reads_as_words_rather_than_the_stages_own(self, window, head, words):
         window.show_lineup(lineup(head, entry("larkin/0 unsorted/a.mp4")))
@@ -182,21 +182,26 @@ class TestWhatItSaysTheUserDid:
         window.arranged.connect(seen.append)
         return seen
 
-    def test_a_video_dragged_to_the_top_is_asked_for_now(self, window):
+    def test_a_video_dragged_to_the_top_goes_first_and_waits_like_any_other(self, window):
+        """Putting a video first is not asking for it now: the arrow stays
+        off until it is clicked."""
         window.show_lineup(lineup(Head(UPSCALING, percent=41),
                                   *(entry(f"larkin/0 unsorted/{name}.mp4") for name in "abc")))
-        asked = []
+        asked, first = [], []
         window.now_requested.connect(asked.append)
+        window.placed_first.connect(first.append)
         seen = self._arrangements(window)
 
         window._tree.move_video("larkin/0 unsorted/c.mp4", 0)
 
-        assert asked == ["larkin/0 unsorted/c.mp4"]
+        assert first == ["larkin/0 unsorted/c.mp4"]
+        assert asked == []
         assert seen == []
         assert window._tree.videos() == ["larkin/0 unsorted/c.mp4", "larkin/0 unsorted/a.mp4",
                                          "larkin/0 unsorted/b.mp4"]
-        assert window._tree.topLevelItem(0).text(2) == "Starting at your request"
-        assert icon_of(window, 0) == arrow(filled=True)
+        assert window._tree.topLevelItem(0).text(2) == "Next, once you're away from the computer"
+        assert window._tree.topLevelItem(1).text(2) == ""
+        assert icon_of(window, 0) == arrow(filled=False)
 
     def test_a_video_dragged_lower_down_keeps_everything_above_it_where_it_is(self, window):
         """Its place is only its place if the videos it was put after stay
