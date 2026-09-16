@@ -732,7 +732,7 @@ class TestSetupLogging:
 
 class TestTheWindowsDoorToTheQueue:
     """The window layer reaches the stages through this module and nowhere else
-    (tests/test_layering.py), so the queue window's three verbs live here."""
+    (tests/test_layering.py), so the queue window's verbs live here."""
 
     def test_the_lineup_is_the_queues_own(self):
         with patch("tasks.nonai_lineup.current") as lineup:
@@ -749,6 +749,11 @@ class TestTheWindowsDoorToTheQueue:
         with patch("tasks.nonai_upscale.request_now") as request_now:
             evolver.upscale_now("larkin/0 unsorted/a.mp4")
         request_now.assert_called_once_with("larkin/0 unsorted/a.mp4")
+
+    def test_withdrawing_the_ask_reaches_the_stage(self):
+        with patch("tasks.nonai_upscale.withdraw_request") as withdraw_request:
+            evolver.withdraw_upscale_now()
+        withdraw_request.assert_called_once_with()
 
 
 class TestOneRunAtATime:

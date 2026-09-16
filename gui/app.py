@@ -278,6 +278,7 @@ class EvolverApp:
         self._queue_window = UpscaleQueueWindow(self._window)
         self._queue_window.arranged.connect(self._arrange_queue)
         self._queue_window.now_requested.connect(self._upscale_now)
+        self._queue_window.now_withdrawn.connect(self._withdraw_upscale_now)
         self._queue_window.refresh_wanted.connect(self._refresh_queue)
         self._refresh_queue()
         self._queue_window.show()
@@ -295,6 +296,17 @@ class EvolverApp:
         evolver.upscale_now(video)
         self._refresh_queue()
         self._runs.start_when_free("manual")
+
+    def _withdraw_upscale_now(self):
+        """Stop asking for the video on the first row, and park it if you're here.
+
+        The poll that parks an encode for the user's presence runs every twenty
+        seconds; polling now is what makes the click take effect while they are
+        looking at it.
+        """
+        evolver.withdraw_upscale_now()
+        self._presence.poll()
+        self._refresh_queue()
 
     def _refresh_queue(self):
         if self._queue_window is not None:

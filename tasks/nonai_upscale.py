@@ -19,8 +19,9 @@ thaws it between ticks so returning to the machine takes effect in seconds.
 
 A video asked for from the queue window is the one exception: it is wanted
 now, so it starts on the next run while the user is at the computer, the toggle
-off or the cooldown not yet over, and nothing parks it until it ends. Asking
-stops whatever other encode is in flight; that video keeps its place in line.
+off or the cooldown not yet over, and nothing parks it until it ends or the ask
+is withdrawn. Asking stops whatever other encode is in flight; that video keeps
+its place in line.
 
 Which clip is next, and why it beat the others, is
 :mod:`tasks.nonai_queue`'s, and how far through the whole project the library
@@ -384,9 +385,9 @@ def request_now(video: str) -> None:
     """Ask for *video* to be upscaled right away, and clear the way for it.
 
     The queue window's door, called on the GUI thread the moment a video is
-    dropped on the "upscaling now" spot. It records the ask and gets the
-    machine out of its way; the encode itself starts on the next pipeline run,
-    which is the one place a Topaz process is ever launched.
+    dragged to the top of the list or its arrow is clicked. It records the ask
+    and gets the machine out of its way; the encode itself starts on the next
+    pipeline run, which is the one place a Topaz process is ever launched.
 
     An encode of another video is stopped here rather than on that run, so the
     AI clips the run upscales first are not held back by a Topaz process this
@@ -411,6 +412,22 @@ def request_now(video: str) -> None:
         nonai_job.save_request(files.request, nonai_job.Request(video))
         log.info("Asked for the non-AI upscale of %s, ahead of %s.",
                  video, ", ".join(next_after) or "nothing in flight")
+
+
+def withdraw_request() -> None:
+    """Stop asking for the video :func:`request_now` asked for.
+
+    It keeps its place at the head of the queue and goes back to the usual
+    rule: upscaled while nobody is at the computer.
+    """
+    files = StageFiles.configured()
+    with _throttle_lock:
+        nonai_job.clear_request(files.request)
+        job = nonai_job.load_job(files.job)
+        if job is not None and job.pop("on_request", None):
+            nonai_job.save_job(files.job, job)
+            log.info("The encode of %s is no longer asked for; it pauses again "
+                     "while you are at the computer.", job.get("source"))
 
 
 def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclusion:

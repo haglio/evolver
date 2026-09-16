@@ -1,4 +1,4 @@
-"""What the upscale queue window is handed, and the five words for the one in flight.
+"""What the upscale queue window is handed: one list, and what its first row is doing.
 
 The shape only. :mod:`tasks.nonai_lineup` fills it in from the library and the
 stage's own records, and ``gui/queue_window.py`` draws it -- which is why the
@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+#: Nothing is in flight; the first row is simply the one the stage takes next.
+NEXT = "next"
 #: Upscaling, with nobody at the computer.
 UPSCALING = "upscaling"
 #: Frozen where it stands, because somebody is.
@@ -22,10 +24,12 @@ STARTING = "starting"
 #: Its encode has ended; the next run promotes the output and retires the original.
 FINISHING = "finishing"
 
+_RUNS_NOW = {ASKED_FOR, STARTING}
+
 
 @dataclass(frozen=True)
 class Entry:
-    """One video waiting its turn, as the window lists it."""
+    """One video in the queue, as the window lists it."""
 
     #: Its path within the non-AI library, which is what the window hands back
     #: when the queue is rearranged or this video is asked for now.
@@ -36,18 +40,28 @@ class Entry:
 
 
 @dataclass(frozen=True)
-class Now:
-    """The one video the machine is on, and how far it has got."""
+class Head:
+    """What the first row's video is doing, and how far it has got."""
 
-    entry: Entry
     state: str
     percent: int | None = None
     #: What is keeping a video asked for from starting, in the stage's word for
     #: it -- "low_ram", "topaz_busy" and the rest of ``StartAttempt.deferred``.
     held_back: str = ""
 
+    @property
+    def runs_now(self) -> bool:
+        """Whether it goes ahead even while somebody is at the computer."""
+        return self.state in _RUNS_NOW
+
+    @property
+    def in_flight(self) -> bool:
+        """Whether the machine is on it, so nothing else can take its place by a drag."""
+        return self.state != NEXT
+
 
 @dataclass(frozen=True)
 class Lineup:
-    now: Now | None
-    up_next: tuple[Entry, ...]
+    rows: tuple[Entry, ...]
+    #: None only when there are no rows.
+    head: Head | None
