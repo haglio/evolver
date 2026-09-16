@@ -12,11 +12,13 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 import config
+import evolver
 from gui import peer_watch, process_identity
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.palette import apply_accent
 from gui.presence_throttle import PresenceThrottle
+from gui.queue_window import UpscaleQueueWindow
 from gui.run_controller import RunController
 from gui.run_record import RunRecord, format_run_label, load_runs
 from gui.scheduler import PipelineScheduler
@@ -80,6 +82,7 @@ class EvolverApp:
 
         self._settings = EvolverSettings.load()
         self._stats_window: StatsWindow | None = None
+        self._queue_window: UpscaleQueueWindow | None = None
         self._log_window: RunLogWindow | None = None
         self._instance = InstanceGateway()
         self._sign_in_notice = SignInNotice()
@@ -113,6 +116,7 @@ class EvolverApp:
             "nonai": self._set_nonai_enabled,
             "settings": self._show_settings,
             "stats": self._show_stats,
+            "queue": self._show_queue,
             "backfill": self._launch_backfill,
             "restart": self._restart,
             "quit": self._quit_by_request,
@@ -128,6 +132,7 @@ class EvolverApp:
             "pause": self._toggle_pause,
             "settings": self._show_settings,
             "stats": self._show_stats,
+            "queue": self._show_queue,
             "restart": self._restart,
             "quit": self._confirm_quit,
         })
@@ -230,6 +235,45 @@ class EvolverApp:
         self._stats_window = StatsWindow(records, self._window)
         self._stats_window.show()
 
+    def _show_queue(self):
+        """Open the upscale queue, or raise the one already open.
+
+        Held like the stats window is, and for the same reason: parented to the
+        main window, one replaced without being taken down would live for the
+        rest of the session.
+        """
+        if self._queue_window is not None:
+            if self._queue_window.isVisible():
+                self._queue_window.raise_()
+                self._queue_window.activateWindow()
+                return
+            self._queue_window.close()
+            self._queue_window.deleteLater()
+        self._queue_window = UpscaleQueueWindow(self._window)
+        self._queue_window.arranged.connect(self._arrange_queue)
+        self._queue_window.now_requested.connect(self._upscale_now)
+        self._queue_window.refresh_wanted.connect(self._refresh_queue)
+        self._refresh_queue()
+        self._queue_window.show()
+
+    def _arrange_queue(self, videos: list):
+        """Keep the order the window was just put in — it leads the next run."""
+        evolver.arrange_upscale_queue(videos)
+
+    def _upscale_now(self, video: str):
+        """Ask for *video* now, and bring the run that starts it forward.
+
+        Encodes start on a pipeline run and nowhere else, so without this the
+        video asked for would wait out the rest of the ten-minute interval.
+        """
+        evolver.upscale_now(video)
+        self._refresh_queue()
+        self._runs.start_when_free("manual")
+
+    def _refresh_queue(self):
+        if self._queue_window is not None:
+            self._queue_window.show_lineup(evolver.upscale_lineup())
+
     def _show_run_log(self, record: RunRecord):
         """Open the log where this run wrote, rather than at its top.
 
@@ -277,6 +321,9 @@ class EvolverApp:
     def _on_run_ended(self):
         self._scheduler.mark_idle()
         self._window.refresh_history()
+        # A run is what starts, promotes and fails encodes, so the queue on
+        # screen is a run old the moment one ends.
+        self._refresh_queue()
 
     def _notify(self, body: str, icon: QSystemTrayIcon.MessageIcon, msecs: int):
         """Say something in a tray balloon, if the user asked for balloons."""

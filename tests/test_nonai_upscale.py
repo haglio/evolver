@@ -8,11 +8,13 @@ from contextlib import ExitStack
 from unittest.mock import Mock, patch
 
 import config
-from tasks import nonai_encode, nonai_upscale
+from tasks import nonai_encode, nonai_queue, nonai_upscale
 from tests.temp_helpers import (
+    STARTED_UNDER,
     make_video,
     override_config,
     workspace_temp_dir,
+    write_job,
     write_sidecar,
 )
 from tests.temp_helpers import (
@@ -20,48 +22,6 @@ from tests.temp_helpers import (
 )
 from util import nonai_job, provenance, sidecar, video_type
 from util.media_files import partial_path
-
-STARTED_UNDER = provenance.reconstructed("evolver", recipe="non_ai_upscale",
-                                         recipe_version="v000")
-
-
-def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
-              source=None, tmp_bytes=b"partial", suspended=False, suspended_at=0.0,
-              suspended_seconds=0.0, job_file=None, stamp=STARTED_UNDER,
-              on_request=False):
-    """A persisted in-flight job whose tmp file exists under the bucket.
-
-    *job_file* writes the record somewhere other than the configured path, which
-    is how the tests for the state-file parameters put the record where only a
-    caller passing that path could find it. *stamp* None is a record written
-    before encodes kept one.
-    """
-    non_ai = overrides["NON_AI_DIR"]
-    source = source or make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
-    out = non_ai / "larkin" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
-    tmp = partial_path(out, source.stem)
-    if tmp_bytes is not None:
-        tmp.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_bytes(tmp_bytes)
-    job = {
-        "pid": pid,
-        "source": str(source),
-        "tmp": str(tmp),
-        "out": str(out),
-        "expected_duration": expected,
-        "started_at": time.time() - started_seconds_ago,
-        "suspended": suspended,
-        "suspended_at": suspended_at,
-        "suspended_seconds": suspended_seconds,
-    }
-    if stamp is not None:
-        job["provenance"] = stamp
-    if on_request:
-        job["on_request"] = True
-    job_file = job_file or overrides["NONAI_JOB_STATE_FILE"]
-    job_file.parent.mkdir(parents=True, exist_ok=True)
-    job_file.write_text(json.dumps(job), encoding="utf-8")
-    return source, tmp, out
 
 
 def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**15,
@@ -439,6 +399,61 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
                              ("", "ai_clips_waiting"))
             mocks["popen"].assert_not_called()
             self.assertEqual(request_of(overrides).held_back, "ai_clips_waiting")
+
+
+class TestAskingForOneNow(unittest.TestCase):
+    """What the queue window's "upscale this now" does the moment it is asked,
+    before any run picks the request up."""
+
+    def test_it_leads_the_queue_and_is_recorded_as_asked_for(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+
+            stack, _mocks = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.request_now("larkin/0 unsorted/b.mp4")
+
+            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+                             ["larkin/0 unsorted/b.mp4"])
+            self.assertEqual(request_of(overrides), nonai_job.Request("larkin/0 unsorted/b.mp4"))
+
+    def test_it_stops_the_encode_in_flight_and_queues_that_video_next(self):
+        """Stopping here rather than on the next run is what lets that run
+        upscale its AI clips first: they wait on any live Topaz process."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            _busy, tmp, _out = write_job(root, overrides)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+
+            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
+            with override_config(**overrides), stack:
+                nonai_upscale.request_now("larkin/0 unsorted/b.mp4")
+
+            mocks["terminate"].assert_called_once_with(4242)
+            self.assertFalse(tmp.exists())
+            self.assertIsNone(nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]))
+            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+                             ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/busy.mp4"])
+            self.assertEqual(request_of(overrides).video, "larkin/0 unsorted/b.mp4")
+
+    def test_asking_for_the_one_already_encoding_lets_it_run_on(self):
+        """It is already the video wanted; killing it to start it again would
+        throw away the hours it has done."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, suspended=True, suspended_at=time.time() - 60)
+
+            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
+            with override_config(**overrides), stack:
+                nonai_upscale.request_now("larkin/0 unsorted/busy.mp4")
+
+            mocks["terminate"].assert_not_called()
+            mocks["resume"].assert_called_once_with(4242)
+            job = nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"])
+            self.assertTrue(job["on_request"])
+            self.assertFalse(job["suspended"])
+            self.assertIsNone(request_of(overrides))
 
 
 class TestAnEncodeYouAskedForRunsOn(unittest.TestCase):

@@ -229,6 +229,56 @@ class TestManifestEntries(unittest.TestCase):
             )
 
 
+class TestPinAhead(unittest.TestCase):
+    def test_the_videos_lead_the_manifest_in_the_order_given(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            for name in ("a.mp4", "b.mp4"):
+                make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / name)
+            pins = root / "next.txt"
+
+            with override_config(**overrides):
+                nonai_queue.pin_ahead(pins, ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
+
+            self.assertEqual(nonai_queue.manifest_entries(pins),
+                             ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
+
+    def test_the_pins_already_there_follow_in_their_order_with_their_notes(self):
+        """The manifest is hand-edited too, so a line's note is the user's and
+        rides along with it wherever the line ends up."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            for name in ("a.mp4", "b.mp4", "c.mp4"):
+                make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / name)
+            pins = root / "next.txt"
+            pins.write_text("larkin/0 unsorted/a.mp4\tfor the weekend\n"
+                            "larkin/0 unsorted/c.mp4\tredo under v2\n", encoding="utf-8")
+
+            with override_config(**overrides):
+                nonai_queue.pin_ahead(pins, ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/c.mp4"])
+
+            self.assertEqual(pins.read_text(encoding="utf-8").splitlines(), [
+                "larkin/0 unsorted/b.mp4",
+                "larkin/0 unsorted/c.mp4\tredo under v2",
+                "larkin/0 unsorted/a.mp4\tfor the weekend",
+            ])
+
+    def test_a_pin_whose_video_has_left_the_library_is_dropped(self):
+        """An upscaled original is retired out of the folder it was pinned in,
+        so its pin names nothing -- and would pin whatever arrived there next
+        under the same name."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+            pins = root / "next.txt"
+            pins.write_text("larkin/0 unsorted/done.mp4\n", encoding="utf-8")
+
+            with override_config(**overrides):
+                nonai_queue.pin_ahead(pins, ["larkin/0 unsorted/a.mp4"])
+
+            self.assertEqual(nonai_queue.manifest_entries(pins), ["larkin/0 unsorted/a.mp4"])
+
+
 class TestAddToSkipManifest(unittest.TestCase):
     def test_appends_the_relative_path_and_the_reason(self):
         with workspace_temp_dir() as root:

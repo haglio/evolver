@@ -32,6 +32,8 @@ from tasks import (
     clip_scripts,
     genau_deliver,
     nonai_group,
+    nonai_lineup,
+    nonai_queue,
     nonai_titles,
     nonai_upscale,
     prompt_scrape,
@@ -48,6 +50,7 @@ from tasks import (
     withdrawn,
 )
 from util import processes, run_log, system_resources, topaz
+from util import upscale_lineup as upscale_lineup_shape
 
 
 @dataclass
@@ -182,6 +185,27 @@ def throttle_nonai_to_presence() -> str:
     layer does not have to know which stage owns a detached ffmpeg.
     """
     return nonai_upscale.throttle_to_presence()
+
+
+def upscale_lineup() -> upscale_lineup_shape.Lineup:
+    """What the queue window shows: the video in flight, and what is next.
+
+    The window layer's three doors to the non-AI queue are here for the reason
+    ``throttle_nonai_to_presence`` is: the repo's layering is
+    ``util <- tasks <- evolver <- gui``, so gui reaches the stages through this
+    module and nothing else.
+    """
+    return nonai_lineup.current()
+
+
+def arrange_upscale_queue(videos: list[str]) -> None:
+    """Put *videos* at the head of the queue, in this order."""
+    nonai_queue.pin_ahead(config.NONAI_PRIORITY_MANIFEST, videos)
+
+
+def upscale_now(video: str) -> None:
+    """Ask for *video* to be upscaled right away, stopping whatever is in flight."""
+    nonai_upscale.request_now(video)
 
 
 def run_pipeline(

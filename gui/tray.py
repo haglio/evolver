@@ -72,6 +72,10 @@ class EvolverTray(QSystemTrayIcon):
         self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats...", self._menu)
         self._menu.addAction(self.stats_action)
 
+        self.queue_action = QAction(qta.icon("fa5s.list-ol", color=_ICON_COLOR),
+                                    "Upscale Queue...", self._menu)
+        self._menu.addAction(self.queue_action)
+
         self.backfill_action = QAction(qta.icon("fa5s.microphone", color=_ICON_COLOR), "Backfill Metadata...", self._menu)
         self._menu.addAction(self.backfill_action)
 
@@ -107,6 +111,7 @@ class EvolverTray(QSystemTrayIcon):
             "nonai": self.nonai_action.toggled,
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
+            "queue": self.queue_action.triggered,
             "backfill": self.backfill_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,

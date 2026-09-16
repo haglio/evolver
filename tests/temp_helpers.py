@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+import time
 import unittest
 import uuid
 from contextlib import ExitStack, contextmanager
@@ -10,6 +11,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
+from util import provenance
+from util.media_files import partial_path
 
 # The system temp dir, not a directory inside the checkout: the suite must not
 # write into the tree it is testing (a killed run left case directories in the
@@ -145,6 +148,49 @@ def make_video(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"video")
     return path
+
+
+STARTED_UNDER = provenance.reconstructed("evolver", recipe="non_ai_upscale",
+                                         recipe_version="v000")
+
+
+def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
+              source=None, tmp_bytes=b"partial", suspended=False, suspended_at=0.0,
+              suspended_seconds=0.0, job_file=None, stamp=STARTED_UNDER,
+              on_request=False):
+    """A persisted in-flight job whose tmp file exists under the bucket.
+
+    *job_file* writes the record somewhere other than the configured path, which
+    is how the tests for the state-file parameters put the record where only a
+    caller passing that path could find it. *stamp* None is a record written
+    before encodes kept one.
+    """
+    non_ai = overrides["NON_AI_DIR"]
+    source = source or make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
+    out = non_ai / "larkin" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
+    tmp = partial_path(out, source.stem)
+    if tmp_bytes is not None:
+        tmp.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_bytes(tmp_bytes)
+    job = {
+        "pid": pid,
+        "source": str(source),
+        "tmp": str(tmp),
+        "out": str(out),
+        "expected_duration": expected,
+        "started_at": time.time() - started_seconds_ago,
+        "suspended": suspended,
+        "suspended_at": suspended_at,
+        "suspended_seconds": suspended_seconds,
+    }
+    if stamp is not None:
+        job["provenance"] = stamp
+    if on_request:
+        job["on_request"] = True
+    job_file = job_file or overrides["NONAI_JOB_STATE_FILE"]
+    job_file.parent.mkdir(parents=True, exist_ok=True)
+    job_file.write_text(json.dumps(job), encoding="utf-8")
+    return source, tmp, out
 
 
 def nonai_library_overrides(root: Path, **extra):

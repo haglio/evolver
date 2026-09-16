@@ -33,6 +33,8 @@ nonai_upscale_attempts*.json
 nonai_upscale_cooldown*.json
 .nonai-upscale-skip*.txt
 .nonai-upscale-next*.txt
+# The pin manifest is rewritten whole, through a temp file beside it.
+.nonai-upscale-next*.tmp
 
 # GUI runtime state
 runs/

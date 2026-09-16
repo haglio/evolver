@@ -719,3 +719,24 @@ class TestSetupLogging:
                 handler.flush()
 
             assert log_file.read_text(encoding="utf-8").count("one line") == 1
+
+
+class TestTheWindowsDoorToTheQueue:
+    """The window layer reaches the stages through this module and nowhere else
+    (tests/test_layering.py), so the queue window's three verbs live here."""
+
+    def test_the_lineup_is_the_queues_own(self):
+        with patch("tasks.nonai_lineup.current") as lineup:
+            assert evolver.upscale_lineup() is lineup.return_value
+        lineup.assert_called_once_with()
+
+    def test_rearranging_pins_the_videos_in_the_configured_manifest(self):
+        with patch("tasks.nonai_queue.pin_ahead") as pin_ahead, \
+             override_config(NONAI_PRIORITY_MANIFEST=Path("next.txt")):
+            evolver.arrange_upscale_queue(["larkin/0 unsorted/a.mp4"])
+        pin_ahead.assert_called_once_with(Path("next.txt"), ["larkin/0 unsorted/a.mp4"])
+
+    def test_asking_for_one_now_reaches_the_stage(self):
+        with patch("tasks.nonai_upscale.request_now") as request_now:
+            evolver.upscale_now("larkin/0 unsorted/a.mp4")
+        request_now.assert_called_once_with("larkin/0 unsorted/a.mp4")

@@ -412,6 +412,9 @@ class TestMainWindowToolbarExists:
     def test_has_settings_action(self, window):
         assert window.settings_action is not None
 
+    def test_has_queue_action(self, window):
+        assert window.queue_action is not None
+
     def test_has_run_now_action(self, window):
         assert window.run_now_action is not None
 

@@ -43,6 +43,7 @@ class RunController(QObject):
         self._window = window
         self._nonai_enabled = nonai_enabled
         self._worker: PipelineWorker | None = None
+        self._when_free = ""
         self._progress_popup: ProgressPopup | None = None
         self._watchdog = QTimer()
         self._watchdog.setSingleShot(True)
@@ -62,6 +63,10 @@ class RunController(QObject):
         )
         self._worker.pipeline_finished.connect(self._on_finished)
         self._worker.pipeline_error.connect(self._on_error)
+        # The thread's own signal, not the pipeline's: a run asked to follow
+        # this one must start after the thread has let go, or the re-entry
+        # guard below drops it.
+        self._worker.finished.connect(self._start_what_was_waiting)
 
         if self._window.isVisible():
             self._progress_popup = ProgressPopup(parent=self._window)
@@ -72,6 +77,23 @@ class RunController(QObject):
 
         self._worker.start()
         self._watchdog.start(config.PIPELINE_WALL_TIMEOUT_SECONDS * 1000)
+
+    def start_when_free(self, trigger: str) -> None:
+        """Run now, or the moment the run in flight has let go of the library.
+
+        The queue window's "upscale this now" lands here: the encode starts on
+        a run, and a run that cannot start is a request that waits out the rest
+        of the interval instead.
+        """
+        if self.is_running:
+            self._when_free = trigger
+        else:
+            self.start(trigger)
+
+    def _start_what_was_waiting(self) -> None:
+        trigger, self._when_free = self._when_free, ""
+        if trigger:
+            self.start(trigger)
 
     def wait_for_exit(self, msecs: int) -> None:
         """Give a run in flight *msecs* to finish its stage before the app goes."""

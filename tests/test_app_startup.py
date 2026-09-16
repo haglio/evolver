@@ -9,6 +9,7 @@ import pytest
 from gui.app import _wire
 from gui.process_identity import APP_MODEL_ID
 from tests.gui_support import build_evolver_app
+from util.upscale_lineup import Lineup
 
 
 class TestAppStartup:
@@ -251,6 +252,111 @@ class TestStatsWindowLifetime:
         assert stats_cls.call_count == 1
         stats_cls.return_value.raise_.assert_called_once_with()
         stats_cls.return_value.close.assert_not_called()
+
+
+class TestOneRunAfterAnother:
+    """A request cannot wait for the next tick, so the run that answers it
+    follows the one in flight rather than being dropped by the re-entry guard."""
+
+    def _started(self, app, worker_cls):
+        return worker_cls.call_count
+
+    def test_with_nothing_running_it_starts_at_once(self, request):
+        app = build_evolver_app(request)
+        with patch("gui.run_controller.PipelineWorker") as worker_cls:
+            worker_cls.return_value.isRunning.return_value = False
+            app._runs.start_when_free("manual")
+        assert worker_cls.call_count == 1
+
+    def test_mid_run_it_waits_for_the_thread_to_let_go(self, request):
+        app = build_evolver_app(request)
+        with patch("gui.run_controller.PipelineWorker") as worker_cls:
+            worker = worker_cls.return_value
+            worker.isRunning.return_value = True
+            app._runs.start("scheduled")
+
+            app._runs.start_when_free("manual")
+            assert worker_cls.call_count == 1
+
+            # What the thread's own finished signal reaches, once it has.
+            worker.isRunning.return_value = False
+            worker.finished.connect.call_args.args[0]()
+            assert worker_cls.call_count == 2
+            assert worker_cls.call_args.kwargs["trigger"] == "manual"
+
+    def test_a_run_nobody_asked_to_follow_is_not_started_again(self, request):
+        app = build_evolver_app(request)
+        with patch("gui.run_controller.PipelineWorker") as worker_cls:
+            worker = worker_cls.return_value
+            worker.isRunning.return_value = True
+            app._runs.start("scheduled")
+
+            worker.isRunning.return_value = False
+            worker.finished.connect.call_args.args[0]()
+        assert worker_cls.call_count == 1
+
+
+EMPTY_QUEUE = Lineup(now=None, up_next=())
+
+
+class TestUpscaleQueueWindow:
+    """The window that shows the upscale queue, and the three verbs it offers."""
+
+    def _open(self, app):
+        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
+            app._show_queue()
+        return lineup
+
+    def test_opening_it_hands_it_the_queue_as_it_stands(self, request):
+        app = build_evolver_app(request)
+        lineup = self._open(app)
+        lineup.assert_called_once_with()
+        assert app._queue_window.isVisible()
+
+    def test_a_second_open_raises_the_one_already_up(self, request):
+        app = build_evolver_app(request)
+        self._open(app)
+        first = app._queue_window
+        self._open(app)
+        assert app._queue_window is first
+
+    def test_rearranging_it_pins_the_order_through_the_pipeline_module(self, request):
+        app = build_evolver_app(request)
+        self._open(app)
+        with patch("evolver.arrange_upscale_queue") as arranged:
+            app._queue_window.arranged.emit(["larkin/0 unsorted/a.mp4"])
+        arranged.assert_called_once_with(["larkin/0 unsorted/a.mp4"])
+
+    def test_asking_for_one_now_records_it_and_runs_the_pipeline_at_once(self, request):
+        """The stage starts encodes on a run and nowhere else, so asking for
+        one has to bring the next run forward rather than wait ten minutes."""
+        app = build_evolver_app(request)
+        self._open(app)
+        with patch("evolver.upscale_now") as asked, \
+             patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE), \
+             patch.object(app._runs, "start_when_free") as run:
+            app._queue_window.now_requested.emit("larkin/0 unsorted/a.mp4")
+        asked.assert_called_once_with("larkin/0 unsorted/a.mp4")
+        run.assert_called_once_with("manual")
+
+    def test_a_finished_run_redraws_it(self, request):
+        """A run is what starts, promotes and fails encodes, so the window is
+        stale the moment one ends."""
+        app = build_evolver_app(request)
+        self._open(app)
+        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
+             patch("gui.main_window.load_runs", return_value=[]):
+            app._on_run_ended()
+        lineup.assert_called_once_with()
+
+    def test_it_asks_to_be_redrawn_while_it_is_open(self, request):
+        """Presence parks and thaws the encode between runs, and the percent
+        climbs the whole time."""
+        app = build_evolver_app(request)
+        self._open(app)
+        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
+            app._queue_window.refresh_wanted.emit()
+        lineup.assert_called_once_with()
 
 
 class TestNonAiUpscaleToggle:
