@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import itertools
 import logging
+import os
 import subprocess
+import tempfile
+import uuid
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -17,6 +20,7 @@ import evolver
 CRLF = (chr(13) + chr(10)).encode("ascii")
 from tasks.stages import ALL_STAGES
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util import run_lock
 
 
 def _stage_mocks() -> dict:
@@ -87,6 +91,11 @@ def _patched_stages(mocks: dict) -> ExitStack:
     stack = ExitStack()
     for target, key in _STAGE_PATCHES:
         stack.enter_context(patch(target, mocks[key]))
+    # Each run's own turn: the machine's is the one a running Evolver holds
+    # while the suite runs beside it, and a test holding it would refuse that.
+    stack.enter_context(override_config(
+        PIPELINE_LOCK_FILE=Path(tempfile.gettempdir()) / "evolver-tests"
+        / f"pipeline-{uuid.uuid4().hex}.lock"))
     return stack
 
 
@@ -740,3 +749,47 @@ class TestTheWindowsDoorToTheQueue:
         with patch("tasks.nonai_upscale.request_now") as request_now:
             evolver.upscale_now("larkin/0 unsorted/a.mp4")
         request_now.assert_called_once_with("larkin/0 unsorted/a.mp4")
+
+
+class TestOneRunAtATime:
+    """A branch preview's Run Now and the running Evolver's schedule, or a
+    command-line run beside the tray, would sort and purge the same files."""
+
+    def test_while_another_evolver_holds_the_turn_no_stage_runs(self):
+        with workspace_temp_dir() as root:
+            lock = root / "pipeline.lock"
+            lock.write_text(str(os.getpid()), encoding="utf-8")
+            mocks = _stage_mocks()
+
+            with _patched_stages(mocks), override_config(PIPELINE_LOCK_FILE=lock), \
+                 pytest.raises(run_lock.Busy):
+                evolver.run_pipeline()
+
+            mocks["strays_run"].assert_not_called()
+
+    def test_the_turn_is_held_through_the_run_and_given_back(self):
+        with workspace_temp_dir() as root:
+            lock = root / "pipeline.lock"
+            held_while_running = []
+            mocks = _stage_mocks()
+            mocks["strays_run"] = Mock(side_effect=lambda: (
+                held_while_running.append(lock.exists()) or Mock(ok=True)))
+
+            with _patched_stages(mocks), override_config(PIPELINE_LOCK_FILE=lock):
+                evolver.run_pipeline()
+
+            assert held_while_running == [True]
+            assert not lock.exists()
+
+    def test_a_command_line_run_that_finds_it_taken_says_so_and_fails(self, caplog):
+        with workspace_temp_dir() as root:
+            lock = root / "pipeline.lock"
+            lock.write_text(str(os.getpid()), encoding="utf-8")
+
+            with _patched_stages(_stage_mocks()), override_config(PIPELINE_LOCK_FILE=lock), \
+                 patch("evolver.setup_logging"), patch("evolver.check_dependencies"), \
+                 caplog.at_level(logging.WARNING), pytest.raises(SystemExit) as exited:
+                evolver.main()
+
+        assert exited.value.code == 1
+        assert "running the pipeline" in caplog.text

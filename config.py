@@ -265,6 +265,8 @@ NONAI_ATTEMPTS_FILE = LOCAL_STATE_DIR / "nonai_upscale_attempts.json"
 NONAI_COOLDOWN_FILE = LOCAL_STATE_DIR / "nonai_upscale_cooldown.json"
 # The video the queue window asked to have upscaled right away, until a run starts it.
 NONAI_REQUEST_FILE = LOCAL_STATE_DIR / "nonai_upscale_request.json"
+# Whose turn it is to run the pipeline, when two Evolvers are up (util/run_lock.py).
+PIPELINE_LOCK_FILE = LOCAL_STATE_DIR / "pipeline.lock"
 NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
 # The last phone favorite applied to Fun Time's favorites, so one is applied
 # exactly once and Fun Time can undo it (tasks/watch_weights.py).

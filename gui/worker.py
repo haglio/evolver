@@ -9,6 +9,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 import config
 import evolver
 from gui.run_record import RunRecord, save_run
+from util.run_lock import Busy
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +51,11 @@ class PipelineWorker(QThread):
             except Exception:
                 log.exception("Failed to save run record")
             self.pipeline_finished.emit(record)
+        except Busy as busy:
+            # The ordinary meeting of a branch preview's Run Now and the running
+            # Evolver's schedule: said in one line, since there is no stack to show.
+            log.info("Pipeline run not started: %s", busy)
+            self.pipeline_error.emit(str(busy))
         except Exception as exc:
             # Logged before it is flattened: str(exc) is all the GUI ever sees,
             # so without this the only record of where a pipeline died is a

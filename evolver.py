@@ -49,7 +49,7 @@ from tasks import (
     watch_weights,
     withdrawn,
 )
-from util import processes, run_log, system_resources, topaz
+from util import processes, run_lock, run_log, system_resources, topaz
 from util import upscale_lineup as upscale_lineup_shape
 
 
@@ -235,7 +235,22 @@ def run_pipeline(
 
     Returns:
         PipelineResult with per-stage records and aggregate status.
+
+    Raises:
+        run_lock.Busy: another Evolver is running the pipeline, so no stage ran.
     """
+    with run_lock.held(config.PIPELINE_LOCK_FILE):
+        return _run_stages(on_stage_start, on_stage_complete, on_stage_progress,
+                           nonai_enabled, should_stop)
+
+
+def _run_stages(
+    on_stage_start: Callable[[str], None] | None,
+    on_stage_complete: Callable[[str, object | None, float, str], None] | None,
+    on_stage_progress: Callable[[str, int, int], None] | None,
+    nonai_enabled: bool | None,
+    should_stop: Callable[[], bool] | None,
+) -> PipelineResult:
     log = logging.getLogger(__name__)
     pipeline_t0 = time.monotonic()
     started_at = datetime.now(UTC)
@@ -413,7 +428,11 @@ def main():
         log.exception("Dependency check failed: %s", e)
         sys.exit(1)
 
-    result = run_pipeline()
+    try:
+        result = run_pipeline()
+    except run_lock.Busy as busy:
+        log.warning("Did not run: %s.", busy)
+        sys.exit(1)
     sys.exit(1 if result.has_errors else 0)
 
 
