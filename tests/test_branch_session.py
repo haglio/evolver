@@ -1,8 +1,9 @@
-"""A branch session: the whole app out of a worktree, beside the live Evolver.
+"""A branch session: the whole app out of a worktree, in place of the usual Evolver.
 
-What it shares with the live app (the library, the run history and its log, the
-queue's manifests, the settings) and what it leaves to it (the schedule, the
-supervision) are the whole contract, and both halves are held here.
+What it shares with the usual one (the library, the run history and its log,
+the queue's manifests, the settings), the work it takes over from it (the
+schedule, the supervision), and how that work goes back are the whole
+contract, and all three are held here.
 
 The config half runs in a fresh interpreter, because the flag is read at import
 and the suite's own import happened long before any test could set it.
@@ -13,11 +14,14 @@ import json
 import os
 import subprocess
 import sys
+from contextlib import ExitStack
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 import pytest
+from PyQt6.QtWidgets import QMessageBox
 
+from gui import branch_session
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import override_config
 
@@ -74,10 +78,11 @@ class TestWhatABranchSessionShares:
         assert [name for name in _PATHS[2:] if ordinary[name].parent != ordinary["PROJECT_DIR"]] == []
 
 
-class TestWhatABranchSessionLeavesToTheLiveApp:
-    """A preview does what it is clicked to do and nothing on a timer: two
-    schedules would run two pipelines, and two presence polls would suspend the
-    one encode twice over and thaw it once."""
+class TestWhatABranchSessionTakesOver:
+    """A preview is the whole app, and the app is its schedule: one Evolver
+    at a time runs the ten-minute pipeline, parks the encode for the user's
+    presence, and keeps the broker up -- and while a preview runs, that is
+    the preview."""
 
     def _preview(self, request):
         with override_config(BRANCH_SESSION=True):
@@ -90,50 +95,141 @@ class TestWhatABranchSessionLeavesToTheLiveApp:
             app.start()
         return cleared
 
-    def test_it_starts_no_schedule_and_no_watch_of_its_own(self, request):
+    def test_it_keeps_the_schedule_and_the_watches_it_took_over(self, request):
         app = self._preview(request)
 
         self._started(app)
-
-        assert not app._presence.is_running
-        assert not app._peer_timer.isActive()
-        assert app._scheduler.next_run_at is None
-
-    def test_starting_it_leaves_the_live_evolvers_stand_down_alone(self, request):
-        """That marker says the user quit the Evolver they run; a preview
-        coming up is not them asking for that one back."""
-        app = self._preview(request)
-
-        cleared = self._started(app)
-
-        cleared.assert_not_called()
-
-    def test_quitting_it_does_not_stand_the_live_evolver_down(self, request):
-        app = self._preview(request)
-
-        with patch("gui.app.peer_watch.stand_evolver_down") as stood_down, \
-             patch.object(app, "_shutdown"):
-            app._quit_by_request()
-
-        stood_down.assert_not_called()
-
-    def test_the_schedule_is_not_this_instances_to_pause(self, request):
-        app = self._preview(request)
-
-        assert not app._tray.pause_action.isEnabled()
-        assert not app._window.active_toggle.isEnabled()
-        assert "keeps the schedule" in app._window.active_toggle.toolTip()
-
-    def test_the_live_app_still_starts_everything(self, request):
-        app = build_evolver_app(request)
-
-        cleared = self._started(app)
 
         assert app._presence.is_running
         assert app._peer_timer.isActive()
         assert app._scheduler.next_run_at is not None
         assert app._tray.pause_action.isEnabled()
+        assert app._window.active_toggle.isEnabled()
+
+    def test_starting_it_is_asking_for_evolver_so_an_earlier_stand_down_goes(self, request):
+        app = self._preview(request)
+
+        cleared = self._started(app)
+
         cleared.assert_called_once_with()
+
+    def test_the_usual_evolver_hands_nothing_back(self, request):
+        app = build_evolver_app(request)
+
+        self._started(app)
+
+        assert not app._hand_back.isActive()
+
+
+class TestHandingTheWorkBack:
+    """A preview forgotten about must not run a branch's pipeline over the
+    library for good: the usual Evolver takes back over."""
+
+    def _started_preview(self, request):
+        with override_config(BRANCH_SESSION=True):
+            app = build_evolver_app(request)
+        with patch("gui.app.process_identity.claim"), \
+             patch("gui.main_window.load_runs", return_value=[]), \
+             patch("gui.app.peer_watch.clear_evolver_stand_down"):
+            app.start()
+        return app
+
+    def _handing_back(self, app):
+        """The three steps of handing back, recorded in the order they ran."""
+        steps = Mock()
+        return steps, ExitStack(), [
+            patch.object(app._instance, "let_go", steps.let_go),
+            patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver),
+            patch.object(app, "_shutdown", steps.shutdown),
+        ]
+
+    def test_once_it_has_had_its_time_it_makes_way_for_the_usual_evolver(self, request):
+        """The claim goes first, so the usual Evolver can take it at once: one
+        from before launches spoke hands its launch to whoever holds the
+        claim, which would open the preview's window instead."""
+        app = self._started_preview(request)
+        steps, stack, patches = self._handing_back(app)
+
+        assert app._hand_back.isActive()
+        assert app._hand_back.interval() == branch_session.HAND_BACK_AFTER_MINUTES * 60_000
+        with stack:
+            for each in patches:
+                stack.enter_context(each)
+            app._hand_back.timeout.emit()
+
+        assert steps.mock_calls == [call.let_go(), call.start_the_usual_evolver(),
+                                    call.shutdown()]
+
+    def test_a_run_in_flight_is_let_finish_first(self, request):
+        """Quitting gives the stage in flight five seconds, and the run it
+        belongs to is the branch's own work."""
+        app = self._started_preview(request)
+        steps, stack, patches = self._handing_back(app)
+
+        with stack, patch.object(type(app._runs), "is_running", new=True):
+            for each in patches:
+                stack.enter_context(each)
+            app._hand_back.timeout.emit()
+
+        assert steps.mock_calls == []
+        assert app._hand_back.isActive()
+
+    def test_quitting_a_preview_hands_the_work_back_at_once(self, request):
+        app = self._started_preview(request)
+        steps, stack, patches = self._handing_back(app)
+
+        with stack, patch("gui.app.peer_watch.stand_evolver_down") as stood_down:
+            for each in patches:
+                stack.enter_context(each)
+            app._quit_by_request()
+
+        assert steps.mock_calls == [call.let_go(), call.start_the_usual_evolver(),
+                                    call.shutdown()]
+        stood_down.assert_not_called()
+
+    def test_the_windows_quit_says_the_work_goes_back_before_it_does(self, request):
+        app = self._started_preview(request)
+
+        with patch("gui.app.QMessageBox.question",
+                   return_value=QMessageBox.StandardButton.No) as asked, \
+             patch("gui.branch_session.start_the_usual_evolver") as started:
+            app._confirm_quit()
+
+        assert "Your usual Evolver takes the work back" in asked.call_args.args[2]
+        started.assert_not_called()
+
+    def test_quitting_the_usual_evolver_still_stands_it_down(self, request):
+        app = build_evolver_app(request)
+
+        with patch("gui.branch_session.start_the_usual_evolver") as started, \
+             patch("gui.app.peer_watch.stand_evolver_down") as stood_down, \
+             patch.object(app, "_shutdown"):
+            app._quit_by_request()
+
+        started.assert_not_called()
+        stood_down.assert_called_once_with()
+
+    def test_the_window_says_when_the_work_goes_back(self, request):
+        with patch("gui.branch_session.branch", return_value="claude/some-change"):
+            app = self._started_preview(request)
+
+        assert app._window.windowTitle().startswith("Evolver — preview of claude/some-change")
+        assert ", until " in app._window.windowTitle()
+
+    def test_the_usual_evolver_is_started_from_its_own_checkout_and_not_as_a_preview(self):
+        """It inherits this process's environment, and the flag in it would
+        make the Evolver started to take back over one more preview."""
+        with override_config(LIVE_DIR=Path("C:/live/evolver")), \
+             patch.dict(os.environ, {"EVOLVER_BRANCH_SESSION": "1"}), \
+             patch("gui.branch_session.subprocess.Popen") as popen:
+            branch_session.start_the_usual_evolver()
+
+        popen.assert_called_once()
+        assert popen.call_args.args[0] == [
+            "wscript.exe", str(Path("C:/live/evolver") / "launch_evolver.vbs")]
+        assert popen.call_args.kwargs["cwd"] == str(Path("C:/live/evolver"))
+        assert "EVOLVER_BRANCH_SESSION" not in popen.call_args.kwargs["env"]
+        assert popen.call_args.kwargs["env"]["PATH"] == os.environ["PATH"]
 
 
 class TestTellingTheTwoApart:
@@ -150,10 +246,3 @@ class TestTellingTheTwoApart:
 
         assert app._window.windowTitle() == "Evolver"
         assert app._tray.toolTip().startswith("Evolver")
-
-    def test_a_preview_claims_its_own_instance_so_neither_refuses_the_other(self, request):
-        with override_config(BRANCH_SESSION=True):
-            preview = build_evolver_app(request)
-        live = build_evolver_app(request)
-
-        assert preview._instance.names() != live._instance.names()

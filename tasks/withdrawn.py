@@ -116,22 +116,6 @@ def _is_video_name(name: str) -> bool:
     return Path(name).suffix.lower() in config.VIDEO_EXTENSIONS
 
 
-def pending() -> list[Path]:
-    """Every copy this library still holds of a withdrawn clip, deleting nothing.
-
-    What :func:`run` would take on its next pass. The branch preview reports it
-    (``preview_branch.py``), which is the only way a stage that deletes can be
-    judged before it lands: running it to see what it does is running it.
-    """
-    try:
-        rows = _gallery_rows()
-    except FileNotFoundError:
-        return []
-    return [video for lane in lanes.sent_lanes()
-            for group in _copy_groups(lane, _withdrawn_stems(rows, lane))
-            for video in group]
-
-
 def _empty_lane(lane: lanes.SentLane, stems: set[str]) -> WithdrawnResult:
     """Delete *lane*'s copies of every clip in *stems*, outbox side first.
 

@@ -72,9 +72,9 @@ class TestPipelineWorker(unittest.TestCase):
         return started, completed, finished, errors, progress
 
     def test_a_run_another_evolver_has_the_turn_for_says_why_it_did_not_start(self):
-        """Not a crash: a branch preview's Run Now landing on a scheduled run
-        is the ordinary case, and a traceback would bury the one line that says
-        what happened."""
+        """Not a crash: the tray's run landing on a command-line one is the
+        ordinary case, and a traceback would bury the one line that says what
+        happened."""
         from util.run_lock import Busy
 
         with self.assertLogs("gui.worker", level="INFO") as logged:

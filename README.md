@@ -94,7 +94,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
   - `gui/presence_throttle.py` - the fast poll that parks the in-flight non-AI encode when the user returns
   - `gui/single_instance.py` - who owns the one instance, and where a second launch goes
-  - `gui/branch_session.py` - a worktree's whole Evolver opened beside the live one, and what it leaves to it
+  - `gui/branch_session.py` - a worktree's whole Evolver run in place of the usual one, and how it hands the work back
   - `util/run_lock.py` - one pipeline run on the machine at a time, whichever Evolver starts it
   - `gui/peer_watch.py` - the check that starts the broker when it is gone, and the mark a deliberate quit leaves
   - `util/crash_log.py` - what the tray app records about the way it died
@@ -131,11 +131,11 @@ Run history is stored as JSON files in `runs/` (gitignored). Settings are persis
 
 ### Judging a branch
 
-`launch_preview_branch.vbs` in a worktree opens that branch's whole Evolver beside the one you run every day: a second tray icon and window, named for the branch, on the same library, run history, queue and settings, with every command working. The ten-minute schedule stays with your usual Evolver, and so does the watch that parks the non-AI encode while you are at the computer, so the preview runs the pipeline only when you click Run Now — and never while your usual Evolver is in the middle of a run, since only one Evolver runs the pipeline at a time.
+`launch_preview_branch.vbs` in a worktree runs that branch's whole Evolver in place of the one you run every day: its tray icon and window, named for the branch, on the same library, run history, queue and settings, with every command working and the ten-minute schedule running. Your usual Evolver steps aside for it — quitting the way it would at a restart, with no mark telling the broker to leave it down — and the preview hands the work back when you quit it, or on its own after an hour; the window's title says when. Handing back is the preview quitting and starting your usual Evolver, hidden in the tray as ever; starting your usual Evolver yourself takes the work back too. A preview that dies instead leaves Evolver down only until the broker's next check, a quarter of an hour at most. Launching the preview again replaces the one already running, so it always shows the branch as it now stands.
 
 ### Launching it again
 
-Only one Evolver ever runs — two schedulers would mean two pipelines and stacked Topaz encodes. But its window lives in the tray, so *launching* Evolver while it is already running is how you ask to see it: the shortcut, the Start menu entry, and the taskbar pin (whose relaunch command Windows re-runs verbatim) all start a second process whose real job is to open the first one's window. That process hands the request over a named pipe and exits.
+Only one Evolver ever runs — two schedulers would mean two pipelines and stacked Topaz encodes. But its window lives in the tray, so *launching* Evolver while it is already running is how you ask to see it: the shortcut, the Start menu entry, and the taskbar pin (whose relaunch command Windows re-runs verbatim) all start a second process whose real job is to open the first one's window. That process says over a named pipe what kind of launch it is and exits once the running Evolver answers. The answer is to open the window — except for a branch preview's launch, which the running Evolver makes way for, and a launch of your usual Evolver while a preview is running, which the preview makes way for. A preview ends an Evolver that does not answer at all, whether it has stopped responding or simply predates the answers.
 
 A launch never ends without telling you why. If the running instance holds the mutex but does not answer the pipe, or if startup fails before there is any window to report into — a missing dependency, say, which under `pythonw.exe` has neither a console nor stderr — you get a Windows dialog naming the cause and pointing at `tray_crash.log`, instead of a launcher that appeared to do nothing.
 

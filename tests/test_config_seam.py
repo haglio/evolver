@@ -69,10 +69,11 @@ CONFIG_REFERENCE_LEDGER = {
     # own, and the pipeline's turn (util/run_lock.py), read where the run is.
     "evolver.py": 11,
     "gui/app.py": 5,
-    # What a branch session is and what it stands beside: the worktree it runs
-    # from, named in the window title, the taskbar identity and the two
-    # single-instance names, and the launcher a preview's button re-runs.
-    "gui/branch_session.py": 8,
+    # What a branch session is and where it runs from -- named in the window
+    # title, the taskbar identity and the launcher a preview's button re-runs --
+    # and the usual Evolver it hands the work back to: that checkout's
+    # launcher, started without the flag that would make it one more preview.
+    "gui/branch_session.py": 10,
     "gui/main_window.py": 2,
     # The broker's launcher, so a check that finds the broker gone has something
     # to start. Where the sibling checkout is is config's business, not this

@@ -64,14 +64,14 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
 PROJECT_DIR  = Path(__file__).resolve().parent
 
 # What ``launch_preview_branch.vbs`` sets, and nothing else does: this run is a
-# worktree's whole app, opened beside the Evolver the user runs every day.
+# worktree's whole app, run in place of the Evolver the user runs every day.
 BRANCH_SESSION_FLAG = "EVOLVER_BRANCH_SESSION"
 
 
 def live_dir(environ: dict, project_dir_path: Path, roots: tuple[Path, ...]) -> Path:
     """The checkout whose run history, log, settings and queue manifests to use.
 
-    This one, except in a branch session, which shares the live app's: a
+    This one, except in a branch session, which shares the usual Evolver's: a
     preview keeping those for itself would show a history nobody made and a
     queue nobody ordered, and the user judges a change by the real ones (see
     ``gui/branch_session.py``).

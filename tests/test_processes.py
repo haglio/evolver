@@ -4,7 +4,9 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+from multiprocessing.connection import Client, Listener
 from pathlib import Path
 
 from util import processes
@@ -71,6 +73,22 @@ class TestCommandLine:
         )
         proc.wait()
         assert processes.command_line(proc.pid) is None
+
+
+class TestPipeServer:
+    """Which process is serving a named pipe, asked from the client end."""
+
+    def test_names_the_process_that_serves_it(self):
+        address = rf"\\.\pipe\EvolverTest_PipeServer_{os.getpid()}_{time.monotonic_ns()}"
+        with Listener(address, family="AF_PIPE") as listener:
+            accepted = threading.Thread(target=listener.accept, daemon=True)
+            accepted.start()
+            with Client(address, family="AF_PIPE") as client:
+                assert processes.pipe_server(client.fileno()) == os.getpid()
+            accepted.join(timeout=10)
+
+    def test_zero_for_a_handle_that_is_no_pipe(self):
+        assert processes.pipe_server(0) == 0
 
 
 class TestTerminate:

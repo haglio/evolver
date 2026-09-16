@@ -5,21 +5,21 @@ Shared rules are in the global `~/.claude/CLAUDE.md`. This file contains only ev
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it
-runs THAT worktree's **whole** Evolver — its own tray icon, the main window,
-every command working, Run Now included — beside the Evolver the user runs every
-day, on the live library and the live app's own run history, log, queue
-manifests and settings (`EVOLVER_BRANCH_SESSION=1` points those at
-`config.LIVE_DIR`). That shape is the user's choice (2026-09-16). Two jobs stay
-with the live app, because two of either would fight: the ten-minute schedule,
-and the supervision around it — the presence poll that parks the non-AI encode
-and the broker watch (`gui/branch_session.py`). Everything a preview does it
-does for real, because somebody clicked it, and `util/run_lock.py` keeps its
-Run Now from landing on a scheduled run. A change to a stage is judged the same
-way: Run Now in the preview runs the branch's whole pipeline, and that run's row
-and its log (click the run's title) are what he reads. **Never hand him a slice
-instead** — one window of the app, a screen filled from a report, buttons greyed
-out so the preview cannot do real work: he does not trust those, and said so
-("it's better if you give the whole app each time").
+runs THAT worktree's **whole** Evolver — its tray icon, the main window, every
+command working, the schedule included — **in place of** the Evolver the user
+runs every day, on the live library and that Evolver's own run history, log,
+queue manifests and settings (`EVOLVER_BRANCH_SESSION=1` points those at
+`config.LIVE_DIR`). That shape is the user's choice (2026-09-16): the preview
+has the running Evolver step aside and takes over its work, and the usual
+Evolver takes it back when the preview is quit, or on its own an hour later
+if he forgets (`gui/branch_session.py`, `gui/single_instance.py`). Launching
+the preview again replaces the one running, so a relaunch after a new commit
+shows the new code. A change to a stage is judged the same way: the preview's
+runs are the branch's whole pipeline, and a run's row and its log (click the
+run's title) are what he reads. **Never hand him a slice instead** — one window
+of the app, a screen filled from a report, buttons greyed out so the preview
+cannot do real work: he does not trust those, and said so ("it's better if you
+give the whole app each time").
 
 The launcher re-copies the primary's `content.local.json` every time — a stale
 copy resolves a library that has moved and the preview comes up empty.
