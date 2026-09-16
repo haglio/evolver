@@ -183,6 +183,7 @@ def nonai_library_overrides(root: Path, **extra):
         NONAI_JOB_STATE_FILE=root / "job.json",
         NONAI_ATTEMPTS_FILE=root / "attempts.json",
         NONAI_COOLDOWN_FILE=root / "cooldown.json",
+        NONAI_REQUEST_FILE=root / "request.json",
         NONAI_FFMPEG_LOG=root / "ffmpeg.log",
         FUN_TIME_WATCH_STATS_FILE=root / "watch_stats.json",
     )

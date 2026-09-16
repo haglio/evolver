@@ -318,6 +318,10 @@ def run_pipeline(
             # Toggle on -> Evolver manages the encode by user presence: suspend it
             # when someone's at the machine, resume it when they idle out.
             presence_managed=nonai_enabled is True,
+            # A video asked for from the queue window starts whatever the
+            # toggle says; only the tray answers that ask, never the CLI.
+            take_requests=nonai_enabled is not None,
+            ai_waiting=not ai_drained,
         )
 
         if upscale_still_pending:
