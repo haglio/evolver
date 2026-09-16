@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
 )
-from shared_ui.colors import BLUE, BORDER_PANEL, TEXT_SECONDARY
+from shared_ui.colors import BLUE, BORDER_PANEL, TEXT_MUTED
 from shared_ui.spacing import GAP_SMALL, MARGIN_STANDARD
 
 from util import upscale_lineup
@@ -41,7 +41,10 @@ if TYPE_CHECKING:
 # back into the list's selection.
 VIDEO_MIME = "application/x-evolver-video"
 
-_ICON_COLOR = TEXT_SECONDARY.name()
+# The family's muted gray rather than its secondary text, which is a near-white
+# for the dark chrome this app draws none of: these sit on a window Windows
+# colors, and the same gray is what the run history marks its inert rows with.
+_MUTED = TEXT_MUTED.name()
 
 # How often an open window asks for the lineup again. The encode it is watching
 # is parked and thawed by a poll of its own between the ten-minute runs, and its
@@ -108,12 +111,12 @@ class _NowBox(QFrame):
         self.name_label.setWordWrap(True)
         top.addWidget(self.name_label, stretch=1)
         self.length_label = QLabel()
-        self.length_label.setStyleSheet(f"color: {TEXT_SECONDARY.name()}")
+        self.length_label.setStyleSheet(f"color: {_MUTED}")
         top.addWidget(self.length_label)
         layout.addLayout(top)
 
         self.state_label = QLabel()
-        self.state_label.setStyleSheet(f"color: {TEXT_SECONDARY.name()}")
+        self.state_label.setStyleSheet(f"color: {_MUTED}")
         self.state_label.setWordWrap(True)
         layout.addWidget(self.state_label)
 
@@ -273,9 +276,8 @@ class UpscaleQueueWindow(QDialog):
         self._up_next_heading = _heading("Up next")
         layout.addWidget(self._up_next_heading)
 
-        hint = QLabel("Drag to reorder. Drop a video on the box above to "
-                      "upscale it right away, whatever else is running.")
-        hint.setStyleSheet(f"color: {TEXT_SECONDARY.name()}")
+        hint = QLabel("Drag to reorder. Drop one on the box above to upscale it now.")
+        hint.setStyleSheet(f"color: {_MUTED}")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
@@ -304,6 +306,7 @@ class UpscaleQueueWindow(QDialog):
         self._tree.clear()
         for entry in lineup.up_next:
             item = QTreeWidgetItem(["", entry.name, running_time(entry.seconds)])
+            item.setTextAlignment(2, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             item.setData(0, Qt.ItemDataRole.UserRole, entry.video)
             item.setToolTip(1, entry.video)
             item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
@@ -340,7 +343,7 @@ class UpscaleQueueWindow(QDialog):
             item = self._tree.topLevelItem(row)
             item.setText(0, str(row + 1))
             placed = item.data(0, Qt.ItemDataRole.UserRole) in self._pinned
-            item.setIcon(0, qta.icon("fa5s.thumbtack", color=_ICON_COLOR) if placed
+            item.setIcon(0, qta.icon("fa5s.thumbtack", color=_MUTED) if placed
                          else qta.icon("fa5s.thumbtack", color="transparent"))
             item.setToolTip(0, "You put this one here" if placed
                             else "Evolver's own order: most watched first")
