@@ -38,8 +38,7 @@ nonai_upscale_cooldown*.json
 
 # GUI runtime state
 runs/
-# The branch preview's own tree: its launcher log, and the running times it
-# measures rather than reading off the library's sidecars (preview_branch.py).
+# The branch preview's own tree: the launcher's log lands there.
 state/
 gui_settings.json
 tray_crash.log
@@ -56,7 +55,7 @@ tray_crash.log
 # untracked one dirties main and blocks merges. '[' escaped to match literally.
 *\[conflicted*
 
-# The Verify <branch>.lnk an agent leaves in the primary checkout (see CLAUDE.md)
+# Shortcuts left in a checkout for the user to click.
 *.lnk
 
 # Written by every editable install into the project root; not source.

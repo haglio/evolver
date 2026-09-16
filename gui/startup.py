@@ -12,6 +12,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import config
+
 
 def _startup_dir() -> Path:
     """The Startup folder, from the environment or from where it always is.
@@ -40,7 +42,9 @@ def _vbs_string(value) -> str:
 
 def register_startup():
     """Create a .lnk shortcut in the Windows Startup folder."""
-    project_dir = Path(__file__).resolve().parent.parent
+    # The checkout the user runs, never a worktree: a preview's settings dialog
+    # would otherwise leave Windows starting a branch at every sign-in.
+    project_dir = config.LIVE_DIR
     target = sys.executable
     arguments = str(project_dir / "tray_app.py")
     working_dir = str(project_dir)

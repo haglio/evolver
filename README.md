@@ -94,6 +94,8 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
   - `gui/presence_throttle.py` - the fast poll that parks the in-flight non-AI encode when the user returns
   - `gui/single_instance.py` - who owns the one instance, and where a second launch goes
+  - `gui/branch_session.py` - a worktree's whole Evolver opened beside the live one, and what it leaves to it
+  - `util/run_lock.py` - one pipeline run on the machine at a time, whichever Evolver starts it
   - `gui/peer_watch.py` - the check that starts the broker when it is gone, and the mark a deliberate quit leaves
   - `util/crash_log.py` - what the tray app records about the way it died
   - `gui/tray.py` - system tray icon and context menu
@@ -126,6 +128,10 @@ pythonw.exe tray_app.py
 This starts a system tray icon. Right-click for the context menu (Run Now, Pause/Resume, Settings, Stats, Upscale Queue, Backfill Metadata, Quit) or double-click to open the main window with run history and live progress. Configure the run interval and Windows startup registration from Settings.
 
 Run history is stored as JSON files in `runs/` (gitignored). Settings are persisted to `gui_settings.json` (gitignored).
+
+### Judging a branch
+
+`launch_preview_branch.vbs` in a worktree opens that branch's whole Evolver beside the one you run every day: a second tray icon and window, named for the branch, on the same library, run history, queue and settings, with every command working. The ten-minute schedule stays with your usual Evolver, and so does the watch that parks the non-AI encode while you are at the computer, so the preview runs the pipeline only when you click Run Now — and never while your usual Evolver is in the middle of a run, since only one Evolver runs the pipeline at a time.
 
 ### Launching it again
 
@@ -271,6 +277,8 @@ Alternative (direct Python command):
 ```bash
 python evolver.py
 ```
+
+A command-line run that finds the tray (or any other Evolver) in the middle of a run starts nothing, says so in the log, and exits 1.
 
 ## Matching carved clips to their scenes
 

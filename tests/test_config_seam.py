@@ -69,13 +69,20 @@ CONFIG_REFERENCE_LEDGER = {
     # own, and the pipeline's turn (util/run_lock.py), read where the run is.
     "evolver.py": 11,
     "gui/app.py": 5,
+    # What a branch session is and what it stands beside: the worktree it runs
+    # from, named in the window title, the taskbar identity and the two
+    # single-instance names, and the launcher a preview's button re-runs.
+    "gui/branch_session.py": 8,
     "gui/main_window.py": 2,
     # The broker's launcher, so a check that finds the broker gone has something
     # to start. Where the sibling checkout is is config's business, not this
     # module's.
     "gui/peer_watch.py": 1,
     "gui/presence_throttle.py": 1,
-    "gui/process_identity.py": 2,
+    # One fewer: what this instance calls itself and what its button re-runs
+    # are gui/branch_session.py's, which is the module that knows which of the
+    # two Evolvers this is.
+    "gui/process_identity.py": 1,
     # The second shape again: the zone a run's timestamp is shown in was
     # ZoneInfo("America/Los_Angeles") bound at this module's own import,
     # which no test and no machine could reach. One read buys the seam.
@@ -84,14 +91,11 @@ CONFIG_REFERENCE_LEDGER = {
     # watchdog is armed, and again in what the overrun says.
     "gui/run_controller.py": 2,
     "gui/settings.py": 2,
+    # The checkout the Windows Startup shortcut points at: the live one, never
+    # the worktree a preview's settings dialog happens to be running from.
+    "gui/startup.py": 1,
     "gui/tray.py": 1,
     "gui/worker.py": 1,
-    # The branch preview reads the library the way a stage does, and points two
-    # of these somewhere else -- the run record and the running times it takes
-    # stay in the worktree rather than in the live install (preview_branch.py).
-    # One more for Topaz's ffmpeg: the preview asks Topaz whether its sign-in
-    # has expired only while no encode of the live app is running.
-    "preview_branch.py": 7,
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 5,

@@ -144,6 +144,42 @@ class TestProjectDir(unittest.TestCase):
             self.assertEqual(found, checkout)
 
 
+class TestLiveDir(unittest.TestCase):
+    """Which checkout's run history, log, settings and queue manifests a run uses.
+
+    Its own, except in a branch session: the preview launcher runs a worktree's
+    whole app beside the live one, and a preview keeping those files for itself
+    would show a history nobody made and a queue nobody ordered.
+    """
+
+    def test_an_ordinary_run_uses_its_own_checkout(self):
+        with workspace_temp_dir() as temp:
+            (temp / "workspace" / "evolver").mkdir(parents=True)
+
+            found = config.live_dir({}, temp / "worktree", (temp / "workspace",))
+
+            self.assertEqual(found, temp / "worktree")
+
+    def test_a_branch_session_uses_the_checkout_the_live_app_runs_from(self):
+        with workspace_temp_dir() as temp:
+            live = temp / "workspace" / "evolver"
+            live.mkdir(parents=True)
+
+            found = config.live_dir({config.BRANCH_SESSION_FLAG: "1"},
+                                    temp / "worktree", (temp / "workspace",))
+
+            self.assertEqual(found, live)
+
+    def test_only_the_flag_the_preview_launcher_sets_counts(self):
+        with workspace_temp_dir() as temp:
+            (temp / "workspace" / "evolver").mkdir(parents=True)
+
+            found = config.live_dir({config.BRANCH_SESSION_FLAG: "yes"},
+                                    temp / "worktree", (temp / "workspace",))
+
+            self.assertEqual(found, temp / "worktree")
+
+
 class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
     """The four sibling paths must come from the roots, not from the library root."""
 

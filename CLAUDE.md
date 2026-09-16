@@ -5,21 +5,24 @@ Shared rules are in the global `~/.claude/CLAUDE.md`. This file contains only ev
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it
-opens THAT worktree's Evolver window on what the branch reports about the real
-library — the run-detail table, off the branch's code, with the live app left
-running. It never runs the pipeline: Evolver's job is moving files in the one
-library and its non-AI stage supervises a detached encode by a pid in a file, so
-a second instance would move the same files and adopt the same encode. What each
-preview reports is one function per stage in `preview_branch.py`; add one there
-when a change makes a stage's report worth judging. A change that adds a
-*window* is judged by opening it: the preview's own toolbar opens the upscale
-queue that way, on copies of the live records (`preview_files`), so nothing the
-window writes reaches the running app.
+runs THAT worktree's **whole** Evolver — its own tray icon, the main window,
+every command working, Run Now included — beside the Evolver the user runs every
+day, on the live library and the live app's own run history, log, queue
+manifests and settings (`EVOLVER_BRANCH_SESSION=1` points those at
+`config.LIVE_DIR`). That shape is the user's choice (2026-09-16). Two jobs stay
+with the live app, because two of either would fight: the ten-minute schedule,
+and the supervision around it — the presence poll that parks the non-AI encode
+and the broker watch (`gui/branch_session.py`). Everything a preview does it
+does for real, because somebody clicked it, and `util/run_lock.py` keeps its
+Run Now from landing on a scheduled run. A change to a stage is judged the same
+way: Run Now in the preview runs the branch's whole pipeline, and that run's row
+and its log (click the run's title) are what he reads. **Never hand him a slice
+instead** — one window of the app, a screen filled from a report, buttons greyed
+out so the preview cannot do real work: he does not trust those, and said so
+("it's better if you give the whole app each time").
 
-The first launch after a change spends a couple of minutes measuring running
-times the library has not recorded yet, and later ones are immediate. The
-launcher re-copies the primary's `content.local.json` every time — a stale copy
-resolves a library that has moved and the preview comes up empty.
+The launcher re-copies the primary's `content.local.json` every time — a stale
+copy resolves a library that has moved and the preview comes up empty.
 
 **The preview is part of delivering a user-facing change, not an extra, and it
 comes BEFORE the pull request** — opening one here lands the change hands-off
@@ -30,18 +33,6 @@ good. **Never launch the preview yourself** — a window over his work gets clos
 in irritation and takes whatever else he was running with it. The windowless
 pre-handoff check is `python -m pytest tests/test_launch_smoke.py`, which
 replays the launch's whole import phase.
-
-## Repo-specific gotchas
-
-- **Get his eyes on a stage before the PR.** From your worktree, copy the
-  primary's `content.local.json` in (git-ignored; without it the branch runs
-  against the example overlay's placeholder library), then leave
-  `Verify <branch>.lnk` in the primary checkout (ignored there) that runs
-  `.venv\Scripts\python.exe tools\run_stage.py <stage module>` from the
-  worktree in a console that stays open, and hand him the link. The stage runs
-  for real against the library, once — which is what the tray does every ten
-  minutes once it lands — so only a stage whose `run()` takes no arguments
-  can be shown this way. Take the `.lnk` back out when the PR merges.
 
 ## Retuning a Topaz recipe owes it a new version
 
