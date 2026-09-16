@@ -56,3 +56,6 @@ tray_crash.log
 
 # The Verify <branch>.lnk an agent leaves in the primary checkout (see CLAUDE.md)
 *.lnk
+
+# Written by every editable install into the project root; not source.
+*.egg-info/
