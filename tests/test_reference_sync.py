@@ -40,10 +40,23 @@ def _stores_under(temp: Path, **used):
             "SCRIPTURE_SESSIONS_DIR": unused,
             "FUN_TIME_WATCH_STATS_FILE": unused / "watch_stats.json",
             "FUN_TIME_FAVS_FILE": unused / "favs.csv",
+            "NON_AI_DIR": unused / "non_AI",
+            "METADATA_DIR": unused / "metadata",
             **used,
         },
     ):
         yield
+
+
+@contextmanager
+def _paired_library(temp: Path):
+    """A non-AI library at *temp* whose clip sidecars are the only store in use."""
+    library = temp / "videos" / "videos"
+    with _stores_under(
+        temp, VIDEO_LIBRARY_DIR=library, NON_AI_DIR=library / "2D" / "non_AI",
+        METADATA_DIR=temp / "videos" / "metadata",
+    ):
+        yield library / "2D" / "non_AI"
 
 
 class TestClipperSessions(unittest.TestCase):
@@ -175,8 +188,59 @@ class TestFunTimeFavorites(unittest.TestCase):
             self.assertIn("https://example.test/clip", cell)
 
 
-if __name__ == "__main__":
-    unittest.main()
+class TestClipPairings(unittest.TestCase):
+    def _pair(self, temp: Path, clip: Path, scene: Path) -> Path:
+        card = temp / "videos" / "metadata" / clip.relative_to(temp / "videos" / "videos")
+        return _write_json(card.with_suffix(".json"), {
+            "clip": {"performer": "Nora Quill", "full_video": str(scene), "scene_offset": 781.125},
+            "video": {"type": "excerpt"},
+        })
+
+    def test_a_pairing_follows_its_scene_to_the_upscale_that_replaced_it(self):
+        with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
+            bucket = non_ai / "larkin"
+            retired = bucket / "0 unsorted" / "Nora-Quill_540-izb4ykfa.mp4"
+            retired.parent.mkdir(parents=True)
+            upscale = _write_video(
+                bucket / "3_good_to_go" / "processed" / "Nora-Quill_540-izb4ykfa_apo8_iris2.mp4")
+            card = self._pair(temp, _write_video(bucket / "1 clips" / "Nora Quill - Brink.mp4"),
+                              retired)
+
+            result = reference_sync.run()
+
+            self.assertEqual(json.loads(card.read_text(encoding="utf-8")), {
+                "clip": {"performer": "Nora Quill", "full_video": str(upscale),
+                         "scene_offset": 781.125},
+                "video": {"type": "excerpt"},
+            })
+            self.assertEqual(result.relocated, 1)
+
+    def test_of_several_versions_the_pairing_takes_the_smallest_the_matcher_would_decode(self):
+        with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
+            processed = non_ai / "larkin" / "3_good_to_go" / "processed"
+            _write_video(processed / "Nora-Quill_540-izb4ykfa_apo8_iris3.mp4").write_bytes(b"x" * 900)
+            smaller = _write_video(processed / "Nora-Quill_540-izb4ykfa_apo8_iris2.mp4")
+            card = self._pair(temp, _write_video(non_ai / "larkin" / "1 clips" / "Brink.mp4"),
+                              non_ai / "larkin" / "0 unsorted" / "Nora-Quill_540-izb4ykfa.mp4")
+
+            reference_sync.run()
+
+            self.assertEqual(json.loads(card.read_text(encoding="utf-8"))["clip"]["full_video"],
+                             str(smaller))
+
+    def test_a_same_named_upscale_in_another_bucket_is_not_that_scene(self):
+        with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
+            (non_ai / "larkin" / "0 unsorted").mkdir(parents=True)
+            _write_video(non_ai / "other" / "3_good_to_go" / "processed"
+                         / "Nora-Quill_540-izb4ykfa_apo8_iris2.mp4")
+            gone = non_ai / "larkin" / "0 unsorted" / "Nora-Quill_540-izb4ykfa.mp4"
+            card = self._pair(temp, _write_video(non_ai / "larkin" / "1 clips" / "Brink.mp4"), gone)
+
+            result = reference_sync.run()
+
+            self.assertEqual(json.loads(card.read_text(encoding="utf-8"))["clip"]["full_video"],
+                             str(gone))
+            self.assertEqual(result.unresolved, 1)
 
 
 class TestUnwritableStore(unittest.TestCase):
@@ -362,3 +426,7 @@ class TestReferenceSyncResultSurface(unittest.TestCase):
             {f.name for f in dataclasses.fields(reference_sync.ReferenceSyncResult)},
             {"checked", "relocated", "unresolved", "write_errors", "refused"},
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -3,8 +3,9 @@
 Evolver relocates videos — sorting them, retiring an upscaled original, and the
 library gets reorganized by hand between runs too. Every sibling app that saved
 a video's path (Clipper's clip bounds, Fun Time's favorites and watch counts)
-is left pointing at where the file used to be. This stage walks those stores
-each run and follows the move.
+is left pointing at where the file used to be, and so is the scene this app
+recorded each carved clip was found in. This stage walks those stores each run
+and follows the move.
 
 Each of those files belongs to a repo that has never heard of this one, so a
 format one of them changes would arrive here as a file that still parses and
@@ -104,7 +105,9 @@ def _reconcile(
         was_at = Path(reference)
         if was_at.exists():
             continue
-        now_at = video_locator.relocate(was_at, index) or _renamed(store, was_at)
+        now_at = (video_locator.relocate(was_at, index)
+                  or _another_version(store, was_at, index)
+                  or _renamed(store, was_at))
         if now_at is None:
             unresolved += 1
             log.warning("UNRESOLVED %s reference (%s): %s", store.label, store.path.name, reference)
@@ -124,6 +127,14 @@ def _reconcile(
             relocated = len(moves)
     return _Reconciled(checked=len(references), relocated=relocated,
                        unresolved=unresolved, write_errors=write_errors)
+
+
+def _another_version(
+    store: reference_stores.ReferenceStore, was_at: Path, index: dict[str, list[Path]],
+) -> Path | None:
+    if not store.any_version_will_do:
+        return None
+    return video_locator.another_version_of(was_at, index)
 
 
 def _renamed(store: reference_stores.ReferenceStore, was_at: Path) -> Path | None:

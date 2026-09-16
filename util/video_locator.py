@@ -8,7 +8,9 @@ from pathlib import Path
 
 import config
 from util import ffprobe
-from util.media_files import is_finalized_video_file, library_videos
+from util.media_files import file_size, is_finalized_video_file, library_videos
+from util.nonai_library import bucket_of
+from util.variants import strip_processing_suffixes
 from util.weird_piles import weird_piles
 
 
@@ -34,6 +36,25 @@ def relocate(was_at: Path, index: dict[str, list[Path]]) -> Path | None:
     """The one video now carrying that filename, or None if none or several do."""
     matches = index.get(was_at.name.lower(), [])
     return matches[0] if len(matches) == 1 else None
+
+
+def another_version_of(was_at: Path, index: dict[str, list[Path]]) -> Path | None:
+    """The smallest other version of that video still in its bucket, if any.
+
+    The upscale that replaces a non-AI original is published into the same
+    bucket under the original's name plus processing suffixes, and the original
+    leaves -- so this is where a video that was upscaled away is found.
+    """
+    bucket = bucket_of(was_at)
+    if bucket is None:
+        return None
+    original = strip_processing_suffixes(was_at.stem).casefold()
+    versions = [
+        video for videos in index.values() for video in videos
+        if strip_processing_suffixes(video.stem).casefold() == original
+        and bucket_of(video) == bucket
+    ]
+    return min(versions, key=lambda video: (file_size(video), str(video))) if versions else None
 
 
 def renamed_in_place(was_at: Path, fingerprint: tuple[float, int]) -> Path | None:

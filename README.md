@@ -243,12 +243,15 @@ Each run, after every stage that could have moved something, Evolver walks the s
 | `scripture/sessions/*.scripture` | a project's `video_path` — its splits, tracking and ground truth |
 | `fun_time/favs.csv` | the `local_file` hyperlink on every favorite, URL and label alike |
 | `fun_time/state/watch_stats.json` | the completions/skips/locks keyed by video path, re-keyed in Fun Time's own lowercased form |
+| `videos/metadata/2D/non_AI/**/*.json` | a carved clip's `clip.full_video` — the scene the matching batch found it in, which Fun Time's jumps between the two go by |
 
-Those four are the stores that hold something you cannot get back: clip bounds and splits made by hand, a curated favorites list, and watch counts accumulated over months. Playlists, HUD state, duration caches and thumbnail caches are all regenerated from the library on demand, so a stale entry in one costs a rebuild rather than the data, and Evolver leaves them alone.
+Those five are the stores that hold something you cannot get back cheaply: clip bounds and splits made by hand, a curated favorites list, watch counts accumulated over months, and a pairing it takes the matching batch minutes of decoding to find again. Playlists, HUD state, duration caches and thumbnail caches are all regenerated from the library on demand, so a stale entry in one costs a rebuild rather than the data, and Evolver leaves them alone.
 
 The stage runs *before* the bookmarks sync on purpose: that stage drops favorites whose file is missing, so a favorite whose video merely moved has to be repointed first or it gets deleted on the very run that could have saved it.
 
 A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder like `_larkin_compilations_archive/` is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Clipper session's frame numbers only mean anything against the exact file they were set on.
+
+A clip's pairing also follows its scene to another version of it: when the non-AI upscale replaces a scene with `<stem>_apo8_iris2` and moves the original out of the library, no file carries the old name any more, so the pairing is matched to the smallest file in the same bucket whose name, processing suffixes taken off, is the one it names. That is safe for a pairing and for nothing else here, because its offset is in seconds, which an upscale keeps, where a Clipper session's frame numbers are not.
 
 Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`. Videos sitting in either condemned pile — `kinda_weird/` and Genau's — are excluded from the search, the purge stage being about to delete them, so pointing anything at one would only re-break it.
 

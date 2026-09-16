@@ -5,13 +5,14 @@ Each store is one file holding references Evolver can break by moving a video.
 mapping in place. Neither ever drops a reference: a path Evolver cannot find a
 new home for is left exactly as it was, for a human to judge.
 
-Every one of these files belongs to another repo, and none of those repos hears
-about this one -- so before rewriting one, ``shape_complaint`` asks whether it
-is still the shape this stage was written against, and a file that is not is
-left alone and reported. Clipper and Scripture each stamp a version their own
-tests hold. Fun Time's watch counts carry none and cannot, since every key
+All but one kind of these files belong to another repo, and none of those repos
+hears about this one -- so before rewriting one, ``shape_complaint`` asks
+whether it is still the shape this stage was written against, and a file that is
+not is left alone and reported. Clipper and Scripture each stamp a version their
+own tests hold. Fun Time's watch counts carry none and cannot, since every key
 there is a video path, so their shape is what is checked; its favorites file is
-a spreadsheet whose header row is its version.
+a spreadsheet whose header row is its version. The one kind that is this app's
+own is a carved clip's sidecar, naming the scene the clip was found in.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from pathlib import Path
 from app_support.file_channel import write_whole
 
 import config
-from util import favs_csv
+from util import favs_csv, lanes, sidecar
 from util.json_reads import read_dict_strict
 
 # The versions the two apps that stamp one write today, and the ones this stage
@@ -48,10 +49,10 @@ def _nothing_to_check(_path: Path) -> str | None:
 
 @dataclass(frozen=True)
 class ReferenceStore:
-    """One file that names videos, and the three things this can ask of it.
+    """One file that names videos, and what this can ask of it.
 
     The readers are held as fields rather than as subclasses because what
-    varies between stores is exactly these three functions and nothing else.
+    varies between stores is exactly these functions and one flag.
     They are private and reached through the methods below: a store handing its
     own path back into its own function -- ``store.read(store.path)`` -- is a
     hand-rolled vtable, and the one thing it makes possible is passing the
@@ -67,6 +68,10 @@ class ReferenceStore:
     _fingerprint: Callable[[Path], tuple[float, int] | None] = _no_fingerprint
     # What stops this file being rewritten, when something does.
     _shape: Callable[[Path], str | None] = _nothing_to_check
+    # Whether another version of the video -- its upscale, say -- serves this
+    # file as well as the one it names: true of a place in seconds, false of a
+    # frame index, which only means anything against the exact file.
+    any_version_will_do: bool = False
 
     def read(self) -> list[str]:
         """Every video path this file names."""
@@ -118,6 +123,39 @@ def discover() -> Iterator[ReferenceStore]:
             _rewrite_favorite_paths,
             _shape=_has_a_local_path_column,
         )
+    yield from _clip_pairings()
+
+
+def _clip_pairings() -> Iterator[ReferenceStore]:
+    """Each carved clip's sidecar that names the scene the clip was found in."""
+    for video in lanes.non_ai_videos():
+        path = sidecar.sidecar_path(video)
+        if _read_paired_scene(path):
+            yield ReferenceStore(
+                "clip pairing", path, _read_paired_scene, _rewrite_paired_scene,
+                any_version_will_do=True,
+            )
+
+
+def _read_paired_scene(path: Path) -> list[str]:
+    scene = _pairing(sidecar.read(path)).get("full_video")
+    return [scene] if isinstance(scene, str) and scene else []
+
+
+def _rewrite_paired_scene(path: Path, moves: dict[str, str]) -> None:
+    def follow_the_scene(payload: dict) -> dict | None:
+        pairing = _pairing(payload)
+        if pairing.get("full_video") not in moves:
+            return None
+        pairing["full_video"] = moves[pairing["full_video"]]
+        return payload
+
+    sidecar.update(path, follow_the_scene)
+
+
+def _pairing(payload: dict) -> dict:
+    clip = payload.get("clip")
+    return clip if isinstance(clip, dict) else {}
 
 
 def _session_files(
