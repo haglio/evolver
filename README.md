@@ -102,7 +102,8 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `gui/main_window.py` - run history list and detail/progress panel
   - `gui/progress_popup.py` - the floating per-stage progress window
   - `gui/stats_window.py` - the stacked-area chart of stage durations across runs
-  - `gui/queue_window.py` - the upscale queue: drag to reorder it, drag to the top to upscale one now
+  - `gui/queue_window.py` - the upscale queue: drag to reorder it, and the first video's arrow to upscale it now
+  - `gui/background.py` - the queue window's reads and changes, done off the window's thread
   - `gui/worker.py` - background QThread pipeline runner
   - `gui/scheduler.py` - timer-based scheduling with run-guard
   - `gui/run_record.py` - JSON run record persistence
@@ -218,9 +219,11 @@ A new encode starts only when *all* of these hold: the toggle is on, the user ha
 
 **The queue window**. **Upscale Queue** in the tray menu, and **Queue** on the main window's toolbar, opens the same list the stage works from: one list, in the order the stage will take it, each video named by the title the library records (`tasks/nonai_titles.py`) or by its file name where it has none. The first row is whatever the machine is on, and says what is happening to it — upscaling, paused because you are at the computer, upscaling at your request, or starting — with how far through it is. With nothing in flight the first row is simply the video that starts next.
 
-Two things you can do there. Drag a row up or down and everything from the top of the list down to where you dropped it keeps that order; the rows below go on following Evolver's own order. Drag a row to the **top** and that video is upscaled **now**: whatever encode is in flight is stopped — it keeps its place, next after the one you asked for, though the hours it had done are lost, since a stopped encode starts over — the ask is recorded in `nonai_upscale_request.json`, and the run that starts it is brought forward instead of waiting out the rest of the ten-minute interval.
+Two things you can do there. Drag a row up or down and everything from the top of the list down to where you dropped it keeps that order; the rows below go on following Evolver's own order. Drag a row to the **top** and that video is the next one upscaled: whatever encode is in flight is stopped — that video goes second, and the hours it had done are lost, since a stopped encode starts over — and the new first video starts the usual way, once you are away from the computer.
 
-The arrow beside the first row is the same switch, and only the first row has one: filled, that video runs whoever is at the computer; clicked, it goes hollow and the video waits until you are away from the computer, as the rest do, so an encode already running is parked again within seconds. A video whose encode has ended has no arrow — the next run files it.
+The arrow beside the first row — only the first row has one — is what upscales a video **now**. Click it and it fills: that video runs whoever is at the computer, the ask is recorded in `nonai_upscale_request.json`, and the run that starts it is brought forward instead of waiting out the rest of the ten-minute interval. Click it again and it goes hollow: the video waits until you are away, as the rest do, and an encode already running is paused again within seconds. A video whose upscale has finished stays in the first row, with no arrow, until Evolver's next run replaces the original with it.
+
+The window reads the queue and makes its changes off its own thread, so a run busy starting an encode never stops it answering the mouse.
 
 **Watching it**: every tick appends one line to `evolver.log` — `Non-AI upscale: started=... in_flight=... promoted=... stopped=... failed=... pending=... left=...h done=...%` — so a `grep "Non-AI"` over the log is the quickest status. While an encode runs, `in_flight` carries its progress, e.g. `in_flight=other/0 unsorted/clip.mp4 (37% encoded)`, measured by probing the duration written to the growing partial so far (the first minute or two may show no percentage while the file's header lands); a frozen encode reads `… [suspended: user present]`. What's encoding right now (source, output, pid, start time, and how long it has spent suspended) sits in `nonai_upscale_job.json`, and the encode's own stderr streams to `nonai_upscale_ffmpeg.log`. The same per-tick summary — including `in_flight_percent` — lands in each run's record, visible in the main window's run history under the **Upscale non-AI** stage row, which reads e.g. `180 queued (41.5h left, 29% done)`.
 

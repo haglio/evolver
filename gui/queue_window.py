@@ -3,8 +3,8 @@
 Two things this window is for. Seeing the order — the stage picks it by watch
 score and a few other signals, and until now the only way to read it was a
 count in a log line. And changing it: a video dragged up the list is kept where
-it was dropped, and one dragged to the top is upscaled right away, which is what
-a video downloaded five minutes ago needs.
+it was dropped, and one dragged to the top is the next one upscaled, ahead of
+whatever the machine was on.
 
 The first row is the one the machine is on, and the arrow beside it says
 whether it goes ahead while somebody is at the computer: filled it runs anyway,
@@ -60,7 +60,7 @@ _STATE_WORDS = {
     upscale_lineup.PAUSED: "Paused while you're at the computer",
     upscale_lineup.ASKED_FOR: "Upscaling at your request",
     upscale_lineup.STARTING: "Starting at your request",
-    upscale_lineup.FINISHING: "Finished encoding; Evolver files it on its next run",
+    upscale_lineup.FINISHING: "Done upscaling; Evolver's next run replaces the original with it",
 }
 
 # Why a video asked for has not started yet. The stage's own words for these
@@ -194,6 +194,8 @@ class UpscaleQueueWindow(QDialog):
 
     #: The videos now placed by hand, in the order they are to be taken.
     arranged = pyqtSignal(list)
+    #: The video dragged to the top: next, at the usual moment.
+    placed_first = pyqtSignal(str)
     #: The video to upscale now, whoever is at the computer.
     now_requested = pyqtSignal(str)
     #: The video on the first row goes back to waiting until you are away.
@@ -218,8 +220,8 @@ class UpscaleQueueWindow(QDialog):
         self._heading.setFont(font)
         layout.addWidget(self._heading)
 
-        hint = QLabel("Drag to reorder. A video dragged to the top is upscaled right "
-                      "away, and the arrow beside the top one switches that off and on.")
+        hint = QLabel("Drag to reorder; the top video is the next one upscaled. Its "
+                      "arrow upscales it right away, even while you're at the computer.")
         hint.setStyleSheet(f"color: {_MUTED}")
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -284,11 +286,15 @@ class UpscaleQueueWindow(QDialog):
             self._mark_places()
             self.now_withdrawn.emit()
             return
-        self._ask_for_the_first_row()
+        self._head = upscale_lineup.Head(upscale_lineup.STARTING)
+        self._mark_places()
+        self.now_requested.emit(self._tree.videos()[0])
 
     def _on_moved(self, video: str, row: int) -> None:
         if row == 0:
-            self._ask_for_the_first_row()
+            self._head = upscale_lineup.Head(upscale_lineup.NEXT)
+            self._mark_places()
+            self.placed_first.emit(video)
             return
         videos = self._tree.videos()
         placed = max([row] + [at for at, name in enumerate(videos) if name in self._pinned])
@@ -296,16 +302,6 @@ class UpscaleQueueWindow(QDialog):
         self._pinned = set(order)
         self._mark_places()
         self.arranged.emit(order)
-
-    def _ask_for_the_first_row(self) -> None:
-        """Say the first row is wanted now, and show it as asked for at once.
-
-        The lineup that says so for real is a pipeline run away, and while a
-        drag is in flight even a refresh is held back until the row lands.
-        """
-        self._head = upscale_lineup.Head(upscale_lineup.STARTING)
-        self._mark_places()
-        self.now_requested.emit(self._tree.videos()[0])
 
     def _mark_places(self) -> None:
         """Number every row, and put the arrow and the state on the first."""

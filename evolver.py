@@ -208,6 +208,11 @@ def upscale_now(video: str) -> None:
     nonai_upscale.request_now(video)
 
 
+def upscale_next(video: str) -> None:
+    """Put *video* first in the queue: it takes over, and starts at the usual moment."""
+    nonai_upscale.put_first(video)
+
+
 def withdraw_upscale_now() -> None:
     """Stop asking: the video asked for waits for nobody at the computer again."""
     nonai_upscale.withdraw_request()

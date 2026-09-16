@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
 import time
 import unittest
 from contextlib import ExitStack
@@ -453,6 +454,59 @@ class TestAskingForOneNow(unittest.TestCase):
             job = nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"])
             self.assertTrue(job["on_request"])
             self.assertFalse(job["suspended"])
+            self.assertIsNone(request_of(overrides))
+
+
+class TestPuttingOneFirst(unittest.TestCase):
+    """A video dragged to the top of the queue window: it is next, and it waits
+    for the usual moment to start like any other."""
+
+    def test_it_leads_the_queue_without_being_asked_for(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+
+            stack, _mocks = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.put_first("larkin/0 unsorted/b.mp4")
+
+            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+                             ["larkin/0 unsorted/b.mp4"])
+            self.assertIsNone(request_of(overrides))
+
+    def test_it_takes_over_from_the_encode_in_flight_which_goes_next(self):
+        """Put first means first: the encode of another video stops, and that
+        video waits second in line to start over."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            _busy, tmp, _out = write_job(root, overrides, suspended=True)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+
+            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
+            with override_config(**overrides), stack:
+                nonai_upscale.put_first("larkin/0 unsorted/b.mp4")
+
+            mocks["terminate"].assert_called_once_with(4242)
+            self.assertFalse(tmp.exists())
+            self.assertIsNone(nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]))
+            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+                             ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/busy.mp4"])
+            self.assertIsNone(request_of(overrides))
+
+    def test_a_video_asked_for_and_not_yet_started_goes_next_and_is_no_longer_asked_for(self):
+        """Only the first video can be asked for, and it is no longer first."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            for name in "ab":
+                make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / f"{name}.mp4")
+
+            stack, _mocks = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.request_now("larkin/0 unsorted/a.mp4")
+                nonai_upscale.put_first("larkin/0 unsorted/b.mp4")
+
+            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+                             ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
             self.assertIsNone(request_of(overrides))
 
 
@@ -921,6 +975,34 @@ class TestThrottleToPresence(unittest.TestCase):
                 changed = nonai_upscale.throttle_to_presence()
 
             self.assertEqual(changed, "")
+            mocks["suspend"].assert_not_called()
+
+    def test_a_poll_while_a_run_has_the_encode_in_hand_passes_at_once(self):
+        """The poll runs on the window's thread, and a run starting an encode
+        holds it for as long as its checks take: waiting there froze the
+        window. The run applies presence itself, and the next poll is seconds
+        away."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+            answered = []
+            poll = threading.Thread(
+                target=lambda: answered.append(nonai_upscale.throttle_to_presence()),
+                daemon=True)
+
+            stack, mocks = probes(is_running=True, idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                nonai_upscale._throttle_lock.acquire()
+                try:
+                    poll.start()
+                    poll.join(timeout=2)
+                    passed_while_held = not poll.is_alive()
+                finally:
+                    nonai_upscale._throttle_lock.release()
+                    poll.join(timeout=10)
+
+            self.assertTrue(passed_while_held)
+            self.assertEqual(answered, [""])
             mocks["suspend"].assert_not_called()
 
 

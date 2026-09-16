@@ -750,6 +750,11 @@ class TestTheWindowsDoorToTheQueue:
             evolver.upscale_now("larkin/0 unsorted/a.mp4")
         request_now.assert_called_once_with("larkin/0 unsorted/a.mp4")
 
+    def test_putting_one_first_reaches_the_stage(self):
+        with patch("tasks.nonai_upscale.put_first") as put_first:
+            evolver.upscale_next("larkin/0 unsorted/a.mp4")
+        put_first.assert_called_once_with("larkin/0 unsorted/a.mp4")
+
     def test_withdrawing_the_ask_reaches_the_stage(self):
         with patch("tasks.nonai_upscale.withdraw_request") as withdraw_request:
             evolver.withdraw_upscale_now()

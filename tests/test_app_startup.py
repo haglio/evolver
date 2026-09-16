@@ -302,13 +302,45 @@ class TestOneRunAfterAnother:
 EMPTY_QUEUE = Lineup(rows=(), head=None)
 
 
+class DoneAtOnce:
+    """The app's background queue, doing each piece of work as it is handed over.
+
+    So the patches a test stands up are still standing when the work runs.
+    """
+
+    def run(self, work, then=None):
+        answer = work()
+        if then is not None:
+            then(answer)
+
+    def stop(self):
+        pass
+
+
 class TestUpscaleQueueWindow:
     """The window that shows the upscale queue, and the verbs it offers."""
 
     def _open(self, app):
+        app._background = DoneAtOnce()
         with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
             app._show_queue()
         return lineup
+
+    def test_the_queue_is_read_off_the_windows_thread(self, request):
+        """A run holding the stage, or a slow library drive, must not stop
+        the window answering the mouse."""
+        app = build_evolver_app(request)
+        app._background = MagicMock()
+
+        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
+            app._show_queue()
+            lineup.assert_not_called()
+            work, then = app._background.run.call_args.args[0], \
+                app._background.run.call_args.kwargs["then"]
+            then(work())
+
+        lineup.assert_called_once_with()
+        assert app._queue_window._heading.text() == "Nothing is waiting to be upscaled"
 
     def test_opening_it_hands_it_the_queue_as_it_stands(self, request):
         app = build_evolver_app(request)
@@ -329,6 +361,21 @@ class TestUpscaleQueueWindow:
         with patch("evolver.arrange_upscale_queue") as arranged:
             app._queue_window.arranged.emit(["larkin/0 unsorted/a.mp4"])
         arranged.assert_called_once_with(["larkin/0 unsorted/a.mp4"])
+
+    def test_a_video_put_first_goes_first_and_starts_no_run(self, request):
+        """Dragging a video to the top is ordering, not asking: it waits for
+        the usual moment like any other."""
+        app = build_evolver_app(request)
+        self._open(app)
+        with patch("evolver.upscale_next") as put_first, \
+             patch("evolver.upscale_now") as asked, \
+             patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
+             patch.object(app._runs, "start_when_free") as run:
+            app._queue_window.placed_first.emit("larkin/0 unsorted/a.mp4")
+        put_first.assert_called_once_with("larkin/0 unsorted/a.mp4")
+        asked.assert_not_called()
+        run.assert_not_called()
+        lineup.assert_called_once_with()
 
     def test_asking_for_one_now_records_it_and_runs_the_pipeline_at_once(self, request):
         """The stage starts encodes on a run and nowhere else, so asking for

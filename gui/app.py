@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+from functools import partial
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
@@ -15,6 +16,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 import config
 import evolver
 from gui import branch_session, peer_watch, process_identity, single_instance
+from gui.background import BackgroundQueue
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.palette import apply_accent
@@ -91,6 +93,9 @@ class EvolverApp:
         self._settings = EvolverSettings.load()
         self._stats_window: StatsWindow | None = None
         self._queue_window: UpscaleQueueWindow | None = None
+        # The queue window's reads and verbs reach into the non-AI stage, which
+        # a run can hold for as long as starting an encode takes.
+        self._background = BackgroundQueue()
         self._log_window: RunLogWindow | None = None
         self._instance = InstanceGateway()
         self._sign_in_notice = SignInNotice()
@@ -319,6 +324,7 @@ class EvolverApp:
             self._queue_window.deleteLater()
         self._queue_window = UpscaleQueueWindow(self._window)
         self._queue_window.arranged.connect(self._arrange_queue)
+        self._queue_window.placed_first.connect(self._upscale_next)
         self._queue_window.now_requested.connect(self._upscale_now)
         self._queue_window.now_withdrawn.connect(self._withdraw_upscale_now)
         self._queue_window.refresh_wanted.connect(self._refresh_queue)
@@ -327,7 +333,12 @@ class EvolverApp:
 
     def _arrange_queue(self, videos: list):
         """Keep the order the window was just put in — it leads the next run."""
-        evolver.arrange_upscale_queue(videos)
+        self._background.run(partial(evolver.arrange_upscale_queue, videos))
+
+    def _upscale_next(self, video: str):
+        """Put *video* first; it starts at the usual moment, like any other."""
+        self._background.run(partial(evolver.upscale_next, video),
+                             then=lambda _: self._refresh_queue())
 
     def _upscale_now(self, video: str):
         """Ask for *video* now, and bring the run that starts it forward.
@@ -335,7 +346,10 @@ class EvolverApp:
         Encodes start on a pipeline run and nowhere else, so without this the
         video asked for would wait out the rest of the ten-minute interval.
         """
-        evolver.upscale_now(video)
+        self._background.run(partial(evolver.upscale_now, video),
+                             then=self._start_what_was_asked_for)
+
+    def _start_what_was_asked_for(self, _):
         self._refresh_queue()
         self._runs.start_when_free("manual")
 
@@ -343,16 +357,22 @@ class EvolverApp:
         """Stop asking for the video on the first row, and park it if you're here.
 
         The poll that parks an encode for the user's presence runs every twenty
-        seconds; polling now is what makes the click take effect while they are
-        looking at it.
+        seconds; polling as soon as the ask is gone is what makes the click take
+        effect while they are looking at it.
         """
-        evolver.withdraw_upscale_now()
+        self._background.run(evolver.withdraw_upscale_now, then=self._park_if_present)
+
+    def _park_if_present(self, _):
         self._presence.poll()
         self._refresh_queue()
 
     def _refresh_queue(self):
         if self._queue_window is not None:
-            self._queue_window.show_lineup(evolver.upscale_lineup())
+            self._background.run(evolver.upscale_lineup, then=self._draw_queue)
+
+    def _draw_queue(self, lineup):
+        if self._queue_window is not None:
+            self._queue_window.show_lineup(lineup)
 
     def _show_run_log(self, record: RunRecord):
         """Open the log where this run wrote, rather than at its top.
@@ -497,6 +517,7 @@ class EvolverApp:
 
     def _shutdown(self):
         self._instance.stop_serving()
+        self._background.stop()
         self._runs.wait_for_exit(5000)
         self._scheduler.stop()
         self._peer_timer.stop()
