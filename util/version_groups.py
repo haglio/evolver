@@ -109,6 +109,18 @@ def group_ids(stems: list[str], overrides: Mapping[str, str] | None = None) -> d
     with three versions, point them all at the same one rather than at each
     other.
     """
+    group_of = _families_by_name(stems)
+    for declared, anchor in (overrides or {}).items():
+        # Only within one bucket: group_ids sees a bucket at a time, and a
+        # declared pair split across two of them is not a family Evolver can
+        # record anyway.
+        anchors = _versions_of(anchor, stems)
+        for stem in _versions_of(declared, stems) if anchors else ():
+            group_of[stem] = group_of[anchors[0]]
+    return group_of
+
+
+def _families_by_name(stems: list[str]) -> dict[str, str]:
     order = {stem: i for i, stem in enumerate(stems)}
     tokens = {stem: group_key_tokens(stem) for stem in stems}
     anchors: list[str] = []
@@ -128,10 +140,9 @@ def group_ids(stems: list[str], overrides: Mapping[str, str] | None = None) -> d
             group_of[stem] = strip_processing_suffixes(stem)
         else:
             group_of[stem] = group_of[joined]
-    for stem, anchor in (overrides or {}).items():
-        # Only within one bucket: group_ids sees a bucket at a time, and a
-        # declared pair split across two of them is not a family Evolver can
-        # record anyway.
-        if stem in group_of and anchor in group_of:
-            group_of[stem] = group_of[anchor]
     return group_of
+
+
+def _versions_of(name: str, stems: list[str]) -> list[str]:
+    original = strip_processing_suffixes(name)
+    return [stem for stem in stems if strip_processing_suffixes(stem) == original]
