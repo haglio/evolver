@@ -44,6 +44,18 @@ class TestGroupIds:
         assert ids["Petra Vance POV Beta 4k 60fps"] == ids["Petra-Vance_540-xq3k9v2w"]
         assert ids["Petra-Vance_540-xq3k9v2w"] == "Petra-Vance_540-xq3k9v2w"
 
+    def test_an_override_still_holds_once_either_side_has_been_upscaled(self):
+        declared = {"Petra Vance POV Beta 4k 60fps": "Petra-Vance_540-xq3k9v2w"}
+        for stems in (
+            ["Petra-Vance_540-xq3k9v2w_apo8_iris2", "Petra Vance POV Beta 4k 60fps"],
+            ["Petra-Vance_540-xq3k9v2w", "Petra Vance POV Beta 4k 60fps_apo8_iris2"],
+            ["Petra-Vance_540-xq3k9v2w_apo8_iris2", "Petra Vance POV Beta 4k 60fps_apo8_iris2",
+             "Petra Vance POV Beta 4k 60fps"],
+        ):
+            ids = group_ids(stems, declared)
+
+            assert set(ids.values()) == {"Petra-Vance_540-xq3k9v2w"}, stems
+
     def test_a_scene_named_past_another_is_not_a_version_of_it(self):
         """Every scene of a performer starts with her name, so a stem that is
         only her name would anchor all of them — and did: three unrelated scenes
