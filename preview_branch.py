@@ -32,6 +32,8 @@ overlay and finds no library at all.
 
 from __future__ import annotations
 
+import logging
+import shutil
 import subprocess
 import sys
 import time
@@ -43,18 +45,21 @@ from PyQt6.QtWidgets import QApplication
 import config
 from evolver import PipelineResult, StageRecord
 from gui.main_window import EvolverMainWindow
+from gui.queue_window import UpscaleQueueWindow
 from gui.run_record import RunRecord, save_run
 from gui.sign_in_notice import SignInNotice
-from tasks import nonai_progress, nonai_titles, withdrawn
-from tasks.nonai_queue import collect_candidates
-from tasks.nonai_upscale import NonAiUpscaleResult
-from util import crash_log, processes, sidecar, topaz, video_type
+from tasks import nonai_lineup, nonai_progress, nonai_queue, nonai_titles, nonai_upscale, withdrawn
+from tasks.nonai_queue import collect_candidates, relpath
+from tasks.nonai_upscale import NonAiUpscaleResult, StageFiles
+from util import crash_log, nonai_job, processes, sidecar, topaz, video_type
 from util.ffprobe import duration_seconds
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
 from util.variants import is_processed_stem
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+
+log = logging.getLogger(__name__)
 
 
 def sign_in_deferral() -> str:
@@ -220,10 +225,107 @@ def branch_name() -> str:
     return done.stdout.strip() or "this worktree"
 
 
+def preview_files(state: Path) -> StageFiles:
+    """The records the queue window reads here, and where its writes land.
+
+    Every one of them is the preview's own copy, under *state*, because every
+    one of them is written by the window: rearranging the queue rewrites the
+    pin manifest, and asking for a video writes the request and clears the job
+    record.  Copied in at each launch (:func:`copy_the_live_records_in`) so
+    what the window shows is the live queue and the live encode, while the
+    live app's own copies are never the ones written.  Fun Time's watch stats
+    are the exception: the queue is ordered by them and nothing here writes
+    them.
+
+    The names are the live resolution's rather than spelled again here.
+    """
+    live = StageFiles.configured()
+    return StageFiles(
+        job=state / live.job.name,
+        attempts=state / live.attempts.name,
+        cooldown=state / live.cooldown.name,
+        skip_manifest=state / live.skip_manifest.name,
+        pin_manifest=state / live.pin_manifest.name,
+        watch_stats=live.watch_stats,
+        request=state / live.request.name,
+    )
+
+
+def copy_the_live_records_in(primary: Path, files: StageFiles) -> None:
+    """Fill the preview's copies from the live app's, where it has one.
+
+    The two manifests are read from the *primary* checkout rather than from
+    this worktree: they are the user's, and a preview reading the branch's own
+    empty copies would show a queue nobody has ever ordered.
+    """
+    live = StageFiles.configured()
+    files.job.parent.mkdir(parents=True, exist_ok=True)
+    for source, copy in (
+        (primary / live.pin_manifest.name, files.pin_manifest),
+        (primary / live.skip_manifest.name, files.skip_manifest),
+        (live.job, files.job),
+        (live.request, files.request),
+    ):
+        copy.unlink(missing_ok=True)
+        if source.is_file():
+            shutil.copyfile(source, copy)
+
+
+def stopped_on_paper(job: dict, reason: str, files: StageFiles) -> str:
+    """What stopping the encode in flight would come to, without stopping it.
+
+    The live app kills the ffmpeg and deletes what it has written.  This
+    preview is looking at that very encode, so it does neither: it clears its
+    own copy of the record, which is what the window then draws.
+    """
+    log.info("Preview: would stop the encode of %s (%s).", job.get("source"), reason)
+    nonai_job.clear_job(files.job)
+    return relpath(Path(job.get("source", "")))
+
+
+def taken_over_on_paper(job: dict, files: StageFiles) -> None:
+    """The same for the encode that is already the one asked for: the live app
+    thaws it, and this marks its copy of the record and thaws nothing."""
+    job["on_request"] = True
+    nonai_job.save_job(files.job, job)
+
+
 # The live window hides to its tray icon when closed. A preview has no tray, so
 # a hidden preview kept running unseen, holding its log open, and the next
 # launch of the preview could not start.
 class PreviewWindow(EvolverMainWindow):
+    """The real window, on the preview's own records rather than the app's."""
+
+    def __init__(self, files: StageFiles, parent=None):
+        super().__init__(parent)
+        self._files = files
+        self._queue: UpscaleQueueWindow | None = None
+        self.queue_action.triggered.connect(self.show_queue)
+
+    def show_queue(self) -> None:
+        """Open the upscale queue on what this branch makes of the real one."""
+        if self._queue is None:
+            self._queue = UpscaleQueueWindow(self)
+            self._queue.arranged.connect(self._arrange)
+            self._queue.now_requested.connect(self._ask_for)
+            self._queue.refresh_wanted.connect(self._redraw)
+        self._redraw()
+        self._queue.show()
+        self._queue.raise_()
+
+    def _arrange(self, videos: list) -> None:
+        nonai_queue.pin_ahead(self._files.pin_manifest, videos)
+        self._redraw()
+
+    def _ask_for(self, video: str) -> None:
+        nonai_upscale.request_now(video, files=self._files, stop=stopped_on_paper,
+                                  take_over=taken_over_on_paper)
+        self._redraw()
+
+    def _redraw(self) -> None:
+        if self._queue is not None:
+            self._queue.show_lineup(nonai_lineup.current(self._files))
+
     def closeEvent(self, event):
         event.accept()
 
@@ -244,7 +346,9 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     SignInNotice().after_run(record, time.monotonic())
-    window = PreviewWindow()
+    files = preview_files(PROJECT_ROOT / "state")
+    copy_the_live_records_in(primary_checkout(), files)
+    window = PreviewWindow(files)
     window.setWindowTitle(f"Evolver — preview of {branch_name()}")
     for action in (window.run_now_action, window.settings_action, window.stats_action,
                    window.restart_action, window.quit_action):
