@@ -45,7 +45,7 @@ from evolver import PipelineResult, StageRecord
 from gui.main_window import EvolverMainWindow
 from gui.run_record import RunRecord, save_run
 from gui.sign_in_notice import SignInNotice
-from tasks import nonai_progress, withdrawn
+from tasks import nonai_progress, nonai_titles, withdrawn
 from tasks.nonai_queue import collect_candidates
 from tasks.nonai_upscale import NonAiUpscaleResult
 from util import crash_log, processes, sidecar, topaz, video_type
@@ -163,9 +163,40 @@ def withdrawn_report(preview_metadata: Path, primary: Path) -> StageRecord:
                        duration_seconds=time.monotonic() - started, result=result)
 
 
+def _library_payloads() -> dict:
+    """Every non-AI video's recorded document, keyed by its path."""
+    return {
+        video: sidecar.read(sidecar.sidecar_path(video))
+        for bucket in buckets()
+        for video in sorted(bucket.rglob("*"))
+        if is_finalized_video_file(video)
+    }
+
+
+def nonai_titles_report(preview_metadata: Path, primary: Path) -> StageRecord:
+    """How much of the library the clip records can name, without naming it.
+
+    Read off the same documents the stage reads and written back to none of
+    them: this preview reads the real library, and what is worth judging here is
+    the count -- how far the clip records reach once a scene inherits from the
+    clip cut out of it.  The two paths every report takes are unused for the
+    same reason ``withdrawn_report``'s are.
+    """
+    started = time.monotonic()
+    payloads = _library_payloads()
+    titles = nonai_titles.titles_by_family(payloads)
+    named = sum(
+        1 for payload in payloads.values()
+        if nonai_titles.clip_title(payload) or titles.get(nonai_titles.family_of(payload), "")
+    )
+    result = nonai_titles.NonAiTitleResult(titled=named, videos=len(payloads))
+    return StageRecord(name="title_non_ai", status="completed",
+                       duration_seconds=time.monotonic() - started, result=result)
+
+
 #: The stages this preview can report on, in pipeline order.  Add one when a
 #: change makes a stage's report worth judging; drop it when it stops being.
-REPORTS = (withdrawn_report, nonai_upscale_report)
+REPORTS = (withdrawn_report, nonai_upscale_report, nonai_titles_report)
 
 
 def preview_record(preview_metadata: Path, primary: Path) -> RunRecord:
