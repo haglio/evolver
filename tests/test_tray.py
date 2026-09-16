@@ -15,6 +15,15 @@ from gui.schedule_state import ScheduleStatus
 from gui.tray import EvolverTray
 
 
+class TestTrayMenu:
+    def test_the_upscale_queue_is_on_the_menu_as_it_is_on_the_toolbar(self):
+        """Both surfaces carry it, so the one that is to hand is the one used
+        -- the tray while the window is closed, the toolbar while it is open."""
+        tray = EvolverTray()
+        assert "queue" in tray.commands()
+        assert tray.queue_action.text() == "Upscale Queue..."
+
+
 class TestTrayScheduleDisplay:
 
     def test_a_scheduled_next_run_is_in_the_tooltip_and_the_menu(self):

@@ -402,6 +402,10 @@ class EvolverMainWindow(QMainWindow):
         self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats", self)
         toolbar.addAction(self.stats_action)
 
+        self.queue_action = QAction(qta.icon("fa5s.list-ol", color=_ICON_COLOR),
+                                    "Queue", self)
+        toolbar.addAction(self.queue_action)
+
         self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self)
         toolbar.addAction(self.restart_action)
 
@@ -420,6 +424,7 @@ class EvolverMainWindow(QMainWindow):
             "pause": self.active_toggle.clicked,
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
+            "queue": self.queue_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,
         }

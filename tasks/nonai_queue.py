@@ -8,7 +8,8 @@ with a funscript — the only per-video engagement signal the non_AI library has
 of its own.
 
 The three files this reads are arguments rather than ambient config: the two
-hand-edited manifests are the user's, the watch stats are a sibling app's, and
+manifests are the user's -- edited by hand, and the pin one also rewritten when
+the queue window is rearranged -- the watch stats are a sibling app's, and
 naming them at the call makes it visible that listing candidates opens three
 files besides walking the tree. What stays ambient is the library itself —
 where the non-AI root is, and what counts as a video — which is one repo-wide
@@ -20,6 +21,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+
+from app_support.file_channel import write_whole
 
 import config
 from util import script_library
@@ -89,6 +92,15 @@ def add_to_skip_manifest(manifest: Path, source: Path, reason: str) -> None:
     log.warning("Skipping %s permanently: %s", source, reason)
     with open(manifest, "a", encoding="utf-8") as handle:
         handle.write(f"{relpath(source)}\t{reason}\n")
+
+
+def pin_ahead(manifest: Path, videos: list[str]) -> None:
+    lines = _manifest_lines(manifest)
+    line_of = dict(reversed(lines))
+    ahead = [line_of.get(video, video) for video in videos]
+    rest = [line for video, line in lines
+            if video not in videos and (config.NON_AI_DIR / video).is_file()]
+    write_whole(manifest, "".join(f"{line}\n" for line in ahead + rest))
 
 
 def manifest_entries(path: Path) -> list[str]:

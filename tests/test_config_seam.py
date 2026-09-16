@@ -64,7 +64,9 @@ CONFIG_REFERENCE_LEDGER = {
     "backfill/voice.py": 5,
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
-    "evolver.py": 9,
+    # The 10th is the third shape again: the pin manifest, read where the queue
+    # window's door to it is, so the window layer names no path of its own.
+    "evolver.py": 10,
     "gui/app.py": 5,
     "gui/main_window.py": 2,
     # The broker's launcher, so a check that finds the broker gone has something
@@ -98,7 +100,10 @@ CONFIG_REFERENCE_LEDGER = {
     # beside its settings, not a template, two edges and a tag looked up here.
     "tasks/nonai_encode.py": 5,
     "tasks/nonai_group.py": 3,
-    "tasks/nonai_queue.py": 1,
+    # Both are the library root, which this module says outright is the one
+    # thing it leaves ambient: once to spell a video's path within the library,
+    # once to ask whether a pin still names a file there.
+    "tasks/nonai_queue.py": 2,
     # Five fewer with the retired-metadata repair pass gone (item 27's last
     # piece), then seven with the six numbers governing one encode collected
     # into tasks.nonai_encode.EncodeSettings -- which is where they belong:

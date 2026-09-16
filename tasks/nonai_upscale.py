@@ -33,11 +33,12 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from tasks import nonai_encode, nonai_progress
+from tasks import nonai_encode, nonai_progress, nonai_queue
 from tasks.nonai_encode import EncodeSettings
 from tasks.nonai_queue import (
     Candidate,
@@ -378,6 +379,46 @@ def _take_over(job: dict, files: StageFiles) -> None:
     job["on_request"] = True
     nonai_job.save_job(files.job, job)
     log.info("The encode of %s runs on: it is the one asked for.", job.get("source"))
+
+
+def request_now(video: str, *, files: StageFiles | None = None,
+                stop: Callable[[dict, str, StageFiles], str] = _stop_in_flight,
+                take_over: Callable[[dict, StageFiles], None] = _take_over) -> None:
+    """Ask for *video* to be upscaled right away, and clear the way for it.
+
+    The queue window's door, called on the GUI thread the moment a video is
+    dropped on the "upscaling now" spot. It records the ask and gets the
+    machine out of its way; the encode itself starts on the next pipeline run,
+    which is the one place a Topaz process is ever launched.
+
+    An encode of another video is stopped here rather than on that run, so the
+    AI clips the run upscales first are not held back by a Topaz process this
+    request is about to end anyway. The stopped video keeps its place in the
+    queue, next after the one asked for.
+
+    *stop* and *take_over* are what touching the running encode means, injected
+    for the branch preview: it shows this window against the live library and
+    must rewrite its own copies of the records without ever terminating or
+    thawing the encode the live app is running.
+    """
+    files = StageFiles.configured() if files is None else files
+    with _throttle_lock:
+        job = nonai_job.load_job(files.job)
+        running = bool(job and job.get("pid") and processes.is_running(job["pid"]))
+        if running and relpath(Path(job["source"])) == video:
+            take_over(job, files)
+            nonai_job.clear_request(files.request)
+            nonai_queue.pin_ahead(files.pin_manifest, [video])
+            return
+
+        next_after = [stop(job, "you asked for another video now", files)] if running else []
+        waiting = nonai_job.load_request(files.request)
+        if waiting is not None and waiting.video != video:
+            next_after.append(waiting.video)
+        nonai_queue.pin_ahead(files.pin_manifest, [video, *next_after])
+        nonai_job.save_request(files.request, nonai_job.Request(video))
+        log.info("Asked for the non-AI upscale of %s, ahead of %s.",
+                 video, ", ".join(next_after) or "nothing in flight")
 
 
 def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclusion:
