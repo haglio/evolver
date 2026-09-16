@@ -456,6 +456,42 @@ class TestAskingForOneNow(unittest.TestCase):
             self.assertIsNone(request_of(overrides))
 
 
+class TestWithdrawingTheAsk(unittest.TestCase):
+    """The queue window's hollow arrow: the first video stays first, and goes
+    back to waiting for nobody to be at the computer."""
+
+    def test_a_video_not_yet_started_is_no_longer_asked_for_and_keeps_its_place(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+
+            stack, _mocks = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.request_now("larkin/0 unsorted/b.mp4")
+                nonai_upscale.withdraw_request()
+
+            self.assertIsNone(request_of(overrides))
+            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+                             ["larkin/0 unsorted/b.mp4"])
+
+    def test_an_encode_already_running_is_parked_again_while_you_are_here(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            _source, tmp, _out = write_job(root, overrides, on_request=True)
+
+            stack, mocks = probes(is_running=True, image=str(config.FFMPEG),
+                                  idle_seconds=5.0)
+            with override_config(**overrides), stack:
+                nonai_upscale.withdraw_request()
+                changed = nonai_upscale.throttle_to_presence()
+
+            self.assertEqual(changed, "suspended")
+            mocks["suspend"].assert_called_once_with(4242)
+            mocks["terminate"].assert_not_called()
+            self.assertTrue(tmp.exists())
+            self.assertNotIn("on_request", nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]))
+
+
 class TestAnEncodeYouAskedForRunsOn(unittest.TestCase):
     """Presence parks the encodes Evolver picked for itself. The one the user
     asked for is the exception: it was wanted while they were at the computer."""

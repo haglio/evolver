@@ -296,11 +296,11 @@ class TestOneRunAfterAnother:
         assert worker_cls.call_count == 1
 
 
-EMPTY_QUEUE = Lineup(now=None, up_next=())
+EMPTY_QUEUE = Lineup(rows=(), head=None)
 
 
 class TestUpscaleQueueWindow:
-    """The window that shows the upscale queue, and the three verbs it offers."""
+    """The window that shows the upscale queue, and the verbs it offers."""
 
     def _open(self, app):
         with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
@@ -338,6 +338,19 @@ class TestUpscaleQueueWindow:
             app._queue_window.now_requested.emit("larkin/0 unsorted/a.mp4")
         asked.assert_called_once_with("larkin/0 unsorted/a.mp4")
         run.assert_called_once_with("manual")
+
+    def test_withdrawing_the_ask_parks_the_encode_for_your_presence_again(self, request):
+        """The poll that parks it fires every twenty seconds; the click that
+        hands it back should not wait them out."""
+        app = build_evolver_app(request)
+        self._open(app)
+        with patch("evolver.withdraw_upscale_now") as withdrawn, \
+             patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
+             patch.object(app._presence, "poll") as poll:
+            app._queue_window.now_withdrawn.emit()
+        withdrawn.assert_called_once_with()
+        poll.assert_called_once_with()
+        lineup.assert_called_once_with()
 
     def test_a_finished_run_redraws_it(self, request):
         """A run is what starts, promotes and fails encodes, so the window is

@@ -13,10 +13,9 @@ from __future__ import annotations
 _.paintEvent  # noqa: F821
 _.drawFocus  # noqa: F821
 # The drag-and-drop half of the same: Qt calls these on the widget the pointer
-# is over (gui/queue_window.py).
-_.dragEnterEvent  # noqa: F821
-_.dragLeaveEvent  # noqa: F821
+# is over, and startDrag when a row is picked up (gui/queue_window.py).
 _.dropEvent  # noqa: F821
+_.startDrag  # noqa: F821
 _.option  # noqa: F821  — drawFocus override parameter (Qt signature)
 
 # -- Python HTMLParser overrides --

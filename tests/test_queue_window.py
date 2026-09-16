@@ -4,20 +4,23 @@ Every video here is invented, and so is every title.
 """
 from __future__ import annotations
 
-import pytest
-from PyQt6.QtCore import QMimeData, QPointF, Qt
-from PyQt6.QtGui import QDropEvent
+from unittest.mock import patch
 
-from gui.queue_window import VIDEO_MIME, UpscaleQueueWindow, running_time
+import pytest
+from PyQt6.QtCore import QPoint, Qt
+
+from gui import queue_window
+from gui.queue_window import UpscaleQueueWindow, running_time
 from util.upscale_lineup import (
     ASKED_FOR,
     FINISHING,
+    NEXT,
     PAUSED,
     STARTING,
     UPSCALING,
     Entry,
+    Head,
     Lineup,
-    Now,
 )
 
 
@@ -25,99 +28,152 @@ def entry(video, name=None, seconds=754.0, pinned=False):
     return Entry(video=video, name=name or video, seconds=seconds, pinned=pinned)
 
 
-def lineup(now=None, *entries):
-    return Lineup(now=now, up_next=tuple(entries))
-
-
-def drop_of(video: str = "") -> QDropEvent:
-    """The event a row dragged out of the list lands with.
-
-    The event borrows the payload rather than owning it, so the payload is
-    parked on the event: collected, it leaves the drop reading freed memory,
-    which on Windows is an access violation rather than a failure.
-    """
-    carried = QMimeData()
-    if video:
-        carried.setData(VIDEO_MIME, video.encode("utf-8"))
-    event = QDropEvent(QPointF(1.0, 1.0), Qt.DropAction.MoveAction, carried,
-                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
-    event._carried = carried
-    return event
+def lineup(head=None, *entries):
+    return Lineup(rows=tuple(entries), head=head or Head(NEXT))
 
 
 @pytest.fixture
 def window():
     made = UpscaleQueueWindow()
+    made.resize(700, 400)
     yield made
     made.deleteLater()
 
 
+def icon_of(window, row: int):
+    """What the first column of *row* draws, as pixels to compare."""
+    return window._tree.topLevelItem(row).icon(0).pixmap(16, 16).toImage()
+
+
+def arrow(filled: bool):
+    return queue_window._arrow(Head(ASKED_FOR if filled else NEXT)).pixmap(16, 16).toImage()
+
+
+def blank_arrow():
+    return queue_window._arrow(None).pixmap(16, 16).toImage()
+
+
+def draggable(window, row: int) -> bool:
+    return bool(window._tree.topLevelItem(row).flags() & Qt.ItemFlag.ItemIsDragEnabled)
+
+
+def click(window, row: int, column: int = 0) -> None:
+    window._tree.itemClicked.emit(window._tree.topLevelItem(row), column)
+
+
 class TestWhatItShows:
-    def test_every_video_waiting_is_a_row_in_order(self, window):
+    def test_every_video_is_a_numbered_row_in_order(self, window):
         window.show_lineup(lineup(None,
                                   entry("larkin/0 unsorted/a.mp4", "Jane Doe - Alpha Study 3"),
                                   entry("larkin/0 unsorted/b.mp4", "b", seconds=None)))
 
         assert window._tree.videos() == ["larkin/0 unsorted/a.mp4", "larkin/0 unsorted/b.mp4"]
         assert window._tree.topLevelItem(0).text(1) == "Jane Doe - Alpha Study 3"
-        assert window._tree.topLevelItem(0).text(2) == "12:34"
+        assert window._tree.topLevelItem(0).text(3) == "12:34"
         assert window._tree.topLevelItem(0).text(0) == "1"
+        assert window._tree.topLevelItem(1).text(0) == "2"
+        assert window._tree.topLevelItem(1).text(3) == ""
+
+    def test_the_first_row_says_what_is_happening_to_its_video(self, window):
+        window.show_lineup(lineup(Head(UPSCALING, percent=41),
+                                  entry("larkin/0 unsorted/a.mp4"),
+                                  entry("larkin/0 unsorted/b.mp4")))
+
+        assert window._tree.topLevelItem(0).text(2) == "Upscaling — 41% done"
         assert window._tree.topLevelItem(1).text(2) == ""
+
+    @pytest.mark.parametrize(("head", "words"), [
+        (Head(NEXT), "Next, once you're away from the computer"),
+        (Head(PAUSED, percent=41), "Paused while you're at the computer — 41% done"),
+        (Head(ASKED_FOR, percent=2), "Upscaling at your request — 2% done"),
+        (Head(STARTING, held_back="low_ram"),
+         "Starting at your request — waiting for memory to free up"),
+        (Head(FINISHING), "Finished encoding; Evolver files it on its next run"),
+    ])
+    def test_each_state_reads_as_words_rather_than_the_stages_own(self, window, head, words):
+        window.show_lineup(lineup(head, entry("larkin/0 unsorted/a.mp4")))
+
+        assert window._tree.topLevelItem(0).text(2) == words
 
     def test_the_heading_counts_the_videos_and_their_hours(self, window):
         window.show_lineup(lineup(None,
                                   entry("larkin/0 unsorted/a.mp4", seconds=3600.0),
                                   entry("larkin/0 unsorted/b.mp4", seconds=1800.0)))
 
-        assert window._up_next_heading.text() == "Up next — 2 videos, 1.5 hours of footage"
+        assert window._heading.text() == "2 videos, 1.5 hours of footage"
 
-    def test_an_encode_in_flight_is_named_with_how_far_it_has_got(self, window):
-        window.show_lineup(lineup(Now(entry("larkin/0 unsorted/a.mp4", "Jane Doe - Alpha Study 3"),
-                                      UPSCALING, percent=41)))
+    def test_an_empty_queue_says_so(self, window):
+        window.show_lineup(Lineup(rows=(), head=None))
 
-        assert window._now_box.name_label.text() == "Jane Doe - Alpha Study 3"
-        assert window._now_box.state_label.text() == "Upscaling — 41% done"
-        assert window._now_box.bar.value() == 41
+        assert window._heading.text() == "Nothing is waiting to be upscaled"
+        assert window._tree.videos() == []
 
-    def test_a_frozen_encode_says_who_froze_it(self, window):
-        window.show_lineup(lineup(Now(entry("larkin/0 unsorted/a.mp4"), PAUSED, percent=41)))
 
-        assert window._now_box.state_label.text() == (
-            "Paused while you're at the computer — 41% done")
+class TestTheArrow:
+    """Only the first row has one: you cannot ask for two videos at once."""
 
-    def test_an_encode_you_asked_for_says_so(self, window):
-        window.show_lineup(lineup(Now(entry("larkin/0 unsorted/a.mp4"), ASKED_FOR, percent=2)))
-
-        assert window._now_box.state_label.text() == "Upscaling at your request — 2% done"
-
-    def test_a_video_asked_for_and_held_back_says_what_it_is_waiting_on(self, window):
-        """The machine's own word for the hold means nothing to a person: the
-        window says what is being waited for."""
-        window.show_lineup(lineup(Now(entry("larkin/0 unsorted/a.mp4"), STARTING,
-                                      held_back="low_ram")))
-
-        assert window._now_box.state_label.text() == (
-            "Starting at your request — waiting for memory to free up")
-
-    def test_an_encode_that_has_ended_says_the_next_run_files_it(self, window):
-        window.show_lineup(lineup(Now(entry("larkin/0 unsorted/a.mp4"), FINISHING)))
-
-        assert "next run" in window._now_box.state_label.text()
-        assert not window._now_box.bar.isVisibleTo(window)
-
-    def test_nothing_upscaling_says_so_and_invites_a_drop(self, window):
-        window.show_lineup(lineup(None, entry("larkin/0 unsorted/a.mp4")))
-
-        assert window._now_box.name_label.text() == "Nothing is being upscaled"
-        assert "Drop a video here" in window._now_box.state_label.text()
-
-    def test_the_rows_the_user_placed_carry_a_pin(self, window):
-        window.show_lineup(lineup(None,
-                                  entry("larkin/0 unsorted/a.mp4", pinned=True),
+    def test_it_is_filled_while_the_first_row_runs_whoever_is_here(self, window):
+        window.show_lineup(lineup(Head(ASKED_FOR, percent=2),
+                                  entry("larkin/0 unsorted/a.mp4"),
                                   entry("larkin/0 unsorted/b.mp4")))
 
-        assert window._tree.topLevelItem(0).toolTip(0) == "You put this one here"
-        assert "most watched" in window._tree.topLevelItem(1).toolTip(0)
+        assert icon_of(window, 0) == arrow(filled=True)
+        assert icon_of(window, 1) == blank_arrow()
+
+    def test_it_is_hollow_while_the_first_row_waits_for_you_to_leave(self, window):
+        window.show_lineup(lineup(Head(PAUSED, percent=41), entry("larkin/0 unsorted/a.mp4")))
+
+        assert icon_of(window, 0) == arrow(filled=False)
+
+    def test_a_video_whose_encode_has_ended_has_none_to_click(self, window):
+        window.show_lineup(lineup(Head(FINISHING), entry("larkin/0 unsorted/a.mp4")))
+
+        assert icon_of(window, 0) == blank_arrow()
+
+    def test_clicking_a_hollow_one_asks_for_that_video_now(self, window):
+        window.show_lineup(lineup(Head(NEXT), entry("larkin/0 unsorted/a.mp4"),
+                                  entry("larkin/0 unsorted/b.mp4")))
+        asked, withdrawn = [], []
+        window.now_requested.connect(asked.append)
+        window.now_withdrawn.connect(lambda: withdrawn.append(True))
+
+        click(window, 0)
+
+        assert asked == ["larkin/0 unsorted/a.mp4"]
+        assert withdrawn == []
+        assert icon_of(window, 0) == arrow(filled=True)
+
+    def test_clicking_a_filled_one_hands_the_video_back_to_your_presence(self, window):
+        window.show_lineup(lineup(Head(ASKED_FOR, percent=2), entry("larkin/0 unsorted/a.mp4")))
+        asked, withdrawn = [], []
+        window.now_requested.connect(asked.append)
+        window.now_withdrawn.connect(lambda: withdrawn.append(True))
+
+        click(window, 0)
+
+        assert withdrawn == [True]
+        assert asked == []
+        assert icon_of(window, 0) == arrow(filled=False)
+        assert window._tree.topLevelItem(0).text(2) == "Upscaling — 2% done"
+
+    def test_the_rest_of_the_row_is_not_the_arrow(self, window):
+        window.show_lineup(lineup(Head(NEXT), entry("larkin/0 unsorted/a.mp4")))
+        asked = []
+        window.now_requested.connect(asked.append)
+
+        click(window, 0, column=1)
+
+        assert asked == []
+
+    def test_a_second_row_is_not_the_arrow_either(self, window):
+        window.show_lineup(lineup(Head(NEXT), entry("larkin/0 unsorted/a.mp4"),
+                                  entry("larkin/0 unsorted/b.mp4")))
+        asked = []
+        window.now_requested.connect(asked.append)
+
+        click(window, 1)
+
+        assert asked == []
 
 
 class TestWhatItSaysTheUserDid:
@@ -126,19 +182,23 @@ class TestWhatItSaysTheUserDid:
         window.arranged.connect(seen.append)
         return seen
 
-    def test_a_video_dragged_to_the_top_is_the_only_one_pinned(self, window):
-        window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
-                                          for name in "abc")))
+    def test_a_video_dragged_to_the_top_is_asked_for_now(self, window):
+        window.show_lineup(lineup(Head(UPSCALING, percent=41),
+                                  *(entry(f"larkin/0 unsorted/{name}.mp4") for name in "abc")))
+        asked = []
+        window.now_requested.connect(asked.append)
         seen = self._arrangements(window)
 
         window._tree.move_video("larkin/0 unsorted/c.mp4", 0)
 
-        assert seen == [["larkin/0 unsorted/c.mp4"]]
+        assert asked == ["larkin/0 unsorted/c.mp4"]
+        assert seen == []
         assert window._tree.videos() == ["larkin/0 unsorted/c.mp4", "larkin/0 unsorted/a.mp4",
                                          "larkin/0 unsorted/b.mp4"]
-        assert window._tree.topLevelItem(0).toolTip(0) == "You put this one here"
+        assert window._tree.topLevelItem(0).text(2) == "Starting at your request"
+        assert icon_of(window, 0) == arrow(filled=True)
 
-    def test_pinning_one_lower_down_pins_everything_above_it(self, window):
+    def test_a_video_dragged_lower_down_keeps_everything_above_it_where_it_is(self, window):
         """Its place is only its place if the videos it was put after stay
         where they are."""
         window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
@@ -149,8 +209,9 @@ class TestWhatItSaysTheUserDid:
 
         assert seen == [["larkin/0 unsorted/a.mp4", "larkin/0 unsorted/b.mp4",
                          "larkin/0 unsorted/d.mp4"]]
+        assert window._tree.topLevelItem(2).text(0) == "3"
 
-    def test_a_video_pushed_below_a_pinned_one_keeps_that_pin_in_the_list(self, window):
+    def test_a_video_pushed_below_a_placed_one_keeps_that_place_in_the_order(self, window):
         window.show_lineup(lineup(None,
                                   entry("larkin/0 unsorted/a.mp4", pinned=True),
                                   entry("larkin/0 unsorted/b.mp4"),
@@ -161,22 +222,52 @@ class TestWhatItSaysTheUserDid:
 
         assert seen == [["larkin/0 unsorted/a.mp4", "larkin/0 unsorted/c.mp4"]]
 
-    def test_a_video_dropped_on_the_now_box_is_asked_for(self, window):
-        window.show_lineup(lineup(None, entry("larkin/0 unsorted/a.mp4")))
-        asked = []
-        window.now_requested.connect(asked.append)
+    def test_a_row_dropped_back_where_it_was_changes_nothing(self, window):
+        window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
+                                          for name in "abc")))
+        seen = self._arrangements(window)
 
-        window._now_box.dropEvent(drop_of("larkin/0 unsorted/a.mp4"))
+        window._tree.move_video("larkin/0 unsorted/b.mp4", 1)
+        window._tree.move_video("larkin/0 unsorted/b.mp4", 2)
 
-        assert asked == ["larkin/0 unsorted/a.mp4"]
+        assert seen == []
 
-    def test_a_drop_carrying_no_video_asks_for_nothing(self, window):
-        asked = []
-        window.now_requested.connect(asked.append)
+    def test_the_video_being_upscaled_cannot_be_dragged_off_the_top(self, window):
+        window.show_lineup(lineup(Head(UPSCALING, percent=41),
+                                  entry("larkin/0 unsorted/a.mp4"),
+                                  entry("larkin/0 unsorted/b.mp4")))
 
-        window._now_box.dropEvent(drop_of())
+        assert not draggable(window, 0)
+        assert draggable(window, 1)
 
-        assert asked == []
+    def test_a_first_row_that_is_merely_next_can_be_dragged(self, window):
+        window.show_lineup(lineup(Head(NEXT), entry("larkin/0 unsorted/a.mp4"),
+                                  entry("larkin/0 unsorted/b.mp4")))
+
+        assert draggable(window, 0)
+
+    def test_a_drag_that_ends_in_a_move_leaves_every_row_in_the_list(self, window):
+        """What Qt does after a move of its own is to remove the row the drag
+        started from -- which took the row the user had just placed."""
+        window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
+                                          for name in "abc")))
+        window._tree.setCurrentItem(window._tree.topLevelItem(2))
+
+        with patch.object(queue_window, "QDrag") as drag:
+            drag.return_value.exec.return_value = Qt.DropAction.MoveAction
+            window._tree.startDrag(Qt.DropAction.MoveAction)
+
+        assert window._tree.videos() == [f"larkin/0 unsorted/{name}.mp4" for name in "abc"]
+
+    def test_where_a_drop_lands_is_the_half_of_the_row_it_was_let_go_over(self, window):
+        window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
+                                          for name in "abc")))
+        tree = window._tree
+        second = tree.visualItemRect(tree.topLevelItem(1))
+
+        assert tree.dropped_row(QPoint(20, second.top() + 1)) == 1
+        assert tree.dropped_row(QPoint(20, second.top() + second.height() - 1)) == 2
+        assert tree.dropped_row(QPoint(20, second.top() + 400)) == 3
 
     def test_a_lineup_arriving_mid_drag_waits_for_the_row_to_land(self, window):
         """The refresh timer goes on firing inside the drag's own event loop,

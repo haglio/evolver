@@ -190,7 +190,7 @@ def throttle_nonai_to_presence() -> str:
 def upscale_lineup() -> upscale_lineup_shape.Lineup:
     """What the queue window shows: the video in flight, and what is next.
 
-    The window layer's three doors to the non-AI queue are here for the reason
+    The window layer's doors to the non-AI queue are here for the reason
     ``throttle_nonai_to_presence`` is: the repo's layering is
     ``util <- tasks <- evolver <- gui``, so gui reaches the stages through this
     module and nothing else.
@@ -206,6 +206,11 @@ def arrange_upscale_queue(videos: list[str]) -> None:
 def upscale_now(video: str) -> None:
     """Ask for *video* to be upscaled right away, stopping whatever is in flight."""
     nonai_upscale.request_now(video)
+
+
+def withdraw_upscale_now() -> None:
+    """Stop asking: the video asked for waits for nobody at the computer again."""
+    nonai_upscale.withdraw_request()
 
 
 def run_pipeline(

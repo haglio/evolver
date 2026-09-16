@@ -1,9 +1,10 @@
-"""The upscale queue as the window shows it: what is being upscaled, and what is next.
+"""The upscale queue as the window shows it: one list, the video in flight on top.
 
 The stage's own view of the same queue is a count and a name in a log line.
 This is the rest of it — every video in the order the stage would take them,
-called what the library calls them, with the one in flight lifted out of the
-list and what is happening to it said in a word (:mod:`util.upscale_lineup`).
+called what the library calls them, with whatever the machine is on (or was
+asked to start) lifted to the first row and what is happening to it said in a
+word (:mod:`util.upscale_lineup`).
 
 Read on the GUI thread, without the lock the stage takes: every file it reads
 is written whole, so the worst a badly timed read sees is the state a moment
@@ -22,12 +23,13 @@ from util import nonai_job, processes, sidecar, video_type
 from util.upscale_lineup import (
     ASKED_FOR,
     FINISHING,
+    NEXT,
     PAUSED,
     STARTING,
     UPSCALING,
     Entry,
+    Head,
     Lineup,
-    Now,
 )
 
 
@@ -37,26 +39,30 @@ def current() -> Lineup:
     entries = [_entry(candidate.path, pinned) for candidate in collect_candidates(
         skip_manifest=files.skip_manifest, pin_manifest=files.pin_manifest,
         watch_stats_file=files.watch_stats)]
-    now = _now(files, entries, pinned)
-    return Lineup(now=now, up_next=tuple(
-        entry for entry in entries if now is None or entry.video != now.entry.video))
+    first, head = _first(files, entries, pinned)
+    if first is None:
+        return Lineup(rows=tuple(entries), head=Head(NEXT) if entries else None)
+    rest = tuple(entry for entry in entries if entry.video != first.video)
+    return Lineup(rows=(first, *rest), head=head)
 
 
-def _now(files: StageFiles, entries: list[Entry], pinned: set[str]) -> Now | None:
+def _first(files: StageFiles, entries: list[Entry],
+           pinned: set[str]) -> tuple[Entry | None, Head | None]:
+    """The video the machine is on or was asked to start, and what it is doing."""
     job = nonai_job.load_job(files.job)
     request = nonai_job.load_request(files.request)
     if job is not None and job.get("source"):
         source = Path(job["source"])
         entry = _known(entries, relpath(source)) or _entry(source, pinned)
         if job.get("pid") and processes.is_running(job["pid"]):
-            return Now(entry, _state(job), nonai_encode.percent_encoded(job))
+            return entry, Head(_state(job), nonai_encode.percent_encoded(job))
         if request is None:
-            return Now(entry, FINISHING)
+            return entry, Head(FINISHING)
     if request is not None:
         entry = _known(entries, request.video) or Entry(
             request.video, Path(request.video).stem, None, request.video in pinned)
-        return Now(entry, STARTING, held_back=request.held_back)
-    return None
+        return entry, Head(STARTING, held_back=request.held_back)
+    return None, None
 
 
 def _state(job: dict) -> str:
