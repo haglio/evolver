@@ -6,9 +6,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from gui import single_instance
 from gui.app import _wire
 from gui.process_identity import APP_MODEL_ID
+from gui.single_instance import Outcome
 from tests.gui_support import build_evolver_app
+from tests.temp_helpers import override_config
 from util.upscale_lineup import Lineup
 
 
@@ -556,81 +559,130 @@ class TestRestart:
             mock_allow.assert_not_called()
 
 
-class TestDuplicateLaunchHandoff:
+class TestALaunchThatFindsEvolverUp:
     """A second launch is the user clicking Evolver, whose window is hidden in
-    the tray — so it must open the running instance's window, not exit."""
+    the tray — so it must open the running instance's window, not exit. A
+    preview's launch is the exception: it came to take the work over."""
 
-    def _duplicate_launch(self, request, handoff_taken):
-        app = build_evolver_app(request)
+    def _launch(self, request, outcome, *, preview=False):
+        with override_config(BRANCH_SESSION=preview):
+            app = build_evolver_app(request)
 
-        with patch.object(app._instance, "claim", return_value=False), \
-             patch.object(app._instance, "hand_off", return_value=handoff_taken) as show_request, \
+        with patch.object(app._instance, "take_over", return_value=outcome) as take_over, \
+             patch.object(app._instance, "serve_launches"), \
              patch("gui.app.show_error") as alert, \
              patch("gui.app.crash_log.write_info") as logged:
             exit_code = app.run()
 
-        return exit_code, show_request, alert, logged
+        return exit_code, take_over, alert, logged
 
-    def test_duplicate_asks_the_running_instance_to_show_its_window(self, request):
-        exit_code, show_request, _, _ = self._duplicate_launch(request, handoff_taken=True)
+    def test_the_usual_evolver_leaves_the_launch_with_the_running_one(self, request):
+        exit_code, take_over, _, _ = self._launch(request, Outcome.HANDED_OFF)
 
-        show_request.assert_called_once_with()
+        take_over.assert_called_once_with(single_instance.USUAL, end_the_unanswering=False)
         assert exit_code == 0
 
+    def test_a_preview_comes_to_take_the_work_and_ends_an_evolver_that_will_not_answer(
+            self, request):
+        _, take_over, _, _ = self._launch(request, Outcome.HANDED_OFF, preview=True)
+
+        take_over.assert_called_once_with(single_instance.PREVIEW, end_the_unanswering=True)
+
     def test_a_taken_handoff_needs_no_dialog(self, request):
-        _, _, alert, _ = self._duplicate_launch(request, handoff_taken=True)
+        _, _, alert, _ = self._launch(request, Outcome.HANDED_OFF)
 
         alert.assert_not_called()
 
     def test_a_handoff_the_running_instance_never_answered_is_visible(self, request):
         """Exiting into silence here is the whole bug: the user clicked Evolver
         and nothing at all happened."""
-        _, _, alert, _ = self._duplicate_launch(request, handoff_taken=False)
+        exit_code, _, alert, _ = self._launch(request, Outcome.UNANSWERED)
 
         alert.assert_called_once()
         assert "evolver" in " ".join(alert.call_args[0]).lower()
+        assert exit_code == 0
 
     def test_the_launch_is_logged_as_the_ordinary_event_it_is(self, request):
         """A click on a running app is not a crash, and must not suppress the
         atexit line that says how this process really ended."""
-        _, _, _, logged = self._duplicate_launch(request, handoff_taken=True)
+        _, _, _, logged = self._launch(request, Outcome.HANDED_OFF)
 
         logged.assert_called_once()
         assert "already running" in logged.call_args[0][0].lower()
 
 
-class TestServingDuplicateLaunches:
-    """The other half of the handoff: without a listener, every duplicate launch
-    falls through to the error dialog and the window still never opens."""
+class TestAnsweringLaunches:
+    """The other half: without a listener, every later launch falls through
+    to the error dialog and the window still never opens."""
 
-    def _run_as_first_instance(self, request):
-        app = build_evolver_app(request)
+    def _run_as_first_instance(self, request, *, preview=False):
+        with override_config(BRANCH_SESSION=preview):
+            app = build_evolver_app(request)
 
-        with patch.object(app._instance, "claim", return_value=True), \
-             patch.object(app._instance, "serve_show_requests") as serve, \
-             patch.object(app._tray, "show"), \
-             patch.object(app._scheduler, "start"), \
-             patch.object(app._app, "exec", return_value=0), \
-             patch("gui.app.sys") as mock_sys:
-            mock_sys.argv = ["tray_app.py"]
+        with patch.object(app._instance, "take_over", return_value=Outcome.CLAIMED), \
+             patch.object(app._instance, "serve_launches") as serve, \
+             patch.object(app, "start"), \
+             patch.object(app._app, "exec", return_value=0):
             app.run()
 
-        return app, serve
+        return app, serve.call_args.kwargs
 
-    def test_first_instance_listens_for_them(self, request):
-        _, serve = self._run_as_first_instance(request)
+    def test_the_usual_evolver_opens_its_window_for_a_usual_launch(self, request):
+        _, served = self._run_as_first_instance(request)
 
-        serve.assert_called_once()
+        assert not served["steps_aside_for"](single_instance.USUAL)
+        assert not served["steps_aside_for"](b"")
+
+    def test_the_usual_evolver_steps_aside_for_a_preview(self, request):
+        _, served = self._run_as_first_instance(request)
+
+        assert served["steps_aside_for"](single_instance.PREVIEW)
+
+    def test_a_preview_steps_aside_for_the_usual_evolver_and_for_a_newer_preview(self, request):
+        _, served = self._run_as_first_instance(request, preview=True)
+
+        assert served["steps_aside_for"](single_instance.USUAL)
+        assert served["steps_aside_for"](single_instance.PREVIEW)
+
+    def test_a_preview_opens_its_window_for_a_launcher_that_says_nothing(self, request):
+        """That launcher predates the answers and exits on the connection, so
+        a preview stepping aside for it would leave no Evolver at all."""
+        _, served = self._run_as_first_instance(request, preview=True)
+
+        assert not served["steps_aside_for"](b"")
 
     def test_what_it_registered_opens_the_window(self, request):
-        app, serve = self._run_as_first_instance(request)
+        app, served = self._run_as_first_instance(request)
 
         with patch.object(app._window, "show") as mock_show, \
              patch.object(app._window, "raise_"), \
              patch.object(app._window, "activateWindow"):
-            serve.call_args[0][0]()
+            served["on_show"]()
 
         mock_show.assert_called_once()
+
+    def test_stepping_aside_quits_without_standing_evolver_down(self, request):
+        """Whoever asked is taking the work over; the broker must not be told
+        to leave Evolver down."""
+        app, served = self._run_as_first_instance(request)
+
+        with patch.object(app, "_shutdown") as shutdown, \
+             patch("gui.app.peer_watch.stand_evolver_down") as stood_down:
+            served["on_step_aside"]()
+
+        shutdown.assert_called_once_with()
+        stood_down.assert_not_called()
+
+    def test_an_evolver_on_its_way_out_answers_no_more_launches(self, request):
+        """A launch answered by an Evolver that is quitting would leave with
+        it, and nothing would be running."""
+        app = build_evolver_app(request)
+
+        with patch.object(app._instance, "stop_serving") as stop, \
+             patch.object(app._app, "quit"):
+            app._shutdown()
+
+        stop.assert_called_once_with()
 
 
 class TestShowWindowFlag:
@@ -640,7 +692,8 @@ class TestShowWindowFlag:
         app = build_evolver_app(request)
 
         with patch.object(app, "_show_window") as mock_show, \
-             patch.object(app._instance, "claim", return_value=True), \
+             patch.object(app._instance, "take_over", return_value=Outcome.CLAIMED), \
+             patch.object(app._instance, "serve_launches"), \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \
@@ -653,7 +706,8 @@ class TestShowWindowFlag:
         app = build_evolver_app(request)
 
         with patch.object(app, "_show_window") as mock_show, \
-             patch.object(app._instance, "claim", return_value=True), \
+             patch.object(app._instance, "take_over", return_value=Outcome.CLAIMED), \
+             patch.object(app._instance, "serve_launches"), \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \

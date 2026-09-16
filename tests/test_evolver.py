@@ -757,8 +757,7 @@ class TestTheWindowsDoorToTheQueue:
 
 
 class TestOneRunAtATime:
-    """A branch preview's Run Now and the running Evolver's schedule, or a
-    command-line run beside the tray, would sort and purge the same files."""
+    """A command-line run beside the tray's would sort and purge the same files."""
 
     def test_while_another_evolver_holds_the_turn_no_stage_runs(self):
         with workspace_temp_dir() as root:

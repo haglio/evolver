@@ -179,43 +179,6 @@ class TestTheGenauLane(unittest.TestCase):
                 self.assertFalse(delivered.exists())
 
 
-class TestWhatTheNextRunWouldTake(unittest.TestCase):
-    """What the branch preview reports, which is the only way a stage that
-    deletes can be judged before it lands."""
-
-    def test_it_names_every_copy_the_run_would_delete_and_deletes_none(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            source = lanes.ORIGENERATOR_SOURCE
-            db = _gallery(root / "gallery.db", [("p1", "made_00008.mp4", "evolver_unsent_at")])
-            with lib.config(ORIGENERATOR_DB_PATH=db):
-                sorted_copy = touch_video(
-                    lib.sorted_dir / source / "portrait" / "made_00008.mp4")
-                upscale = touch_video(
-                    lib.outbox / "portrait" / source / "made_00008_topaz.mp4")
-
-                waiting = withdrawn.pending()
-
-                self.assertEqual(sorted(waiting), sorted([sorted_copy, upscale]))
-                self.assertTrue(sorted_copy.exists() and upscale.exists())
-
-    def test_nothing_withdrawn_is_nothing_to_report(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            db = _gallery(root / "gallery.db", [("p1", "made_00009.mp4", None)])
-            with lib.config(ORIGENERATOR_DB_PATH=db):
-                touch_video(lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE
-                            / "made_00009_topaz.mp4")
-
-                self.assertEqual(withdrawn.pending(), [])
-
-    def test_no_gallery_is_nothing_to_report(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            with lib.config(ORIGENERATOR_DB_PATH=root / "absent.db"):
-                self.assertEqual(withdrawn.pending(), [])
-
-
 class TestAGalleryThisCannotRead(unittest.TestCase):
     def test_a_database_that_is_not_there_is_no_work_and_no_failure(self):
         with workspace_temp_dir() as root:

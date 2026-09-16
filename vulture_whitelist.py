@@ -34,9 +34,6 @@ _.cbSize  # noqa: F821  — _LastInputInfo.cbSize (required by GetLastInputInfo)
 # -- Dataclass fields consumed via dataclasses.asdict() --
 _.stopped_at_budget  # noqa: F821  — UpscaleResult.stopped_at_budget, serialized to run records
 
-# -- Written-but-never-read on purpose: the reference IS the job --
-_._show_requests  # noqa: F821  — anchors the QLocalServer; collecting it closes the pipe
-
 # -- BackfillWindow's read surface: reached from the tests, which the vulture
 #    scan deliberately excludes. The accessors exist so assertions about the
 #    window go through a public seam instead of six private attributes. --

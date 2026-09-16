@@ -149,6 +149,14 @@ def image_path(pid: int) -> str | None:
         _kernel32.CloseHandle(handle)
 
 
+def pipe_server(handle: int) -> int:
+    """The pid serving the named pipe *handle* is a client end of, or 0."""
+    pid = ctypes.wintypes.ULONG()
+    if not _kernel32.GetNamedPipeServerProcessId(ctypes.c_void_p(handle), ctypes.byref(pid)):
+        return 0
+    return pid.value
+
+
 def terminate(pid: int) -> bool:
     """Forcibly end *pid*. True when the terminate call was accepted."""
     handle = _kernel32.OpenProcess(_PROCESS_TERMINATE, False, pid)
