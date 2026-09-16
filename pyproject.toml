@@ -15,7 +15,14 @@ requires-python = ">=3.12"
 # this repo's venv holds today. tzdata is the exception and says so in
 # tests/test_dependencies.py: it is the time zone database, and a ceiling on it
 # would pin a fact about the world.
+# The family repos this one runs are named at the tags it was built against
+# rather than left to be whatever checkouts sit beside it. Unpinned, a change
+# landing in one of them reached every consumer the same minute, and one whose
+# other half had not landed turned all of them red at once. Moving to a newer
+# one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
+    "app-support @ git+https://github.com/haglio/app_support@v0.1.140",
+    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.123",
     "numpy>=2.4,<3",
     "PyQt6>=6,<7",
     "qtawesome>=1,<2",
