@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 TREES = [ROOT / "backfill", ROOT / "gui", ROOT / "tasks", ROOT / "util", ROOT / "tests",
          ROOT / "tools", ROOT / "backfill_app.py", ROOT / "check_correspondence.py",
          ROOT / "check_duplicate_sizes.py", ROOT / "config.py", ROOT / "content_overlay.py",
-         ROOT / "evolver.py", ROOT / "preview_branch.py", ROOT / "tray_app.py",
+         ROOT / "evolver.py", ROOT / "tray_app.py",
          ROOT / "vulture_whitelist.py"]
 
 
@@ -32,9 +32,9 @@ def test_every_third_party_import_is_declared():
         ROOT, [ROOT / "backfill", ROOT / "gui", ROOT / "tasks", ROOT / "util",
                ROOT / "backfill_app.py", ROOT / "check_correspondence.py",
                ROOT / "check_duplicate_sizes.py", ROOT / "config.py", ROOT / "content_overlay.py",
-               ROOT / "evolver.py", ROOT / "preview_branch.py", ROOT / "tray_app.py"],
+               ROOT / "evolver.py", ROOT / "tray_app.py"],
         ROOT / "pyproject.toml", local=("backfill", "gui", "tasks", "util", "backfill_app", "check_correspondence",
-               "check_duplicate_sizes", "config", "content_overlay", "evolver", "preview_branch",
+               "check_duplicate_sizes", "config", "content_overlay", "evolver",
                "tray_app"))
 
 

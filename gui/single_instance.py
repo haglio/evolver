@@ -39,12 +39,23 @@ _CONNECT_TIMEOUT_MS = 3000
 
 
 class InstanceGateway:
-    """This process's claim on being *the* Evolver, and the pipe under it."""
+    """This process's claim on being *the* Evolver, and the pipe under it.
 
-    def __init__(self):
+    *suffix* is how a branch preview claims its own pair instead: it is the
+    whole app too, so it must neither be refused by the live app's mutex nor
+    hand its launch down that pipe (``gui/branch_session.py``).
+    """
+
+    def __init__(self, suffix: str = ""):
+        self._mutex_name = _MUTEX_NAME + suffix
+        self._pipe_name = _PIPE_NAME + suffix
         # Each handle IS the thing it claims, so both live as long as this does.
         self._mutex_handle: int | None = None
         self._show_requests: QLocalServer | None = None
+
+    def names(self) -> tuple[str, str]:
+        """The mutex and the pipe this instance claims, for a test to tell apart."""
+        return self._mutex_name, self._pipe_name
 
     def claim(self) -> bool:
         """Claim the named mutex. True when no other Evolver holds it.
@@ -54,18 +65,18 @@ class InstanceGateway:
         against, so a refusal to create the mutex is a refusal to run, not a
         licence to.
         """
-        self._mutex_handle = try_acquire_mutex(_MUTEX_NAME)
+        self._mutex_handle = try_acquire_mutex(self._mutex_name)
         return self._mutex_handle is not None
 
     def serve_show_requests(self, on_show: Callable[[], None]) -> None:
         """Listen for duplicate launches and run *on_show* for each one."""
         server = QLocalServer()
-        QLocalServer.removeServer(_PIPE_NAME)  # only ours to take: we hold the mutex
-        if not server.listen(_PIPE_NAME):
+        QLocalServer.removeServer(self._pipe_name)  # only ours to take: we hold the mutex
+        if not server.listen(self._pipe_name):
             # Not fatal — this instance still works. But nothing can hand a
             # launch to it, so say why here rather than in a dialog the user
             # cannot act on.
-            log.error("Cannot listen on %s: %s", _PIPE_NAME, server.errorString())
+            log.error("Cannot listen on %s: %s", self._pipe_name, server.errorString())
 
         def _accept():
             connection = server.nextPendingConnection()
@@ -85,7 +96,7 @@ class InstanceGateway:
         handle.
         """
         socket = QLocalSocket()
-        socket.connectToServer(_PIPE_NAME)
+        socket.connectToServer(self._pipe_name)
         if not socket.waitForConnected(_CONNECT_TIMEOUT_MS):
             return False
         socket.disconnectFromServer()

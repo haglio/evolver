@@ -62,6 +62,27 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
 # This repo, located from the source file rather than the library root: the
 # app's own assets travel with the code, not with the media.
 PROJECT_DIR  = Path(__file__).resolve().parent
+
+# What ``launch_preview_branch.vbs`` sets, and nothing else does: this run is a
+# worktree's whole app, opened beside the Evolver the user runs every day.
+BRANCH_SESSION_FLAG = "EVOLVER_BRANCH_SESSION"
+
+
+def live_dir(environ: dict, project_dir_path: Path, roots: tuple[Path, ...]) -> Path:
+    """The checkout whose run history, log, settings and queue manifests to use.
+
+    This one, except in a branch session, which shares the live app's: a
+    preview keeping those for itself would show a history nobody made and a
+    queue nobody ordered, and the user judges a change by the real ones (see
+    ``gui/branch_session.py``).
+    """
+    if environ.get(BRANCH_SESSION_FLAG) != "1":
+        return project_dir_path
+    return siblings.project_dir("evolver", roots)
+
+
+LIVE_DIR = live_dir(os.environ, PROJECT_DIR, PROJECT_ROOTS)
+BRANCH_SESSION = LIVE_DIR != PROJECT_DIR
 FUN_TIME_PROJECT_DIR = project_dir("fun_time")
 FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
 # Fun Time's per-video watch counts ("breeding" data), read-only, populated by
@@ -271,12 +292,12 @@ NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
 # The last phone favorite applied to Fun Time's favorites, so one is applied
 # exactly once and Fun Time can undo it (tasks/watch_weights.py).
 WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
-NONAI_SKIP_MANIFEST = PROJECT_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
+NONAI_SKIP_MANIFEST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
 # The counterpart to the skip list: videos to encode next, in the order listed.
 # A pin outranks every ordering heuristic and re-queues a video the bucket
 # already holds an older processed variant of, which is the only way to ask for
 # a redo under a newer recipe.
-NONAI_PRIORITY_MANIFEST = PROJECT_DIR / ".nonai-upscale-next.txt"
+NONAI_PRIORITY_MANIFEST = LIVE_DIR / ".nonai-upscale-next.txt"
 # What one non-AI encode may cost the machine and when is
 # tasks.nonai_encode.EncodeSettings, not here: those six numbers are this app's
 # own policy, and what belongs in this file is what the machine and the overlay
@@ -286,15 +307,15 @@ NONAI_PRIORITY_MANIFEST = PROJECT_DIR / ".nonai-upscale-next.txt"
 # returning user parks the encode within seconds instead of minutes.
 NONAI_PRESENCE_POLL_SECONDS = 20.0
 
-LOG_FILE = PROJECT_DIR / "evolver.log"
-RUNS_DIR = PROJECT_DIR / "runs"
+LOG_FILE = LIVE_DIR / "evolver.log"
+RUNS_DIR = LIVE_DIR / "runs"
 # How many runs the main window's history list reads. Nothing prunes RUNS_DIR
 # -- about 144 files a day at the default interval, kept forever -- and the
 # read happens on the GUI thread after every run, so it needs a ceiling. A
 # thousand is a week at ten minutes and months at longer intervals; the files
 # themselves are all still there, and the stats window still charts every one.
 RUNS_SHOWN = 1000
-GUI_SETTINGS_FILE = PROJECT_DIR / "gui_settings.json"
+GUI_SETTINGS_FILE = LIVE_DIR / "gui_settings.json"
 
 # Voice control for the metadata backfill tool. The model name is resolved and cached
 # by vosk under ~/.cache/vosk, the same small English model Fun Time listens with.

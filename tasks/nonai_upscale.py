@@ -33,7 +33,6 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -381,9 +380,7 @@ def _take_over(job: dict, files: StageFiles) -> None:
     log.info("The encode of %s runs on: it is the one asked for.", job.get("source"))
 
 
-def request_now(video: str, *, files: StageFiles | None = None,
-                stop: Callable[[dict, str, StageFiles], str] = _stop_in_flight,
-                take_over: Callable[[dict, StageFiles], None] = _take_over) -> None:
+def request_now(video: str) -> None:
     """Ask for *video* to be upscaled right away, and clear the way for it.
 
     The queue window's door, called on the GUI thread the moment a video is
@@ -395,23 +392,18 @@ def request_now(video: str, *, files: StageFiles | None = None,
     AI clips the run upscales first are not held back by a Topaz process this
     request is about to end anyway. The stopped video keeps its place in the
     queue, next after the one asked for.
-
-    *stop* and *take_over* are what touching the running encode means, injected
-    for the branch preview: it shows this window against the live library and
-    must rewrite its own copies of the records without ever terminating or
-    thawing the encode the live app is running.
     """
-    files = StageFiles.configured() if files is None else files
+    files = StageFiles.configured()
     with _throttle_lock:
         job = nonai_job.load_job(files.job)
         running = bool(job and job.get("pid") and processes.is_running(job["pid"]))
         if running and relpath(Path(job["source"])) == video:
-            take_over(job, files)
+            _take_over(job, files)
             nonai_job.clear_request(files.request)
             nonai_queue.pin_ahead(files.pin_manifest, [video])
             return
 
-        next_after = [stop(job, "you asked for another video now", files)] if running else []
+        next_after = [_stop_in_flight(job, "you asked for another video now", files)] if running else []
         waiting = nonai_job.load_request(files.request)
         if waiting is not None and waiting.video != video:
             next_after.append(waiting.video)

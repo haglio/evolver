@@ -27,8 +27,9 @@ def _make_icon() -> QIcon:
 class EvolverTray(QSystemTrayIcon):
     """System tray icon with Open / Run Now / Pause / Settings / Quit menu."""
 
-    def __init__(self, parent=None):
+    def __init__(self, name: str = "Evolver", parent=None):
         super().__init__(_make_icon(), parent)
+        self._name = name
 
         self._menu = QMenu()
         # A tray menu has no window to take the family's rules from; without
@@ -132,7 +133,7 @@ class EvolverTray(QSystemTrayIcon):
         self.pause_action.setText(
             "Resume Scheduling" if status.is_paused else "Pause Scheduling")
         self.setToolTip(" - ".join(
-            part for part in ("Evolver", status.activity()) if part))
+            part for part in (self._name, status.activity()) if part))
         self._status_action.setText(f"Status: {status.headline()}")
         self._next_run_action.setText(status.next_run_text())
         self._next_run_action.setVisible(bool(status.next_run_text()))

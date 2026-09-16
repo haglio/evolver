@@ -31,8 +31,8 @@ from util.upscale_lineup import (
 )
 
 
-def current(files: StageFiles | None = None) -> Lineup:
-    files = StageFiles.configured() if files is None else files
+def current() -> Lineup:
+    files = StageFiles.configured()
     pinned = set(manifest_entries(files.pin_manifest))
     entries = [_entry(candidate.path, pinned) for candidate in collect_candidates(
         skip_manifest=files.skip_manifest, pin_manifest=files.pin_manifest,

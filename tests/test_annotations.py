@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 TREES = [ROOT / "backfill", ROOT / "gui", ROOT / "tasks", ROOT / "util", ROOT / "tests",
          ROOT / "tools", ROOT / "backfill_app.py", ROOT / "check_correspondence.py",
          ROOT / "check_duplicate_sizes.py", ROOT / "config.py", ROOT / "content_overlay.py",
-         ROOT / "evolver.py", ROOT / "preview_branch.py", ROOT / "tray_app.py",
+         ROOT / "evolver.py", ROOT / "tray_app.py",
          ROOT / "vulture_whitelist.py"]
 
 

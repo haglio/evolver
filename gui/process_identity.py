@@ -11,11 +11,11 @@ on, which is why they are here and not in a constructor.
 from __future__ import annotations
 
 import logging
-import sys
 
 from app_support.win32 import set_app_user_model_id
 
 import config
+from gui import branch_session
 from gui.taskbar import set_taskbar_properties
 
 log = logging.getLogger(__name__)
@@ -23,7 +23,6 @@ log = logging.getLogger(__name__)
 # The Windows identity contract. A pinned shortcut belongs to whatever this
 # says, so it is the one string that must not drift.
 APP_MODEL_ID = "Evolver.TrayApp"
-DISPLAY_NAME = "Evolver"
 
 
 def claim(hwnd: int) -> None:
@@ -32,24 +31,15 @@ def claim(hwnd: int) -> None:
     A refusal is logged, not raised: a button wearing Python's icon is still a
     button, and an icon is never worth failing to start over.
     """
+    identity = branch_session.model_id(APP_MODEL_ID)
     try:
-        set_app_user_model_id(APP_MODEL_ID)
+        set_app_user_model_id(identity)
     except OSError:
         log.warning("Could not claim the taskbar identity", exc_info=True)
     set_taskbar_properties(
         hwnd,
-        APP_MODEL_ID,
-        _relaunch_command(),
-        DISPLAY_NAME,
+        identity,
+        branch_session.relaunch_command(),
+        branch_session.app_name(),
         str(config.PROJECT_DIR / "icon.ico"),
     )
-
-
-def _relaunch_command() -> str:
-    """What the shell runs when a pinned Evolver button is clicked.
-
-    Quoted here rather than at the call site: both halves are paths that
-    routinely hold spaces, and a relaunch command the shell cannot parse pins
-    a button that does nothing.
-    """
-    return f'"{sys.executable}" "{config.PROJECT_DIR / "tray_app.py"}" --show-window'

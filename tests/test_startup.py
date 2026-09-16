@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pytest
 
 from gui import startup
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir
 
 
 @pytest.fixture
@@ -50,6 +50,18 @@ class TestRegisterStartup:
         assert f'oLink.Arguments = "{project_dir / "tray_app.py"}"' in script
         assert f'oLink.WorkingDirectory = "{project_dir}"' in script
         assert "oLink.Save" in script
+
+    def test_a_branch_preview_still_points_it_at_the_evolver_that_runs_every_day(self, startup_dir):
+        """A preview is the whole app, settings dialog included, and ticking
+        "Start with Windows" there must not leave Windows starting a branch."""
+        captured = {}
+        with workspace_temp_dir() as live, \
+             override_config(LIVE_DIR=live), \
+             patch("gui.startup.subprocess.run", side_effect=_capture_cscript(captured)):
+            startup.register_startup()
+
+            assert f'oLink.Arguments = "{live / "tray_app.py"}"' in captured["script"]
+            assert f'oLink.WorkingDirectory = "{live}"' in captured["script"]
 
     def test_a_quote_in_a_path_is_doubled_the_way_vbscript_reads_it(self, startup_dir):
         # The four paths were dropped straight inside VBScript string literals,

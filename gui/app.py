@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 import config
 import evolver
-from gui import peer_watch, process_identity
+from gui import branch_session, peer_watch, process_identity
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.palette import apply_accent
@@ -80,11 +80,14 @@ class EvolverApp:
         self._app.setApplicationName("Evolver")
         apply_accent(self._app)
 
+        # Read once: what this process is was settled by the launcher that
+        # started it, and every branch below has to give the same answer.
+        self._branch_session = branch_session.is_one()
         self._settings = EvolverSettings.load()
         self._stats_window: StatsWindow | None = None
         self._queue_window: UpscaleQueueWindow | None = None
         self._log_window: RunLogWindow | None = None
-        self._instance = InstanceGateway()
+        self._instance = InstanceGateway(branch_session.instance_suffix())
         self._sign_in_notice = SignInNotice()
 
         # Parks and thaws the in-flight non-AI encode between the slow pipeline
@@ -106,7 +109,7 @@ class EvolverApp:
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.status_changed.connect(self._update_status_display)
 
-        self._tray = EvolverTray()
+        self._tray = EvolverTray(branch_session.app_name())
         self._app.setWindowIcon(self._tray.icon())
         self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
         _wire(self._tray, {
@@ -125,6 +128,9 @@ class EvolverApp:
         self._app.commitDataRequest.connect(self._on_session_end)
 
         self._window = EvolverMainWindow()
+        self._window.setWindowTitle(branch_session.app_name())
+        if self._branch_session:
+            self._leave_the_schedule_to_the_live_app()
         # Quit is the one command that means something different here: from the
         # window it asks first, because the window is where a stray click lands.
         _wire(self._window, {
@@ -159,18 +165,38 @@ class EvolverApp:
         it too late.
         """
         process_identity.claim(int(self._window.winId()))
+        self._window.refresh_history()
+        self._tray.show()
+        if self._branch_session:
+            # A preview runs nothing on a timer (gui/branch_session.py) and is
+            # opened to be looked at, so its window comes up with it.
+            self._show_window()
+        else:
+            self._keep_the_schedule()
+        if "--show-window" in sys.argv:
+            self._show_window()
+
+    def _keep_the_schedule(self) -> None:
+        """Start the timers that are the live app's alone: the schedule, the
+        presence poll that parks the non-AI encode, and the broker watch."""
         # Whatever the user wanted the last time they closed Evolver, starting it
         # is them wanting it up now -- so the stand-down goes before the first
         # peer check, not after it.
         peer_watch.clear_evolver_stand_down()
-        self._window.refresh_history()
         self._presence.start()
-        self._tray.show()
         self._scheduler.start()
         self._peer_timer.start()
         self._peer.tick()
-        if "--show-window" in sys.argv:
-            self._show_window()
+
+    def _leave_the_schedule_to_the_live_app(self) -> None:
+        """Show on both surfaces that the schedule is not this instance's.
+
+        Disabled rather than hidden: a preview is the whole app, and a missing
+        control reads as a change this branch made.
+        """
+        for control in (self._tray.pause_action, self._window.active_toggle):
+            control.setEnabled(False)
+            control.setToolTip(branch_session.SCHEDULE_IS_THE_LIVE_APPS)
 
     def run(self) -> int:
         if not self._instance.claim():
@@ -408,7 +434,8 @@ class EvolverApp:
         cancels. This one leaves a mark, so closing Evolver on purpose is not
         argued with. Starting it again clears the mark; see start().
         """
-        peer_watch.stand_evolver_down()
+        if not self._branch_session:
+            peer_watch.stand_evolver_down()
         self._shutdown()
 
     def _shutdown(self):
