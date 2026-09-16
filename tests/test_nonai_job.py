@@ -56,6 +56,15 @@ class TestJobRecord(unittest.TestCase):
 
             self.assertIsNone(nonai_job.load_job(path))
 
+    def test_an_empty_record_means_no_job(self):
+        """A record naming no encode has nothing to supervise; read as one, its
+        missing source took the stage down trying to name it."""
+        with workspace_temp_dir() as root:
+            path = root / "job.json"
+            path.write_text("{}", encoding="utf-8")
+
+            self.assertIsNone(nonai_job.load_job(path))
+
     def test_clearing_removes_the_file_and_tolerates_it_being_gone(self):
         with workspace_temp_dir() as root:
             path = root / "job.json"

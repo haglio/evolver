@@ -7,11 +7,12 @@ unattended night does not run the machine flat out end to end).
 
 Every function takes the file it works on rather than reading ``config``: the
 stage owns which paths these are, and a caller — a test, or a second entry
-point — can point them anywhere.  All three readers are tolerant by design.
+point — can point them anywhere.  Every reader is tolerant by design.
 The record is the on-disk contract with a live multi-hour encode and the sync
 service covering the project tree has renamed it mid-run, so a missing or
 half-written file has to read as "no state", never as a crash that would strand
-the encode it describes.
+the encode it describes.  Every writer lands its file whole, because the GUI's
+presence poll and a pipeline tick read the record from two threads.
 """
 
 from __future__ import annotations
@@ -20,18 +21,17 @@ import json
 import time
 from pathlib import Path
 
+from app_support.file_channel import write_whole
+
+from util.json_reads import read_dict
+
 
 def load_job(path: Path) -> dict | None:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return payload if isinstance(payload, dict) else None
+    return read_dict(path) or None
 
 
 def save_job(path: Path, job: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(job, indent=2), encoding="utf-8")
+    write_whole(path, json.dumps(job, indent=2))
 
 
 def clear_job(path: Path) -> None:
@@ -39,43 +39,25 @@ def clear_job(path: Path) -> None:
 
 
 def attempts_of(path: Path, key: str) -> int:
-    return _load_attempts(path).get(key, 0)
+    return read_dict(path).get(key, 0)
 
 
 def bump_attempts(path: Path, key: str) -> None:
-    attempts = _load_attempts(path)
+    attempts = read_dict(path)
     attempts[key] = attempts.get(key, 0) + 1
-    _save_attempts(path, attempts)
+    write_whole(path, json.dumps(attempts, indent=2))
 
 
 def clear_attempts(path: Path, key: str) -> None:
-    attempts = _load_attempts(path)
+    attempts = read_dict(path)
     if attempts.pop(key, None) is not None:
-        _save_attempts(path, attempts)
-
-
-def _load_attempts(path: Path) -> dict[str, int]:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _save_attempts(path: Path, attempts: dict[str, int]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(attempts, indent=2), encoding="utf-8")
+        write_whole(path, json.dumps(attempts, indent=2))
 
 
 def last_encode_ended_at(path: Path) -> float:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return 0.0
-    ended_at = payload.get("ended_at", 0.0) if isinstance(payload, dict) else 0.0
+    ended_at = read_dict(path).get("ended_at", 0.0)
     return ended_at if isinstance(ended_at, (int, float)) else 0.0
 
 
 def stamp_encode_ended(path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"ended_at": time.time()}), encoding="utf-8")
+    write_whole(path, json.dumps({"ended_at": time.time()}))
