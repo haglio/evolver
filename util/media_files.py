@@ -39,6 +39,14 @@ def library_videos(root: Path):
             yield path
 
 
+def file_size(path: Path) -> int:
+    """*path*'s size in bytes, 0 when it cannot be read."""
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
 # How a name collision is uniquified: "stem", then "stem (2)", "stem (3)"...
 # It is a contract between two apps -- Origenerator applies it exporting into
 # Evolver's inbox, Evolver applies it again delivering into Genau's folder, and

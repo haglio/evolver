@@ -29,6 +29,7 @@ import numpy as np
 
 from util import lanes, sidecar
 from util.frame_hashes import SAMPLE_FPS, Match, align, frame_hashes, locate, sample_frames
+from util.media_files import file_size
 from util.version_groups import stable_title
 
 log = logging.getLogger(__name__)
@@ -237,14 +238,7 @@ def _best_scene_per_clip(matched: dict[Path, Match]) -> dict[Path, Match]:
 
 
 def _largest_first(videos: list[Path]) -> list[Path]:
-    return sorted(videos, key=lambda video: (-_size(video), str(video)))
-
-
-def _size(video: Path) -> int:
-    try:
-        return video.stat().st_size
-    except OSError:
-        return 0
+    return sorted(videos, key=lambda video: (-file_size(video), str(video)))
 
 
 def _undoubled_tokens(text: str) -> set[str]:
