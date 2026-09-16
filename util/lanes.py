@@ -15,6 +15,42 @@ ORIGENERATOR_SOURCE = "origenerator"
 
 
 @dataclass(frozen=True)
+class SentLane:
+    """One lane Origenerator hands a clip down, seen from the receiving end.
+
+    ``source`` is the ``0_inbox`` folder the clip arrives under -- the whole of
+    what a send says, since routing by that name is the only thing passing
+    between the two apps -- and ``unsent_column`` is where Origenerator's gallery
+    records a send being taken back. Both are names agreed with that repo and
+    must stay spelled as it spells them.
+
+    ``delivered_dir`` is where a finished clip of this lane leaves the library
+    for, or ``None`` for the lane whose clips stay in the outbox. It is the one
+    way the two differ, and it is why a withdrawal has to be answered here: by
+    the time one is asked for, the clip has been sorted, upscaled and in that
+    lane's case moved somewhere Origenerator has never heard of.
+    """
+
+    source: str
+    unsent_column: str
+    delivered_dir: Path | None
+
+
+def sent_lanes() -> tuple[SentLane, ...]:
+    """Both lanes Origenerator sends down, resolved against config as it is now.
+
+    A function rather than a table, for the reason ``weird_piles`` is one: the
+    Genau lane's folder name comes from the overlay, and a tuple built at import
+    freezes whatever ``config`` held then.
+    """
+    return (
+        SentLane(ORIGENERATOR_SOURCE, "evolver_unsent_at", delivered_dir=None),
+        SentLane(config.GENAU_SOURCE, "genau_unsent_at",
+                 delivered_dir=config.GENAU_CLIPS_DIR),
+    )
+
+
+@dataclass(frozen=True)
 class AiClip:
     video: Path
     source: str

@@ -40,6 +40,31 @@ class TestGenauClips(unittest.TestCase):
                 self.assertEqual(list(lanes.genau_clips()), [loop])
 
 
+class TestSentLanes(unittest.TestCase):
+    def test_each_lane_names_its_inbox_folder_and_the_column_it_is_withdrawn_in(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(genau_source="example-loop-clips"):
+                sent = lanes.sent_lanes()
+
+                self.assertEqual([(lane.source, lane.unsent_column) for lane in sent],
+                                 [("origenerator", "evolver_unsent_at"),
+                                  ("example-loop-clips", "genau_unsent_at")])
+
+    def test_only_the_genau_lane_delivers_its_clips_out_of_the_library(self):
+        # The other lane's clips rest in the outbox, so there is nowhere else to
+        # look for a copy of one; this lane's leave for the folder Genau plays
+        # from, which is the whole reason a withdrawal cannot be done from the
+        # app that sent them.
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                library_lane, genau_lane = lanes.sent_lanes()
+
+                self.assertIsNone(library_lane.delivered_dir)
+                self.assertEqual(genau_lane.delivered_dir, lib.genau_clips)
+
+
 class TestNonAiVideos(unittest.TestCase):
     def test_walks_every_bucket_in_a_stable_order(self):
         with workspace_temp_dir() as root:

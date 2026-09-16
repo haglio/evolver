@@ -45,7 +45,7 @@ from evolver import PipelineResult, StageRecord
 from gui.main_window import EvolverMainWindow
 from gui.run_record import RunRecord, save_run
 from gui.sign_in_notice import SignInNotice
-from tasks import nonai_progress
+from tasks import nonai_progress, withdrawn
 from tasks.nonai_queue import collect_candidates
 from tasks.nonai_upscale import NonAiUpscaleResult
 from util import crash_log, processes, sidecar, topaz, video_type
@@ -146,9 +146,26 @@ def nonai_upscale_report(preview_metadata: Path, primary: Path) -> StageRecord:
                        duration_seconds=time.monotonic() - started, result=result)
 
 
+def withdrawn_report(preview_metadata: Path, primary: Path) -> StageRecord:
+    """What the live run would delete for clips Origenerator has taken back.
+
+    Counted, never deleted: this preview reads the real library, and a stage
+    whose whole job is removing files cannot be shown by letting it do that.
+    So the row says how many copies the next real run will take, which is the
+    number worth judging before the stage lands at all. It takes the preview's
+    two paths because every report does and reads neither, what it counts being
+    in the library itself.
+    """
+    started = time.monotonic()
+    copies = withdrawn.pending()
+    result = withdrawn.WithdrawnResult(deleted=len(copies))
+    return StageRecord(name="withdrawn", status="completed",
+                       duration_seconds=time.monotonic() - started, result=result)
+
+
 #: The stages this preview can report on, in pipeline order.  Add one when a
 #: change makes a stage's report worth judging; drop it when it stops being.
-REPORTS = (nonai_upscale_report,)
+REPORTS = (withdrawn_report, nonai_upscale_report)
 
 
 def preview_record(preview_metadata: Path, primary: Path) -> RunRecord:

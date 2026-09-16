@@ -20,12 +20,10 @@ from __future__ import annotations
 import json
 import math
 import re
-import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
-import config
-from util import provenance
+from util import origenerator_gallery, provenance
 from util.ffprobe import video_dimensions
 from util.media_files import strip_uniquifier
 
@@ -64,7 +62,7 @@ def build_metadata(video_path, db_path=None) -> dict:
     ``FileNotFoundError`` when the database is absent.
     """
     video_path = Path(video_path)
-    rows = _load_rows(_database(db_path))
+    rows = _load_rows(db_path)
     row = _match_video_row(video_path, rows)
     if row is None:
         raise LookupError(f"No Origenerator generation produced {video_path.name}")
@@ -81,21 +79,13 @@ def build_metadata(video_path, db_path=None) -> dict:
     return payload
 
 
-def _database(db_path) -> Path:
-    """The gallery database to read -- *db_path*, else the configured one -- which must exist."""
-    db_path = Path(db_path) if db_path is not None else config.ORIGENERATOR_DB_PATH
-    if not db_path.exists():
-        raise FileNotFoundError(f"Origenerator database not found: {db_path}")
-    return db_path
-
-
 def generation_records(db_path=None) -> Callable[[Path], dict]:
     """What made each of Origenerator's videos, answered from one read of its gallery.
 
     Raises ``FileNotFoundError`` when the database is absent, as
     :func:`build_metadata` does.
     """
-    rows = _load_rows(_database(db_path))
+    rows = _load_rows(db_path)
 
     def generation_of(video: Path) -> dict:
         row = _match_video_row(Path(video), rows)
@@ -106,28 +96,10 @@ def generation_records(db_path=None) -> Callable[[Path], dict]:
     return generation_of
 
 
-def _load_rows(db_path: Path) -> list[dict]:
-    """Every generation row, read from a fresh read-only connection.
-
-    Opened ``mode=ro`` so a running Origenerator (which owns the file) is never
-    at risk of a write from here, and so a wrong path fails loudly instead of
-    creating an empty database.
-    """
-    conn = _connect_ro(db_path)
-    try:
-        present = {column[1] for column in conn.execute("PRAGMA table_info(generations)")}
-        columns = [*_COLUMNS, _OWN_PROVENANCE] if _OWN_PROVENANCE in present else list(_COLUMNS)
-        cursor = conn.execute(f"SELECT {', '.join(columns)} FROM generations")
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
-    finally:
-        conn.close()
-
-
-def _connect_ro(db_path: Path) -> sqlite3.Connection:
-    """A read-only connection to Origenerator's database, opened by URI so a wrong
-    path fails loudly instead of creating an empty file."""
-    uri = db_path.resolve().as_uri() + "?mode=ro"
-    return sqlite3.connect(uri, uri=True, timeout=5.0)
+def _load_rows(db_path) -> list[dict]:
+    """Every generation row, holding the columns this strategy reads."""
+    return origenerator_gallery.rows(_COLUMNS, optional=(_OWN_PROVENANCE,),
+                                     db_path=db_path)
 
 
 def _match_video_row(video_path: Path, rows: list[dict]) -> dict | None:

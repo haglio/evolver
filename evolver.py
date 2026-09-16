@@ -44,6 +44,7 @@ from tasks import (
     upscale,
     video_types,
     watch_weights,
+    withdrawn,
 )
 from util import processes, run_log, system_resources, topaz
 
@@ -72,6 +73,12 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     # because the alternative failure (a folder that cannot be written at all)
     # looks identical from here and would otherwise never be noticed.
     "genau_deliver": lambda r: bool(r.failed),
+    # A copy that would not delete is, like the one above, almost always a clip
+    # an app has open right now, and the next run gets it -- but it stays visible
+    # for the same reason: a folder that cannot be written at all looks identical
+    # from here, and a withdrawal that silently never happens leaves the clip in
+    # the library after the user was told it was going.
+    "withdrawn": lambda r: bool(r.failed),
     "verify": lambda r: not r.ok,
     "references": lambda r: not r.ok,
     "watch_weights": lambda r: not r.ok,
@@ -248,6 +255,10 @@ def run_pipeline(
         # script it rehomes is invisible to all of them until it has run.
         _run_stage("strays", stray_files.run)
         _run_stage("purge", purge_weird.run)
+        # Before the scrape and the sort: a clip whose send has been taken back
+        # should not be given a sidecar on its way out, nor filed into 1_sorted
+        # from an inbox it is about to be deleted from.
+        _run_stage("withdrawn", withdrawn.run)
         _run_stage("metadata", prompt_scrape.run)
         sort_result = _run_stage("sort", sort.run)
 
