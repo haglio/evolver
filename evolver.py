@@ -32,6 +32,7 @@ from tasks import (
     clip_scripts,
     genau_deliver,
     nonai_group,
+    nonai_titles,
     nonai_upscale,
     prompt_scrape,
     provenance_sweep,
@@ -341,6 +342,9 @@ def run_pipeline(
         _run_stage("scene_scripts", scene_scripts.run)
         _run_stage("scripts", scripts_sync.run, show_popup=True)
         _run_stage("group_non_ai", nonai_group.run)
+        # After the grouping, whose version families are what carries a clip's
+        # name to every rendition of the scene it was cut from.
+        _run_stage("title_non_ai", nonai_titles.run)
         # After the grouping, which is what creates a new non-AI video's sidecar:
         # the kind then joins a record that is already there rather than making a
         # second one for the same video in the same run.
