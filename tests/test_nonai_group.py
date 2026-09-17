@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import evolver
 from tasks import nonai_group
@@ -172,6 +173,171 @@ class TestNonAiGroup(unittest.TestCase):
                 result = nonai_group.run()
                 self.assertEqual(result.pruned, 1)
                 self.assertFalse(sidecar.sidecar_path(clip).exists())
+
+
+ONE_PICTURE = [f"{0x5A5A5A5A5A5A5A5A + moment:016x}" for moment in range(16)]
+
+
+def _scene(path: Path, seconds: float) -> Path:
+    """A full-length video whose running time the video-kinds stage has recorded."""
+    _touch(path)
+    write_sidecar(sidecar.sidecar_path(path),
+                  {"video": {"type": "full_length", "duration_seconds": seconds}})
+    return path
+
+
+def _group(video: Path) -> str:
+    return sidecar.read(sidecar.sidecar_path(video))["version"]["group"]
+
+
+class TestOneVideoByItsPictures(unittest.TestCase):
+    def test_two_differently_named_copies_with_the_same_pictures_are_one_video(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                unsorted = non_ai / "larkin" / "0 unsorted"
+                old = _scene(unsorted / "Jane Doe - studio video original.mp4", 850.57)
+                new = _scene(unsorted / "jane-doe-scene-two-enhanced-60fps-1080p.mp4", 850.51)
+
+                result = nonai_group.run(fingerprint=lambda video, seconds: ONE_PICTURE)
+
+                self.assertEqual(_group(old), _group(new))
+                self.assertEqual(result.joined, 1)
+
+    def test_a_video_is_measured_once_and_its_pictures_kept(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                unsorted = non_ai / "larkin" / "0 unsorted"
+                old = _scene(unsorted / "Jane Doe - studio video original.mp4", 850.57)
+                new = _scene(unsorted / "jane-doe-scene-two-enhanced-60fps-1080p.mp4", 850.51)
+                measured: list[str] = []
+
+                def fingerprint(video: Path, seconds: float) -> list[str]:
+                    measured.append(video.name)
+                    return ONE_PICTURE
+
+                nonai_group.run(fingerprint=fingerprint)
+                nonai_group.run(fingerprint=fingerprint)
+
+                self.assertEqual(sorted(measured), sorted([old.name, new.name]))
+                self.assertEqual(_group(old), _group(new))
+
+    def test_only_full_videos_of_the_same_length_are_ever_measured(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                unsorted = non_ai / "larkin" / "0 unsorted"
+                old = _scene(unsorted / "Jane Doe - studio video original.mp4", 850.57)
+                new = _scene(unsorted / "jane-doe-scene-two-enhanced-60fps-1080p.mp4", 850.51)
+                longer = _scene(unsorted / "Jane Doe - Scene Three.mp4", 851.2)
+                carved = _touch(non_ai / "larkin" / "1 clips" / "Jane Doe - Scene Two.mp4")
+                write_sidecar(sidecar.sidecar_path(carved), {
+                    "clip": {"compilation": "Vol6", "index": 2},
+                    "video": {"type": "excerpt", "duration_seconds": 850.5},
+                })
+                measured: list[str] = []
+
+                def fingerprint(video: Path, seconds: float) -> list[str]:
+                    measured.append(video.name)
+                    return ONE_PICTURE
+
+                nonai_group.run(fingerprint=fingerprint)
+
+                self.assertEqual(sorted(measured), sorted([old.name, new.name]))
+                self.assertNotEqual(_group(longer), _group(old))
+                self.assertNotEqual(_group(carved), _group(old))
+
+    def test_a_family_is_measured_through_its_smallest_file(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                bucket = non_ai / "larkin"
+                old = _scene(bucket / "0 unsorted" / "Jane Doe - studio video original.mp4", 850.57)
+                upscale = _scene(bucket / "3_good_to_go" / "processed"
+                                 / "Jane Doe - studio video original_apo8_iris2.mp4", 850.57)
+                upscale.write_text("x" * 50)
+                new = _scene(bucket / "0 unsorted" / "jane-doe-scene-two-enhanced.mp4", 850.51)
+                measured: list[str] = []
+
+                def fingerprint(video: Path, seconds: float) -> list[str]:
+                    measured.append(video.name)
+                    return ONE_PICTURE
+
+                nonai_group.run(fingerprint=fingerprint)
+
+                self.assertEqual(sorted(measured), sorted([old.name, new.name]))
+                self.assertEqual(_group(upscale), _group(new))
+
+    def test_pictures_an_upscale_was_handed_are_not_measured_again(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                bucket = non_ai / "larkin"
+                upscale = bucket / "3_good_to_go" / "processed" / "Jane Doe - original_apo8_iris2.mp4"
+                _touch(upscale)
+                write_sidecar(sidecar.sidecar_path(upscale), {
+                    "video": {"type": "full_length", "duration_seconds": 850.57},
+                    "footage": {"fingerprint": ONE_PICTURE},
+                })
+                new = _scene(bucket / "0 unsorted" / "jane-doe-scene-two-enhanced.mp4", 850.51)
+                measured: list[str] = []
+
+                def fingerprint(video: Path, seconds: float) -> list[str]:
+                    measured.append(video.name)
+                    return ONE_PICTURE
+
+                nonai_group.run(fingerprint=fingerprint)
+
+                self.assertEqual(measured, [new.name])
+                self.assertEqual(_group(upscale), _group(new))
+
+    def test_a_run_measures_no_more_videos_than_its_allowance(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ), patch.object(nonai_group, "MEASURED_PER_RUN", 3):
+                unsorted = non_ai / "larkin" / "0 unsorted"
+                for scene, seconds in ((1, 100.0), (2, 200.0), (3, 300.0)):
+                    _scene(unsorted / f"Jane Doe - Scene {scene}.mp4", seconds)
+                    _scene(unsorted / f"jane-doe-copy-{scene}-enhanced.mp4", seconds + 0.1)
+                measured: list[str] = []
+
+                def fingerprint(video: Path, seconds: float) -> list[str]:
+                    measured.append(video.name)
+                    return ONE_PICTURE
+
+                result = nonai_group.run(fingerprint=fingerprint)
+
+                self.assertEqual(len(measured), 3)
+                self.assertEqual(result.measured, 3)
+
+    def test_the_same_length_with_other_pictures_is_another_video(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                unsorted = non_ai / "larkin" / "0 unsorted"
+                first = _scene(unsorted / "various - Example Studio - finale 1.mp4", 60.0)
+                second = _scene(unsorted / "various - Example Studio - finale 2.mp4", 59.95)
+                other = [f"{int(moment, 16) ^ ((1 << 64) - 1):016x}" for moment in ONE_PICTURE]
+
+                nonai_group.run(fingerprint=lambda video, seconds:
+                                ONE_PICTURE if video == first else other)
+
+                self.assertNotEqual(_group(first), _group(second))
 
 
 class TestGroupingCannotFail(unittest.TestCase):

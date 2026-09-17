@@ -10,7 +10,9 @@ Matching a bare token *prefix* is too loose to hold: every scene of a performer
 starts with her name, so a stem that is only her name anchors all of them.
 
 A version renamed rather than suffixed keeps no such thread back to its
-original, so those pairs are declared instead (``config.NONAI_VERSION_OVERRIDES``).
+original: the grouping stage finds one of the same length by its pictures
+(:mod:`util.same_footage`), and any other pair is declared
+(``config.NONAI_VERSION_OVERRIDES``).
 
 :func:`stable_title` is the same question asked strictly. The prefix rule above
 is deliberately wide, so a copy the user tagged by hand joins its original; that

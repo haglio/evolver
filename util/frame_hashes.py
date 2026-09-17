@@ -160,28 +160,48 @@ def sample_frames(video: Path, fps: float) -> np.ndarray:
     complaining on stderr the whole way -- held back unless the run really fails,
     since a batch over hundreds of videos is unreadable otherwise.
     """
-    crop = content_crop(video)
-    filters = [f"fps={fps}"]
-    if crop is not None:
-        filters.append("crop={}:{}:{}:{}".format(*crop))
+    filters = ",".join([f"fps={fps}", *_picture_filters(content_crop(video))])
+    return _thumbnails(_decode(video, ["-i", str(video), "-an", "-vf", filters]))
+
+
+def frames_at(video: Path, seconds: Iterable[float]) -> np.ndarray:
+    """*video*'s picture at each of *seconds*, as :func:`sample_frames` reads one.
+
+    A moment ffmpeg cannot read is left out, so a caller that needs them all
+    counts what came back.
+    """
+    filters = ",".join(_picture_filters(content_crop(video)))
+    moments = [
+        _thumbnails(_decode(video, ["-ss", f"{at:.3f}", "-i", str(video), "-an",
+                                    "-frames:v", "1", "-vf", filters]))
+        for at in seconds
+    ]
+    return np.concatenate([_thumbnails(b""), *moments])
+
+
+def _picture_filters(crop: tuple[int, int, int, int] | None) -> list[str]:
+    bars = [] if crop is None else ["crop={}:{}:{}:{}".format(*crop)]
     # Averaging the whole source block, rather than sampling a few pixels of it,
     # is what makes a 4K upscale thumbnail like its 540p original.
-    filters.append(f"scale={SAMPLE_WIDTH}:{SAMPLE_HEIGHT}:flags=area")
-    command = [
-        "ffmpeg", "-v", "error", "-i", str(video), "-an",
-        "-vf", ",".join(filters),
-        "-pix_fmt", "gray", "-f", "rawvideo", "-",
-    ]
+    return [*bars, f"scale={SAMPLE_WIDTH}:{SAMPLE_HEIGHT}:flags=area"]
+
+
+def _decode(video: Path, arguments: list[str]) -> bytes:
+    # Below normal: whatever the user is doing on the machine comes first.
+    command = ["ffmpeg", "-v", "error", *arguments, "-pix_fmt", "gray", "-f", "rawvideo", "-"]
     try:
-        raw = subprocess.run(
-            command, capture_output=True, check=True, **hidden_subprocess_kwargs(),
+        return subprocess.run(
+            command, capture_output=True, check=True,
+            **hidden_subprocess_kwargs(creationflags=subprocess.BELOW_NORMAL_PRIORITY_CLASS),
         ).stdout
     except subprocess.CalledProcessError as exc:
         log.warning("could not sample %s: %s", video.name, exc.stderr.decode(errors="replace"))
-        raw = b""
     except OSError as exc:
         log.warning("could not sample %s: %s", video.name, exc)
-        raw = b""
+    return b""
+
+
+def _thumbnails(raw: bytes) -> np.ndarray:
     pixels = SAMPLE_HEIGHT * SAMPLE_WIDTH
     count = len(raw) // pixels
     return np.frombuffer(raw[: count * pixels], dtype=np.uint8).reshape(
