@@ -84,7 +84,7 @@ STAGES: tuple[Stage, ...] = (
           "Align funscripts to mirror the video library tree",
           (0xAD, 0x40, 0x35)),
     Stage("group_non_ai", "Group non-AI",
-          "Record each 2D/non_AI clip's version family (original + processed variants) in a mirrored metadata sidecar",
+          "Record each 2D/non_AI clip's version family (original + processed variants, and copies whose pictures match) in a mirrored metadata sidecar",
           (0x6F, 0xDB, 0x9A)),
     Stage("title_non_ai", "Title non-AI",
           "Record what to call each 2D/non_AI video -- the performer and movie its clip record names, carried to the whole scene that clip was cut out of -- so every app reads one name instead of working it out at launch",

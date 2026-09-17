@@ -136,6 +136,44 @@ class TestSampleFrames:
         )
 
 
+class TestFramesAt:
+    def _commands(self, seconds: list[float]) -> list[list[str]]:
+        commands: list[list[str]] = []
+
+        class _Finished:
+            stdout = bytes(SAMPLE_HEIGHT * SAMPLE_WIDTH)
+
+        with patch.object(fh, "content_crop", lambda video: (1440, 1080, 240, 0)), \
+             patch.object(fh.subprocess, "run",
+                          lambda command, **kwargs: commands.append(command) or _Finished()):
+            frames = fh.frames_at(Path("scene.mp4"), seconds)
+        assert frames.shape == (len(seconds), SAMPLE_HEIGHT, SAMPLE_WIDTH)
+        return commands
+
+    def test_each_moment_is_one_frame_read_after_seeking_to_it(self):
+        commands = self._commands([12.5, 40.0])
+
+        assert [command[command.index("-ss") + 1] for command in commands] == ["12.500", "40.000"]
+        for command in commands:
+            assert command.index("-ss") < command.index("-i")
+            assert command[command.index("-frames:v") + 1] == "1"
+
+    def test_the_bars_come_off_a_moment_as_they_do_a_run_of_frames(self):
+        (command,) = self._commands([12.5])
+
+        assert command[command.index("-vf") + 1] == (
+            f"crop=1440:1080:240:0,scale={SAMPLE_WIDTH}:{SAMPLE_HEIGHT}:flags=area"
+        )
+
+    def test_a_moment_ffmpeg_cannot_read_is_left_out(self):
+        class _Nothing:
+            stdout = b""
+
+        with patch.object(fh, "content_crop", lambda video: None), \
+             patch.object(fh.subprocess, "run", lambda command, **kwargs: _Nothing()):
+            assert len(fh.frames_at(Path("scene.mp4"), [1.0, 2.0])) == 0
+
+
 class TestAlign:
     def test_bars_stop_a_clip_aligning_with_the_scene_it_came_from(self):
         """Why the crop happens at all. A hash says where things sit in the
