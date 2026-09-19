@@ -5,7 +5,7 @@ Fun Time's metadata filter matches against.  Kept free of the vosk runtime so th
 tests import it without an audio backend, the same split Fun Time draws between
 its voice_commands and voice_control.
 
-The vosk small model's lexicon has none of the domain-specific compounds the
+The vosk model's lexicon lacks most of the domain-specific compounds the
 library records as actions, and a word missing from the lexicon is silently
 dropped from a grammar.  Every phrase is therefore voiced in words the model
 knows, and the compound survives only in the action it writes.
@@ -133,6 +133,9 @@ class Vocabulary:
 
     def grammar_phrases(self) -> list[str]:
         return sorted({*self.actions, *self.controls})
+
+    def discarding_phrases(self) -> set[str]:
+        return {phrase for phrase, kind in self.controls.items() if kind == WEIRD}
 
 
 def load_vocabulary() -> Vocabulary:

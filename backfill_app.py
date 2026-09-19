@@ -54,7 +54,8 @@ def main() -> int:
 
     window = BackfillWindow(session, vocabulary, thumbnails=_ready_thumbnails(vocabulary, scan))
 
-    listener = VoiceListener(vocabulary.grammar_phrases(), parent=window)
+    listener = VoiceListener(vocabulary.grammar_phrases(), parent=window,
+                             never_repaired=vocabulary.discarding_phrases())
     listener.heard.connect(window.on_phrase)
     listener.hearing.connect(window.on_hearing)
     listener.failed.connect(window.on_voice_failed)
