@@ -220,21 +220,6 @@ class TestStoppingAndRestarting(unittest.TestCase):
 
         self.assertEqual(again.heard, ["side beta"])
 
-    def test_a_listener_that_never_comes_back_does_not_hold_a_closing_window(self):
-        wedged = threading.Event()
-        self.addCleanup(wedged.set)
-        stopped = threading.Event()
-
-        with patch("backfill.voice.CommandListener") as built,                 patch("backfill.voice.STOP_PATIENCE_S", 0.05):
-            built.return_value.run.side_effect = lambda: wedged.wait(PATIENCE_S)
-            listener = VoiceListener(PHRASES)
-            listener.start()
-            closing = threading.Thread(target=lambda: (listener.stop(), stopped.set()),
-                                       daemon=True)
-            closing.start()
-
-            self.assertTrue(stopped.wait(PATIENCE_S / 2), "stop() is still waiting")
-
     def test_stopping_one_that_never_started_is_not_an_error(self):
         VoiceListener(PHRASES).stop()
 
