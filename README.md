@@ -88,7 +88,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `backfill/decisions.py` - writing a clip's action or discarding it as weird, and taking either back
   - `backfill/session.py` - what a heard phrase does to the queue, and the history "undo" walks back through
   - `backfill/work.py` - the single thread the file work runs on, in the order it was spoken
-  - `backfill/voice.py` - offline vosk recognition over the tool's grammar
+  - `backfill/voice.py` - hands the window what `voice_core`, the family's listener, hears
   - `backfill/window.py` - the looping player, the remaining count, and the last decision
   - `gui/app.py` - tray application wiring: builds the parts, then starts them
   - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
@@ -118,7 +118,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
 - Topaz ffmpeg at `C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe`
 - Topaz model directory at `C:\ProgramData\Topaz Labs LLC\Topaz Video\models`
 - PyQt6 (`pip install PyQt6`)
-- `vosk` and `sounddevice`, for the backfill tool's voice commands (`pip install vosk sounddevice`). The speech model is downloaded and cached on first use.
+- `voice_core`, the family's listener, for the backfill tool's voice commands. It brings `vosk` and `sounddevice`, and `faster-whisper` reads each command a second time before it acts. Both speech models are downloaded and cached on first use.
 
 ## Run as tray app (recommended)
 
@@ -188,7 +188,7 @@ A panel on the right lists every command as a clickable tile, laid out the way t
 lives there rather than in source, and leaving it out simply means every tile takes the automatic
 match. Frames are sampled a little way into the clip (past the intro, with the act actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
 
-Acts are voiced in plain-English words because the vosk lexicon has none of the compounds — the same trick Fun Time uses. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. Set `config.VOICE_DEVICE_NAME` to a substring of your mic's name (from `python -m sounddevice`) to pin a specific one instead.
+Acts are voiced in plain-English words because the vosk lexicon lacks most of the compounds — the same trick Fun Time uses. A spoken command acts once a second recognizer (Whisper) has read the same audio and agrees, about half a second later; a phrase the two read differently is dropped, so say it again or click its tile. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. Set `config.VOICE_DEVICE_NAME` to a substring of your mic's name (from `python -m sounddevice`) to pin a specific one instead.
 
 ## Topaz sign-in
 

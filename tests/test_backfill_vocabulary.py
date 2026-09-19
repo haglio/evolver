@@ -55,6 +55,9 @@ class TestControls(unittest.TestCase):
     def test_same_repeats_the_last_action(self):
         self.assertEqual(VOCABULARY.controls["same"], SAME)
 
+    def test_the_phrases_that_discard_a_clip_are_every_way_of_saying_weird(self):
+        self.assertEqual(VOCABULARY.discarding_phrases(), {"weird", "trash"})
+
     def test_no_phrase_is_both_an_action_and_a_control(self):
         self.assertEqual(set(VOCABULARY.actions) & set(VOCABULARY.controls), set())
 
