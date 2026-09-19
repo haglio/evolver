@@ -113,7 +113,15 @@ class TestMain(unittest.TestCase):
         mocks = self._run_main()
 
         mocks["listener"].assert_called_once_with(
-            mocks["vocabulary"].return_value.grammar_phrases.return_value, parent=ANY)
+            mocks["vocabulary"].return_value.grammar_phrases.return_value, parent=ANY,
+            never_repaired=ANY)
+
+    def test_a_phrase_that_discards_the_clip_is_never_repaired_from_a_near_miss(self):
+        mocks = self._run_main()
+
+        self.assertIs(
+            mocks["listener"].call_args.kwargs["never_repaired"],
+            mocks["vocabulary"].return_value.discarding_phrases.return_value)
 
 
 class TestReadyThumbnails(unittest.TestCase):

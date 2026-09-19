@@ -56,12 +56,11 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 # paying it in the modules that do the work would not be.
 CONFIG_REFERENCE_LEDGER = {
     "backfill/decisions.py": 3,
-    "backfill/mic.py": 1,
     # The provider's source name, read at the call: a literal agreed with the
     # overlay only by happening to (bug 12).
     "backfill/queue.py": 2,
     "backfill/thumbnails.py": 3,
-    "backfill/voice.py": 5,
+    "backfill/voice.py": 4,
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
     # The 10th and 11th are the third shape again: the pin manifest, read where

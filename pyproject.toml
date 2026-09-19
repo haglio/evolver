@@ -20,14 +20,17 @@ requires-python = ">=3.14"
 # other half had not landed turned all of them red at once. Moving to a newer
 # one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
-    "app-support @ git+https://github.com/haglio/app_support@v0.1.153",
-    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.127",
+    "app-support @ git+https://github.com/haglio/app_support@v0.1.156",
+    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.129",
+    # The family's listener, for the backfill tool: it brings vosk and sounddevice.
+    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.14",
+    # What voice_core reads each command with a second time; it imports it, this repo
+    # installs it.
+    "faster-whisper>=1,<2",
     "numpy>=2.4,<3",
     "PyQt6>=6,<7",
     "qtawesome>=1,<2",
-    "sounddevice>=0.5,<0.6",
     "tzdata",
-    "vosk>=0.3,<0.4",
 ]
 
 [project.optional-dependencies]
@@ -55,7 +58,7 @@ testpaths = ["tests"]
 # [project.dependencies]; tests/test_dependencies.py holds this list against the
 # tree instead.
 [tool.haglio]
-siblings = ["app_support", "shared_ui"]
+siblings = ["app_support", "shared_ui", "voice_core"]
 
 # What Evolver's two launchers start: launch_evolver.vbs, which the broker's tray
 # runs when it finds Evolver gone, and launch_preview_branch.vbs, which opens a
