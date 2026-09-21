@@ -17,8 +17,7 @@ from pathlib import Path
 
 import config
 from tests.temp_helpers import workspace_temp_dir
-from util import media_files
-from util import pipeline_contract as contract
+from util import contract, media_files, sidecar, video_type, watch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,7 +28,7 @@ def _document() -> dict:
 
 class PublishedDocument(unittest.TestCase):
     def test_the_tracked_copy_is_what_publishing_writes(self):
-        """Run ``util.pipeline_contract.publish()`` when this fails: a document
+        """Run ``util.contract.publish()`` when this fails: a document
         that has drifted from this module tells a sender something untrue."""
         tracked = contract.contract_path(REPO_ROOT)
 
@@ -60,3 +59,44 @@ class PublishedDocument(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TheLibraryRecord(unittest.TestCase):
+    """What a reader of a library video's record may rely on.
+
+    Fun Time reads one on every clip it shows and writes one field back, and
+    both sides spelled every name for themselves until this document existed.
+    """
+
+    def setUp(self):
+        self.record = _document()["library_record"]
+
+    def test_every_kind_it_names_is_one_this_repo_records(self):
+        """A reader branching on the kind has to know the whole set."""
+        self.assertEqual(self.record["video_kinds"], list(video_type.TYPES))
+
+    def test_the_field_the_reader_writes_is_the_one_this_repo_clears(self):
+        """Fun Time strikes an act out and leaves this in its place; only the
+        backfill tool clears it, once a viewer has finally named the act."""
+        video = self.record["blocks"][video_type.BLOCK]
+
+        self.assertEqual(video["written_by_the_reader"], [sidecar.WRONG_ACTION_FIELD])
+        self.assertIn(sidecar.WRONG_ACTION_FIELD, video["fields"])
+
+    def test_the_watch_block_it_names_is_the_one_this_repo_stamps(self):
+        """The counts and the weight a shuffled playlist draws by."""
+        stamped = watch.stamped({}, dict.fromkeys(watch.COUNT_FIELDS, 1), favorite=True)
+
+        self.assertEqual(sorted(stamped[watch.BLOCK]),
+                         sorted(self.record["blocks"][watch.BLOCK]["fields"]))
+        self.assertIn(watch.FAVORITE_FIELD, self.record["top_level_keys"])
+
+    def test_the_kind_and_the_running_time_sit_where_it_says(self):
+        """Both go in the video block, which is where a reader looks for them."""
+        stamped = video_type.timed(video_type.stamped({}, video_type.SHORT), 12.5)
+
+        self.assertEqual(sorted(stamped[video_type.BLOCK]),
+                         sorted((video_type.FIELD, video_type.DURATION_FIELD)))
+        declared = self.record["blocks"][video_type.BLOCK]["fields"]
+        self.assertLessEqual({video_type.FIELD, video_type.DURATION_FIELD},
+                             set(declared))

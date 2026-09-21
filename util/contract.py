@@ -1,17 +1,18 @@
-"""What an app handing clips to this pipeline must know, published for it.
+"""What another app must know about this one, published for it.
 
+Two arrangements, each of which every other side had written out for itself
+from reading this repo's source, with nothing comparing the copies.
 Origenerator sends a finished video here by copying it into the inbox under a
-folder named for its lane, and later reads the upscale this pipeline made of it
-back out of the outbox.  It cannot import this repo -- no app here reaches into
-another's -- so it had both folders and the marker a half-written copy wears
-spelled on its own side, from reading this one's source.
+folder named for its lane, and later reads the upscale back out of the outbox;
+Fun Time reads the record this repo keeps beside every library video, and
+writes one field of it back.  A folder renamed here left that app dropping
+clips where nothing ingests them; a key renamed here left that reader quietly
+answering "nothing recorded"; both suites stayed green through either (audit
+cross/boundaries/cross/003).
 
-Spelled over there they were a copy, and nothing compared the two: renaming a
-folder here left that app dropping clips where nothing ingests them, with both
-suites green.  Spelled here they are the promise this repo makes, and
-``evolver_contract.json`` at the checkout root is how they travel.  Run
-``python -m util.pipeline_contract`` to rewrite it; the suite fails on a copy
-that no longer matches.
+``evolver_contract.json`` at the checkout root is how the promise travels.  Run
+``python -m util.contract`` to rewrite it; the suite fails on a copy that no
+longer matches.
 
 Every path is relative to the library root, never absolute: that root is
 private, and each app resolves it from its own content overlay.  The folder a
@@ -24,6 +25,7 @@ import json
 from pathlib import Path
 
 import config
+from util import library_records
 from util.media_files import PARTIAL_MARKER
 
 #: At the checkout root beside the launcher, which is the path an app that
@@ -46,10 +48,11 @@ def _under_library(path: Path) -> str:
 
 
 def declaration() -> dict:
-    """The published document, as a sender reads it."""
+    """The published document, as another app reads it."""
     return {
         "library_relative": library_relative(),
         "partial_marker": PARTIAL_MARKER,
+        "library_record": library_records.declaration(),
     }
 
 
