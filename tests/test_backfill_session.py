@@ -268,7 +268,7 @@ class TestUndo(unittest.TestCase):
         self.assertEqual(session.current, clip)
         self.assertEqual(session.remaining, 3)
 
-    def test_undo_works_after_the_final_clip_has_been_labelled(self):
+    def test_the_last_clip_labelled_can_still_be_undone(self):
         session = self._session(count=1)
         clip = session.current
 

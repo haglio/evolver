@@ -4,8 +4,8 @@ A run reports "success" or "error"; a stage reports "completed", "warning",
 "skipped" or "error". Those are the same verdicts under two spellings, so they
 draw the same marks — a run's green check is its stages' green check — and the
 color goes on the symbol alone. A failed run is a red ✘ beside a plainly-colored
-timestamp, not a whole line in red, which used to make a run's own verdict
-indistinguishable from a stage of it having gone wrong.
+timestamp rather than a whole line in red, which is what keeps a run's own
+verdict distinguishable from a stage of it having gone wrong.
 """
 
 from __future__ import annotations

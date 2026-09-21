@@ -1,17 +1,14 @@
 """What the schedule is doing, decided and worded once for every surface.
 
 The tray's tooltip, the two status lines at the top of its menu and the
-window's toolbar label used to each decide this for themselves, and decided it
-differently: the tray put a run in flight ahead of a pause, the window put the
-pause first, so pausing while a pipeline was running read "Running..." in the
-tray and "inactive" in the window at the same moment.  A run on screen is the
-fact the user is looking at, and a pause stops the schedule after it -- so
-running outranks paused, here, for both.
+window's toolbar label all report the same moment, so one answer decides it for
+every one of them: a run on screen is the fact the user is looking at, and a
+pause stops the schedule after it, so running outranks paused everywhere.
 
-Three chains over the same three booleans, each with its own ``strftime`` and
-its own wording for an idle schedule, is how they came apart the first time.
-The scheduler hands out a :class:`ScheduleStatus` instead, and every word a
-surface shows comes off it -- including the one deliberate difference, the
+Each surface asking the same three booleans for itself is what lets them
+disagree -- its own chain, its own ``strftime``, its own wording for an idle
+schedule. The scheduler hands out a :class:`ScheduleStatus` instead, and every
+word a surface shows comes off it -- including the one deliberate difference, the
 window's longer sentence for a paused schedule, which reads as a sentence
 because it sits in a wide toolbar rather than in a hover.
 """

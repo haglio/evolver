@@ -126,8 +126,8 @@ class EvolverTray(QSystemTrayIcon):
         """Put the schedule on all five of the tray's surfaces at once.
 
         Every one of them changes together on every change, so they are set
-        together: the two that used to be updated in separate passes are how
-        the tooltip and the menu could disagree about the same moment.
+        together: updating any of them in a pass of its own is what lets the
+        tooltip and the menu disagree about the same moment.
         """
         self.run_now_action.setEnabled(not status.is_running)
         self.pause_action.setText(

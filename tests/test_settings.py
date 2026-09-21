@@ -51,7 +51,7 @@ class TestEvolverSettings(unittest.TestCase):
 
             self.assertEqual(EvolverSettings.load(path).interval_minutes, 7)
 
-    def test_load_returns_defaults_for_missing_file(self):
+    def test_settings_that_were_never_saved_come_up_at_the_defaults(self):
         s = EvolverSettings.load(path=None)
         # Will try config.GUI_SETTINGS_FILE which won't exist in test env
         self.assertEqual(s.interval_minutes, 10)
@@ -63,7 +63,7 @@ class TestEvolverSettings(unittest.TestCase):
             loaded = EvolverSettings.load(path)
             self.assertEqual(loaded.interval_minutes, 7)
 
-    def test_load_returns_defaults_for_corrupt_file(self):
+    def test_settings_too_damaged_to_parse_come_up_at_the_defaults(self):
         with workspace_temp_dir() as tmp:
             path = tmp / "settings.json"
             path.write_text("not json!!!")

@@ -610,7 +610,7 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
         self.assertEqual(result.negative_prompt, "ugly")
         self.assertEqual(result.parent_image_id, "img456")
 
-    def test_returns_empty_when_no_match(self):
+    def test_a_page_carrying_no_metadata_for_that_id_yields_nothing(self):
         result = prompt_scrape._extract_provider_embedded_metadata("<html>nothing</html>", "missing")
         self.assertEqual(result.prompt, "")
         self.assertEqual(result.negative_prompt, "")
@@ -708,7 +708,7 @@ class TestCssSelector(unittest.TestCase):
         self.assertIsNotNone(node)
         self.assertEqual(html_query.text_content(node).strip(), "found")
 
-    def test_query_selector_returns_none_for_no_match(self):
+    def test_a_selector_nothing_matches_finds_no_element(self):
         html = '<body><div class="other">text</div></body>'
         doc = html_query.parse_document(html)
         self.assertIsNone(html_query.query_selector(doc, "body > div.missing"))
@@ -782,7 +782,7 @@ class TestExtractMetadataFields(unittest.TestCase):
         self.assertNotIn("inpainted", result)
         self.assertEqual(result["model"], "v3")
 
-    def test_returns_empty_dict_when_no_fields(self):
+    def test_a_panel_with_no_labelled_fields_yields_no_metadata(self):
         html = '<div><p>Hello world</p></div>'
         doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)

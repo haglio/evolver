@@ -121,7 +121,7 @@ class TestProjectDir(unittest.TestCase):
 
             self.assertEqual(found, stayed)
 
-    def test_returns_a_path_under_the_first_root_when_no_root_holds_it(self):
+    def test_a_sibling_that_is_not_installed_still_resolves_to_a_path(self):
         """A missing sibling still resolves to a path, so callers can .is_dir() it.
 
         Raising here would take the whole app down over a sibling that simply

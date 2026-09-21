@@ -7,11 +7,11 @@ single author: :mod:`tasks.video_types` writes both, and everything else reads.
 Four kinds, and every video in the library is exactly one of them.  The answer
 lives on the video's metadata sidecar, in the ``video`` block beside the act and
 the generation parameters, so that the apps *read* a kind rather than each
-working one out for itself.  They used to work it out: the folder a clip was
-delivered to, a source folder's name, a running time compared against a
-threshold each app picked separately, the presence of a ``clip`` record, and
-"everything else" — five answers to one question, disagreeing at the edges and
-impossible to correct in one place.
+working one out for itself.  Working it out gives five answers to one question
+— the folder a clip was delivered to, a source folder's name, a running time
+against a threshold each app picks separately, the presence of a ``clip``
+record, and "everything else" — disagreeing at the edges and impossible to
+correct in one place.
 
 Which the four are, and the order they settle in (a video that looks like two of
 them is the earlier one):

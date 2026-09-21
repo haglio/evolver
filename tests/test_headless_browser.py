@@ -38,7 +38,7 @@ class TestFindBrowserExecutable(unittest.TestCase):
 
 
 class TestFetchDom(unittest.TestCase):
-    def test_returns_what_the_browser_dumped(self):
+    def test_the_page_the_browser_dumped_is_what_the_caller_gets(self):
         with workspace_temp_dir() as root:
             with patch("subprocess.run", return_value=_completed(stdout="<p>hi</p>")):
                 dom = headless_browser.fetch_dom(

@@ -111,7 +111,7 @@ class TestAvailableRam(unittest.TestCase):
 
 
 class TestSecondsSinceLastInput(unittest.TestCase):
-    def test_returns_a_nonnegative_plausible_number(self):
+    def test_the_idle_time_is_never_negative_and_never_weeks(self):
         idle = system_resources.seconds_since_last_input()
         self.assertIsInstance(idle, float)
         self.assertGreaterEqual(idle, 0.0)

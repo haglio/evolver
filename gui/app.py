@@ -74,10 +74,10 @@ class EvolverApp:
     Split in two on purpose. ``__init__`` only *builds*: it constructs the
     parts and connects them, and touches nothing outside the process. ``start``
     is everything the app *does* -- claim the Windows identity, read the run
-    history off disk, start the two timers, show the tray. Merely constructing
-    one used to name this process to the shell and begin a twenty-second
-    presence poll, which is why every test of any one part had to build the
-    whole thing and then live with a running timer for the rest of the session.
+    history off disk, start the two timers, show the tray. So constructing one
+    names nothing to the shell and starts no timer, which is what lets a test
+    build one part without a twenty-second presence poll running for the rest
+    of the session.
     """
 
     def __init__(self):
