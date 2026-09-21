@@ -73,7 +73,7 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                clip = _touch(non_ai / "larkin" / "1 clips" / "Ann Bly - POV.mp4")
+                clip = _touch(non_ai / "larkin" / "1 clips" / "Ann Bly - Scene One.mp4")
                 write_sidecar(
                     sidecar.sidecar_path(clip),
                     {"video": {"action": "Alpha"},
