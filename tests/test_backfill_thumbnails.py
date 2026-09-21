@@ -8,11 +8,11 @@ from unittest.mock import patch
 
 from backfill import thumbnails
 from backfill.queue import library_scan
-from backfill.vocabulary import Act, Vocabulary
+from backfill.vocabulary import Act
 from tests.temp_helpers import library_tree, override_config, workspace_temp_dir
+from tests.vocabulary_support import vocabulary_of
 
-# Fabricated, in the committed example's placeholder style.
-VOCABULARY = Vocabulary([Act("alpha", "Alpha"), Act("beta", "Beta"), Act("gamma", "Gamma")])
+VOCABULARY = vocabulary_of(Act("alpha", "Alpha"), Act("beta", "Beta"), Act("gamma", "Gamma"))
 
 # Fabricated: a real pin names a clip inside the library, which is why the pins
 # moved to the git-ignored overlay in the first place. The tile label is one the
@@ -40,7 +40,7 @@ class TestExampleClips(unittest.TestCase):
             video = lib.video("portrait", "provider2", "k_topaz.mp4")
             self._tag(lib, "portrait", "provider2", "k_topaz", "Side Kappa")
 
-            self.assertEqual(self._examples(Vocabulary([Act("kappa", "Kappa")])), {"Side Kappa": video})
+            self.assertEqual(self._examples(vocabulary_of(Act("kappa", "Kappa"))), {"Side Kappa": video})
             self.assertEqual(self._examples(VOCABULARY), {})
 
     def test_an_unlabeled_clip_contributes_no_example(self):
@@ -53,9 +53,9 @@ class TestExampleClips(unittest.TestCase):
         """Unlike the work queue, the gallery welcomes already-labeled scraped clips."""
         with library_tree() as lib:
             video = lib.video("landscape", "provider", "b_topaz.mp4")
-            self._tag(lib, "landscape", "provider", "b_topaz", "POV Gamma")
+            self._tag(lib, "landscape", "provider", "b_topaz", "XYZ Gamma")
 
-            self.assertEqual(self._examples(), {"POV Gamma": video})
+            self.assertEqual(self._examples(), {"XYZ Gamma": video})
 
     def test_the_first_clip_found_wins_for_an_action(self):
         with library_tree() as lib:
@@ -69,11 +69,11 @@ class TestExampleClips(unittest.TestCase):
     def test_a_compound_tag_illustrates_each_of_its_parts(self):
         with library_tree() as lib:
             video = lib.video("portrait", "provider", "c_topaz.mp4")
-            self._tag(lib, "portrait", "provider", "c_topaz", "POV Gamma, Side Alpha")
+            self._tag(lib, "portrait", "provider", "c_topaz", "XYZ Gamma, Side Alpha")
 
             examples = self._examples()
 
-            self.assertEqual(examples["POV Gamma"], video)
+            self.assertEqual(examples["XYZ Gamma"], video)
             self.assertEqual(examples["Side Alpha"], video)
 
     def test_a_curated_pin_supplies_a_tile_the_library_never_tags(self):
@@ -115,12 +115,12 @@ class TestExampleClips(unittest.TestCase):
 class TestThumbnailCachePath(unittest.TestCase):
     def test_slugifies_the_action_into_a_stable_filename(self):
         with override_config(BACKFILL_THUMBNAIL_DIR=Path("/cache")):
-            self.assertEqual(thumbnails.thumbnail_cache_path("POV Beta"), Path("/cache/pov_beta.jpg"))
+            self.assertEqual(thumbnails.thumbnail_cache_path("XYZ Beta"), Path("/cache/xyz_beta.jpg"))
 
 
 class TestBuildThumbnails(unittest.TestCase):
     def test_extracts_and_yields_each_example(self):
-        examples = {"Side Beta": Path("a.mp4"), "POV Alpha": Path("b.mp4")}
+        examples = {"Side Beta": Path("a.mp4"), "XYZ Alpha": Path("b.mp4")}
         calls = []
 
         def extract(clip, dest):
@@ -131,7 +131,7 @@ class TestBuildThumbnails(unittest.TestCase):
 
         self.assertEqual(
             result,
-            [("Side Beta", Path("/c/Side Beta.jpg")), ("POV Alpha", Path("/c/POV Alpha.jpg"))],
+            [("Side Beta", Path("/c/Side Beta.jpg")), ("XYZ Alpha", Path("/c/XYZ Alpha.jpg"))],
         )
         self.assertEqual(calls[0], (Path("a.mp4"), Path("/c/Side Beta.jpg")))
 

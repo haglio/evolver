@@ -8,11 +8,11 @@ later open, so the window only ever loads ready files — it never extracts on o
 A tile's example comes from one of two places, curated first:
 
 * ``config.CURATED_EXAMPLES`` pins a specific clip to a tile by id. This is how the acts
-  the library never tags in a camera-scoped form get a picture — a side gamma, a POV
-  zeta — and how a clip mistagged (or tagged for a different act than it best shows)
+  the library never tags in a camera-scoped form get a picture — a side gamma, say
+  — and how a clip mistagged (or tagged for a different act than it best shows)
   is still put to use.
 * otherwise the first library clip whose ``video.action`` matches the tile, taken from
-  a single scan. A compound tag like ``Pov Epsilon, Alpha`` counts as each of its
+  a single scan. A compound tag like ``Side Epsilon, Alpha`` counts as each of its
   comma-separated parts, so it can illustrate either tile.
 
 The pure pieces take their effects as arguments or touch only the filesystem, so they

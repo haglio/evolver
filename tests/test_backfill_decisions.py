@@ -65,10 +65,10 @@ class TestRecordAction(unittest.TestCase):
             video = lib.video()
 
             record_action(video, "Dancing")
-            record_action(video, "POV Gamma")
+            record_action(video, "XYZ Gamma")
             payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
-            self.assertEqual(payload, {"video": {"action": "POV Gamma"}})
+            self.assertEqual(payload, {"video": {"action": "XYZ Gamma"}})
 
 
 class TestSidecarSnapshotAndRestore(unittest.TestCase):

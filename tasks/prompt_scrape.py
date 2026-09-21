@@ -460,14 +460,16 @@ def _extract_json_first_array_string(blob: str, field_name: str) -> str:
 
 
 def _titlecase_action(raw_action: str) -> str:
-    """Title-case a Provider action, but keep the "pov" initialism fully upper.
+    """Title-case a Provider action, but write a camera word as the overlay does.
 
-    A plain ``str.title()`` would render "pov_gamma" as "Pov Gamma"; the
-    library — and the backfill tool's spoken vocabulary — write it "POV Gamma",
-    so one Fun Time filter query still reaches both producers' clips.
+    A plain ``str.title()`` would render an initialism, "xyz_gamma", as "Xyz
+    Gamma"; the library — and the backfill tool's spoken vocabulary — write it
+    "XYZ Gamma", so one Fun Time filter query still reaches both producers'
+    clips.
     """
+    as_written = {prefix.lower(): prefix for prefix in config.CAMERA_PREFIXES}
     words = raw_action.replace("_", " ").split()
-    return " ".join("POV" if word.lower() == "pov" else word.title() for word in words)
+    return " ".join(as_written.get(word.lower(), word.title()) for word in words)
 
 
 def _parse_provider_created_at(value: str) -> str:

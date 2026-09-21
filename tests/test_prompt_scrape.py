@@ -631,7 +631,7 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
             '{"imageId":"abc123","prompt":"a beautiful scene","negative_prompt":null,'
             '"parent_image_id":null,"model":"Realism","version":"v3","seed":12345,'
             '"aspectRatio":"16:9","width":1280,"height":720,"quality":"720p",'
-            '"styleValue":null,"action":["pov_beta"],'
+            '"styleValue":null,"action":["xyz_beta"],'
             '"createdAt":"Fri, 13 Mar 2026 09:45:26 GMT","creativity":7}'
         )
         result = prompt_scrape._extract_provider_embedded_metadata(html, "abc123")
@@ -642,7 +642,7 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
         self.assertEqual(result.resolution, "1280x720")
         self.assertEqual(result.quality, "720p")
         self.assertEqual(result.created, "2026-03-13")
-        self.assertEqual(result.action, "POV Beta")
+        self.assertEqual(result.action, "XYZ Beta")
         self.assertEqual(result.style, "")
         self.assertEqual(result.creativity, "7")
 
@@ -696,9 +696,10 @@ class TestTitlecaseAction(unittest.TestCase):
     def test_title_cases_each_word(self):
         self.assertEqual(prompt_scrape._titlecase_action("two_words"), "Two Words")
 
-    def test_keeps_the_pov_initialism_fully_upper(self):
-        self.assertEqual(prompt_scrape._titlecase_action("pov_beta"), "POV Beta")
-        self.assertEqual(prompt_scrape._titlecase_action("side_pov_gamma"), "Side POV Gamma")
+    def test_writes_a_camera_word_the_way_the_overlay_prefixes_it(self):
+        with override_config(CAMERA_PREFIXES=("North", "QRS")):
+            self.assertEqual(prompt_scrape._titlecase_action("qrs_beta"), "QRS Beta")
+            self.assertEqual(prompt_scrape._titlecase_action("north_qrs_gamma"), "North QRS Gamma")
 
 
 class TestCssSelector(unittest.TestCase):

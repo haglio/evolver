@@ -63,8 +63,8 @@ class BackfillWindow(QWidget):
     command, so a phrase that never lands is visible rather than a silent nothing.
 
     A panel of every command sits on the right, one tile per possibility grouped
-    the way the vocabulary is — every act as a grid of Side/POV columns, then the
-    controls. A tile is both the reference (what can I say?) and a fallback:
+    the way the vocabulary is — every act as a row with a column per camera
+    word, then the controls. A tile is both the reference (what can I say?) and a fallback:
     clicking it drives the exact path a spoken phrase would, so a wedged
     microphone never leaves the tool unusable. Each act tile carries an example
     frame — passed in ready at construction, already cached — so the panel opens
@@ -141,7 +141,7 @@ class BackfillWindow(QWidget):
         panel.setWidget(inner)
         panel.setWidgetResizable(True)
         panel.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Size to the grid's own width (the Side/POV columns at this machine's
+        # Size to the grid's own width (the camera columns at this machine's
         # font) rather than a hardcoded guess, plus room for the vertical
         # scrollbar, so no column is ever clipped off the right edge.
         panel.setFixedWidth(inner.sizeHint().width() + _SCROLLBAR_ALLOWANCE)
@@ -195,8 +195,8 @@ class BackfillWindow(QWidget):
 
         Read off the buttons themselves rather than a second index: the label
         is already the tile's text, and case-folding bridges the library's
-        older action casing ("Pov Alpha" against the "POV Alpha" the vocabulary
-        writes today).
+        older action casing (an initialism title-cased, "Xyz Alpha", against
+        the "XYZ Alpha" the vocabulary writes today).
         """
         wanted = label.lower()
         return next((tile for tile in self._tiles.values() if tile.text().lower() == wanted), None)
