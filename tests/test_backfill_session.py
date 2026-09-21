@@ -8,12 +8,12 @@ from unittest.mock import patch
 from backfill import session
 from backfill.queue import BackfillQueue
 from backfill.session import BackfillSession
-from backfill.vocabulary import Act, Vocabulary
+from backfill.vocabulary import Act
 from tests.temp_helpers import library_tree
+from tests.vocabulary_support import vocabulary_of
 from util.sidecar import sidecar_path
 
-# Fabricated, in the committed example's placeholder style.
-VOCABULARY = Vocabulary([Act("beta", "Beta"), Act("dance", "Dancing"), Act("zeta", "Zeta")])
+VOCABULARY = vocabulary_of(Act("beta", "Beta"), Act("dance", "Dancing"), Act("zeta", "Zeta"))
 
 
 class ImmediateWorker:
@@ -50,21 +50,21 @@ class TestBackfillSession(unittest.TestCase):
         return BackfillSession(queue, worker or ImmediateWorker(), vocabulary)
 
     def test_a_phrase_means_what_the_vocabulary_the_session_was_handed_says(self):
-        session = self._session(vocabulary=Vocabulary([Act("kappa", "Kappa")]))
+        session = self._session(vocabulary=vocabulary_of(Act("kappa", "Kappa")))
         clip = session.current
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
-            note = session.apply("pov kappa")
+            note = session.apply("xyz kappa")
 
-        record.assert_called_once_with(clip, "POV Kappa")
-        self.assertEqual(note, f"{clip.name} → POV Kappa")
+        record.assert_called_once_with(clip, "XYZ Kappa")
+        self.assertEqual(note, f"{clip.name} → XYZ Kappa")
 
     def test_a_control_the_session_does_not_dispatch_moves_no_file(self):
         """The four controls are dispatched by name. A fifth added to the
         vocabulary and not here has to do nothing: the fallback used to be the
         discard path, which moves the clip on screen into the weird folder."""
-        vocabulary = Vocabulary([Act("beta", "Beta")])
+        vocabulary = vocabulary_of(Act("beta", "Beta"))
         vocabulary.controls["reticulate"] = "reticulate"
         session = self._session(vocabulary=vocabulary)
         clip = session.current
@@ -365,12 +365,12 @@ class TestSame(unittest.TestCase):
             session = self._session(lib)
             first = session.current
 
-            session.apply("pov zeta")
+            session.apply("xyz zeta")
             second = session.current
             note = session.apply("same")
 
-            self.assertEqual(self._recorded_action(second), "POV Zeta")
-            self.assertEqual(note, f"{second.name} → POV Zeta")
+            self.assertEqual(self._recorded_action(second), "XYZ Zeta")
+            self.assertEqual(note, f"{second.name} → XYZ Zeta")
             self.assertNotEqual(second, first)
 
     def test_same_repeats_the_most_recent_act_not_the_first(self):
@@ -383,12 +383,12 @@ class TestSame(unittest.TestCase):
             session = self._session(lib, count=4)
 
             session.apply("side dance")
-            session.apply("pov zeta")
+            session.apply("xyz zeta")
             third = session.current
             note = session.apply("same")
 
-            self.assertEqual(self._recorded_action(third), "POV Zeta")
-            self.assertEqual(note, f"{third.name} → POV Zeta")
+            self.assertEqual(self._recorded_action(third), "XYZ Zeta")
+            self.assertEqual(note, f"{third.name} → XYZ Zeta")
 
     def test_same_before_any_action_repeats_nothing(self):
         with library_tree() as lib:
@@ -481,7 +481,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
         with library_tree() as lib:
             video = lib.video()
             session = self._session(video)
-            session.apply("pov zeta")
+            session.apply("xyz zeta")
             self.assertTrue(sidecar_path(video).is_file())
 
             session.apply("undo")

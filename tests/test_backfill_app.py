@@ -126,7 +126,7 @@ class TestMain(unittest.TestCase):
 
 class TestReadyThumbnails(unittest.TestCase):
     def test_hands_the_window_every_built_thumbnail_as_strings(self):
-        built = [("Side Beta", Path("/c/side_beta.jpg")), ("POV Alpha", Path("/c/pov_alpha.jpg"))]
+        built = [("Side Beta", Path("/c/side_beta.jpg")), ("XYZ Alpha", Path("/c/xyz_alpha.jpg"))]
         vocabulary, scan = object(), []
         with patch("backfill_app.build_thumbnails", return_value=built) as build, \
              patch("backfill_app.example_clips", return_value={}) as examples:
@@ -134,7 +134,7 @@ class TestReadyThumbnails(unittest.TestCase):
 
         self.assertEqual(
             ready,
-            {"Side Beta": str(Path("/c/side_beta.jpg")), "POV Alpha": str(Path("/c/pov_alpha.jpg"))},
+            {"Side Beta": str(Path("/c/side_beta.jpg")), "XYZ Alpha": str(Path("/c/xyz_alpha.jpg"))},
         )
         build.assert_called_once()
         examples.assert_called_once_with(vocabulary, scan)

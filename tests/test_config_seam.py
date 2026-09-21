@@ -115,7 +115,10 @@ CONFIG_REFERENCE_LEDGER = {
     # how long an encode may run and how much of the machine it may take are
     # this app's policy, not anything the machine or the overlay says.
     "tasks/nonai_upscale.py": 14,
-    "tasks/prompt_scrape.py": 5,
+    # The 6th is the camera words a scraped action is cased by. They were a
+    # literal in this module; they are library vocabulary, so they are the
+    # overlay's now, and a stage reaches the overlay through config alone.
+    "tasks/prompt_scrape.py": 6,
     # The name the non-AI lane gives its outputs, which is how a hand export
     # made before the stage existed is told from an original.
     "tasks/provenance_sweep.py": 1,
@@ -170,6 +173,7 @@ CONFIG_REFERENCE_LEDGER = {
 # ``key.subkey``. ``genau_source`` is origenerator's too.
 OVERLAY_KEYS = {
     "acts",
+    "cameras",
     "chrome_profile",
     "curated_examples",
     "display_timezone",

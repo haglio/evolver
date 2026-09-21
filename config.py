@@ -176,6 +176,11 @@ GENAU_WEIRD_DIR = GENAU_CLIPS_DIR.parent / "weird"
 _SCRAPE_PROVIDER = overlay_value(_CONTENT, "scrape_provider", path=LOCAL_CONTENT)
 PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
 PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]
+# The camera words as the library writes them in front of an act. Library
+# vocabulary, so from the overlay like the acts they prefix; the backfill tool
+# reads the same list for what it hears and records.
+CAMERA_PREFIXES = tuple(
+    camera["prefix"] for camera in overlay_value(_CONTENT, "cameras", path=LOCAL_CONTENT))
 # The scratch profile the metadata stage hands its headless browser: a whole
 # Chrome user-data tree, written from nothing on each scrape and worth keeping
 # for none of it. In the system temp dir because it defaulted to one under

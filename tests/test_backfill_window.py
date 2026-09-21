@@ -9,11 +9,11 @@ from unittest.mock import patch
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QToolButton
 
-from backfill.vocabulary import Act, Vocabulary
+from backfill.vocabulary import Act
 from backfill.window import BackfillWindow
+from tests.vocabulary_support import vocabulary_of
 
-# Fabricated, in the committed example's placeholder style.
-VOCABULARY = Vocabulary([Act("alpha", "Alpha"), Act("beta", "Beta"), Act("dance", "Dancing")])
+VOCABULARY = vocabulary_of(Act("alpha", "Alpha"), Act("beta", "Beta"), Act("dance", "Dancing"))
 
 
 def _every_grid_command(vocabulary):
@@ -194,11 +194,11 @@ class TestBackfillWindow(unittest.TestCase):
         )
 
     def test_the_tiles_are_the_commands_of_the_vocabulary_it_was_handed(self):
-        window = self._window(FakeSession([Path("a_topaz.mp4")]), Vocabulary([Act("kappa", "Kappa")]))
+        window = self._window(FakeSession([Path("a_topaz.mp4")]), vocabulary_of(Act("kappa", "Kappa")))
 
         self.assertEqual(
             sorted(tile.text() for tile in window.findChildren(QToolButton)),
-            ["POV Kappa", "Same", "Side Kappa", "Skip", "Undo", "Weird"],
+            ["Same", "Side Kappa", "Skip", "Undo", "Weird", "XYZ Kappa"],
         )
 
     def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
@@ -216,7 +216,7 @@ class TestBackfillWindow(unittest.TestCase):
         an act labeled "Dancing" can coexist. Neither may take the other's
         tile — the phrase would click the wrong act, and the example frame
         would land on the wrong face."""
-        shadowing = Vocabulary([Act("dancing", "Dance Move"), Act("dance", "Dancing")])
+        shadowing = vocabulary_of(Act("dancing", "Dance Move"), Act("dance", "Dancing"))
         window = self._window(FakeSession([Path("a_topaz.mp4")]), shadowing)
 
         for command in _every_grid_command(shadowing):
@@ -254,12 +254,12 @@ class TestBackfillWindow(unittest.TestCase):
             self.assertFalse(window.tile_for("side beta").icon().isNull())
 
     def test_an_example_stored_under_older_casing_still_lights_its_tile(self):
-        """Library clips tagged "Pov ..." must reach the "POV ..." tile."""
+        """Library clips tagged "Xyz ..." must reach the "XYZ ..." tile."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         with tempfile.TemporaryDirectory() as tmp:
-            window.set_thumbnail("Pov Beta", str(self._png(tmp)))
+            window.set_thumbnail("Xyz Beta", str(self._png(tmp)))
 
-            self.assertFalse(window.tile_for("pov beta").icon().isNull())
+            self.assertFalse(window.tile_for("xyz beta").icon().isNull())
 
     def test_a_thumbnail_for_an_action_with_no_tile_is_ignored(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
