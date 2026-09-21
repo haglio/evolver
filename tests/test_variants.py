@@ -26,8 +26,8 @@ class TestStripProcessingSuffixes:
         assert strip_processing_suffixes("clip_apo8_gcg5_topaz_cfr") == "clip"
 
     def test_plain_stem_unchanged(self):
-        assert strip_processing_suffixes("Corin Waverly - POV Beta (1080)") == (
-            "Corin Waverly - POV Beta (1080)"
+        assert strip_processing_suffixes("Corin Waverly - Beta Cut (1080)") == (
+            "Corin Waverly - Beta Cut (1080)"
         )
 
     def test_mid_name_tokens_are_not_suffixes(self):

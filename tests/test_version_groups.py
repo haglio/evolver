@@ -35,22 +35,22 @@ class TestGroupIds:
 
     def test_an_override_folds_a_stem_the_name_rule_cannot_reach(self):
         """A hand-renamed trim shares no name prefix with the video it came from
-        — "Petra Vance POV Beta 4k 60fps" against "Petra-Vance_540-hash" —
+        — "Petra Vance Beta Cut 4k 60fps" against "Petra-Vance_540-hash" —
         so the only way to call them one video is to say so."""
-        stems = ["Petra-Vance_540-xq3k9v2w", "Petra Vance POV Beta 4k 60fps"]
+        stems = ["Petra-Vance_540-xq3k9v2w", "Petra Vance Beta Cut 4k 60fps"]
 
-        ids = group_ids(stems, {"Petra Vance POV Beta 4k 60fps": "Petra-Vance_540-xq3k9v2w"})
+        ids = group_ids(stems, {"Petra Vance Beta Cut 4k 60fps": "Petra-Vance_540-xq3k9v2w"})
 
-        assert ids["Petra Vance POV Beta 4k 60fps"] == ids["Petra-Vance_540-xq3k9v2w"]
+        assert ids["Petra Vance Beta Cut 4k 60fps"] == ids["Petra-Vance_540-xq3k9v2w"]
         assert ids["Petra-Vance_540-xq3k9v2w"] == "Petra-Vance_540-xq3k9v2w"
 
     def test_an_override_still_holds_once_either_side_has_been_upscaled(self):
-        declared = {"Petra Vance POV Beta 4k 60fps": "Petra-Vance_540-xq3k9v2w"}
+        declared = {"Petra Vance Beta Cut 4k 60fps": "Petra-Vance_540-xq3k9v2w"}
         for stems in (
-            ["Petra-Vance_540-xq3k9v2w_apo8_iris2", "Petra Vance POV Beta 4k 60fps"],
-            ["Petra-Vance_540-xq3k9v2w", "Petra Vance POV Beta 4k 60fps_apo8_iris2"],
-            ["Petra-Vance_540-xq3k9v2w_apo8_iris2", "Petra Vance POV Beta 4k 60fps_apo8_iris2",
-             "Petra Vance POV Beta 4k 60fps"],
+            ["Petra-Vance_540-xq3k9v2w_apo8_iris2", "Petra Vance Beta Cut 4k 60fps"],
+            ["Petra-Vance_540-xq3k9v2w", "Petra Vance Beta Cut 4k 60fps_apo8_iris2"],
+            ["Petra-Vance_540-xq3k9v2w_apo8_iris2", "Petra Vance Beta Cut 4k 60fps_apo8_iris2",
+             "Petra Vance Beta Cut 4k 60fps"],
         ):
             ids = group_ids(stems, declared)
 
