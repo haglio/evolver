@@ -23,8 +23,8 @@ def _stream_geometry(file: Path) -> tuple[int, int, int] | None:
     """(width, height, rotation degrees) for the first video stream, or None.
 
     One process for all three. The sort stage asks this once per incoming file,
-    so a batch of a hundred clips used to be three hundred process spawns --
-    and on Windows the spawn is the expensive part, not the probing.
+    so a probe per field makes a batch of a hundred clips three hundred process
+    spawns -- and on Windows the spawn is the expensive part, not the probing.
 
     A rotation nothing can parse counts as none: the width and height are still
     good, and a tag this cannot read only means the clip is not rotated as far

@@ -219,7 +219,7 @@ class TestExtractFrame(unittest.TestCase):
             argv = run.call_args[0][0]
             self.assertEqual(argv[argv.index("-ss") + 1], "0.000")
 
-    def test_returns_false_when_ffmpeg_fails(self):
+    def test_a_frame_ffmpeg_could_not_write_is_reported_as_not_extracted(self):
         with workspace_temp_dir() as root:
             dest = root / "out.jpg"
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \

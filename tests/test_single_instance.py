@@ -21,7 +21,7 @@ class TestIsFirstInstance(unittest.TestCase):
     """The mutex must be immune to GetLastError clobbering by injected DLLs
     (e.g. Windhawk)."""
 
-    def test_first_instance_returns_true(self):
+    def test_the_first_evolver_to_ask_is_given_the_claim(self):
         unique = f"TestMutex_{os.getpid()}"
         with patch.object(single_instance, "_MUTEX_NAME", unique):
             self.assertTrue(single_instance.InstanceGateway().claim())
@@ -38,7 +38,7 @@ class TestIsFirstInstance(unittest.TestCase):
 
             self.assertTrue(single_instance.InstanceGateway().claim())
 
-    def test_second_instance_returns_false(self):
+    def test_a_second_evolver_is_refused_while_the_first_holds_the_claim(self):
         unique = f"TestMutex_Dup_{os.getpid()}"
         with patch.object(single_instance, "_MUTEX_NAME", unique), held_mutex(unique):
             self.assertFalse(single_instance.InstanceGateway().claim())

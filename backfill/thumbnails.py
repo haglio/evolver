@@ -104,10 +104,10 @@ def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTI
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
-        # The probe is inside the try too: it also runs a binary, and one that
-        # is not installed used to escape here, escape build_thumbnails and
-        # take the whole tool's startup down -- silently, since pythonw.exe has
-        # no console for the traceback.
+        # The probe is inside the try too: it also runs a binary, and above the
+        # try a missing one escapes here, escapes build_thumbnails and takes
+        # the whole tool's startup down -- silently, since pythonw.exe has no
+        # console for the traceback.
         duration = duration_seconds(clip)
         timestamp = duration * at_fraction if duration else 0.0
         result = subprocess.run(

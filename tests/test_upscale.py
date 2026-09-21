@@ -196,7 +196,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             written_to = run_ffmpeg.call_args.args[1]
             self.assertNotIn(written_to.suffix.lower(), config.VIDEO_EXTENSIONS)
 
-    def test_run_records_failure_when_ffmpeg_returns_false(self):
+    def test_an_encode_ffmpeg_refused_is_recorded_as_a_failure(self):
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, weird_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"

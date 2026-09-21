@@ -42,7 +42,7 @@ class TestSerialWorker(unittest.TestCase):
 
         self.assertEqual(done, ["slow"])
 
-    def test_draining_with_nothing_submitted_returns(self):
+    def test_draining_a_worker_nothing_was_submitted_to_waits_on_nothing(self):
         worker = self._worker()
         worker.drain()
         self.assertIsNone(worker._latest)  # nothing was ever waited on

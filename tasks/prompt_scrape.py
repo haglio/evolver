@@ -127,12 +127,11 @@ def run(*, sorted_dir: Path | None = None,
 def _already_scraped(output_path: Path) -> bool:
     """Whether the sidecar at *output_path* already holds what this stage writes.
 
-    The test used to be the file's existence, and that stopped being the same
-    question when ``tasks.video_types`` began recording a kind and a running
-    time on every library video — including the ones nothing has scraped yet.
-    A sidecar holding nothing but those is not a scrape, and reading it as one
-    would lose the prompts for good: a video this stage has skipped once is
-    never looked at again.
+    Existence is not the same question: ``tasks.video_types`` records a kind
+    and a running time on every library video, including the ones nothing has
+    scraped yet. A sidecar holding nothing but those is not a scrape, and
+    reading it as one loses the prompts for good — a video this stage has
+    skipped once is never looked at again.
     """
     return output_path.exists() and not video_type.only_the_video_itself(
         sidecar.read(output_path))

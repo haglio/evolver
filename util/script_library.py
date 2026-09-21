@@ -3,7 +3,7 @@ cut out of the scene's, or placed back into the scene's timeline — saying in t
 script itself which of those acts wrote it.
 
 What a funscript *is* belongs to every app in this family that reads or writes
-one and lives in :mod:`app_support.funscript`; this module used to say it again.
+one and lives in :mod:`app_support.funscript`, not here.
 """
 
 from __future__ import annotations

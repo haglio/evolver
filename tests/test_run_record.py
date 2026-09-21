@@ -52,7 +52,7 @@ class TestResultToDict:
         d = result_to_dict(object())
         assert list(d) == ["repr"]
 
-    def test_returns_none_for_none(self):
+    def test_a_stage_with_no_result_is_recorded_as_having_none(self):
         assert result_to_dict(None) is None
 
 
@@ -138,7 +138,7 @@ class TestRunRecordRoundTrip:
             ids = [r.id for r in loaded]
             assert ids == ["2026-03-29T14-30-00", "2026-03-29T14-15-00", "2026-03-29T14-00-00"]
 
-    def test_load_runs_returns_empty_for_missing_dir(self):
+    def test_a_history_directory_that_does_not_exist_reads_as_no_runs(self):
         assert load_runs(Path("nonexistent_dir_xyz")) == []
 
 

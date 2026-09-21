@@ -100,7 +100,7 @@ class TestStackedAreaChartSeries:
         ]
         return StackedAreaChart(records)
 
-    def test_normal_returns_raw_durations_chronological(self, chart):
+    def test_a_stage_is_plotted_at_the_times_it_took_oldest_run_first(self, chart):
         series = chart._compute_series()
         # Records are reversed to chronological, so purge values = [1, 2, 3]
         purge_series = series[ALL_STAGES.index("purge")]
@@ -111,13 +111,13 @@ class TestStackedAreaChartSeries:
         sort_series = series[ALL_STAGES.index("sort")]
         assert sort_series == [2.0, 4.0, 6.0]
 
-    def test_missing_stage_returns_zero(self, chart):
+    def test_a_stage_no_run_mentions_is_flat_at_zero(self, chart):
         series = chart._compute_series()
         # "metadata" is a stage the records here do not mention
         metadata_series = series[ALL_STAGES.index("metadata")]
         assert metadata_series == [0.0, 0.0, 0.0]
 
-    def test_averages_returns_running_mean(self, chart):
+    def test_in_averages_mode_a_stage_is_plotted_as_its_running_mean(self, chart):
         chart.set_mode("averages")
         series = chart._compute_series()
         purge_series = series[ALL_STAGES.index("purge")]

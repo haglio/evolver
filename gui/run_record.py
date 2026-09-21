@@ -41,16 +41,15 @@ class RunRecord:
         The start is the pipeline's own, captured at its first instant, and the
         finish is that plus the duration -- so ``finished_at - started_at ==
         duration_seconds`` holds by construction and the three cannot drift
-        apart. Both used to be stamped with the FINISH, which made every view
-        that trusts the name -- the history label, the chart's x axis -- wrong
-        by the run's whole duration; at the 660-second watchdog ceiling that is
-        eleven minutes, a full slot past the ten-minute schedule, so a run read
-        as belonging to the next tick. The 11,105 records already on disk were
-        repaired once by hand -- ``finished_at`` minus ``duration_seconds`` is
-        the true start, and both were recorded honestly under either
-        convention. Deliberately by hand and not by the app: a one-shot
-        migration wired into a scheduler tick becomes a permanent walk of the
-        whole history, run forever to find nothing.
+        apart. Stamping both at the finish puts every view that trusts the name
+        -- the history label, the chart's x axis -- out by the run's whole
+        duration, which at the 660-second watchdog ceiling is a full slot past
+        the ten-minute schedule and reads as the next tick's run.
+
+        A record written under an older convention is repaired by hand rather
+        than by the app: a one-shot migration wired into a scheduler tick
+        becomes a permanent walk of the whole history, run forever to find
+        nothing.
         """
         started = result.started_at
         finished = started + timedelta(seconds=result.duration_seconds)

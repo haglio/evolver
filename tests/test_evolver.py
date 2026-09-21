@@ -312,7 +312,7 @@ class TestRunPipeline:
                 "_stage_mocks and _STAGE_PATCHES"
             )
 
-    def test_returns_pipeline_result(self):
+    def test_a_clean_run_reports_every_stage_it_ran_and_no_errors(self):
         stack, _ = self._patch_all_stages()
         with stack:
             result = evolver.run_pipeline()
