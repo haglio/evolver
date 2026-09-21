@@ -3,5 +3,74 @@
     "inbox_dir": "videos/videos/2D/AI/0_inbox",
     "upscaled_dir": "videos/videos/2D/AI/2_outbox/upscaled_by_orientation"
   },
-  "partial_marker": ".partial."
+  "partial_marker": ".partial.",
+  "library_record": {
+    "blocks": {
+      "video": {
+        "fields": [
+          "type",
+          "duration_seconds",
+          "action",
+          "wrong_action",
+          "prompt",
+          "model",
+          "resolution",
+          "aspect_ratio",
+          "quality",
+          "style",
+          "seed",
+          "created"
+        ],
+        "written_by_the_reader": [
+          "wrong_action"
+        ]
+      },
+      "source_image": {
+        "fields": [
+          "positive_prompt",
+          "negative_prompt",
+          "model",
+          "action",
+          "resolution",
+          "aspect_ratio",
+          "quality",
+          "style",
+          "creativity",
+          "seed",
+          "created"
+        ]
+      },
+      "clip": {
+        "fields": [
+          "performer",
+          "source",
+          "full_video",
+          "scene_offset"
+        ]
+      },
+      "version": {
+        "fields": [
+          "group"
+        ]
+      },
+      "watch": {
+        "fields": [
+          "completions",
+          "skips",
+          "locks",
+          "weight"
+        ]
+      }
+    },
+    "top_level_keys": [
+      "title",
+      "favorite"
+    ],
+    "video_kinds": [
+      "genau_clip",
+      "excerpt",
+      "short",
+      "full_length"
+    ]
+  }
 }

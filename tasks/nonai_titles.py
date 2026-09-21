@@ -27,12 +27,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from util import sidecar
+from util.library_records import TITLE_KEY as TITLE_FIELD
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
 
 log = logging.getLogger(__name__)
 
-TITLE_FIELD = "title"
 
 
 @dataclass
