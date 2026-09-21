@@ -9,6 +9,7 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
 from PyQt6.QtWidgets import QMessageBox, QToolBar
+from shared_ui.colors import GREEN, RED
 from shared_ui.toggle_switch import ToggleSwitch
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
@@ -136,13 +137,13 @@ class TestStageStatusColumn:
     def test_a_completed_stage_shows_a_green_check(self):
         cell = self._status_cell("completed")
         assert cell.text() == "✔"
-        assert cell.foreground().color().name() == "#30a030"
+        assert cell.foreground().color().name() == GREEN.name()
 
     def test_an_errored_stage_shows_a_red_cross(self):
         """The row a low-disk hold now produces, which no run record had before."""
         cell = self._status_cell("error")
         assert cell.text() == "✘"
-        assert cell.foreground().color().name() == "#ff3c3c"
+        assert cell.foreground().color().name() == RED.name()
 
     def test_the_word_survives_as_the_cell_tooltip(self):
         assert self._status_cell("skipped").toolTip() == "skipped"
@@ -164,12 +165,12 @@ class TestRunVerdictInDetailPane:
     def test_a_failed_run_is_marked_with_the_red_cross(self):
         text = self._info_text("error")
         assert "✘" in text
-        assert "#ff3c3c" in text
+        assert RED.name() in text
 
     def test_a_successful_run_is_marked_with_the_green_check(self):
         text = self._info_text("success")
         assert "✔" in text
-        assert "#30a030" in text
+        assert GREEN.name() in text
 
     def test_qt_binds_the_color_to_the_mark_and_to_nothing_else(self):
         """The markup is only a promise until Qt's text engine has read it.
@@ -195,7 +196,7 @@ class TestRunVerdictInDetailPane:
             if color.style() != Qt.BrushStyle.NoBrush:
                 colored[fragment.text()] = color.color().name()
             iterator += 1
-        assert colored == {"✘": "#ff3c3c"}
+        assert colored == {"✘": RED.name()}
 
 
 class TestSummarizeResult:

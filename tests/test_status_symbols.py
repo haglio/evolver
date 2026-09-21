@@ -4,7 +4,7 @@ from __future__ import annotations
 import inspect
 import unittest
 
-from shared_ui.colors import GREEN, TEXT_MUTED
+from shared_ui.colors import GREEN, RED, TEXT_MUTED
 
 from gui import status_symbols
 from gui.status_symbols import mark_for
@@ -34,7 +34,7 @@ class TestMarkFor(unittest.TestCase):
     def test_an_errored_stage_is_a_red_cross(self):
         glyph, color = mark_for("error")
         self.assertEqual(glyph, "✘")
-        self.assertEqual(color.name(), "#ff3c3c")
+        self.assertEqual(color.name(), RED.name())
 
     def test_a_successful_run_draws_the_same_mark_as_a_completed_stage(self):
         """A run says "success" where a stage says "completed" — one verdict,
