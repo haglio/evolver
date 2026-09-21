@@ -4,6 +4,7 @@ import dataclasses
 import json
 import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import config
@@ -542,7 +543,6 @@ class TestSubprocessTimeout(unittest.TestCase):
 class TestFfmpegWindowSuppression(unittest.TestCase):
     def test_run_ffmpeg_passes_create_no_window(self):
         """ffmpeg must not spawn a visible console window on Windows."""
-        from pathlib import Path
         with patch("tasks.upscale.subprocess.run") as mock_run:
             mock_run.return_value = unittest.mock.MagicMock(returncode=0)
             upscale._run_ffmpeg(

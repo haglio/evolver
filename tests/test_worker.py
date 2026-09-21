@@ -7,6 +7,7 @@ from PyQt6.QtCore import QEventLoop, QTimer
 
 from evolver import PipelineResult, StageRecord
 from gui.worker import PipelineWorker
+from util.run_lock import Busy
 
 
 class TestPipelineWorker(unittest.TestCase):
@@ -75,8 +76,6 @@ class TestPipelineWorker(unittest.TestCase):
         """Not a crash: the tray's run landing on a command-line one is the
         ordinary case, and a traceback would bury the one line that says what
         happened."""
-        from util.run_lock import Busy
-
         with self.assertLogs("gui.worker", level="INFO") as logged:
             _, _, finished, errors, _ = self._run_worker(
                 pipeline_error=Busy("another Evolver (process 42) is running the pipeline"))

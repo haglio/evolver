@@ -14,13 +14,13 @@ import pytest
 
 import config
 import evolver
+from tasks.stages import ALL_STAGES
+from tests.temp_helpers import override_config, workspace_temp_dir
+from util import run_lock, run_log
 
 # What logging writes at the end of every line on this platform, and so what
 # a byte offset into the log has to be counted in.
 CRLF = (chr(13) + chr(10)).encode("ascii")
-from tasks.stages import ALL_STAGES
-from tests.temp_helpers import override_config, workspace_temp_dir
-from util import run_lock
 
 
 def _stage_mocks() -> dict:
@@ -324,8 +324,6 @@ class TestRunPipeline:
         """Two offsets and a banner, so a run's lines can be pointed at rather
         than searched for in a file nothing rotates. The offsets are taken
         either side of the run, so the stretch between them is the run's own."""
-        from util import run_log
-
         log = tmp_path / "evolver.log"
         log.write_bytes(b"[2026-07-25 08:10:02] an earlier run" + CRLF)
         stack, _ = self._patch_all_stages()

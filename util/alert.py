@@ -18,7 +18,7 @@ ICON_FILE = Path(__file__).resolve().parent.parent / "icon.ico"
 def show_error(title: str, message: str) -> None:
     """Put *message* on the screen under *title*, and block until it is read."""
     try:
-        from shared_ui.alert import show_alert
+        from shared_ui.alert import show_alert  # noqa: PLC0415  (see the module docstring)
 
         show_alert(title, message, icon=ICON_FILE)
     except Exception:
@@ -28,7 +28,7 @@ def show_error(title: str, message: str) -> None:
 
 def _fall_back_to_windows(title: str, message: str) -> None:
     try:
-        from app_support.win32 import show_error_popup
+        from app_support.win32 import show_error_popup  # noqa: PLC0415  (see the module docstring)
 
         show_error_popup(title, message)
     except Exception:

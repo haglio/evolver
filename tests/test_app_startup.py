@@ -1,14 +1,18 @@
 """Smoke test: verify the tray app can be constructed without crashing."""
 from __future__ import annotations
 
+import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+import config
 from gui import single_instance
 from gui.app import _wire
 from gui.process_identity import APP_MODEL_ID
+from gui.run_record import RunRecord
+from gui.settings import EvolverSettings
 from gui.single_instance import Outcome
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import override_config
@@ -174,7 +178,6 @@ class TestToastPolicy:
     """One place decides whether a tray balloon is shown at all."""
 
     def _app(self, request, *, enable_toasts):
-        from gui.settings import EvolverSettings
         settings = EvolverSettings(enable_toasts=enable_toasts)
         with patch("gui.app.EvolverSettings.load", return_value=settings):
             return build_evolver_app(request)
@@ -214,7 +217,6 @@ class TestToastPolicy:
 
 class TestTopazSignInNotice:
     def test_a_finished_run_held_back_for_the_topaz_sign_in_tells_the_user(self, request):
-        from gui.run_record import RunRecord
         app = build_evolver_app(request)
         record = RunRecord(
             id="r", started_at="2026-01-01T00:00:00", finished_at="2026-01-01T00:00:10",
@@ -426,7 +428,6 @@ class TestNonAiUpscaleToggle:
     """The tray menu's opt-in switch for the multi-hour non-AI encodes."""
 
     def _app_with_fresh_settings(self, request):
-        from gui.settings import EvolverSettings
         with patch("gui.app.EvolverSettings.load", return_value=EvolverSettings()):
             return build_evolver_app(request)
 
@@ -455,7 +456,6 @@ class TestPresenceMonitor:
     the slow pipeline ticks."""
 
     def _app_with_toggle(self, request, enabled):
-        from gui.settings import EvolverSettings
         settings = EvolverSettings()
         settings.nonai_upscale_enabled = enabled
         with patch("gui.app.EvolverSettings.load", return_value=settings):
@@ -549,17 +549,13 @@ class TestRestart:
             mock_quit.assert_called_once()
 
     def test_restart_launches_tray_app_on_this_interpreter(self, request):
-        import sys as real_sys
-
-        import config
-
         app = build_evolver_app(request)
 
         with patch("gui.app.subprocess.Popen") as mock_popen, \
              patch.object(app, "_shutdown"):
             app._restart()
             args = mock_popen.call_args[0][0]
-            assert args[0] == real_sys.executable
+            assert args[0] == sys.executable
             assert args[1] == str(config.PROJECT_DIR / "tray_app.py")
 
     def test_restart_passes_show_window_when_window_visible(self, request):

@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
+from evolver import PipelineResult, StageRecord
 from gui.run_record import (
     RunRecord,
     format_run_label,
@@ -17,6 +18,7 @@ from gui.run_record import (
     save_run,
 )
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util import run_log
 
 
 @dataclass
@@ -103,8 +105,6 @@ class TestRunRecordRoundTrip:
         """What stops every scheduled run failing to record: sort.run()'s
         moved_files are Path objects, and json.dumps raises on a Path --
         the conversion has to happen on the way into the record."""
-        from evolver import PipelineResult, StageRecord
-
         pipeline_result = PipelineResult(
             stages=[StageRecord(
                 "sort", "completed", 1.5,
@@ -249,8 +249,6 @@ class TestLoadingOnlyTheNewest:
 class TestRunRecordFromPipelineResult:
 
     def test_from_pipeline_result_creates_record(self):
-        from evolver import PipelineResult, StageRecord
-
         pr = PipelineResult(
             stages=[
                 StageRecord("sort", "completed", 1.5, Mock(moved=2)),
@@ -273,8 +271,6 @@ class TestRunRecordFromPipelineResult:
         wrong by the run's whole duration -- and at the 660-second watchdog
         ceiling that is eleven minutes, a full slot past the ten-minute
         schedule, which reads as belonging to the following tick."""
-        from evolver import PipelineResult
-
         pr = PipelineResult(
             stages=[], has_errors=False, duration_seconds=699.7,
             started_at=datetime(2026, 7, 15, 3, 20, 0, tzinfo=UTC),
@@ -290,9 +286,6 @@ class TestRunRecordFromPipelineResult:
         with it. Recomputing the start here from the finish would drift from
         that banner by however long the record took to save, and a run whose
         record and banner disagree is one nothing can find in the log."""
-        from evolver import PipelineResult
-        from util import run_log
-
         started = datetime(2026, 7, 15, 3, 20, 0, tzinfo=UTC)
         pr = PipelineResult(stages=[], has_errors=False, duration_seconds=699.7,
                             started_at=started)
@@ -302,8 +295,6 @@ class TestRunRecordFromPipelineResult:
         assert record.id == run_log.run_id(started)
 
     def test_the_log_mark_rides_along_onto_the_record(self):
-        from evolver import PipelineResult
-
         pr = PipelineResult(stages=[], has_errors=False, duration_seconds=1.0,
                             log_start=1024, log_end=4096)
 
@@ -312,8 +303,6 @@ class TestRunRecordFromPipelineResult:
         assert (record.log_start, record.log_end) == (1024, 4096)
 
     def test_the_id_names_the_start_so_the_history_sorts_by_it(self):
-        from evolver import PipelineResult
-
         pr = PipelineResult(stages=[], has_errors=False, duration_seconds=699.7)
 
         record = RunRecord.from_pipeline_result(pr)

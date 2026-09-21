@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from PyQt6.QtGui import QFontMetrics, QImage
 
+from gui.main_window import EvolverMainWindow
 from gui.run_record import RunRecord
 from gui.stats_window import (
     STAGE_COLORS,
@@ -18,6 +19,7 @@ from gui.stats_window import (
     chart_right_margin,
     legend_width,
 )
+from gui.tray import EvolverTray
 from tasks.stages import ALL_STAGES, STAGE_LABELS
 from tests.color_support import band_fill
 from tests.temp_helpers import make_run_record
@@ -386,12 +388,10 @@ class TestPickYTicks:
 
 class TestStatsActionExists:
     def test_tray_has_stats_action(self):
-        from gui.tray import EvolverTray
         tray = EvolverTray()
         assert tray.stats_action is not None
 
     def test_window_has_stats_action(self):
-        from gui.main_window import EvolverMainWindow
         window = EvolverMainWindow()
         assert window.stats_action is not None
 

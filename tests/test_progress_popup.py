@@ -4,28 +4,25 @@ import unittest
 from unittest.mock import patch
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QProgressBar
+from PyQt6.QtWidgets import QLabel, QMainWindow, QProgressBar
+
+from gui.progress_popup import ProgressPopup
+from tasks.stages import ALL_STAGES, STAGE_LABELS
 
 
 class TestPopupConstruction(unittest.TestCase):
     def setUp(self):
-        from gui.progress_popup import ProgressPopup
         self.popup = ProgressPopup()
 
     def tearDown(self):
         self.popup.close()
 
     def test_has_a_bar_per_pipeline_stage(self):
-        from tasks.stages import ALL_STAGES
         self.assertEqual(len(self.popup._bars), len(ALL_STAGES))
 
     def test_every_row_is_captioned_with_the_stage_label(self):
         """The bars are read while a run is in flight, so they say what the
         stage is rather than the key the run record files it under."""
-        from PyQt6.QtWidgets import QLabel
-
-        from tasks.stages import STAGE_LABELS
-
         captions = {label.text() for label in self.popup.findChildren(QLabel)}
 
         self.assertTrue(set(STAGE_LABELS.values()) <= captions)
@@ -35,10 +32,6 @@ class TestPopupConstruction(unittest.TestCase):
         """The column is sized from the labels, not from a guess: the widest
         one is 137 px in this machine's default font and was 91 as a key, and
         the font is whatever the machine running it has."""
-        from PyQt6.QtWidgets import QLabel
-
-        from tasks.stages import STAGE_LABELS
-
         for label in self.popup.findChildren(QLabel):
             if label.text() in set(STAGE_LABELS.values()):
                 with self.subTest(caption=label.text()):
@@ -55,7 +48,6 @@ class TestPopupConstruction(unittest.TestCase):
         self.assertEqual(self.popup._total_bar.value(), 0)
 
     def test_total_bar_range_is_100_per_stage(self):
-        from tasks.stages import ALL_STAGES
         self.assertEqual(self.popup._total_bar.maximum(), 100 * len(ALL_STAGES))
 
     def test_window_flags_include_tool_without_stay_on_top(self):
@@ -66,7 +58,6 @@ class TestPopupConstruction(unittest.TestCase):
 
 class TestPopupStageLifecycle(unittest.TestCase):
     def setUp(self):
-        from gui.progress_popup import ProgressPopup
         self.popup = ProgressPopup()
 
     def tearDown(self):
@@ -98,7 +89,6 @@ class TestPopupStageLifecycle(unittest.TestCase):
 
 class TestPopupIntraProgress(unittest.TestCase):
     def setUp(self):
-        from gui.progress_popup import ProgressPopup
         self.popup = ProgressPopup()
 
     def tearDown(self):
@@ -123,8 +113,6 @@ class TestPopupIntraProgress(unittest.TestCase):
 
 class TestPopupTotalBar(unittest.TestCase):
     def setUp(self):
-        from gui.progress_popup import ProgressPopup
-        from tasks.stages import ALL_STAGES
         self.popup = ProgressPopup()
         self._all_stages = ALL_STAGES
 
@@ -143,7 +131,6 @@ class TestPopupTotalBar(unittest.TestCase):
 
 class TestPopupAutoClose(unittest.TestCase):
     def setUp(self):
-        from gui.progress_popup import ProgressPopup
         self.popup = ProgressPopup()
 
     def tearDown(self):
@@ -159,10 +146,6 @@ class TestPopupAutoClose(unittest.TestCase):
 
 class TestPopupPositioning(unittest.TestCase):
     def test_centers_on_anchor_window(self):
-        from PyQt6.QtWidgets import QMainWindow
-
-        from gui.progress_popup import ProgressPopup
-
         anchor = QMainWindow()
         anchor.resize(800, 600)
         anchor.move(200, 100)

@@ -6,7 +6,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QKeySequence, QPixmap, QShortcut
+from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtWidgets import QToolButton
 
 from backfill.vocabulary import Act
@@ -297,8 +299,6 @@ class TestBackfillWindow(unittest.TestCase):
         self.assertTrue(window._audio.isMuted())
 
     def test_the_clip_loops_until_a_decision_lands(self):
-        from PyQt6.QtMultimedia import QMediaPlayer
-
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         self.assertEqual(window._player.loops(), QMediaPlayer.Loops.Infinite)
 
@@ -316,9 +316,6 @@ class TestBackfillWindow(unittest.TestCase):
         stop.assert_called_once()
 
     def test_escape_closes_the_window(self):
-        from PyQt6.QtCore import Qt
-        from PyQt6.QtGui import QKeySequence, QShortcut
-
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         escapes = [
             s for s in window.findChildren(QShortcut)
@@ -334,8 +331,6 @@ class TestBackfillWindow(unittest.TestCase):
     def test_no_tile_ever_takes_keyboard_focus(self):
         """The space bar must not re-fire the last clicked tile, and Esc must
         keep closing the window rather than being swallowed by a button."""
-        from PyQt6.QtCore import Qt
-
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         tiles = window.findChildren(QToolButton)
         self.assertTrue(tiles)

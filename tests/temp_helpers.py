@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
+from gui.run_record import RunRecord
 from util import provenance
 from util.media_files import partial_path
 
@@ -308,8 +309,6 @@ def make_run_record(**overrides):
     field meant editing five places. All values are fabricated, per this
     repo's fixture rule.
     """
-    from gui.run_record import RunRecord
-
     fields = dict(
         id="2026-07-25T15-20-02",
         started_at="2026-07-25T15:20:02",

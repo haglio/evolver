@@ -21,7 +21,7 @@ from tests.temp_helpers import (
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
-from util import nonai_job, provenance, sidecar, video_type
+from util import nonai_job, orientation, provenance, sidecar, topaz, video_type
 from util.media_files import partial_path
 
 
@@ -679,7 +679,6 @@ class TestTheJobFilesKeys(unittest.TestCase):
             self.assertIs(written["on_request"], True)
 
     def test_an_adopted_encode_writes_exactly_these(self):
-        from util import orientation, topaz
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -771,7 +770,6 @@ class TestOrphanAdoption(unittest.TestCase):
     """
 
     def test_a_lone_topaz_process_is_adopted_back_into_a_job(self):
-        from util import orientation, topaz
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]

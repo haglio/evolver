@@ -7,6 +7,7 @@ run to start one, and that no quit except the user's own leaves a mark.
 """
 from __future__ import annotations
 
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import config
@@ -64,7 +65,6 @@ class TestStartingTheBroker:
         with patch("gui.peer_watch.crash_log.write_info"):
             peer_watch.launch_broker_tray(launcher=launcher, popen=popen)
 
-        import subprocess
         assert popen.call_args.kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
 
     def test_a_checkout_with_no_broker_beside_it_starts_nothing(self, tmp_path):
