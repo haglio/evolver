@@ -153,6 +153,10 @@ CONFIG_REFERENCE_LEDGER = {
     "util/script_library.py": 3,
     "util/media_files.py": 1,
     "util/nonai_library.py": 5,
+    # The two folders another app hands clips to this pipeline through, read
+    # here so the published document says where they are TODAY rather than
+    # where they were when somebody last wrote them out by hand.
+    "util/pipeline_contract.py": 3,
     # One fewer with the archive lookup gone (item 27's last piece).
     "util/nonai_retire.py": 2,
     "util/reference_stores.py": 6,

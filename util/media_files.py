@@ -15,17 +15,23 @@ from pathlib import Path
 
 import config
 
+#: What a copy still being written wears, so a walk of the library goes past it
+#: instead of taking half a video for a finished one. Published to the apps that
+#: hand clips to this pipeline (``util.pipeline_contract``), which put it in the
+#: names they copy under.
+PARTIAL_MARKER = ".partial."
+
 
 def partial_path(final: Path, stem: str) -> Path:
-    return final.with_name(f"{stem}.partial.{uuid.uuid4().hex}")
+    return final.with_name(f"{stem}{PARTIAL_MARKER}{uuid.uuid4().hex}")
 
 
 def partial_stem(partial: Path) -> str:
-    return partial.name.split(".partial.")[0]
+    return partial.name.split(PARTIAL_MARKER)[0]
 
 
 def is_partial_path(path: Path) -> bool:
-    return ".partial." in path.name.lower()
+    return PARTIAL_MARKER in path.name.lower()
 
 
 def is_finalized_video_file(path: Path) -> bool:
