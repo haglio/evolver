@@ -3,7 +3,7 @@
 ``launch_preview_branch.vbs`` in a worktree starts that branch's app with
 ``EVOLVER_BRANCH_SESSION=1``: the same tray icon, the same window, every
 command working, on the live library and the usual Evolver's own run history,
-queue manifests and settings (``config.LIVE_DIR``).  The user judges a change
+queue lists and settings (``config.LIVE_DIR``).  The user judges a change
 by using the app, so the preview has to *be* the app — a slice of it, or one
 window of it filled from a report, is a thing he cannot trust and has said so.
 

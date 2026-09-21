@@ -1,14 +1,14 @@
 """Which non-AI clip the upscale stage encodes next, and in what order.
 
 Candidates come from the buckets' triage folders (``0 unsorted``, ``1 could
-use work``), most-wanted first: a pin in the priority manifest beats everything
-and also re-queues a video whose only processed variant came from an older
+use work``), most-wanted first: a pin in the pin list beats everything and
+also re-queues a video whose only processed variant came from an older
 recipe, then an explicit ``1`` flag, then Fun Time's watch score, then clips
 with a funscript — the only per-video engagement signal the non_AI library has
 of its own.
 
 The three files this reads are arguments rather than ambient config: the two
-manifests are the user's -- edited by hand, and the pin one also rewritten when
+lists are the user's -- edited by hand, and the pin one also rewritten when
 the queue window is rearranged -- the watch stats are a sibling app's, and
 naming them at the call makes it visible that listing candidates opens three
 files besides walking the tree. What stays ambient is the library itself —
@@ -43,12 +43,12 @@ class Candidate:
     watch_score: float
 
 
-def collect_candidates(*, skip_manifest: Path, pin_manifest: Path,
+def collect_candidates(*, skip_list: Path, pin_list: Path,
                        watch_stats_file: Path) -> list[Candidate]:
     """Unprocessed triage-folder videos, most-wanted first."""
     candidates: list[Candidate] = []
-    skipped = set(manifest_entries(skip_manifest))
-    pinned = manifest_entries(pin_manifest)
+    skipped = set(listed_videos(skip_list))
+    pinned = listed_videos(pin_list)
     watch_scores = _watch_scores(watch_stats_file)
     for bucket in buckets():
         processed_stems = _processed_stems(bucket)
@@ -81,37 +81,37 @@ def collect_candidates(*, skip_manifest: Path, pin_manifest: Path,
 def relpath(video: Path) -> str:
     """*video*'s path within the non-AI library — the key everything here uses.
 
-    Both manifests are written in it by hand, the attempt counter is keyed by
+    Both lists are written in it by hand, the attempt counter is keyed by
     it, and it is what the stage reports and logs, so one spelling has to serve
     all four.
     """
     return video.relative_to(config.NON_AI_DIR).as_posix()
 
 
-def add_to_skip_manifest(manifest: Path, source: Path, reason: str) -> None:
+def add_to_skip_list(skip_list: Path, source: Path, reason: str) -> None:
     log.warning("Skipping %s permanently: %s", source, reason)
-    with open(manifest, "a", encoding="utf-8") as handle:
+    with open(skip_list, "a", encoding="utf-8") as handle:
         handle.write(f"{relpath(source)}\t{reason}\n")
 
 
-def pin_ahead(manifest: Path, videos: list[str]) -> None:
-    lines = _manifest_lines(manifest)
+def pin_ahead(pin_list: Path, videos: list[str]) -> None:
+    lines = _list_lines(pin_list)
     line_of = dict(reversed(lines))
     ahead = [line_of.get(video, video) for video in videos]
     rest = [line for video, line in lines
             if video not in videos and (config.NON_AI_DIR / video).is_file()]
-    write_whole(manifest, "".join(f"{line}\n" for line in ahead + rest))
+    write_whole(pin_list, "".join(f"{line}\n" for line in ahead + rest))
 
 
-def manifest_entries(path: Path) -> list[str]:
-    """A hand-edited manifest's relative paths, in file order.
+def listed_videos(path: Path) -> list[str]:
+    """A hand-edited list's relative paths, in file order.
 
     One path per line; anything past a tab is the user's own note about why.
     """
-    return [video for video, _line in _manifest_lines(path)]
+    return [video for video, _line in _list_lines(path)]
 
 
-def _manifest_lines(path: Path) -> list[tuple[str, str]]:
+def _list_lines(path: Path) -> list[tuple[str, str]]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:

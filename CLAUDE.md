@@ -8,7 +8,7 @@ Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it
 runs THAT worktree's **whole** Evolver — its tray icon, the main window, every
 command working, the schedule included — **in place of** the Evolver the user
 runs every day, on the live library and that Evolver's own run history, log,
-queue manifests and settings (`EVOLVER_BRANCH_SESSION=1` points those at
+queue lists and settings (`EVOLVER_BRANCH_SESSION=1` points those at
 `config.LIVE_DIR`). That shape is the user's choice (2026-09-16): the preview
 has the running Evolver step aside and takes over its work, and the usual
 Evolver takes it back when the preview is quit, or on its own an hour later

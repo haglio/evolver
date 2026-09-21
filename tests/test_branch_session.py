@@ -1,7 +1,7 @@
 """A branch session: the whole app out of a worktree, in place of the usual Evolver.
 
 What it shares with the usual one (the library, the run history and its log,
-the queue's manifests, the settings), the work it takes over from it (the
+the queue's lists, the settings), the work it takes over from it (the
 schedule, the supervision), and how that work goes back are the whole
 contract, and all three are held here.
 
@@ -28,7 +28,7 @@ from tests.temp_helpers import override_config
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 _PATHS = ("PROJECT_DIR", "LIVE_DIR", "LOG_FILE", "RUNS_DIR", "GUI_SETTINGS_FILE",
-          "NONAI_SKIP_MANIFEST", "NONAI_PRIORITY_MANIFEST")
+          "NONAI_SKIP_LIST", "NONAI_PIN_LIST")
 
 
 def config_paths(branch_session: bool) -> dict[str, Path]:

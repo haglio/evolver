@@ -2,7 +2,7 @@
 
 These moved out of tests/test_nonai_upscale.py with the queue itself. They no
 longer construct the stage to ask it: the three files a queue is built from are
-arguments, so each test names the manifest or the stats file it wrote.
+arguments, so each test names the list or the stats file it wrote.
 """
 from __future__ import annotations
 
@@ -20,11 +20,11 @@ from tests.temp_helpers import (
 )
 
 
-def queue_files(root, overrides, *, pin_manifest=None):
+def queue_files(root, overrides, *, pin_list=None):
     """The three files collect_candidates reads, defaulted to absent ones."""
     return {
-        "skip_manifest": overrides["NONAI_SKIP_MANIFEST"],
-        "pin_manifest": pin_manifest or root / "next.txt",
+        "skip_list": overrides["NONAI_SKIP_LIST"],
+        "pin_list": pin_list or root / "next.txt",
         "watch_stats_file": overrides["FUN_TIME_WATCH_STATS_FILE"],
     }
 
@@ -92,7 +92,7 @@ class TestCollectCandidates(unittest.TestCase):
             self.assertEqual(sorted(c.path for c in candidates), [good, trimmed])
 
     def test_pinned_videos_lead_the_queue_in_the_order_listed(self):
-        """The pin manifest is how the user says "encode this one next", so it
+        """The pin list is how the user says "encode this one next", so it
         outranks the triage digit and every other ordering heuristic."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -108,7 +108,7 @@ class TestCollectCandidates(unittest.TestCase):
 
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(
-                    **queue_files(root, overrides, pin_manifest=pins))
+                    **queue_files(root, overrides, pin_list=pins))
 
             self.assertEqual([c.path for c in candidates][:2], [first, second])
 
@@ -128,7 +128,7 @@ class TestCollectCandidates(unittest.TestCase):
 
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(
-                    **queue_files(root, overrides, pin_manifest=pins))
+                    **queue_files(root, overrides, pin_list=pins))
 
             self.assertEqual([c.path for c in candidates], [original])
 
@@ -148,14 +148,14 @@ class TestCollectCandidates(unittest.TestCase):
 
             self.assertEqual([c.path for c in candidates], [fresh])
 
-    def test_excludes_skip_manifest_entries(self):
+    def test_excludes_what_the_skip_list_names(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
             make_video(non_ai / "other" / "0 unsorted" / "hopeless.mp4")
             fresh = make_video(non_ai / "other" / "0 unsorted" / "fresh.mp4")
-            overrides["NONAI_SKIP_MANIFEST"].write_text(
+            overrides["NONAI_SKIP_LIST"].write_text(
                 "other/0 unsorted/hopeless.mp4\tfailed twice\n", encoding="utf-8"
             )
 
@@ -211,9 +211,9 @@ class TestCollectCandidates(unittest.TestCase):
 
 
 class TestManifestEntries(unittest.TestCase):
-    def test_a_missing_manifest_is_empty_rather_than_an_error(self):
+    def test_a_missing_list_is_empty_rather_than_an_error(self):
         with workspace_temp_dir() as root:
-            self.assertEqual(nonai_queue.manifest_entries(root / "none.txt"), [])
+            self.assertEqual(nonai_queue.listed_videos(root / "none.txt"), [])
 
     def test_a_note_past_a_tab_is_the_users_own_and_not_part_of_the_path(self):
         with workspace_temp_dir() as root:
@@ -224,13 +224,13 @@ class TestManifestEntries(unittest.TestCase):
             )
 
             self.assertEqual(
-                nonai_queue.manifest_entries(path),
+                nonai_queue.listed_videos(path),
                 ["larkin/0 unsorted/a.mp4", "other/0 unsorted/b.mp4"],
             )
 
 
 class TestPinAhead(unittest.TestCase):
-    def test_the_videos_lead_the_manifest_in_the_order_given(self):
+    def test_the_videos_lead_the_pin_list_in_the_order_given(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             for name in ("a.mp4", "b.mp4"):
@@ -240,11 +240,11 @@ class TestPinAhead(unittest.TestCase):
             with override_config(**overrides):
                 nonai_queue.pin_ahead(pins, ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
 
-            self.assertEqual(nonai_queue.manifest_entries(pins),
+            self.assertEqual(nonai_queue.listed_videos(pins),
                              ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
 
     def test_the_pins_already_there_follow_in_their_order_with_their_notes(self):
-        """The manifest is hand-edited too, so a line's note is the user's and
+        """The list is hand-edited too, so a line's note is the user's and
         rides along with it wherever the line ends up."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -276,7 +276,7 @@ class TestPinAhead(unittest.TestCase):
             with override_config(**overrides):
                 nonai_queue.pin_ahead(pins, ["larkin/0 unsorted/a.mp4"])
 
-            self.assertEqual(nonai_queue.manifest_entries(pins), ["larkin/0 unsorted/a.mp4"])
+            self.assertEqual(nonai_queue.listed_videos(pins), ["larkin/0 unsorted/a.mp4"])
 
 
 class TestAddToSkipManifest(unittest.TestCase):
@@ -284,14 +284,14 @@ class TestAddToSkipManifest(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             video = make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
-            manifest = root / "skip.txt"
-            manifest.write_text("other/0 unsorted/b.mp4\tearlier\n", encoding="utf-8")
+            skip_list = root / "skip.txt"
+            skip_list.write_text("other/0 unsorted/b.mp4\tearlier\n", encoding="utf-8")
 
             with override_config(**overrides):
-                nonai_queue.add_to_skip_manifest(manifest, video, "already tagged")
+                nonai_queue.add_to_skip_list(skip_list, video, "already tagged")
 
             self.assertEqual(
-                manifest.read_text(encoding="utf-8").splitlines(),
+                skip_list.read_text(encoding="utf-8").splitlines(),
                 ["other/0 unsorted/b.mp4\tearlier",
                  "larkin/0 unsorted/a.mp4\talready tagged"],
             )

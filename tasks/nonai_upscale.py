@@ -42,7 +42,7 @@ from tasks import nonai_encode, nonai_progress, nonai_queue
 from tasks.nonai_encode import EncodeSettings
 from tasks.nonai_queue import (
     Candidate,
-    add_to_skip_manifest,
+    add_to_skip_list,
     collect_candidates,
     relpath,
 )
@@ -147,7 +147,7 @@ class StageFiles:
 
     Four it writes -- the job record, the attempt counter, the cooldown stamp,
     the request from the queue window -- and three the queue reads: the skip
-    and pin manifests, and Fun Time's watch stats. Held as one record rather
+    and pin lists, and Fun Time's watch stats. Held as one record rather
     than threaded separately because every function below is handed the same
     set, and seven separate resolutions put seven conditionals in front of the
     code that supervises a live multi-hour encode -- the one function here that
@@ -157,15 +157,15 @@ class StageFiles:
     job: Path
     attempts: Path
     cooldown: Path
-    skip_manifest: Path
-    pin_manifest: Path
+    skip_list: Path
+    pin_list: Path
     watch_stats: Path
     request: Path
 
     @classmethod
     def configured(cls, *, job: Path | None = None, attempts: Path | None = None,
-                   cooldown: Path | None = None, skip_manifest: Path | None = None,
-                   pin_manifest: Path | None = None, watch_stats: Path | None = None,
+                   cooldown: Path | None = None, skip_list: Path | None = None,
+                   pin_list: Path | None = None, watch_stats: Path | None = None,
                    request: Path | None = None) -> StageFiles:
         """Each path given, or the configured one where none was.
 
@@ -177,8 +177,8 @@ class StageFiles:
             job=job or config.NONAI_JOB_STATE_FILE,
             attempts=attempts or config.NONAI_ATTEMPTS_FILE,
             cooldown=cooldown or config.NONAI_COOLDOWN_FILE,
-            skip_manifest=skip_manifest or config.NONAI_SKIP_MANIFEST,
-            pin_manifest=pin_manifest or config.NONAI_PRIORITY_MANIFEST,
+            skip_list=skip_list or config.NONAI_SKIP_LIST,
+            pin_list=pin_list or config.NONAI_PIN_LIST,
             watch_stats=watch_stats or config.FUN_TIME_WATCH_STATS_FILE,
             request=request or config.NONAI_REQUEST_FILE,
         )
@@ -188,7 +188,7 @@ def run(allow_start: bool = True, stop: bool = False,
         presence_managed: bool = False, *, take_requests: bool = False,
         ai_waiting: bool = False, job_file: Path | None = None,
         attempts_file: Path | None = None, cooldown_file: Path | None = None,
-        skip_manifest: Path | None = None, pin_manifest: Path | None = None,
+        skip_list: Path | None = None, pin_list: Path | None = None,
         watch_stats_file: Path | None = None, request_file: Path | None = None,
         settings: EncodeSettings | None = None) -> NonAiUpscaleResult:
     """Check on the in-flight encode, then start the next one if the machine is free.
@@ -210,7 +210,7 @@ def run(allow_start: bool = True, stop: bool = False,
     """
     files = StageFiles.configured(
         job=job_file, attempts=attempts_file, cooldown=cooldown_file,
-        skip_manifest=skip_manifest, pin_manifest=pin_manifest,
+        skip_list=skip_list, pin_list=pin_list,
         watch_stats=watch_stats_file, request=request_file)
     settings = EncodeSettings() if settings is None else settings
     result = NonAiUpscaleResult()
@@ -248,7 +248,7 @@ def run(allow_start: bool = True, stop: bool = False,
             result.deferred_low_disk |= attempt.deferred_low_disk
 
     # Collected a second time on purpose: a start attempt can retire clips to
-    # the skip manifest, and the count reported is the queue as it stands after
+    # the skip list, and the count reported is the queue as it stands after
     # that. The doubled walk is finding tasks/design/008's; merging the two
     # would change what `pending` means, so it stays and stays visible.
     queued = _collect(files)
@@ -314,8 +314,8 @@ def _match_presence(job_file: Path, settings: EncodeSettings) -> str:
 
 
 def _collect(files: StageFiles) -> list[Candidate]:
-    return collect_candidates(skip_manifest=files.skip_manifest,
-                              pin_manifest=files.pin_manifest,
+    return collect_candidates(skip_list=files.skip_list,
+                              pin_list=files.pin_list,
                               watch_stats_file=files.watch_stats)
 
 
@@ -440,7 +440,7 @@ def _put_ahead(video: str, files: StageFiles, why: str) -> dict | None:
     if waiting is not None and waiting.video != video:
         next_after.append(waiting.video)
         nonai_job.clear_request(files.request)
-    nonai_queue.pin_ahead(files.pin_manifest, [video, *next_after])
+    nonai_queue.pin_ahead(files.pin_list, [video, *next_after])
     return job if running else None
 
 
@@ -484,7 +484,7 @@ def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclus
               source, f"{actual:.1f}s" if actual else "none", expected)
     nonai_encode.delete_tmp(tmp)
     if nonai_job.attempts_of(files.attempts, relpath(source)) >= settings.max_attempts:
-        add_to_skip_manifest(files.skip_manifest, source,
+        add_to_skip_list(files.skip_list, source,
                              f"failed {settings.max_attempts} attempts")
         nonai_job.clear_attempts(files.attempts, relpath(source))
     return Conclusion(failed=relpath(source))
@@ -537,16 +537,16 @@ def _start_requested(request: nonai_job.Request, files: StageFiles,
 
 
 def _launch(candidate: Candidate, files: StageFiles, *, on_request: bool = False) -> bool:
-    """Start *candidate*'s encode, or retire it to the skip manifest unstarted."""
+    """Start *candidate*'s encode, or retire it to the skip list unstarted."""
     source = candidate.path
     expected_duration = ffprobe.duration_seconds(source)
     orient = ffprobe.orientation_of(source)
     if ffprobe.videoai_tag(source):
-        add_to_skip_manifest(files.skip_manifest, source,
+        add_to_skip_list(files.skip_list, source,
                              "already carries a Topaz videoai tag")
         return False
     if expected_duration is None or orient == orientation.UNKNOWN:
-        add_to_skip_manifest(files.skip_manifest, source,
+        add_to_skip_list(files.skip_list, source,
                              "ffprobe could not read duration or orientation")
         return False
 

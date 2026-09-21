@@ -63,7 +63,7 @@ CONFIG_REFERENCE_LEDGER = {
     "backfill/voice.py": 4,
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
-    # The 10th and 11th are the third shape again: the pin manifest, read where
+    # The 10th and 11th are the third shape again: the pin list, read where
     # the queue window's door to it is, so the window layer names no path of its
     # own, and the pipeline's turn (util/run_lock.py), read where the run is.
     "evolver.py": 11,

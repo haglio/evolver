@@ -42,7 +42,7 @@ class PublishedDocument(unittest.TestCase):
         document = _document()
 
         self.assertEqual(
-            {name: config.BASE_DIR / Path(value)
+            {name: config.LIBRARY_ROOT / Path(value)
              for name, value in document["library_relative"].items()},
             {"inbox_dir": config.INBOX_DIR,
              "upscaled_dir": config.OUT_UPSCALED_DIR},

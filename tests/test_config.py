@@ -145,7 +145,7 @@ class TestProjectDir(unittest.TestCase):
 
 
 class TestLiveDir(unittest.TestCase):
-    """Which checkout's run history, log, settings and queue manifests a run uses.
+    """Which checkout's run history, log, settings and queue lists a run uses.
 
     Its own, except in a branch session: the preview launcher runs a worktree's
     whole app beside the live one, and a preview keeping those files for itself

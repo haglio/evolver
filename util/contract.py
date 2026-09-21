@@ -44,7 +44,7 @@ def library_relative() -> dict[str, str]:
 
 
 def _under_library(path: Path) -> str:
-    return path.relative_to(config.BASE_DIR).as_posix()
+    return path.relative_to(config.LIBRARY_ROOT).as_posix()
 
 
 def declaration() -> dict:
