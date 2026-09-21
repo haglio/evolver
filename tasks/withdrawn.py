@@ -70,6 +70,12 @@ def run() -> WithdrawnResult:
     return result
 
 
+#: The column this stage selects itself; the withdrawal stamps beside it are
+#: each lane's (``util.lanes``). Public for the same reason the metadata
+#: stage's are: it is a name another repo keeps for this one.
+COLUMNS = ("output_files",)
+
+
 def _gallery_rows() -> list[dict]:
     """Origenerator's rows, holding the output names and both withdrawal stamps.
 
@@ -77,7 +83,7 @@ def _gallery_rows() -> list[dict]:
     withdrawal to report, which is one more row with nothing set.
     """
     return origenerator_gallery.rows(
-        ("output_files",),
+        COLUMNS,
         optional=tuple(lane.unsent_column for lane in lanes.sent_lanes()),
     )
 

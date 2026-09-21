@@ -92,7 +92,8 @@ FUN_TIME_WATCH_STATS_FILE = FUN_TIME_PROJECT_DIR / "state" / "watch_stats.json"
 # content source: for videos it drops in 0_inbox/origenerator/, Evolver pulls the
 # generation metadata straight from Origenerator's own gallery database, read-only
 # (see tasks/origenerator_metadata.py). Origenerator never reaches into Evolver.
-ORIGENERATOR_DB_PATH = project_dir("origenerator") / "state" / "origenerator.db"
+ORIGENERATOR_PROJECT_DIR = project_dir("origenerator")
+ORIGENERATOR_DB_PATH = ORIGENERATOR_PROJECT_DIR / "state" / "origenerator.db"
 # Sibling apps that record a video's path in their own saved work. Evolver moves
 # videos, so it owns keeping these pointed at the right file (see
 # tasks/reference_sync.py); left alone they strand hand-made clip bounds,

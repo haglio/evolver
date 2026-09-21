@@ -29,18 +29,21 @@ from util.media_files import strip_uniquifier
 
 # Columns read from Origenerator's ``generations`` table. ``params_json`` carries
 # the model/LoRA/input_image a run used; the prompts and seed are first-class.
-_COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
+# Public because they are this repo's reading surface against another repo, and
+# tests/test_origenerator_gallery_contract.py holds them to what that repo
+# publishes it will keep.
+COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
             "negative_prompt", "seed", "params_json", "output_files", "created_at")
 
 # The stamp a gallery that records its own generations keeps on each row. Read
 # where the table has it; where it does not, the two workflow columns are all
 # there is to reconstruct one from.
-_OWN_PROVENANCE = "provenance"
+OWN_PROVENANCE = "provenance"
 
 # Param keys naming the model a run used, most-specific first — covers every
 # Origenerator workflow (WAN i2v/t2i use unet_high, Flux uses unet, SDXL uses
 # checkpoint). The first present wins; its filename is cleaned to a bare label.
-_MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
+MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
 _MODEL_EXT_RE = re.compile(r"\.(safetensors|ckpt|pt|pth|gguf|sft|bin)$", re.IGNORECASE)
 
 # ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
@@ -98,7 +101,7 @@ def generation_records(db_path=None) -> Callable[[Path], dict]:
 
 def _load_rows(db_path) -> list[dict]:
     """Every generation row, holding the columns this strategy reads."""
-    return origenerator_gallery.rows(_COLUMNS, optional=(_OWN_PROVENANCE,),
+    return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE,),
                                      db_path=db_path)
 
 
@@ -150,7 +153,7 @@ _IMPORT_PLACEHOLDERS = frozenset({"unknown", "imported"})
 
 
 def _generation_provenance(row: dict) -> dict:
-    its_own = _decoded(row.get(_OWN_PROVENANCE), dict)
+    its_own = _decoded(row.get(OWN_PROVENANCE), dict)
     if its_own:
         return its_own
     return provenance.reconstructed(
@@ -181,8 +184,8 @@ def _put(block: dict, key: str, value) -> None:
 
 
 def _model_label(params: dict) -> str:
-    """A bare model name from a row's params (first present of ``_MODEL_KEYS``)."""
-    for key in _MODEL_KEYS:
+    """A bare model name from a row's params (first present of ``MODEL_KEYS``)."""
+    for key in MODEL_KEYS:
         value = params.get(key)
         if value:
             base = str(value).replace("\\", "/").rsplit("/", 1)[-1]
