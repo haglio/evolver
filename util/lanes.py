@@ -18,11 +18,14 @@ ORIGENERATOR_SOURCE = "origenerator"
 class SentLane:
     """One lane Origenerator hands a clip down, seen from the receiving end.
 
-    ``source`` is the ``0_inbox`` folder the clip arrives under -- the whole of
-    what a send says, since routing by that name is the only thing passing
-    between the two apps -- and ``unsent_column`` is where Origenerator's gallery
-    records a send being taken back. Both are names agreed with that repo and
-    must stay spelled as it spells them.
+    ``key`` is what Origenerator's published document calls this lane, which is
+    how the two sides' tables are compared at all. ``source`` is the ``0_inbox``
+    folder the clip arrives under -- the whole of what a send says, since routing
+    by that name is the only thing passing between the two apps -- and
+    ``unsent_column`` is where Origenerator's gallery records a send being taken
+    back. Both are names agreed with that repo and must stay spelled as it
+    spells them; ``tests/test_origenerator_gallery_contract.py`` is what holds
+    them to it.
 
     ``delivered_dir`` is where a finished clip of this lane leaves the library
     for, or ``None`` for the lane whose clips stay in the outbox. It is the one
@@ -31,6 +34,7 @@ class SentLane:
     lane's case moved somewhere Origenerator has never heard of.
     """
 
+    key: str
     source: str
     unsent_column: str
     delivered_dir: Path | None
@@ -44,8 +48,9 @@ def sent_lanes() -> tuple[SentLane, ...]:
     freezes whatever ``config`` held then.
     """
     return (
-        SentLane(ORIGENERATOR_SOURCE, "evolver_unsent_at", delivered_dir=None),
-        SentLane(config.GENAU_SOURCE, "genau_unsent_at",
+        SentLane("evolver", ORIGENERATOR_SOURCE, "evolver_unsent_at",
+                 delivered_dir=None),
+        SentLane("genau", config.GENAU_SOURCE, "genau_unsent_at",
                  delivered_dir=config.GENAU_CLIPS_DIR),
     )
 
