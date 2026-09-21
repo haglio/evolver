@@ -260,11 +260,11 @@ def _rewrite_favorite_paths(path: Path, moves: dict[str, str]) -> None:
     favs_csv.write_rows(path, fieldnames, rows)
 
 
-def _favorite_locals(rows: list[dict[str, str]], column: str, base_dir: Path) -> dict[int, Path]:
+def _favorite_locals(rows: list[dict[str, str]], column: str, csv_dir: Path) -> dict[int, Path]:
     """Every row that links to a local file, by row index."""
     found: dict[int, Path] = {}
     for index, row in enumerate(rows):
-        local = favs_csv.local_path((row.get(column) or "").strip(), base_dir)
+        local = favs_csv.local_path((row.get(column) or "").strip(), csv_dir)
         if local is not None:
             found[index] = local
     return found

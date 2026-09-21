@@ -114,7 +114,7 @@ class TestRunStartsAJob(unittest.TestCase):
             self.assertEqual(mocks["popen"].call_args.args[0][-1], job["tmp"])
             self.assertFalse(job["tmp"].lower().endswith(tuple(config.VIDEO_EXTENSIONS)))
 
-    def test_already_tagged_candidate_is_manifested_and_the_next_one_starts(self):
+    def test_an_already_tagged_candidate_is_skipped_and_the_next_one_starts(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -128,8 +128,8 @@ class TestRunStartsAJob(unittest.TestCase):
 
             self.assertEqual(result.started, "larkin/0 unsorted/b fresh.mp4")
             self.assertIn(str(fresh), mocks["popen"].call_args.args[0])
-            manifest = overrides["NONAI_SKIP_MANIFEST"].read_text(encoding="utf-8")
-            self.assertIn("larkin/0 unsorted/a tagged.mp4\t", manifest)
+            skip_list = overrides["NONAI_SKIP_LIST"].read_text(encoding="utf-8")
+            self.assertIn("larkin/0 unsorted/a tagged.mp4\t", skip_list)
 
     def test_allow_start_false_starts_nothing(self):
         with workspace_temp_dir() as root:
@@ -415,7 +415,7 @@ class TestAskingForOneNow(unittest.TestCase):
             with override_config(**overrides), stack:
                 nonai_upscale.request_now("larkin/0 unsorted/b.mp4")
 
-            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
                              ["larkin/0 unsorted/b.mp4"])
             self.assertEqual(request_of(overrides), nonai_job.Request("larkin/0 unsorted/b.mp4"))
 
@@ -434,7 +434,7 @@ class TestAskingForOneNow(unittest.TestCase):
             mocks["terminate"].assert_called_once_with(4242)
             self.assertFalse(tmp.exists())
             self.assertIsNone(nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]))
-            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
                              ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/busy.mp4"])
             self.assertEqual(request_of(overrides).video, "larkin/0 unsorted/b.mp4")
 
@@ -470,7 +470,7 @@ class TestPuttingOneFirst(unittest.TestCase):
             with override_config(**overrides), stack:
                 nonai_upscale.put_first("larkin/0 unsorted/b.mp4")
 
-            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
                              ["larkin/0 unsorted/b.mp4"])
             self.assertIsNone(request_of(overrides))
 
@@ -489,7 +489,7 @@ class TestPuttingOneFirst(unittest.TestCase):
             mocks["terminate"].assert_called_once_with(4242)
             self.assertFalse(tmp.exists())
             self.assertIsNone(nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]))
-            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
                              ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/busy.mp4"])
             self.assertIsNone(request_of(overrides))
 
@@ -505,7 +505,7 @@ class TestPuttingOneFirst(unittest.TestCase):
                 nonai_upscale.request_now("larkin/0 unsorted/a.mp4")
                 nonai_upscale.put_first("larkin/0 unsorted/b.mp4")
 
-            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
                              ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
             self.assertIsNone(request_of(overrides))
 
@@ -525,7 +525,7 @@ class TestWithdrawingTheAsk(unittest.TestCase):
                 nonai_upscale.withdraw_request()
 
             self.assertIsNone(request_of(overrides))
-            self.assertEqual(nonai_queue.manifest_entries(overrides["NONAI_PRIORITY_MANIFEST"]),
+            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
                              ["larkin/0 unsorted/b.mp4"])
 
     def test_an_encode_already_running_is_parked_again_while_you_are_here(self):
@@ -617,7 +617,7 @@ class TestRunStopsAJob(unittest.TestCase):
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
             attempts = json.loads(overrides["NONAI_ATTEMPTS_FILE"].read_text(encoding="utf-8"))
             self.assertNotIn("larkin/0 unsorted/busy.mp4", attempts)
-            self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
+            self.assertFalse(overrides["NONAI_SKIP_LIST"].exists())
 
     def test_stop_still_promotes_an_encode_that_already_finished(self):
         with workspace_temp_dir() as root:
@@ -1010,7 +1010,7 @@ class TestEveryFileIsAParameter(unittest.TestCase):
     """The six files the stage touches are arguments, not ambient reads.
 
     Three it writes -- the job record, the attempt counter, the cooldown stamp
-    -- and three the queue reads -- the skip and pin manifests, and Fun Time's
+    -- and three the queue reads -- the skip and pin lists, and Fun Time's
     watch stats. Each threads through functions that decide whether a live
     encode is promoted, failed or killed, or which clip is started at all, so a
     parameter wired to the wrong place -- or resolved once at import, past
@@ -1067,7 +1067,7 @@ class TestEveryFileIsAParameter(unittest.TestCase):
             )
             self.assertFalse(overrides["NONAI_COOLDOWN_FILE"].exists())
 
-    def test_a_refused_start_is_recorded_in_the_skip_manifest_it_is_given(self):
+    def test_a_refused_start_is_recorded_in_the_skip_list_it_is_given(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             elsewhere = root / "elsewhere"
@@ -1081,8 +1081,8 @@ class TestEveryFileIsAParameter(unittest.TestCase):
                     job_file=elsewhere / "job.json",
                     attempts_file=elsewhere / "attempts.json",
                     cooldown_file=elsewhere / "cooldown.json",
-                    skip_manifest=elsewhere / "skip.txt",
-                    pin_manifest=elsewhere / "next.txt",
+                    skip_list=elsewhere / "skip.txt",
+                    pin_list=elsewhere / "next.txt",
                     watch_stats_file=elsewhere / "watch.json",
                 )
 
@@ -1091,9 +1091,9 @@ class TestEveryFileIsAParameter(unittest.TestCase):
                 (elsewhere / "skip.txt").read_text(encoding="utf-8").splitlines(),
                 ["larkin/0 unsorted/a.mp4\talready carries a Topaz videoai tag"],
             )
-            self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
+            self.assertFalse(overrides["NONAI_SKIP_LIST"].exists())
 
-    def test_the_pin_manifest_it_is_given_decides_which_clip_starts(self):
+    def test_the_pin_list_it_is_given_decides_which_clip_starts(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             elsewhere = root / "elsewhere"
@@ -1111,8 +1111,8 @@ class TestEveryFileIsAParameter(unittest.TestCase):
                     job_file=elsewhere / "job.json",
                     attempts_file=elsewhere / "attempts.json",
                     cooldown_file=elsewhere / "cooldown.json",
-                    skip_manifest=elsewhere / "skip.txt",
-                    pin_manifest=elsewhere / "next.txt",
+                    skip_list=elsewhere / "skip.txt",
+                    pin_list=elsewhere / "next.txt",
                     watch_stats_file=elsewhere / "watch.json",
                 )
 
@@ -1138,8 +1138,8 @@ class TestEveryFileIsAParameter(unittest.TestCase):
                     job_file=elsewhere / "job.json",
                     attempts_file=elsewhere / "attempts.json",
                     cooldown_file=elsewhere / "cooldown.json",
-                    skip_manifest=elsewhere / "skip.txt",
-                    pin_manifest=elsewhere / "next.txt",
+                    skip_list=elsewhere / "skip.txt",
+                    pin_list=elsewhere / "next.txt",
                     watch_stats_file=elsewhere / "watch.json",
                 )
 
@@ -1265,10 +1265,10 @@ class TestRunSupervisesAJob(unittest.TestCase):
             self.assertFalse(out.exists())
             self.assertFalse(tmp.exists())
             self.assertTrue(source.exists())
-            self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
+            self.assertFalse(overrides["NONAI_SKIP_LIST"].exists())
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
 
-    def test_final_failed_attempt_lands_in_the_skip_manifest(self):
+    def test_a_final_failed_attempt_lands_in_the_skip_list(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _source, _tmp, _out = write_job(root, overrides, expected=100.0)
@@ -1282,8 +1282,8 @@ class TestRunSupervisesAJob(unittest.TestCase):
                 result = nonai_upscale.run(allow_start=False)
 
             self.assertEqual(result.failed, "larkin/0 unsorted/busy.mp4")
-            manifest = overrides["NONAI_SKIP_MANIFEST"].read_text(encoding="utf-8")
-            self.assertIn("larkin/0 unsorted/busy.mp4\t", manifest)
+            skip_list = overrides["NONAI_SKIP_LIST"].read_text(encoding="utf-8")
+            self.assertIn("larkin/0 unsorted/busy.mp4\t", skip_list)
             attempts = json.loads(overrides["NONAI_ATTEMPTS_FILE"].read_text(encoding="utf-8"))
             self.assertNotIn("larkin/0 unsorted/busy.mp4", attempts)
 
@@ -1336,7 +1336,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             self.assertEqual(result.stopped, "larkin/0 unsorted/busy.mp4")
             self.assertEqual(result.failed, "")
             self.assertFalse(tmp.exists())
-            self.assertFalse(overrides["NONAI_SKIP_MANIFEST"].exists())
+            self.assertFalse(overrides["NONAI_SKIP_LIST"].exists())
             self.assertFalse(overrides["NONAI_JOB_STATE_FILE"].exists())
 
     def test_orphaned_partials_are_swept_but_the_live_jobs_tmp_survives(self):
@@ -1471,7 +1471,7 @@ class TestReportingHowFarAlongItIs(unittest.TestCase):
             self.assertEqual(result.percent_complete, 25)
             self.assertEqual(result.unmeasured_videos, 0)
 
-    def test_a_clip_retired_to_the_skip_manifest_leaves_both_the_count_and_the_hours(self):
+    def test_a_clip_retired_to_the_skip_list_leaves_both_the_count_and_the_hours(self):
         """The queue is collected again after a start attempt for exactly this
         reason, and the running times have to come off that same collection."""
         with workspace_temp_dir() as root:

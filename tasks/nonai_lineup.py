@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tasks import nonai_encode
-from tasks.nonai_queue import collect_candidates, manifest_entries, relpath
+from tasks.nonai_queue import collect_candidates, listed_videos, relpath
 from tasks.nonai_titles import TITLE_FIELD
 from tasks.nonai_upscale import StageFiles
 from util import nonai_job, processes, sidecar, video_type
@@ -35,9 +35,9 @@ from util.upscale_lineup import (
 
 def current() -> Lineup:
     files = StageFiles.configured()
-    pinned = set(manifest_entries(files.pin_manifest))
+    pinned = set(listed_videos(files.pin_list))
     entries = [_entry(candidate.path, pinned) for candidate in collect_candidates(
-        skip_manifest=files.skip_manifest, pin_manifest=files.pin_manifest,
+        skip_list=files.skip_list, pin_list=files.pin_list,
         watch_stats_file=files.watch_stats)]
     first, head = _first(files, entries, pinned)
     if first is None:

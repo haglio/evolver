@@ -11,7 +11,7 @@ given: every bucket video with a processed variant counts as done, whoever made
 it — a good part of the library was upscaled by hand in the Topaz GUI before
 this stage existed, and those are as finished as anything it promoted.  What is
 in neither set is in neither total, because the project cannot reach it: a clip
-in a sub-stage that still wants a human with a trimmer, one the skip manifest
+in a sub-stage that still wants a human with a trimmer, one the skip list
 retired, one sitting in a bucket's "good to go" that nobody asked to re-encode.
 
 Nothing here measures anything.  A running time comes off the video's sidecar,

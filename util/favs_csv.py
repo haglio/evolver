@@ -54,7 +54,7 @@ def write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) ->
     write_whole(path, buffer.getvalue(), newline="")
 
 
-def local_path(value: str, base_dir: Path) -> Path | None:
+def local_path(value: str, csv_dir: Path) -> Path | None:
     """The path a cell points at, or None when it is not a filesystem reference."""
     candidate = _hyperlink_target(value)
     parsed = urlparse(candidate)
@@ -66,7 +66,7 @@ def local_path(value: str, base_dir: Path) -> Path | None:
         return None
 
     path = Path(candidate)
-    return path if path.is_absolute() else base_dir / path
+    return path if path.is_absolute() else csv_dir / path
 
 
 def with_local_path(value: str, new_path: Path) -> str:

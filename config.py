@@ -17,10 +17,10 @@ from content_overlay import LOCAL_CONTENT, load_content
 # shows the shape and documents each key).
 _CONTENT = load_content()
 
-BASE_DIR     = Path(overlay_value(_CONTENT, "library_root", path=LOCAL_CONTENT))
+LIBRARY_ROOT = Path(overlay_value(_CONTENT, "library_root", path=LOCAL_CONTENT))
 
 
-def project_roots(content: dict[str, Any], base_dir: Path) -> tuple[Path, ...]:
+def project_roots(content: dict[str, Any], library_root: Path) -> tuple[Path, ...]:
     """The folders that hold the suite's sibling app checkouts, in search order.
 
     An overlay that says nothing means ``library_root/projects``; the setting
@@ -29,10 +29,10 @@ def project_roots(content: dict[str, Any], base_dir: Path) -> tuple[Path, ...]:
     a part-finished move resolves — each checkout is found wherever it actually
     is right now, with no window where half the suite is unreachable.
     """
-    return siblings.project_roots(content.get("project_roots"), fallback=base_dir / "projects")
+    return siblings.project_roots(content.get("project_roots"), fallback=library_root / "projects")
 
 
-PROJECT_ROOTS = project_roots(_CONTENT, BASE_DIR)
+PROJECT_ROOTS = project_roots(_CONTENT, LIBRARY_ROOT)
 
 
 def retired_root(content: dict[str, Any]) -> Path | None:
@@ -69,7 +69,7 @@ BRANCH_SESSION_FLAG = "EVOLVER_BRANCH_SESSION"
 
 
 def live_dir(environ: dict, project_dir_path: Path, roots: tuple[Path, ...]) -> Path:
-    """The checkout whose run history, log, settings and queue manifests to use.
+    """The checkout whose run history, log, settings and queue lists to use.
 
     This one, except in a branch session, which shares the usual Evolver's: a
     preview keeping those for itself would show a history nobody made and a
@@ -106,16 +106,16 @@ SCRIPTURE_SESSIONS_DIR = project_dir("scripture") / "sessions"
 # every public one — leaves this pointing at nothing, which is how the watch
 # turns itself off.
 BROKER_TRAY_LAUNCHER = project_dir("broker") / "launch_broker_tray.vbs"
-VIDEO_LIBRARY_DIR = BASE_DIR / "videos" / "videos"
+VIDEO_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "videos"
 # Where to hunt for a video a stored reference has lost track of. Wider than the
 # library itself, because videos also get parked in sibling folders such as
 # _larkin_compilations_archive/ — a reference into one of those still deserves
 # to be followed rather than dropped.
-VIDEO_SEARCH_ROOT = BASE_DIR / "videos"
-METADATA_DIR = BASE_DIR / "videos" / "metadata"
+VIDEO_SEARCH_ROOT = LIBRARY_ROOT / "videos"
+METADATA_DIR = LIBRARY_ROOT / "videos" / "metadata"
 
 
-def warm_gun_journal_dirs(content: dict[str, Any], base_dir: Path) -> tuple[Path, ...]:
+def warm_gun_journal_dirs(content: dict[str, Any], library_root: Path) -> tuple[Path, ...]:
     """Every folder Warm Gun's journal is read from, in order.
 
     Inside the library is where it belongs: the folder sync that carries the
@@ -128,17 +128,17 @@ def warm_gun_journal_dirs(content: dict[str, Any], base_dir: Path) -> tuple[Path
     folder retired without a day where the two sides disagree; drop it once the
     folder is gone.
     """
-    dirs = [base_dir / "videos" / "warm_gun"]
+    dirs = [library_root / "videos" / "warm_gun"]
     outbox = content.get("warm_gun_outbox")
     if outbox:
         dirs.append(Path(outbox))
     return tuple(dirs)
 
 
-WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, BASE_DIR)
-SCRIPT_LIBRARY_DIR = BASE_DIR / "videos" / "scripts" / "scripts"
-AI_DIR       = BASE_DIR / "videos" / "videos" / "2D" / "AI"
-NON_AI_DIR   = BASE_DIR / "videos" / "videos" / "2D" / "non_AI"
+WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, LIBRARY_ROOT)
+SCRIPT_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
+AI_DIR       = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
+NON_AI_DIR   = LIBRARY_ROOT / "videos" / "videos" / "2D" / "non_AI"
 CHROME_USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"
 CHROME_PROFILE_NAME = overlay_value(_CONTENT, "chrome_profile", path=LOCAL_CONTENT)
 CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
@@ -162,7 +162,7 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 # Origenerator reads the same key from its own overlay; the two must agree, the
 # folder being the only thing that passes between them.
 GENAU_SOURCE    = overlay_value(_CONTENT, "genau_source", path=LOCAL_CONTENT)
-GENAU_CLIPS_DIR = BASE_DIR / "videos" / "genau" / "clips"
+GENAU_CLIPS_DIR = LIBRARY_ROOT / "videos" / "genau" / "clips"
 # Where Genau moves a clip it is told to condemn. Beside the folder it plays
 # from rather than inside it: that is Genau's rule, published in its own
 # genau_contract.json, and tests/test_genau_contract.py holds this end of it to
@@ -299,12 +299,12 @@ NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
 # The last phone favorite applied to Fun Time's favorites, so one is applied
 # exactly once and Fun Time can undo it (tasks/watch_weights.py).
 WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
-NONAI_SKIP_MANIFEST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
+NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
 # The counterpart to the skip list: videos to encode next, in the order listed.
 # A pin outranks every ordering heuristic and re-queues a video the bucket
 # already holds an older processed variant of, which is the only way to ask for
 # a redo under a newer recipe.
-NONAI_PRIORITY_MANIFEST = LIVE_DIR / ".nonai-upscale-next.txt"
+NONAI_PIN_LIST = LIVE_DIR / ".nonai-upscale-next.txt"
 # What one non-AI encode may cost the machine and when is
 # tasks.nonai_encode.EncodeSettings, not here: those six numbers are this app's
 # own policy, and what belongs in this file is what the machine and the overlay

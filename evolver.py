@@ -200,7 +200,7 @@ def upscale_lineup() -> upscale_lineup_shape.Lineup:
 
 def arrange_upscale_queue(videos: list[str]) -> None:
     """Put *videos* at the head of the queue, in this order."""
-    nonai_queue.pin_ahead(config.NONAI_PRIORITY_MANIFEST, videos)
+    nonai_queue.pin_ahead(config.NONAI_PIN_LIST, videos)
 
 
 def upscale_now(video: str) -> None:

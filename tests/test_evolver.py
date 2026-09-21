@@ -739,9 +739,9 @@ class TestTheWindowsDoorToTheQueue:
             assert evolver.upscale_lineup() is lineup.return_value
         lineup.assert_called_once_with()
 
-    def test_rearranging_pins_the_videos_in_the_configured_manifest(self):
+    def test_rearranging_pins_the_videos_in_the_configured_pin_list(self):
         with patch("tasks.nonai_queue.pin_ahead") as pin_ahead, \
-             override_config(NONAI_PRIORITY_MANIFEST=Path("next.txt")):
+             override_config(NONAI_PIN_LIST=Path("next.txt")):
             evolver.arrange_upscale_queue(["larkin/0 unsorted/a.mp4"])
         pin_ahead.assert_called_once_with(Path("next.txt"), ["larkin/0 unsorted/a.mp4"])
 

@@ -203,9 +203,9 @@ def nonai_library_overrides(root: Path, **extra):
     that has a real one. Tests then also share that tree with each other, and
     two of them naming a clip the same way read back one another's fixtures.
 
-    NONAI_RETIRED_ROOT and NONAI_PRIORITY_MANIFEST are here for the same
+    NONAI_RETIRED_ROOT and NONAI_PIN_LIST are here for the same
     reason, and both default to a machine's own answer rather than to nothing:
-    the archive comes from the overlay's ``retired_root``, and the pin manifest
+    the archive comes from the overlay's ``retired_root``, and the pin list
     is a path *inside the checkout*. So on a machine that has configured an
     archive, retiring an original in a test moved the fixture into the real one
     and then failed the assertion that it had gone to the bucket's ``2*``
@@ -224,8 +224,8 @@ def nonai_library_overrides(root: Path, **extra):
         METADATA_DIR=root / "metadata",
         SCRIPT_LIBRARY_DIR=root / "scripts",
         NONAI_RETIRED_ROOT=None,
-        NONAI_PRIORITY_MANIFEST=root / "next.txt",
-        NONAI_SKIP_MANIFEST=root / "skip.txt",
+        NONAI_PIN_LIST=root / "next.txt",
+        NONAI_SKIP_LIST=root / "skip.txt",
         NONAI_JOB_STATE_FILE=root / "job.json",
         NONAI_ATTEMPTS_FILE=root / "attempts.json",
         NONAI_COOLDOWN_FILE=root / "cooldown.json",

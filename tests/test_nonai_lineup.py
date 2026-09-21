@@ -56,7 +56,7 @@ class TestTheList(unittest.TestCase):
             non_ai = overrides["NON_AI_DIR"]
             make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
             make_video(non_ai / "larkin" / "0 unsorted" / "b.mp4")
-            overrides["NONAI_PRIORITY_MANIFEST"].write_text(
+            overrides["NONAI_PIN_LIST"].write_text(
                 "larkin/0 unsorted/b.mp4\n", encoding="utf-8")
 
             with override_config(**overrides):

@@ -2,7 +2,7 @@
 
 A test that does not redirect one reads or writes the real machine's. That is
 not hypothetical: ``NONAI_RETIRED_ROOT`` comes from the git-ignored overlay and
-``NONAI_PRIORITY_MANIFEST`` is a path inside the checkout, so before both were
+``NONAI_PIN_LIST`` is a path inside the checkout, so before both were
 pinned here, four tests that retire an original moved their fixture videos into
 the developer's real archive and then failed the assertion that the video had
 gone to the bucket's ``2*`` folder. They were green on this Mac and on CI only
@@ -48,11 +48,11 @@ PLACES_ON_DISK = {
     "NONAI_COOLDOWN_FILE",
     "NONAI_FFMPEG_LOG",
     "NONAI_JOB_STATE_FILE",
-    "NONAI_PRIORITY_MANIFEST",
+    "NONAI_PIN_LIST",
     "NONAI_REQUEST_FILE",
     "NONAI_RETIRED_ROOT",
     "VIDEO_SEARCH_ROOT",
-    "NONAI_SKIP_MANIFEST",
+    "NONAI_SKIP_LIST",
     "NON_AI_DIR",
     "SCRIPT_LIBRARY_DIR",
     "VIDEO_LIBRARY_DIR",
