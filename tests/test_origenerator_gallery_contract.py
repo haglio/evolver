@@ -20,20 +20,30 @@ import config
 from tasks import origenerator_metadata, withdrawn
 from util import lanes
 
+CONTRACT = Path("origenerator") / "origenerator_gallery_contract.json"
+
 
 def _promise() -> dict | None:
-    """Origenerator's published document, or ``None`` where it is not installed."""
-    published = config.ORIGENERATOR_PROJECT_DIR / "origenerator_gallery_contract.json"
-    if not published.is_file():
-        return None
-    return json.loads(published.read_text(encoding="utf-8"))
+    """Origenerator's published document, or ``None`` where it is not beside this.
+
+    Walked up from here rather than resolved through the content overlay: the
+    overlay is git-ignored, so a worktree -- which is where every suite runs --
+    has only the placeholder one, pointing at a library that is not there.  The
+    walk lands on the checkout beside the primary from a worktree and from a
+    clone alike.
+    """
+    for parent in Path(__file__).resolve().parents:
+        published = parent / CONTRACT
+        if published.is_file():
+            return json.loads(published.read_text(encoding="utf-8"))
+    return None
 
 
 class OrigeneratorGalleryContract(unittest.TestCase):
     def setUp(self):
         self.promise = _promise()
         if self.promise is None:
-            self.skipTest("no Origenerator checkout beside this one")
+            self.skipTest("no origenerator/origenerator_gallery_contract.json beside this checkout")
 
     def test_every_column_read_here_is_one_origenerator_promises(self):
         """A column this repo selects and that repo does not promise is a
@@ -63,6 +73,8 @@ class OrigeneratorGalleryContract(unittest.TestCase):
                          self.promise["params_model_keys"])
 
     def test_the_database_is_where_origenerator_says_it_keeps_it(self):
+        """This repo resolves that checkout through its own overlay, so what has
+        to agree is the path INSIDE it."""
         relative = Path(self.promise["database_path"])
 
         self.assertEqual(config.ORIGENERATOR_DB_PATH,
