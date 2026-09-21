@@ -1,29 +1,45 @@
-*.log
-
-# Python
+# The family's baseline block, byte-identical in every checkout that carries it,
+# so what a routine editable install or test run drops is ignored in the repo
+# that drops it. The eleven files were written independently and covered
+# different subsets of the same artifacts, which left several trees dirty after
+# a plain `pip install -e .` -- and a dirty tree here blocks every agent's merge.
+# This repo's own entries go under the marker below, never in here.
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Virtual environments
 .venv/
-venv/
-
-# Test and type-checker caches
+*.egg-info/
+.eggs/
+dist/
+build/
 .pytest_cache/
-.mypy_cache/
-
-# Coverage artifacts
+.hypothesis/
+.ruff_cache/
 .coverage
 .coverage.*
 htmlcov/
+.tmp-pytest-*/
+
+# Windows shortcuts are machine-specific and embed the real install path.
+*.lnk
+
+# pCloud conflict copies (this dir syncs via pCloud). Never our files; an
+# untracked one dirties main and blocks merges. '[' escaped to match literally.
+*\[conflicted*
+
+# --- evolver's own ---
+
+# The app's own logs, at the root where it writes them.
+*.log
+
+# A virtual environment under the other name people give one.
+venv/
+
+# The type checker's cache, which only this repo runs.
+.mypy_cache/
 
 # The prompt-scrape browser profile now lives in the system temp dir; the glob
 # stays to cover a leftover copy in a checkout that ran the older code.
 .tmp-prompt-browser-profile/
-
-# Regen-mode runtime state
-.regen-skip.txt
 
 # Non-AI upscale runtime state now lives under LOCALAPPDATA\Evolver; the globs
 # also cover leftover copies in the repo root, including the "[conflicted N]"
@@ -36,27 +52,20 @@ nonai_upscale_cooldown*.json
 # The pin manifest is rewritten whole, through a temp file beside it.
 .nonai-upscale-next*.tmp
 
+# Left by a regeneration mode this app no longer has -- no code has referenced
+# either name since March. Both files are still in this checkout, so un-ignoring
+# them would leave the tree permanently dirty, which is the failure the block
+# above exists to prevent; they go when the files do.
+.regen-skip.txt
+.regen-complete
+
 # GUI runtime state
 runs/
 # The branch preview's own tree: the launcher's log lands there.
 state/
 gui_settings.json
-tray_crash.log
-
-# Claude Code local config
-.regen-complete
 
 # Private overlays — real values live here and never get published. Each has a
 # committed *.example.* template that documents its shape.
 #   real copy — spoken act vocabulary and provider details
 /content.local.json
-
-# pCloud conflict copies (this dir syncs via pCloud). Never our files; an
-# untracked one dirties main and blocks merges. '[' escaped to match literally.
-*\[conflicted*
-
-# Shortcuts left in a checkout for the user to click.
-*.lnk
-
-# Written by every editable install into the project root; not source.
-*.egg-info/
