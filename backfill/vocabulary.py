@@ -24,47 +24,38 @@ camera word: a clip is always tagged with one of them, never bare.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
+from typing import Any
 
 from content_overlay import load_content
 
 
 @dataclass(frozen=True)
-class Act:
-    """An act, its canonical spoken phrase, and any other way it is voiced."""
+class _Voiced:
+    spoken: str  # the canonical phrase: what a click re-emits and a tile is built from
+    aliases: tuple[str, ...] = field(default=(), kw_only=True)  # other phrases heard as it
 
-    spoken: str  # the phrase a click re-emits and the grid tile is built from
+    def forms(self) -> tuple[str, ...]:
+        return (self.spoken, *self.aliases)
+
+
+@dataclass(frozen=True)
+class Act(_Voiced):
     action: str  # the Title Case act stem a camera word prefixes
-    aliases: tuple[str, ...] = ()  # extra phrases the recognizer also accepts
-
-    def forms(self) -> tuple[str, ...]:
-        return (self.spoken, *self.aliases)
 
 
 @dataclass(frozen=True)
-class Camera:
-    """A camera word: how it is said, and the prefix it adds."""
-
-    spoken: str  # the canonical phrase a click re-emits
-    prefix: str  # the prefix it prepends to the action, and the grid's column header
-    aliases: tuple[str, ...] = ()  # extra phrases the recognizer also accepts
-
-    def forms(self) -> tuple[str, ...]:
-        return (self.spoken, *self.aliases)
+class Camera(_Voiced):
+    prefix: str  # what it writes in front of the act, and the grid's column header
 
 
 @dataclass(frozen=True)
-class _Control:
-    """A non-labeling command — skip, discard, undo, repeat — and how it is voiced."""
+class _Control(_Voiced):
+    """A non-labeling command — skip, discard, undo, repeat."""
 
-    spoken: str
     label: str  # the grid tile text, e.g. "Weird"
     kind: str  # the control constant it maps to (SKIP / WEIRD / UNDO / SAME)
-    aliases: tuple[str, ...] = ()
-
-    def forms(self) -> tuple[str, ...]:
-        return (self.spoken, *self.aliases)
 
 
 @dataclass(frozen=True)
@@ -132,11 +123,15 @@ class Vocabulary:
         return {phrase for phrase, kind in self.controls.items() if kind == WEIRD}
 
 
+def _aliases(entry: Mapping[str, Any]) -> tuple[str, ...]:
+    return tuple(entry.get("aliases", ()))
+
+
 def load_vocabulary() -> Vocabulary:
     content = load_content()
     return Vocabulary(
-        (Act(entry["spoken"], entry["action"], tuple(entry.get("aliases", ())))
+        (Act(entry["spoken"], entry["action"], aliases=_aliases(entry))
          for entry in content["acts"]),
-        (Camera(entry["spoken"], entry["prefix"], tuple(entry.get("aliases", ())))
+        (Camera(entry["spoken"], entry["prefix"], aliases=_aliases(entry))
          for entry in content["cameras"]),
     )
