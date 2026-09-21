@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -42,8 +43,6 @@ class TestPromptScrape(unittest.TestCase):
         return p.with_name(p.name + ".failed")
 
     def test_run_writes_mirrored_json_for_provider_video_with_source_image_prompts(self):
-        from datetime import date
-
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
@@ -283,8 +282,6 @@ class TestPromptScrape(unittest.TestCase):
 
     def test_run_scans_sorted_and_writes_metadata_at_outbox_mirror_path(self):
         """Metadata stage should scan 1_sorted and place JSONs where _is_t2v_provider expects them."""
-        from datetime import date
-
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
@@ -772,7 +769,6 @@ class TestExtractMetadataFields(unittest.TestCase):
         self.assertEqual(result["creativity"], "Balance")
 
     def test_converts_created_to_date(self):
-        from datetime import date
         html = '<div><h2>Created</h2><h1>2w ago</h1></div>'
         doc = html_query.parse_document(html)
         with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
@@ -795,8 +791,6 @@ class TestExtractMetadataFields(unittest.TestCase):
 
 class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
     def test_uses_embedded_metadata_when_dom_panel_absent(self):
-        from datetime import date
-
         html = (
             "<html><body>"
             '{"imageId":"vid1","prompt":"video prompt","negative_prompt":null,'

@@ -24,6 +24,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication
 
+from gui.app import EvolverApp
+
 # Built at import, not in a fixture: the GUI modules construct widgets at class
 # scope and a QApplication has to exist before the first of them is imported.
 # conftest.py imports this module for that reason, so it happens once, before any
@@ -38,8 +40,6 @@ def build_evolver_app(owner):
     a pytest ``request`` fixture. Wrap any other patches the test needs around
     the call; this owns only the QApplication substitution and the teardown.
     """
-    from gui.app import EvolverApp
-
     with patch("gui.app.QApplication", return_value=QAPP):
         app = EvolverApp()
     if hasattr(owner, "addCleanup"):

@@ -1,8 +1,10 @@
 """Tests for gui.taskbar — Windows taskbar pin properties."""
 from __future__ import annotations
 
+import logging
 from unittest.mock import patch
 
+from gui.process_identity import APP_MODEL_ID
 from gui.taskbar import set_taskbar_properties
 from tests.gui_support import build_evolver_app
 
@@ -13,8 +15,6 @@ class TestSetTaskbarProperties:
         """Taskbar cosmetics must never crash the app, but must not fail
         silently either -- the warning is the observable outcome, and asserting
         it is what separates 'the error path ran' from 'the call returned'."""
-        import logging
-
         with caplog.at_level(logging.WARNING, logger="gui.taskbar"):
             set_taskbar_properties(0, "Test.App", "test.exe", "Test", "test.ico")
         assert any(
@@ -25,8 +25,6 @@ class TestSetTaskbarProperties:
 class TestAppSetsTaskbarProperties:
 
     def test_evolver_app_sets_taskbar_pin_properties(self, request):
-        from gui.process_identity import APP_MODEL_ID
-
         app = build_evolver_app(request)
         with patch("gui.process_identity.set_taskbar_properties") as mock_set:
             app.start()

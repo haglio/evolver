@@ -32,7 +32,9 @@ def main():
     crash_log.record_warnings()
     _name_this_process()
     atexit.register(crash_log.on_exit)
-    from gui.app import EvolverApp
+    # Late so that a Qt or dependency failure raises inside the __main__
+    # try below, where report_startup_crash can put it on the screen.
+    from gui.app import EvolverApp  # noqa: PLC0415
     sys.exit(EvolverApp().run())
 
 
