@@ -10,26 +10,29 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from PyQt6.QtCore import Qt
-from voice_core.listener import Engines
+from voice_core.listener import Engines, PauseSettings
 from voice_core.whisper_reader import WhisperReader
 
 import config
 from backfill.voice import VoiceListener
 
 PHRASES = ["side beta", "undo"]
-LOUD_BLOCK = array.array("h", [2000, -2000] * 4000).tobytes()
+PAUSES = PauseSettings()
+LOUD_FRAME = array.array("h", [2000, -2000] * (PAUSES.frame_samples // 2)).tobytes()
+QUIET_FRAME = bytes(PAUSES.frame_samples * 2)
 PATIENCE_S = 10.0
 
 
+def _said(*readings, forming=()):
+    return list(forming), list(readings)
+
+
 class _ScriptedRecognizer:
-    """A recognizer that plays a script, one step per audio block.
-
-    Each step is ``("partial", text)`` or ``("final", [readings, best first])``.
-    """
-
-    def __init__(self, steps):
-        self._steps = list(steps)
-        self._current = ("partial", "")
+    def __init__(self, utterances):
+        self._utterances = list(utterances)
+        self._forming: list[str] = []
+        self._readings: list[str] = []
+        self._partial = ""
 
     def SetWords(self, enable):  # noqa: N802 - vosk's own name
         pass
@@ -37,30 +40,40 @@ class _ScriptedRecognizer:
     def SetMaxAlternatives(self, count):  # noqa: N802 - vosk's own name
         pass
 
-    def AcceptWaveform(self, _block):  # noqa: N802 - vosk's own name
-        self._current = self._steps.pop(0) if self._steps else ("partial", "")
-        return self._current[0] == "final"
+    def Reset(self):  # noqa: N802 - vosk's own name
+        self._forming, self._readings = self._utterances.pop(0) if self._utterances else ([], [])
+        self._partial = ""
+
+    def AcceptWaveform(self, _frame):  # noqa: N802 - vosk's own name
+        if self._forming:
+            self._partial = self._forming.pop(0)
+        return False
 
     def PartialResult(self):  # noqa: N802 - vosk's own name
-        return json.dumps({"partial": self._current[1]})
+        return json.dumps({"partial": self._partial})
 
-    def Result(self):  # noqa: N802 - vosk's own name
+    def FinalResult(self):  # noqa: N802 - vosk's own name
         return json.dumps({"alternatives": [
-            {"text": reading, "confidence": 1.0} for reading in self._current[1]]})
+            {"text": reading, "confidence": 1.0} for reading in self._readings]})
 
 
-def _engines(steps, *, streams=None, **more):
-    """Fake vosk and sounddevice: a microphone that delivers one loud block per step.
+def _frames_saying(utterances):
+    frames = [QUIET_FRAME] * PAUSES.calibration_frames
+    for forming, _ in utterances:
+        frames += [LOUD_FRAME] * max(len(forming), PAUSES.min_speech_frames)
+        frames += [QUIET_FRAME] * PAUSES.hangover_frames
+    return frames
 
-    *streams* collects "opened" and "closed" as the microphone is."""
+
+def _engines(utterances, *, streams=None, **more):
     devices = [{"name": "Desk mic", "max_input_channels": 1, "hostapi": 0}]
     streams = [] if streams is None else streams
 
     @contextmanager
     def stream(**kwargs):
         streams.append("opened")
-        for _step in steps:
-            kwargs["callback"](LOUD_BLOCK, len(LOUD_BLOCK) // 2, None, None)
+        for frame in _frames_saying(utterances):
+            kwargs["callback"](frame, len(frame) // 2, None, None)
         try:
             yield
         finally:
@@ -68,7 +81,7 @@ def _engines(steps, *, streams=None, **more):
 
     return Engines(
         vosk=SimpleNamespace(Model=lambda model_name: model_name,
-                             KaldiRecognizer=lambda *args: _ScriptedRecognizer(steps)),
+                             KaldiRecognizer=lambda *args: _ScriptedRecognizer(utterances)),
         sounddevice=SimpleNamespace(
             default=SimpleNamespace(device=(0, 0)),
             query_devices=lambda index=None: devices if index is None else devices[index],
@@ -125,20 +138,19 @@ def _told_by(listener, *, until_heard=None):
 
 class TestWhatTheWindowIsTold(unittest.TestCase):
     def test_a_settled_phrase_reaches_the_window(self):
-        told = _listen([("final", ["side beta"])], until_heard="side beta")
+        told = _listen([_said("side beta")], until_heard="side beta")
 
         self.assertEqual(told.heard, ["side beta"])
 
     def test_the_words_still_forming_are_shown_as_they_change_and_cleared_before_the_phrase(self):
-        told = _listen([("partial", "side"), ("partial", "side"), ("partial", "side beta"),
-                        ("final", ["side beta"])], until_heard="side beta")
+        told = _listen([_said("side beta", forming=["side", "side", "side beta"])],
+                       until_heard="side beta")
 
         self.assertEqual(told.timeline, [("hearing", "side"), ("hearing", "side beta"),
                                          ("hearing", ""), ("heard", "side beta")])
 
     def test_what_is_said_outside_the_phrases_is_not_handed_to_the_window(self):
-        told = _listen([("final", ["beta side undo"]), ("final", ["side beta"])],
-                       until_heard="side beta")
+        told = _listen([_said("beta side undo"), _said("side beta")], until_heard="side beta")
 
         self.assertEqual(told.heard, ["side beta"])
 
@@ -168,7 +180,7 @@ class TestWhenListeningCannotGoOn(unittest.TestCase):
         self.assertEqual(told.failures, ["no input device"])
 
     def test_a_recognizer_that_breaks_partway_says_listening_stopped(self):
-        engines = _engines([("partial", "side")])
+        engines = _engines([_said(forming=["side"])])
         engines.vosk.KaldiRecognizer = Mock(return_value=Mock(
             AcceptWaveform=Mock(side_effect=RuntimeError("the decoder gave up"))))
 
@@ -180,7 +192,7 @@ class TestWhenListeningCannotGoOn(unittest.TestCase):
         self.assertEqual(told.failures, ["the decoder gave up"])
 
     def test_a_failure_with_nothing_to_say_for_itself_is_named_for_what_it_is(self):
-        engines = _engines([("partial", "side")])
+        engines = _engines([_said(forming=["side"])])
         engines.vosk.KaldiRecognizer = Mock(return_value=Mock(
             AcceptWaveform=Mock(side_effect=RuntimeError())))
 
@@ -195,14 +207,14 @@ class TestStoppingAndRestarting(unittest.TestCase):
         """The loop runs inside a PortAudio stream, so returning sooner lets the
         interpreter tear down while a C callback thread is still live in it."""
         streams = []
-        _listen([("final", ["side beta"])], until_heard="side beta", streams=streams)
+        _listen([_said("side beta")], until_heard="side beta", streams=streams)
 
         self.assertEqual(streams, ["opened", "closed"])
 
     def test_starting_twice_opens_one_microphone(self):
         streams = []
         listener = VoiceListener(
-            PHRASES, engines=_engines([("final", ["side beta"])], streams=streams))
+            PHRASES, engines=_engines([_said("side beta")], streams=streams))
         told = _Told(listener, until_heard="side beta")
 
         listener.start()
@@ -213,7 +225,7 @@ class TestStoppingAndRestarting(unittest.TestCase):
         self.assertEqual(streams, ["opened", "closed"])
 
     def test_a_stopped_listener_can_be_started_again_and_hears_again(self):
-        listener = VoiceListener(PHRASES, engines=_engines([("final", ["side beta"])]))
+        listener = VoiceListener(PHRASES, engines=_engines([_said("side beta")]))
 
         _told_by(listener, until_heard="side beta")
         again = _told_by(listener, until_heard="side beta")
@@ -226,21 +238,21 @@ class TestStoppingAndRestarting(unittest.TestCase):
 
 class TestWhichReadingsAreTrusted(unittest.TestCase):
     def test_a_phrase_ranked_under_a_near_miss_is_still_taken(self):
-        told = _listen([("final", ["side side beta", "side beta"])], until_heard="side beta")
+        told = _listen([_said("side side beta", "side beta")], until_heard="side beta")
 
         self.assertEqual(told.heard, ["side beta"])
 
     def test_a_phrase_that_discards_the_clip_is_taken_only_as_the_first_reading(self):
         listener = VoiceListener(
             ["trash", "same", "undo"], never_repaired={"trash"},
-            engines=_engines([("final", ["trash same", "trash"]), ("final", ["undo"])]))
+            engines=_engines([_said("trash same", "trash"), _said("undo")]))
 
         told = _told_by(listener, until_heard="undo")
 
         self.assertEqual(told.heard, ["undo"])
 
     def test_a_phrase_the_second_listener_reads_differently_does_not_act(self):
-        told = _listen([("final", ["side beta"]), ("final", ["undo"])], until_heard="undo",
+        told = _listen([_said("side beta"), _said("undo")], until_heard="undo",
                        second_opinion=lambda audio, hint: "and then" if "beta" in hint else hint)
 
         self.assertEqual(told.heard, ["undo"])
