@@ -124,10 +124,13 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/provenance_sweep.py": 1,
     "tasks/purge_weird.py": 2,
     "tasks/scene_scripts.py": 1,
-    # The three trees this stage aligns between are its arguments now, so the
-    # four bucket classifiers take the roots rather than looking them up:
-    # what is left is those three resolutions and the funscript extension.
-    "tasks/scripts_sync.py": 6,
+    # The five folders this stage works between are its arguments, so the
+    # four bucket classifiers take the roots rather than looking them up: what
+    # is left is those five resolutions and the funscript extension. The two
+    # that went up are the third shape: where a VR video is kept off the
+    # library's drive, and the unmatched_scripts folder, both new with the
+    # stage's parking of a script that matches nothing.
+    "tasks/scripts_sync.py": 8,
     "tasks/sort.py": 2,
     "tasks/stray_files.py": 8,
     # One more for the provider's source name in the recipe guard (bug 7), then
@@ -191,6 +194,7 @@ OVERLAY_KEYS = {
     "topaz_ffmpeg",
     "topaz_models",
     "version_overrides",
+    "vr_videos",
     "warm_gun_outbox",
 }
 
@@ -201,7 +205,7 @@ OVERLAY_KEYS = {
 # answer rather than as the override it is.
 OPTIONAL_OVERLAY_KEYS = {
     "display_timezone", "project_roots", "retired_root", "topaz_ffmpeg",
-    "topaz_models", "version_overrides", "warm_gun_outbox",
+    "topaz_models", "version_overrides", "vr_videos", "warm_gun_outbox",
 }
 
 

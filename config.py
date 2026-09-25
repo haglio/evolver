@@ -137,6 +137,15 @@ def warm_gun_journal_dirs(content: dict[str, Any], library_root: Path) -> tuple[
 
 WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, LIBRARY_ROOT)
 SCRIPT_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
+UNMATCHED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "unmatched_scripts"
+
+
+def vr_video_dir(content: dict[str, Any]) -> Path | None:
+    configured = content.get("vr_videos")
+    return Path(configured) if configured else None
+
+
+VR_VIDEO_DIR = vr_video_dir(_CONTENT)
 AI_DIR       = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = LIBRARY_ROOT / "videos" / "videos" / "2D" / "non_AI"
 CHROME_USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"

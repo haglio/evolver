@@ -11,11 +11,13 @@ from pathlib import Path
 
 import config
 from util.alert import show_error
-from util.media_files import library_videos, remove_empty_dirs
+from util.media_files import library_videos, listed_videos, remove_empty_dirs, unique_path
 from util.script_library import script_path_for_video
 from util.variants import strip_processing_suffixes
 
 log = logging.getLogger(__name__)
+
+VR_FOLDER = "VR"
 
 
 @dataclass
@@ -64,7 +66,7 @@ class _VariantRehome:
 class _FollowedRetired:
     """What became of the scripts whose videos are no longer in the library."""
 
-    unmatched_paths: list[str] = field(default_factory=list)
+    unmatched: list[Path] = field(default_factory=list)
     followed_to_archive: int = 0
     rehomed_to_variants: int = 0
     collision_paths: list[str] = field(default_factory=list)
@@ -73,19 +75,11 @@ class _FollowedRetired:
 
 @dataclass(frozen=True)
 class Trees:
-    """The three trees this stage aligns between, resolved once at its boundary.
-
-    The script tree mirrors the video tree exactly, so almost everything here
-    is one path read against the other, and where the archive is decides
-    whether a script whose video left the library can follow it. Held as one
-    record rather than read off ``config`` in each of the four bucket
-    classifiers, which is what made a stage about two trees say nothing about
-    which two.
-    """
-
     videos: Path
     scripts: Path
+    unmatched: Path
     archive: Path | None
+    vr: Path | None
 
 
 @dataclass(frozen=True)
@@ -98,22 +92,25 @@ class _VariantCopies:
 
 
 def run(show_popup: bool = False, *, video_dir: Path | None = None,
-        script_dir: Path | None = None,
-        archive_root: Path | None = None) -> ScriptsSyncResult:
-    """Align the script tree to the video tree, and follow videos out of it.
+        script_dir: Path | None = None, unmatched_dir: Path | None = None,
+        archive_root: Path | None = None, vr_dir: Path | None = None) -> ScriptsSyncResult:
+    """Align the script tree to the video tree, follow videos out of it, and move
+    what matches no video to unmatched_scripts until it is renamed.
 
-    The three trees are arguments so the signature says what the stage reads
-    and writes; see :class:`Trees`. They are resolved here rather than in the
+    The folders are arguments so the signature says what the stage reads and
+    writes; see :class:`Trees`. They are resolved here rather than in the
     signature, in the sentinel form -- a default is evaluated at import, which
-    would freeze the value past ``override_config``. The archive is the one
-    that can genuinely be None: an unset one means a retired original stays in
-    its bucket, so None cannot be told from "ask config" and the sentinel is
-    the caller passing a path or not.
+    would freeze the value past ``override_config``. The archive and the VR
+    videos' own folder are the ones that can genuinely be None, an unset one
+    meaning there is none, so None cannot be told from "ask config" and the
+    sentinel is the caller passing a path or not.
     """
     trees = Trees(
         videos=config.VIDEO_LIBRARY_DIR if video_dir is None else video_dir,
         scripts=config.SCRIPT_LIBRARY_DIR if script_dir is None else script_dir,
+        unmatched=config.UNMATCHED_SCRIPTS_DIR if unmatched_dir is None else unmatched_dir,
         archive=config.NONAI_RETIRED_ROOT if archive_root is None else archive_root,
+        vr=config.VR_VIDEO_DIR if vr_dir is None else vr_dir,
     )
     result = ScriptsSyncResult()
     trees.scripts.mkdir(parents=True, exist_ok=True)
@@ -122,17 +119,17 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
     log.info("VIDEOS:  %s", trees.videos)
     log.info("SCRIPTS: %s", trees.scripts)
 
-    video_index = _index_videos(trees.videos)
+    video_index = _index_videos(trees)
 
     orphans: list[Path] = []
-    for script_path in _iter_funscripts(trees.scripts):
+    for script_path in _iter_funscripts(trees.scripts, trees.unmatched):
         matches = _matching_videos_for_script(script_path, video_index, trees)
         if not matches:
             orphans.append(script_path)
             continue
         if len(matches) > 1:
             log.warning("AMBIGUOUS script match for %s: %s", script_path, ", ".join(str(p) for p in matches))
-            result.ambiguous_paths.append(str(script_path.relative_to(trees.scripts)))
+            result.ambiguous_paths.append(_shown(script_path, trees))
             continue
 
         dest = script_path_for_video(matches[0])
@@ -141,7 +138,7 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
             continue
         if dest.exists():
             log.warning("SCRIPT COLLISION (destination exists, leaving source in place): %s -> %s", script_path, dest)
-            result.collision_paths.append(str(script_path.relative_to(trees.scripts)))
+            result.collision_paths.append(_shown(script_path, trees))
             continue
 
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -150,7 +147,7 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         result.moved += 1
 
     followed = _follow_retired_videos(orphans, video_index, trees)
-    result.unmatched_paths += followed.unmatched_paths
+    result.unmatched_paths += [_park(script_path, trees) for script_path in followed.unmatched]
     result.followed_to_archive += followed.followed_to_archive
     result.rehomed_to_variants += followed.rehomed_to_variants
     result.collision_paths += followed.collision_paths
@@ -182,7 +179,8 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         log.error("Scripts sync failed. See log entries above for unresolved funscript alignment issues.")
         if show_popup:
             log.info("Showing error popup for scripts-sync failure")
-            show_error("Evolver - Funscript Match Error", _popup_message(result))
+            links = [("Open unmatched_scripts", trees.unmatched)] if result.unmatched_paths else []
+            show_error("Evolver - Funscript Match Error", _popup_message(result), links=links)
             log.info("Error popup dismissed")
     return result
 
@@ -211,14 +209,15 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     is a guess about which video the script belongs to, and no archived video at
     all is the real unmatched case this stage exists to report.
     """
-    unmatched_paths: list[str] = []
+    unmatched: list[Path] = []
     followed_to_archive = 0
     rehomed_to_variants = 0
     collision_paths: list[str] = []
     discarded_duplicates = 0
     archived = _index_archived_videos(trees.archive) if orphans else {}
     for script_path in orphans:
-        rehome = _rehome_to_library_variant(script_path, video_index, archived, trees)
+        rehome = (_VariantRehome() if _waiting(script_path, trees)
+                  else _rehome_to_library_variant(script_path, video_index, archived, trees))
         if rehome.archived_copy:
             followed_to_archive += 1
         if rehome.moved:
@@ -227,7 +226,8 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
         videos = archived.get(script_path.stem, [])
         if len(videos) != 1:
             log.info("UNMATCHED script (no video basename match): %s", script_path)
-            unmatched_paths.append(str(script_path.relative_to(trees.scripts)))
+            if not _waiting(script_path, trees):
+                unmatched.append(script_path)
             continue
 
         dest = videos[0].with_suffix(config.FUNSCRIPT_EXTENSION)
@@ -235,7 +235,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
             if _discard_or_keep_duplicate(script_path, dest) is _Duplicate.DISCARDED:
                 discarded_duplicates += 1
             else:
-                collision_paths.append(str(script_path.relative_to(trees.scripts)))
+                collision_paths.append(_shown(script_path, trees))
             continue
 
         try:
@@ -244,13 +244,35 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
             shutil.move(str(script_path), str(dest))
         except OSError:
             log.exception("FAILED TO FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
-            unmatched_paths.append(str(script_path.relative_to(trees.scripts)))
+            unmatched.append(script_path)
             continue
         followed_to_archive += 1
         log.info("FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
 
-    return _FollowedRetired(unmatched_paths, followed_to_archive,
+    return _FollowedRetired(unmatched, followed_to_archive,
                             rehomed_to_variants, collision_paths, discarded_duplicates)
+
+
+def _waiting(script_path: Path, trees: Trees) -> bool:
+    return script_path.is_relative_to(trees.unmatched)
+
+
+def _shown(script_path: Path, trees: Trees) -> str:
+    if _waiting(script_path, trees):
+        return str(script_path.relative_to(trees.unmatched.parent))
+    return str(script_path.relative_to(trees.scripts))
+
+
+def _park(script_path: Path, trees: Trees) -> str:
+    dest = unique_path(trees.unmatched / script_path.name)
+    try:
+        trees.unmatched.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(script_path), str(dest))
+    except OSError:
+        log.exception("FAILED TO MOVE UNMATCHED SCRIPT  %s  ->  %s", script_path, dest)
+        return _shown(script_path, trees)
+    log.info("MOVE UNMATCHED SCRIPT  %s  ->  %s", script_path, dest)
+    return dest.name
 
 
 def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Path]],
@@ -332,19 +354,26 @@ def _index_archived_videos(root: Path | None) -> dict[str, list[Path]]:
     return index
 
 
-def _index_videos(root: Path) -> dict[str, list[Path]]:
+def _index_videos(trees: Trees) -> dict[str, list[Path]]:
     index: dict[str, list[Path]] = defaultdict(list)
-    if not root.is_dir():
-        return index
-    for video_path in library_videos(root):
+    for video_path in _library_videos(trees):
         index[video_path.stem].append(video_path)
     return index
 
 
-def _iter_funscripts(root: Path):
-    for path in root.rglob(f"*{config.FUNSCRIPT_EXTENSION}"):
-        if path.is_file():
-            yield path
+def _library_videos(trees: Trees):
+    if trees.videos.is_dir():
+        yield from library_videos(trees.videos)
+    if trees.vr is not None:
+        for kept in listed_videos(trees.vr):
+            yield trees.videos / VR_FOLDER / kept.relative_to(trees.vr)
+
+
+def _iter_funscripts(*roots: Path):
+    for root in roots:
+        for path in root.rglob(f"*{config.FUNSCRIPT_EXTENSION}"):
+            if path.is_file():
+                yield path
 
 
 def _matching_videos_for_script(script_path: Path, video_index: dict[str, list[Path]],
@@ -454,8 +483,9 @@ def _variant_kind(video_path: Path, trees: Trees) -> str:
 
 
 def _script_match_bucket(script_path: Path, trees: Trees) -> str | None:
-    rel = script_path.relative_to(trees.scripts)
-    parts = rel.parts
+    if not script_path.is_relative_to(trees.scripts):
+        return None
+    parts = script_path.relative_to(trees.scripts).parts
     if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
         return parts[1]
     return None

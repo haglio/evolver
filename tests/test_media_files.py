@@ -17,6 +17,7 @@ from util.media_files import (
     child_dirs,
     is_partial_path,
     library_videos,
+    listed_videos,
     partial_path,
     partial_stem,
     remove_empty_dirs,
@@ -57,6 +58,26 @@ class TestLibraryVideos(unittest.TestCase):
     def test_a_root_that_is_not_there_yields_nothing(self):
         with workspace_temp_dir() as root, override_config(VIDEO_EXTENSIONS={".mp4"}):
             self.assertEqual(list(library_videos(root / "nope")), [])
+
+
+class TestListedVideos(unittest.TestCase):
+    def test_finds_finished_videos_at_any_depth_without_asking_the_disk_about_any_one(self):
+        with workspace_temp_dir() as root:
+            good = root / "a" / "clip.mp4"
+            good.parent.mkdir(parents=True)
+            good.write_bytes(b"video")
+            (root / "a" / "clip.partial.deadbeef.mp4").write_bytes(b"partial")
+            (root / "a" / "notes.txt").write_text("notes", encoding="utf-8")
+
+            with override_config(VIDEO_EXTENSIONS={".mp4"}), \
+                    patch("os.stat", side_effect=AssertionError("asked the disk about one file")):
+                found = list(listed_videos(root))
+
+        self.assertEqual(found, [good])
+
+    def test_a_root_that_is_not_there_yields_nothing(self):
+        with workspace_temp_dir() as root, override_config(VIDEO_EXTENSIONS={".mp4"}):
+            self.assertEqual(list(listed_videos(root / "nope")), [])
 
 
 class TestPartialPath(unittest.TestCase):

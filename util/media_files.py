@@ -9,6 +9,7 @@ so.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import uuid
 from pathlib import Path
@@ -34,8 +35,12 @@ def is_partial_path(path: Path) -> bool:
     return PARTIAL_MARKER in path.name.lower()
 
 
+def _is_finished_video_name(path: Path) -> bool:
+    return path.suffix.lower() in config.VIDEO_EXTENSIONS and not is_partial_path(path)
+
+
 def is_finalized_video_file(path: Path) -> bool:
-    return path.suffix.lower() in config.VIDEO_EXTENSIONS and not is_partial_path(path) and path.is_file()
+    return _is_finished_video_name(path) and path.is_file()
 
 
 def library_videos(root: Path):
@@ -43,6 +48,23 @@ def library_videos(root: Path):
     for path in root.rglob("*"):
         if is_finalized_video_file(path):
             yield path
+
+
+def listed_videos(root: Path):
+    """Every finished video under *root*, told apart by its folder's listing alone.
+
+    For a cloud drive, where asking about one file can block for good while
+    listing its folder answers at once.
+    """
+    try:
+        entries = list(os.scandir(root))
+    except OSError:
+        return
+    for entry in entries:
+        if entry.is_dir(follow_symlinks=False):
+            yield from listed_videos(Path(entry.path))
+        elif entry.is_file(follow_symlinks=False) and _is_finished_video_name(Path(entry.name)):
+            yield Path(entry.path)
 
 
 def file_size(path: Path) -> int:
