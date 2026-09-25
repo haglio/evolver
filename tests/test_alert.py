@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from shared_ui.alert import Link
+
 from tests.product_sources import PROJECT_ROOT, product_sources
 from util import alert
 
@@ -33,7 +35,16 @@ class TestShowError(unittest.TestCase):
     def test_it_opens_the_familys_dialog_under_evolvers_own_icon(self, show_alert):
         alert.show_error("Title", "Body")
 
-        show_alert.assert_called_once_with("Title", "Body", icon=alert.ICON_FILE)
+        show_alert.assert_called_once_with("Title", "Body", icon=alert.ICON_FILE, links=[])
+
+    @patch("shared_ui.alert.show_alert")
+    def test_a_folder_to_open_reaches_the_dialog_as_a_link_under_the_message(self, show_alert):
+        folder = Path("library", "scripts", "alpha")
+
+        alert.show_error("Title", "Body", links=[("Open its folder", folder)])
+
+        show_alert.assert_called_once_with(
+            "Title", "Body", icon=alert.ICON_FILE, links=[Link("Open its folder", folder)])
 
     @patch("app_support.win32.show_error_popup")
     @patch("shared_ui.alert.show_alert", side_effect=ImportError("no Qt"))
@@ -49,6 +60,18 @@ class TestShowError(unittest.TestCase):
 
         show_error_popup.assert_called_once_with("Title", "Body")
         self.assertIn("Title", logged.records[0].getMessage())
+
+    @patch("app_support.win32.show_error_popup")
+    @patch("shared_ui.alert.show_alert", side_effect=ImportError("no Qt"))
+    def test_the_windows_dialog_spells_out_the_folders_it_cannot_link_to(
+        self, _show_alert, show_error_popup,
+    ):
+        folder = Path("library", "scripts", "alpha")
+
+        with self.assertLogs("util.alert", level="ERROR"):
+            alert.show_error("Title", "Body", links=[("Open its folder", folder)])
+
+        show_error_popup.assert_called_once_with("Title", f"Body\n\n{folder}")
 
     @patch("app_support.win32.show_error_popup", side_effect=OSError("no user32"))
     @patch("shared_ui.alert.show_alert", side_effect=ImportError("no Qt"))
