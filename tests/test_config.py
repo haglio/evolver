@@ -54,6 +54,17 @@ class TestRetiredRoot(unittest.TestCase):
         )
 
 
+class TestVrVideoDir(unittest.TestCase):
+    def test_unset_means_the_vr_videos_sit_in_the_library(self):
+        self.assertIsNone(config.vr_video_dir({}))
+
+    def test_an_empty_value_counts_as_unset(self):
+        self.assertIsNone(config.vr_video_dir({"vr_videos": ""}))
+
+    def test_reads_where_the_vr_videos_are_kept_from_the_overlay(self):
+        self.assertEqual(config.vr_video_dir({"vr_videos": "Q:/cloud/VR"}), Path("Q:/cloud/VR"))
+
+
 class TestTopazPaths(unittest.TestCase):
     """Where Topaz Video is installed, which decides whether either upscale
     stage can run at all: they drive its own ffmpeg build and no other."""

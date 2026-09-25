@@ -20,9 +20,152 @@ def library_overrides(video_root, script_root, **extra):
     example overlay happens to supply None.
     """
     overrides = dict(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                     NONAI_RETIRED_ROOT=None)
+                     NONAI_RETIRED_ROOT=None, VR_VIDEO_DIR=None,
+                     UNMATCHED_SCRIPTS_DIR=script_root.parent / "unmatched_scripts")
     overrides.update(extra)
     return override_config(**overrides)
+
+
+class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
+    def test_a_vr_script_matches_its_video_where_the_vr_videos_are_kept(self):
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            vr_root = root / "cloud" / "VR"
+            video = vr_root / "finished" / "scene one.mp4"
+            script_path = script_root / "VR" / "finished" / "scene one.funscript"
+            for path in (video, script_path):
+                path.parent.mkdir(parents=True, exist_ok=True)
+            video.write_bytes(b"video")
+            script_path.write_text("{}", encoding="utf-8")
+
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=vr_root):
+                result = scripts_sync.run()
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.already_aligned, 1)
+            self.assertTrue(script_path.exists())
+
+    def test_a_stray_vr_script_moves_under_vr_in_the_scripts_tree(self):
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            vr_root = root / "cloud" / "VR"
+            video = vr_root / "finished" / "scene one.mp4"
+            stray = script_root / "unsorted" / "scene one.funscript"
+            for path in (video, stray):
+                path.parent.mkdir(parents=True, exist_ok=True)
+            video.write_bytes(b"video")
+            stray.write_text("{}", encoding="utf-8")
+
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=vr_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.moved, 1)
+            self.assertTrue((script_root / "VR" / "finished" / "scene one.funscript").exists())
+
+
+class TestUnmatchedScriptsFolder(unittest.TestCase):
+    """A script that matches no video waits in unmatched_scripts until renamed."""
+
+    def _roots(self, root):
+        return root / "videos", root / "scripts", root / "unmatched_scripts"
+
+    def test_a_script_that_matches_no_video_moves_to_unmatched_scripts(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, unmatched = self._roots(root)
+            stray = script_root / "VR" / "finished" / "scene one.funscript"
+            stray.parent.mkdir(parents=True, exist_ok=True)
+            stray.write_text("{}", encoding="utf-8")
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            self.assertFalse(stray.exists())
+            self.assertTrue((unmatched / "scene one.funscript").exists())
+            self.assertEqual(result.unmatched_paths, ["scene one.funscript"])
+
+    def test_a_waiting_script_renamed_to_match_a_video_moves_into_place(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, unmatched = self._roots(root)
+            video = video_root / "2D" / "non_AI" / "studio" / "scene one.mp4"
+            waiting = unmatched / "scene one.funscript"
+            for path in (video, waiting):
+                path.parent.mkdir(parents=True, exist_ok=True)
+            video.write_bytes(b"video")
+            waiting.write_text("{}", encoding="utf-8")
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.moved, 1)
+            self.assertFalse(waiting.exists())
+            self.assertTrue((script_root / "2D" / "non_AI" / "studio" / "scene one.funscript").exists())
+
+    def test_a_script_still_waiting_does_not_bring_the_popup_back(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, unmatched = self._roots(root)
+            waiting = unmatched / "scene one.funscript"
+            waiting.parent.mkdir(parents=True, exist_ok=True)
+            waiting.write_text("{}", encoding="utf-8")
+
+            with library_overrides(video_root, script_root):
+                with patch("tasks.scripts_sync.show_error") as show_error:
+                    result = scripts_sync.run(show_popup=True)
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.unmatched_paths, [])
+            show_error.assert_not_called()
+            self.assertTrue(waiting.exists())
+
+    def test_the_popup_links_to_unmatched_scripts(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, unmatched = self._roots(root)
+            stray = script_root / "unsorted" / "scene one.funscript"
+            stray.parent.mkdir(parents=True, exist_ok=True)
+            stray.write_text("{}", encoding="utf-8")
+
+            with library_overrides(video_root, script_root):
+                with patch("tasks.scripts_sync.show_error") as show_error:
+                    scripts_sync.run(show_popup=True)
+
+            self.assertEqual(show_error.call_args.kwargs["links"],
+                             [("Open unmatched_scripts", unmatched)])
+
+    def test_a_name_already_waiting_gets_a_number_rather_than_being_written_over(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, unmatched = self._roots(root)
+            waiting = unmatched / "scene one.funscript"
+            stray = script_root / "unsorted" / "scene one.funscript"
+            for path, actions in ((waiting, "[1]"), (stray, "[2]")):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f'{{"actions":{actions}}}', encoding="utf-8")
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.unmatched_paths, ["scene one (2).funscript"])
+            self.assertEqual(waiting.read_text(encoding="utf-8"), '{"actions":[1]}')
+            self.assertEqual((unmatched / "scene one (2).funscript").read_text(encoding="utf-8"),
+                             '{"actions":[2]}')
+
+    def test_a_waiting_script_renamed_to_match_two_videos_says_where_it_waits(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, unmatched = self._roots(root)
+            for video in (video_root / "alpha" / "scene one.mp4", video_root / "beta" / "scene one.mkv"):
+                video.parent.mkdir(parents=True, exist_ok=True)
+                video.write_bytes(b"video")
+            waiting = unmatched / "scene one.funscript"
+            waiting.parent.mkdir(parents=True, exist_ok=True)
+            waiting.write_text("{}", encoding="utf-8")
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.ambiguous_paths,
+                             [str(Path("unmatched_scripts", "scene one.funscript"))])
+            self.assertTrue(waiting.exists())
 
 
 class TestScriptsSync(unittest.TestCase):
@@ -109,6 +252,7 @@ class TestScriptsSync(unittest.TestCase):
                 message,
                 "This funscript can't move into place, because a different script is already there:\n"
                 + str(Path("unsorted", "clip.funscript")))
+            self.assertEqual(show_error.call_args.kwargs["links"], [])
 
     def test_ai_script_ignores_duplicate_non_ai_video_match(self):
         with workspace_temp_dir() as root:
@@ -198,17 +342,14 @@ class TestScriptsSync(unittest.TestCase):
                     scripts_sync.run(show_popup=True)
 
             _title, message = show_error.call_args.args
-            self.assertEqual(
-                message,
-                "This funscript matches no video:\n"
-                + str(Path("VR", "finished", "scene one.funscript")))
+            self.assertEqual(message, "This funscript matches no video:\nscene one.funscript")
 
     def test_the_popup_lists_every_unmatched_script_in_order(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
-            for folder in ("beta", "alpha"):
-                script_path = script_root / folder / "scene one.funscript"
+            for folder, name in (("alpha", "scene two"), ("beta", "scene one")):
+                script_path = script_root / folder / f"{name}.funscript"
                 script_path.parent.mkdir(parents=True, exist_ok=True)
                 script_path.write_text("{}", encoding="utf-8")
 
@@ -218,10 +359,7 @@ class TestScriptsSync(unittest.TestCase):
 
             _title, message = show_error.call_args.args
             self.assertEqual(
-                message,
-                "These funscripts match no video:\n"
-                + str(Path("alpha", "scene one.funscript")) + "\n"
-                + str(Path("beta", "scene one.funscript")))
+                message, "These funscripts match no video:\nscene one.funscript\nscene two.funscript")
 
     def test_copies_ai_script_from_sorted_to_outbox_variant(self):
         with workspace_temp_dir() as root:
@@ -314,19 +452,6 @@ class TestScriptsSync(unittest.TestCase):
             self.assertEqual(result.ambiguous_variant_groups, 1)
             self.assertEqual(result.copied_variants, 0)
             self.assertFalse((scripts / "clip_topaz.funscript").exists())
-
-    def test_records_which_scripts_went_unmatched(self):
-        with workspace_temp_dir() as root:
-            video_root = root / "videos"
-            script_root = root / "scripts"
-            script_path = script_root / "unsorted" / "clip.funscript"
-            script_path.parent.mkdir(parents=True, exist_ok=True)
-            script_path.write_text("{}", encoding="utf-8")
-
-            with library_overrides(video_root, script_root):
-                result = scripts_sync.run()
-
-            self.assertEqual(result.unmatched_paths, [str(Path("unsorted", "clip.funscript"))])
 
     def test_reports_variant_copy_error_without_crashing(self):
         with workspace_temp_dir() as root:
@@ -514,8 +639,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             self.assertTrue(script_path.exists())
             self.assertEqual(archived_script.read_text(encoding="utf-8"), '{"actions":[9]}')
 
-    def test_leaves_the_script_when_two_archived_videos_share_its_name(self):
-        """Which video it belongs to is a guess, so it stays for a person."""
+    def test_a_script_two_archived_videos_share_a_name_with_waits_for_a_person(self):
+        """Which video it belongs to is a guess, so it waits in unmatched_scripts."""
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
             script_path = script_root / "2D" / "non_AI" / "studio" / "scene one.funscript"
@@ -532,7 +657,7 @@ class TestFollowRetiredVideos(unittest.TestCase):
 
             self.assertEqual(result.unmatched, 1)
             self.assertEqual(result.followed_to_archive, 0)
-            self.assertTrue(script_path.exists())
+            self.assertTrue((root / "unmatched_scripts" / "scene one.funscript").exists())
 
     def test_a_failed_move_leaves_the_script_unmatched_rather_than_crashing(self):
         with workspace_temp_dir() as root:
@@ -571,7 +696,7 @@ class TestFollowRetiredVideos(unittest.TestCase):
             self.assertEqual(result.already_aligned, 1)
             index_archived.assert_not_called()
 
-    def test_unset_archive_keeps_the_script_unmatched(self):
+    def test_with_no_archive_set_the_script_waits_in_unmatched_scripts(self):
         with workspace_temp_dir() as root:
             video_root, script_root, _ = self._tree(root)
             script_path = script_root / "2D" / "non_AI" / "studio" / "scene one.funscript"
@@ -582,7 +707,7 @@ class TestFollowRetiredVideos(unittest.TestCase):
                 result = scripts_sync.run()
 
             self.assertEqual(result.unmatched, 1)
-            self.assertTrue(script_path.exists())
+            self.assertTrue((root / "unmatched_scripts" / "scene one.funscript").exists())
 
 
 class TestScriptsSyncResultSurface(unittest.TestCase):
