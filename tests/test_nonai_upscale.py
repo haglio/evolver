@@ -1004,6 +1004,117 @@ class TestThrottleToPresence(unittest.TestCase):
             mocks["suspend"].assert_not_called()
 
 
+class TestMakingWayForAiClips(unittest.TestCase):
+    def test_a_running_encode_is_frozen_while_the_clips_upscale_and_thawed_after(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+
+            stack, mocks = probes(is_running=True)
+            with override_config(**overrides), stack:
+                with nonai_upscale.frozen_for_ai_clips():
+                    frozen_during = [call.args for call in mocks["suspend"].call_args_list]
+                    thawed_during = mocks["resume"].called
+
+            self.assertEqual(frozen_during, [(4242,)])
+            self.assertFalse(thawed_during)
+            mocks["resume"].assert_called_once_with(4242)
+
+    def test_an_encode_frozen_for_the_user_stays_frozen_after(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides, suspended=True, suspended_at=time.time() - 30)
+
+            stack, mocks = probes(is_running=True)
+            with override_config(**overrides), stack:
+                with nonai_upscale.frozen_for_ai_clips():
+                    pass
+
+            mocks["resume"].assert_not_called()
+            job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            self.assertTrue(job["suspended"])
+
+    def test_there_is_nothing_to_freeze_without_an_encode_in_flight(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+
+            stack, mocks = probes()
+            with override_config(**overrides), stack:
+                with nonai_upscale.frozen_for_ai_clips():
+                    pass
+
+            mocks["suspend"].assert_not_called()
+            mocks["resume"].assert_not_called()
+
+    def test_an_encode_that_has_ended_is_left_for_supervision_to_conclude(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+            record_before = overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8")
+
+            stack, mocks = probes(is_running=False)
+            with override_config(**overrides), stack:
+                with nonai_upscale.frozen_for_ai_clips():
+                    pass
+
+            mocks["suspend"].assert_not_called()
+            self.assertEqual(
+                overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"), record_before)
+
+    def test_the_user_leaving_does_not_thaw_it_until_the_clips_are_done(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+            answered = []
+            poll = threading.Thread(
+                target=lambda: answered.append(nonai_upscale.throttle_to_presence()),
+                daemon=True)
+
+            stack, mocks = probes(is_running=True, idle_seconds=10_000.0)
+            with override_config(**overrides), stack:
+                with nonai_upscale.frozen_for_ai_clips():
+                    poll.start()
+                    poll.join(timeout=10)
+                    thawed_during = mocks["resume"].called
+
+            self.assertEqual(answered, [""])
+            self.assertFalse(thawed_during)
+
+    def test_the_encode_it_supervises_does_not_hold_the_clips_back(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+
+            stack, _ = probes(topaz_pids=(4242,))
+            with override_config(**overrides), stack:
+                self.assertFalse(nonai_upscale.foreign_topaz_running())
+
+    def test_a_topaz_encode_it_did_not_start_holds_the_clips_back(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+
+            stack, _ = probes(topaz_pids=(4242, 31337))
+            with override_config(**overrides), stack:
+                self.assertTrue(nonai_upscale.foreign_topaz_running())
+
+    def test_the_log_gives_the_ai_clips_as_the_reason_for_the_pause(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            write_job(root, overrides)
+
+            stack, _ = probes(is_running=True)
+            with override_config(**overrides), stack, \
+                    self.assertLogs("tasks.nonai_encode", level="INFO") as logged:
+                with nonai_upscale.frozen_for_ai_clips():
+                    pass
+
+            said = "\n".join(logged.output)
+            self.assertIn("AI clips", said)
+            self.assertNotIn("the user is back", said)
+            self.assertNotIn("the machine is idle", said)
+
+
 class TestEveryFileIsAParameter(unittest.TestCase):
     """The six files the stage touches are arguments, not ambient reads.
 

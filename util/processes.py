@@ -84,10 +84,6 @@ def pids_of_image(image: Path) -> list[int]:
         _kernel32.CloseHandle(snapshot)
 
 
-def count_running(image: Path) -> int:
-    return len(pids_of_image(image))
-
-
 def command_line(pid: int) -> str | None:
     """The command line *pid* was started with, or None when unreadable.
 

@@ -6,7 +6,7 @@ import os
 import subprocess
 import tempfile
 import uuid
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, nullcontext
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -54,7 +54,8 @@ def _stage_mocks() -> dict:
         "correspondence_run": Mock(return_value=Mock(ok=True)),
         "has_pending_work": Mock(return_value=False),
         "should_skip_cpu": Mock(return_value=False),
-        "count_running": Mock(return_value=0),
+        "foreign_topaz_running": Mock(return_value=False),
+        "frozen_for_ai_clips": Mock(side_effect=nullcontext),
         "topaz_sign_in_expired": Mock(return_value=False),
     }
 
@@ -81,7 +82,8 @@ _STAGE_PATCHES = [
     ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
     ("evolver.upscale.has_pending_work", "has_pending_work"),
     ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
-    ("evolver.processes.count_running", "count_running"),
+    ("evolver.nonai_upscale.foreign_topaz_running", "foreign_topaz_running"),
+    ("evolver.nonai_upscale.frozen_for_ai_clips", "frozen_for_ai_clips"),
     ("util.topaz.sign_in_expired", "topaz_sign_in_expired"),
     ("evolver.prompt_scrape.run", "prompt_scrape_run"),
 ]
@@ -195,17 +197,37 @@ class TestEvolverMain:
 
     # --- Non-AI upscale gating ---
 
-    def test_ai_upscale_waits_while_a_topaz_encode_is_running(self):
-        """A detached non-AI encode (or a manual GUI export) owns the GPU;
-        stacking the AI batch on top is what crashed the machine."""
+    def test_ai_upscale_waits_while_a_topaz_encode_evolver_did_not_start_is_running(self):
         mocks = self._run_pipeline(
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
-            count_running=Mock(return_value=1),
+            foreign_topaz_running=Mock(return_value=True),
         )
         assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_not_called()
+        mocks["frozen_for_ai_clips"].assert_not_called()
         mocks["correspondence_run"].assert_not_called()
+
+    def test_ai_clips_upscale_with_the_library_encode_frozen_around_every_topaz_step(self):
+        steps = []
+
+        @contextmanager
+        def frozen():
+            steps.append("frozen")
+            yield
+            steps.append("thawed")
+
+        self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+            frozen_for_ai_clips=Mock(side_effect=frozen),
+            should_skip_cpu=Mock(side_effect=lambda log: steps.append("cpu sampled") and False),
+            topaz_sign_in_expired=Mock(side_effect=lambda: steps.append("sign-in asked") and False),
+            upscale_run=Mock(side_effect=lambda **kwargs: steps.append("upscaled") or Mock(
+                failed=0, deferred_low_disk=False, pending_after_run=0)),
+        )
+
+        assert steps == ["frozen", "cpu sampled", "sign-in asked", "upscaled", "thawed"]
 
     def test_cli_run_neither_starts_nor_stops_nor_manages_nonai_encodes(self):
         """Nor starts one the queue window asked for: that ask is the tray's to
@@ -399,7 +421,8 @@ class TestRunPipeline:
     def test_topaz_is_asked_about_its_sign_in_only_when_an_upscale_could_start(self):
         for overrides in (
             dict(has_pending_work=Mock(return_value=False)),
-            dict(has_pending_work=Mock(return_value=True), count_running=Mock(return_value=1)),
+            dict(has_pending_work=Mock(return_value=True),
+                 foreign_topaz_running=Mock(return_value=True)),
         ):
             stack, mocks = self._patch_all_stages(**overrides)
             with stack:
@@ -455,12 +478,10 @@ class TestRunPipeline:
             allow_start=False, stop=False, presence_managed=True,
             take_requests=True, ai_waiting=True)
 
-    def test_ai_clips_held_back_by_a_topaz_encode_are_still_waiting(self):
-        """The paused encode the AI stage waited on is the one a video asked
-        for now replaces -- and those clips go before it."""
+    def test_ai_clips_held_back_by_a_topaz_encode_evolver_did_not_start_are_still_waiting(self):
         stack, mocks = self._patch_all_stages(
             has_pending_work=Mock(return_value=True),
-            count_running=Mock(return_value=1),
+            foreign_topaz_running=Mock(return_value=True),
         )
         with stack:
             evolver.run_pipeline(nonai_enabled=True)
@@ -541,14 +562,14 @@ class TestRunPipeline:
     def test_skips_alone_do_not_make_a_run_a_failure(self):
         """Skipping is how the pipeline stays out of the way, not how it fails.
 
-        A Topaz encode already owning the GPU parks the AI upscale, which parks
+        A Topaz encode Evolver did not start parks the AI upscale, which parks
         the correspondence check after it — two skipped stages on a run where
         nothing at all went wrong.
         """
         stack, _ = self._patch_all_stages(
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
-            count_running=Mock(return_value=1),
+            foreign_topaz_running=Mock(return_value=True),
         )
         with stack:
             result = evolver.run_pipeline()

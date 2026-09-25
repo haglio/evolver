@@ -72,6 +72,10 @@ def unrecorded_start() -> dict:
     return provenance.reconstructed("evolver", recipe=topaz.NON_AI_UPSCALE.name)
 
 
+def topaz_pids() -> list[int]:
+    return processes.pids_of_image(config.FFMPEG)
+
+
 def adopt_orphan(job_file: Path) -> dict | None:
     """Rebuild the job record for a lone still-running encode of ours.
 
@@ -82,7 +86,7 @@ def adopt_orphan(job_file: Path) -> dict | None:
     the non-AI tree is unambiguously ours, so it is adopted back under
     supervision.
     """
-    pids = processes.pids_of_image(config.FFMPEG)
+    pids = topaz_pids()
     if len(pids) != 1:
         return None
     source, tmp = _parse_topaz_command(processes.command_line(pids[0]) or "")
@@ -130,7 +134,7 @@ def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
     return Path(source), Path(output)
 
 
-def suspend_job(job: dict, job_file: Path) -> None:
+def suspend_job(job: dict, job_file: Path, *, because: str) -> None:
     """Freeze the encode and remember when, so the pause is not charged runtime."""
     if job.get("suspended"):
         return
@@ -138,11 +142,10 @@ def suspend_job(job: dict, job_file: Path) -> None:
     job["suspended"] = True
     job["suspended_at"] = time.time()
     nonai_job.save_job(job_file, job)
-    log.info("Suspended the non-AI encode of %s; the user is back at the machine.",
-             job.get("source"))
+    log.info("Suspended the non-AI encode of %s; %s.", job.get("source"), because)
 
 
-def resume_job(job: dict, job_file: Path) -> None:
+def resume_job(job: dict, job_file: Path, *, because: str) -> None:
     """Thaw the encode and bank the time it spent frozen."""
     if not job.get("suspended"):
         return
@@ -152,8 +155,7 @@ def resume_job(job: dict, job_file: Path) -> None:
     job["suspended"] = False
     job["suspended_at"] = 0.0
     nonai_job.save_job(job_file, job)
-    log.info("Resumed the non-AI encode of %s; the machine is idle again.",
-             job.get("source"))
+    log.info("Resumed the non-AI encode of %s; %s.", job.get("source"), because)
 
 
 def overran(job: dict, settings: EncodeSettings, *, now: float | None = None) -> bool:

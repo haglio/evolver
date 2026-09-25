@@ -49,7 +49,7 @@ from tasks import (
     watch_weights,
     withdrawn,
 )
-from util import processes, run_lock, run_log, system_resources, topaz
+from util import run_lock, run_log, system_resources, topaz
 from util import upscale_lineup as upscale_lineup_shape
 
 
@@ -318,29 +318,28 @@ def _run_stages(
         if not upscale.has_pending_work(priority_files=priority_files):
             log.info("No pending upscale work found. Skipping upscale.")
             _skip_stage("upscale", "no_pending_work")
-        elif processes.count_running(config.FFMPEG) > 0:
-            # A detached non-AI encode (or a manual Topaz GUI export) already owns
-            # the GPU; running the AI batch alongside it stacks Topaz processes,
-            # which is what used to exhaust memory and crash the machine.
-            log.info("Skipping upscale: a Topaz ffmpeg encode is already running.")
+        elif nonai_upscale.foreign_topaz_running():
+            log.info("Skipping upscale: a Topaz encode Evolver did not start is running.")
             upscale_skipped = True
             _skip_stage("upscale", "topaz_busy")
-        elif _should_skip_upscale_due_to_cpu(log):
-            log.info("Skipping upscale because CPU usage is above the configured threshold.")
-            upscale_skipped = True
-            _skip_stage("upscale", "cpu_busy")
-        elif topaz.sign_in_expired():
-            log.info("Skipping upscale: Topaz's sign-in has expired, and Topaz can watermark "
-                     "what it makes until someone signs in to the Topaz Video app.")
-            upscale_skipped = True
-            _skip_stage("upscale", topaz.SIGN_IN_EXPIRED)
         else:
-            upscale_kwargs: dict = dict(
-                priority_files=priority_files, max_items=config.UPSCALE_BATCH_LIMIT,
-            )
-            if on_stage_progress is not None:
-                upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
-            upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
+            with nonai_upscale.frozen_for_ai_clips():
+                if _should_skip_upscale_due_to_cpu(log):
+                    log.info("Skipping upscale because CPU usage is above the configured threshold.")
+                    upscale_skipped = True
+                    _skip_stage("upscale", "cpu_busy")
+                elif topaz.sign_in_expired():
+                    log.info("Skipping upscale: Topaz's sign-in has expired, and Topaz can watermark "
+                             "what it makes until someone signs in to the Topaz Video app.")
+                    upscale_skipped = True
+                    _skip_stage("upscale", topaz.SIGN_IN_EXPIRED)
+                else:
+                    upscale_kwargs: dict = dict(
+                        priority_files=priority_files, max_items=config.UPSCALE_BATCH_LIMIT,
+                    )
+                    if on_stage_progress is not None:
+                        upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
+                    upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
 
         # Straight after the upscale, so a clip made this run reaches Genau this run —
         # and before the correspondence check, which would otherwise see the delivered
