@@ -66,7 +66,7 @@ CONFIG_REFERENCE_LEDGER = {
     # The 10th and 11th are the third shape again: the pin list, read where
     # the queue window's door to it is, so the window layer names no path of its
     # own, and the pipeline's turn (util/run_lock.py), read where the run is.
-    "evolver.py": 11,
+    "evolver.py": 10,
     "gui/app.py": 5,
     # What a branch session is and where it runs from -- named in the window
     # title, the taskbar identity and the launcher a preview's button re-runs --
@@ -114,7 +114,7 @@ CONFIG_REFERENCE_LEDGER = {
     # into tasks.nonai_encode.EncodeSettings -- which is where they belong:
     # how long an encode may run and how much of the machine it may take are
     # this app's policy, not anything the machine or the overlay says.
-    "tasks/nonai_upscale.py": 14,
+    "tasks/nonai_upscale.py": 13,
     # The 6th is the camera words a scraped action is cased by. They were a
     # literal in this module; they are library vocabulary, so they are the
     # overlay's now, and a stage reaches the overlay through config alone.

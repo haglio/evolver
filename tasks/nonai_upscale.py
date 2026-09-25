@@ -34,6 +34,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -68,6 +70,10 @@ log = logging.getLogger(__name__)
 _throttle_lock = threading.Lock()
 
 LOW_DISK = "low_disk"
+
+_USER_IS_BACK = "the user is back at the machine"
+_MACHINE_IS_IDLE = "the machine is idle again"
+_ASKED_FOR = "it is the video asked for now"
 
 
 @dataclass
@@ -305,12 +311,33 @@ def _match_presence(job_file: Path, settings: EncodeSettings) -> str:
         return ""
     present = _user_present(settings)
     if present and not job.get("suspended"):
-        nonai_encode.suspend_job(job, job_file)
+        nonai_encode.suspend_job(job, job_file, because=_USER_IS_BACK)
         return "suspended"
     if not present and job.get("suspended"):
-        nonai_encode.resume_job(job, job_file)
+        nonai_encode.resume_job(job, job_file, because=_MACHINE_IS_IDLE)
         return "resumed"
     return ""
+
+
+def foreign_topaz_running(*, job_file: Path | None = None) -> bool:
+    job = nonai_job.load_job(StageFiles.configured(job=job_file).job) or {}
+    return any(pid != job.get("pid") for pid in nonai_encode.topaz_pids())
+
+
+@contextmanager
+def frozen_for_ai_clips(*, job_file: Path | None = None) -> Iterator[None]:
+    job_file = StageFiles.configured(job=job_file).job
+    with _throttle_lock:
+        job = nonai_job.load_job(job_file)
+        was_running = (job is not None and not job.get("suspended")
+                       and processes.is_running(job.get("pid", 0)))
+        if was_running:
+            nonai_encode.suspend_job(job, job_file, because="AI clips are upscaling first")
+        try:
+            yield
+        finally:
+            if was_running:
+                nonai_encode.resume_job(job, job_file, because="the AI clips are done")
 
 
 def _collect(files: StageFiles) -> list[Candidate]:
@@ -337,11 +364,12 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
                     job, "free disk fell below the safety floor mid-encode", files),
             )
         if presence_managed and not on_request and _user_present(settings):
-            nonai_encode.suspend_job(job, files.job)
+            nonai_encode.suspend_job(job, files.job, because=_USER_IS_BACK)
             return Supervision(in_flight=relpath(source), suspended=True,
                                in_flight_percent=nonai_encode.percent_encoded(job))
         if presence_managed or on_request:
-            nonai_encode.resume_job(job, files.job)  # a no-op unless it was frozen
+            nonai_encode.resume_job(job, files.job,
+                                    because=_ASKED_FOR if on_request else _MACHINE_IS_IDLE)
         if not nonai_encode.overran(job, settings):
             return Supervision(in_flight=relpath(source),
                                in_flight_percent=nonai_encode.percent_encoded(job))
@@ -383,7 +411,7 @@ def _make_way_for(video: str, job: dict, files: StageFiles) -> tuple[dict | None
 
 def _take_over(job: dict, files: StageFiles) -> None:
     """Let the encode already running stand as the one that was asked for."""
-    nonai_encode.resume_job(job, files.job)  # a no-op unless the user's presence froze it
+    nonai_encode.resume_job(job, files.job, because=_ASKED_FOR)
     job["on_request"] = True
     nonai_job.save_job(files.job, job)
     log.info("The encode of %s runs on: it is the one asked for.", job.get("source"))
@@ -604,7 +632,7 @@ def _machine_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
     """
     if not asked_for and _user_present(settings):
         return "user_present"
-    if processes.pids_of_image(config.FFMPEG):
+    if nonai_encode.topaz_pids():
         return "topaz_busy"
     if system_resources.available_ram_gb() < settings.min_available_ram_gb:
         return "low_ram"
