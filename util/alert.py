@@ -8,6 +8,7 @@ something, and PyQt6 is one of the things it could have failed on.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -15,15 +16,17 @@ log = logging.getLogger(__name__)
 ICON_FILE = Path(__file__).resolve().parent.parent / "icon.ico"
 
 
-def show_error(title: str, message: str) -> None:
+def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = ()) -> None:
     """Put *message* on the screen under *title*, and block until it is read."""
     try:
-        from shared_ui.alert import show_alert  # noqa: PLC0415  (see the module docstring)
+        from shared_ui.alert import Link, show_alert  # noqa: PLC0415  (see the module docstring)
 
-        show_alert(title, message, icon=ICON_FILE)
+        show_alert(title, message, icon=ICON_FILE,
+                   links=[Link(text, target) for text, target in links])
     except Exception:
         log.exception("Could not open the alert dialog: %s", title)
-        _fall_back_to_windows(title, message)
+        targets = "\n".join(str(target) for _text, target in links)
+        _fall_back_to_windows(title, f"{message}\n\n{targets}" if targets else message)
 
 
 def _fall_back_to_windows(title: str, message: str) -> None:
