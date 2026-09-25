@@ -205,11 +205,11 @@ def _summarize_result(
 # Ambiguous variant groups are the one problem here that does not also make the
 # stage red -- whether they should is the stage's call, not the view's.
 _SCRIPTS_PROBLEMS = (
-    ("unmatched", "match no video"),
-    ("ambiguous", "match more than one video"),
-    ("collisions", "cannot move — a different script holds the destination"),
-    ("ambiguous_variant_groups", "variant groups whose scripts differ — none copied"),
-    ("variant_copy_errors", "failed to copy to a variant"),
+    ("unmatched", "match no video", "unmatched_paths"),
+    ("ambiguous", "match more than one video", "ambiguous_paths"),
+    ("collisions", "cannot move — a different script holds the destination", "collision_paths"),
+    ("ambiguous_variant_groups", "variant groups whose scripts differ — none copied", None),
+    ("variant_copy_errors", "failed to copy to a variant", "variant_copy_error_paths"),
 )
 _SCRIPTS_ROUTINE = (
     ("moved", "moved into place"),
@@ -232,18 +232,18 @@ def _summarize_scripts_sync(result: dict[str, Any]) -> str:
     Naming the offending scripts is the difference between knowing the stage
     failed and knowing what to go fix.
     """
-    problems = [f"{result[key]} {label}" for key, label in _SCRIPTS_PROBLEMS
+    problems = [_naming(f"{result[key]} {label}", result.get(names) or [])
+                for key, label, names in _SCRIPTS_PROBLEMS
                 if isinstance(result.get(key), int) and result[key]]
     if not problems:
         routine = [f"{result[key]} {label}" for key, label in _SCRIPTS_ROUTINE
                    if isinstance(result.get(key), int) and result[key]]
         return ", ".join(routine) if routine else "no funscripts"
+    return "; ".join(problems)
 
-    summary = "; ".join(problems)
-    names = result.get("unmatched_paths") or []
-    if names:
-        summary += f" — {_name_sample(names)}"
-    return summary
+
+def _naming(said: str, names: list[str]) -> str:
+    return f"{said} ({_name_sample(names)})" if names else said
 
 
 def _name_sample(names: list[str]) -> str:

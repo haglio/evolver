@@ -253,6 +253,20 @@ class TestScriptsSyncSummary:
         assert "scene one.funscript" in summary
         assert "scene two.funscript" in summary
 
+    def test_names_each_kind_of_trouble_beside_the_scripts_it_caught(self):
+        summary = self._result(
+            unmatched=1, unmatched_paths=["alpha/scene one.funscript"],
+            ambiguous=1, ambiguous_paths=["beta/scene two.funscript"],
+            collisions=1, collision_paths=["gamma/scene three.funscript"],
+            variant_copy_errors=1, variant_copy_error_paths=["delta/scene four.funscript"],
+        )
+        assert summary == (
+            "1 match no video (alpha/scene one.funscript); "
+            "1 match more than one video (beta/scene two.funscript); "
+            "1 cannot move — a different script holds the destination (gamma/scene three.funscript); "
+            "1 failed to copy to a variant (delta/scene four.funscript)"
+        )
+
     def test_stands_in_a_count_for_the_names_it_cannot_fit(self):
         summary = self._result(unmatched=5, unmatched_paths=[f"clip {i}.funscript" for i in range(5)])
         assert "clip 0.funscript" in summary
