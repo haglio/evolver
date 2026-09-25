@@ -31,11 +31,10 @@ class ScriptsSyncResult:
     rehomed_to_variants: int = 0
     followed_to_archive: int = 0
     discarded_duplicates: int = 0
-    unmatched_paths: list[str] | None = None
-
-    def __post_init__(self) -> None:
-        if self.unmatched_paths is None:
-            self.unmatched_paths = []
+    unmatched_paths: list[str] = field(default_factory=list)
+    ambiguous_paths: list[str] = field(default_factory=list)
+    collision_paths: list[str] = field(default_factory=list)
+    variant_copy_error_paths: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -68,7 +67,7 @@ class _FollowedRetired:
     unmatched_paths: list[str] = field(default_factory=list)
     followed_to_archive: int = 0
     rehomed_to_variants: int = 0
-    collisions: int = 0
+    collision_paths: list[str] = field(default_factory=list)
     discarded_duplicates: int = 0
 
 
@@ -95,7 +94,7 @@ class _VariantCopies:
 
     copied: int = 0
     ambiguous_groups: int = 0
-    copy_errors: int = 0
+    copy_error_paths: list[str] = field(default_factory=list)
 
 
 def run(show_popup: bool = False, *, video_dir: Path | None = None,
@@ -133,7 +132,7 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
             continue
         if len(matches) > 1:
             log.warning("AMBIGUOUS script match for %s: %s", script_path, ", ".join(str(p) for p in matches))
-            result.ambiguous += 1
+            result.ambiguous_paths.append(str(script_path.relative_to(trees.scripts)))
             continue
 
         dest = script_path_for_video(matches[0])
@@ -142,7 +141,7 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
             continue
         if dest.exists():
             log.warning("SCRIPT COLLISION (destination exists, leaving source in place): %s -> %s", script_path, dest)
-            result.collisions += 1
+            result.collision_paths.append(str(script_path.relative_to(trees.scripts)))
             continue
 
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -151,17 +150,20 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         result.moved += 1
 
     followed = _follow_retired_videos(orphans, video_index, trees)
-    result.unmatched += len(followed.unmatched_paths)
     result.unmatched_paths += followed.unmatched_paths
     result.followed_to_archive += followed.followed_to_archive
     result.rehomed_to_variants += followed.rehomed_to_variants
-    result.collisions += followed.collisions
+    result.collision_paths += followed.collision_paths
     result.discarded_duplicates += followed.discarded_duplicates
     remove_empty_dirs(trees.scripts)
     variants = _copy_missing_variant_scripts(video_index, trees)
     result.copied_variants += variants.copied
     result.ambiguous_variant_groups += variants.ambiguous_groups
-    result.variant_copy_errors += variants.copy_errors
+    result.variant_copy_error_paths += variants.copy_error_paths
+    result.unmatched = len(result.unmatched_paths)
+    result.ambiguous = len(result.ambiguous_paths)
+    result.collisions = len(result.collision_paths)
+    result.variant_copy_errors = len(result.variant_copy_error_paths)
     log.info(
         "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Variant copies: %d, Ambiguous variant groups: %d, Variant copy errors: %d, Rehomed to variants: %d, Followed to archive: %d, Discarded duplicates: %d",
         result.moved,
@@ -212,7 +214,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     unmatched_paths: list[str] = []
     followed_to_archive = 0
     rehomed_to_variants = 0
-    collisions = 0
+    collision_paths: list[str] = []
     discarded_duplicates = 0
     archived = _index_archived_videos(trees.archive) if orphans else {}
     for script_path in orphans:
@@ -233,7 +235,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
             if _discard_or_keep_duplicate(script_path, dest) is _Duplicate.DISCARDED:
                 discarded_duplicates += 1
             else:
-                collisions += 1
+                collision_paths.append(str(script_path.relative_to(trees.scripts)))
             continue
 
         try:
@@ -248,7 +250,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
         log.info("FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
 
     return _FollowedRetired(unmatched_paths, followed_to_archive,
-                            rehomed_to_variants, collisions, discarded_duplicates)
+                            rehomed_to_variants, collision_paths, discarded_duplicates)
 
 
 def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Path]],
@@ -359,7 +361,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
                                   trees: Trees) -> _VariantCopies:
     copied = 0
     ambiguous_groups = 0
-    copy_errors = 0
+    copy_error_paths: list[str] = []
     groups: dict[tuple[tuple[str, ...], str], list[Path]] = defaultdict(list)
     for matches in video_index.values():
         for video_path in matches:
@@ -396,14 +398,14 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
                 dest_script.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_script, dest_script)
             except OSError:
-                copy_errors += 1
+                copy_error_paths.append(str(source_script.relative_to(trees.scripts)))
                 log.exception("FAILED TO COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
                 continue
             copied += 1
             existing_sources.append(target_video)
             log.info("COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
 
-    return _VariantCopies(copied, ambiguous_groups, copy_errors)
+    return _VariantCopies(copied, ambiguous_groups, copy_error_paths)
 
 
 def _pick_variant_source(target_video: Path, existing_sources: list[Path],
@@ -468,15 +470,25 @@ def _video_match_bucket(video_path: Path, trees: Trees) -> str | None:
 
 
 def _popup_message(result: ScriptsSyncResult) -> str:
-    lines = [
-        "Evolver found funscript files that do not cleanly match the video library.",
-        "",
-        "Check the log for full details:",
-        str(config.LOG_FILE),
-        "",
-        f"Unmatched funscripts: {result.unmatched}",
-        f"Ambiguous basename matches: {result.ambiguous}",
-        f"Destination collisions: {result.collisions}",
-        f"Variant copy errors: {result.variant_copy_errors}",
-    ]
-    return "\n".join(lines)
+    sections = []
+    if result.unmatched_paths:
+        sections.append(_naming(result.unmatched_paths, "matches no video", "match no video"))
+    if result.ambiguous_paths:
+        sections.append(_naming(result.ambiguous_paths,
+                                "matches more than one video", "match more than one video"))
+    if result.collision_paths:
+        sections.append(_naming(
+            result.collision_paths,
+            "can't move into place, because a different script is already there",
+            "can't move into place, because different scripts are already there"))
+    if result.variant_copy_error_paths:
+        sections.append(_naming(
+            result.variant_copy_error_paths,
+            "failed to copy to another version of its video",
+            "failed to copy to other versions of their videos"))
+    return "\n\n".join(sections)
+
+
+def _naming(scripts: list[str], one_does: str, several_do: str) -> str:
+    heading = f"This funscript {one_does}:" if len(scripts) == 1 else f"These funscripts {several_do}:"
+    return "\n".join([heading, *sorted(scripts)])

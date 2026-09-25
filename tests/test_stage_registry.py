@@ -198,17 +198,19 @@ class TestStageRegistry(unittest.TestCase):
         Held by reading the keys out of the window's own source rather than by
         listing them here, so this cannot drift from what the code asks for.
         """
-        for result_type, functions, tables in (
-            (ScriptsSyncResult,
-             ("_summarize_scripts_sync",),
-             (main_window._SCRIPTS_PROBLEMS, main_window._SCRIPTS_ROUTINE)),
+        scripts_keys = (
+            {key for key, _label, _names in main_window._SCRIPTS_PROBLEMS}
+            | {names for _key, _label, names in main_window._SCRIPTS_PROBLEMS if names}
+            | {key for key, _label in main_window._SCRIPTS_ROUTINE}
+        )
+        for result_type, functions, table_keys in (
+            (ScriptsSyncResult, ("_summarize_scripts_sync",), scripts_keys),
             (NonAiUpscaleResult,
              ("_summarize_nonai_upscale", "_whats_left", "_encode_state"),
-             ()),
+             set()),
         ):
             with self.subTest(result=result_type.__name__):
-                shown = _result_keys_read(functions)
-                shown |= {key for table in tables for key, _label in table}
+                shown = _result_keys_read(functions) | table_keys
                 self.assertEqual(
                     sorted(shown),
                     sorted(field.name for field in dataclasses.fields(result_type)),
