@@ -8,7 +8,6 @@ import time.
 from __future__ import annotations
 
 import tempfile
-import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,6 +16,12 @@ import content_overlay
 content_overlay.LOCAL_CONTENT = content_overlay.EXAMPLE_CONTENT
 
 import config  # noqa: E402
+from util import crash_log  # noqa: E402
+
+# The suite's own copies of files the app keeps outside the test's reach, for
+# the life of the run.
+_run_state = tempfile.TemporaryDirectory(prefix="evolver-tests-", ignore_cleanup_errors=True)
+RUN_STATE = Path(_run_state.name)
 
 # No test may open a real modal dialog. Both of these block until a human clicks,
 # so one unguarded call hangs an unattended suite forever instead of failing it.
@@ -45,7 +50,10 @@ patch("gui.peer_watch.clear_evolver_stand_down").start()
 # Nor the low-disk warning's dismissal, which lives beside it: every upscale run
 # that finds room on its drive clears it, so a suite run would bring back a
 # warning the user dismissed.
-patch.object(
-    config, "LOW_DISK_WARNING_DISMISSED_FILE",
-    Path(tempfile.gettempdir()) / "evolver-tests" / f"low_disk_warning_dismissed-{uuid.uuid4().hex}",
-).start()
+patch.object(config, "LOW_DISK_WARNING_DISMISSED_FILE",
+             RUN_STATE / "low_disk_warning_dismissed").start()
+
+# Nor the crash log, which sits in the checkout: every test that has Evolver
+# step aside writes a line to it, and a suite run in the primary checkout
+# would put those lines among the user's real ones.
+patch.object(crash_log, "CRASH_LOG", RUN_STATE / "tray_crash.log").start()

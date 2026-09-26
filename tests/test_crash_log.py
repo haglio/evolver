@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import tray_app
+from tests.product_sources import PROJECT_ROOT
 from tests.temp_helpers import workspace_temp_dir
 from util import crash_log
 
@@ -191,6 +192,12 @@ class TestStartupCrashIsVisible(unittest.TestCase):
         self.assertIn("evolver", title.lower())
         self.assertIn("qtawesome", body)
         self.assertIn(str(crash_log.CRASH_LOG), body)
+
+
+class TestTheSuiteLeavesTheCrashLogAlone(unittest.TestCase):
+    def test_no_test_writes_into_the_crash_log_of_the_checkout_it_runs_in(self):
+        """Every test that has Evolver step aside writes a line there."""
+        self.assertFalse(crash_log.CRASH_LOG.is_relative_to(PROJECT_ROOT))
 
 
 if __name__ == "__main__":
