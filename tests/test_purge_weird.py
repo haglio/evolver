@@ -5,6 +5,40 @@ from unittest.mock import patch
 
 from tasks import purge_weird
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
+from util import script_library
+
+
+class TestTheFunscriptsOfACondemnedClip(unittest.TestCase):
+    def test_the_funscript_of_each_version_goes_with_the_clip_mark_and_all(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                touch_video(lib.weird / "made_00001_topaz.mp4")
+                source = touch_video(lib.sorted_dir / "src" / "portrait" / "made_00001.mp4")
+                scripts = [script_library.script_path_for_video(version) for version in
+                           (source, lib.outbox / "portrait" / "src" / "made_00001_topaz.mp4")]
+                for script in scripts:
+                    touch_video(script)
+                    script_library.mark_generated(script)
+
+                result = purge_weird.run()
+
+                for script in scripts:
+                    self.assertFalse(script.exists())
+                    self.assertFalse(script_library.is_marked_generated(script))
+        self.assertEqual(result.deleted_scripts, 2)
+
+    def test_a_funscript_that_already_followed_its_clip_into_the_pile_goes_too(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                condemned = touch_video(lib.weird / "made_00002_topaz.mp4")
+                followed = touch_video(script_library.script_path_for_video(condemned))
+
+                with patch("tasks.purge_weird.show_error"):
+                    purge_weird.run()
+
+                self.assertFalse(followed.exists())
 
 
 class TestPurgeWeird(unittest.TestCase):

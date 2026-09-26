@@ -3,7 +3,7 @@
 Two piles: ``2_outbox/kinda_weird``, where a viewer's "mark as weird" and the
 backfill's discard both put an outbox video, and the one beside Genau's clips
 folder, where Genau puts a clip a session condemns. A condemned video takes its
-``1_sorted`` source and its metadata sidecar with it.
+``1_sorted`` source, its metadata sidecar and both versions' funscripts with it.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util import lanes, script_library
 from util.alert import show_error
 from util.media_files import is_finalized_video_file
 from util.variants import UPSCALE_SUFFIX
@@ -27,24 +28,29 @@ class PurgeWeirdResult:
     deleted_weird: int = 0
     deleted_sorted: int = 0
     deleted_metadata: int = 0
+    deleted_scripts: int = 0
     missing_sorted: list[str] = field(default_factory=list)
+
+    def __add__(self, other: PurgeWeirdResult) -> PurgeWeirdResult:
+        return PurgeWeirdResult(
+            deleted_weird=self.deleted_weird + other.deleted_weird,
+            deleted_sorted=self.deleted_sorted + other.deleted_sorted,
+            deleted_metadata=self.deleted_metadata + other.deleted_metadata,
+            deleted_scripts=self.deleted_scripts + other.deleted_scripts,
+            missing_sorted=self.missing_sorted + other.missing_sorted)
 
 
 def run() -> PurgeWeirdResult:
-    result = PurgeWeirdResult()
-    for pile in weird_piles():
-        purged = _purge_pile(pile)
-        result.deleted_weird += purged.deleted_weird
-        result.deleted_sorted += purged.deleted_sorted
-        result.deleted_metadata += purged.deleted_metadata
-        result.missing_sorted += purged.missing_sorted
+    result = sum((_purge_pile(pile) for pile in weird_piles()), PurgeWeirdResult())
 
     if result.missing_sorted:
         _report_missing_sources(result.missing_sorted)
 
     log.info(
-        "Purge done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, missing sources: %d",
-        result.deleted_weird, result.deleted_sorted, result.deleted_metadata, len(result.missing_sorted),
+        "Purge done.  Deleted weird: %d, deleted sorted: %d, deleted metadata: %d, "
+        "deleted funscripts: %d, missing sources: %d",
+        result.deleted_weird, result.deleted_sorted, result.deleted_metadata,
+        result.deleted_scripts, len(result.missing_sorted),
     )
     return result
 
@@ -69,10 +75,7 @@ def _purge_pile(pile: WeirdPile) -> PurgeWeirdResult:
     log.info("WEIRD:  %s", pile.directory)
     log.info("Found %d file(s) to purge", len(weird_files))
 
-    deleted_weird = 0
-    deleted_sorted = 0
-    deleted_metadata = 0
-    missing_sorted: list[str] = []
+    purged = PurgeWeirdResult()
     for weird_file in sorted(weird_files):
         src_name = _source_name(weird_file)
         # By name, not by pattern: a `[`, `*` or `?` in a file name is a
@@ -84,24 +87,36 @@ def _purge_pile(pile: WeirdPile) -> PurgeWeirdResult:
             if pile.report_missing_sources:
                 log.warning("No source found in 1_sorted for: %s  (expected: %s)",
                             weird_file.name, src_name)
-                missing_sorted.append(weird_file.name)
+                purged.missing_sorted.append(weird_file.name)
         else:
             for match in matches:
                 match.unlink()
-                deleted_sorted += 1
+                purged.deleted_sorted += 1
                 log.info("Deleted source: %s", match)
+                purged.deleted_scripts += _delete_scripts(match, lanes.upscale_filed_for(match))
 
         for json_file in config.METADATA_DIR.rglob(glob.escape(weird_file.stem + ".json")):
             json_file.unlink()
-            deleted_metadata += 1
+            purged.deleted_metadata += 1
             log.info("Deleted metadata: %s", json_file)
 
         weird_file.unlink()
-        deleted_weird += 1
+        purged.deleted_weird += 1
         log.info("Deleted weird:  %s", weird_file.name)
+        purged.deleted_scripts += _delete_scripts(weird_file)
 
-    return PurgeWeirdResult(deleted_weird, deleted_sorted, deleted_metadata,
-                            missing_sorted)
+    return purged
+
+
+def _delete_scripts(*videos: Path | None) -> int:
+    """Delete the funscript each of *videos* has, mark and all; how many there
+    were. A condemned upscale's stays where the upscale was filed until the
+    scripts stage next runs, so its source's filed upscale is one of them."""
+    held = script_library.scripts_held_for(*videos)
+    for script in held:
+        script_library.delete_script(script)
+        log.info("Deleted funscript: %s", script)
+    return len(held)
 
 
 def source_stem(stem: str) -> str:

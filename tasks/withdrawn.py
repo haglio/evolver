@@ -1,10 +1,11 @@
 """Delete every clip Origenerator has taken back.
 
-Origenerator hands a finished clip over by copying it into ``0_inbox/<source>/``
-and nothing else; the folder is the whole message. Undoing that is a file
-delete, and by the time one is asked for -- which is the point, it can be asked
-for a long time afterwards -- the clip has been sorted, renamed by the upscale
-and, down the Genau lane, moved into a folder outside the library altogether.
+Origenerator hands a finished clip over by copying it, with its funscript when it
+has one, into ``0_inbox/<source>/``; the folder is the whole message. Undoing
+that is a file delete, and by the time one is asked for -- which is the point,
+it can be asked for a long time afterwards -- the clip has been sorted, renamed
+by the upscale and, down the Genau lane, moved into a folder outside the
+library altogether.
 Origenerator knows none of that and must not learn it: it is a content source
 like any other, so it records the withdrawal on its own row and this stage
 pulls it, the same read-only read ``tasks.origenerator_metadata`` does.
@@ -30,7 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import lanes, origenerator_gallery
+from util import lanes, origenerator_gallery, script_library
 from util.media_files import child_dirs, library_videos, strip_uniquifier
 from util.variants import strip_processing_suffixes
 
@@ -41,14 +42,17 @@ log = logging.getLogger(__name__)
 class WithdrawnResult:
     deleted: int = 0
     deleted_metadata: int = 0
+    deleted_scripts: int = 0
     failed: int = 0
 
     def __add__(self, other: WithdrawnResult) -> WithdrawnResult:
         """One result covering both, so each helper returns what it learned
         rather than writing through a result it was handed."""
-        return WithdrawnResult(self.deleted + other.deleted,
-                               self.deleted_metadata + other.deleted_metadata,
-                               self.failed + other.failed)
+        return WithdrawnResult(
+            deleted=self.deleted + other.deleted,
+            deleted_metadata=self.deleted_metadata + other.deleted_metadata,
+            deleted_scripts=self.deleted_scripts + other.deleted_scripts,
+            failed=self.failed + other.failed)
 
 
 def run() -> WithdrawnResult:
@@ -197,7 +201,8 @@ def origin_stem(stem: str) -> str:
 
 
 def _delete_all(videos: list[Path]) -> WithdrawnResult:
-    """Delete each of *videos* and its sidecars, and say what that came to."""
+    """Delete each of *videos*, its sidecars and its funscripts, and say what
+    that came to."""
     result = WithdrawnResult()
     for video in videos:
         try:
@@ -213,6 +218,25 @@ def _delete_all(videos: list[Path]) -> WithdrawnResult:
         log.info("WITHDRAWN %s", video)
         result.deleted += 1
         result.deleted_metadata += _delete_metadata(video)
+        result = result + _delete_scripts(video)
+    return result
+
+
+def _delete_scripts(video: Path) -> WithdrawnResult:
+    """Delete *video*'s funscript, mark and all -- and for a 1_sorted copy, the
+    one filed with its upscale, which stays there after a viewer condemns the
+    upscale until the scripts stage next runs."""
+    result = WithdrawnResult()
+    for script in script_library.scripts_held_for(video, lanes.upscale_filed_for(video)):
+        try:
+            script_library.delete_script(script)
+        except OSError:
+            log.warning("Could not delete %s; leaving it for the next run",
+                        script.name, exc_info=True)
+            result.failed += 1
+            continue
+        log.info("Deleted funscript: %s", script)
+        result.deleted_scripts += 1
     return result
 
 

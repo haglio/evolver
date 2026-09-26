@@ -40,6 +40,18 @@ def script_path_for_video(video: Path) -> Path:
     return script
 
 
+def scripts_held_for(*videos: Path | None) -> list[Path]:
+    held = []
+    for video in filter(None, videos):
+        try:
+            script = script_path_for_video(video)
+        except ValueError:
+            continue
+        if script.is_file():
+            held.append(script)
+    return held
+
+
 def generated_mark(script: Path) -> Path | None:
     """Where the mark saying no person wrote *script* sits, for a script in the
     scripts tree.
@@ -81,6 +93,11 @@ def drop_mark(script: Path) -> None:
     mark = generated_mark(script)
     if mark is not None:
         mark.unlink(missing_ok=True)
+
+
+def delete_script(script: Path) -> None:
+    script.unlink()
+    drop_mark(script)
 
 
 def remove_empty_mark_folders() -> None:
