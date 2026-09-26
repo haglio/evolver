@@ -189,7 +189,7 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
             log.info("Showing error popup for scripts-sync failure")
             links = [("Open unmatched_scripts", trees.unmatched)] if result.unmatched_paths else []
             show_error("Evolver - Funscript Match Error", _popup_message(result), links=links)
-            log.info("Error popup dismissed")
+            log.info("Error popup closed")
     return result
 
 

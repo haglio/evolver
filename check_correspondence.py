@@ -84,7 +84,7 @@ def run(
     if show_popup and not result.ok:
         log.info("Showing error popup for correspondence failure")
         show_error("Evolver - Correspondence Error", _popup_message(result))
-        log.info("Error popup dismissed")
+        log.info("Error popup closed")
 
     return result
 
