@@ -143,8 +143,8 @@ class TestWhatTheWindowIsTold(unittest.TestCase):
         self.assertEqual(told.heard, ["side beta"])
 
     def test_the_words_still_forming_are_shown_as_they_change_and_cleared_before_the_phrase(self):
-        told = _listen([_said("side beta", forming=["side", "side", "side beta"])],
-                       until_heard="side beta")
+        forming = ["side"] * PAUSES.min_speech_frames + ["side beta"]
+        told = _listen([_said("side beta", forming=forming)], until_heard="side beta")
 
         self.assertEqual(told.timeline, [("hearing", "side"), ("hearing", "side beta"),
                                          ("hearing", ""), ("heard", "side beta")])
