@@ -8,10 +8,11 @@ import json
 import sqlite3
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tasks import withdrawn
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
-from util import lanes
+from util import lanes, script_library
 
 _SCHEMA = (
     "CREATE TABLE generations ("
@@ -62,6 +63,57 @@ class TestTheEvolverLane(unittest.TestCase):
                 self.assertFalse(upscale.exists())
                 self.assertFalse(sorted_copy.exists())
         self.assertEqual(result.deleted, 2)
+
+    def test_a_withdrawn_clip_takes_each_copys_funscript_and_its_mark_along(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            source = lanes.ORIGENERATOR_SOURCE
+            db = _gallery(root / "gallery.db", [("p1", "made_00006.mp4", "evolver_unsent_at")])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                copies = (touch_video(lib.sorted_dir / source / "portrait" / "made_00006.mp4"),
+                          touch_video(lib.outbox / "portrait" / source / "made_00006_topaz.mp4"))
+                scripts = [script_library.script_path_for_video(copy) for copy in copies]
+                for script in scripts:
+                    touch_video(script)
+                    script_library.mark_generated(script)
+
+                result = withdrawn.run()
+
+                for script in scripts:
+                    self.assertFalse(script.exists())
+                    self.assertFalse(script_library.is_marked_generated(script))
+        self.assertEqual(result.deleted_scripts, 2)
+
+    def test_the_funscript_still_where_a_condemned_upscale_was_filed_goes_too(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            source = lanes.ORIGENERATOR_SOURCE
+            db = _gallery(root / "gallery.db", [("p1", "made_00007.mp4", "evolver_unsent_at")])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                touch_video(lib.weird / "made_00007_topaz.mp4")
+                touch_video(lib.sorted_dir / source / "portrait" / "made_00007.mp4")
+                left_behind = touch_video(script_library.script_path_for_video(
+                    lib.outbox / "portrait" / source / "made_00007_topaz.mp4"))
+
+                withdrawn.run()
+
+                self.assertFalse(left_behind.exists())
+
+    def test_a_funscript_that_will_not_delete_is_left_for_the_next_run(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            source = lanes.ORIGENERATOR_SOURCE
+            db = _gallery(root / "gallery.db", [("p1", "made_00008.mp4", "evolver_unsent_at")])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                sorted_copy = touch_video(lib.sorted_dir / source / "portrait" / "made_00008.mp4")
+                script = touch_video(script_library.script_path_for_video(sorted_copy))
+
+                with patch("tasks.withdrawn.script_library.delete_script",
+                           side_effect=PermissionError("in use")):
+                    result = withdrawn.run()
+
+                self.assertTrue(script.exists())
+        self.assertEqual((result.deleted, result.deleted_scripts, result.failed), (1, 0, 1))
 
     def test_a_clip_still_in_the_inbox_goes_before_it_is_ever_sorted(self):
         with workspace_temp_dir() as root:

@@ -75,6 +75,15 @@ def ai_clips() -> Iterator[AiClip]:
                 yield AiClip(video, source_dir.name, orient_dir.name)
 
 
+def upscale_filed_for(video: Path) -> Path | None:
+    """Where the upscale of *video* is filed, when *video* is a 1_sorted copy."""
+    try:
+        source, orientation, *inside = video.relative_to(config.SORTED_DIR).parts
+    except ValueError:
+        return None
+    return AiClip(video, source, orientation).upscale if inside else None
+
+
 def genau_clips() -> Iterator[Path]:
     if not config.GENAU_CLIPS_DIR.is_dir():
         return

@@ -152,8 +152,10 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/withdrawn.py": 8,
     # Two more: the Genau lane's folder name and where its clips are delivered,
     # both read where the lane table is built rather than by the stage reading
-    # that table (tasks/withdrawn.py).
-    "util/lanes.py": 8,
+    # that table (tasks/withdrawn.py). Then one more: 1_sorted again, to say
+    # where a sorted copy's upscale is filed, for the two stages that delete a
+    # clip's funscripts.
+    "util/lanes.py": 9,
     # Origenerator's gallery file, read nowhere else now that both stages pulling
     # from it come through here.
     "util/origenerator_gallery.py": 1,
