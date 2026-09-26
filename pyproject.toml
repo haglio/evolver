@@ -23,7 +23,7 @@ dependencies = [
     "app-support @ git+https://github.com/haglio/app_support@v0.1.156",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.135",
     # The family's listener, for the backfill tool: it brings vosk and sounddevice.
-    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.19",
+    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.27",
     # What voice_core reads each command with a second time; it imports it, this repo
     # installs it.
     "faster-whisper>=1,<2",
