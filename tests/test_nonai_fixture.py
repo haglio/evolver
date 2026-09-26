@@ -43,6 +43,7 @@ MODULES = (
 # reading or writing the machine's own.
 PLACES_ON_DISK = {
     "FUN_TIME_WATCH_STATS_FILE",
+    "GENERATED_SCRIPTS_DIR",
     "METADATA_DIR",
     "NONAI_ATTEMPTS_FILE",
     "NONAI_COOLDOWN_FILE",

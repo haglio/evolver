@@ -27,6 +27,8 @@ from util.nonai_library import bucket_of, stage_dirs
 
 log = logging.getLogger(__name__)
 
+_MIRRORS = (sidecar.sidecar_path, script_library.script_path_for_video)
+
 # The one part of a sidecar that describes the FILE rather than the footage in
 # it: which family it belongs to and whether it is a processed variant.  An
 # upscale's is its own, and the grouping stage stamps it on the same pass.
@@ -126,13 +128,11 @@ def _archive_original(source: Path, archive_root: Path) -> None:
     """
     dest = archive_root / source.relative_to(config.NON_AI_DIR)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    for mirror, suffix in (
-        (sidecar.sidecar_path, ".json"),
-        (script_library.script_path_for_video, config.FUNSCRIPT_EXTENSION),
-    ):
+    for mirror in _MIRRORS:
         src = mirror(source)
         if src.exists():
-            shutil.move(str(src), str(dest.with_suffix(suffix)))
+            shutil.move(str(src), str(dest.with_suffix(src.suffix)))
+    script_library.drop_mark(script_library.script_path_for_video(source))
     shutil.move(str(source), str(dest))
     log.info("Archived original: %s -> %s", source, dest)
 
@@ -149,10 +149,12 @@ def _move_mirrored_files(source: Path, dest: Path) -> None:
     runs first and writes the clip a fresh script at the new path, so the sync
     finds its destination taken and fails the run on an unresolvable collision.
     """
-    for mirror in (sidecar.sidecar_path, script_library.script_path_for_video):
+    for mirror in _MIRRORS:
         src = mirror(source)
         if not src.exists():
             continue
         dst = mirror(dest)
         dst.parent.mkdir(parents=True, exist_ok=True)
         src.replace(dst)
+    script_library.carry_mark(script_library.script_path_for_video(source),
+                              script_library.script_path_for_video(dest))

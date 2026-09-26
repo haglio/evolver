@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tasks import stray_files
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util import lanes
 from util.media_files import partial_path
 
 
@@ -118,6 +119,40 @@ class TestStrayFunscripts(unittest.TestCase):
             self.assertEqual(
                 (scripts / "scene one.funscript").read_text(encoding="utf-8"), "already here"
             )
+
+
+class TestScriptsOrigeneratorHandsOver(unittest.TestCase):
+    def _library(self, root):
+        videos = root / "videos"
+        return videos, dict(VIDEO_LIBRARY_DIR=videos, INBOX_DIR=videos / "2D" / "AI" / "0_inbox",
+                            SCRIPT_LIBRARY_DIR=root / "scripts",
+                            GENERATED_SCRIPTS_DIR=root / "generated")
+
+    def test_a_script_handed_over_with_its_clip_is_marked_as_no_persons(self):
+        with workspace_temp_dir() as root:
+            videos, folders = self._library(root)
+            lane = Path("2D") / "AI" / "0_inbox" / lanes.ORIGENERATOR_SOURCE
+            (videos / lane).mkdir(parents=True)
+            (videos / lane / "made_00001.funscript").write_text("{}", encoding="utf-8")
+
+            with override_config(**folders):
+                stray_files.run()
+
+            self.assertTrue((root / "scripts" / lane / "made_00001.funscript").is_file())
+            self.assertTrue((root / "generated" / lane / "made_00001.generated").is_file())
+
+    def test_a_script_found_anywhere_else_carries_no_mark(self):
+        with workspace_temp_dir() as root:
+            videos, folders = self._library(root)
+            bucket = Path("2D") / "non_AI" / "example"
+            (videos / bucket).mkdir(parents=True)
+            (videos / bucket / "scene one.funscript").write_text("{}", encoding="utf-8")
+
+            with override_config(**folders):
+                stray_files.run()
+
+            self.assertTrue((root / "scripts" / bucket / "scene one.funscript").is_file())
+            self.assertFalse((root / "generated").exists())
 
 
 class TestEverythingElse(unittest.TestCase):

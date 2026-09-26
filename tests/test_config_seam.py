@@ -132,7 +132,9 @@ CONFIG_REFERENCE_LEDGER = {
     # stage's parking of a script that matches nothing.
     "tasks/scripts_sync.py": 8,
     "tasks/sort.py": 2,
-    "tasks/stray_files.py": 8,
+    # The 9th is the third shape: the inbox, to tell a funscript Origenerator
+    # handed over with its clip -- one no person wrote -- from any other.
+    "tasks/stray_files.py": 9,
     # One more for the provider's source name in the recipe guard (bug 7), then
     # four fewer: the two recipes it chooses between are util.topaz's, named and
     # versioned beside the settings they run with, not four loose strings here.
@@ -155,15 +157,19 @@ CONFIG_REFERENCE_LEDGER = {
     # Origenerator's gallery file, read nowhere else now that both stages pulling
     # from it come through here.
     "util/origenerator_gallery.py": 1,
-    "util/script_library.py": 3,
+    # Three more, the third shape: the tree of marks Fun Time reads to know a
+    # funscript no person wrote, read where a mark is kept beside its script.
+    "util/script_library.py": 6,
     "util/media_files.py": 1,
     "util/nonai_library.py": 5,
     # The two folders another app hands clips to this pipeline through, read
     # here so the published document says where they are TODAY rather than
     # where they were when somebody last wrote them out by hand.
     "util/contract.py": 3,
-    # One fewer with the archive lookup gone (item 27's last piece).
-    "util/nonai_retire.py": 2,
+    # One fewer with the archive lookup gone (item 27's last piece), then one
+    # more fewer: an archived original's sidecar and funscript keep the suffix
+    # their mirrors gave them, rather than one looked up again.
+    "util/nonai_retire.py": 1,
     "util/reference_stores.py": 6,
     "util/sidecar.py": 4,
     "util/topaz.py": 3,

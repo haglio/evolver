@@ -1,6 +1,7 @@
-"""Where a funscript lives, and how to carry one between a clip and its scene —
-cut out of the scene's, or placed back into the scene's timeline — saying in the
-script itself which of those acts wrote it.
+"""Where a funscript lives, with the mark saying no person wrote it, and how to
+carry one between a clip and its scene — cut out of the scene's, or placed back
+into the scene's timeline — saying in the script itself which of those acts
+wrote it.
 
 What a funscript *is* belongs to every app in this family that reads or writes
 one and lives in :mod:`app_support.funscript`, not here.
@@ -15,6 +16,7 @@ from app_support.mirrored_tree import mirrored_path
 
 import config
 from util import provenance
+from util.media_files import remove_empty_dirs
 
 
 def script_path_for_video(video: Path) -> Path:
@@ -36,6 +38,53 @@ def script_path_for_video(video: Path) -> Path:
     if script is None:
         raise ValueError(f"{video} is not in the video library")
     return script
+
+
+def generated_mark(script: Path) -> Path | None:
+    """Where the mark saying no person wrote *script* sits, for a script in the
+    scripts tree.
+
+    Fun Time's F-mode plays only the scripts a person wrote and knows the rest
+    by this empty file alone, so the mark goes wherever its script goes.
+    """
+    return mirrored_path(
+        script,
+        roots=(config.SCRIPT_LIBRARY_DIR,),
+        mirror_root=config.GENERATED_SCRIPTS_DIR,
+        suffix=".generated",
+    )
+
+
+def mark_generated(script: Path) -> None:
+    mark = generated_mark(script)
+    if mark is not None:
+        mark.parent.mkdir(parents=True, exist_ok=True)
+        mark.touch()
+
+
+def is_marked_generated(script: Path) -> bool:
+    mark = generated_mark(script)
+    return mark is not None and mark.exists()
+
+
+def copy_mark(script: Path, copied_to: Path) -> None:
+    if is_marked_generated(script):
+        mark_generated(copied_to)
+
+
+def carry_mark(script: Path, moved_to: Path) -> None:
+    copy_mark(script, moved_to)
+    drop_mark(script)
+
+
+def drop_mark(script: Path) -> None:
+    mark = generated_mark(script)
+    if mark is not None:
+        mark.unlink(missing_ok=True)
+
+
+def remove_empty_mark_folders() -> None:
+    remove_empty_dirs(config.GENERATED_SCRIPTS_DIR)
 
 
 def trim(script: dict, start_seconds: float, duration_seconds: float) -> dict:

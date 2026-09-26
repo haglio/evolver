@@ -93,6 +93,25 @@ class TestRetireIntoTheBucket(unittest.TestCase):
                     {"actions": [{"at": 0, "pos": 20}]},
                 )
 
+    def test_the_mark_saying_no_person_wrote_the_funscript_goes_with_it(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            source = make_video(non_ai / "example" / "1 clips to upscale" / "scene one.mp4")
+            make_video(non_ai / "example" / "2 do not need work" / "placeholder.mp4")
+
+            with override_config(**overrides):
+                script = script_library.script_path_for_video(source)
+                funscript.write(script, {"actions": []})
+                script_library.mark_generated(script)
+
+                nonai_retire.retire_original(source, archive_root=None)
+
+                dest = non_ai / "example" / "2 do not need work" / "scene one.mp4"
+                self.assertTrue(script_library.is_marked_generated(
+                    script_library.script_path_for_video(dest)))
+                self.assertFalse(script_library.is_marked_generated(script))
+
 
 class TestRetireToAnArchive(unittest.TestCase):
     """With an archive given, a retired original leaves the library entirely.
@@ -143,6 +162,21 @@ class TestRetireToAnArchive(unittest.TestCase):
                 json.loads(archived.read_text(encoding="utf-8")),
                 {"actions": [{"at": 0, "pos": 20}]},
             )
+
+    def test_no_mark_is_left_behind_for_a_funscript_that_left_the_library(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            source = make_video(overrides["NON_AI_DIR"] / "example" / "1 clips to upscale"
+                                / "scene one.mp4")
+
+            with override_config(**overrides):
+                script = script_library.script_path_for_video(source)
+                funscript.write(script, {"actions": []})
+                script_library.mark_generated(script)
+
+                nonai_retire.retire_original(source, archive_root=root / "archive")
+
+                self.assertFalse(script_library.is_marked_generated(script))
 
     def test_the_sidecar_goes_with_it_so_the_archive_describes_itself(self):
         """The metadata tree mirrors the library, and the grouping stage prunes

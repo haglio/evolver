@@ -8,7 +8,9 @@ than a dot (``clip mp4``), which no stage can see is a video at all, and a
 ``.funscript`` dropped in the video tree instead of the script tree, which the
 scripts sync never walks.  This stage repairs the first, sends the second to the
 mirror path the scripts sync does walk, and reports anything else by path
-without touching it.
+without touching it.  One such funscript is expected rather than stray: the one
+Origenerator hands over beside its clip, which it made from the clip's length,
+so it arrives marked as a script no person wrote.
 """
 from __future__ import annotations
 
@@ -17,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
+from util import lanes, script_library
 from util.media_files import is_partial_path
 
 log = logging.getLogger(__name__)
@@ -170,7 +173,13 @@ def _rehome_script(path: Path) -> str:
     dest.parent.mkdir(parents=True, exist_ok=True)
     log.info("REHOME SCRIPT  %s  ->  %s", path, dest)
     path.rename(dest)
+    if _handed_over_by_origenerator(path):
+        script_library.mark_generated(dest)
     return ""
+
+
+def _handed_over_by_origenerator(path: Path) -> bool:
+    return path.is_relative_to(config.INBOX_DIR / lanes.ORIGENERATOR_SOURCE)
 
 
 def _reportable(path: Path) -> str:
