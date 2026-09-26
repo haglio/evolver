@@ -50,14 +50,13 @@ _kernel32 = load_dll("kernel32")
 _MUTEX_NAME = "EvolverTrayApp_SingleInstance"
 _PIPE_NAME = "EvolverTrayApp_ShowWindow"
 
-_CONNECT_TIMEOUT_MS = 3000
-# The running Evolver answers from its event loop the moment the launch has
-# spoken; one that has not answered by now is not going to.
-_ANSWER_TIMEOUT_MS = 2000
-# An Evolver stepping aside gives the stage it is in five seconds to finish,
-# then exits; this is that, with room to spare for a machine under load.
+# How long a launch waits on the Evolver already running, to answer and then to
+# go: stepping aside, it gives the stage it is in five seconds to finish, and a
+# machine under load can keep it from the processor for seconds on end --
+# starved of it, one took fifteen to answer.
 _PATIENCE_SECONDS = 30.0
 _RETRY_SECONDS = 0.2
+_SEND_TIMEOUT_MS = 2000
 
 #: What a launch says when it finds an Evolver already running: the Evolver
 #: the user runs every day, or a branch's, come to take the work over.
@@ -120,14 +119,15 @@ class InstanceGateway:
         while not self.claim():
             if time.monotonic() >= deadline:
                 return Outcome.UNANSWERED
-            answer = self.ask(launch)
+            answer = self.ask(launch, until=deadline)
             if answer is not None and answer.reply == SHOWING:
                 return Outcome.HANDED_OFF
             if answer is not None and answer.reply != STEPPING_ASIDE:
                 if not end_the_unanswering:
                     return Outcome.HANDED_OFF
                 log.warning("Evolver (process %s) did not answer; ending it", answer.pid)
-                processes.terminate(answer.pid)
+                if processes.terminate(answer.pid):
+                    deadline = time.monotonic() + _PATIENCE_SECONDS
             time.sleep(_RETRY_SECONDS)
         return Outcome.CLAIMED
 
@@ -182,30 +182,34 @@ class InstanceGateway:
             _kernel32.CloseHandle(ctypes.c_void_p(self._mutex_handle))
             self._mutex_handle = None
 
-    def ask(self, launch: bytes) -> Answer | None:
-        """Tell the running Evolver what *launch* is, and hear what it does.
+    def ask(self, launch: bytes, *, until: float) -> Answer | None:
+        """Tell the running Evolver what *launch* is, and hear by *until* what it does.
 
         None when nothing is listening -- an Evolver still starting, or one on
         its way out.
         """
         socket = QLocalSocket()
         socket.connectToServer(_PIPE_NAME)
-        if not socket.waitForConnected(_CONNECT_TIMEOUT_MS):
+        if not socket.waitForConnected(_milliseconds_until(until)):
             return None
         pid = processes.pipe_server(int(socket.socketDescriptor()))
         socket.write(launch)
-        socket.waitForBytesWritten(_CONNECT_TIMEOUT_MS)
+        socket.waitForBytesWritten(_milliseconds_until(until))
         reply = b""
-        if socket.waitForReadyRead(_ANSWER_TIMEOUT_MS):
+        if socket.waitForReadyRead(_milliseconds_until(until)):
             reply = bytes(socket.readAll())
         socket.disconnectFromServer()
         return Answer(reply, pid)
 
 
+def _milliseconds_until(moment: float) -> int:
+    return max(0, round((moment - time.monotonic()) * 1000))
+
+
 def _reply(connection: QLocalSocket, launch: bytes, reply: bytes) -> None:
     if launch:
         connection.write(reply)
-        connection.waitForBytesWritten(_ANSWER_TIMEOUT_MS)
+        connection.waitForBytesWritten(_SEND_TIMEOUT_MS)
     connection.disconnectFromServer()
     connection.deleteLater()
 
