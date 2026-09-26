@@ -41,18 +41,24 @@ def run(
     outbox_dir: Path | None = None,
     weird_dir: Path | None = None,
     low_disk_floor_gb: float | None = None,
+    low_disk_dismissed_file: Path | None = None,
 ) -> UpscaleResult:
     """Upscale the pending sorted videos into the outbox, within one run's budget.
 
-    The three trees the stage spans and the free-space floor it stops at are
-    arguments, resolved here rather than in the signature: a default is
-    evaluated at import, which would freeze the value past ``override_config``.
+    The three trees the stage spans, the free-space floor it stops at and the
+    file that remembers the low-disk warning was dismissed are arguments,
+    resolved here rather than in the signature: a default is evaluated at
+    import, which would freeze the value past ``override_config``.
     """
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
     weird_dir = config.WEIRD_DIR if weird_dir is None else weird_dir
     low_disk_floor_gb = (
         config.LOW_DISK_WARNING_GB if low_disk_floor_gb is None else low_disk_floor_gb
+    )
+    low_disk_dismissed_file = (
+        config.LOW_DISK_WARNING_DISMISSED_FILE if low_disk_dismissed_file is None
+        else low_disk_dismissed_file
     )
 
     result = UpscaleResult()
@@ -65,6 +71,8 @@ def run(
         (outbox_dir / orient).mkdir(parents=True, exist_ok=True)
     weird_dir.mkdir(parents=True, exist_ok=True)
     removed_partial_outputs = remove_partial_files(outbox_dir, logger=log)
+    if not _is_low_disk(outbox_dir, low_disk_floor_gb):
+        _bring_back_the_low_disk_warning(low_disk_dismissed_file)
 
     log.info("=== Stage: upscale from 1_sorted ===")
     log.info("OUT: %s/{landscape,portrait}/<source>/", outbox_dir)
@@ -103,7 +111,7 @@ def run(
         if _is_low_disk(outbox_dir, low_disk_floor_gb):
             result.deferred_low_disk = True
             result.pending_after_run = total_pending - result.processed - result.failed
-            _show_low_disk_warning(outbox_dir, low_disk_floor_gb)
+            _show_low_disk_warning(outbox_dir, low_disk_floor_gb, low_disk_dismissed_file)
             log.warning("Stopping the upscale stage early due to low free disk space.")
             break
 
@@ -297,9 +305,11 @@ def _is_low_disk(outbox_dir: Path, floor_gb: float) -> bool:
     return free_gb < floor_gb
 
 
-def _show_low_disk_warning(outbox_dir: Path, floor_gb: float) -> None:
+def _show_low_disk_warning(outbox_dir: Path, floor_gb: float, dismissed: Path) -> None:
+    if dismissed.exists():
+        return
     free_gb = system_resources.free_bytes(outbox_dir) / (1024 ** 3)
-    show_error(
+    clicked_dismiss = show_error(
         "Evolver - Low Disk Space",
         (
             "Evolver paused the upscale stage because free disk space is below the configured safety floor.\n\n"
@@ -308,4 +318,17 @@ def _show_low_disk_warning(outbox_dir: Path, floor_gb: float) -> None:
             f"Required floor: {floor_gb:.1f} GiB\n\n"
             f"Check the log for details:\n{config.LOG_FILE}"
         ),
+        dismissible=True,
     )
+    if clicked_dismiss:
+        dismissed.parent.mkdir(parents=True, exist_ok=True)
+        dismissed.touch()
+        log.info("The low-disk warning was dismissed until a run finds room on the drive again.")
+
+
+def _bring_back_the_low_disk_warning(dismissed: Path) -> None:
+    try:
+        dismissed.unlink()
+    except FileNotFoundError:
+        return
+    log.info("The drive has room again, so the low-disk warning will show the next time it runs low.")

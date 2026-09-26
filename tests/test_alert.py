@@ -35,7 +35,8 @@ class TestShowError(unittest.TestCase):
     def test_it_opens_the_familys_dialog_under_evolvers_own_icon(self, show_alert):
         alert.show_error("Title", "Body")
 
-        show_alert.assert_called_once_with("Title", "Body", icon=alert.ICON_FILE, links=[])
+        show_alert.assert_called_once_with(
+            "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False)
 
     @patch("shared_ui.alert.show_alert")
     def test_a_folder_to_open_reaches_the_dialog_as_a_link_under_the_message(self, show_alert):
@@ -44,7 +45,15 @@ class TestShowError(unittest.TestCase):
         alert.show_error("Title", "Body", links=[("Open its folder", folder)])
 
         show_alert.assert_called_once_with(
-            "Title", "Body", icon=alert.ICON_FILE, links=[Link("Open its folder", folder)])
+            "Title", "Body", icon=alert.ICON_FILE, links=[Link("Open its folder", folder)],
+            dismissible=False)
+
+    @patch("shared_ui.alert.show_alert", return_value=True)
+    def test_an_alert_that_offers_dismiss_says_whether_it_was_dismissed(self, show_alert):
+        dismissed = alert.show_error("Title", "Body", dismissible=True)
+
+        self.assertIs(dismissed, True)
+        self.assertIs(show_alert.call_args.kwargs["dismissible"], True)
 
     @patch("app_support.win32.show_error_popup")
     @patch("shared_ui.alert.show_alert", side_effect=ImportError("no Qt"))
@@ -72,6 +81,14 @@ class TestShowError(unittest.TestCase):
             alert.show_error("Title", "Body", links=[("Open its folder", folder)])
 
         show_error_popup.assert_called_once_with("Title", f"Body\n\n{folder}")
+
+    @patch("app_support.win32.show_error_popup")
+    @patch("shared_ui.alert.show_alert", side_effect=ImportError("no Qt"))
+    def test_the_windows_dialog_has_no_dismiss_so_it_comes_back(self, _show_alert, _popup):
+        with self.assertLogs("util.alert", level="ERROR"):
+            dismissed = alert.show_error("Title", "Body", dismissible=True)
+
+        self.assertIs(dismissed, False)
 
     @patch("app_support.win32.show_error_popup", side_effect=OSError("no user32"))
     @patch("shared_ui.alert.show_alert", side_effect=ImportError("no Qt"))

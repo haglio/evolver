@@ -7,11 +7,16 @@ import time.
 """
 from __future__ import annotations
 
+import tempfile
+import uuid
+from pathlib import Path
 from unittest.mock import patch
 
 import content_overlay
 
 content_overlay.LOCAL_CONTENT = content_overlay.EXAMPLE_CONTENT
+
+import config  # noqa: E402
 
 # No test may open a real modal dialog. Both of these block until a human clicks,
 # so one unguarded call hangs an unattended suite forever instead of failing it.
@@ -21,7 +26,7 @@ content_overlay.LOCAL_CONTENT = content_overlay.EXAMPLE_CONTENT
 # runs before any test module is read, and both are importable on an interpreter
 # with no Windows, so the gag never becomes the thing that decides whether the
 # suite collects at all.
-patch("shared_ui.alert.show_alert").start()
+patch("shared_ui.alert.show_alert", return_value=False).start()
 patch("app_support.win32.show_error_popup").start()
 
 # No test may write or delete the stand-down marker. It lives under LOCALAPPDATA,
@@ -36,3 +41,11 @@ patch("app_support.win32.show_error_popup").start()
 # project root does not exist. A test that wants it stubbed patches it.
 patch("gui.peer_watch.stand_evolver_down").start()
 patch("gui.peer_watch.clear_evolver_stand_down").start()
+
+# Nor the low-disk warning's dismissal, which lives beside it: every upscale run
+# that finds room on its drive clears it, so a suite run would bring back a
+# warning the user dismissed.
+patch.object(
+    config, "LOW_DISK_WARNING_DISMISSED_FILE",
+    Path(tempfile.gettempdir()) / "evolver-tests" / f"low_disk_warning_dismissed-{uuid.uuid4().hex}",
+).start()

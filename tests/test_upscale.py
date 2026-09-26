@@ -5,7 +5,7 @@ import json
 import subprocess
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import config
 from tasks import upscale
@@ -266,6 +266,65 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             self.assertEqual(result.processed, 0)
             self.assertEqual(result.failed, 1)
+
+
+FULL_DRIVE = 1
+ROOMY_DRIVE = 10**15
+
+
+class TestTheLowDiskWarning(unittest.TestCase):
+    def runs(self, *free_bytes_each_run: int, clicked_dismiss: bool = False) -> MagicMock:
+        """One run of the stage per entry, with a video waiting every time.
+
+        The encode fails, so the video is still waiting for the next run.
+        """
+        with workspace_temp_dir() as root:
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            touch_video(sorted_dir / "src" / "landscape" / "clip.mp4")
+
+            with patch("tasks.upscale._run_ffmpeg", return_value=False), \
+                 patch("tasks.upscale.system_resources.free_bytes") as free_bytes, \
+                 patch("tasks.upscale.show_error", return_value=clicked_dismiss) as show_error:
+                for free in free_bytes_each_run:
+                    free_bytes.return_value = free
+                    upscale.run(max_items=5, sorted_dir=sorted_dir, outbox_dir=out_dir,
+                                weird_dir=weird_dir, low_disk_floor_gb=1,
+                                low_disk_dismissed_file=root / "state" / "dismissed")
+        return show_error
+
+    def test_the_low_disk_warning_offers_dismiss(self):
+        show_error = self.runs(FULL_DRIVE)
+
+        self.assertIs(show_error.call_args.kwargs["dismissible"], True)
+
+    def test_no_test_can_reach_the_dismissal_on_the_machine_running_the_suite(self):
+        """Every upscale test with room on its drive clears the dismissal it sees."""
+        self.assertFalse(
+            config.LOW_DISK_WARNING_DISMISSED_FILE.is_relative_to(config.LOCAL_STATE_DIR))
+
+    def test_ok_leaves_it_coming_back_every_run_the_drive_is_low(self):
+        show_error = self.runs(FULL_DRIVE, FULL_DRIVE, FULL_DRIVE)
+
+        self.assertEqual(show_error.call_count, 3)
+
+    def test_after_dismiss_it_stays_away_while_the_drive_stays_low(self):
+        show_error = self.runs(FULL_DRIVE, FULL_DRIVE, FULL_DRIVE, clicked_dismiss=True)
+
+        self.assertEqual(show_error.call_count, 1)
+
+    def test_once_a_run_finds_room_again_the_next_low_run_shows_it_once_more(self):
+        show_error = self.runs(FULL_DRIVE, ROOMY_DRIVE, FULL_DRIVE, FULL_DRIVE, clicked_dismiss=True)
+
+        self.assertEqual(show_error.call_count, 2)
+
+    def test_the_log_says_when_it_was_dismissed_and_when_room_brought_it_back(self):
+        with self.assertLogs("tasks.upscale", level="INFO") as logged:
+            self.runs(FULL_DRIVE, ROOMY_DRIVE, ROOMY_DRIVE, clicked_dismiss=True)
+
+        said = [line for line in logged.output if "low-disk warning" in line]
+        self.assertEqual(len(said), 2)
+        self.assertIn("dismissed", said[0])
+        self.assertIn("room again", said[1])
 
 
 class TestWhatMadeTheUpscale(unittest.TestCase):
