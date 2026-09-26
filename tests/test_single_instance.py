@@ -256,6 +256,22 @@ class TestTakingOver(unittest.TestCase):
 
         self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
 
+    def test_an_evolver_that_steps_aside_late_is_still_given_time_to_go(self):
+        mutex = _unique("LateMutex")
+        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("LatePipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              held_mutex(mutex) as holder:
+            gone = threading.Timer(0.5, holder.let_go)
+            running = Listening(steps_aside_for=lambda launch: time.sleep(0.7) or True)
+            running.stepped_aside = _Calls(gone.start)
+            try:
+                outcome = in_the_background(lambda: single_instance.InstanceGateway().take_over(
+                    single_instance.PREVIEW, end_the_unanswering=True))
+            finally:
+                running.close()
+                if gone.is_alive():
+                    gone.join()
+
+        self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
+
     def test_a_preview_ends_an_evolver_that_never_answers(self):
         """One from before launches spoke, or one that has stopped responding: either way
         it holds the work the preview came to take."""

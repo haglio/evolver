@@ -50,10 +50,10 @@ _kernel32 = load_dll("kernel32")
 _MUTEX_NAME = "EvolverTrayApp_SingleInstance"
 _PIPE_NAME = "EvolverTrayApp_ShowWindow"
 
-# How long a launch waits on the Evolver already running, to answer and then to
-# go: stepping aside, it gives the stage it is in five seconds to finish, and a
-# machine under load can keep it from the processor for seconds on end --
-# starved of it, one took fifteen to answer.
+# How long a launch waits for the Evolver already running to answer, and again
+# for it to go: stepping aside, it gives the stage it is in five seconds to
+# finish, and a machine under load can keep it from the processor for seconds
+# on end -- starved of it, one took fifteen to answer.
 _PATIENCE_SECONDS = 30.0
 _RETRY_SECONDS = 0.2
 _SEND_TIMEOUT_MS = 2000
@@ -120,13 +120,12 @@ class InstanceGateway:
             if time.monotonic() >= deadline:
                 return Outcome.UNANSWERED
             answer = self.ask(launch, until=deadline)
-            if answer is not None and answer.reply == SHOWING:
-                return Outcome.HANDED_OFF
-            if answer is not None and answer.reply != STEPPING_ASIDE:
-                if not end_the_unanswering:
+            if answer is not None:
+                if answer.reply == SHOWING:
                     return Outcome.HANDED_OFF
-                log.warning("Evolver (process %s) did not answer; ending it", answer.pid)
-                if processes.terminate(answer.pid):
+                if answer.reply != STEPPING_ASIDE and not end_the_unanswering:
+                    return Outcome.HANDED_OFF
+                if answer.reply == STEPPING_ASIDE or _end(answer.pid):
                     deadline = time.monotonic() + _PATIENCE_SECONDS
             time.sleep(_RETRY_SECONDS)
         return Outcome.CLAIMED
@@ -200,6 +199,11 @@ class InstanceGateway:
             reply = bytes(socket.readAll())
         socket.disconnectFromServer()
         return Answer(reply, pid)
+
+
+def _end(pid: int) -> bool:
+    log.warning("Evolver (process %s) did not answer; ending it", pid)
+    return processes.terminate(pid)
 
 
 def _milliseconds_until(moment: float) -> int:
