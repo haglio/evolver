@@ -305,24 +305,32 @@ class TestTakingOver(unittest.TestCase):
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+_STARVED_SECONDS = 2.5
+
 _RUNNING_EVOLVER = """
-import sys
+import sys, time
 from PyQt6.QtCore import QCoreApplication
-from PyQt6.QtNetwork import QLocalServer
+from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from gui import single_instance
-single_instance._MUTEX_NAME, single_instance._PIPE_NAME, answers = sys.argv[1:4]
+single_instance._MUTEX_NAME, single_instance._PIPE_NAME, manner, starved = sys.argv[1:5]
 app = QCoreApplication([])
 gateway = single_instance.InstanceGateway()
 assert gateway.claim()
-if answers == "answers":
-    gateway.serve_launches(
-        steps_aside_for=lambda launch: launch == single_instance.PREVIEW,
-        on_show=lambda: None, on_step_aside=app.quit)
-else:
+if manner == "slow to hang up":
+    hang_up = QLocalSocket.disconnectFromServer
+    def hang_up_slowly(connection):
+        time.sleep(float(starved))
+        hang_up(connection)
+    QLocalSocket.disconnectFromServer = hang_up_slowly
+if manner == "silent":
     mute = QLocalServer()
     assert mute.listen(single_instance._PIPE_NAME)
     held = []
     mute.newConnection.connect(lambda: held.append(mute.nextPendingConnection()))
+else:
+    gateway.serve_launches(
+        steps_aside_for=lambda launch: launch == single_instance.PREVIEW,
+        on_show=lambda: None, on_step_aside=app.quit)
 print("serving", flush=True)
 app.exec()
 """
@@ -332,9 +340,9 @@ class TestAcrossProcesses(unittest.TestCase):
     """In life the two ends are two processes, and the claim is let go only
     when the one making way has exited."""
 
-    def _running_evolver(self, mutex: str, pipe: str, answers: str):
+    def _running_evolver(self, mutex: str, pipe: str, manner: str):
         running = subprocess.Popen(
-            [sys.executable, "-c", _RUNNING_EVOLVER, mutex, pipe, answers],
+            [sys.executable, "-c", _RUNNING_EVOLVER, mutex, pipe, manner, str(_STARVED_SECONDS)],
             cwd=REPO_ROOT, stdout=subprocess.PIPE,
             env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
             creationflags=subprocess.CREATE_NO_WINDOW)
@@ -350,6 +358,15 @@ class TestAcrossProcesses(unittest.TestCase):
     def test_an_evolver_that_steps_aside_exits_and_the_preview_is_evolver(self):
         mutex, pipe = _unique("CrossMutex"), _unique("CrossPipe")
         running = self._running_evolver(mutex, pipe, "answers")
+
+        outcome = self._preview_launch(mutex, pipe)
+
+        self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
+        self.assertEqual(running.wait(timeout=30), 0)
+
+    def test_an_evolver_slow_to_hang_up_after_stepping_aside_still_exits_on_its_own(self):
+        mutex, pipe = _unique("CrossLateMutex"), _unique("CrossLatePipe")
+        running = self._running_evolver(mutex, pipe, "slow to hang up")
 
         outcome = self._preview_launch(mutex, pipe)
 

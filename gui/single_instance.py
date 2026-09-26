@@ -150,16 +150,12 @@ class InstanceGateway:
             log.error("Cannot listen on %s: %s", _PIPE_NAME, server.errorString())
 
         def _answer(connection: QLocalSocket, launch: bytes) -> None:
-            aside = steps_aside_for(launch)
-            if launch:
-                connection.write(STEPPING_ASIDE if aside else SHOWING)
-                connection.waitForBytesWritten(_ANSWER_TIMEOUT_MS)
-            connection.disconnectFromServer()
-            connection.deleteLater()
-            if aside:
+            if steps_aside_for(launch):
                 self.stop_serving()
+                _reply(connection, launch, STEPPING_ASIDE)
                 on_step_aside()
             else:
+                _reply(connection, launch, SHOWING)
                 on_show()
 
         def _accept():
@@ -204,6 +200,14 @@ class InstanceGateway:
             reply = bytes(socket.readAll())
         socket.disconnectFromServer()
         return Answer(reply, pid)
+
+
+def _reply(connection: QLocalSocket, launch: bytes, reply: bytes) -> None:
+    if launch:
+        connection.write(reply)
+        connection.waitForBytesWritten(_ANSWER_TIMEOUT_MS)
+    connection.disconnectFromServer()
+    connection.deleteLater()
 
 
 def _hear(connection: QLocalSocket, answer: Callable[[QLocalSocket, bytes], None]) -> None:
