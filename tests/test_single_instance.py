@@ -298,7 +298,7 @@ class TestTakingOver(unittest.TestCase):
 
     def test_an_evolver_that_steps_aside_is_waited_out_and_replaced(self):
         mutex = _unique("AsideMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("AsidePipe")),              held_mutex(mutex) as holder:
+        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("AsidePipe")),              patch("util.processes.terminate") as terminate,              held_mutex(mutex) as holder:
             running = Listening(steps_aside_for=lambda launch: True)
             running.stepped_aside = _Calls(holder.let_go)
             try:
@@ -308,22 +308,27 @@ class TestTakingOver(unittest.TestCase):
                 running.close()
 
         self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
+        terminate.assert_not_called()
 
     def test_an_evolver_that_steps_aside_late_is_still_given_time_to_go(self):
-        mutex = _unique("LateMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("LatePipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              held_mutex(mutex) as holder:
-            gone = threading.Timer(0.5, holder.let_go)
-            running = Listening(steps_aside_for=lambda launch: time.sleep(0.7) or True)
-            running.stepped_aside = _Calls(gone.start)
-            try:
-                outcome = in_the_background(lambda: single_instance.InstanceGateway().take_over(
-                    single_instance.PREVIEW, end_the_unanswering=True))
-            finally:
-                running.close()
-                if gone.is_alive():
-                    gone.join()
+        gateway = single_instance.InstanceGateway()
+        answered_at = []
+
+        def ask(_launch, **_):
+            if answered_at:
+                return None
+            time.sleep(0.7)
+            answered_at.append(time.monotonic())
+            return single_instance.Answer(single_instance.STEPPING_ASIDE, 0)
+
+        def gone():
+            return bool(answered_at) and time.monotonic() - answered_at[0] >= 0.6
+
+        with patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              patch.object(gateway, "ask", side_effect=ask),              patch.object(gateway, "claim", side_effect=gone),              patch("util.processes.terminate") as terminate:
+            outcome = gateway.take_over(single_instance.PREVIEW, end_the_unanswering=True)
 
         self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
+        terminate.assert_not_called()
 
     def test_a_preview_ends_an_evolver_that_never_answers(self):
         """One from before launches spoke, or one that has stopped responding: either way
@@ -335,7 +340,6 @@ class TestTakingOver(unittest.TestCase):
 
             def terminate(pid):
                 ended.append(pid)
-                mute.close()
                 holder.let_go()
                 return True
 
@@ -351,25 +355,24 @@ class TestTakingOver(unittest.TestCase):
         self.assertEqual(ended, [os.getpid()])
 
     def test_an_evolver_ended_when_the_patience_runs_out_is_still_given_time_to_go(self):
-        mutex = _unique("GoingMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("GoingPipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              held_mutex(mutex) as holder:
-            mute = Unanswering()
-            gone = threading.Timer(0.3, holder.let_go)
+        gateway = single_instance.InstanceGateway()
+        ended_at = []
 
-            def terminate(_pid):
-                mute.close()
-                gone.start()
-                return True
+        def ask(_launch, *, until):
+            if ended_at:
+                return None
+            time.sleep(max(0.0, until - time.monotonic()))
+            return single_instance.Answer(b"", 0)
 
-            try:
-                with patch("util.processes.terminate", side_effect=terminate):
-                    outcome = in_the_background(
-                        lambda: single_instance.InstanceGateway().take_over(
-                            single_instance.PREVIEW, end_the_unanswering=True))
-            finally:
-                mute.close()
-                if gone.is_alive():
-                    gone.join()
+        def end(_pid):
+            ended_at.append(time.monotonic())
+            return True
+
+        def gone():
+            return bool(ended_at) and time.monotonic() - ended_at[0] >= 0.3
+
+        with patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              patch.object(gateway, "ask", side_effect=ask),              patch.object(gateway, "claim", side_effect=gone),              patch("util.processes.terminate", side_effect=end):
+            outcome = gateway.take_over(single_instance.PREVIEW, end_the_unanswering=True)
 
         self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
 
