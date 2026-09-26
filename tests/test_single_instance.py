@@ -145,6 +145,48 @@ class Unanswering:
         self._server.close()
 
 
+class AnswersBeforeHearing:
+    """A running Evolver's pipe that answers a launch the moment it connects, takes in
+    what the launch said only a moment later, and hangs up."""
+
+    def __init__(self, reply: bytes, heard: bytes):
+        self._kernel32 = kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        handle, number = ctypes.c_void_p, ctypes.c_uint32
+        kernel32.CreateNamedPipeW.argtypes = [ctypes.c_wchar_p, *[number] * 6, handle]
+        kernel32.CreateNamedPipeW.restype = handle
+        kernel32.ConnectNamedPipe.argtypes = [handle, handle]
+        kernel32.FlushFileBuffers.argtypes = [handle]
+        kernel32.DisconnectNamedPipe.argtypes = [handle]
+        kernel32.CloseHandle.argtypes = [handle]
+        kernel32.WriteFile.argtypes = [handle, ctypes.c_char_p, number, ctypes.POINTER(number),
+                                       handle]
+        kernel32.ReadFile.argtypes = kernel32.WriteFile.argtypes
+        duplex, one_instance, unbuffered = 3, 1, 0
+        self._pipe = self._kernel32.CreateNamedPipeW(
+            "\\\\.\\pipe\\" + single_instance._PIPE_NAME, duplex, 0, one_instance,
+            unbuffered, unbuffered, 0, None)
+        assert self._pipe not in (None, ctypes.c_void_p(-1).value), ctypes.get_last_error()
+        self._reply = reply
+        self._heard = ctypes.create_string_buffer(len(heard))
+        self._serving = threading.Thread(target=self._serve, daemon=True)
+        self._serving.start()
+
+    def _serve(self):
+        moved = ctypes.c_uint32()
+        self._kernel32.ConnectNamedPipe(self._pipe, None)
+        self._kernel32.WriteFile(self._pipe, self._reply, len(self._reply), ctypes.byref(moved),
+                                 None)
+        time.sleep(0.1)
+        self._kernel32.ReadFile(self._pipe, self._heard, len(self._heard), ctypes.byref(moved),
+                                None)
+        self._kernel32.FlushFileBuffers(self._pipe)
+        self._kernel32.DisconnectNamedPipe(self._pipe)
+
+    def close(self):
+        self._serving.join(timeout=10)
+        self._kernel32.CloseHandle(self._pipe)
+
+
 class TestAskingTheRunningOne(unittest.TestCase):
     """A launch that finds Evolver up says what it is, and hears what the
     running one does about it."""
@@ -179,6 +221,17 @@ class TestAskingTheRunningOne(unittest.TestCase):
 
         self.assertEqual(answer.reply, single_instance.SHOWING)
         self.assertEqual((running.shown, running.stepped_aside), ([True], []))
+
+    def test_an_answer_in_before_the_launch_has_finished_speaking_is_heard(self):
+        with patch.object(single_instance, "_PIPE_NAME", _unique("Early")):
+            running = AnswersBeforeHearing(single_instance.STEPPING_ASIDE,
+                                           heard=single_instance.PREVIEW)
+            try:
+                answer = _ask(single_instance.PREVIEW)
+            finally:
+                running.close()
+
+        self.assertEqual(answer.reply, single_instance.STEPPING_ASIDE)
 
     def test_a_launcher_from_before_launches_spoke_still_opens_the_window(self):
         """Its whole message is to connect and hang up."""

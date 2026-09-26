@@ -194,9 +194,9 @@ class InstanceGateway:
         pid = processes.pipe_server(int(socket.socketDescriptor()))
         socket.write(launch)
         socket.waitForBytesWritten(_milliseconds_until(until))
-        reply = b""
-        if socket.waitForReadyRead(_milliseconds_until(until)):
-            reply = bytes(socket.readAll())
+        if not socket.bytesAvailable():
+            socket.waitForReadyRead(_milliseconds_until(until))
+        reply = bytes(socket.readAll())
         socket.disconnectFromServer()
         return Answer(reply, pid)
 
