@@ -138,7 +138,9 @@ CONFIG_REFERENCE_LEDGER = {
     # One more for the provider's source name in the recipe guard (bug 7), then
     # four fewer: the two recipes it chooses between are util.topaz's, named and
     # versioned beside the settings they run with, not four loose strings here.
-    "tasks/upscale.py": 12,
+    # Then one more, the third shape: where a dismissed low-disk warning is
+    # remembered, read once in run() and handed to the two helpers.
+    "tasks/upscale.py": 13,
     "tasks/video_types.py": 5,
     # The lane walk it used to do itself, and the stage that walks the lanes
     # after it to stamp the viewing on the same sidecars.
