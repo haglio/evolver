@@ -84,6 +84,10 @@ def _unique(label: str) -> str:
     return f"EvolverTest_{label}_{os.getpid()}_{time.monotonic_ns()}"
 
 
+def _ask(launch: bytes) -> single_instance.Answer | None:
+    return single_instance.InstanceGateway().ask(launch, until=time.monotonic() + 10.0)
+
+
 def in_the_background(work):
     """Run *work* on a thread while this one serves, and hand back its result.
 
@@ -147,14 +151,14 @@ class TestAskingTheRunningOne(unittest.TestCase):
 
     def test_nothing_listening_is_no_answer(self):
         with patch.object(single_instance, "_PIPE_NAME", _unique("Absent")):
-            self.assertIsNone(single_instance.InstanceGateway().ask(single_instance.USUAL))
+            self.assertIsNone(_ask(single_instance.USUAL))
 
     def test_the_running_one_says_it_steps_aside_and_which_process_it_is(self):
         with patch.object(single_instance, "_PIPE_NAME", _unique("Aside")):
             running = Listening(steps_aside_for=lambda launch: launch == single_instance.PREVIEW)
             try:
                 answer = in_the_background(
-                    lambda: single_instance.InstanceGateway().ask(single_instance.PREVIEW))
+                    lambda: _ask(single_instance.PREVIEW))
                 _pump_until(lambda: running.stepped_aside)
             finally:
                 running.close()
@@ -168,7 +172,7 @@ class TestAskingTheRunningOne(unittest.TestCase):
             running = Listening()
             try:
                 answer = in_the_background(
-                    lambda: single_instance.InstanceGateway().ask(single_instance.USUAL))
+                    lambda: _ask(single_instance.USUAL))
                 _pump_until(lambda: running.shown)
             finally:
                 running.close()
@@ -197,9 +201,9 @@ class TestAskingTheRunningOne(unittest.TestCase):
             running = Listening(steps_aside_for=lambda launch: True)
             try:
                 in_the_background(
-                    lambda: single_instance.InstanceGateway().ask(single_instance.PREVIEW))
+                    lambda: _ask(single_instance.PREVIEW))
                 _pump_until(lambda: running.stepped_aside)
-                later = single_instance.InstanceGateway().ask(single_instance.PREVIEW)
+                later = _ask(single_instance.PREVIEW)
             finally:
                 running.close()
 
@@ -256,7 +260,7 @@ class TestTakingOver(unittest.TestCase):
         """One from before launches spoke, or one that has stopped responding: either way
         it holds the work the preview came to take."""
         mutex = _unique("MuteMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("MutePipe")),              held_mutex(mutex) as holder:
+        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("MutePipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 0.5),              held_mutex(mutex) as holder:
             mute = Unanswering()
             ended = []
 
@@ -277,11 +281,34 @@ class TestTakingOver(unittest.TestCase):
         self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
         self.assertEqual(ended, [os.getpid()])
 
+    def test_an_evolver_ended_when_the_patience_runs_out_is_still_given_time_to_go(self):
+        mutex = _unique("GoingMutex")
+        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("GoingPipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              held_mutex(mutex) as holder:
+            mute = Unanswering()
+            gone = threading.Timer(0.3, holder.let_go)
+
+            def terminate(_pid):
+                mute.close()
+                gone.start()
+                return True
+
+            try:
+                with patch("util.processes.terminate", side_effect=terminate):
+                    outcome = in_the_background(
+                        lambda: single_instance.InstanceGateway().take_over(
+                            single_instance.PREVIEW, end_the_unanswering=True))
+            finally:
+                mute.close()
+                if gone.is_alive():
+                    gone.join()
+
+        self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
+
     def test_the_usual_launch_leaves_an_evolver_that_never_answers_alone(self):
         """The Evolver it reached may simply predate the answers, in which case
         its window has already opened."""
         mutex = _unique("OldMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("OldPipe")),              held_mutex(mutex):
+        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("OldPipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 0.5),              held_mutex(mutex):
             mute = Unanswering()
             try:
                 with patch("util.processes.terminate") as terminate:
@@ -322,15 +349,17 @@ if manner == "slow to hang up":
         time.sleep(float(starved))
         hang_up(connection)
     QLocalSocket.disconnectFromServer = hang_up_slowly
-if manner == "silent":
+def steps_aside_for(launch):
+    if manner == "slow to answer":
+        time.sleep(float(starved))
+    return launch == single_instance.PREVIEW
+if manner == "hangs up without a word":
     mute = QLocalServer()
     assert mute.listen(single_instance._PIPE_NAME)
-    held = []
-    mute.newConnection.connect(lambda: held.append(mute.nextPendingConnection()))
+    mute.newConnection.connect(lambda: mute.nextPendingConnection().disconnectFromServer())
 else:
-    gateway.serve_launches(
-        steps_aside_for=lambda launch: launch == single_instance.PREVIEW,
-        on_show=lambda: None, on_step_aside=app.quit)
+    gateway.serve_launches(steps_aside_for=steps_aside_for,
+                           on_show=lambda: None, on_step_aside=app.quit)
 print("serving", flush=True)
 app.exec()
 """
@@ -364,6 +393,15 @@ class TestAcrossProcesses(unittest.TestCase):
         self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
         self.assertEqual(running.wait(timeout=30), 0)
 
+    def test_an_evolver_slow_to_answer_is_waited_for_and_exits_on_its_own(self):
+        mutex, pipe = _unique("CrossSlowMutex"), _unique("CrossSlowPipe")
+        running = self._running_evolver(mutex, pipe, "slow to answer")
+
+        outcome = self._preview_launch(mutex, pipe)
+
+        self.assertEqual(outcome, single_instance.Outcome.CLAIMED)
+        self.assertEqual(running.wait(timeout=30), 0)
+
     def test_an_evolver_slow_to_hang_up_after_stepping_aside_still_exits_on_its_own(self):
         mutex, pipe = _unique("CrossLateMutex"), _unique("CrossLatePipe")
         running = self._running_evolver(mutex, pipe, "slow to hang up")
@@ -375,7 +413,7 @@ class TestAcrossProcesses(unittest.TestCase):
 
     def test_an_evolver_that_never_answers_is_ended_and_the_preview_is_evolver(self):
         mutex, pipe = _unique("CrossMuteMutex"), _unique("CrossMutePipe")
-        running = self._running_evolver(mutex, pipe, "silent")
+        running = self._running_evolver(mutex, pipe, "hangs up without a word")
 
         outcome = self._preview_launch(mutex, pipe)
 
