@@ -56,7 +56,7 @@ def run(show_popup: bool = False, *, non_ai_dir: Path | None = None) -> Duplicat
     if show_popup and not result.ok:
         log.info("Showing error popup for duplicate-size scan failure")
         show_error("Evolver - Likely Duplicate Videos", _popup_message(result))
-        log.info("Error popup dismissed")
+        log.info("Error popup closed")
 
     return result
 
