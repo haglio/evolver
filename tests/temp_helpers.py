@@ -121,12 +121,15 @@ class LaneLibrary:
         self.genau_clips = videos / "genau" / "clips"
         self.genau_weird = videos / "genau" / "weird"
         self.metadata = videos / "metadata"
+        self.scripts = videos / "scripts" / "scripts"
+        self.generated = videos / "scripts" / "generated"
         self.search_root = videos
 
     def config(self, genau_source="example-loop-clips", **extra):
         settings = {
             "VIDEO_LIBRARY_DIR": self.library, "VIDEO_SEARCH_ROOT": self.search_root,
             "METADATA_DIR": self.metadata, "INBOX_DIR": self.inbox,
+            "SCRIPT_LIBRARY_DIR": self.scripts, "GENERATED_SCRIPTS_DIR": self.generated,
             "SORTED_DIR": self.sorted_dir,
             "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
             "WEIRD_DIR": self.weird,
@@ -224,6 +227,7 @@ def nonai_library_overrides(root: Path, **extra):
         NON_AI_DIR=video_lib / "2D" / "non_AI",
         METADATA_DIR=root / "metadata",
         SCRIPT_LIBRARY_DIR=root / "scripts",
+        GENERATED_SCRIPTS_DIR=root / "generated",
         NONAI_RETIRED_ROOT=None,
         NONAI_PIN_LIST=root / "next.txt",
         NONAI_SKIP_LIST=root / "skip.txt",

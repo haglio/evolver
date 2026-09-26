@@ -138,6 +138,9 @@ def warm_gun_journal_dirs(content: dict[str, Any], library_root: Path) -> tuple[
 WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, LIBRARY_ROOT)
 SCRIPT_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 UNMATCHED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "unmatched_scripts"
+# Fun Time's F-mode reads this mirror of the video tree (fun_time/modes.py): an
+# empty "<name>.generated" there says no person wrote that video's funscript.
+GENERATED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "generated"
 
 
 def vr_video_dir(content: dict[str, Any]) -> Path | None:

@@ -21,9 +21,120 @@ def library_overrides(video_root, script_root, **extra):
     """
     overrides = dict(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
                      NONAI_RETIRED_ROOT=None, VR_VIDEO_DIR=None,
-                     UNMATCHED_SCRIPTS_DIR=script_root.parent / "unmatched_scripts")
+                     UNMATCHED_SCRIPTS_DIR=script_root.parent / "unmatched_scripts",
+                     GENERATED_SCRIPTS_DIR=script_root.parent / "generated")
     overrides.update(extra)
     return override_config(**overrides)
+
+
+def _write(*paths: Path) -> None:
+    for path in paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+
+
+class TestTheMarkSayingNoPersonWroteAScript(unittest.TestCase):
+    def test_a_script_that_moves_to_its_video_takes_its_mark_along(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, generated = root / "videos", root / "scripts", root / "generated"
+            waiting = Path("2D", "AI", "0_inbox", "src")
+            filed = Path("2D", "AI", "1_sorted", "src", "portrait")
+            _write(video_root / filed / "clip.mp4", script_root / waiting / "clip.funscript",
+                   generated / waiting / "clip.generated")
+
+            with library_overrides(video_root, script_root):
+                scripts_sync.run()
+
+            self.assertTrue((generated / filed / "clip.generated").is_file())
+            self.assertFalse((generated / waiting / "clip.generated").exists())
+
+    def test_the_folder_every_mark_has_left_goes_as_the_scripts_folder_does(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, generated = root / "videos", root / "scripts", root / "generated"
+            waiting = Path("2D", "AI", "0_inbox", "src")
+            filed = Path("2D", "AI", "1_sorted", "src", "portrait")
+            _write(video_root / filed / "clip.mp4", script_root / waiting / "clip.funscript",
+                   generated / waiting / "clip.generated")
+
+            with library_overrides(video_root, script_root):
+                scripts_sync.run()
+
+            self.assertFalse((script_root / waiting).exists())
+            self.assertFalse((generated / waiting).exists())
+
+    def test_the_copy_made_for_the_upscale_is_marked_too(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, generated = root / "videos", root / "scripts", root / "generated"
+            filed = Path("2D", "AI", "1_sorted", "src", "portrait")
+            upscaled = Path("2D", "AI", "2_outbox", "upscaled_by_orientation", "portrait", "src")
+            _write(video_root / filed / "clip.mp4", video_root / upscaled / "clip_topaz.mp4",
+                   script_root / filed / "clip.funscript", generated / filed / "clip.generated")
+
+            with library_overrides(video_root, script_root):
+                scripts_sync.run()
+
+            self.assertTrue((script_root / upscaled / "clip_topaz.funscript").is_file())
+            self.assertTrue((generated / upscaled / "clip_topaz.generated").is_file())
+            self.assertTrue((generated / filed / "clip.generated").is_file())
+
+    def test_a_script_handed_to_the_version_left_in_the_library_takes_its_mark_along(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, generated = root / "videos", root / "scripts", root / "generated"
+            retired = Path("2D", "non_AI", "studio", "2 retired")
+            kept = Path("2D", "non_AI", "studio", "3 done", "processed")
+            _write(video_root / kept / "scene one_apo8_iris2.mp4",
+                   root / "archive" / retired / "scene one.mp4",
+                   script_root / retired / "scene one.funscript",
+                   generated / retired / "scene one.generated")
+
+            with library_overrides(video_root, script_root, NONAI_RETIRED_ROOT=root / "archive"):
+                scripts_sync.run()
+
+            self.assertTrue((generated / kept / "scene one_apo8_iris2.generated").is_file())
+            self.assertFalse((generated / retired / "scene one.generated").exists())
+
+    def test_a_script_that_follows_its_video_out_of_the_library_leaves_no_mark_behind(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, generated = root / "videos", root / "scripts", root / "generated"
+            retired = Path("2D", "non_AI", "studio", "2 retired")
+            _write(root / "archive" / retired / "scene one.mp4",
+                   script_root / retired / "scene one.funscript",
+                   generated / retired / "scene one.generated")
+
+            with library_overrides(video_root, script_root, NONAI_RETIRED_ROOT=root / "archive"):
+                scripts_sync.run()
+
+            self.assertTrue((root / "archive" / retired / "scene one.funscript").is_file())
+            self.assertFalse((generated / retired / "scene one.generated").exists())
+
+    def test_a_duplicate_thrown_away_leaves_no_mark_behind(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, generated = root / "videos", root / "scripts", root / "generated"
+            retired = Path("2D", "non_AI", "studio", "2 retired")
+            to_do = Path("2D", "non_AI", "studio", "1 to do")
+            _write(root / "archive" / retired / "scene one.mp4",
+                   script_root / retired / "scene one.funscript",
+                   script_root / to_do / "scene one.funscript",
+                   generated / retired / "scene one.generated",
+                   generated / to_do / "scene one.generated")
+
+            with library_overrides(video_root, script_root, NONAI_RETIRED_ROOT=root / "archive"):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.discarded_duplicates, 1)
+            self.assertEqual(list(generated.rglob("*.generated")), [])
+
+    def test_a_script_set_aside_until_it_is_renamed_leaves_no_mark_behind(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, generated = root / "videos", root / "scripts", root / "generated"
+            filed = Path("2D", "AI", "1_sorted", "src", "portrait")
+            _write(script_root / filed / "clip.funscript", generated / filed / "clip.generated")
+
+            with library_overrides(video_root, script_root):
+                scripts_sync.run()
+
+            self.assertTrue((root / "unmatched_scripts" / "clip.funscript").is_file())
+            self.assertFalse((generated / filed / "clip.generated").exists())
 
 
 class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):

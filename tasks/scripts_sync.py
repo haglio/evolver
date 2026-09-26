@@ -12,7 +12,13 @@ from pathlib import Path
 import config
 from util.alert import show_error
 from util.media_files import library_videos, listed_videos, remove_empty_dirs, unique_path
-from util.script_library import script_path_for_video
+from util.script_library import (
+    carry_mark,
+    copy_mark,
+    drop_mark,
+    remove_empty_mark_folders,
+    script_path_for_video,
+)
 from util.variants import strip_processing_suffixes
 
 log = logging.getLogger(__name__)
@@ -144,6 +150,7 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         dest.parent.mkdir(parents=True, exist_ok=True)
         log.info("MOVE SCRIPT  %s  ->  %s", script_path, dest)
         script_path.rename(dest)
+        carry_mark(script_path, dest)
         result.moved += 1
 
     followed = _follow_retired_videos(orphans, video_index, trees)
@@ -153,6 +160,7 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
     result.collision_paths += followed.collision_paths
     result.discarded_duplicates += followed.discarded_duplicates
     remove_empty_dirs(trees.scripts)
+    remove_empty_mark_folders()
     variants = _copy_missing_variant_scripts(video_index, trees)
     result.copied_variants += variants.copied
     result.ambiguous_variant_groups += variants.ambiguous_groups
@@ -246,6 +254,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
             log.exception("FAILED TO FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
             unmatched.append(script_path)
             continue
+        carry_mark(script_path, dest)
         followed_to_archive += 1
         log.info("FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
 
@@ -271,6 +280,7 @@ def _park(script_path: Path, trees: Trees) -> str:
     except OSError:
         log.exception("FAILED TO MOVE UNMATCHED SCRIPT  %s  ->  %s", script_path, dest)
         return _shown(script_path, trees)
+    carry_mark(script_path, dest)
     log.info("MOVE UNMATCHED SCRIPT  %s  ->  %s", script_path, dest)
     return dest.name
 
@@ -318,6 +328,7 @@ def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Pa
     except OSError:
         log.exception("FAILED TO REHOME SCRIPT TO VARIANT  %s  ->  %s", script_path, dest)
         return _VariantRehome(archived_copy=archived_copy)
+    carry_mark(script_path, dest)
     log.info("REHOME SCRIPT TO LIBRARY VARIANT  %s  ->  %s", script_path, dest)
     return _VariantRehome(moved=True, archived_copy=archived_copy)
 
@@ -334,6 +345,7 @@ def _discard_or_keep_duplicate(script_path: Path, dest: Path) -> _Duplicate:
     """
     if filecmp.cmp(str(script_path), str(dest), shallow=False):
         script_path.unlink()
+        drop_mark(script_path)
         log.info("DISCARD DUPLICATE SCRIPT (archive already has it)  %s", script_path)
         return _Duplicate.DISCARDED
     log.warning("ARCHIVED SCRIPT COLLISION (destination exists and differs): %s -> %s", script_path, dest)
@@ -426,6 +438,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
             try:
                 dest_script.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_script, dest_script)
+                copy_mark(source_script, dest_script)
             except OSError:
                 copy_error_paths.append(str(source_script.relative_to(trees.scripts)))
                 log.exception("FAILED TO COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
