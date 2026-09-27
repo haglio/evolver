@@ -68,11 +68,15 @@ def run() -> WithdrawnResult:
     log.info("=== Stage: clips Origenerator has taken back ===")
     for lane in lanes.sent_lanes():
         result = result + _empty_lane(lane, _withdrawn_stems(rows, lane))
+        result = result + _empty_lane(lane, _soundless_copies_beside_their_sound(rows, lane))
 
     log.info("Withdrawn done. Deleted: %d, deleted metadata: %d, failed: %d",
              result.deleted, result.deleted_metadata, result.failed)
     return result
 
+
+#: Origenerator's role for a video's copy without its sound, inside ``output_files``.
+SILENT_COPY_ROLE = "silent"
 
 #: The column this stage selects itself; the withdrawal stamps beside it are
 #: each lane's (``util.lanes``). Public for the same reason the metadata
@@ -107,19 +111,40 @@ def _withdrawn_stems(rows: list[dict], lane: lanes.SentLane) -> set[str]:
     return stems
 
 
+def _soundless_copies_beside_their_sound(rows: list[dict], lane: lanes.SentLane) -> set[str]:
+    reachable = {origin_stem(video.stem) for video in _videos_under(_reachable_roots(lane))}
+    stems = set()
+    for row in rows:
+        videos = [entry for entry in _output_entries(row) or []
+                  if _is_video_name(entry["filename"])]
+        soundless = {Path(entry["filename"]).stem for entry in videos
+                     if entry.get("role") == SILENT_COPY_ROLE}
+        with_sound = {Path(entry["filename"]).stem for entry in videos} - soundless
+        if with_sound & reachable:
+            stems |= soundless
+    return stems
+
+
 def _output_names(row: dict) -> list[str]:
     """The file names a generation row says it produced, or none if it says badly.
 
     A row is another app's data, so a column holding something other than the
     list of ``{"filename": ...}`` it usually holds costs that one row, not the run.
     """
-    try:
-        return [entry["filename"] for entry in json.loads(row.get("output_files") or "[]")
-                if entry.get("filename")]
-    except (AttributeError, TypeError, ValueError):
+    entries = _output_entries(row)
+    if entries is None:
         log.warning("Could not read what a withdrawn generation produced: %r",
                     row.get("output_files"))
         return []
+    return [entry["filename"] for entry in entries]
+
+
+def _output_entries(row: dict) -> list[dict] | None:
+    try:
+        return [entry for entry in json.loads(row.get("output_files") or "[]")
+                if entry.get("filename")]
+    except (AttributeError, TypeError, ValueError):
+        return None
 
 
 def _is_video_name(name: str) -> bool:
@@ -156,10 +181,14 @@ def _copy_groups(lane: lanes.SentLane,
 def _reachable_copies(lane: lanes.SentLane, stems: set[str]) -> list[Path]:
     """Every copy a viewer could still reach: the upscale, the delivered loop,
     and either pile a condemned one is waiting in."""
+    return _matches(_reachable_roots(lane), stems)
+
+
+def _reachable_roots(lane: lanes.SentLane) -> list[Path]:
     roots = [*_outbox_dirs(lane), config.WEIRD_DIR]
     if lane.delivered_dir is not None:
         roots += [lane.delivered_dir, config.GENAU_WEIRD_DIR]
-    return _matches(roots, stems)
+    return roots
 
 
 def _outbox_dirs(lane: lanes.SentLane) -> list[Path]:
@@ -179,9 +208,12 @@ def _matches(roots, stems: set[str]) -> list[Path]:
     them, so there the stem is all there is to go on -- and it is enough, being
     the name Origenerator gave the file.
     """
+    return [video for video in _videos_under(roots) if origin_stem(video.stem) in stems]
+
+
+def _videos_under(roots) -> list[Path]:
     return [video for root in roots if Path(root).is_dir()
-            for video in sorted(library_videos(Path(root)))
-            if origin_stem(video.stem) in stems]
+            for video in sorted(library_videos(Path(root)))]
 
 
 def origin_stem(stem: str) -> str:
