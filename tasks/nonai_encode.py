@@ -36,6 +36,8 @@ from util.media_files import is_partial_path, partial_stem
 
 log = logging.getLogger(__name__)
 
+_LOG_WARNINGS_AND_PROGRESS_ONLY = ("-loglevel", "warning", "-stats")
+
 
 @dataclass(frozen=True)
 class EncodeSettings:
@@ -215,10 +217,10 @@ def delete_tmp(tmp: Path) -> None:
 
 
 def launch(source: Path, tmp: Path, orient: str) -> int:
-    cmd = topaz.command(source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orient))
+    ffmpeg, *arguments = topaz.command(source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orient))
     with open(config.NONAI_FFMPEG_LOG, "w", encoding="utf-8") as ffmpeg_log:
         proc = subprocess.Popen(
-            cmd,
+            [ffmpeg, *_LOG_WARNINGS_AND_PROGRESS_ONLY, *arguments],
             env=topaz.environment(),
             stdout=subprocess.DEVNULL,
             stderr=ffmpeg_log,
