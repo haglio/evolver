@@ -101,6 +101,23 @@ class TestRunStartsAJob(unittest.TestCase):
             self.assertEqual(job["source"], str(video))
             self.assertEqual(job["expected_duration"], 100.0)
 
+    def test_the_encodes_log_gets_its_warnings_and_progress_and_no_readout_of_the_video(self):
+        """At ffmpeg's default level the log opened with a readout of the source and
+        the output, every tag of the video included -- a generated video's embedded
+        prompt, a downloaded one's title. What the log is for, what went wrong and
+        how far the encode got, is its warnings and its progress line."""
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+
+            stack, mocks = probes()
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=True)
+
+            cmd = mocks["popen"].call_args.args[0]
+            self.assertEqual(cmd[cmd.index("-loglevel") + 1], "warning")
+            self.assertLess(cmd.index("-stats"), cmd.index("-i"))
+
     def test_the_file_an_encode_writes_until_promotion_carries_no_video_extension(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
