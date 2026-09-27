@@ -231,6 +231,64 @@ class TestTheGenauLane(unittest.TestCase):
                 self.assertFalse(delivered.exists())
 
 
+
+def _gallery_of_videos_with_sound(path: Path, stems) -> Path:
+    """A gallery whose every row is a video with its sound, listing its soundless copy."""
+    conn = sqlite3.connect(path)
+    conn.execute(_SCHEMA)
+    for n, stem in enumerate(stems):
+        outputs = json.dumps([{"filename": f"{stem}-audio.mp4", "subfolder": "video"},
+                              {"filename": f"{stem}.mp4", "subfolder": "video",
+                               "role": withdrawn.SILENT_COPY_ROLE}])
+        conn.execute("INSERT INTO generations (prompt_id, output_files) VALUES (?, ?)",
+                     (f"p{n}", outputs))
+    conn.commit()
+    conn.close()
+    return path
+
+
+class TestASoundlessCopy(unittest.TestCase):
+    def test_it_leaves_genaus_folder_once_the_video_with_its_sound_is_there(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            db = _gallery_of_videos_with_sound(root / "gallery.db", ["loop_00009"])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                sounded = touch_video(lib.genau_clips / "loop_00009-audio_topaz.mp4")
+                soundless = touch_video(lib.genau_clips / "loop_00009_topaz.mp4")
+
+                withdrawn.run()
+
+                self.assertTrue(sounded.exists())
+                self.assertFalse(soundless.exists())
+
+    def test_it_stays_where_it_is_the_only_copy_of_its_video(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            db = _gallery_of_videos_with_sound(root / "gallery.db", ["loop_00010"])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                soundless = touch_video(lib.genau_clips / "loop_00010_topaz.mp4")
+
+                withdrawn.run()
+
+                self.assertTrue(soundless.exists())
+
+    def test_it_leaves_the_library_once_the_video_with_its_sound_has_its_upscale(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            source = lanes.ORIGENERATOR_SOURCE
+            db = _gallery_of_videos_with_sound(root / "gallery.db", ["made_00011"])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                sounded = touch_video(lib.outbox / "landscape" / source / "made_00011-audio_topaz.mp4")
+                soundless = (touch_video(lib.outbox / "landscape" / source / "made_00011_topaz.mp4"),
+                             touch_video(lib.sorted_dir / source / "landscape" / "made_00011.mp4"))
+
+                result = withdrawn.run()
+
+                self.assertTrue(sounded.exists())
+                self.assertFalse(any(copy.exists() for copy in soundless))
+        self.assertEqual(result.deleted, 2)
+
+
 class TestAGalleryThisCannotRead(unittest.TestCase):
     def test_a_database_that_is_not_there_is_no_work_and_no_failure(self):
         with workspace_temp_dir() as root:

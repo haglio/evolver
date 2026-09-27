@@ -67,6 +67,9 @@ class OrigeneratorGalleryContract(unittest.TestCase):
         self.assertEqual(
             {lane.key: lane.unsent_column for lane in lanes.sent_lanes()}, promised)
 
+    def test_the_soundless_copy_role_read_here_is_the_one_origenerator_writes(self):
+        self.assertEqual(withdrawn.SILENT_COPY_ROLE, self.promise["silent_copy_role"])
+
     def test_the_model_keys_read_here_are_the_ones_origenerator_records(self):
         """A run's model is named under one of these inside ``params_json``."""
         self.assertEqual(list(origenerator_metadata.MODEL_KEYS),

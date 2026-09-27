@@ -45,7 +45,7 @@ STAGES: tuple[Stage, ...] = (
           "Delete the videos condemned into 2_outbox/kinda_weird and into the pile beside Genau's clips folder, along with their matching sources in 1_sorted, their metadata and their funscripts",
           (0xF2, 0x8E, 0x2B)),
     Stage("withdrawn", "Taken Back",
-          "Delete every copy this library holds of a clip Origenerator has taken back -- the inbox copy, the 1_sorted copy, the upscale and, down the Genau lane, the delivered loop -- with their metadata and funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded",
+          "Delete every copy this library holds of a clip Origenerator has taken back -- the inbox copy, the 1_sorted copy, the upscale and, down the Genau lane, the delivered loop -- with their metadata and funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its sound once the video with its sound is there",
           (0x00, 0x00, 0x6C)),
     Stage("metadata", "Metadata Scrape",
           "Scrape AI prompt metadata into mirrored JSON files",
