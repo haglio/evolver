@@ -613,6 +613,57 @@ class TestScriptsSync(unittest.TestCase):
                 + str(Path("2D", "AI", "1_sorted", "src", "portrait", "clip.funscript")))
 
 
+class TestOneVideoSentDownTwoLanes(unittest.TestCase):
+    AI = Path("2D", "AI")
+
+    def test_its_script_goes_to_the_copy_in_the_lane_it_arrived_with(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root = root / "videos", root / "scripts"
+            arrived = script_root / self.AI / "0_inbox" / "lane_a" / "clip.funscript"
+            _write(video_root / self.AI / "1_sorted" / "lane_a" / "landscape" / "clip.mp4",
+                   video_root / self.AI / "1_sorted" / "lane_b" / "landscape" / "clip.mp4",
+                   arrived)
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.ambiguous, 0)
+            self.assertEqual(result.moved, 1)
+            self.assertFalse(arrived.exists())
+            self.assertTrue(
+                (script_root / self.AI / "1_sorted" / "lane_a" / "landscape" / "clip.funscript").is_file())
+
+    def test_the_script_its_upscale_was_given_stays_with_that_lanes_upscale(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root = root / "videos", root / "scripts"
+            upscaled = self.AI / "2_outbox" / "upscaled_by_orientation" / "landscape"
+            given = script_root / upscaled / "lane_a" / "clip_topaz.funscript"
+            _write(video_root / upscaled / "lane_a" / "clip_topaz.mp4",
+                   video_root / upscaled / "lane_b" / "clip_topaz.mp4",
+                   given)
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.ambiguous, 0)
+            self.assertEqual(result.already_aligned, 1)
+            self.assertTrue(given.is_file())
+
+    def test_a_script_from_a_lane_holding_neither_copy_still_waits_for_a_person(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root = root / "videos", root / "scripts"
+            arrived = script_root / self.AI / "0_inbox" / "lane_c" / "clip.funscript"
+            _write(video_root / self.AI / "1_sorted" / "lane_a" / "landscape" / "clip.mp4",
+                   video_root / self.AI / "1_sorted" / "lane_b" / "landscape" / "clip.mp4",
+                   arrived)
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.ambiguous, 1)
+            self.assertTrue(arrived.is_file())
+
+
 class TestFollowRetiredVideos(unittest.TestCase):
     """A script whose video was archived should follow it out, not fail forever.
 

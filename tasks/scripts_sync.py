@@ -391,11 +391,42 @@ def _iter_funscripts(*roots: Path):
 def _matching_videos_for_script(script_path: Path, video_index: dict[str, list[Path]],
                                 trees: Trees) -> list[Path]:
     matches = video_index.get(script_path.stem, [])
-    bucket = _script_match_bucket(script_path, trees)
-    if bucket is None:
+    if not script_path.is_relative_to(trees.scripts):
         return matches
-    return [video_path for video_path in matches
-            if _video_match_bucket(video_path, trees) == bucket]
+    mirrored = script_path.relative_to(trees.scripts)
+    if _ai_or_non_ai(mirrored) is None:
+        return matches
+    filed = {video_path: video_path.relative_to(trees.videos) for video_path in matches}
+    matches = [video_path for video_path in matches
+               if _ai_or_non_ai(filed[video_path]) == _ai_or_non_ai(mirrored)]
+    source = _ai_filing(mirrored).source
+    same_source = [video_path for video_path in matches
+                   if _ai_filing(filed[video_path]).source == source]
+    return same_source if source and same_source else matches
+
+
+def _ai_or_non_ai(rel: Path) -> str | None:
+    parts = rel.parts
+    if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
+        return parts[1]
+    return None
+
+
+@dataclass(frozen=True)
+class _AiFiling:
+    source: str | None = None
+    orientation: str | None = None
+
+
+def _ai_filing(rel: Path) -> _AiFiling:
+    match rel.parts[:-1]:
+        case ("2D", "AI", "0_inbox", source, *_):
+            return _AiFiling(source)
+        case ("2D", "AI", "1_sorted", source, orientation, *_):
+            return _AiFiling(source, orientation)
+        case ("2D", "AI", "2_outbox", "upscaled_by_orientation", orientation, source, *_):
+            return _AiFiling(source, orientation)
+    return _AiFiling()
 
 
 def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
@@ -471,12 +502,10 @@ def _pick_variant_source(target_video: Path, existing_sources: list[Path],
 
 def _variant_bucket(video_path: Path, trees: Trees) -> tuple[str, ...]:
     rel = video_path.relative_to(trees.videos)
+    filing = _ai_filing(rel)
+    if filing.source and filing.orientation:
+        return ("2D", "AI", filing.source, filing.orientation)
     parts = rel.parts
-    if len(parts) >= 6 and parts[0] == "2D" and parts[1] == "AI":
-        if parts[2] == "1_sorted":
-            return ("2D", "AI", parts[3], parts[4])
-        if parts[2] == "2_outbox" and parts[3] == "upscaled_by_orientation":
-            return ("2D", "AI", parts[5], parts[4])
     if len(parts) >= 3 and parts[0] == "2D" and parts[1] == "non_AI":
         return tuple(parts[:3])
     return tuple(parts[:2]) if len(parts) >= 2 else tuple(parts)
@@ -493,23 +522,6 @@ def _variant_kind(video_path: Path, trees: Trees) -> str:
     if "processed" in parts:
         return "processed"
     return "original"
-
-
-def _script_match_bucket(script_path: Path, trees: Trees) -> str | None:
-    if not script_path.is_relative_to(trees.scripts):
-        return None
-    parts = script_path.relative_to(trees.scripts).parts
-    if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
-        return parts[1]
-    return None
-
-
-def _video_match_bucket(video_path: Path, trees: Trees) -> str | None:
-    rel = video_path.relative_to(trees.videos)
-    parts = rel.parts
-    if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
-        return parts[1]
-    return None
 
 
 def _popup_message(result: ScriptsSyncResult) -> str:
