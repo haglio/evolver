@@ -3,12 +3,15 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
+
 from tests.product_sources import PROJECT_ROOT, product_sources
 from util.variants import (
     UPSCALE_SUFFIX,
     is_processed_stem,
     is_upscaled_stem,
     sorted_stem_of,
+    source_stem,
     strip_processing_suffixes,
     upscaled_stem,
 )
@@ -73,6 +76,23 @@ class TestTheUpscaleNamingRule:
     def test_the_suffix_tuple_is_built_from_the_same_constant(self):
         assert UPSCALE_SUFFIX in strip_processing_suffixes.__globals__["PROCESSING_SUFFIXES"]
         assert f"{UPSCALE_SUFFIX}_cfr" in strip_processing_suffixes.__globals__["PROCESSING_SUFFIXES"]
+
+
+class TestSourceStem:
+    @pytest.mark.parametrize(("stem", "expected"), [
+        ("clip_topaz", "clip"),
+        ("clip_topaz_cfr", "clip"),
+        ("clip_apo8_gcg5_topaz", "clip_apo8_gcg5"),
+        ("clip_apo8_gcg5", "clip"),
+        ("clip_apo8_gcg5_Copy(2)", "clip"),
+        ("clip_topaz_extra", "clip"),
+        ("clip", "clip"),
+        ("no_suffix_at_all", "no_suffix_at_all"),
+        ("a_b_topaz", "a_b"),
+        ("clip_apo8_gcg5_topaz_cfr", "clip_apo8_gcg5"),
+    ])
+    def test_strips_the_upscale_or_else_the_apo8_gcg5_chain_and_everything_after_it(self, stem, expected):
+        assert source_stem(stem) == expected
 
 
 def _string_constants(tree: ast.AST):

@@ -7,6 +7,8 @@ is how originals and their processed variants are matched across the tree.
 """
 from __future__ import annotations
 
+import re
+
 # What the AI upscale stage appends to a 1_sorted video's stem. It is the
 # library's most-depended-on naming rule -- three stages, the backfill tool and
 # two sibling repos read which video a file came from out of it -- and it was written
@@ -33,6 +35,13 @@ def sorted_stem_of(stem: str) -> str:
     below is the general form, which strips every Topaz token iteratively.
     """
     return stem[: -len(UPSCALE_SUFFIX)] if is_upscaled_stem(stem) else stem
+
+
+def source_stem(stem: str) -> str:
+    stripped_topaz = re.sub(rf"{re.escape(UPSCALE_SUFFIX)}(?:_.*)?$", "", stem)
+    if stripped_topaz != stem:
+        return stripped_topaz
+    return re.sub(r"_apo8_gcg5(?:_.*)?$", "", stem)
 
 
 # Elementary suffix tokens; composites like "_apo8_iris2" strip iteratively.
