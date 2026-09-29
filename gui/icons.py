@@ -2,7 +2,7 @@
 
 Most of the toolbar and the tray menu is still Font Awesome, which suits the
 verbs nothing else in the family draws -- a cog for settings, a chart, a film
-strip.  Three marks are not left to it, because the family draws them and the
+strip.  Four marks are not left to it, because the family draws them and the
 apps sit open side by side:
 
 * quit, the power symbol -- Fun Time paints this same one on its bar,
@@ -11,7 +11,8 @@ apps sit open side by side:
   pair (Font Awesome's "redo" is a plain circular arrow, which is what an undo
   looks like everywhere else here),
 * run now, the play triangle, whose corners are rounded the way an icon font's
-  transport controls are.
+  transport controls are,
+* pause, the two bars the Broker's tray menu pauses with.
 """
 
 from __future__ import annotations
@@ -21,11 +22,7 @@ from shared_ui.icons import glyph_icon
 
 
 def restart_icon(color: str) -> QIcon:
-    """The family's restart mark, tinted for the chrome it sits on.
-
-    The toolbar is dark and the tray menu is light, so the two callers pass
-    different inks for the same drawing.
-    """
+    """The family's restart mark, tinted for the chrome it sits on."""
     return glyph_icon("restart", color=color)
 
 
@@ -39,3 +36,7 @@ def run_now_icon(color: str) -> QIcon:
     """The family's play triangle, corners rounded like the transport marks it
     replaces."""
     return glyph_icon("play", color=color)
+
+
+def pause_icon(color: str) -> QIcon:
+    return glyph_icon("pause", color=color)

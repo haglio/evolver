@@ -1,4 +1,5 @@
-"""Quit, restart and Run Now wear the family's marks, in the window and the tray.
+"""Quit, restart, Run Now and pause wear the family's marks, in the window and
+the tray.
 
 What evolver owns here is which glyph each function asks shared_ui for, and
 that the caller's ink color reaches the drawing. How the glyphs are drawn --
@@ -12,7 +13,7 @@ from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QIcon, QImage
 from shared_ui.icons import glyph_pixmap
 
-from gui.icons import quit_icon, restart_icon, run_now_icon
+from gui.icons import pause_icon, quit_icon, restart_icon, run_now_icon
 
 _SIZE = QSize(48, 48)
 
@@ -30,8 +31,6 @@ class TestRestartIcon:
         assert _rendered(restart_icon("#ddd")) == glyph_pixmap("restart", 48, QColor("#ddd")).toImage()
 
     def test_it_takes_the_ink_the_chrome_it_sits_on_needs(self):
-        # The toolbar is dark and the tray menu is light, so one drawing has to
-        # come out in two inks rather than being baked to one.
         light = _rendered(restart_icon("#ddd"))
         dark = _rendered(restart_icon("#333"))
         assert light != dark
@@ -50,3 +49,11 @@ class TestRunNowIcon:
 
     def test_it_is_the_familys_play_triangle(self):
         assert _rendered(run_now_icon("#ddd")) == glyph_pixmap("play", 48, QColor("#ddd")).toImage()
+
+
+class TestPauseIcon:
+
+    def test_it_is_the_familys_pause_bars(self):
+        # The Broker's tray menu pauses with this same mark, and its icon sits
+        # beside this app's in the tray.
+        assert _rendered(pause_icon("#ddd")) == glyph_pixmap("pause", 48, QColor("#ddd")).toImage()
