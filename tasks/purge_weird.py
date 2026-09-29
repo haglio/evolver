@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import glob
 import logging
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,7 +16,7 @@ import config
 from util import lanes, script_library
 from util.alert import show_error
 from util.media_files import is_finalized_video_file
-from util.variants import UPSCALE_SUFFIX
+from util.variants import source_stem
 from util.weird_piles import WeirdPile, weird_piles
 
 log = logging.getLogger(__name__)
@@ -117,23 +116,6 @@ def _delete_scripts(*videos: Path | None) -> int:
         script_library.delete_script(script)
         log.info("Deleted funscript: %s", script)
     return len(held)
-
-
-def source_stem(stem: str) -> str:
-    """Strip known processing suffixes from an outbox file stem.
-
-    Examples:
-        'abc_topaz'         -> 'abc'
-        'abc_topaz_cfr'     -> 'abc'
-        'abc_apo8_gcg5_topaz' -> 'abc_apo8_gcg5'
-        'abc_topaz_extra'   -> 'abc'
-        'abc_apo8_gcg5'     -> 'abc'
-        'abc_apo8_gcg5_x'   -> 'abc'
-    """
-    stripped_topaz = re.sub(rf"{re.escape(UPSCALE_SUFFIX)}(?:_.*)?$", "", stem)
-    if stripped_topaz != stem:
-        return stripped_topaz
-    return re.sub(r"_apo8_gcg5(?:_.*)?$", "", stem)
 
 
 def _source_name(outbox_file: Path) -> str:

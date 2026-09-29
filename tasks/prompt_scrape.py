@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 
 import config
 from tasks import origenerator_metadata
-from tasks.purge_weird import source_stem
 from util import lanes, orientation, provenance, relative_dates, sidecar, video_type
 from util.headless_browser import fetch_dom, find_browser_executable
 from util.html_query import (
@@ -27,6 +26,7 @@ from util.html_query import (
 )
 from util.media_files import child_dirs, library_videos
 from util.sidecar import sidecar_path, upscaled_video_path
+from util.variants import source_stem
 
 log = logging.getLogger(__name__)
 

@@ -42,23 +42,6 @@ class TestTheFunscriptsOfACondemnedClip(unittest.TestCase):
 
 
 class TestPurgeWeird(unittest.TestCase):
-    def test_source_stem_strips_known_processing_suffixes(self):
-        cases = [
-            ("clip_topaz", "clip"),
-            ("clip_topaz_cfr", "clip"),
-            ("clip_apo8_gcg5_topaz", "clip_apo8_gcg5"),
-            ("clip_apo8_gcg5", "clip"),
-            ("clip_apo8_gcg5_Copy(2)", "clip"),
-            ("clip_topaz_extra", "clip"),
-            ("clip", "clip"),
-            ("no_suffix_at_all", "no_suffix_at_all"),
-            ("a_b_topaz", "a_b"),
-            ("clip_apo8_gcg5_topaz_cfr", "clip_apo8_gcg5"),
-        ]
-        for stem, expected in cases:
-            with self.subTest(stem=stem):
-                self.assertEqual(purge_weird.source_stem(stem), expected)
-
     def test_run_deletes_weird_and_matching_preprocessed_sorted_file(self):
         with workspace_temp_dir() as root:
             weird_dir = root / "weird"
