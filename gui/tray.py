@@ -9,10 +9,9 @@ from shared_ui.chrome import menu_rules
 from shared_ui.colors import TEXT_SECONDARY
 
 import config
-from gui.icons import quit_icon, restart_icon, run_now_icon
+from gui.icons import pause_icon, quit_icon, restart_icon, run_now_icon
 from gui.schedule_state import ScheduleStatus
 
-# The marks sit on the family's dark menu now, so they are its light text.
 _ICON_COLOR = TEXT_SECONDARY.name()
 
 
@@ -55,7 +54,7 @@ class EvolverTray(QSystemTrayIcon):
         self.run_now_action = QAction(run_now_icon(_ICON_COLOR), "Run Now", self._menu)
         self._menu.addAction(self.run_now_action)
 
-        self.pause_action = QAction(qta.icon("fa5s.pause", color=_ICON_COLOR), "Pause Scheduling", self._menu)
+        self.pause_action = QAction(pause_icon(_ICON_COLOR), "Pause Scheduling", self._menu)
         self._menu.addAction(self.pause_action)
 
         # A one-time opt-in, off by default because a non-AI encode owns the
