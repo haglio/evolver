@@ -6,9 +6,8 @@ Nothing else declares any of that: the progress popup's bars, the run detail
 table's names, tooltips and numbers, the stats chart's series and its legend
 all read this list.
 
-It sits with the stage implementations — twelve of the fourteen are in this
-package, and the other two are the ``check_*`` scripts at the repo root — and
-outside ``gui/`` so the headless CLI can read it without Qt. The color is a
+It sits with the stage implementations — all but the two ``check_*`` scripts
+at the repo root are in this package — and outside ``gui/`` so the headless CLI can read it without Qt. The color is a
 plain RGB triple for the same reason: the one window that paints a band builds
 its own ``QColor`` at the edge where Qt begins.
 
@@ -41,9 +40,6 @@ STAGES: tuple[Stage, ...] = (
     Stage("strays", "Stray Files",
           "Repair a video whose extension separator is not a dot, send a funscript found in the video tree to its mirror path under the scripts -- marking one Origenerator handed over as a script no person wrote -- and report every other non-video file found there",
           (0x0A, 0x12, 0x2C)),
-    Stage("purge", "Purge Weird",
-          "Delete the videos condemned into 2_outbox/kinda_weird and into the pile beside Genau's clips folder, along with their matching sources in 1_sorted, their metadata and their funscripts",
-          (0xF2, 0x8E, 0x2B)),
     Stage("withdrawn", "Taken Back",
           "Delete every copy this library holds of a clip Origenerator has taken back -- the inbox copy, the 1_sorted copy, the upscale and, down the Genau lane, the delivered loop -- with their metadata and funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its sound once the video with its sound is there",
           (0x00, 0x00, 0x6C)),

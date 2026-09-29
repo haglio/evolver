@@ -122,7 +122,6 @@ CONFIG_REFERENCE_LEDGER = {
     # The name the non-AI lane gives its outputs, which is how a hand export
     # made before the stage existed is told from an original.
     "tasks/provenance_sweep.py": 1,
-    "tasks/purge_weird.py": 2,
     "tasks/scene_scripts.py": 1,
     # The five folders this stage works between are its arguments, so the
     # four bucket classifiers take the roots rather than looking them up: what
@@ -179,10 +178,9 @@ CONFIG_REFERENCE_LEDGER = {
     "util/topaz.py": 3,
     "util/video_locator.py": 1,
     "util/warm_gun.py": 3,
-    # Where the two condemned piles are, and the corner of 1_sorted each one's
-    # files came from. The stage that empties them and the index that has to
-    # leave them out both read it here instead of the library layout (bug 11).
-    "util/weird_piles.py": 4,
+    # Where the two weird piles are, which the index that leaves them out reads
+    # here instead of the library layout.
+    "util/weird_piles.py": 2,
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or

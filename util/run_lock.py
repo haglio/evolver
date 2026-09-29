@@ -2,7 +2,7 @@
 
 Only one tray Evolver is ever up (``gui/single_instance.py``), but a
 command-line run can start while the tray's runs go on.  Each would sort the
-same inbox and purge the same piles; the upscale stages check for a live Topaz
+same inbox; the upscale stages check for a live Topaz
 process before starting one, but between two sorts nothing stood.  The turn is a file in the machine-local
 state folder, created exclusively and holding the runner's process number.
 """

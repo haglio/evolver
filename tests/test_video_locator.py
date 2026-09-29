@@ -33,7 +33,7 @@ class TestRelocate(unittest.TestCase):
 
             self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
 
-    def test_ignores_a_copy_awaiting_deletion_in_kinda_weird(self):
+    def test_leaves_a_reference_where_its_video_was_while_the_video_waits_in_kinda_weird(self):
         with workspace_temp_dir() as temp:
             weird_dir = temp / "videos" / "2_outbox" / "kinda_weird"
             _write_video(weird_dir / "clip.mp4")
@@ -42,9 +42,7 @@ class TestRelocate(unittest.TestCase):
 
             self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
 
-    def test_ignores_a_clip_awaiting_deletion_in_the_pile_genau_condemns_to(self):
-        """The purge stage sweeps that pile too, so a reference repointed at one
-        of its clips would be re-broken on the very next run."""
+    def test_leaves_a_reference_where_its_clip_was_while_the_clip_waits_in_genaus_weird_pile(self):
         with workspace_temp_dir() as temp:
             genau_weird = temp / "videos" / "genau" / "weird"
             _write_video(genau_weird / "loop.mp4")
