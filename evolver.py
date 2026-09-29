@@ -38,7 +38,6 @@ from tasks import (
     nonai_upscale,
     prompt_scrape,
     provenance_sweep,
-    purge_weird,
     reference_sync,
     scene_scripts,
     scripts_sync,
@@ -68,7 +67,6 @@ class StageRecord:
 # stages' verdicts (see ``run_pipeline``), which is what keeps the two legible
 # together.
 _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
-    "purge": lambda r: bool(r.missing_sorted),
     "metadata": lambda r: not r.ok,
     "upscale": lambda r: bool(r.failed),
     "upscale_non_ai": lambda r: bool(r.failed),
@@ -304,7 +302,6 @@ def _run_stages(
         # funscripts only under the script tree, so a name this one repairs or a
         # script it rehomes is invisible to all of them until it has run.
         _run_stage("strays", stray_files.run)
-        _run_stage("purge", purge_weird.run)
         # Before the scrape and the sort: a clip whose send has been taken back
         # should not be given a sidecar on its way out, nor filed into 1_sorted
         # from an inbox it is about to be deleted from.

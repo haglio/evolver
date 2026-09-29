@@ -15,8 +15,9 @@ import pytest
 import config
 import evolver
 from tasks.stages import ALL_STAGES
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
 from util import run_lock, run_log
+from util.sidecar import sidecar_path
 
 # What logging writes at the end of every line on this platform, and so what
 # a byte offset into the log has to be counted in.
@@ -34,7 +35,6 @@ def _stage_mocks() -> dict:
     return {
         "strays_run": Mock(return_value=Mock(ok=True)),
         "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
-        "purge_run": Mock(return_value=Mock(missing_sorted=[])),
         "withdrawn_run": Mock(return_value=Mock(failed=0)),
         "scripts_sync_run": Mock(return_value=Mock(ok=True)),
         "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
@@ -65,7 +65,6 @@ _STAGE_PATCHES = [
     ("evolver.sort.run", "sort_run"),
     ("evolver.video_types.run", "video_types_run"),
     ("evolver.provenance_sweep.run", "provenance_sweep_run"),
-    ("evolver.purge_weird.run", "purge_run"),
     ("evolver.withdrawn.run", "withdrawn_run"),
     ("evolver.clip_scripts.run", "clip_scripts_run"),
     ("evolver.scene_scripts.run", "scene_scripts_run"),
@@ -243,7 +242,7 @@ class TestEvolverMain:
         "failing_overrides",
         [
             pytest.param(lambda: dict(
-                purge_run=Mock(return_value=Mock(missing_sorted=["file.mp4"]))), id="purge"),
+                withdrawn_run=Mock(return_value=Mock(failed=1))), id="withdrawn"),
             pytest.param(lambda: dict(
                 nonai_run=Mock(return_value=Mock(failed=1, deferred_low_disk=False))), id="upscale_non_ai"),
             pytest.param(lambda: dict(
@@ -291,7 +290,7 @@ class TestEvolverMain:
         )
         assert mocks["exit_code"] == 0
         mocks["sort_run"].assert_called_once()
-        mocks["purge_run"].assert_called_once()
+        mocks["withdrawn_run"].assert_called_once()
         mocks["clip_scripts_run"].assert_called_once()
         mocks["scripts_sync_run"].assert_called_once_with(show_popup=True)
         mocks["bookmarks_sync_run"].assert_called_once()
@@ -442,12 +441,12 @@ class TestRunPipeline:
         stack, mocks = self._patch_all_stages()
         with stack:
             evolver.run_pipeline(on_stage_complete=on_complete)
-        # Any stage would do; purge is picked by name rather than by position,
+        # Any stage would do; this one is picked by name rather than by position,
         # because its position is the registry's to decide.
-        purge_call = next(c for c in on_complete.call_args_list if c.args[0] == "purge")
-        assert purge_call.args[1] == mocks["purge_run"].return_value
-        assert isinstance(purge_call.args[2], float)  # elapsed
-        assert purge_call.args[3] == "completed"
+        withdrawn_call = next(c for c in on_complete.call_args_list if c.args[0] == "withdrawn")
+        assert withdrawn_call.args[1] == mocks["withdrawn_run"].return_value
+        assert isinstance(withdrawn_call.args[2], float)  # elapsed
+        assert withdrawn_call.args[3] == "completed"
 
     def test_on_stage_complete_reports_skipped_for_upscale(self):
         on_complete = Mock()
@@ -507,7 +506,7 @@ class TestRunPipeline:
 
     def test_has_errors_true_when_stage_fails(self):
         stack, _ = self._patch_all_stages(
-            purge_run=Mock(return_value=Mock(missing_sorted=["file.mp4"])),
+            withdrawn_run=Mock(return_value=Mock(failed=1)),
         )
         with stack:
             result = evolver.run_pipeline()
@@ -522,12 +521,12 @@ class TestRunPipeline:
         nothing anywhere saying which one went wrong.
         """
         stack, _ = self._patch_all_stages(
-            purge_run=Mock(return_value=Mock(missing_sorted=["file.mp4"])),
+            withdrawn_run=Mock(return_value=Mock(failed=1)),
         )
         with stack:
             result = evolver.run_pipeline()
         errored = [s.name for s in result.stages if s.status == "error"]
-        assert errored == ["purge"]
+        assert errored == ["withdrawn"]
 
     def test_a_low_disk_hold_warns_on_the_non_ai_stage_instead_of_failing_it(self):
         """The condition that reddened almost every run for days on end.
@@ -780,8 +779,50 @@ class TestTheWindowsDoorToTheQueue:
         withdraw_request.assert_called_once_with()
 
 
+def _a_record_for(video: Path) -> Path:
+    record = sidecar_path(video)
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text("{}", encoding="utf-8")
+    return record
+
+
+def _a_run(lib: LaneLibrary) -> None:
+    with lib.config(), _patched_stages(_stage_mocks()):
+        evolver.run_pipeline()
+
+
+class TestWhatIsMarkedWeird:
+    def test_a_run_leaves_a_clip_genau_marked_weird_where_it_is_with_its_record(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                marked = touch_video(lib.genau_weird / "loop_7_topaz.mp4")
+                record = _a_record_for(lib.genau_clips / marked.name)
+
+            _a_run(lib)
+
+            assert marked.exists()
+            assert record.exists()
+
+    def test_a_run_leaves_the_record_of_every_other_video_that_shares_its_name(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                touch_video(lib.genau_weird / "scene one.mp4")
+                touch_video(lib.genau_weird / "loop_8_topaz.mp4")
+                full_scene = _a_record_for(
+                    touch_video(lib.non_ai / "example-bucket" / "full" / "scene one.mp4"))
+                landscape_copy = _a_record_for(
+                    touch_video(lib.outbox / "landscape" / "example-source" / "loop_8_topaz.mp4"))
+
+            _a_run(lib)
+
+            assert full_scene.exists()
+            assert landscape_copy.exists()
+
+
 class TestOneRunAtATime:
-    """A command-line run beside the tray's would sort and purge the same files."""
+    """A command-line run beside the tray's would sort and upscale the same files."""
 
     def test_while_another_evolver_holds_the_turn_no_stage_runs(self):
         with workspace_temp_dir() as root:

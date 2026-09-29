@@ -86,7 +86,7 @@ class _Labelled:
 
 @dataclass
 class _Discarded:
-    """The clip was weird; it now sits in the weird folder, awaiting the purge stage."""
+    """The clip was weird; it now sits in the weird folder."""
 
     clip: Path
     _landed_at: Path | None = field(default=None, init=False, repr=False)

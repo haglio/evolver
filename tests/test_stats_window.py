@@ -94,17 +94,17 @@ class TestStackedAreaChartSeries:
     def chart(self):
         # Three records with known durations (newest-first like load_runs returns)
         records = [
-            _make_record({"sort": 6.0, "purge": 3.0}),
-            _make_record({"sort": 4.0, "purge": 2.0}),
-            _make_record({"sort": 2.0, "purge": 1.0}),
+            _make_record({"sort": 6.0, "withdrawn": 3.0}),
+            _make_record({"sort": 4.0, "withdrawn": 2.0}),
+            _make_record({"sort": 2.0, "withdrawn": 1.0}),
         ]
         return StackedAreaChart(records)
 
     def test_a_stage_is_plotted_at_the_times_it_took_oldest_run_first(self, chart):
         series = chart._compute_series()
-        # Records are reversed to chronological, so purge values = [1, 2, 3]
-        purge_series = series[ALL_STAGES.index("purge")]
-        assert purge_series == [1.0, 2.0, 3.0]
+        # Records are reversed to chronological, so withdrawn values = [1, 2, 3]
+        withdrawn_series = series[ALL_STAGES.index("withdrawn")]
+        assert withdrawn_series == [1.0, 2.0, 3.0]
 
     def test_every_stage_charts_its_own_durations(self, chart):
         series = chart._compute_series()
@@ -120,9 +120,9 @@ class TestStackedAreaChartSeries:
     def test_in_averages_mode_a_stage_is_plotted_as_its_running_mean(self, chart):
         chart.set_mode("averages")
         series = chart._compute_series()
-        purge_series = series[ALL_STAGES.index("purge")]
+        withdrawn_series = series[ALL_STAGES.index("withdrawn")]
         # raw = [1, 2, 3], running avg = [1/1, 3/2, 6/3] = [1.0, 1.5, 2.0]
-        assert purge_series == pytest.approx([1.0, 1.5, 2.0])
+        assert withdrawn_series == pytest.approx([1.0, 1.5, 2.0])
 
     def test_averages_mode_means_every_stage_not_just_the_first(self, chart):
         chart.set_mode("averages")
@@ -180,7 +180,7 @@ class TestStackedAreaChartPainting:
         # Which of the two stacks first is the registry's to say, so the test
         # asks it rather than assuming: bands go up in registry order, so the
         # lower 200 s belongs to whichever of the two comes earlier in it.
-        lower, upper = sorted(("purge", "sort"), key=ALL_STAGES.index)
+        lower, upper = sorted(("withdrawn", "sort"), key=ALL_STAGES.index)
         chart = StackedAreaChart(
             _two_runs({lower: 200.0, upper: 200.0}, {lower: 200.0, upper: 200.0})
         )

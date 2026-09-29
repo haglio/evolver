@@ -1,6 +1,6 @@
 """Where Genau puts a condemned clip, held to what Genau says it does.
 
-Evolver delivers upscaled clips into the folder Genau plays from and drains the
+Evolver delivers upscaled clips into the folder Genau plays from and reads the
 pile Genau moves a condemned one to.  That pile's place -- beside the folder,
 not inside it -- is Genau's rule, and it was written out a second time here,
 from reading that repo's source, with nothing comparing the two.  A rename over
@@ -45,7 +45,7 @@ class GenauContract(unittest.TestCase):
         if self.promise is None:
             self.skipTest(f"no {CONTRACT.as_posix()} beside this checkout")
 
-    def test_the_pile_drained_here_is_where_genau_condemns_a_clip_to(self):
+    def test_the_pile_read_here_is_where_genau_condemns_a_clip_to(self):
         """Delivered clips and condemned ones are the two ends of one folder
         pair, and only one repo decides its shape."""
         beside = self.promise["beside_the_clips_folder"]

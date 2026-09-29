@@ -11,22 +11,18 @@ from util import ffprobe
 from util.media_files import file_size, is_finalized_video_file, library_videos
 from util.nonai_library import bucket_of
 from util.variants import strip_processing_suffixes
-from util.weird_piles import weird_piles
+from util.weird_piles import weird_pile_dirs
 
 
 def build_index() -> dict[str, list[Path]]:
-    """Index every video under the search root by lowercased filename.
-
-    Videos sitting in a condemned pile are left out: the purge stage deletes
-    them and their sources, so pointing a reference at one only re-breaks it.
-    """
+    """Index every video under the search root by lowercased filename."""
     index: dict[str, list[Path]] = defaultdict(list)
     root = config.VIDEO_SEARCH_ROOT
     if not root.is_dir():
         return index
-    piles = weird_piles()
+    piles = weird_pile_dirs()
     for video_path in library_videos(root):
-        if any(video_path.is_relative_to(pile.directory) for pile in piles):
+        if any(video_path.is_relative_to(pile) for pile in piles):
             continue
         index[video_path.name.lower()].append(video_path)
     return index

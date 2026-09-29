@@ -60,8 +60,6 @@ def restore_sidecar(clip: Path, snapshot: dict | None) -> None:
 def discard_as_weird(clip: Path) -> Path:
     """Move *clip* to the weird folder, as Fun Time's "mark as weird" does.
 
-    No metadata is written: the purge_weird stage deletes a weird clip along with
-    the ``1_sorted`` source it came from and any sidecar left over from either one.
     Returns where the clip landed.
     """
     config.WEIRD_DIR.mkdir(parents=True, exist_ok=True)
