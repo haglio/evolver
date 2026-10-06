@@ -60,9 +60,10 @@ testpaths = ["tests"]
 [tool.haglio]
 siblings = ["app_support", "shared_ui", "voice_core"]
 
-# What Evolver's two launchers start: launch_evolver.vbs, which the broker's tray
-# runs when it finds Evolver gone, and launch_preview_branch.vbs, which opens a
-# worktree's run-detail window. Both are rendered from these by
+# What Evolver's two launchers start: launch_evolver.vbs, which its pinned
+# shortcut runs and the broker's tray runs when it finds Evolver gone, and
+# launch_preview_branch.vbs, which opens a worktree's run-detail window. Both are
+# rendered from these by
 # `python -m app_support.launcher --write`.
 [tool.haglio.launchers."launch_evolver.vbs"]
 app = "Evolver"
@@ -78,6 +79,15 @@ run = '"{root}\tray_app.py" --show-window'
 log = 'state\preview_branch.log'
 environment = { EVOLVER_BRANCH_SESSION = "1" }
 copy-from-primary = ["content.local.json"]
+
+# What Evolver relies on Windows to keep: the shortcut it is pinned from.
+# `python -m app_support.windows_settings --write` makes this machine match every
+# checkout's list.
+[tool.haglio.shortcuts."Evolver"]
+launcher = "launch_evolver.vbs"
+icon = "icon.ico"
+app-id = "Evolver.TrayApp"
+places = ["taskbar", "checkout"]
 
 [tool.setuptools.packages.find]
 include = ["evolver*"]
