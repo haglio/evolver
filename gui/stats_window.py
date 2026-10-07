@@ -208,7 +208,7 @@ class StackedAreaChart(QWidget):
     def __init__(self, history: RunHistory, parent=None):
         super().__init__(parent)
         self._history = history
-        self._mode = "normal"
+        self._mode = "historical"
         self._fit = False
         self.setMinimumSize(600, 400)
 
@@ -402,13 +402,13 @@ class StatsWindow(QDialog):
         # Held exclusive by Qt rather than by four slots that each checked one
         # button and unchecked the other by hand.
         btn_row = QHBoxLayout()
-        self._normal_btn = _toggle("Normal", checked=True)
+        self._historical_btn = _toggle("Historical", checked=True)
         self._averages_btn = _toggle("Averages")
         self._10m_btn = _toggle("10m", checked=True)
         self._fit_btn = _toggle("Fit")
-        self._measure = _either_or(self, self._normal_btn, self._averages_btn)
+        self._measure = _either_or(self, self._historical_btn, self._averages_btn)
         self._scale = _either_or(self, self._10m_btn, self._fit_btn)
-        for button in (self._normal_btn, self._averages_btn):
+        for button in (self._historical_btn, self._averages_btn):
             btn_row.addWidget(button)
         btn_row.addSpacing(20)
         for button in (self._10m_btn, self._fit_btn):
@@ -438,7 +438,7 @@ class StatsWindow(QDialog):
 
     def _show_chosen_measure(self):
         if self._chart is not None:
-            self._chart.set_mode("averages" if self._averages_btn.isChecked() else "normal")
+            self._chart.set_mode("averages" if self._averages_btn.isChecked() else "historical")
 
     def _show_chosen_scale(self):
         if self._chart is not None:
