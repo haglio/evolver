@@ -21,8 +21,12 @@ def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (),
     """Put *message* on the screen under *title*, block until it is read, and say whether it was dismissed."""
     try:
         from shared_ui.alert import Link, show_alert  # noqa: PLC0415  (see the module docstring)
+        from shared_ui.preview_icon import app_icon  # noqa: PLC0415  (see the module docstring)
 
-        return show_alert(title, message, icon=ICON_FILE,
+        from util.preview import shown_as  # noqa: PLC0415  (see the module docstring)
+
+        shown = shown_as()
+        return show_alert(title, message, icon=ICON_FILE if shown is None else app_icon(ICON_FILE, shown),
                           links=[Link(text, target) for text, target in links],
                           dismissible=dismissible)
     except Exception:

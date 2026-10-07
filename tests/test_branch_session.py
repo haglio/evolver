@@ -20,6 +20,8 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 from PyQt6.QtWidgets import QMessageBox
+from shared_ui.palette import PREVIEW_INK
+from shared_ui.preview import Preview
 
 from gui import branch_session
 from tests.gui_support import build_evolver_app
@@ -210,10 +212,10 @@ class TestHandingTheWorkBack:
         stood_down.assert_called_once_with()
 
     def test_the_window_says_when_the_work_goes_back(self, request):
-        with patch("gui.branch_session.branch", return_value="claude/some-change"):
+        with patch("util.preview.preview_of", return_value=Preview(feature="the new queue window")):
             app = self._started_preview(request)
 
-        assert app._window.windowTitle().startswith("Evolver — preview of claude/some-change")
+        assert app._window.windowTitle().startswith("Evolver — preview of the new queue window")
         assert ", until " in app._window.windowTitle()
 
     def test_the_usual_evolver_is_started_from_its_own_checkout_and_not_as_a_preview(self):
@@ -243,13 +245,27 @@ class TestHandingTheWorkBack:
 
 
 class TestTellingTheTwoApart:
-    def test_the_window_and_the_tray_name_the_branch(self, request):
+    def test_the_window_and_the_tray_name_the_feature_the_preview_demos(self, request):
         with override_config(BRANCH_SESSION=True), \
-             patch("gui.branch_session.branch", return_value="claude/some-change"):
+             patch("util.preview.preview_of", return_value=Preview(feature="the new queue window")):
             app = build_evolver_app(request)
 
-        assert "claude/some-change" in app._window.windowTitle()
-        assert "claude/some-change" in app._tray.toolTip()
+        assert "preview of the new queue window" in app._window.windowTitle()
+        assert "preview of the new queue window" in app._tray.toolTip()
+
+    def test_a_preview_wears_its_letter_in_the_preview_ink(self, request):
+        with override_config(BRANCH_SESSION=True), \
+             patch("util.preview.preview_of", return_value=Preview(feature=None)):
+            app = build_evolver_app(request)
+
+        for icon in (app._tray.icon(), app._app.windowIcon()):
+            middle_of_the_e = icon.pixmap(256, 256).toImage().pixelColor(128, 128)
+            assert (middle_of_the_e.red(), middle_of_the_e.green(), middle_of_the_e.blue()) == PREVIEW_INK
+
+    def test_a_preview_gets_a_taskbar_button_of_its_own(self):
+        with override_config(BRANCH_SESSION=True), \
+             patch("util.preview.preview_of", return_value=Preview(feature=None)):
+            assert branch_session.model_id("Evolver.TrayApp") == "Evolver.TrayApp.Preview"
 
     def test_the_live_app_is_just_evolver(self, request):
         app = build_evolver_app(request)

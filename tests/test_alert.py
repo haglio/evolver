@@ -4,7 +4,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from PyQt6.QtWidgets import QApplication
 from shared_ui.alert import Link
+from shared_ui.palette import PREVIEW_INK
+from shared_ui.preview import Preview
 
 from tests.product_sources import PROJECT_ROOT, product_sources
 from util import alert
@@ -37,6 +40,15 @@ class TestShowError(unittest.TestCase):
 
         show_alert.assert_called_once_with(
             "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False)
+
+    @patch("shared_ui.alert.show_alert")
+    def test_a_previews_alert_wears_its_letter_in_the_preview_ink(self, show_alert):
+        _app = QApplication.instance() or QApplication([])
+        with patch("util.preview.shown_as", return_value=Preview(feature=None)):
+            alert.show_error("Title", "Body")
+
+        letter = show_alert.call_args.kwargs["icon"].pixmap(256, 256).toImage().pixelColor(128, 128)
+        self.assertEqual((letter.red(), letter.green(), letter.blue()), PREVIEW_INK)
 
     @patch("shared_ui.alert.show_alert")
     def test_a_folder_to_open_reaches_the_dialog_as_a_link_under_the_message(self, show_alert):
