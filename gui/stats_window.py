@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui.run_history import RunHistory
-from gui.run_record import RunRecord, in_display_zone
+from gui.run_record import in_display_zone
 from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 
 # The registry's colors, as the painter wants them. This is the edge where Qt
@@ -389,13 +389,14 @@ def _either_or(parent, *buttons: QPushButton) -> QButtonGroup:
 class StatsWindow(QDialog):
     """Non-modal dialog showing pipeline run statistics."""
 
-    def __init__(self, records: list[RunRecord], parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Evolver \u2014 Run Statistics")
         self.setMinimumSize(800, 500)
         self.resize(1000, 600)
 
         layout = QVBoxLayout(self)
+        self._layout = layout
 
         # Two either-or pairs: what the bands measure, and what the scale is.
         # Held exclusive by Qt rather than by four slots that each checked one
@@ -415,23 +416,30 @@ class StatsWindow(QDialog):
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
-        if records:
-            self._chart = StackedAreaChart(RunHistory.of(records))
-            layout.addWidget(self._chart, stretch=1)
-        else:
-            self._chart = None
-            placeholder = QLabel("No run data available.")
-            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addWidget(placeholder, stretch=1)
+        self._chart: StackedAreaChart | None = None
+        self._placeholder = QLabel("Reading the run history…")
+        self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._placeholder, stretch=1)
 
-        self._measure.buttonClicked.connect(self._on_measure_chosen)
-        self._scale.buttonClicked.connect(self._on_scale_chosen)
+        self._measure.buttonClicked.connect(self._show_chosen_measure)
+        self._scale.buttonClicked.connect(self._show_chosen_scale)
 
-    def _on_measure_chosen(self, button):
+    def show_history(self, history: RunHistory):
+        if not history:
+            self._placeholder.setText("No run data available.")
+            return
+        self._chart = StackedAreaChart(history)
+        self._show_chosen_measure()
+        self._show_chosen_scale()
+        self._layout.removeWidget(self._placeholder)
+        self._placeholder.hide()
+        self._placeholder.deleteLater()
+        self._layout.addWidget(self._chart, stretch=1)
+
+    def _show_chosen_measure(self):
         if self._chart is not None:
-            self._chart.set_mode(
-                "averages" if button is self._averages_btn else "normal")
+            self._chart.set_mode("averages" if self._averages_btn.isChecked() else "normal")
 
-    def _on_scale_chosen(self, button):
+    def _show_chosen_scale(self):
         if self._chart is not None:
-            self._chart.set_fit(button is self._fit_btn)
+            self._chart.set_fit(self._fit_btn.isChecked())

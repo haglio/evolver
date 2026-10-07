@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
-from gui.run_record import RunRecord, utc_time
+from gui.run_record import RunRecord, every_run, utc_time
 from tasks.stages import ALL_STAGES
 
 _ROW_OF_STAGE = {stage: row for row, stage in enumerate(ALL_STAGES)}
@@ -33,6 +34,10 @@ class RunHistory:
             durations=np.array(durations, dtype=float).reshape(-1, len(ALL_STAGES))
             [oldest_first].T,
         )
+
+    @classmethod
+    def read(cls, runs_dir: Path) -> RunHistory:
+        return cls.of(every_run(runs_dir))
 
     def __len__(self) -> int:
         return len(self.started)

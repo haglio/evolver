@@ -12,8 +12,9 @@ from zoneinfo import ZoneInfo
 from evolver import PipelineResult, StageRecord
 from gui.run_record import (
     RunRecord,
+    every_run,
     format_run_label,
-    load_runs,
+    newest_runs,
     result_to_dict,
     save_run,
 )
@@ -94,7 +95,7 @@ class TestRunRecordRoundTrip:
             assert expected_path.exists()
 
             # Round-trip
-            loaded = load_runs(runs_dir)
+            loaded = list(every_run(runs_dir))
             assert len(loaded) == 1
             assert loaded[0].id == record.id
             assert loaded[0].trigger == "manual"
@@ -118,11 +119,11 @@ class TestRunRecordRoundTrip:
         with workspace_temp_dir() as tmp:
             runs_dir = tmp / "runs"
             save_run(record, runs_dir)  # json.dumps on the real payload shape
-            loaded = load_runs(runs_dir)
+            loaded = list(every_run(runs_dir))
 
         assert loaded[0].stages[0]["result"]["moved_files"] == [str(Path("C:/videos/a.mp4"))]
 
-    def test_load_runs_sorted_newest_first(self):
+    def test_the_newest_runs_come_newest_first(self):
         with workspace_temp_dir() as tmp:
             runs_dir = tmp / "runs"
             runs_dir.mkdir()
@@ -134,12 +135,13 @@ class TestRunRecordRoundTrip:
                 )
                 save_run(record, runs_dir)
 
-            loaded = load_runs(runs_dir)
+            loaded = newest_runs(runs_dir, 10)
             ids = [r.id for r in loaded]
             assert ids == ["2026-03-29T14-30-00", "2026-03-29T14-15-00", "2026-03-29T14-00-00"]
 
     def test_a_history_directory_that_does_not_exist_reads_as_no_runs(self):
-        assert load_runs(Path("nonexistent_dir_xyz")) == []
+        assert newest_runs(Path("nonexistent_dir_xyz"), 10) == []
+        assert list(every_run(Path("nonexistent_dir_xyz"))) == []
 
 
 class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
@@ -171,9 +173,9 @@ class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
                 encoding="utf-8",
             )
 
-            records = load_runs(root)
+            records = list(every_run(root))
 
-            assert [r.id for r in records] == ["b", "a"]
+            assert [r.id for r in records] == ["a", "b"]
 
     def test_a_file_written_half_way_is_skipped_and_named(self, caplog):
         with workspace_temp_dir() as root:
@@ -181,7 +183,7 @@ class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
             (root / "b.json").write_text('{"id": "b", "started_at":', encoding="utf-8")
 
             with caplog.at_level(logging.WARNING):
-                records = load_runs(root)
+                records = list(every_run(root))
 
             assert [r.id for r in records] == ["a"]
             assert any("b.json" in record.getMessage() for record in caplog.records)
@@ -191,40 +193,44 @@ class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
             (root / "a.json").write_text(json.dumps({"id": "a"}), encoding="utf-8")
 
             with caplog.at_level(logging.WARNING):
-                records = load_runs(root)
+                records = list(every_run(root))
 
             assert records == []
             assert any("a.json" in record.getMessage() for record in caplog.records)
+
+
+def _write_run(root, run_id):
+    (root / f"{run_id}.json").write_text(json.dumps({
+        "id": run_id, "started_at": "2026-01-01T00:00:00",
+        "finished_at": "2026-01-01T00:00:05", "duration_seconds": 5.0,
+        "trigger": "manual", "status": "success", "stages": [],
+    }), encoding="utf-8")
+
+
+def _counting_opens(opened: list[str]):
+    real_read_text = Path.read_text
+
+    def counting_read_text(self, *args, **kwargs):
+        opened.append(self.name)
+        return real_read_text(self, *args, **kwargs)
+
+    return patch.object(Path, "read_text", counting_read_text)
 
 
 class TestLoadingOnlyTheNewest:
     """Nothing prunes the runs directory, and the main window reads it on the
     GUI thread after every run."""
 
-    def _write(self, root, run_id):
-        (root / f"{run_id}.json").write_text(json.dumps({
-            "id": run_id, "started_at": "2026-01-01T00:00:00",
-            "finished_at": "2026-01-01T00:00:05", "duration_seconds": 5.0,
-            "trigger": "manual", "status": "success", "stages": [],
-        }), encoding="utf-8")
-
     def test_a_limit_takes_the_newest_that_many(self):
         with workspace_temp_dir() as root:
             for run_id in ("2026-01-01T00-00-00", "2026-01-02T00-00-00",
                            "2026-01-03T00-00-00"):
-                self._write(root, run_id)
+                _write_run(root, run_id)
 
-            records = load_runs(root, limit=2)
+            records = newest_runs(root, 2)
 
             assert [r.id for r in records] == ["2026-01-03T00-00-00",
                                                "2026-01-02T00-00-00"]
-
-    def test_no_limit_reads_them_all(self):
-        with workspace_temp_dir() as root:
-            for run_id in ("2026-01-01T00-00-00", "2026-01-02T00-00-00"):
-                self._write(root, run_id)
-
-            assert len(load_runs(root)) == 2
 
     def test_the_limit_is_applied_before_any_file_is_opened(self):
         """The whole point: a run's file is named for the moment it started, so
@@ -232,18 +238,35 @@ class TestLoadingOnlyTheNewest:
         costs one directory listing rather than parsing the lot."""
         with workspace_temp_dir() as root:
             for day in range(1, 6):
-                self._write(root, f"2026-01-0{day}T00-00-00")
+                _write_run(root, f"2026-01-0{day}T00-00-00")
             opened = []
-            real_read_text = Path.read_text
 
-            def counting_read_text(self, *args, **kwargs):
-                opened.append(self.name)
-                return real_read_text(self, *args, **kwargs)
-
-            with patch.object(Path, "read_text", counting_read_text):
-                load_runs(root, limit=2)
+            with _counting_opens(opened):
+                newest_runs(root, 2)
 
             assert opened == ["2026-01-05T00-00-00.json", "2026-01-04T00-00-00.json"]
+
+
+class TestReadingEveryRun:
+    def test_every_run_on_record_is_read(self):
+        with workspace_temp_dir() as root:
+            for run_id in ("2026-01-01T00-00-00", "2026-01-02T00-00-00"):
+                _write_run(root, run_id)
+
+            assert len(list(every_run(root))) == 2
+
+    def test_runs_come_oldest_first_each_file_opened_only_when_its_run_is_reached(self):
+        with workspace_temp_dir() as root:
+            for day in range(1, 4):
+                _write_run(root, f"2026-01-0{day}T00-00-00")
+            opened = []
+
+            with _counting_opens(opened):
+                runs = every_run(root)
+                first = next(runs)
+
+            assert first.id == "2026-01-01T00-00-00"
+            assert opened == ["2026-01-01T00-00-00.json"]
 
 
 class TestRunRecordFromPipelineResult:
@@ -311,7 +334,7 @@ class TestRunRecordFromPipelineResult:
 
     def test_a_record_with_no_mark_still_loads_back(self):
         """Every record on disk was written before the mark existed, so the two
-        fields have to be optional at BOTH ends -- load_runs drops a record
+        fields have to be optional at BOTH ends -- reading drops a record
         whose file is missing a field the dataclass requires."""
         with workspace_temp_dir() as runs_dir:
             (runs_dir / "2026-01-01T00-00-00.json").write_text(json.dumps({
@@ -322,7 +345,7 @@ class TestRunRecordFromPipelineResult:
                 "status": "success", "stages": [],
             }), encoding="utf-8")
 
-            loaded = load_runs(runs_dir)
+            loaded = list(every_run(runs_dir))
 
         assert [r.log_start for r in loaded] == [None]
 

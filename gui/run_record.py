@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -147,40 +148,34 @@ def save_run(record: RunRecord, runs_dir: Path) -> Path:
     return path
 
 
-def load_runs(runs_dir: Path, limit: int | None = None) -> list[RunRecord]:
-    """Load run records from a directory, newest first, at most *limit* of them.
+def newest_runs(runs_dir: Path, count: int) -> list[RunRecord]:
+    paths = sorted(_record_files(runs_dir), reverse=True)[:count]
+    records = list(_read_records(paths))
+    records.sort(key=lambda r: r.id, reverse=True)
+    return records
 
-    Only the keys the dataclass declares are read off a record, so a field
-    added to the format later does not make every record written since
-    unreadable -- which, hidden by a bare ``except: continue``, emptied the
-    history list and the stats chart with nothing said. A file that genuinely
-    cannot be read is skipped and named in the log instead of vanishing.
 
-    *limit* is applied to the FILENAMES, before anything is opened: a run's
-    file is named for the moment it started, so newest-first is the reverse of
-    their order and picking the newest N costs one directory listing. Nothing
-    prunes this directory -- roughly 144 files a day at the default interval,
-    kept forever -- so without a limit every read of it grows, and this one
-    happens on the GUI thread after every run.
-    """
-    if not runs_dir.is_dir():
-        return []
-    paths = sorted(runs_dir.glob("*.json"), reverse=True)
-    if limit is not None:
-        paths = paths[:limit]
-    records = []
+def every_run(runs_dir: Path) -> Iterator[RunRecord]:
+    return _read_records(sorted(_record_files(runs_dir)))
+
+
+def _record_files(runs_dir: Path) -> list[Path]:
+    return list(runs_dir.glob("*.json")) if runs_dir.is_dir() else []
+
+
+def _read_records(paths: Iterable[Path]) -> Iterator[RunRecord]:
     for path in paths:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            records.append(RunRecord(**{
+            record = RunRecord(**{
                 key: value for key, value in data.items()
                 if key in RunRecord.__dataclass_fields__
-            }))
+            })
         except (OSError, json.JSONDecodeError, TypeError, AttributeError):
             # AttributeError: valid JSON that is not an object, so .items() is
             # not there to call. TypeError: a record missing a field the
             # dataclass requires.
             log.warning("Could not read run record %s; skipping it.", path,
                         exc_info=True)
-    records.sort(key=lambda r: r.id, reverse=True)
-    return records
+            continue
+        yield record

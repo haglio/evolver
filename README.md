@@ -100,8 +100,9 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `gui/main_window.py` - run history list and detail/progress panel
   - `gui/progress_popup.py` - the floating per-stage progress window
   - `gui/stats_window.py` - the stacked-area chart of stage durations across runs
+  - `gui/run_history.py` - every run's start and how long each stage took in it, which is all the chart reads
   - `gui/queue_window.py` - the upscale queue: drag to reorder it, and the first video's arrow to upscale it now
-  - `gui/background.py` - the queue window's reads and changes, done off the window's thread
+  - `gui/background.py` - what the queue and stats windows read or change, done off the window's thread
   - `gui/worker.py` - background QThread pipeline runner
   - `gui/scheduler.py` - timer-based scheduling with run-guard
   - `gui/run_record.py` - JSON run record persistence
