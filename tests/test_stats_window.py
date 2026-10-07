@@ -1,10 +1,12 @@
 """Tests for the stats window and stacked area chart."""
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+import numpy as np
 import pytest
 from PyQt6.QtGui import QFontMetrics, QImage
 
@@ -146,6 +148,15 @@ def _two_runs(stage_durations_old, stage_durations_new) -> RunHistory:
     ])
 
 
+def _every_ten_minutes(**seconds_by_stage: np.ndarray) -> RunHistory:
+    runs = len(next(iter(seconds_by_stage.values())))
+    durations = np.zeros((len(ALL_STAGES), runs))
+    for stage, seconds in seconds_by_stage.items():
+        durations[ALL_STAGES.index(stage)] = seconds
+    first_start = datetime(2026, 3, 30, tzinfo=UTC).timestamp()
+    return RunHistory(started=first_start + 600.0 * np.arange(runs), durations=durations)
+
+
 def _limit_line_rows(image: QImage) -> list[int]:
     """Rows in the 10-minute line's neighbourhood holding a long gray dash run.
 
@@ -187,6 +198,11 @@ class TestStackedAreaChartPainting:
         assert _is_band_fill(_rgb(image, 380, 300), lower)
         assert _is_band_fill(_rgb(image, 380, 230), upper)
         assert _rgb(image, 380, 120) == _WHITE  # above the stack: bare ground
+
+    def test_a_history_of_one_run_still_gets_its_axes_dated(self):
+        image = _render(StackedAreaChart(RunHistory.of([_make_record({"sort": 300.0})])))
+
+        assert _ink_count(image, range(60, 740, 2), range(352, 380)) > 50
 
     def test_an_empty_chart_says_so_instead_of_going_blank(self):
         image = _render(StackedAreaChart(RunHistory.of([])))
@@ -271,6 +287,38 @@ class TestStackedAreaChartPainting:
     def test_the_runs_are_dated_along_the_x_axis(self):
         image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
         assert _ink_count(image, range(60, 740, 2), range(352, 380)) > 50
+
+    def test_one_long_run_among_thousands_still_reaches_its_full_height(self):
+        seconds = np.full(2000, 30.0)
+        seconds[1000] = 500.0
+        chart = StackedAreaChart(_every_ten_minutes(sort=seconds))
+
+        image = _render(chart)
+
+        plot = chart._plot()
+        long_run_x = round(plot.left + plot.width * 1000 / 1999)
+        four_hundred_seconds_up = round(plot.y_of(400.0))
+        assert any(_rgb(image, x, four_hundred_seconds_up) != _WHITE
+                   for x in range(long_run_x - 1, long_run_x + 2))
+        assert _rgb(image, plot.left + plot.width // 4, four_hundred_seconds_up) == _WHITE
+
+
+class TestAYearOfRuns:
+    def test_a_year_of_runs_paints_in_under_a_second_in_every_mode(self):
+        runs = 365 * 24 * 6
+        rng = np.random.default_rng(7)
+        chart = StackedAreaChart(_every_ten_minutes(
+            **{stage: rng.exponential(8.0, runs) for stage in ALL_STAGES}))
+
+        slowest = 0.0
+        for mode, fit in (("normal", False), ("averages", False), ("normal", True)):
+            chart.set_mode(mode)
+            chart.set_fit(fit)
+            started = time.perf_counter()
+            _render(chart, 1000, 560)
+            slowest = max(slowest, time.perf_counter() - started)
+
+        assert slowest < 1.0
 
 
 class TestStatsWindow:

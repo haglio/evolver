@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import numpy as np
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
+from PyQt6.QtCore import QLineF, QPointF, Qt
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPolygonF
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -117,31 +117,89 @@ def _running_means(durations: np.ndarray) -> np.ndarray:
 
 @dataclass(frozen=True)
 class _Plot:
-    """Where the chart sits in the widget, and how a value becomes a pixel."""
-
     left: int
     top: int
     width: int
     height: int
-    timestamps: np.ndarray
+    started: np.ndarray
     series: np.ndarray
     y_max: float
 
     @property
     def t_min(self) -> float:
-        return float(self.timestamps.min()) if len(self.timestamps) else 0.0
+        return float(self.started.min()) if len(self.started) else 0.0
 
     @property
     def t_max(self) -> float:
-        return float(self.timestamps.max()) if len(self.timestamps) else 0.0
+        return float(self.started.max()) if len(self.started) else 0.0
 
-    def x_of(self, run_index: int) -> float:
-        """Where the run at *run_index* sits, by when it ran."""
+    def x_of(self, moments: np.ndarray) -> np.ndarray:
         span = self.t_max - self.t_min or 1.0
-        return self.left + self.width * (self.timestamps[run_index] - self.t_min) / span
+        return self.left + self.width * (moments - self.t_min) / span
 
-    def y_of(self, seconds: float) -> float:
+    def y_of(self, seconds):
         return self.top + self.height * (1 - seconds / self.y_max)
+
+
+@dataclass(frozen=True)
+class _PixelColumns:
+    x: np.ndarray
+    first: np.ndarray
+    lowest: np.ndarray
+    highest: np.ndarray
+    last: np.ndarray
+    mean: np.ndarray
+
+    @classmethod
+    def of(cls, xs: np.ndarray, heights: np.ndarray, pixels_per_unit: float) -> _PixelColumns:
+        pixel = np.floor(xs * pixels_per_unit)
+        starts = np.flatnonzero(np.r_[True, pixel[1:] != pixel[:-1]])
+        ends = np.r_[starts[1:], len(xs)] - 1
+        runs = ends - starts + 1
+        return cls(
+            x=np.add.reduceat(xs, starts) / runs,
+            first=heights[:, starts],
+            lowest=np.minimum.reduceat(heights, starts, axis=1),
+            highest=np.maximum.reduceat(heights, starts, axis=1),
+            last=heights[:, ends],
+            mean=np.add.reduceat(heights, starts, axis=1) / runs,
+        )
+
+
+def _polygon(xs: np.ndarray, ys: np.ndarray) -> QPolygonF:
+    return QPolygonF([QPointF(x, y) for x, y in zip(xs.tolist(), ys.tolist(), strict=True)])
+
+
+def _lines(x0: np.ndarray, y0: np.ndarray, x1: np.ndarray, y1: np.ndarray) -> list[QLineF]:
+    return [QLineF(*ends) for ends in zip(
+        x0.tolist(), y0.tolist(), x1.tolist(), y1.tolist(), strict=True)]
+
+
+def _paint_band(painter: QPainter, plot: _Plot, xs: np.ndarray,
+                floor: np.ndarray, top: np.ndarray, color: QColor):
+    fill = QColor(color)
+    fill.setAlpha(BAND_ALPHA)
+    painter.setBrush(fill)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.drawPolygon(_polygon(np.r_[xs, xs[::-1]], plot.y_of(np.r_[floor, top[::-1]])))
+
+
+def _paint_band_top(painter: QPainter, plot: _Plot, columns: _PixelColumns, row: int,
+                    color: QColor):
+    painter.setPen(QPen(color, 1))
+    upper = plot.y_of(columns.highest[row])
+    lower = plot.y_of(columns.lowest[row])
+    moved = lower - upper >= 1.0
+    _draw_vertical_lines(
+        painter, _lines(columns.x[moved], upper[moved], columns.x[moved], lower[moved]))
+    painter.drawLines(_lines(columns.x[:-1], plot.y_of(columns.last[row][:-1]),
+                             columns.x[1:], plot.y_of(columns.first[row][1:])))
+
+
+def _draw_vertical_lines(painter: QPainter, lines: list[QLineF]):
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+    painter.drawLines(lines)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
 
 class StackedAreaChart(QWidget):
@@ -167,15 +225,6 @@ class StackedAreaChart(QWidget):
         return _running_means(durations) if self._mode == "averages" else durations
 
     def paintEvent(self, event):
-        """The chart, in the order the layers sit: ground, bands, then axes.
-
-        Each layer is its own function taking the one :class:`_Plot` that says
-        where the chart is and how a value becomes a pixel. It was a single
-        method holding the geometry, the scale, the stacking, both axes, the
-        tick rule and the legend in one set of locals -- so the widget's whole
-        drawing had to be read to change any of it, and the only thing that
-        could be tested was the pixels that came out.
-        """
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(self.rect(), QColor(255, 255, 255))
@@ -214,7 +263,7 @@ class StackedAreaChart(QWidget):
             top=_MARGIN_TOP,
             width=chart_w,
             height=chart_h,
-            timestamps=self._history.started,
+            started=self._history.started,
             series=series,
             y_max=self._y_max(series),
         )
@@ -232,36 +281,14 @@ class StackedAreaChart(QWidget):
         return max(tallest * 1.15, 1.0)  # 15% headroom
 
     def _paint_bands(self, painter: QPainter, plot: _Plot):
-        """One filled band per stage, stacked in registry order."""
-        baselines = [0.0] * len(plot.timestamps)
-        for stage_idx, stage_key in enumerate(ALL_STAGES):
-            values = plot.series[stage_idx]
+        heights = np.minimum(np.cumsum(plot.series, axis=0), plot.y_max)
+        columns = _PixelColumns.of(plot.x_of(plot.started), heights, self.devicePixelRatioF())
+        band_floor = np.zeros_like(columns.x)
+        for row, stage_key in enumerate(ALL_STAGES):
             color = STAGE_COLORS[stage_key]
-
-            path = QPainterPath()
-            path.moveTo(plot.x_of(0), plot.y_of(baselines[0]))
-            for i in range(1, len(plot.timestamps)):
-                path.lineTo(plot.x_of(i), plot.y_of(baselines[i]))
-            for i in reversed(range(len(plot.timestamps))):
-                path.lineTo(plot.x_of(i), plot.y_of(baselines[i] + values[i]))
-            path.closeSubpath()
-
-            fill = QColor(color)
-            fill.setAlpha(BAND_ALPHA)
-            painter.setBrush(fill)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawPath(path)
-
-            painter.setPen(QPen(color, 1))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            for i in range(len(plot.timestamps) - 1):
-                painter.drawLine(
-                    int(plot.x_of(i)), int(plot.y_of(baselines[i] + values[i])),
-                    int(plot.x_of(i + 1)), int(plot.y_of(baselines[i + 1] + values[i + 1])),
-                )
-
-            for i in range(len(plot.timestamps)):
-                baselines[i] += values[i]
+            _paint_band(painter, plot, columns.x, band_floor, columns.mean[row], color)
+            _paint_band_top(painter, plot, columns, row, color)
+            band_floor = columns.mean[row]
 
     def _paint_limit_line(self, painter: QPainter, plot: _Plot):
         """The watchdog's ten minutes, dotted -- only when the scale reaches it."""
