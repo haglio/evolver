@@ -83,6 +83,12 @@ class TestWatchingOne(_ReviewingALibrary):
 
         self.assertEqual((playing_first, _playing(window)), (first, second))
 
+    def test_what_the_player_reads_out_of_a_video_is_kept_out_of_every_log(self):
+        with patch("review_weird.window.silence_the_ffmpeg_format_dump") as silenced:
+            self._window()
+
+        silenced.assert_called_once_with()
+
 
 class TestPuttingBack(_ReviewingALibrary):
     def test_the_selected_video_goes_back_and_the_next_one_plays(self):

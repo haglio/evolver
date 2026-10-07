@@ -24,6 +24,7 @@ from shared_ui.spacing import MARGIN_STANDARD
 
 import config
 from util import weird_piles
+from util.player_readout import silence_the_ffmpeg_format_dump
 
 _ICON_COLOR = TEXT_SECONDARY.name()
 _HINT = ("Put Back returns a video to the folder it was marked weird in. Delete for Good deletes it, "
@@ -54,6 +55,7 @@ class ReviewWeirdWindow(QWidget):
         self.videos.itemSelectionChanged.connect(self._offer_what_can_be_done)
 
         screen = QVideoWidget()
+        silence_the_ffmpeg_format_dump()
         self._sound = QAudioOutput()
         self._sound.setMuted(True)
         self.player = QMediaPlayer()
