@@ -19,6 +19,7 @@ from unittest.mock import patch
 from util.ffprobe import (
     duration_seconds,
     frame_fingerprint,
+    has_sound,
     orientation_of,
     video_dimensions,
     videoai_tag,
@@ -157,6 +158,21 @@ class TestVideoDimensions(unittest.TestCase):
 
     def test_none_when_a_dimension_is_not_a_number(self):
         self.assertIsNone(self._dimensions("N/A", "1080"))
+
+
+class TestHasSound(unittest.TestCase):
+    def test_a_file_with_an_audio_stream_has_sound(self):
+        calls = []
+        fake = _ffprobe_answering({"stream=codec_type": "audio"}, calls)
+        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+            self.assertTrue(has_sound(Path("x.mp4")))
+        self.assertEqual(calls[0][calls[0].index("-select_streams") + 1], "a")
+
+    def test_a_file_with_no_audio_stream_or_no_answer_has_none(self):
+        with patch("util.ffprobe.subprocess.run", side_effect=_ffprobe_answering({})):
+            self.assertFalse(has_sound(Path("x.mp4")))
+        with patch("util.ffprobe.subprocess.run", side_effect=FileNotFoundError("ffprobe")):
+            self.assertFalse(has_sound(Path("x.mp4")))
 
 
 class TestFfprobeInvocation(unittest.TestCase):

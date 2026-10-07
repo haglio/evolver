@@ -111,6 +111,54 @@ class TestGenauDeliver(unittest.TestCase):
                 delivered = sidecar.read(sidecar.sidecar_path(clips / "loop_1_topaz.mp4"))
             self.assertEqual(video_type.type_of(delivered), video_type.GENAU_CLIP)
 
+    def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
+        """Fun Time's audio companion plays ``<audio folder>/<clip name>.mp3``
+        while a clip is up, as it does for the clips Clipper cuts."""
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, clips = _lane(root)
+            _stage_clip(outbox, sorted_dir)
+            audio = root / "genau" / "audio"
+            saved = []
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_CLIPS_DIR=clips, GENAU_AUDIO_DIR=audio,
+                                 GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
+                 patch("tasks.genau_deliver.has_sound", return_value=True), \
+                 patch("tasks.genau_deliver.save_as_mp3",
+                       side_effect=lambda video, mp3: saved.append((video, mp3))):
+                genau_deliver.run()
+
+            self.assertEqual(saved, [(clips / "loop_1_topaz.mp4", audio / "loop_1_topaz.mp3")])
+
+    def test_a_silent_loop_leaves_no_sound_behind(self):
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, clips = _lane(root)
+            _stage_clip(outbox, sorted_dir)
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_CLIPS_DIR=clips, GENAU_AUDIO_DIR=root / "audio",
+                                 GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
+                 patch("tasks.genau_deliver.has_sound", return_value=False), \
+                 patch("tasks.genau_deliver.save_as_mp3") as save:
+                result = genau_deliver.run()
+
+            self.assertEqual(result.delivered, 1)
+            save.assert_not_called()
+
+    def test_a_sound_that_cannot_be_saved_leaves_the_loop_delivered(self):
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, clips = _lane(root)
+            _upscaled, original = _stage_clip(outbox, sorted_dir)
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_CLIPS_DIR=clips, GENAU_AUDIO_DIR=root / "audio",
+                                 GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
+                 patch("tasks.genau_deliver.has_sound", return_value=True), \
+                 patch("tasks.genau_deliver.save_as_mp3", side_effect=OSError("disk full")), \
+                 self.assertLogs("tasks.genau_deliver", level="WARNING"):
+                result = genau_deliver.run()
+
+            self.assertEqual((result.delivered, result.failed), (1, 0))
+            self.assertTrue((clips / "loop_1_topaz.mp4").is_file())
+            self.assertFalse(original.exists())
+
     def test_only_the_genau_source_is_delivered(self):
         with workspace_temp_dir() as root:
             outbox, sorted_dir, clips = _lane(root)
