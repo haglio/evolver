@@ -44,7 +44,7 @@ def stems_marked_weird() -> set[str]:
 @dataclass(frozen=True)
 class MarkedWeird:
     video: Path
-    goes_back_to: Path | None
+    restores_to: Path | None
     upscaled_from: Path | None = None
 
 
@@ -68,8 +68,8 @@ def _out_of_the_outbox(video: Path, sorted_copies: dict[str, list[Path]]) -> Mar
     upscales = {spot: copy
                 for copy in sorted_copies.get(sorted_stem_of(Path(name_it_had(video)).stem), [])
                 if (spot := lanes.upscale_filed_for(copy)) is not None}
-    goes_back_to = _the_one_vacant(list(upscales)) or _the_one_vacant(_recorded_spots(video))
-    return MarkedWeird(video, goes_back_to, upscales.get(goes_back_to))
+    restores_to = _the_one_vacant(list(upscales)) or _the_one_vacant(_recorded_spots(video))
+    return MarkedWeird(video, restores_to, upscales.get(restores_to))
 
 
 def _out_of_genau(video: Path, pile: Path, sorted_copies: dict[str, list[Path]]) -> MarkedWeird:
@@ -89,31 +89,31 @@ def _recorded_spots(video: Path) -> list[Path]:
             for record in records.rglob(glob.escape(f"{Path(name).stem}.json"))]
 
 
-def put_back(marked: MarkedWeird) -> None:
-    if marked.goes_back_to is None:
+def restore(marked: MarkedWeird) -> None:
+    if marked.restores_to is None:
         raise ValueError(f"Nothing says where {marked.video.name} was marked weird from")
-    if marked.goes_back_to.exists():
-        raise FileExistsError(f"Something else is at {marked.goes_back_to} now")
-    marked.goes_back_to.parent.mkdir(parents=True, exist_ok=True)
-    retry_while_in_use(lambda: marked.video.rename(marked.goes_back_to))
-    log.info("Put back %s  ->  %s", marked.video, marked.goes_back_to)
+    if marked.restores_to.exists():
+        raise FileExistsError(f"Something else is at {marked.restores_to} now")
+    marked.restores_to.parent.mkdir(parents=True, exist_ok=True)
+    retry_while_in_use(lambda: marked.video.rename(marked.restores_to))
+    log.info("Restored %s  ->  %s", marked.video, marked.restores_to)
     for script in script_library.scripts_held_for(marked.video):
-        home = script_library.script_path_for_video(marked.goes_back_to)
+        home = script_library.script_path_for_video(marked.restores_to)
         if not home.exists():
             home.parent.mkdir(parents=True, exist_ok=True)
             script.rename(home)
             script_library.carry_mark(script, home)
 
 
-def delete_for_good(marked: MarkedWeird) -> None:
-    own_record = sidecar_path(marked.goes_back_to) if marked.goes_back_to is not None else None
+def delete_permanently(marked: MarkedWeird) -> None:
+    own_record = sidecar_path(marked.restores_to) if marked.restores_to is not None else None
     for gone in (marked.upscaled_from, marked.video, own_record, _sound_only_it_plays(marked)):
         if gone is not None and gone.exists():
             retry_while_in_use(gone.unlink)
-            log.info("Deleted for good: %s", gone)
-    for script in script_library.scripts_held_for(marked.video, marked.goes_back_to, marked.upscaled_from):
+            log.info("Deleted permanently: %s", gone)
+    for script in script_library.scripts_held_for(marked.video, marked.restores_to, marked.upscaled_from):
         script_library.delete_script(script)
-        log.info("Deleted for good: %s", script)
+        log.info("Deleted permanently: %s", script)
 
 
 def _sound_only_it_plays(marked: MarkedWeird) -> Path | None:

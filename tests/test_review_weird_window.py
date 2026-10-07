@@ -32,7 +32,7 @@ class _ReviewingALibrary(unittest.TestCase):
 
 
 class TestWhatTheWindowLists(_ReviewingALibrary):
-    def test_every_video_marked_weird_is_listed_with_the_folder_it_goes_back_to(self):
+    def test_every_video_marked_weird_is_listed_with_the_folder_it_restores_to(self):
         touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene one.mp4")
         touch_video(self.lib.weird / "scene one_topaz.mp4")
         touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_1_topaz.mp4")
@@ -61,7 +61,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
 
         self.assertEqual(self._rows(window), [("scene two.mp4", "can't tell")])
         self.assertEqual(window.videos.topLevelItem(0).toolTip(1),
-                         "Nothing says which folder it was marked weird in, so it can't be put back")
+                         "Nothing says which folder it was marked weird in, so it can't be restored")
 
     def test_each_row_says_in_full_where_the_video_is_and_where_it_goes(self):
         marked = touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_14_topaz.mp4")
@@ -90,19 +90,19 @@ class TestWatchingOne(_ReviewingALibrary):
         silenced.assert_called_once_with()
 
 
-class TestPuttingBack(_ReviewingALibrary):
-    def test_the_selected_video_goes_back_and_the_next_one_plays(self):
+class TestRestoring(_ReviewingALibrary):
+    def test_the_selected_video_is_restored_and_the_next_one_plays(self):
         touch_video(self.lib.genau_weird / "loop_5_topaz.mp4")
         after = touch_video(self.lib.genau_weird / "loop_6_topaz.mp4")
         window = self._window()
 
-        window.put_back_button.click()
+        window.restore_button.click()
 
         self.assertTrue((self.lib.genau_clips / "loop_5_topaz.mp4").is_file())
         self.assertEqual(self._rows(window), [("loop_6_topaz.mp4", "genau\\clips")])
         self.assertEqual(_playing(window), after)
 
-    def test_one_that_cannot_go_back_is_named_and_the_rest_still_go(self):
+    def test_one_that_cannot_be_restored_is_named_and_the_rest_still_are(self):
         touch_video(self.lib.genau_weird / "loop_11_topaz.mp4")
         touch_video(self.lib.genau_weird / "loop_12_topaz.mp4")
         window = self._window()
@@ -110,7 +110,7 @@ class TestPuttingBack(_ReviewingALibrary):
         touch_video(self.lib.genau_clips / "loop_11_topaz.mp4")
 
         with patch("review_weird.window.QMessageBox.warning") as warned:
-            window.put_back_button.click()
+            window.restore_button.click()
 
         self.assertIn("loop_11_topaz.mp4", warned.call_args.args[2])
         self.assertTrue((self.lib.genau_clips / "loop_12_topaz.mp4").is_file())
@@ -121,20 +121,20 @@ class TestWhatCanBeDone(_ReviewingALibrary):
     def test_with_nothing_marked_neither_verdict_can_be_given(self):
         window = self._window()
 
-        self.assertEqual((window.put_back_button.isEnabled(), window.delete_button.isEnabled()),
+        self.assertEqual((window.restore_button.isEnabled(), window.delete_button.isEnabled()),
                          (False, False))
 
-    def test_a_video_nothing_says_the_place_of_can_be_deleted_but_not_put_back(self):
+    def test_a_video_nothing_says_the_place_of_can_be_deleted_but_not_restored(self):
         touch_video(self.lib.weird / "scene three.mp4")
         touch_video(self.lib.genau_weird / "loop_10_topaz.mp4")
         window = self._window()
         window.videos.selectAll()
 
-        self.assertEqual((window.put_back_button.isEnabled(), window.delete_button.isEnabled()),
+        self.assertEqual((window.restore_button.isEnabled(), window.delete_button.isEnabled()),
                          (False, True))
 
 
-class TestDeletingForGood(_ReviewingALibrary):
+class TestDeletingPermanently(_ReviewingALibrary):
     def test_it_asks_first_and_deletes_only_on_yes(self):
         marked = touch_video(self.lib.genau_weird / "loop_7_topaz.mp4")
         window = self._window()
@@ -145,7 +145,7 @@ class TestDeletingForGood(_ReviewingALibrary):
         with _answering(QMessageBox.StandardButton.Yes):
             window.delete_button.click()
 
-        self.assertEqual(asked.call_args.args[2], "Delete loop_7_topaz.mp4 for good? This can't be undone.")
+        self.assertEqual(asked.call_args.args[2], "Delete loop_7_topaz.mp4 permanently? This can't be undone.")
         self.assertEqual((kept, marked.exists()), (True, False))
         self.assertEqual(window.heading.text(), "Nothing is marked weird")
 
@@ -158,7 +158,7 @@ class TestDeletingForGood(_ReviewingALibrary):
             window.delete_button.click()
 
         asked.assert_called_once()
-        self.assertEqual(asked.call_args.args[2], "Delete these 2 videos for good? This can't be undone.")
+        self.assertEqual(asked.call_args.args[2], "Delete these 2 videos permanently? This can't be undone.")
         self.assertEqual([video for video in marked if video.exists()], [])
 
     def test_the_delete_key_asks_the_same_question(self):

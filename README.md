@@ -61,7 +61,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `util/warm_gun.py` - the phone's journal, and which library video each line means
   - `util/lanes.py` - every video the library holds, lane by lane
   - `util/frame_hashes.py` - a video read down to comparable frames, and one run of them found inside another
-  - `util/weird_piles.py` - the two folders a video marked weird waits in, where each one goes back to, and putting it back or deleting it for good
+  - `util/weird_piles.py` - the two folders a video marked weird waits in, where each one goes back to, and restoring it or deleting it permanently
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
   - `util/favs_csv.py` - Fun Time's favorites CSV: its rows, and the local path each cell links to
   - `util/video_locator.py` - where a video a reference has lost track of now lives
@@ -89,7 +89,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `backfill/voice.py` - hands the window what `voice_core`, the family's listener, hears
   - `backfill/window.py` - the looping player, the remaining count, and the last decision
   - `review_weird_app.py` - the tool that reviews what is marked weird (see below), launched from the tray
-  - `review_weird/window.py` - every video marked weird, the one picked playing, and Put Back and Delete for Good
+  - `review_weird/window.py` - every video marked weird, the one picked playing, and Restore and Delete Permanently
   - `util/player_readout.py` - keeping what the two tools' players read out of a video, its tags among it, out of every log
   - `gui/app.py` - tray application wiring: builds the parts, then starts them
   - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
@@ -194,10 +194,10 @@ Acts are voiced in plain-English words because the vosk lexicon lacks most of th
 
 ## Reviewing what is marked weird
 
-A video marked weird — by Fun Time's players, by the backfill tool's `weird`, or by Genau — waits in `2_outbox/kinda_weird/` or in the `weird` folder beside Genau's clips, and nothing Evolver runs deletes it. **Review Weird...** in the tray menu, and **Review Weird** on the main window's toolbar, open a window that lists every one of them with the folder it goes back to, and plays the one you pick, looping and muted.
+A video marked weird — by Fun Time's players, by the backfill tool's `weird`, or by Genau — waits in `2_outbox/kinda_weird/` or in the `weird` folder beside Genau's clips, and nothing Evolver runs deletes it. **Review Weird...** in the tray menu, and **Review Weird** on the main window's toolbar, open a window that lists every one of them with the folder it restores to, and plays the one you pick, looping and muted.
 
-- **Put Back** returns the picked videos to the folders they were marked weird in, under the names they had there, each with the funscript that followed it into the pile. An upscale goes back where the upscale stage filed it, a Genau clip to its own place in Genau's clips folder, and any other video to the folder its metadata is still filed under. A video nothing says the place of reads "can't tell", and can only be deleted.
-- **Delete for Good** asks first, then deletes the picked videos and what is theirs: the `1_sorted` copy each was upscaled from, its own metadata — never the metadata of another video that shares its name — its funscripts, and a Genau clip's sound, unless another clip of that name still plays it. The `Delete` key does the same.
+- **Restore** puts the picked videos back in the folders they were marked weird in, under the names they had there, each with the funscript that followed it into the pile. An upscale goes back where the upscale stage filed it, a Genau clip to its own place in Genau's clips folder, and any other video to the folder its metadata is still filed under. A video nothing says the place of reads "can't tell", and can only be deleted.
+- **Delete Permanently** asks first, then deletes the picked videos and what is theirs: the `1_sorted` copy each was upscaled from, its own metadata — never the metadata of another video that shares its name — its funscripts, and a Genau clip's sound, unless another clip of that name still plays it. The `Delete` key does the same.
 
 Both say in `evolver.log` what they moved or deleted. The window runs as its own process, as the backfill tool's does.
 
