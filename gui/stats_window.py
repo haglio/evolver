@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.run_record import RunRecord
+from gui.run_record import RunRecord, in_display_zone, utc_time
 from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 
 # The registry's colors, as the painter wants them. This is the edge where Qt
@@ -99,7 +99,7 @@ def _x_axis_labels(t_min: float, t_max: float, count: int) -> list[str]:
     does not, because the date is the thing being read.
     """
     span = t_max - t_min or 1.0
-    moments = [datetime.fromtimestamp(t_min + span * i / (count - 1))
+    moments = [in_display_zone(datetime.fromtimestamp(t_min + span * i / (count - 1), UTC))
                for i in range(count)]
     dates = [moment.strftime("%m/%d") for moment in moments]
     return [
@@ -193,7 +193,7 @@ class StackedAreaChart(QWidget):
         timestamps: list[float] = []
         for rec in self._records:
             try:
-                dt = datetime.fromisoformat(rec.started_at)
+                dt = utc_time(rec.started_at)
             except (ValueError, TypeError):
                 dt = datetime(2000, 1, 1)
             timestamps.append(dt.timestamp())
