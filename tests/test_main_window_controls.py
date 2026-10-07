@@ -430,6 +430,14 @@ class TestMainWindowToolbarExists:
     def test_has_queue_action(self, window):
         assert window.queue_action is not None
 
+    def test_review_weird_sits_beside_the_queue_with_a_line_either_side(self, window):
+        [toolbar] = window.findChildren(QToolBar)
+        entries = ["|" if action.isSeparator() else action.text() for action in toolbar.actions()]
+        queue = entries.index("Queue")
+
+        assert entries[queue - 1:queue + 3] == ["|", "Queue", "Review Weird", "|"]
+        assert window.commands()["review_weird"] == window.review_weird_action.triggered
+
     def test_has_run_now_action(self, window):
         assert window.run_now_action is not None
 

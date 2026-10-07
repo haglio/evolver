@@ -97,6 +97,7 @@ CONFIG_REFERENCE_LEDGER = {
     "gui/startup.py": 1,
     "gui/tray.py": 1,
     "gui/worker.py": 1,
+    "review_weird/window.py": 1,
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 5,
@@ -180,9 +181,7 @@ CONFIG_REFERENCE_LEDGER = {
     "util/topaz.py": 3,
     "util/video_locator.py": 1,
     "util/warm_gun.py": 3,
-    # Where the two weird piles are, which the index that leaves them out reads
-    # here instead of the library layout.
-    "util/weird_piles.py": 2,
+    "util/weird_piles.py": 10,
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or

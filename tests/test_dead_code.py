@@ -14,8 +14,8 @@ from app_support.dead_code import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGES = (ROOT / "backfill", ROOT / "gui", ROOT / "tasks", ROOT / "util",)
-SCANNED = (*PACKAGES, ROOT / "backfill_app.py", ROOT / "check_correspondence.py", ROOT / "check_duplicate_sizes.py", ROOT / "config.py", ROOT / "content_overlay.py", ROOT / "evolver.py", ROOT / "tray_app.py", ROOT / "tools")
+PACKAGES = (ROOT / "backfill", ROOT / "gui", ROOT / "review_weird", ROOT / "tasks", ROOT / "util",)
+SCANNED = (*PACKAGES, ROOT / "backfill_app.py", ROOT / "check_correspondence.py", ROOT / "check_duplicate_sizes.py", ROOT / "config.py", ROOT / "content_overlay.py", ROOT / "evolver.py", ROOT / "review_weird_app.py", ROOT / "tray_app.py", ROOT / "tools")
 WHITELIST = ROOT / "vulture_whitelist.py"
 
 
@@ -28,7 +28,7 @@ def test_the_whitelist_still_suppresses_what_it_claims_to():
 
 
 def test_every_package_in_the_tree_is_scanned():
-    assert_every_package_is_scanned(ROOT, ("backfill", "gui", "tasks", "util",))
+    assert_every_package_is_scanned(ROOT, ("backfill", "gui", "review_weird", "tasks", "util",))
 
 
 def test_nothing_is_imported_or_assigned_and_left_unread():

@@ -138,6 +138,7 @@ class EvolverApp:
             "stats": self._show_stats,
             "queue": self._show_queue,
             "backfill": self._launch_backfill,
+            "review_weird": self._launch_review_weird,
             "restart": self._restart,
             "quit": self._quit_by_request,
         })
@@ -154,6 +155,7 @@ class EvolverApp:
             "settings": self._show_settings,
             "stats": self._show_stats,
             "queue": self._show_queue,
+            "review_weird": self._launch_review_weird,
             "restart": self._restart,
             "quit": self._confirm_quit,
         })
@@ -406,14 +408,16 @@ class EvolverApp:
         self._log_window.activateWindow()
 
     def _launch_backfill(self):
-        """Start the metadata backfill tool as its own process.
+        self._launch_tool("backfill_app.py")
 
-        Detached rather than in-process: it holds the microphone open and drives a
-        media backend for as long as the user keeps labelling, and neither belongs
-        in the tray process that has to survive the whole session.
-        """
+    def _launch_review_weird(self):
+        self._launch_tool("review_weird_app.py")
+
+    def _launch_tool(self, script: str):
+        # Its own process: a tool plays video, and a media backend that wedges
+        # or crashes must not take the tray down with it.
         subprocess.Popen(
-            [sys.executable, str(config.PROJECT_DIR / "backfill_app.py")],
+            [sys.executable, str(config.PROJECT_DIR / script)],
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
 

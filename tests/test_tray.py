@@ -23,6 +23,16 @@ class TestTrayMenu:
         assert "queue" in tray.commands()
         assert tray.queue_action.text() == "Upscale Queue..."
 
+    def test_the_three_tools_sit_together_with_a_line_above_and_below(self):
+        tray = EvolverTray()
+        entries = ["---" if action.isSeparator() else action.text()
+                   for action in tray.contextMenu().actions()]
+        first = entries.index("Upscale Queue...")
+
+        assert entries[first - 1:first + 4] == [
+            "---", "Upscale Queue...", "Backfill Metadata...", "Review Weird...", "---"]
+        assert tray.commands()["review_weird"] == tray.review_weird_action.triggered
+
 
 class TestTrayScheduleDisplay:
 

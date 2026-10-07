@@ -28,7 +28,7 @@ from shared_ui.spacing import BUTTON_ICON
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
-from gui.icons import quit_icon, restart_icon, run_now_icon
+from gui.icons import quit_icon, restart_icon, review_weird_icon, run_now_icon
 from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
 from gui.status_symbols import GRAY, mark_for, mark_icon
@@ -400,9 +400,16 @@ class EvolverMainWindow(QMainWindow):
         self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats", self)
         toolbar.addAction(self.stats_action)
 
+        toolbar.addSeparator()
+
         self.queue_action = QAction(qta.icon("fa5s.list-ol", color=_ICON_COLOR),
                                     "Queue", self)
         toolbar.addAction(self.queue_action)
+
+        self.review_weird_action = QAction(review_weird_icon(_ICON_COLOR), "Review Weird", self)
+        toolbar.addAction(self.review_weird_action)
+
+        toolbar.addSeparator()
 
         self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self)
         toolbar.addAction(self.restart_action)
@@ -423,6 +430,7 @@ class EvolverMainWindow(QMainWindow):
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
+            "review_weird": self.review_weird_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,
         }

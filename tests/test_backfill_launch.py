@@ -43,6 +43,17 @@ class TestLaunch(unittest.TestCase):
         creationflags = popen.call_args.kwargs["creationflags"]
         self.assertTrue(creationflags & subprocess.DETACHED_PROCESS)
 
+    def test_review_weird_starts_its_own_process_from_the_tray_and_the_window_alike(self):
+        app = self._app()
+
+        with patch("gui.app.subprocess.Popen") as popen:
+            app._tray.review_weird_action.trigger()
+            app._window.review_weird_action.trigger()
+
+        expected = [sys.executable, str(config.PROJECT_DIR / "review_weird_app.py")]
+        self.assertEqual([call.args[0] for call in popen.call_args_list], [expected, expected])
+        self.assertTrue(popen.call_args.kwargs["creationflags"] & subprocess.DETACHED_PROCESS)
+
 
 if __name__ == "__main__":
     unittest.main()
