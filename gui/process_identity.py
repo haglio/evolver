@@ -12,11 +12,12 @@ from __future__ import annotations
 
 import logging
 
-from app_support.win32 import set_app_user_model_id
+from app_support.win32 import TaskbarApp, dress_window, set_app_user_model_id
+from shared_ui.preview_icon import icon_file
 
 import config
 from gui import branch_session
-from gui.taskbar import set_taskbar_properties
+from util.preview import shown_as
 
 log = logging.getLogger(__name__)
 
@@ -36,10 +37,11 @@ def claim(hwnd: int) -> None:
         set_app_user_model_id(identity)
     except OSError:
         log.warning("Could not claim the taskbar identity", exc_info=True)
-    set_taskbar_properties(
-        hwnd,
-        identity,
-        branch_session.relaunch_command(),
-        branch_session.app_name(),
-        str(config.PROJECT_DIR / "icon.ico"),
-    )
+    try:
+        dress_window(hwnd, identity, TaskbarApp(
+            name=branch_session.app_name(),
+            icon=icon_file(config.PROJECT_DIR / "icon.ico", shown_as(), config.LOCAL_STATE_DIR),
+            relaunch=branch_session.relaunch_command(),
+        ))
+    except OSError:
+        log.warning("Could not tell the taskbar what this window is", exc_info=True)

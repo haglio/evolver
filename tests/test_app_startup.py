@@ -39,7 +39,7 @@ class TestAppStartup:
     def test_app_sets_appusermodelid(self, request):
         app = build_evolver_app(request)
         with patch("gui.process_identity.set_app_user_model_id") as mock_set_id, \
-             patch("gui.process_identity.set_taskbar_properties"):
+             patch("gui.process_identity.dress_window"):
             app.start()
         mock_set_id.assert_called_once_with(APP_MODEL_ID)
 

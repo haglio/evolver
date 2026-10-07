@@ -79,10 +79,11 @@ CONFIG_REFERENCE_LEDGER = {
     # module's.
     "gui/peer_watch.py": 1,
     "gui/presence_throttle.py": 1,
-    # One fewer: what this instance calls itself and what its button re-runs
-    # are gui/branch_session.py's, which is the module that knows which of the
-    # two Evolvers this is.
-    "gui/process_identity.py": 1,
+    # What this instance calls itself and what its button re-runs are
+    # gui/branch_session.py's, which is the module that knows which of the two
+    # Evolvers this is; the two reads here are the letter's file and the local
+    # folder a preview's inked copy of it is kept in.
+    "gui/process_identity.py": 2,
     # The second shape again: the zone a run's timestamp is shown in was
     # ZoneInfo("America/Los_Angeles") bound at this module's own import,
     # which no test and no machine could reach. One read buys the seam.
