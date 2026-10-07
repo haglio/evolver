@@ -11,10 +11,6 @@ its family id and whether it is a processed variant.
 
 Being the source of truth means it rewrites ``version.group`` on every run, so
 editing a sidecar by hand does not hold: an override is the way to correct one.
-
-New clips get grouped on the next run; sidecars for clips that have since moved
-or been deleted are pruned, so the metadata tree stays a faithful record of the
-library Evolver knows about.
 """
 
 from __future__ import annotations
@@ -26,7 +22,7 @@ from itertools import combinations
 from pathlib import Path
 
 import config
-from util import same_footage, sidecar
+from util import same_footage, sidecar, weird_piles
 from util.media_files import file_size, is_finalized_video_file
 from util.nonai_library import buckets
 from util.variants import is_processed_stem, strip_processing_suffixes
@@ -173,14 +169,14 @@ def _family_fingerprint(
 
 
 def _prune_orphans(expected: set[Path]) -> int:
-    """Delete non-AI sidecars no current clip maps to (moved or removed files)."""
     pruned = 0
+    awaiting_review = weird_piles.stems_marked_weird()
     for bucket in buckets():
         bucket_metadata = sidecar.sidecar_folder(bucket)
         if bucket_metadata is None or not bucket_metadata.is_dir():
             continue
         for json_path in bucket_metadata.rglob("*.json"):
-            if json_path not in expected:
+            if json_path not in expected and json_path.stem not in awaiting_review:
                 try:
                     json_path.unlink()
                     pruned += 1

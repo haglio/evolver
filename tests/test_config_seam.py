@@ -55,7 +55,7 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 # feature paying one read where the wiring already lives is the seam working;
 # paying it in the modules that do the work would not be.
 CONFIG_REFERENCE_LEDGER = {
-    "backfill/decisions.py": 3,
+    "backfill/decisions.py": 2,
     # The provider's source name, read at the call: a literal agreed with the
     # overlay only by happening to (bug 12).
     "backfill/queue.py": 2,
