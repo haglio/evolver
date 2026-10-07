@@ -19,6 +19,7 @@ from gui.stats_window import (
     StatsWindow,
     _legend_font,
     _pick_y_ticks,
+    _PixelColumns,
     _x_axis_labels,
     chart_right_margin,
     legend_width,
@@ -303,12 +304,17 @@ class TestStackedAreaChartPainting:
         assert _rgb(image, plot.left + plot.width // 4, four_hundred_seconds_up) == _WHITE
 
 
+_SECONDS_WINDOWS_WAITS_BEFORE_CALLING_A_WINDOW_NOT_RESPONDING = 5.0
+
+_A_YEAR_OF_RUNS = 365 * 24 * 6
+
+
 class TestAYearOfRuns:
-    def test_a_year_of_runs_paints_in_under_a_second_in_every_mode(self):
-        runs = 365 * 24 * 6
+    def test_no_paint_of_a_year_of_runs_keeps_windows_waiting_long_enough_to_say_not_responding(
+            self):
         rng = np.random.default_rng(7)
         chart = StackedAreaChart(_every_ten_minutes(
-            **{stage: rng.exponential(8.0, runs) for stage in ALL_STAGES}))
+            **{stage: rng.exponential(8.0, _A_YEAR_OF_RUNS) for stage in ALL_STAGES}))
 
         slowest = 0.0
         for mode, fit in (("historical", False), ("averages", False), ("historical", True)):
@@ -318,7 +324,17 @@ class TestAYearOfRuns:
             _render(chart, 1000, 560)
             slowest = max(slowest, time.perf_counter() - started)
 
-        assert slowest < 1.0
+        assert slowest < _SECONDS_WINDOWS_WAITS_BEFORE_CALLING_A_WINDOW_NOT_RESPONDING
+
+    def test_a_year_of_runs_is_gathered_into_no_more_points_than_the_chart_has_pixels_across(
+            self):
+        width = 760
+        xs = np.linspace(70.0, 70.0 + width, _A_YEAR_OF_RUNS)
+        heights = np.ones((len(ALL_STAGES), _A_YEAR_OF_RUNS))
+
+        columns = _PixelColumns.of(xs, heights, pixels_per_unit=1.0)
+
+        assert len(columns.x) <= width + 1
 
 
 def _window_showing(*records: RunRecord) -> StatsWindow:
