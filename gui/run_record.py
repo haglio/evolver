@@ -91,6 +91,10 @@ def utc_time(stamp: str) -> datetime:
     return datetime.fromisoformat(stamp).replace(tzinfo=UTC)
 
 
+def in_display_zone(moment: datetime) -> datetime:
+    return moment.astimezone(config.DISPLAY_TIMEZONE)
+
+
 def format_run_label(started_at: str, duration_seconds: float) -> str:
     """When a run started and how long it took, e.g. "2026/03/30 22:20 (5s)".
 
@@ -100,7 +104,7 @@ def format_run_label(started_at: str, duration_seconds: float) -> str:
     :mod:`gui.status_symbols`), so coloring the verdict cannot color the
     timestamp along with it.
     """
-    shown = utc_time(started_at).astimezone(config.DISPLAY_TIMEZONE)
+    shown = in_display_zone(utc_time(started_at))
     return f"{shown.strftime('%Y/%m/%d %H:%M')} ({duration_seconds:.0f}s)"
 
 

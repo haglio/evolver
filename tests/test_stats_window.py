@@ -1,8 +1,9 @@
 """Tests for the stats window and stacked area chart."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from PyQt6.QtGui import QFontMetrics, QImage
@@ -22,7 +23,7 @@ from gui.stats_window import (
 from gui.tray import EvolverTray
 from tasks.stages import ALL_STAGES, STAGE_LABELS
 from tests.color_support import band_fill
-from tests.temp_helpers import make_run_record
+from tests.temp_helpers import make_run_record, override_config
 
 
 def _make_record(
@@ -328,8 +329,15 @@ class TestStatsWindow:
 class TestXAxisLabels:
     """The dates under the runs, and when a date is not enough on its own."""
 
+    _ZONE = ZoneInfo("America/Los_Angeles")
+
+    @pytest.fixture(autouse=True)
+    def _shown_in_one_zone(self):
+        with override_config(DISPLAY_TIMEZONE=self._ZONE):
+            yield
+
     def _at(self, *moments):
-        return [datetime(*moment).timestamp() for moment in moments]
+        return [datetime(*moment, tzinfo=self._ZONE).timestamp() for moment in moments]
 
     def test_spans_the_whole_range_end_to_end(self):
         first, last = self._at((2026, 3, 30), (2026, 4, 4))
@@ -360,6 +368,19 @@ class TestXAxisLabels:
         (only,) = self._at((2026, 3, 30, 9, 0))
 
         assert _x_axis_labels(only, only, 4) == ["03/30\n09:00"] * 4
+
+    def test_the_dates_read_in_the_zone_the_run_history_shows(self):
+        moment = datetime(2026, 7, 15, 3, 20, tzinfo=UTC).timestamp()
+
+        with override_config(DISPLAY_TIMEZONE=ZoneInfo("Asia/Tokyo")):
+            assert _x_axis_labels(moment, moment, 2) == ["07/15\n12:20"] * 2
+
+
+class TestRunsAlongTheTimeAxis:
+    def test_a_run_sits_at_the_moment_it_started_which_its_record_gives_in_utc(self):
+        chart = StackedAreaChart([_make_record({"sort": 1.0}, started_at="2026-07-15T03:20:00")])
+
+        assert chart._parse_timestamps() == [datetime(2026, 7, 15, 3, 20, tzinfo=UTC).timestamp()]
 
 
 class TestPickYTicks:
