@@ -44,7 +44,7 @@ class TestGenauDeliver(unittest.TestCase):
                 result = genau_deliver.run()
 
             self.assertEqual(result.delivered, 1)
-            delivered = clips / "loop_1_topaz.mp4"
+            delivered = clips / "2D" / "AI" / "loop_1_topaz.mp4"
             self.assertTrue(delivered.is_file())
             self.assertEqual(delivered.read_text(encoding="utf-8"), "upscaled")
             self.assertFalse(upscaled.exists())
@@ -69,7 +69,7 @@ class TestGenauDeliver(unittest.TestCase):
 
                 genau_deliver.run()
 
-                delivered = sidecar.read(sidecar.sidecar_path(clips / "loop_1_topaz.mp4"))
+                delivered = sidecar.read(sidecar.sidecar_path(clips / "2D" / "AI" / "loop_1_topaz.mp4"))
             self.assertEqual(delivered["video"]["prompt"], "a prompt")
             self.assertEqual(video_type.type_of(delivered), video_type.GENAU_CLIP)
             # The outbox path it mirrored is gone, so the record must not stay there.
@@ -95,7 +95,7 @@ class TestGenauDeliver(unittest.TestCase):
 
                 genau_deliver.run()
 
-                delivered = sidecar.read(sidecar.sidecar_path(clips / "loop_1_topaz.mp4"))
+                delivered = sidecar.read(sidecar.sidecar_path(clips / "2D" / "AI" / "loop_1_topaz.mp4"))
             self.assertEqual(delivered[provenance.BLOCK], stamps)
 
     def test_a_clip_delivered_without_any_metadata_still_gets_a_record(self):
@@ -108,7 +108,7 @@ class TestGenauDeliver(unittest.TestCase):
                                  METADATA_DIR=root / "metadata"):
                 genau_deliver.run()
 
-                delivered = sidecar.read(sidecar.sidecar_path(clips / "loop_1_topaz.mp4"))
+                delivered = sidecar.read(sidecar.sidecar_path(clips / "2D" / "AI" / "loop_1_topaz.mp4"))
             self.assertEqual(video_type.type_of(delivered), video_type.GENAU_CLIP)
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
@@ -127,7 +127,7 @@ class TestGenauDeliver(unittest.TestCase):
                        side_effect=lambda video, mp3: saved.append((video, mp3))):
                 genau_deliver.run()
 
-            self.assertEqual(saved, [(clips / "loop_1_topaz.mp4", audio / "loop_1_topaz.mp3")])
+            self.assertEqual(saved, [(clips / "2D" / "AI" / "loop_1_topaz.mp4", audio / "loop_1_topaz.mp3")])
 
     def test_a_silent_loop_leaves_no_sound_behind(self):
         with workspace_temp_dir() as root:
@@ -156,7 +156,7 @@ class TestGenauDeliver(unittest.TestCase):
                 result = genau_deliver.run()
 
             self.assertEqual((result.delivered, result.failed), (1, 0))
-            self.assertTrue((clips / "loop_1_topaz.mp4").is_file())
+            self.assertTrue((clips / "2D" / "AI" / "loop_1_topaz.mp4").is_file())
             self.assertFalse(original.exists())
 
     def test_only_the_genau_source_is_delivered(self):
@@ -173,7 +173,7 @@ class TestGenauDeliver(unittest.TestCase):
 
             self.assertEqual(result.delivered, 1)
             self.assertTrue(other.is_file())  # the ordinary lane stays in the outbox
-            self.assertFalse((clips / "video_1_topaz.mp4").exists())
+            self.assertFalse((clips / "2D" / "AI" / "video_1_topaz.mp4").exists())
 
     def test_clips_are_found_under_every_orientation(self):
         with workspace_temp_dir() as root:
@@ -186,15 +186,15 @@ class TestGenauDeliver(unittest.TestCase):
                 result = genau_deliver.run()
 
             self.assertEqual(result.delivered, 2)
-            self.assertTrue((clips / "wide_topaz.mp4").is_file())
-            self.assertTrue((clips / "tall_topaz.mp4").is_file())
+            self.assertTrue((clips / "2D" / "AI" / "wide_topaz.mp4").is_file())
+            self.assertTrue((clips / "2D" / "AI" / "tall_topaz.mp4").is_file())
 
     def test_a_name_already_in_genaus_folder_is_not_overwritten(self):
         with workspace_temp_dir() as root:
             outbox, sorted_dir, clips = _lane(root)
             _stage_clip(outbox, sorted_dir)
-            clips.mkdir(parents=True)
-            existing = clips / "loop_1_topaz.mp4"
+            (clips / "2D" / "AI").mkdir(parents=True)
+            existing = clips / "2D" / "AI" / "loop_1_topaz.mp4"
             existing.write_text("a clip already being played", encoding="utf-8")
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
                                  GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
@@ -203,7 +203,7 @@ class TestGenauDeliver(unittest.TestCase):
 
             self.assertEqual(existing.read_text(encoding="utf-8"),
                              "a clip already being played")
-            self.assertTrue((clips / "loop_1_topaz (2).mp4").is_file())
+            self.assertTrue((clips / "2D" / "AI" / "loop_1_topaz (2).mp4").is_file())
 
     def test_a_clip_that_cannot_be_moved_is_left_whole_for_the_next_run(self):
         # Genau holds the file open on Windows while it plays. Leaving both halves
@@ -265,11 +265,11 @@ class TestGenauDeliver(unittest.TestCase):
                     outbox_dir=given_outbox,
                     sorted_dir=given_sorted,
                     genau_source=GENAU_SOURCE,
-                    genau_clips_dir=given_clips,
+                    delivery_dir=given_clips / "2D" / "AI",
                 )
 
             self.assertEqual(result.delivered, 1)
-            self.assertTrue((given_clips / "loop_given_topaz.mp4").is_file())
+            self.assertTrue((given_clips / "2D" / "AI" / "loop_given_topaz.mp4").is_file())
             self.assertFalse(ambient_clips.exists())
             self.assertTrue((ambient_outbox / "landscape" / GENAU_SOURCE / "loop_ambient_topaz.mp4").is_file())
 

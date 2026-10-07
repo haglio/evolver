@@ -29,6 +29,16 @@ class TestAiClips(unittest.TestCase):
 
 
 class TestGenauClips(unittest.TestCase):
+    def test_every_clip_in_the_2d_and_vr_folders_is_a_genau_clip(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                loop = touch_video(lib.genau_clips / "2D" / "AI" / "loop_2_topaz.mp4")
+                cut = touch_video(lib.genau_clips / "2D" / "non_AI" / "scene one.mp4")
+                vr = touch_video(lib.genau_clips / "VR" / "scene two_180.mp4")
+
+                self.assertEqual(list(lanes.genau_clips()), [loop, cut, vr])
+
     def test_lists_the_delivered_loops_and_nothing_still_being_written(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
@@ -62,7 +72,7 @@ class TestSentLanes(unittest.TestCase):
                 library_lane, genau_lane = lanes.sent_lanes()
 
                 self.assertIsNone(library_lane.delivered_dir)
-                self.assertEqual(genau_lane.delivered_dir, lib.genau_clips)
+                self.assertEqual(genau_lane.delivered_dir, lib.genau_clips / "2D" / "AI")
 
 
 class TestNonAiVideos(unittest.TestCase):

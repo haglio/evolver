@@ -5,7 +5,7 @@ import json
 import unittest
 from pathlib import Path
 
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import override_config, touch_video, workspace_temp_dir
 from util import warm_gun
 from util.warm_gun import Event
 
@@ -89,6 +89,22 @@ class TestLibraryVideo(unittest.TestCase):
                 warm_gun.library_video(r"genau\clips\loop_topaz.mp4"),
                 Path("C:/lib/genau/clips/loop_topaz.mp4"),
             )
+
+    def test_a_clip_in_genaus_folders_sits_at_that_place_under_them(self):
+        with override_config(GENAU_CLIPS_DIR=Path("C:/lib/genau/clips")):
+            self.assertEqual(
+                warm_gun.library_video("genau/clips/2D/AI/loop_topaz.mp4"),
+                Path("C:/lib/genau/clips/2D/AI/loop_topaz.mp4"),
+            )
+
+    def test_a_loop_the_phone_named_before_genaus_folders_split_is_found_where_it_went(self):
+        """The phone's journal goes back past the split, and names a loop the
+        way the one folder held it."""
+        with workspace_temp_dir() as root:
+            clips = root / "genau" / "clips"
+            moved = touch_video(clips / "2D" / "AI" / "loop_topaz.mp4")
+            with override_config(GENAU_CLIPS_DIR=clips):
+                self.assertEqual(warm_gun.library_video("genau/clips/loop_topaz.mp4"), moved)
 
     def test_a_lane_this_library_has_no_folder_for_is_nobody_s(self):
         for path in ("VR/finished/scene.mp4", "1_sorted/short.mp4", "genau/audio/track.mp4", "non_AI", ""):

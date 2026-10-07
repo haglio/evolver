@@ -19,6 +19,7 @@ import unittest
 from pathlib import Path
 
 import config
+from util import lanes
 
 CONTRACT = Path("genau") / "genau_contract.json"
 
@@ -52,6 +53,12 @@ class GenauContract(unittest.TestCase):
 
         self.assertEqual(config.GENAU_WEIRD_DIR,
                          config.GENAU_CLIPS_DIR.parent / beside["condemned"])
+
+    def test_a_loop_is_delivered_into_the_2d_folder_genau_plays(self):
+        inside = self.promise["inside_the_clips_folder"]
+
+        self.assertEqual(lanes.genau_delivery_dir().parent,
+                         config.GENAU_CLIPS_DIR / inside["flat"])
 
 
 if __name__ == "__main__":
