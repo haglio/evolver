@@ -30,6 +30,12 @@ class TestCommand(unittest.TestCase):
         self.assertNotIn("-an", cmd)
         self.assertIn("aac", cmd)
 
+    def test_every_recipe_keeps_the_soundtrack(self):
+        for recipe in topaz.RECIPES:
+            with self.subTest(recipe=recipe.name):
+                runnable = topaz.framed(recipe, orientation.LANDSCAPE) if recipe.frame else recipe
+                self.assertNotIn("-an", topaz.command(Path("in.mp4"), Path("tmp.mp4"), runnable))
+
     def test_names_the_container_outright_since_the_file_it_writes_has_no_extension(self):
         cmd = topaz.command(Path("in.mp4"), Path("scene one.partial.ab12"), _EXAMPLE)
         self.assertEqual(cmd[cmd.index("-f") + 1], "mp4")
@@ -48,6 +54,8 @@ SHIPPED = {
     ("ai_upscale", "v001"): "ba105a7372baef8f",
     ("ai_upscale_t2v", "v001"): "433ce5942b2b7849",
     ("non_ai_upscale", "v001"): "7abba8acb076bb73",
+    ("ai_upscale", "v002"): "81093271ab54e32e",
+    ("ai_upscale_t2v", "v002"): "aebaf14fdcf41a06",
 }
 
 
@@ -79,6 +87,14 @@ class TestWhatAFilesNoteSaysMadeIt(unittest.TestCase):
         for recipe in topaz.RECIPES:
             with self.subTest(recipe=recipe.name):
                 self.assertIs(topaz.recipe_noted(recipe.videoai_tag), recipe)
+
+    def test_a_note_written_before_the_ai_recipes_kept_sound_names_the_version_that_wrote_it(self):
+        for retired in topaz.RETIRED_RECIPES:
+            with self.subTest(recipe=retired.name):
+                noted = topaz.recipe_noted(retired.videoai_tag)
+
+                self.assertEqual((noted.name, noted.version, noted.keep_audio),
+                                 (retired.name, "v001", False))
 
     def test_a_note_differing_only_in_the_name_in_parentheses_at_its_end_names_it_too(self):
         """The text-to-video recipe's note once named a site in those parentheses,

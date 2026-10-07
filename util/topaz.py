@@ -38,23 +38,26 @@ class Recipe:
 # tests/test_topaz.py holds each version to the settings it shipped with.
 AI_UPSCALE = Recipe(
     name="ai_upscale",
-    version="v001",
+    version="v002",
     filter_complex=(
         "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
         "tvai_up=model=gcg-5:scale=4:device=0:vram=1:instances=1"
     ),
-    videoai_tag="Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale",
+    videoai_tag=("Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale, "
+                 "keeping the soundtrack"),
+    keep_audio=True,
 )
 AI_UPSCALE_T2V = Recipe(
     name="ai_upscale_t2v",
-    version="v001",
+    version="v002",
     filter_complex=(
         "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:device=0:vram=1:instances=1,"
         "tvai_up=model=prob-4:scale=4:preblur=0:noise=0.33:details=0.33:"
         "halo=0:blur=0.67:compression=0:estimate=20:device=0:vram=1:instances=1"
     ),
-    videoai_tag=("Processed using apo-8 for 60 fps interpolation and prob-4 for 4x upscale "
-                 "(t2v provider)"),
+    videoai_tag=("Processed using apo-8 for 60 fps interpolation and prob-4 for 4x upscale, "
+                 "keeping the soundtrack (t2v provider)"),
+    keep_audio=True,
 )
 # What the non-AI clips processed by hand in the Topaz GUI carry in their videoai
 # tags: apo-8 60 fps interpolation, then an iris-2 upscale in auto mode with
@@ -79,6 +82,14 @@ NON_AI_UPSCALE = Recipe(
 
 RECIPES = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE)
 
+RETIRED_RECIPES = (
+    replace(AI_UPSCALE, version="v001", keep_audio=False,
+            videoai_tag="Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale"),
+    replace(AI_UPSCALE_T2V, version="v001", keep_audio=False,
+            videoai_tag=("Processed using apo-8 for 60 fps interpolation and prob-4 for 4x "
+                         "upscale (t2v provider)")),
+)
+
 # A name in parentheses closing a note: the one part of a recipe's note that has
 # been reworded while the recipe stayed the same.
 _CLOSING_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
@@ -99,7 +110,7 @@ _SIGN_IN_CHECK_TIMEOUT_SECONDS = 90
 def recipe_noted(note: str) -> Recipe | None:
     """The recipe whose note Topaz wrote into a file is *note*, or None."""
     said = _CLOSING_PARENTHETICAL.sub("", note)
-    return next((recipe for recipe in RECIPES
+    return next((recipe for recipe in (*RECIPES, *RETIRED_RECIPES)
                  if _CLOSING_PARENTHETICAL.sub("", recipe.videoai_tag) == said), None)
 
 
