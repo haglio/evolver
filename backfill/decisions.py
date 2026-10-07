@@ -7,18 +7,12 @@ the weird folder is reclaimed from where it landed.
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 import config
 from util import sidecar
+from util.media_files import retry_while_in_use
 from util.sidecar import WRONG_ACTION_FIELD, sidecar_path
-
-# The window moves to the next clip the instant a phrase lands, so the media player
-# can still be letting go of the old file when the move runs. Windows refuses to
-# rename an open file, so wait it out rather than lose the discard.
-_UNLOCK_ATTEMPTS = 10
-_UNLOCK_DELAY_SECONDS = 0.2
 
 
 def record_action(clip: Path, action: str) -> None:
@@ -68,23 +62,11 @@ def discard_as_weird(clip: Path) -> Path:
     while destination.exists():
         destination = config.WEIRD_DIR / f"{clip.stem}__dup{duplicate_index}{clip.suffix}"
         duplicate_index += 1
-    _move_once_unlocked(clip, destination)
+    retry_while_in_use(lambda: clip.replace(destination))
     return destination
 
 
 def reclaim_from_weird(destination: Path, clip: Path) -> None:
     """Move a discarded clip back from *destination* to where it came from."""
     clip.parent.mkdir(parents=True, exist_ok=True)
-    _move_once_unlocked(destination, clip)
-
-
-def _move_once_unlocked(source: Path, target: Path) -> None:
-    """Rename *source* to *target*, waiting for the player to release it."""
-    for attempt in range(_UNLOCK_ATTEMPTS):
-        try:
-            source.replace(target)
-            return
-        except PermissionError:
-            if attempt == _UNLOCK_ATTEMPTS - 1:
-                raise
-            time.sleep(_UNLOCK_DELAY_SECONDS)
+    retry_while_in_use(lambda: destination.replace(clip))

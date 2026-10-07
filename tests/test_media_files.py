@@ -22,9 +22,12 @@ from util.media_files import (
     partial_stem,
     remove_empty_dirs,
     remove_partial_files,
+    retry_while_in_use,
     strip_uniquifier,
     unique_path,
 )
+
+_IN_USE = PermissionError(32, "The process cannot access the file")
 
 
 class TestLibraryVideos(unittest.TestCase):
@@ -211,6 +214,44 @@ class TestRemovePartialFiles(unittest.TestCase):
                 removed = remove_partial_files(root, log)
 
             self.assertEqual(removed, 0)
+
+
+class TestRetryWhileInUse(unittest.TestCase):
+    def test_waits_out_a_player_that_still_holds_the_file_open(self):
+        tries = []
+
+        def held_open_once():
+            tries.append(None)
+            if len(tries) == 1:
+                raise _IN_USE
+            return "moved"
+
+        with patch("util.media_files.time.sleep") as sleep:
+            self.assertEqual(retry_while_in_use(held_open_once), "moved")
+
+        self.assertEqual(len(tries), 2)
+        sleep.assert_called_once()
+
+    def test_the_player_gets_ten_short_chances_to_let_go(self):
+        tries = []
+
+        def held_open_until_the_last_chance():
+            tries.append(None)
+            if len(tries) < 10:
+                raise _IN_USE
+
+        with patch("util.media_files.time.sleep") as sleep:
+            retry_while_in_use(held_open_until_the_last_chance)
+
+        self.assertEqual(len(tries), 10)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [0.2] * 9)
+
+    def test_gives_up_on_a_file_that_is_never_let_go(self):
+        def always_held_open():
+            raise _IN_USE
+
+        with patch("util.media_files.time.sleep"), self.assertRaises(PermissionError):
+            retry_while_in_use(always_held_open)
 
 
 if __name__ == "__main__":
