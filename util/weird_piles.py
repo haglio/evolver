@@ -36,9 +36,13 @@ def name_it_had(video: Path) -> str:
     return f"{_DUPLICATE_NUMBER.sub('', video.stem)}{video.suffix}"
 
 
+def videos_marked_weird() -> list[Path]:
+    return [video for pile in weird_pile_dirs()
+            for video in sorted(library_videos(pile), key=lambda video: (video.name.lower(), video))]
+
+
 def stems_marked_weird() -> set[str]:
-    return {Path(name_it_had(video)).stem
-            for pile in weird_pile_dirs() for video in library_videos(pile)}
+    return {Path(name_it_had(video)).stem for video in videos_marked_weird()}
 
 
 @dataclass(frozen=True)
@@ -49,12 +53,11 @@ class MarkedWeird:
 
 
 def marked_weird() -> list[MarkedWeird]:
-    outbox_pile, genau_pile = weird_pile_dirs()
+    _, genau_pile = weird_pile_dirs()
     sorted_copies = _sorted_copies_by_stem()
-    return ([_out_of_the_outbox(video, sorted_copies)
-             for video in sorted(library_videos(outbox_pile))]
-            + [_out_of_genau(video, genau_pile, sorted_copies)
-               for video in sorted(library_videos(genau_pile))])
+    return [_out_of_genau(video, genau_pile, sorted_copies) if video.is_relative_to(genau_pile)
+            else _out_of_the_outbox(video, sorted_copies)
+            for video in videos_marked_weird()]
 
 
 def _sorted_copies_by_stem() -> dict[str, list[Path]]:

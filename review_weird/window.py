@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtCore import Qt, QTimer, QUrl
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -26,6 +26,7 @@ import config
 from util import weird_piles
 from util.player_readout import silence_the_ffmpeg_format_dump
 
+LOOK_AGAIN_SECONDS = 2.0
 _ICON_COLOR = TEXT_SECONDARY.name()
 _HINT = ("Restore puts a video back in the folder it was marked weird in. Delete Permanently deletes it, "
          "along with the copy it was upscaled from, its metadata and its funscript. "
@@ -69,6 +70,10 @@ class ReviewWeirdWindow(QWidget):
         self.delete_button.clicked.connect(self._delete_permanently)
         QShortcut(QKeySequence(QKeySequence.StandardKey.Delete), self, self._delete_permanently)
 
+        self.watch = QTimer(self)
+        self.watch.setInterval(int(LOOK_AGAIN_SECONDS * 1000))
+        self.watch.timeout.connect(self._look_again)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD, MARGIN_STANDARD, MARGIN_STANDARD)
         layout.addWidget(self.heading)
@@ -78,7 +83,9 @@ class ReviewWeirdWindow(QWidget):
 
         self._show(weird_piles.marked_weird(), row=0)
 
-    def _show(self, marked: list[weird_piles.MarkedWeird], row: int) -> None:
+    def _show(self, marked: list[weird_piles.MarkedWeird], row: int,
+              current: Path | None = None, picked: frozenset[Path] = frozenset()) -> None:
+        self._marked = marked
         self.heading.setText(_counted(len(marked)))
         self.videos.clear()
         for each in marked:
@@ -87,14 +94,28 @@ class ReviewWeirdWindow(QWidget):
             item.setToolTip(0, str(each.video))
             item.setToolTip(1, _NOWHERE if each.restores_to is None else str(each.restores_to))
             self.videos.addTopLevelItem(item)
-        self.videos.setCurrentItem(self.videos.topLevelItem(min(row, len(marked) - 1)))
+        at = next((at for at, each in enumerate(marked) if each.video == current),
+                  min(row, len(marked) - 1))
+        self.videos.setCurrentItem(self.videos.topLevelItem(at))
+        for at, each in enumerate(marked):
+            if each.video in picked:
+                self.videos.topLevelItem(at).setSelected(True)
         self._offer_what_can_be_done()
 
     def _play(self, item: QTreeWidgetItem | None) -> None:
         if item is None:
             return
-        self.player.setSource(QUrl.fromLocalFile(str(_marked(item).video)))
-        self.player.play()
+        source = QUrl.fromLocalFile(str(_marked(item).video))
+        if self.player.source() != source:
+            self.player.setSource(source)
+            self.player.play()
+
+    def _look_again(self) -> None:
+        if weird_piles.videos_marked_weird() != [each.video for each in self._marked]:
+            current = self.videos.currentItem()
+            self._show(weird_piles.marked_weird(), self.videos.indexOfTopLevelItem(current),
+                       current=_marked(current).video if current is not None else None,
+                       picked=frozenset(each.video for each in self._chosen()))
 
     def _restore(self) -> None:
         self._settle(weird_piles.restore)
@@ -126,6 +147,14 @@ class ReviewWeirdWindow(QWidget):
     def _let_go(self) -> None:
         self.player.stop()
         self.player.setSource(QUrl())
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.watch.start()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self.watch.stop()
 
 
 def _side_by_side(left: QWidget, right: QWidget) -> QSplitter:

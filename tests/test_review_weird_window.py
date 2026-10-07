@@ -53,6 +53,52 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
     def test_with_nothing_marked_the_heading_says_so(self):
         self.assertEqual(self._window().heading.text(), "Nothing is marked weird")
 
+    def test_a_video_marked_weird_while_the_window_is_open_shows_up_in_it(self):
+        touch_video(self.lib.genau_weird / "loop_15_topaz.mp4")
+        window = self._window()
+        touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_16_topaz.mp4")
+
+        window.watch.timeout.emit()
+
+        self.assertEqual([row[0] for row in self._rows(window)],
+                         ["loop_15_topaz.mp4", "loop_16_topaz.mp4"])
+        self.assertEqual(window.heading.text(), "2 videos marked weird")
+
+    def test_the_video_playing_plays_on_while_another_arrives(self):
+        touch_video(self.lib.genau_weird / "loop_17_topaz.mp4")
+        playing = touch_video(self.lib.genau_weird / "loop_18_topaz.mp4")
+        window = self._window()
+        window.videos.setCurrentItem(window.videos.topLevelItem(1))
+        touch_video(self.lib.genau_weird / "loop_19_topaz.mp4")
+
+        with patch.object(window.player, "setSource", wraps=window.player.setSource) as switched:
+            window.watch.timeout.emit()
+
+        switched.assert_not_called()
+        self.assertEqual(_playing(window), playing)
+        self.assertEqual(window.videos.currentItem().text(0), "loop_18_topaz.mp4")
+
+    def test_the_videos_picked_stay_picked_while_another_arrives(self):
+        for number in (20, 21, 22):
+            touch_video(self.lib.genau_weird / f"loop_{number}_topaz.mp4")
+        window = self._window()
+        window.videos.selectAll()
+        touch_video(self.lib.genau_weird / "loop_23_topaz.mp4")
+
+        window.watch.timeout.emit()
+
+        self.assertEqual(sorted(item.text(0) for item in window.videos.selectedItems()),
+                         ["loop_20_topaz.mp4", "loop_21_topaz.mp4", "loop_22_topaz.mp4"])
+
+    def test_the_folders_are_looked_at_again_every_couple_of_seconds_while_it_is_open(self):
+        window = self._window()
+
+        window.show()
+        while_open = (window.watch.isActive(), window.watch.interval())
+        window.hide()
+
+        self.assertEqual((while_open, window.watch.isActive()), ((True, 2000), False))
+
     def test_a_video_nothing_says_the_place_of_reads_as_cant_tell_and_says_why(self):
         touch_video(self.lib.weird / "scene two.mp4")
 
