@@ -23,7 +23,8 @@ from gui.palette import apply_accent
 from gui.presence_throttle import PresenceThrottle
 from gui.queue_window import UpscaleQueueWindow
 from gui.run_controller import RunController
-from gui.run_record import RunRecord, format_run_label, load_runs
+from gui.run_history import RunHistory
+from gui.run_record import RunRecord, format_run_label
 from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog
@@ -304,9 +305,15 @@ class EvolverApp:
             # being taken down stays alive for the process's whole life.
             self._stats_window.close()
             self._stats_window.deleteLater()
-        records = load_runs(config.RUNS_DIR)
-        self._stats_window = StatsWindow(records, self._window)
-        self._stats_window.show()
+        window = StatsWindow(self._window)
+        self._stats_window = window
+        window.show()
+        self._background.run(partial(RunHistory.read, config.RUNS_DIR),
+                             then=partial(self._chart_history, window))
+
+    def _chart_history(self, window: StatsWindow, history: RunHistory):
+        if window is self._stats_window:
+            window.show_history(history)
 
     def _show_queue(self):
         """Open the upscale queue, or raise the one already open.

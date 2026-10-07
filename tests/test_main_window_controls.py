@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -76,7 +76,7 @@ class TestRunHistoryMarks:
     def _item(self, status):
         record = make_run_record(status=status)
         self.window = EvolverMainWindow()
-        with patch("gui.main_window.load_runs", return_value=[record]):
+        with patch("gui.main_window.newest_runs", return_value=[record]):
             self.window.refresh_history()
         return self.window._history_list.item(0)
 
@@ -101,7 +101,7 @@ class TestRunHistoryMarks:
         self.window = EvolverMainWindow()
         newest = make_run_record(id="2026-07-25T15-20-02", duration_seconds=34.0)
         older = make_run_record(id="2026-07-25T15-10-02", duration_seconds=99.0)
-        with patch("gui.main_window.load_runs", return_value=[newest, older]):
+        with patch("gui.main_window.newest_runs", return_value=[newest, older]):
             self.window.refresh_history()
         assert self.window._history_list.currentRow() == 0
         info = self.window._detail_widget._info_label.text()
@@ -552,16 +552,15 @@ class TestToolbarAppWiring:
         mock_dialog.assert_called_once_with(app._settings, app._window)
 
     def test_the_stats_button_opens_the_stats_window(self, app):
-        with patch("gui.app.StatsWindow") as mock_stats, \
-             patch("gui.app.load_runs", return_value=[]) as mock_load:
+        app._background = MagicMock()
+        with patch("gui.app.StatsWindow") as mock_stats:
             app._window.stats_action.trigger()
-        mock_stats.assert_called_once_with([], app._window)
+        mock_stats.assert_called_once_with(app._window)
         mock_stats.return_value.show.assert_called_once()
-        mock_load.assert_called_once()
 
     def test_the_trays_stats_item_opens_the_stats_window_too(self, app):
-        with patch("gui.app.StatsWindow") as mock_stats, \
-             patch("gui.app.load_runs", return_value=[]):
+        app._background = MagicMock()
+        with patch("gui.app.StatsWindow") as mock_stats:
             app._tray.stats_action.trigger()
         mock_stats.return_value.show.assert_called_once()
 

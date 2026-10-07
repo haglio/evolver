@@ -6,16 +6,18 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from PyQt6.QtCore import QEvent
 
 import config
 from gui import single_instance
 from gui.app import _wire
 from gui.process_identity import APP_MODEL_ID
+from gui.run_history import RunHistory
 from gui.run_record import RunRecord
 from gui.settings import EvolverSettings
 from gui.single_instance import Outcome
-from tests.gui_support import build_evolver_app
-from tests.temp_helpers import override_config
+from tests.gui_support import QAPP, build_evolver_app
+from tests.temp_helpers import make_run_record, override_config
 from util.upscale_lineup import Lineup
 
 
@@ -62,14 +64,14 @@ class TestBuildingIsNotStarting:
         assert not app._runs._watchdog.isActive()
 
     def test_construction_reads_no_run_history(self, request):
-        with patch("gui.main_window.load_runs") as load:
+        with patch("gui.main_window.newest_runs") as load:
             build_evolver_app(request)
         load.assert_not_called()
 
     def test_starting_does_all_four(self, request):
         app = build_evolver_app(request)
         with patch("gui.app.process_identity.claim") as claim, \
-             patch("gui.main_window.load_runs", return_value=[]) as load:
+             patch("gui.main_window.newest_runs", return_value=[]) as load:
             app.start()
 
         claim.assert_called_once()
@@ -232,12 +234,41 @@ class TestTopazSignInNotice:
 
 
 class TestStatsWindowLifetime:
+    def test_the_window_opens_at_once_and_the_run_history_is_read_off_its_thread(
+            self, request):
+        app = build_evolver_app(request)
+        app._background = MagicMock()
+
+        with patch("gui.run_history.RunHistory.read", return_value=RunHistory.of([])) as read:
+            app._show_stats()
+            read.assert_not_called()
+            assert app._stats_window.isVisible()
+            work, then = (app._background.run.call_args.args[0],
+                          app._background.run.call_args.kwargs["then"])
+            then(work())
+
+        read.assert_called_once_with(config.RUNS_DIR)
+        assert app._stats_window._placeholder.text() == "No run data available."
+
+    def test_a_history_read_for_a_window_since_closed_and_gone_is_let_go(self, request):
+        app = build_evolver_app(request)
+        app._background = MagicMock()
+        app._show_stats()
+        answer_for_the_first = app._background.run.call_args.kwargs["then"]
+        app._stats_window.close()
+        app._show_stats()
+        QAPP.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+        answer_for_the_first(RunHistory.of([make_run_record()]))
+
+        assert app._stats_window._chart is None
+
     def test_a_second_stats_window_takes_the_first_one_down(self, request):
         """The dialog is parented to the main window, so one replaced without
         being closed stays alive for the process's whole life."""
         app = build_evolver_app(request)
-        with patch("gui.app.StatsWindow") as stats_cls, \
-             patch("gui.app.load_runs", return_value=[]):
+        app._background = MagicMock()
+        with patch("gui.app.StatsWindow") as stats_cls:
             first = stats_cls.return_value
             first.isVisible.return_value = False
             app._show_stats()
@@ -248,8 +279,8 @@ class TestStatsWindowLifetime:
 
     def test_a_stats_window_still_open_is_raised_rather_than_replaced(self, request):
         app = build_evolver_app(request)
-        with patch("gui.app.StatsWindow") as stats_cls, \
-             patch("gui.app.load_runs", return_value=[]):
+        app._background = MagicMock()
+        with patch("gui.app.StatsWindow") as stats_cls:
             stats_cls.return_value.isVisible.return_value = True
             app._show_stats()
             app._show_stats()
@@ -410,7 +441,7 @@ class TestUpscaleQueueWindow:
         app = build_evolver_app(request)
         self._open(app)
         with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
-             patch("gui.main_window.load_runs", return_value=[]):
+             patch("gui.main_window.newest_runs", return_value=[]):
             app._on_run_ended()
         lineup.assert_called_once_with()
 
@@ -464,7 +495,7 @@ class TestPresenceMonitor:
     def test_monitor_timer_runs_once_the_app_is_started(self, request):
         app = self._app_with_toggle(request, True)
         with patch("gui.app.process_identity.claim"), \
-             patch("gui.main_window.load_runs", return_value=[]):
+             patch("gui.main_window.newest_runs", return_value=[]):
             app.start()
         assert app._presence.is_running
 

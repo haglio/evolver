@@ -29,7 +29,7 @@ from shared_ui.toggle_switch import ToggleSwitch
 
 import config
 from gui.icons import quit_icon, restart_icon, run_now_icon
-from gui.run_record import RunRecord, format_run_label, load_runs
+from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
@@ -429,7 +429,7 @@ class EvolverMainWindow(QMainWindow):
 
     def refresh_history(self):
         """Reload run records from disk."""
-        self._records = load_runs(config.RUNS_DIR, limit=config.RUNS_SHOWN)
+        self._records = newest_runs(config.RUNS_DIR, config.RUNS_SHOWN)
         self._history_list.clear()
         for record in self._records:
             item = QListWidgetItem(

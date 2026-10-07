@@ -90,7 +90,7 @@ class TestWhatABranchSessionTakesOver:
 
     def _started(self, app):
         with patch("gui.app.process_identity.claim"), \
-             patch("gui.main_window.load_runs", return_value=[]), \
+             patch("gui.main_window.newest_runs", return_value=[]), \
              patch("gui.app.peer_watch.clear_evolver_stand_down") as cleared:
             app.start()
         return cleared
@@ -129,7 +129,7 @@ class TestHandingTheWorkBack:
         with override_config(BRANCH_SESSION=True):
             app = build_evolver_app(request)
         with patch("gui.app.process_identity.claim"), \
-             patch("gui.main_window.load_runs", return_value=[]), \
+             patch("gui.main_window.newest_runs", return_value=[]), \
              patch("gui.app.peer_watch.clear_evolver_stand_down"):
             app.start()
         return app

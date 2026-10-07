@@ -321,54 +321,81 @@ class TestAYearOfRuns:
         assert slowest < 1.0
 
 
+def _window_showing(*records: RunRecord) -> StatsWindow:
+    window = StatsWindow()
+    window.show_history(RunHistory.of(records))
+    return window
+
+
 class TestStatsWindow:
     def test_window_title(self):
-        window = StatsWindow([])
+        window = StatsWindow()
         assert "Statistics" in window.windowTitle()
 
     def test_normal_button_starts_checked(self):
-        window = StatsWindow([])
+        window = StatsWindow()
         assert window._normal_btn.isChecked()
         assert not window._averages_btn.isChecked()
 
     def test_toggle_to_averages(self):
-        records = [_make_record({"sort": 1.0})]
-        window = StatsWindow(records)
+        window = _window_showing(_make_record({"sort": 1.0}))
         window._averages_btn.click()
         assert window._averages_btn.isChecked()
         assert not window._normal_btn.isChecked()
+        assert window._chart._mode == "averages"
 
     def test_toggle_back_to_normal(self):
-        records = [_make_record({"sort": 1.0})]
-        window = StatsWindow(records)
+        window = _window_showing(_make_record({"sort": 1.0}))
         window._averages_btn.click()
         window._normal_btn.click()
         assert window._normal_btn.isChecked()
         assert not window._averages_btn.isChecked()
+        assert window._chart._mode == "normal"
 
     def test_10m_button_starts_checked(self):
-        window = StatsWindow([])
+        window = StatsWindow()
         assert window._10m_btn.isChecked()
         assert not window._fit_btn.isChecked()
 
     def test_toggle_to_fit(self):
-        records = [_make_record({"sort": 1.0})]
-        window = StatsWindow(records)
+        window = _window_showing(_make_record({"sort": 1.0}))
         window._fit_btn.click()
         assert window._fit_btn.isChecked()
         assert not window._10m_btn.isChecked()
+        assert window._chart._fit
 
     def test_toggle_back_to_10m(self):
-        records = [_make_record({"sort": 1.0})]
-        window = StatsWindow(records)
+        window = _window_showing(_make_record({"sort": 1.0}))
         window._fit_btn.click()
         window._10m_btn.click()
         assert window._10m_btn.isChecked()
         assert not window._fit_btn.isChecked()
+        assert not window._chart._fit
 
-    def test_empty_records_shows_placeholder(self):
-        window = StatsWindow([])
+    def test_a_window_opened_before_its_history_is_read_says_it_is_reading_it(self):
+        window = StatsWindow()
+        assert window._placeholder.text() == "Reading the run history…"
+
+    def test_a_history_with_no_runs_says_there_is_no_run_data(self):
+        window = _window_showing()
         assert window._chart is None
+        assert window._placeholder.text() == "No run data available."
+
+    def test_a_history_with_runs_puts_the_chart_where_the_notice_was(self):
+        window = _window_showing(_make_record({"sort": 1.0}))
+        assert window._layout.indexOf(window._chart) == 1
+        assert window._layout.indexOf(window._placeholder) == -1
+        assert window._placeholder.isHidden()
+
+    def test_what_was_chosen_while_the_history_was_read_is_what_it_is_charted_with(self):
+        window = StatsWindow()
+        window._averages_btn.click()
+        window._fit_btn.click()
+
+        window.show_history(RunHistory.of([_make_record({"sort": 1.0})]))
+
+        assert window._chart._mode == "averages"
+        assert window._chart._fit
 
 
 class TestXAxisLabels:
