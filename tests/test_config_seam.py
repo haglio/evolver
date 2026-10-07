@@ -98,7 +98,7 @@ CONFIG_REFERENCE_LEDGER = {
     "gui/worker.py": 1,
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
-    "tasks/genau_deliver.py": 5,
+    "tasks/genau_deliver.py": 6,
     # One fewer: the runtime cap is a field of the EncodeSettings this
     # module now declares, rather than a number it looks up. Then six fewer: the
     # recipe it launches is util.topaz's NON_AI_UPSCALE, named and versioned

@@ -99,6 +99,11 @@ def videoai_tag(file: Path) -> str:
     return _probe_format(file, "format_tags=videoai")
 
 
+def has_sound(file: Path) -> bool:
+    return "audio" in _run_ffprobe(
+        ["-select_streams", "a", "-show_entries", "stream=codec_type", str(file)])
+
+
 def _probe(file: Path, show_entries: str) -> str:
     return _run_ffprobe(["-select_streams", "v:0", "-show_entries", show_entries, str(file)])
 

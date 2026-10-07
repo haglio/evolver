@@ -22,12 +22,15 @@ still sits in ComfyUI's output folder and in Origenerator's gallery.
 from __future__ import annotations
 
 import logging
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import config
 from util import sidecar, video_type
+from util.ffprobe import has_sound
 from util.media_files import child_dirs, library_videos, remove_empty_dirs, unique_path
+from util.sound import save_as_mp3
 from util.variants import is_upscaled_stem, sorted_stem_of
 
 log = logging.getLogger(__name__)
@@ -107,6 +110,15 @@ def _move_sidecar(upscaled: Path, destination: Path) -> None:
         log.warning("Could not re-file the metadata for %s", upscaled.name, exc_info=True)
 
 
+def _save_its_sound(clip: Path, audio_dir: Path) -> None:
+    if not has_sound(clip):
+        return
+    try:
+        save_as_mp3(clip, audio_dir / f"{clip.stem}.mp3")
+    except (OSError, subprocess.CalledProcessError):
+        log.warning("Could not save the sound of %s", clip.name, exc_info=True)
+
+
 def _retire_source(upscaled: Path, genau_sorted_dir: Path) -> None:
     """Remove the ``1_sorted`` copy the delivered clip was made from.
 
@@ -124,6 +136,7 @@ def run(
     sorted_dir: Path | None = None,
     genau_source: str | None = None,
     genau_clips_dir: Path | None = None,
+    genau_audio_dir: Path | None = None,
 ) -> GenauDeliverResult:
     """Move every finished Genau upscale into Genau's folder, retiring its source.
 
@@ -138,6 +151,7 @@ def run(
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     genau_source = config.GENAU_SOURCE if genau_source is None else genau_source
     genau_clips_dir = config.GENAU_CLIPS_DIR if genau_clips_dir is None else genau_clips_dir
+    genau_audio_dir = config.GENAU_AUDIO_DIR if genau_audio_dir is None else genau_audio_dir
     # The lane's own corner of 1_sorted. Composed once so the two helpers that
     # need it take one path rather than two halves they could pair differently.
     genau_sorted_dir = sorted_dir / genau_source
@@ -149,6 +163,7 @@ def run(
         try:
             destination = _deliver(upscaled, genau_clips_dir)
             _move_sidecar(upscaled, destination)
+            _save_its_sound(destination, genau_audio_dir)
             _retire_source(upscaled, genau_sorted_dir)
         except OSError:
             # A clip Genau is playing right now is locked on Windows. Leaving it

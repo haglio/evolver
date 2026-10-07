@@ -181,6 +181,7 @@ GENAU_CLIPS_DIR = LIBRARY_ROOT / "videos" / "genau" / "clips"
 # that document -- the two have to agree on a directory neither owns, and until
 # the rule was published each side simply spelled it and hoped.
 GENAU_WEIRD_DIR = GENAU_CLIPS_DIR.parent / "weird"
+GENAU_AUDIO_DIR = GENAU_CLIPS_DIR.parent / "audio"
 
 # The scraped provider: the 0_inbox folder its clips arrive under, and the site
 # root the metadata stage fetches their prompt pages from. Both are private, so
