@@ -33,6 +33,14 @@ from gui.app import EvolverApp
 QAPP = QApplication.instance() or QApplication([])
 
 
+def row_ground(view, row: int) -> str:
+    """The color a list view paints *row* in, read near its right end, past any text."""
+    QAPP.processEvents()
+    last_cell = view.visualRect(view.model().index(row, view.model().columnCount() - 1))
+    painted = view.viewport().grab().toImage()
+    return painted.pixelColor(last_cell.right() - 2, last_cell.center().y()).name()
+
+
 def build_evolver_app(owner):
     """An ``EvolverApp`` on the shared QApplication, retired when the test ends.
 

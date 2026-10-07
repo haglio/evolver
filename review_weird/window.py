@@ -25,6 +25,7 @@ from shared_ui.spacing import MARGIN_STANDARD
 import config
 from util import weird_piles
 from util.player_readout import silence_the_ffmpeg_format_dump
+from util.selection_highlight import SELECTION_HIGHLIGHT
 
 LOOK_AGAIN_SECONDS = 2.0
 _ICON_COLOR = TEXT_SECONDARY.name()
@@ -52,6 +53,7 @@ class ReviewWeirdWindow(QWidget):
         self.videos.setHeaderLabels(["Video", "Restores to"])
         self.videos.setRootIsDecorated(False)
         self.videos.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.videos.setStyleSheet(SELECTION_HIGHLIGHT)
         self.videos.currentItemChanged.connect(self._play)
         self.videos.itemSelectionChanged.connect(self._offer_what_can_be_done)
 

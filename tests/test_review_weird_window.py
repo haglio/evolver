@@ -5,8 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PyQt6.QtGui import QKeySequence, QShortcut
+from shared_ui.colors import BLUE
 
 from review_weird.window import ReviewWeirdWindow
+from tests.gui_support import row_ground
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
 
 
@@ -133,6 +135,22 @@ class TestWatchingOne(_ReviewingALibrary):
             self._window()
 
         silenced.assert_called_once_with()
+
+
+class TestPickedRows(_ReviewingALibrary):
+    def test_every_picked_row_wears_the_familys_blue(self):
+        for number in (24, 25, 26):
+            touch_video(self.lib.genau_weird / f"loop_{number}_topaz.mp4")
+        window = self._window()
+        window.show()
+        window.videos.topLevelItem(0).setSelected(True)
+        window.videos.topLevelItem(2).setSelected(True)
+
+        grounds = [row_ground(window.videos, row) for row in range(3)]
+
+        self.assertEqual(grounds[0], BLUE.name())
+        self.assertEqual(grounds[2], BLUE.name())
+        self.assertNotEqual(grounds[1], BLUE.name())
 
 
 class TestRestoring(_ReviewingALibrary):
