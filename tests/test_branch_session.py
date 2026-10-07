@@ -231,6 +231,16 @@ class TestHandingTheWorkBack:
         assert "EVOLVER_BRANCH_SESSION" not in popen.call_args.kwargs["env"]
         assert popen.call_args.kwargs["env"]["PATH"] == os.environ["PATH"]
 
+    def test_the_usual_evolver_loads_its_own_modules_rather_than_the_preview_s(self):
+        a_sibling_branch_the_preview_was_tried_with = "C:/workspace/shared_ui/.claude/worktrees/a-change"
+        with override_config(LIVE_DIR=Path("C:/live/evolver")), \
+             patch.dict(os.environ, {"EVOLVER_BRANCH_SESSION": "1",
+                                     "PYTHONPATH": a_sibling_branch_the_preview_was_tried_with}), \
+             patch("gui.branch_session.subprocess.Popen") as popen:
+            branch_session.start_the_usual_evolver()
+
+        assert "PYTHONPATH" not in popen.call_args.kwargs["env"]
+
 
 class TestTellingTheTwoApart:
     def test_the_window_and_the_tray_name_the_branch(self, request):
