@@ -61,7 +61,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `util/warm_gun.py` - the phone's journal, and which library video each line means
   - `util/lanes.py` - every video the library holds, lane by lane
   - `util/frame_hashes.py` - a video read down to comparable frames, and one run of them found inside another
-  - `util/weird_piles.py` - the two folders a video marked weird waits in until you review it
+  - `util/weird_piles.py` - the two folders a video marked weird waits in, where each one goes back to, and putting it back or deleting it for good
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
   - `util/favs_csv.py` - Fun Time's favorites CSV: its rows, and the local path each cell links to
   - `util/video_locator.py` - where a video a reference has lost track of now lives
@@ -88,6 +88,8 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `backfill/work.py` - the single thread the file work runs on, in the order it was spoken
   - `backfill/voice.py` - hands the window what `voice_core`, the family's listener, hears
   - `backfill/window.py` - the looping player, the remaining count, and the last decision
+  - `review_weird_app.py` - the tool that reviews what is marked weird (see below), launched from the tray
+  - `review_weird/window.py` - every video marked weird, the one picked playing, and Put Back and Delete for Good
   - `gui/app.py` - tray application wiring: builds the parts, then starts them
   - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
   - `gui/presence_throttle.py` - the fast poll that parks the in-flight non-AI encode when the user returns
@@ -125,7 +127,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
 pythonw.exe tray_app.py
 ```
 
-This starts a system tray icon. Right-click for the context menu (Run Now, Pause/Resume, Settings, Stats, Upscale Queue, Backfill Metadata, Quit) or double-click to open the main window with run history and live progress. Configure the run interval and Windows startup registration from Settings.
+This starts a system tray icon. Right-click for the context menu (Run Now, Pause/Resume, Settings, Stats, Upscale Queue, Backfill Metadata, Review Weird, Quit) or double-click to open the main window with run history and live progress. Configure the run interval and Windows startup registration from Settings.
 
 Run history is stored as JSON files in `runs/` (gitignored). Settings are persisted to `gui_settings.json` (gitignored).
 
@@ -175,7 +177,7 @@ Four more phrases:
 
 - `same` — record the last act again on the clip now on screen, for a run that all share one act. It reaches past any intervening `skip` to the last act actually spoken, and says "nothing to repeat" if you have not named one yet
 - `skip` — not now; the clip goes to the back of the queue and comes round again
-- `weird` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "mark as weird" does. No metadata is written, and nothing deletes it: it waits there, with its `1_sorted` source, until you review it
+- `weird` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "mark as weird" does. No metadata is written, and nothing deletes it: it waits there, with its `1_sorted` source, until you review it (see "Reviewing what is marked weird" below)
 - `undo` — take the last decision back, and keep saying it to walk back through the whole run
 
 Undo restores the clip to the screen and reverses what the decision did on disk: a sidecar it wrote is deleted (or, if the clip arrived carrying prompts, only the act is removed), and a clip sent to `kinda_weird/` is reclaimed from where it landed. Undoing every decision rewinds the queue to the order it had. It works after the last clip too, so a mislabelled final clip is still recoverable.
@@ -188,6 +190,15 @@ lives there rather than in source, and leaving it out simply means every tile ta
 match. Frames are sampled a little way into the clip (past the intro, with the act actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
 
 Acts are voiced in plain-English words because the vosk lexicon lacks most of the compounds — the same trick Fun Time uses. A spoken command acts once a second recognizer (Whisper) has read the same audio and agrees, about half a second later; a phrase the two read differently is dropped, so say it again or click its tile. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. Set `config.VOICE_DEVICE_NAME` to a substring of your mic's name (from `python -m sounddevice`) to pin a specific one instead.
+
+## Reviewing what is marked weird
+
+A video marked weird — by Fun Time's players, by the backfill tool's `weird`, or by Genau — waits in `2_outbox/kinda_weird/` or in the `weird` folder beside Genau's clips, and nothing Evolver runs deletes it. **Review Weird...** in the tray menu, and **Review Weird** on the main window's toolbar, open a window that lists every one of them with the folder it goes back to, and plays the one you pick, looping and muted.
+
+- **Put Back** returns the picked videos to the folders they were marked weird in, under the names they had there, each with the funscript that followed it into the pile. An upscale goes back where the upscale stage filed it, a Genau clip to its own place in Genau's clips folder, and any other video to the folder its metadata is still filed under. A video nothing says the place of reads "can't tell", and can only be deleted.
+- **Delete for Good** asks first, then deletes the picked videos and what is theirs: the `1_sorted` copy each was upscaled from, its own metadata — never the metadata of another video that shares its name — its funscripts, and a Genau clip's sound, unless another clip of that name still plays it. The `Delete` key does the same.
+
+Both say in `evolver.log` what they moved or deleted. The window runs as its own process, as the backfill tool's does.
 
 ## Topaz sign-in
 
@@ -368,7 +379,7 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 
 ## Notes
 
-- Nothing Evolver runs deletes a video marked weird: one in `2_outbox/kinda_weird/` or in `videos/genau/weird/` stays there, with its `1_sorted` source, its metadata and its funscripts, until you review it.
+- Nothing Evolver runs deletes a video marked weird: one in `2_outbox/kinda_weird/` or in `videos/genau/weird/` stays there, with its `1_sorted` source, its metadata and its funscripts, until you review it with **Review Weird...** in the tray menu.
 - Scripts Sync always runs. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` tree within `videos/videos` (or exactly one in the script's own source folder), then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously.
 - Bookmarks Sync resolves the Chrome profile from Chrome's `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the remaining CSV `web_url` values, after dropping rows whose local favorite file no longer exists.
 - Metadata Scrape writes prompt JSON files under `videos/metadata/2_outbox/.../<video-name>_topaz.json`, skipping any video that already has a JSON. A video whose scrape fails (for example, its source page was deleted) gets a sibling `<video-name>_topaz.json.failed` marker so it is not retried every run; delete the marker to force a retry. The current scraper only extracts Provider prompts.

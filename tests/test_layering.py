@@ -25,7 +25,7 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 # told from an import of a third-party library or the standard one.
 _OURS = (
     "backfill", "backfill_app", "check_correspondence", "check_duplicate_sizes",
-    "config", "content_overlay", "evolver", "gui", "tasks",
+    "config", "content_overlay", "evolver", "gui", "review_weird", "review_weird_app", "tasks",
     "tray_app", "util", "vulture_whitelist",
 )
 
@@ -42,6 +42,8 @@ ALLOWED = {
     "evolver": {"check_correspondence", "check_duplicate_sizes", "config",
                 "tasks", "util"},
     "gui": {"config", "evolver", "tasks.stages", "util"},
+    "review_weird": {"config", "util"},
+    "review_weird_app": {"evolver", "review_weird"},
     "tasks": {"config", "util"},
     "tray_app": {"gui", "util"},
     "util": {"config"},

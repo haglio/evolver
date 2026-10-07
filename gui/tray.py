@@ -11,7 +11,7 @@ from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
 
 import config
-from gui.icons import pause_icon, quit_icon, restart_icon, run_now_icon
+from gui.icons import pause_icon, quit_icon, restart_icon, review_weird_icon, run_now_icon
 from gui.schedule_state import ScheduleStatus
 
 _ICON_COLOR = TEXT_SECONDARY.name()
@@ -68,12 +68,17 @@ class EvolverTray(QSystemTrayIcon):
         self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats...", self._menu)
         self._menu.addAction(self.stats_action)
 
+        self._menu.addSeparator()
+
         self.queue_action = QAction(qta.icon("fa5s.list-ol", color=_ICON_COLOR),
                                     "Upscale Queue...", self._menu)
         self._menu.addAction(self.queue_action)
 
         self.backfill_action = QAction(qta.icon("fa5s.microphone", color=_ICON_COLOR), "Backfill Metadata...", self._menu)
         self._menu.addAction(self.backfill_action)
+
+        self.review_weird_action = QAction(review_weird_icon(_ICON_COLOR), "Review Weird...", self._menu)
+        self._menu.addAction(self.review_weird_action)
 
         self._menu.addSeparator()
 
@@ -109,6 +114,7 @@ class EvolverTray(QSystemTrayIcon):
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
             "backfill": self.backfill_action.triggered,
+            "review_weird": self.review_weird_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,
         }

@@ -20,22 +20,23 @@ from app_support.dependencies import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-TREES = [ROOT / "backfill", ROOT / "gui", ROOT / "tasks", ROOT / "util", ROOT / "tests",
+TREES = [ROOT / "backfill", ROOT / "gui", ROOT / "review_weird", ROOT / "tasks", ROOT / "util",
+         ROOT / "tests",
          ROOT / "tools", ROOT / "backfill_app.py", ROOT / "check_correspondence.py",
          ROOT / "check_duplicate_sizes.py", ROOT / "config.py", ROOT / "content_overlay.py",
-         ROOT / "evolver.py", ROOT / "tray_app.py",
+         ROOT / "evolver.py", ROOT / "review_weird_app.py", ROOT / "tray_app.py",
          ROOT / "vulture_whitelist.py"]
 
 
 def test_every_third_party_import_is_declared():
     assert_every_import_is_declared(
-        ROOT, [ROOT / "backfill", ROOT / "gui", ROOT / "tasks", ROOT / "util",
+        ROOT, [ROOT / "backfill", ROOT / "gui", ROOT / "review_weird", ROOT / "tasks", ROOT / "util",
                ROOT / "backfill_app.py", ROOT / "check_correspondence.py",
                ROOT / "check_duplicate_sizes.py", ROOT / "config.py", ROOT / "content_overlay.py",
-               ROOT / "evolver.py", ROOT / "tray_app.py"],
-        ROOT / "pyproject.toml", local=("backfill", "gui", "tasks", "util", "backfill_app", "check_correspondence",
+               ROOT / "evolver.py", ROOT / "review_weird_app.py", ROOT / "tray_app.py"],
+        ROOT / "pyproject.toml", local=("backfill", "gui", "review_weird", "tasks", "util", "backfill_app", "check_correspondence",
                "check_duplicate_sizes", "config", "content_overlay", "evolver",
-               "tray_app"))
+               "review_weird_app", "tray_app"))
 
 
 def test_every_requirement_has_an_upper_bound():

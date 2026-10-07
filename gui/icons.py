@@ -2,7 +2,7 @@
 
 Most of the toolbar and the tray menu is still Font Awesome, which suits the
 verbs nothing else in the family draws -- a cog for settings, a chart, a film
-strip.  Four marks are not left to it, because the family draws them and the
+strip.  Five marks are not left to it, because the family draws them and the
 apps sit open side by side:
 
 * quit, the power symbol -- Fun Time paints this same one on its bar,
@@ -12,7 +12,8 @@ apps sit open side by side:
   looks like everywhere else here),
 * run now, the play triangle, whose corners are rounded the way an icon font's
   transport controls are,
-* pause, the two bars the Broker's tray menu pauses with.
+* pause, the two bars the Broker's tray menu pauses with,
+* review weird, the trash can Fun Time's button marks a video weird with.
 """
 
 from __future__ import annotations
@@ -40,3 +41,7 @@ def run_now_icon(color: str) -> QIcon:
 
 def pause_icon(color: str) -> QIcon:
     return glyph_icon("pause", color=color)
+
+
+def review_weird_icon(color: str) -> QIcon:
+    return glyph_icon("trash", color=color)

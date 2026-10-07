@@ -52,6 +52,7 @@ LAUNCH_FILES = (
     REPO_ROOT / "tray_app.py",
     REPO_ROOT / "gui" / "app.py",
     REPO_ROOT / "backfill_app.py",
+    REPO_ROOT / "review_weird_app.py",
 )
 
 # Reached only from inside main(), so a module-level import test never saw it.
