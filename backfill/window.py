@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 
 from backfill.session import BackfillSession
 from backfill.vocabulary import Command, Vocabulary
+from util.player_readout import silence_the_ffmpeg_format_dump
 
 _DONE = "Nothing left to label."
 _SCROLLBAR_ALLOWANCE = 28
@@ -104,6 +105,7 @@ class BackfillWindow(QWidget):
         for label, path in (thumbnails or {}).items():
             self.set_thumbnail(label, path)
 
+        silence_the_ffmpeg_format_dump()
         self._audio = QAudioOutput()
         self._audio.setMuted(True)
         self._player = QMediaPlayer()

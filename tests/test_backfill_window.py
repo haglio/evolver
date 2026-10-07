@@ -315,6 +315,12 @@ class TestBackfillWindow(unittest.TestCase):
 
         stop.assert_called_once()
 
+    def test_what_the_player_reads_out_of_a_clip_is_kept_out_of_every_log(self):
+        with patch("backfill.window.silence_the_ffmpeg_format_dump") as silenced:
+            self._window(FakeSession([Path("a_topaz.mp4")]))
+
+        silenced.assert_called_once_with()
+
     def test_escape_closes_the_window(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         escapes = [

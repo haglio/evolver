@@ -90,6 +90,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `backfill/window.py` - the looping player, the remaining count, and the last decision
   - `review_weird_app.py` - the tool that reviews what is marked weird (see below), launched from the tray
   - `review_weird/window.py` - every video marked weird, the one picked playing, and Put Back and Delete for Good
+  - `util/player_readout.py` - keeping what the two tools' players read out of a video, its tags among it, out of every log
   - `gui/app.py` - tray application wiring: builds the parts, then starts them
   - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
   - `gui/presence_throttle.py` - the fast poll that parks the in-flight non-AI encode when the user returns
