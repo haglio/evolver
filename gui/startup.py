@@ -1,77 +1,41 @@
-"""Windows Startup folder shortcut management.
+"""The Start-with-Windows shortcut: the one Evolver's list keeps in the Startup folder.
 
-Creates a proper .lnk shortcut using a temporary VBScript, avoiding any
-dependency on pywin32.
+Always the checkout the user runs, never a worktree: a preview's settings dialog
+would otherwise leave Windows starting a branch at every sign-in.
 """
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
-import tempfile
+import dataclasses
 from pathlib import Path
+
+from app_support import win32, windows_settings
 
 import config
 
+_NAME = "Evolver"
+_PLACE = "startup"
 
-def _startup_dir() -> Path:
-    """The Startup folder, from the environment or from where it always is.
 
-    ``.get`` with a real fallback rather than an index: ``%APPDATA%`` is the
-    roaming profile and the path below is where Windows puts it, so a process
-    started without it -- a service, a stripped shell -- still finds the folder
-    instead of dying on a KeyError in a tray app with no console.
-    """
-    roaming = os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming"
-    return Path(roaming) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+def _everyday_checkout() -> Path:
+    return config.LIVE_DIR
 
 
 def _shortcut_path() -> Path:
-    return _startup_dir() / "Evolver.lnk"
+    return windows_settings.shortcut_file(_everyday_checkout(), _NAME, _PLACE)
 
 
 def is_registered() -> bool:
     return _shortcut_path().exists()
 
 
-def _vbs_string(value) -> str:
-    """*value* as a VBScript string literal: a quote inside one is written twice."""
-    return '"' + str(value).replace('"', '""') + '"'
+def register_startup() -> None:
+    checkout = _everyday_checkout()
+    (listed,) = [spec for spec in windows_settings.declared(checkout).shortcuts
+                 if spec.name == _NAME and _PLACE in spec.places]
+    shortcut = windows_settings.shortcut_for(checkout, listed)
+    win32.write_shortcut(str(_shortcut_path()), **dataclasses.asdict(shortcut))
 
 
-def register_startup():
-    """Create a .lnk shortcut in the Windows Startup folder."""
-    # The checkout the user runs, never a worktree: a preview's settings dialog
-    # would otherwise leave Windows starting a branch at every sign-in.
-    project_dir = config.LIVE_DIR
-    target = sys.executable
-    arguments = str(project_dir / "tray_app.py")
-    working_dir = str(project_dir)
-    shortcut_path = str(_shortcut_path())
-
-    vbs = (
-        'Set oWS = WScript.CreateObject("WScript.Shell")\n'
-        f'Set oLink = oWS.CreateShortCut({_vbs_string(shortcut_path)})\n'
-        f'oLink.TargetPath = {_vbs_string(target)}\n'
-        f'oLink.Arguments = {_vbs_string(arguments)}\n'
-        f'oLink.WorkingDirectory = {_vbs_string(working_dir)}\n'
-        'oLink.Description = "Evolver Tray Application"\n'
-        'oLink.Save\n'
-    )
-
-    with tempfile.NamedTemporaryFile("w", suffix=".vbs", delete=False, encoding="utf-8") as f:
-        f.write(vbs)
-        vbs_path = f.name
-
-    try:
-        subprocess.run(["cscript", "//Nologo", vbs_path], check=True, capture_output=True)
-    finally:
-        Path(vbs_path).unlink(missing_ok=True)
-
-
-def unregister_startup():
-    """Remove the startup shortcut if it exists."""
-    path = _shortcut_path()
-    if path.exists():
-        path.unlink()
+def unregister_startup() -> None:
+    _shortcut_path().unlink(missing_ok=True)
