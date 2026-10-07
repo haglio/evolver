@@ -72,15 +72,17 @@ def relaunch_command() -> str:
     return f'"{sys.executable}" "{config.PROJECT_DIR / "tray_app.py"}" --show-window'
 
 
+_WHAT_ONLY_A_PREVIEW_RUNS_WITH = (config.BRANCH_SESSION_FLAG, "PYTHONPATH")
+
+
 def start_the_usual_evolver() -> None:
     """Start the Evolver the user runs, which takes the work back from this one.
 
     Hidden, the way the broker starts it: it comes back to the tray, not to
-    the screen.  Without the preview flag, which it would otherwise inherit
-    from this process and come up as one more preview.
+    the screen.
     """
     environment = {key: value for key, value in os.environ.items()
-                   if key != config.BRANCH_SESSION_FLAG}
+                   if key not in _WHAT_ONLY_A_PREVIEW_RUNS_WITH}
     subprocess.Popen(["wscript.exe", str(config.LIVE_DIR / "launch_evolver.vbs")],
                      cwd=str(config.LIVE_DIR), env=environment,
                      **hidden_subprocess_kwargs())
