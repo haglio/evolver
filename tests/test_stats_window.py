@@ -92,7 +92,7 @@ def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
 
 
 class TestStackedAreaChartSeries:
-    """_compute_series should return correct values for normal and averages mode."""
+    """_compute_series should return correct values for historical and averages modes."""
 
     @pytest.fixture
     def chart(self):
@@ -212,25 +212,25 @@ class TestStackedAreaChartPainting:
         # 50 s of work is 7 % of the fixed 700 s scale -- a sliver along the
         # chart's lower edge. Fit mode rescales to the tallest run plus
         # headroom, so the same band then covers most of the chart's height.
-        normal = _render(StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0})))
+        historical = _render(StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0})))
         fitted_chart = StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0}))
         fitted_chart.set_fit(True)
         fitted = _render(fitted_chart)
-        assert _rgb(normal, 380, 185) == _WHITE
+        assert _rgb(historical, 380, 185) == _WHITE
         assert _is_band_fill(_rgb(fitted, 380, 185), "sort")
 
     def test_averages_mode_charts_the_running_mean_not_the_raw_run(self):
         # sort runs 100 s then 300 s: the second run's raw band reaches 300 s,
         # its running mean only 200 s, so a pixel between the two heights near
         # the newest run is inked in one mode and bare in the other.
-        normal = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
+        historical = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
         averaged_chart = StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0}))
         averaged_chart.set_mode("averages")
         averaged = _render(averaged_chart)
         # Just inside the chart's right edge, which the legend's measured width
         # decides -- a fixed x here would land in the margin on another font.
         newest = 800 - chart_right_margin() - 10
-        assert _is_band_fill(_rgb(normal, newest, 230), "sort")
+        assert _is_band_fill(_rgb(historical, newest, 230), "sort")
         assert _rgb(averaged, newest, 230) == _WHITE
 
     def test_the_10_minute_line_appears_only_when_the_scale_reaches_it(self):
@@ -311,7 +311,7 @@ class TestAYearOfRuns:
             **{stage: rng.exponential(8.0, runs) for stage in ALL_STAGES}))
 
         slowest = 0.0
-        for mode, fit in (("normal", False), ("averages", False), ("normal", True)):
+        for mode, fit in (("historical", False), ("averages", False), ("historical", True)):
             chart.set_mode(mode)
             chart.set_fit(fit)
             started = time.perf_counter()
@@ -332,25 +332,30 @@ class TestStatsWindow:
         window = StatsWindow()
         assert "Statistics" in window.windowTitle()
 
-    def test_normal_button_starts_checked(self):
+    def test_the_two_measures_are_historical_and_averages(self):
         window = StatsWindow()
-        assert window._normal_btn.isChecked()
+        assert [window._historical_btn.text(), window._averages_btn.text()] == [
+            "Historical", "Averages"]
+
+    def test_historical_button_starts_checked(self):
+        window = StatsWindow()
+        assert window._historical_btn.isChecked()
         assert not window._averages_btn.isChecked()
 
     def test_toggle_to_averages(self):
         window = _window_showing(_make_record({"sort": 1.0}))
         window._averages_btn.click()
         assert window._averages_btn.isChecked()
-        assert not window._normal_btn.isChecked()
+        assert not window._historical_btn.isChecked()
         assert window._chart._mode == "averages"
 
-    def test_toggle_back_to_normal(self):
+    def test_toggle_back_to_historical(self):
         window = _window_showing(_make_record({"sort": 1.0}))
         window._averages_btn.click()
-        window._normal_btn.click()
-        assert window._normal_btn.isChecked()
+        window._historical_btn.click()
+        assert window._historical_btn.isChecked()
         assert not window._averages_btn.isChecked()
-        assert window._chart._mode == "normal"
+        assert window._chart._mode == "historical"
 
     def test_10m_button_starts_checked(self):
         window = StatsWindow()
