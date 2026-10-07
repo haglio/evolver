@@ -209,7 +209,7 @@ class TestTheGenauLane(unittest.TestCase):
             lib = LaneLibrary(root)
             db = _gallery(root / "gallery.db", [("p2", "loop_00001.mp4", "genau_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                delivered = touch_video(lib.genau_clips / "loop_00001_topaz.mp4")
+                delivered = touch_video(lib.genau_clips / "2D" / "AI" / "loop_00001_topaz.mp4")
 
                 withdrawn.run()
 
@@ -223,7 +223,7 @@ class TestTheGenauLane(unittest.TestCase):
                 kept = touch_video(
                     lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE
                     / "both_00001_topaz.mp4")
-                delivered = touch_video(lib.genau_clips / "both_00001_topaz.mp4")
+                delivered = touch_video(lib.genau_clips / "2D" / "AI" / "both_00001_topaz.mp4")
 
                 withdrawn.run()
 
@@ -253,8 +253,8 @@ class TestASoundlessCopy(unittest.TestCase):
             lib = LaneLibrary(root)
             db = _gallery_of_videos_with_sound(root / "gallery.db", ["loop_00009"])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                sounded = touch_video(lib.genau_clips / "loop_00009-audio_topaz.mp4")
-                soundless = touch_video(lib.genau_clips / "loop_00009_topaz.mp4")
+                sounded = touch_video(lib.genau_clips / "2D" / "AI" / "loop_00009-audio_topaz.mp4")
+                soundless = touch_video(lib.genau_clips / "2D" / "AI" / "loop_00009_topaz.mp4")
 
                 withdrawn.run()
 
@@ -266,7 +266,7 @@ class TestASoundlessCopy(unittest.TestCase):
             lib = LaneLibrary(root)
             db = _gallery_of_videos_with_sound(root / "gallery.db", ["loop_00010"])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                soundless = touch_video(lib.genau_clips / "loop_00010_topaz.mp4")
+                soundless = touch_video(lib.genau_clips / "2D" / "AI" / "loop_00010_topaz.mp4")
 
                 withdrawn.run()
 

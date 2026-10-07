@@ -51,7 +51,7 @@ def sent_lanes() -> tuple[SentLane, ...]:
         SentLane("evolver", ORIGENERATOR_SOURCE, "evolver_unsent_at",
                  delivered_dir=None),
         SentLane("genau", config.GENAU_SOURCE, "genau_unsent_at",
-                 delivered_dir=config.GENAU_CLIPS_DIR),
+                 delivered_dir=genau_delivery_dir()),
     )
 
 
@@ -84,10 +84,14 @@ def upscale_filed_for(video: Path) -> Path | None:
     return AiClip(video, source, orientation).upscale if inside else None
 
 
+def genau_delivery_dir() -> Path:
+    return config.GENAU_CLIPS_DIR / "2D" / "AI"
+
+
 def genau_clips() -> Iterator[Path]:
     if not config.GENAU_CLIPS_DIR.is_dir():
         return
-    for video in sorted(config.GENAU_CLIPS_DIR.iterdir()):
+    for video in sorted(config.GENAU_CLIPS_DIR.rglob("*")):
         if is_finalized_video_file(video):
             yield video
 

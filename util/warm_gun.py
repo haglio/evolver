@@ -1,6 +1,7 @@
 """Warm Gun's journal: one JSON line per event on the phone, each naming its
 video by the lane it was played from — ``1_sorted/<source>/<orientation>/x.mp4``,
-``non_AI/<bucket>/…`` or ``genau/clips/x.mp4``."""
+``non_AI/<bucket>/…`` or ``genau/clips/2D/AI/x.mp4`` -- or, written before
+Genau's clips folder split into 2D and VR, ``genau/clips/x.mp4``."""
 
 from __future__ import annotations
 
@@ -62,9 +63,18 @@ def library_video(journal_path: str) -> Path | None:
         return upscaled_video_path(source, orient, Path(name).stem)
     if lane == "non_AI" and rest:
         return config.NON_AI_DIR.joinpath(*rest)
-    if lane == "genau" and len(rest) == 2 and rest[0] == "clips":
-        return config.GENAU_CLIPS_DIR / rest[1]
+    if lane == "genau" and len(rest) >= 2 and rest[0] == "clips":
+        return _genau_clip(config.GENAU_CLIPS_DIR, rest[1:])
     return None
+
+
+def _genau_clip(clips_folder: Path, inside: list[str]) -> Path:
+    named = clips_folder.joinpath(*inside)
+    if len(inside) == 1 and not named.exists():
+        found = list(clips_folder.rglob(inside[0])) if clips_folder.is_dir() else []
+        if len(found) == 1:
+            return found[0]
+    return named
 
 
 def played_video(journal_path: str) -> Path | None:

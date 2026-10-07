@@ -1,7 +1,7 @@
 """Deliver upscaled Genau clips to the folder Genau plays from.
 
 The last step of the Genau lane, which ``config.GENAU_SOURCE`` describes: once
-the upscale exists, move it into ``videos/genau/clips/`` and retire the
+the upscale exists, move it into ``videos/genau/clips/2D/AI/`` and retire the
 ``1_sorted`` copy it was made from. A loop goes through the Topaz stage like
 any other AI video rather than being copied straight across, because one fresh
 out of the graph is visibly softer than the clips already in that folder, which
@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import sidecar, video_type
+from util import lanes, sidecar, video_type
 from util.ffprobe import has_sound
 from util.media_files import child_dirs, library_videos, remove_empty_dirs, unique_path
 from util.sound import save_as_mp3
@@ -72,13 +72,12 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
     return None
 
 
-def _deliver(upscaled: Path, clips_dir: Path) -> Path:
-    """Move one finished upscale into Genau's clips folder; return where it landed."""
-    clips_dir.mkdir(parents=True, exist_ok=True)
-    # Genau's folder is flat and holds clips carved by hand as well as
-    # generated ones, so a name can genuinely already be taken and
-    # delivering must never overwrite a clip that is already being played.
-    destination = unique_path(clips_dir / upscaled.name)
+def _deliver(upscaled: Path, delivery_dir: Path) -> Path:
+    """Move one finished upscale into Genau's AI folder; return where it landed."""
+    delivery_dir.mkdir(parents=True, exist_ok=True)
+    # A name can genuinely already be taken there, and delivering must never
+    # overwrite a clip that is already being played.
+    destination = unique_path(delivery_dir / upscaled.name)
     upscaled.replace(destination)
     return destination
 
@@ -135,7 +134,7 @@ def run(
     outbox_dir: Path | None = None,
     sorted_dir: Path | None = None,
     genau_source: str | None = None,
-    genau_clips_dir: Path | None = None,
+    delivery_dir: Path | None = None,
     genau_audio_dir: Path | None = None,
 ) -> GenauDeliverResult:
     """Move every finished Genau upscale into Genau's folder, retiring its source.
@@ -150,18 +149,18 @@ def run(
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     genau_source = config.GENAU_SOURCE if genau_source is None else genau_source
-    genau_clips_dir = config.GENAU_CLIPS_DIR if genau_clips_dir is None else genau_clips_dir
+    delivery_dir = lanes.genau_delivery_dir() if delivery_dir is None else delivery_dir
     genau_audio_dir = config.GENAU_AUDIO_DIR if genau_audio_dir is None else genau_audio_dir
     # The lane's own corner of 1_sorted. Composed once so the two helpers that
     # need it take one path rather than two halves they could pair differently.
     genau_sorted_dir = sorted_dir / genau_source
 
     result = GenauDeliverResult()
-    log.info("=== Genau lane: 2_outbox -> %s ===", genau_clips_dir)
+    log.info("=== Genau lane: 2_outbox -> %s ===", delivery_dir)
 
     for upscaled in _upscaled_genau_clips(outbox_dir, genau_source):
         try:
-            destination = _deliver(upscaled, genau_clips_dir)
+            destination = _deliver(upscaled, delivery_dir)
             _move_sidecar(upscaled, destination)
             _save_its_sound(destination, genau_audio_dir)
             _retire_source(upscaled, genau_sorted_dir)
