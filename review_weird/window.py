@@ -100,15 +100,7 @@ class ReviewWeirdWindow(QWidget):
         self._settle(weird_piles.restore)
 
     def _delete_permanently(self) -> None:
-        chosen = self._chosen()
-        if not chosen:
-            return
-        which = chosen[0].video.name if len(chosen) == 1 else f"these {len(chosen)} videos"
-        asked = QMessageBox.question(
-            self, "Delete Permanently", f"Delete {which} permanently? This can't be undone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No)
-        if asked == QMessageBox.StandardButton.Yes:
+        if self._chosen():
             self._settle(weird_piles.delete_permanently)
 
     def _settle(self, verdict) -> None:

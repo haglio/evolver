@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QMessageBox
 
 from review_weird.window import ReviewWeirdWindow
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
@@ -135,57 +134,50 @@ class TestWhatCanBeDone(_ReviewingALibrary):
 
 
 class TestDeletingPermanently(_ReviewingALibrary):
-    def test_it_asks_first_and_deletes_only_on_yes(self):
+    def test_it_deletes_at_once_without_asking(self):
         marked = touch_video(self.lib.genau_weird / "loop_7_topaz.mp4")
         window = self._window()
 
-        with _answering(QMessageBox.StandardButton.No) as asked:
-            window.delete_button.click()
-        kept = marked.exists()
-        with _answering(QMessageBox.StandardButton.Yes):
+        with _no_question_asked() as asked:
             window.delete_button.click()
 
-        self.assertEqual(asked.call_args.args[2], "Delete loop_7_topaz.mp4 permanently? This can't be undone.")
-        self.assertEqual((kept, marked.exists()), (True, False))
+        asked.assert_not_called()
+        self.assertFalse(marked.exists())
         self.assertEqual(window.heading.text(), "Nothing is marked weird")
 
-    def test_several_selected_are_asked_about_once_and_all_deleted(self):
+    def test_several_selected_all_go_at_once(self):
         marked = [touch_video(self.lib.genau_weird / f"loop_{number}_topaz.mp4") for number in (8, 9)]
         window = self._window()
         window.videos.selectAll()
 
-        with _answering(QMessageBox.StandardButton.Yes) as asked:
-            window.delete_button.click()
+        window.delete_button.click()
 
-        asked.assert_called_once()
-        self.assertEqual(asked.call_args.args[2], "Delete these 2 videos permanently? This can't be undone.")
         self.assertEqual([video for video in marked if video.exists()], [])
 
-    def test_the_delete_key_asks_the_same_question(self):
+    def test_the_delete_key_deletes_too(self):
         marked = touch_video(self.lib.genau_weird / "loop_13_topaz.mp4")
         window = self._window()
-        [delete_key] = [shortcut for shortcut in window.findChildren(QShortcut)
-                        if shortcut.key() == QKeySequence(QKeySequence.StandardKey.Delete)]
 
-        with _answering(QMessageBox.StandardButton.Yes) as asked:
-            delete_key.activated.emit()
+        _delete_key(window).activated.emit()
 
-        asked.assert_called_once()
         self.assertFalse(marked.exists())
 
-    def test_the_delete_key_with_nothing_marked_asks_nothing(self):
+    def test_the_delete_key_with_nothing_marked_does_nothing(self):
         window = self._window()
-        [delete_key] = [shortcut for shortcut in window.findChildren(QShortcut)
-                        if shortcut.key() == QKeySequence(QKeySequence.StandardKey.Delete)]
 
-        with _answering(QMessageBox.StandardButton.Yes) as asked:
-            delete_key.activated.emit()
+        _delete_key(window).activated.emit()
 
-        asked.assert_not_called()
+        self.assertEqual(window.heading.text(), "Nothing is marked weird")
 
 
-def _answering(button):
-    return patch("review_weird.window.QMessageBox.question", return_value=button)
+def _no_question_asked():
+    return patch("review_weird.window.QMessageBox.question")
+
+
+def _delete_key(window: ReviewWeirdWindow) -> QShortcut:
+    [key] = [shortcut for shortcut in window.findChildren(QShortcut)
+             if shortcut.key() == QKeySequence(QKeySequence.StandardKey.Delete)]
+    return key
 
 
 def _playing(window: ReviewWeirdWindow) -> Path:
