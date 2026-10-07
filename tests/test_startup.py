@@ -1,21 +1,24 @@
-"""Tests for gui.startup — the Start-with-Windows shortcut.
+"""Tests for gui.startup -- the Start-with-Windows shortcut.
 
-The shortcut is written by generating a VBScript and running it through
-cscript, so the observable surface off Windows is the script text and the
-cscript invocation; both are captured at the subprocess boundary. The
-Startup folder itself is redirected through APPDATA into a temp tree.
+The Startup folder is redirected through APPDATA into a temp tree.
 """
 from __future__ import annotations
 
-import subprocess
+import shutil
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from app_support import windows_settings
+from app_support.win32 import read_shortcut
 
 from gui import startup
 from tests.temp_helpers import override_config, workspace_temp_dir
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+on_windows = pytest.mark.skipif(sys.platform != "win32", reason="a shortcut: only Windows can say")
 
 
 @pytest.fixture
@@ -26,82 +29,38 @@ def startup_dir():
         yield folder
 
 
-def _capture_cscript(captured):
-    """A subprocess.run stand-in that reads the script before it is deleted."""
-    def fake_run(argv, **kwargs):
-        captured["argv"] = argv
-        captured["script"] = Path(argv[2]).read_text(encoding="utf-8")
-        captured["script_path"] = Path(argv[2])
-        return subprocess.CompletedProcess(argv, 0)
-    return fake_run
-
-
+@on_windows
 class TestRegisterStartup:
 
-    def test_the_script_points_the_shortcut_at_the_tray_app(self, startup_dir):
-        captured = {}
-        with patch("gui.startup.subprocess.run", side_effect=_capture_cscript(captured)):
+    def test_the_shortcut_is_the_one_evolvers_list_keeps_in_the_startup_folder(self, startup_dir):
+        """So "Start with Windows" and the command that keeps the machine in step
+        with every app's list never write two different shortcuts."""
+        with override_config(LIVE_DIR=REPO_ROOT):
             startup.register_startup()
 
-        project_dir = Path(startup.__file__).resolve().parent.parent
-        script = captured["script"]
-        assert f'CreateShortCut("{startup_dir / "Evolver.lnk"}")' in script
-        assert f'oLink.TargetPath = "{sys.executable}"' in script
-        assert f'oLink.Arguments = "{project_dir / "tray_app.py"}"' in script
-        assert f'oLink.WorkingDirectory = "{project_dir}"' in script
-        assert "oLink.Save" in script
+        (spec,) = windows_settings.declared(REPO_ROOT).shortcuts
+        written = read_shortcut(str(startup_dir / "Evolver.lnk"))
+        assert windows_settings.what_differs(
+            written, windows_settings.shortcut_for(REPO_ROOT, spec)) == []
+
+    def test_it_starts_the_tray_through_its_launcher(self, startup_dir):
+        with override_config(LIVE_DIR=REPO_ROOT):
+            startup.register_startup()
+
+        written = read_shortcut(str(startup_dir / "Evolver.lnk"))
+        assert written.arguments == f'"{REPO_ROOT / "launch_evolver.vbs"}"'
+        assert Path(written.working_directory) == REPO_ROOT
 
     def test_a_branch_preview_still_points_it_at_the_evolver_that_runs_every_day(self, startup_dir):
         """A preview is the whole app, settings dialog included, and ticking
         "Start with Windows" there must not leave Windows starting a branch."""
-        captured = {}
-        with workspace_temp_dir() as live, \
-             override_config(LIVE_DIR=live), \
-             patch("gui.startup.subprocess.run", side_effect=_capture_cscript(captured)):
+        with workspace_temp_dir() as live, override_config(LIVE_DIR=live):
+            shutil.copy(REPO_ROOT / "pyproject.toml", live / "pyproject.toml")
             startup.register_startup()
 
-            assert f'oLink.Arguments = "{live / "tray_app.py"}"' in captured["script"]
-            assert f'oLink.WorkingDirectory = "{live}"' in captured["script"]
-
-    def test_a_quote_in_a_path_is_doubled_the_way_vbscript_reads_it(self, startup_dir):
-        # The four paths were dropped straight inside VBScript string literals,
-        # so a path with a quote in it produced a broken script and a shortcut
-        # that was silently wrong (bug 49).  VBScript doubles a quote to mean one.
-        captured = {}
-        with patch("gui.startup.subprocess.run", side_effect=_capture_cscript(captured)), \
-             patch("gui.startup.sys.executable", 'C:\\odd"name\\python.exe'):
-            startup.register_startup()
-
-        assert 'oLink.TargetPath = "C:\\odd""name\\python.exe"' in captured["script"]
-
-    def test_the_script_is_run_through_cscript_quietly(self, startup_dir):
-        captured = {}
-        with patch("gui.startup.subprocess.run", side_effect=_capture_cscript(captured)):
-            startup.register_startup()
-
-        assert captured["argv"][0] == "cscript"
-        assert captured["argv"][1] == "//Nologo"
-        assert captured["argv"][2].endswith(".vbs")
-
-    def test_the_temp_script_is_removed_afterwards(self, startup_dir):
-        captured = {}
-        with patch("gui.startup.subprocess.run", side_effect=_capture_cscript(captured)):
-            startup.register_startup()
-
-        assert not captured["script_path"].exists()
-
-    def test_the_temp_script_is_removed_even_when_cscript_fails(self, startup_dir):
-        captured = {}
-
-        def failing_run(argv, **kwargs):
-            captured["script_path"] = Path(argv[2])
-            raise subprocess.CalledProcessError(1, argv)
-
-        with patch("gui.startup.subprocess.run", side_effect=failing_run):
-            with pytest.raises(subprocess.CalledProcessError):
-                startup.register_startup()
-
-        assert not captured["script_path"].exists()
+            written = read_shortcut(str(startup_dir / "Evolver.lnk"))
+            assert written.arguments == f'"{live / "launch_evolver.vbs"}"'
+            assert Path(written.working_directory) == live
 
 
 class TestUnregisterStartup:
