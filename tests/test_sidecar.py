@@ -79,6 +79,23 @@ class TestSidecarPath(unittest.TestCase):
             sidecar_path(root / "elsewhere" / "clip.mp4")
 
 
+class TestSidecarFolder(unittest.TestCase):
+    def test_a_folder_holds_its_videos_records_at_the_same_place_in_the_metadata_tree(self):
+        with workspace_temp_dir() as root, override_config(
+            VIDEO_LIBRARY_DIR=root / "videos", METADATA_DIR=root / "metadata",
+        ):
+            folder = root / "videos" / "2D" / "non_AI" / "example.bucket" / "vol. 2"
+
+            self.assertEqual(sidecar.sidecar_folder(folder), sidecar_path(folder / "clip.mp4").parent)
+
+    def test_a_folder_outside_the_library_has_no_records_folder(self):
+        with workspace_temp_dir() as root, override_config(
+            VIDEO_LIBRARY_DIR=root / "videos" / "videos",
+            VIDEO_SEARCH_ROOT=root / "videos", METADATA_DIR=root / "metadata",
+        ):
+            self.assertIsNone(sidecar.sidecar_folder(root / "elsewhere"))
+
+
 class TestUpdate(unittest.TestCase):
     """The one write, and the lock it holds while it reads and changes.
 

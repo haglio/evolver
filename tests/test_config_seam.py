@@ -105,7 +105,7 @@ CONFIG_REFERENCE_LEDGER = {
     # recipe it launches is util.topaz's NON_AI_UPSCALE, named and versioned
     # beside its settings, not a template, two edges and a tag looked up here.
     "tasks/nonai_encode.py": 5,
-    "tasks/nonai_group.py": 3,
+    "tasks/nonai_group.py": 1,
     # Both are the library root, which this module says outright is the one
     # thing it leaves ambient: once to spell a video's path within the library,
     # once to ask whether a pin still names a file there.
