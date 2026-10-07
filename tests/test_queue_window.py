@@ -8,9 +8,11 @@ from unittest.mock import patch
 
 import pytest
 from PyQt6.QtCore import QPoint, Qt
+from shared_ui.colors import BLUE
 
 from gui import queue_window
 from gui.queue_window import UpscaleQueueWindow, running_time
+from tests.gui_support import row_ground
 from util.upscale_lineup import (
     ASKED_FOR,
     FINISHING,
@@ -107,6 +109,15 @@ class TestWhatItShows:
 
         assert window._heading.text() == "Nothing is waiting to be upscaled"
         assert window._tree.videos() == []
+
+    def test_the_picked_row_wears_the_familys_blue(self, window):
+        window.show_lineup(lineup(None, entry("larkin/0 unsorted/a.mp4"),
+                                  entry("larkin/0 unsorted/b.mp4")))
+        window.show()
+        window._tree.setCurrentItem(window._tree.topLevelItem(1))
+
+        assert row_ground(window._tree, 1) == BLUE.name()
+        assert row_ground(window._tree, 0) != BLUE.name()
 
 
 class TestTheArrow:

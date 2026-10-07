@@ -34,6 +34,7 @@ from shared_ui.colors import BLUE, TEXT_MUTED
 from shared_ui.spacing import MARGIN_STANDARD
 
 from util import upscale_lineup
+from util.selection_highlight import SELECTION_HIGHLIGHT
 
 if TYPE_CHECKING:
     from util.upscale_lineup import Head, Lineup
@@ -107,6 +108,7 @@ class _QueueTree(QTreeWidget):
         self.setRootIsDecorated(False)
         self.setUniformRowHeights(True)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setStyleSheet(SELECTION_HIGHLIGHT)
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)

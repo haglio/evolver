@@ -91,6 +91,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `review_weird_app.py` - the tool that reviews what is marked weird (see below), launched from the tray
   - `review_weird/window.py` - every video marked weird, the one picked playing, and Restore and Delete Permanently
   - `util/player_readout.py` - keeping what the two tools' players read out of a video, its tags among it, out of every log
+  - `util/selection_highlight.py` - the family's blue for a picked row, in the lists that would otherwise wear Windows 11's faint gray
   - `gui/app.py` - tray application wiring: builds the parts, then starts them
   - `gui/process_identity.py` - what this process tells Windows it is, so a pinned button says Evolver
   - `gui/presence_throttle.py` - the fast poll that parks the in-flight non-AI encode when the user returns
