@@ -9,6 +9,7 @@ import pytest
 from PyQt6.QtGui import QFontMetrics, QImage
 
 from gui.main_window import EvolverMainWindow
+from gui.run_history import RunHistory
 from gui.run_record import RunRecord
 from gui.stats_window import (
     STAGE_COLORS,
@@ -93,30 +94,27 @@ class TestStackedAreaChartSeries:
 
     @pytest.fixture
     def chart(self):
-        # Three records with known durations (newest-first like load_runs returns)
-        records = [
-            _make_record({"sort": 6.0, "withdrawn": 3.0}),
-            _make_record({"sort": 4.0, "withdrawn": 2.0}),
-            _make_record({"sort": 2.0, "withdrawn": 1.0}),
-        ]
-        return StackedAreaChart(records)
+        return StackedAreaChart(RunHistory.of([
+            _make_record({"sort": 2.0, "withdrawn": 1.0}, started_at="2026-03-30T00:00:00"),
+            _make_record({"sort": 4.0, "withdrawn": 2.0}, started_at="2026-03-30T00:10:00"),
+            _make_record({"sort": 6.0, "withdrawn": 3.0}, started_at="2026-03-30T00:20:00"),
+        ]))
 
     def test_a_stage_is_plotted_at_the_times_it_took_oldest_run_first(self, chart):
         series = chart._compute_series()
-        # Records are reversed to chronological, so withdrawn values = [1, 2, 3]
         withdrawn_series = series[ALL_STAGES.index("withdrawn")]
-        assert withdrawn_series == [1.0, 2.0, 3.0]
+        assert withdrawn_series.tolist() == [1.0, 2.0, 3.0]
 
     def test_every_stage_charts_its_own_durations(self, chart):
         series = chart._compute_series()
         sort_series = series[ALL_STAGES.index("sort")]
-        assert sort_series == [2.0, 4.0, 6.0]
+        assert sort_series.tolist() == [2.0, 4.0, 6.0]
 
     def test_a_stage_no_run_mentions_is_flat_at_zero(self, chart):
         series = chart._compute_series()
         # "metadata" is a stage the records here do not mention
         metadata_series = series[ALL_STAGES.index("metadata")]
-        assert metadata_series == [0.0, 0.0, 0.0]
+        assert metadata_series.tolist() == [0.0, 0.0, 0.0]
 
     def test_in_averages_mode_a_stage_is_plotted_as_its_running_mean(self, chart):
         chart.set_mode("averages")
@@ -135,18 +133,17 @@ class TestStackedAreaChartSeries:
 
 class TestStackedAreaChartEdgeCases:
     def test_empty_records(self):
-        chart = StackedAreaChart([])
+        chart = StackedAreaChart(RunHistory.of([]))
         series = chart._compute_series()
         for s in series:
-            assert s == []
+            assert s.tolist() == []
 
 
-def _two_runs(stage_durations_old, stage_durations_new):
-    """Two records a day apart, newest first, the order load_runs returns."""
-    return [
-        _make_record(stage_durations_new, started_at="2026-03-31T00:00:00"),
+def _two_runs(stage_durations_old, stage_durations_new) -> RunHistory:
+    return RunHistory.of([
         _make_record(stage_durations_old, started_at="2026-03-30T00:00:00"),
-    ]
+        _make_record(stage_durations_new, started_at="2026-03-31T00:00:00"),
+    ])
 
 
 def _limit_line_rows(image: QImage) -> list[int]:
@@ -192,7 +189,7 @@ class TestStackedAreaChartPainting:
         assert _rgb(image, 380, 120) == _WHITE  # above the stack: bare ground
 
     def test_an_empty_chart_says_so_instead_of_going_blank(self):
-        image = _render(StackedAreaChart([]))
+        image = _render(StackedAreaChart(RunHistory.of([])))
         assert _ink_count(image, range(71, 690, 2), range(21, 350, 2)) > 20
 
     def test_fit_mode_rescales_the_bands_to_fill_the_chart(self):
@@ -375,12 +372,6 @@ class TestXAxisLabels:
         with override_config(DISPLAY_TIMEZONE=ZoneInfo("Asia/Tokyo")):
             assert _x_axis_labels(moment, moment, 2) == ["07/15\n12:20"] * 2
 
-
-class TestRunsAlongTheTimeAxis:
-    def test_a_run_sits_at_the_moment_it_started_which_its_record_gives_in_utc(self):
-        chart = StackedAreaChart([_make_record({"sort": 1.0}, started_at="2026-07-15T03:20:00")])
-
-        assert chart._parse_timestamps() == [datetime(2026, 7, 15, 3, 20, tzinfo=UTC).timestamp()]
 
 
 class TestPickYTicks:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import (
@@ -17,7 +18,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from gui.run_record import RunRecord, in_display_zone, utc_time
+from gui.run_history import RunHistory
+from gui.run_record import RunRecord, in_display_zone
 from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 
 # The registry's colors, as the painter wants them. This is the edge where Qt
@@ -109,22 +111,8 @@ def _x_axis_labels(t_min: float, t_max: float, count: int) -> list[str]:
     ]
 
 
-def _duration_of(record: RunRecord, stage_key: str) -> float:
-    """How long *stage_key* took in *record* -- zero when it did not run."""
-    for stage in record.stages:
-        if stage.get("name") == stage_key:
-            return stage.get("duration_seconds", 0.0)
-    return 0.0
-
-
-def _running_means(values: list[float]) -> list[float]:
-    """The mean of everything up to and including each value."""
-    means: list[float] = []
-    total = 0.0
-    for index, value in enumerate(values):
-        total += value
-        means.append(total / (index + 1))
-    return means
+def _running_means(durations: np.ndarray) -> np.ndarray:
+    return np.cumsum(durations, axis=1) / np.arange(1, durations.shape[1] + 1)
 
 
 @dataclass(frozen=True)
@@ -135,17 +123,17 @@ class _Plot:
     top: int
     width: int
     height: int
-    timestamps: list[float]
-    series: list[list[float]]
+    timestamps: np.ndarray
+    series: np.ndarray
     y_max: float
 
     @property
     def t_min(self) -> float:
-        return min(self.timestamps, default=0.0)
+        return float(self.timestamps.min()) if len(self.timestamps) else 0.0
 
     @property
     def t_max(self) -> float:
-        return max(self.timestamps, default=0.0)
+        return float(self.timestamps.max()) if len(self.timestamps) else 0.0
 
     def x_of(self, run_index: int) -> float:
         """Where the run at *run_index* sits, by when it ran."""
@@ -159,9 +147,9 @@ class _Plot:
 class StackedAreaChart(QWidget):
     """Custom-painted stacked area chart of stage durations across runs."""
 
-    def __init__(self, records: list[RunRecord], parent=None):
+    def __init__(self, history: RunHistory, parent=None):
         super().__init__(parent)
-        self._records = list(reversed(records))  # chronological order
+        self._history = history
         self._mode = "normal"
         self._fit = False
         self.setMinimumSize(600, 400)
@@ -174,30 +162,9 @@ class StackedAreaChart(QWidget):
         self._fit = fit
         self.update()
 
-    def _compute_series(self) -> list[list[float]]:
-        """One list of values per stage, one value per run, oldest first."""
-        return [self._values_for(stage_key) for stage_key in ALL_STAGES]
-
-    def _values_for(self, stage_key: str) -> list[float]:
-        """What one stage's band is drawn from: its seconds, or its trend.
-
-        Averages mode is a running mean rather than the whole history's, so a
-        stage that has been getting slower shows as a band that climbs -- the
-        one number cannot.
-        """
-        durations = [_duration_of(record, stage_key) for record in self._records]
+    def _compute_series(self) -> np.ndarray:
+        durations = self._history.durations
         return _running_means(durations) if self._mode == "averages" else durations
-
-    def _parse_timestamps(self) -> list[float]:
-        """Parse started_at into epoch seconds for each record."""
-        timestamps: list[float] = []
-        for rec in self._records:
-            try:
-                dt = utc_time(rec.started_at)
-            except (ValueError, TypeError):
-                dt = datetime(2000, 1, 1)
-            timestamps.append(dt.timestamp())
-        return timestamps
 
     def paintEvent(self, event):
         """The chart, in the order the layers sit: ground, bands, then axes.
@@ -217,7 +184,7 @@ class StackedAreaChart(QWidget):
         if plot is None:
             painter.end()
             return
-        if not self._records:
+        if not self._history:
             painter.setPen(QColor(0x80, 0x80, 0x80))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No run data")
             painter.end()
@@ -241,19 +208,18 @@ class StackedAreaChart(QWidget):
         if chart_w <= 0 or chart_h <= 0:
             return None
 
-        timestamps = self._parse_timestamps()
         series = self._compute_series()
         return _Plot(
             left=_MARGIN_LEFT,
             top=_MARGIN_TOP,
             width=chart_w,
             height=chart_h,
-            timestamps=timestamps,
+            timestamps=self._history.started,
             series=series,
             y_max=self._y_max(series),
         )
 
-    def _y_max(self, series: list[list[float]]) -> float:
+    def _y_max(self, series: np.ndarray) -> float:
         """The top of the scale: the watchdog's ceiling, or the tallest run.
 
         The fixed scale is what makes two runs comparable at a glance -- a band
@@ -262,8 +228,7 @@ class StackedAreaChart(QWidget):
         """
         if not self._fit:
             return _Y_MAX
-        tallest = max((sum(stage[i] for stage in series)
-                       for i in range(len(self._records))), default=0.0)
+        tallest = float(series.sum(axis=0).max(initial=0.0))
         return max(tallest * 1.15, 1.0)  # 15% headroom
 
     def _paint_bands(self, painter: QPainter, plot: _Plot):
@@ -424,7 +389,7 @@ class StatsWindow(QDialog):
         layout.addLayout(btn_row)
 
         if records:
-            self._chart = StackedAreaChart(records)
+            self._chart = StackedAreaChart(RunHistory.of(records))
             layout.addWidget(self._chart, stretch=1)
         else:
             self._chart = None
