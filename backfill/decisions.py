@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import config
-from util import sidecar
+from util import sidecar, weird_piles
 from util.media_files import retry_while_in_use
 from util.sidecar import WRONG_ACTION_FIELD, sidecar_path
 
@@ -57,11 +57,7 @@ def discard_as_weird(clip: Path) -> Path:
     Returns where the clip landed.
     """
     config.WEIRD_DIR.mkdir(parents=True, exist_ok=True)
-    destination = config.WEIRD_DIR / clip.name
-    duplicate_index = 1
-    while destination.exists():
-        destination = config.WEIRD_DIR / f"{clip.stem}__dup{duplicate_index}{clip.suffix}"
-        duplicate_index += 1
+    destination = weird_piles.free_spot_in(config.WEIRD_DIR, clip.name)
     retry_while_in_use(lambda: clip.replace(destination))
     return destination
 

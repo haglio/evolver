@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import evolver
 from tasks import nonai_group
-from tests.temp_helpers import override_config, workspace_temp_dir, write_sidecar
+from tests.temp_helpers import LaneLibrary, override_config, workspace_temp_dir, write_sidecar
 from util import sidecar
 
 
@@ -173,6 +173,20 @@ class TestNonAiGroup(unittest.TestCase):
                 result = nonai_group.run()
                 self.assertEqual(result.pruned, 1)
                 self.assertFalse(sidecar.sidecar_path(clip).exists())
+
+    def test_keeps_the_record_of_a_clip_marked_weird_until_it_is_reviewed(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                clip = _touch(lib.non_ai / "example-bucket" / "0 unsorted" / "Scene-2.mp4")
+                nonai_group.run()
+                lib.weird.mkdir(parents=True)
+                clip.replace(lib.weird / f"{clip.stem}__dup1{clip.suffix}")
+
+                result = nonai_group.run()
+
+                self.assertEqual(result.pruned, 0)
+                self.assertTrue(sidecar.sidecar_path(clip).exists())
 
 
 ONE_PICTURE = [f"{0x5A5A5A5A5A5A5A5A + moment:016x}" for moment in range(16)]
