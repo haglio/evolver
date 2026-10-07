@@ -27,8 +27,10 @@ import sys
 from datetime import datetime, timedelta
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
+from shared_ui.preview import taskbar_identity, window_title
 
 import config
+from util.preview import shown_as
 
 #: How long a preview keeps the work if nobody quits it.
 HAND_BACK_AFTER_MINUTES = 60
@@ -38,20 +40,9 @@ def is_one() -> bool:
     return config.BRANCH_SESSION
 
 
-def branch() -> str:
-    """The branch this worktree is on, for the window that has to say so."""
-    try:
-        done = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                              cwd=config.PROJECT_DIR, capture_output=True, text=True,
-                              check=False, **hidden_subprocess_kwargs())
-    except OSError:
-        return config.PROJECT_DIR.name
-    return done.stdout.strip() or config.PROJECT_DIR.name
-
-
 def app_name() -> str:
     """What this instance calls itself, on a window title and a tray hover."""
-    return f"Evolver — preview of {branch()}" if is_one() else "Evolver"
+    return window_title("Evolver", shown_as())
 
 
 def until(now: datetime) -> str:
@@ -62,7 +53,7 @@ def until(now: datetime) -> str:
 
 def model_id(live: str) -> str:
     """The Windows identity, so a preview's button never merges with the live one's."""
-    return f"{live}.Preview.{config.PROJECT_DIR.name}" if is_one() else live
+    return taskbar_identity(live, shown_as())
 
 
 def relaunch_command() -> str:

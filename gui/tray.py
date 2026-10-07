@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import qtawesome as qta
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 from shared_ui.chrome import menu_rules
 from shared_ui.colors import TEXT_SECONDARY
+from shared_ui.preview import Preview
+from shared_ui.preview_icon import app_icon
 
 import config
 from gui.icons import pause_icon, quit_icon, restart_icon, run_now_icon
@@ -15,19 +17,13 @@ from gui.schedule_state import ScheduleStatus
 _ICON_COLOR = TEXT_SECONDARY.name()
 
 
-def _make_icon() -> QIcon:
-    """Load the E icon from the project .ico file."""
-    icon_path = config.PROJECT_DIR / "icon.ico"
-    if icon_path.exists():
-        return QIcon(str(icon_path))
-    return QIcon()
 
 
 class EvolverTray(QSystemTrayIcon):
     """System tray icon with Open / Run Now / Pause / Settings / Quit menu."""
 
-    def __init__(self, name: str = "Evolver", parent=None):
-        super().__init__(_make_icon(), parent)
+    def __init__(self, name: str = "Evolver", parent=None, *, shown_as: Preview | None = None):
+        super().__init__(app_icon(config.PROJECT_DIR / "icon.ico", shown_as), parent)
         self._name = name
 
         self._menu = QMenu()

@@ -126,7 +126,7 @@ class EvolverApp:
         self._hand_back.setInterval(branch_session.HAND_BACK_AFTER_MINUTES * 60_000)
         self._hand_back.timeout.connect(self._hand_back_when_free)
 
-        self._tray = EvolverTray(self._name)
+        self._tray = EvolverTray(self._name, shown_as=branch_session.shown_as())
         self._app.setWindowIcon(self._tray.icon())
         self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
         _wire(self._tray, {

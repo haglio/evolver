@@ -72,7 +72,7 @@ CONFIG_REFERENCE_LEDGER = {
     # title, the taskbar identity and the launcher a preview's button re-runs --
     # and the usual Evolver it hands the work back to: that checkout's
     # launcher, started without the flag that would make it one more preview.
-    "gui/branch_session.py": 10,
+    "gui/branch_session.py": 6,
     "gui/main_window.py": 2,
     # The broker's launcher, so a check that finds the broker gone has something
     # to start. Where the sibling checkout is is config's business, not this
@@ -160,6 +160,7 @@ CONFIG_REFERENCE_LEDGER = {
     # Origenerator's gallery file, read nowhere else now that both stages pulling
     # from it come through here.
     "util/origenerator_gallery.py": 1,
+    "util/preview.py": 2,
     # Three more, the third shape: the tree of marks Fun Time reads to know a
     # funscript no person wrote, read where a mark is kept beside its script.
     "util/script_library.py": 6,
