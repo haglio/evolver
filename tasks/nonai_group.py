@@ -176,8 +176,8 @@ def _prune_orphans(expected: set[Path]) -> int:
     """Delete non-AI sidecars no current clip maps to (moved or removed files)."""
     pruned = 0
     for bucket in buckets():
-        bucket_metadata = config.METADATA_DIR / bucket.relative_to(config.VIDEO_LIBRARY_DIR)
-        if not bucket_metadata.is_dir():
+        bucket_metadata = sidecar.sidecar_folder(bucket)
+        if bucket_metadata is None or not bucket_metadata.is_dir():
             continue
         for json_path in bucket_metadata.rglob("*.json"):
             if json_path not in expected:

@@ -57,15 +57,23 @@ def sidecar_path(video: Path) -> Path:
 
     Raises ``ValueError`` for a video under neither.
     """
-    path = mirrored_path(
-        video,
-        roots=(config.VIDEO_LIBRARY_DIR, config.VIDEO_SEARCH_ROOT),
-        mirror_root=config.METADATA_DIR,
-        suffix=".json",
-    )
+    path = _mirrored(video, ".json")
     if path is None:
         raise ValueError(f"{video} is not in the video library")
     return path
+
+
+def sidecar_folder(folder: Path) -> Path | None:
+    return _mirrored(folder, folder.suffix)
+
+
+def _mirrored(path: Path, suffix: str) -> Path | None:
+    return mirrored_path(
+        path,
+        roots=(config.VIDEO_LIBRARY_DIR, config.VIDEO_SEARCH_ROOT),
+        mirror_root=config.METADATA_DIR,
+        suffix=suffix,
+    )
 
 
 def read(path: Path) -> dict:
