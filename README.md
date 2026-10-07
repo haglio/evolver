@@ -151,7 +151,7 @@ The OSR2 broker next door already had one: a scheduled task relaunching its tray
 
 ## Metadata backfill tool
 
-Most sources publish nothing about what a clip actually shows. Provider exposes an action on its site and Origenerator has its gallery database, so the metadata scrape fills those in on its own; a clip from Provider2, Provider3, Candy, ComfyUI or Provider4 arrives with no `video.action` at all, and Fun Time cannot group or filter it.
+Most sources publish nothing about what a clip actually shows. Provider exposes an action on its site and Origenerator has its gallery database, so the metadata scrape fills those in on its own; a clip from Provider2, Provider3, Provider5, ComfyUI or Provider4 arrives with no `video.action` at all, and Fun Time cannot group or filter it.
 
 **Backfill Metadata...** in the tray menu opens a separate window that plays every such clip — looping and muted, in the stable order it found them so a reopened session resumes where the last left off — until you say what it is. The clip changes the instant you speak, and the sidecar is written after it.
 
