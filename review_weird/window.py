@@ -27,10 +27,10 @@ from util import weird_piles
 from util.player_readout import silence_the_ffmpeg_format_dump
 
 _ICON_COLOR = TEXT_SECONDARY.name()
-_HINT = ("Put Back returns a video to the folder it was marked weird in. Delete for Good deletes it, "
+_HINT = ("Restore puts a video back in the folder it was marked weird in. Delete Permanently deletes it, "
          "along with the copy it was upscaled from, its metadata and its funscript. "
          "Ctrl or Shift picks several.")
-_NOWHERE = "Nothing says which folder it was marked weird in, so it can't be put back"
+_NOWHERE = "Nothing says which folder it was marked weird in, so it can't be restored"
 
 
 class ReviewWeirdWindow(QWidget):
@@ -48,7 +48,7 @@ class ReviewWeirdWindow(QWidget):
         hint.setWordWrap(True)
 
         self.videos = QTreeWidget()
-        self.videos.setHeaderLabels(["Video", "Goes back to"])
+        self.videos.setHeaderLabels(["Video", "Restores to"])
         self.videos.setRootIsDecorated(False)
         self.videos.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.videos.currentItemChanged.connect(self._play)
@@ -63,17 +63,17 @@ class ReviewWeirdWindow(QWidget):
         self.player.setVideoOutput(screen)
         self.player.setLoops(QMediaPlayer.Loops.Infinite)
 
-        self.put_back_button = QPushButton(glyph_icon("undo_arrow", color=_ICON_COLOR), "Put Back")
-        self.put_back_button.clicked.connect(self._put_back)
-        self.delete_button = QPushButton(glyph_icon("trash", color=_ICON_COLOR), "Delete for Good")
-        self.delete_button.clicked.connect(self._delete_for_good)
-        QShortcut(QKeySequence(QKeySequence.StandardKey.Delete), self, self._delete_for_good)
+        self.restore_button = QPushButton(glyph_icon("undo_arrow", color=_ICON_COLOR), "Restore")
+        self.restore_button.clicked.connect(self._restore)
+        self.delete_button = QPushButton(glyph_icon("trash", color=_ICON_COLOR), "Delete Permanently")
+        self.delete_button.clicked.connect(self._delete_permanently)
+        QShortcut(QKeySequence(QKeySequence.StandardKey.Delete), self, self._delete_permanently)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD, MARGIN_STANDARD, MARGIN_STANDARD)
         layout.addWidget(self.heading)
         layout.addWidget(hint)
-        layout.addWidget(_side_by_side(self.videos, _above(screen, self.put_back_button,
+        layout.addWidget(_side_by_side(self.videos, _above(screen, self.restore_button,
                                                            self.delete_button)), stretch=1)
 
         self._show(weird_piles.marked_weird(), row=0)
@@ -82,10 +82,10 @@ class ReviewWeirdWindow(QWidget):
         self.heading.setText(_counted(len(marked)))
         self.videos.clear()
         for each in marked:
-            item = QTreeWidgetItem([each.video.name, _folder(each.goes_back_to)])
+            item = QTreeWidgetItem([each.video.name, _folder(each.restores_to)])
             item.setData(0, Qt.ItemDataRole.UserRole, each)
             item.setToolTip(0, str(each.video))
-            item.setToolTip(1, _NOWHERE if each.goes_back_to is None else str(each.goes_back_to))
+            item.setToolTip(1, _NOWHERE if each.restores_to is None else str(each.restores_to))
             self.videos.addTopLevelItem(item)
         self.videos.setCurrentItem(self.videos.topLevelItem(min(row, len(marked) - 1)))
         self._offer_what_can_be_done()
@@ -96,20 +96,20 @@ class ReviewWeirdWindow(QWidget):
         self.player.setSource(QUrl.fromLocalFile(str(_marked(item).video)))
         self.player.play()
 
-    def _put_back(self) -> None:
-        self._settle(weird_piles.put_back)
+    def _restore(self) -> None:
+        self._settle(weird_piles.restore)
 
-    def _delete_for_good(self) -> None:
+    def _delete_permanently(self) -> None:
         chosen = self._chosen()
         if not chosen:
             return
         which = chosen[0].video.name if len(chosen) == 1 else f"these {len(chosen)} videos"
         asked = QMessageBox.question(
-            self, "Delete for Good", f"Delete {which} for good? This can't be undone.",
+            self, "Delete Permanently", f"Delete {which} permanently? This can't be undone.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No)
         if asked == QMessageBox.StandardButton.Yes:
-            self._settle(weird_piles.delete_for_good)
+            self._settle(weird_piles.delete_permanently)
 
     def _settle(self, verdict) -> None:
         row = self.videos.indexOfTopLevelItem(self.videos.currentItem())
@@ -127,8 +127,8 @@ class ReviewWeirdWindow(QWidget):
 
     def _offer_what_can_be_done(self) -> None:
         chosen = self._chosen()
-        self.put_back_button.setEnabled(
-            bool(chosen) and all(marked.goes_back_to is not None for marked in chosen))
+        self.restore_button.setEnabled(
+            bool(chosen) and all(marked.restores_to is not None for marked in chosen))
         self.delete_button.setEnabled(bool(chosen))
 
     def _let_go(self) -> None:
@@ -166,7 +166,7 @@ def _counted(videos: int) -> str:
     return f"{videos} video{'' if videos == 1 else 's'} marked weird"
 
 
-def _folder(goes_back_to: Path | None) -> str:
-    if goes_back_to is None:
+def _folder(restores_to: Path | None) -> str:
+    if restores_to is None:
         return "can't tell"
-    return str(goes_back_to.parent.relative_to(config.VIDEO_SEARCH_ROOT))
+    return str(restores_to.parent.relative_to(config.VIDEO_SEARCH_ROOT))
