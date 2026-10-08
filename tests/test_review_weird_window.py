@@ -8,7 +8,7 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 from shared_ui.colors import BLUE
 
 from review_weird.window import ReviewWeirdWindow
-from tests.gui_support import row_ground
+from tests.gui_support import QAPP, row_ground
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
 
 
@@ -137,6 +137,17 @@ class TestWatchingOne(_ReviewingALibrary):
         silenced.assert_called_once_with()
 
 
+def _row_colors(view, row: int) -> set[str]:
+    """Every color *row* is painted in, across all its cells."""
+    QAPP.processEvents()
+    first = view.visualRect(view.model().index(row, 0))
+    last = view.visualRect(view.model().index(row, view.model().columnCount() - 1))
+    painted = view.viewport().grab().toImage()
+    return {painted.pixelColor(x, y).name()
+            for y in range(first.top(), first.top() + first.height())
+            for x in range(first.left(), last.left() + last.width())}
+
+
 class TestPickedRows(_ReviewingALibrary):
     def test_every_picked_row_wears_the_familys_blue(self):
         for number in (24, 25, 26):
@@ -151,6 +162,21 @@ class TestPickedRows(_ReviewingALibrary):
         self.assertEqual(grounds[0], BLUE.name())
         self.assertEqual(grounds[2], BLUE.name())
         self.assertNotEqual(grounds[1], BLUE.name())
+
+    def test_the_row_the_keyboard_is_on_wears_no_frame_round_its_blue(self):
+        touch_video(self.lib.genau_weird / "loop_27_topaz.mp4")
+        window = self._window()
+        window.show()
+        window.activateWindow()
+        QAPP.processEvents()
+        window.videos.setFocus()
+        window.videos.setCurrentItem(window.videos.topLevelItem(0))
+        for column in range(window.videos.columnCount()):
+            window.videos.topLevelItem(0).setText(column, "")
+        QAPP.processEvents()
+
+        self.assertTrue(window.videos.hasFocus())
+        self.assertEqual(_row_colors(window.videos, 0), {BLUE.name()})
 
 
 class TestRestoring(_ReviewingALibrary):
