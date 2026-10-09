@@ -19,6 +19,7 @@ from backfill.vocabulary import Vocabulary, load_vocabulary
 from backfill.voice import VoiceListener
 from backfill.window import BackfillWindow
 from backfill.work import SerialWorker
+from gui import process_identity
 
 _TITLE = "Backfill Metadata"
 
@@ -39,6 +40,7 @@ def _ready_thumbnails(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[s
 def main() -> int:
     evolver.setup_logging()
     app = QApplication(sys.argv)
+    process_identity.claim(app)
 
     # One walk of the library, one parse of each sidecar: the work queue and
     # the example clips are two projections of it (util_backfill/design/005).

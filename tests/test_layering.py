@@ -35,7 +35,7 @@ _OURS = (
 # read their labels, tooltips and band colours out of. Not a stage.
 ALLOWED = {
     "backfill": {"config", "content_overlay", "util"},
-    "backfill_app": {"backfill", "evolver"},
+    "backfill_app": {"backfill", "evolver", "gui"},
     "check_correspondence": {"config", "util"},
     "check_duplicate_sizes": {"config", "util"},
     "config": {"content_overlay"},
@@ -43,7 +43,7 @@ ALLOWED = {
                 "tasks", "util"},
     "gui": {"config", "evolver", "tasks.stages", "util"},
     "review_weird": {"config", "util"},
-    "review_weird_app": {"evolver", "review_weird"},
+    "review_weird_app": {"evolver", "gui", "review_weird"},
     "tasks": {"config", "util"},
     "tray_app": {"gui", "util"},
     "util": {"config"},

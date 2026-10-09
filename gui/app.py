@@ -127,7 +127,6 @@ class EvolverApp:
         self._hand_back.timeout.connect(self._hand_back_when_free)
 
         self._tray = EvolverTray(self._name, shown_as=branch_session.shown_as())
-        self._app.setWindowIcon(self._tray.icon())
         self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
         _wire(self._tray, {
             "open": self._show_window,
@@ -181,7 +180,7 @@ class EvolverApp:
         process first appears, so claiming it after the tray is up is claiming
         it too late.
         """
-        process_identity.claim(int(self._window.winId()))
+        process_identity.claim(self._app)
         self._window.refresh_history()
         self._tray.show()
         self._keep_the_schedule()
@@ -251,6 +250,7 @@ class EvolverApp:
         )
         if outcome is Outcome.HANDED_OFF:
             return
+        process_identity.claim(self._app)
         show_error(
             "Evolver",
             "Evolver is already running but did not respond, so its window "
