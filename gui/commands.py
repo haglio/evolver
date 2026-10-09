@@ -34,3 +34,7 @@ BACKFILL = Command("Backfill Metadata...", _font_awesome("fa5s.microphone"))
 REVIEW_WEIRD = Command("Review Weird...", review_weird_icon)
 RESTART = Command("Restart", restart_icon)
 QUIT = Command("Quit", quit_icon)
+
+
+def pause_or_resume(is_paused: bool) -> str:
+    return "Resume Scheduling" if is_paused else PAUSE.label

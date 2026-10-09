@@ -21,6 +21,7 @@ from gui.commands import (
     RUN_NOW,
     SETTINGS,
     STATS,
+    pause_or_resume,
 )
 from gui.schedule_state import ScheduleStatus
 
@@ -135,8 +136,7 @@ class EvolverTray(QSystemTrayIcon):
         tooltip and the menu disagree about the same moment.
         """
         self.run_now_action.setEnabled(not status.is_running)
-        self.pause_action.setText(
-            "Resume Scheduling" if status.is_paused else "Pause Scheduling")
+        self.pause_action.setText(pause_or_resume(status.is_paused))
         self.setToolTip(" - ".join(
             part for part in (self._name, status.activity()) if part))
         self._status_action.setText(f"Status: {status.headline()}")

@@ -456,6 +456,15 @@ class TestToolbarMatchesTheTrayMenu:
                        if entry != tray.pause_action.text()]
         assert bar[bar.index("Run Now"):] == in_the_menu
 
+    @pytest.mark.parametrize("status", [ScheduleStatus(), ScheduleStatus(is_paused=True)],
+                             ids=["scheduling", "paused"])
+    def test_the_switch_at_its_left_end_is_named_as_the_menus_pause_item_is(self, window, status):
+        tray = EvolverTray()
+        tray.show_schedule(status)
+        window.show_schedule(status)
+
+        assert window.active_toggle.toolTip() == tray.pause_action.text()
+
 
 class TestTheWholeToolbarShows:
 
