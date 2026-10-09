@@ -58,7 +58,7 @@ from util import (
     system_resources,
     topaz,
 )
-from util.media_files import partial_path, remove_partial_files
+from util.media_files import partial_path, reachable, remove_partial_files
 from util.nonai_library import buckets, stage_dirs
 from util.nonai_retire import carry_metadata, retire_original
 
@@ -101,16 +101,12 @@ class NonAiUpscaleResult:
     # Whether the encode in flight, or the one just started, was asked for from
     # the queue window rather than picked by the stage.
     on_request: bool = False
+    unreachable_archive: str = ""
 
 
 @dataclass(frozen=True)
 class Supervision:
-    """What checking on the in-flight encode came to, this tick.
-
-    Either the encode is still going -- named, with how far through it is, and
-    frozen or not -- or it has ended, in one of three ways: stopped through no
-    fault of its video, promoted over the original, or failed.
-    """
+    """What checking on the in-flight encode came to, this tick."""
 
     in_flight: str = ""
     in_flight_percent: int | None = None
@@ -119,6 +115,7 @@ class Supervision:
     promoted: str = ""
     failed: str = ""
     deferred_low_disk: bool = False
+    unreachable_archive: str = ""
 
 
 @dataclass(frozen=True)
@@ -137,14 +134,11 @@ class StartAttempt:
 
 @dataclass(frozen=True)
 class Conclusion:
-    """The verdict on an encode that is no longer running.
-
-    Exactly one of the two is set: the output covered enough of the source and
-    was promoted over the original, or it did not and the clip failed.
-    """
+    """The verdict on an encode that is no longer running."""
 
     promoted: str = ""
     failed: str = ""
+    unreachable_archive: str = ""
 
 
 @dataclass(frozen=True)
@@ -240,6 +234,7 @@ def run(allow_start: bool = True, stop: bool = False,
             result.promoted = supervised.promoted
             result.failed = supervised.failed
             result.deferred_low_disk = supervised.deferred_low_disk
+            result.unreachable_archive = supervised.unreachable_archive
             result.on_request = bool(result.in_flight and job.get("on_request"))
 
         attempt = None
@@ -376,6 +371,9 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
         nonai_encode.terminate_ffmpeg(
             pid, f"it exceeded the {settings.max_runtime_hours}h runtime cap")
     conclusion = _conclude(job, files, settings)
+    if conclusion.unreachable_archive:
+        return Supervision(in_flight=relpath(source),
+                           unreachable_archive=conclusion.unreachable_archive)
     nonai_job.clear_job(files.job)
     return Supervision(promoted=conclusion.promoted, failed=conclusion.failed)
 
@@ -494,16 +492,22 @@ def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclus
     out = Path(job.get("out", ""))
     expected = job.get("expected_duration") or 0.0
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
+    finished = actual and expected and actual >= settings.complete_duration_fraction * expected
+    archive = config.NONAI_RETIRED_ROOT
+    if finished and archive is not None and not reachable(archive):
+        log.warning("The upscale of %s is finished and waits until %s can be reached to take "
+                    "the original.", source, archive)
+        return Conclusion(unreachable_archive=str(archive))
 
     nonai_job.stamp_encode_ended(files.cooldown)
-    if actual and expected and actual >= settings.complete_duration_fraction * expected:
+    if finished:
         tmp.replace(out)
         # Before the original leaves, and it takes its sidecar with it.
         carry_metadata(source, out)
         stamp = job.get("provenance") or nonai_encode.unrecorded_start()
         sidecar.update(sidecar.sidecar_path(out), lambda current: provenance.recorded(
             current, provenance.UPSCALE_NON_AI, stamp))
-        retire_original(source, archive_root=config.NONAI_RETIRED_ROOT)
+        retire_original(source, archive_root=archive)
         nonai_job.clear_attempts(files.attempts, relpath(source))
         log.info("Promoted finished non-AI upscale: %s", out)
         return Conclusion(promoted=relpath(source))

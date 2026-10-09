@@ -41,7 +41,7 @@ def _stage_mocks() -> dict:
         "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
         "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
         "genau_deliver_run": Mock(return_value=Mock(failed=0)),
-        "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False)),
+        "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, unreachable_archive="")),
         "nonai_group_run": Mock(),
         "nonai_titles_run": Mock(),
         "video_types_run": Mock(),
@@ -554,6 +554,17 @@ class TestRunPipeline:
             result = evolver.run_pipeline()
         statuses = {s.name: s.status for s in result.stages}
         assert statuses["scripts"] == "warning"
+        assert not result.has_errors
+
+    def test_a_finished_encode_waiting_for_the_archive_warns_instead_of_failing(self):
+        stack, _ = self._patch_all_stages(
+            nonai_run=Mock(return_value=Mock(failed="", deferred_low_disk=False,
+                                             unreachable_archive="Q:/archive")),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+        statuses = {s.name: s.status for s in result.stages}
+        assert statuses["upscale_non_ai"] == "warning"
         assert not result.has_errors
 
     def test_a_dead_encode_outranks_a_hold_on_the_same_stage(self):
