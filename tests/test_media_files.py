@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
 from util.media_files import (
     child_dirs,
     is_partial_path,
@@ -89,9 +89,12 @@ class TestReachable(unittest.TestCase):
         with workspace_temp_dir() as root:
             self.assertTrue(reachable(root))
 
-    def test_a_folder_that_is_not_there_cannot_be_reached(self):
+    def test_a_folder_not_made_yet_on_a_drive_that_is_there_can_be_reached(self):
         with workspace_temp_dir() as root:
-            self.assertFalse(reachable(root / "cloud" / "VR"))
+            self.assertTrue(reachable(root / "archive"))
+
+    def test_a_folder_on_a_drive_that_is_not_there_cannot_be_reached(self):
+        self.assertFalse(reachable(a_drive_that_is_not_there() / "cloud" / "VR"))
 
 
 class TestPartialPath(unittest.TestCase):

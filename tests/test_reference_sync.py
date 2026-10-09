@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import reference_sync
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
 from util import reference_stores
 
 
@@ -170,7 +170,7 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
     def test_a_reference_into_it_is_not_checked_rather_than_called_unresolved(self):
         with workspace_temp_dir() as temp:
             (temp / "videos").mkdir()
-            vr_root = temp / "cloud" / "VR"
+            vr_root = a_drive_that_is_not_there() / "VR"
             kept = str(vr_root / "finished" / "scene one.mp4").lower()
             stats = _write_json(temp / "state" / "watch_stats.json",
                                 {kept: {"completions": 3, "skips": 0, "locks": 0}})
@@ -183,7 +183,7 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
     def test_the_log_says_once_which_folder_could_not_be_reached(self):
         with workspace_temp_dir() as temp:
             (temp / "videos").mkdir()
-            vr_root = temp / "cloud" / "VR"
+            vr_root = a_drive_that_is_not_there() / "VR"
             stats = _write_json(temp / "state" / "watch_stats.json", {
                 str(vr_root / "finished" / name).lower(): {"completions": 1, "skips": 0, "locks": 0}
                 for name in ("scene one.mp4", "scene two.mp4")})
@@ -198,7 +198,7 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
     def test_a_video_of_the_same_name_in_the_library_does_not_take_the_reference(self):
         with workspace_temp_dir() as temp:
             _write_video(temp / "videos" / "2D" / "scene one.mp4")
-            vr_root = temp / "cloud" / "VR"
+            vr_root = a_drive_that_is_not_there() / "VR"
             kept = str(vr_root / "finished" / "scene one.mp4").lower()
             stats = _write_json(temp / "state" / "watch_stats.json",
                                 {kept: {"completions": 3, "skips": 0, "locks": 0}})
@@ -212,7 +212,7 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
     def test_a_reference_into_the_archive_waits_while_the_archive_cannot_be_reached(self):
         with workspace_temp_dir() as temp:
             (temp / "videos").mkdir()
-            archive_root = temp / "cloud" / "archive"
+            archive_root = a_drive_that_is_not_there() / "archive"
             stats = _write_json(temp / "state" / "watch_stats.json", {
                 str(archive_root / "studio" / "scene one.mp4").lower():
                     {"completions": 3, "skips": 0, "locks": 0}})
