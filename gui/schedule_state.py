@@ -1,6 +1,6 @@
 """What the schedule is doing, decided and worded once for every surface.
 
-The tray's tooltip, the two status lines at the top of its menu and the
+The tray's tooltip, the status line at the top of its menu and the
 window's toolbar label all report the same moment, so one answer decides it for
 every one of them: a run on screen is the fact the user is looking at, and a
 pause stops the schedule after it, so running outranks paused everywhere.
@@ -49,7 +49,9 @@ class ScheduleStatus:
         return schedule_state(self.is_running, self.is_paused, self.next_run_at)
 
     def headline(self) -> str:
-        """One word for the state, for the menu's status line."""
+        """The state, for the menu's status line, with the time of a scheduled run."""
+        if self.state == SCHEDULED:
+            return f"Scheduled for {self.next_run_at.strftime(_CLOCK)}"
         return {RUNNING: "Running", PAUSED: "Paused"}.get(self.state, "Scheduled")
 
     def next_run_text(self) -> str:
