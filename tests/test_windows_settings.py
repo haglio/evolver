@@ -14,6 +14,25 @@ from gui.process_identity import APP_MODEL_ID
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LISTED = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["haglio"]
+RUNS = {launcher.file: launcher.run for launcher in launchers(REPO_ROOT)}
+
+
+def _what_shortcuts_run_from(*places: str) -> list[str]:
+    return [RUNS[spec["launcher"]] for spec in LISTED["shortcuts"].values()
+            if set(spec["places"]) & set(places)]
+
+
+def test_the_shortcut_windows_starts_at_sign_in_leaves_a_running_evolver_alone():
+    (run,) = _what_shortcuts_run_from("startup")
+
+    assert run.endswith(" --if-not-running")
+
+
+def test_a_shortcut_clicked_to_open_evolver_opens_the_running_ones_window():
+    clicked = _what_shortcuts_run_from("taskbar", "start-menu", "checkout")
+
+    assert clicked
+    assert not [run for run in clicked if "--if-not-running" in run]
 
 
 def test_what_the_list_starts_is_one_of_this_checkouts_launchers():

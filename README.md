@@ -141,6 +141,8 @@ Run history is stored as JSON files in `runs/` (gitignored). Settings are persis
 
 Only one Evolver ever runs — two schedulers would mean two pipelines and stacked Topaz encodes. But its window lives in the tray, so *launching* Evolver while it is already running is how you ask to see it: the shortcut, the Start menu entry, and the taskbar pin (whose relaunch command Windows re-runs verbatim) all start a second process whose real job is to open the first one's window. That process says over a named pipe what kind of launch it is and exits once the running Evolver answers. The answer is to open the window — except for a branch preview's launch, which the running Evolver makes way for, and a launch of your usual Evolver while a preview is running, which the preview makes way for. A preview ends an Evolver that does not answer at all, whether it has stopped responding or simply predates the answers.
 
+What starts Evolver without anyone clicking it — Windows at sign-in, the broker finding it gone, a preview handing the work back — runs `launch_evolver_if_not_running.vbs`, which says nothing to an Evolver already running and leaves its window where it is. At sign-in two of them can land at once: the broker's scheduled task starts its tray, which starts Evolver, while Windows works through the Startup folder.
+
 A launch never ends without telling you why. If the running instance holds the mutex but does not answer the pipe, or if startup fails before there is any window to report into — a missing dependency, say, which under `pythonw.exe` has neither a console nor stderr — you get a Windows dialog naming the cause and pointing at `tray_crash.log`, instead of a launcher that appeared to do nothing.
 
 ### Staying up: Evolver and the broker watch each other
@@ -149,7 +151,7 @@ Evolver used to have no supervisor at all. It started from a Startup-folder shor
 
 The OSR2 broker next door already had one: a scheduled task relaunching its tray every couple of minutes, and a tray keeping the broker process alive. So the two are now paired. Every fifteen minutes each looks for the other's single-instance mutex, and starts it if it is gone — which hands Evolver that scheduled task by way of the broker's tray, and covers the broker for the case where the task itself has been switched off. Neither ever kills anything, and each relies on the other's mutex to make a launch over a live peer a no-op. A checkout with no broker beside it watches nothing.
 
-**Quit means quit.** Quitting Evolver from its tray or its toolbar leaves a stand-down marker under `LOCALAPPDATA` and the broker leaves it down; starting Evolver again clears it. Every other way Evolver goes down leaves no marker and it comes back inside the quarter hour. `launch_evolver.vbs` is what the broker runs — the launcher exists for callers that have a path and no way to work out which interpreter to use.
+**Quit means quit.** Quitting Evolver from its tray or its toolbar leaves a stand-down marker under `LOCALAPPDATA` and the broker leaves it down; starting Evolver again clears it. Every other way Evolver goes down leaves no marker and it comes back inside the quarter hour. `launch_evolver_if_not_running.vbs` is what the broker runs — the launcher exists for callers that have a path and no way to work out which interpreter to use.
 
 ## Metadata backfill tool
 

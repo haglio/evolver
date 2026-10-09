@@ -74,6 +74,6 @@ def start_the_usual_evolver() -> None:
     """
     environment = {key: value for key, value in os.environ.items()
                    if key not in _WHAT_ONLY_A_PREVIEW_RUNS_WITH}
-    subprocess.Popen(["wscript.exe", str(config.LIVE_DIR / "launch_evolver.vbs")],
+    subprocess.Popen(["wscript.exe", str(config.LIVE_DIR / "launch_evolver_if_not_running.vbs")],
                      cwd=str(config.LIVE_DIR), env=environment,
                      **hidden_subprocess_kwargs())

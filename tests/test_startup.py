@@ -17,6 +17,7 @@ from gui import startup
 from tests.temp_helpers import override_config, workspace_temp_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SHORTCUT = "Evolver in the tray.lnk"
 
 on_windows = pytest.mark.skipif(sys.platform != "win32", reason="a shortcut: only Windows can say")
 
@@ -38,17 +39,18 @@ class TestRegisterStartup:
         with override_config(LIVE_DIR=REPO_ROOT):
             startup.register_startup()
 
-        (spec,) = windows_settings.declared(REPO_ROOT).shortcuts
-        written = read_shortcut(str(startup_dir / "Evolver.lnk"))
+        (spec,) = [spec for spec in windows_settings.declared(REPO_ROOT).shortcuts
+                   if "startup" in spec.places]
+        written = read_shortcut(str(startup_dir / SHORTCUT))
         assert windows_settings.what_differs(
             written, windows_settings.shortcut_for(REPO_ROOT, spec)) == []
 
-    def test_it_starts_the_tray_through_its_launcher(self, startup_dir):
+    def test_it_starts_evolver_only_if_it_is_not_running(self, startup_dir):
         with override_config(LIVE_DIR=REPO_ROOT):
             startup.register_startup()
 
-        written = read_shortcut(str(startup_dir / "Evolver.lnk"))
-        assert written.arguments == f'"{REPO_ROOT / "launch_evolver.vbs"}"'
+        written = read_shortcut(str(startup_dir / SHORTCUT))
+        assert written.arguments == f'"{REPO_ROOT / "launch_evolver_if_not_running.vbs"}"'
         assert Path(written.working_directory) == REPO_ROOT
 
     def test_a_branch_preview_still_points_it_at_the_evolver_that_runs_every_day(self, startup_dir):
@@ -58,21 +60,21 @@ class TestRegisterStartup:
             shutil.copy(REPO_ROOT / "pyproject.toml", live / "pyproject.toml")
             startup.register_startup()
 
-            written = read_shortcut(str(startup_dir / "Evolver.lnk"))
-            assert written.arguments == f'"{live / "launch_evolver.vbs"}"'
+            written = read_shortcut(str(startup_dir / SHORTCUT))
+            assert written.arguments == f'"{live / "launch_evolver_if_not_running.vbs"}"'
             assert Path(written.working_directory) == live
 
 
 class TestUnregisterStartup:
 
     def test_removes_the_shortcut(self, startup_dir):
-        (startup_dir / "Evolver.lnk").write_bytes(b"shortcut")
+        (startup_dir / SHORTCUT).write_bytes(b"shortcut")
         assert startup.is_registered()
 
         startup.unregister_startup()
 
         assert not startup.is_registered()
-        assert not (startup_dir / "Evolver.lnk").exists()
+        assert not (startup_dir / SHORTCUT).exists()
 
     def test_is_a_noop_when_no_shortcut_exists(self, startup_dir):
         assert not startup.is_registered()

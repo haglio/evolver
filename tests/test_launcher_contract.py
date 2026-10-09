@@ -1,9 +1,7 @@
-"""What Evolver's two launchers run, asked of each under the real script host.
+"""What Evolver's launchers run, asked of each under the real script host.
 
-launch_evolver.vbs is what the broker's tray runs when it finds Evolver gone, and
-launch_preview_branch.vbs opens a worktree's run-detail window, so both names are
-pinned here.  Both are rendered from their specs in pyproject.toml by
-app_support.launcher, whose own tests hold what every launcher does.
+The broker's tray spells launch_evolver_if_not_running.vbs in its own config, so
+the names are pinned here.
 """
 from __future__ import annotations
 
@@ -15,6 +13,7 @@ from app_support.launcher import assert_launchers_match_their_specs, dry_run
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRAY_LAUNCHER = REPO_ROOT / "launch_evolver.vbs"
+IF_NOT_RUNNING_LAUNCHER = REPO_ROOT / "launch_evolver_if_not_running.vbs"
 PREVIEW_LAUNCHER = REPO_ROOT / "launch_preview_branch.vbs"
 
 on_windows = pytest.mark.skipif(sys.platform != "win32", reason="the Windows script host")
@@ -22,6 +21,7 @@ on_windows = pytest.mark.skipif(sys.platform != "win32", reason="the Windows scr
 
 def test_the_launchers_are_where_their_callers_point():
     assert TRAY_LAUNCHER.is_file()
+    assert IF_NOT_RUNNING_LAUNCHER.is_file()
     assert PREVIEW_LAUNCHER.is_file()
 
 
@@ -38,6 +38,16 @@ def test_the_tray_runs_windowed_from_this_checkout_on_its_venv():
     assert Path(report.value("directory")) == REPO_ROOT
     assert report.value("arguments") == f'"{REPO_ROOT / "tray_app.py"}"'
     assert report.values("log") == []
+
+
+@on_windows
+def test_the_start_for_when_evolver_is_not_running_is_the_same_tray_saying_so():
+    tray, if_not_running = dry_run(TRAY_LAUNCHER), dry_run(IF_NOT_RUNNING_LAUNCHER)
+
+    assert if_not_running.value("interpreter") == tray.value("interpreter")
+    assert if_not_running.value("directory") == tray.value("directory")
+    assert if_not_running.value("arguments") == f'{tray.value("arguments")} --if-not-running'
+    assert if_not_running.values("log") == []
 
 
 @on_windows
