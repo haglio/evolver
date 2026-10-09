@@ -54,7 +54,7 @@ def library_videos(root: Path):
 
 def reachable(folder: Path) -> bool:
     try:
-        with os.scandir(folder):
+        with os.scandir(folder.anchor):
             return True
     except OSError:
         return False

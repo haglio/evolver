@@ -7,7 +7,13 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from tasks import watch_weights
-from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
+from tests.temp_helpers import (
+    LaneLibrary,
+    a_drive_that_is_not_there,
+    touch_video,
+    workspace_temp_dir,
+    write_sidecar,
+)
 from util import favs_csv, sidecar
 
 
@@ -17,7 +23,7 @@ class _Setting(LaneLibrary):
     def __init__(self, root: Path):
         super().__init__(root)
         self.journal_dir = root / "videos" / "warm_gun"
-        self.phones_own_folder = root / "cloud" / "WarmGun"
+        self.phones_own_folder = a_drive_that_is_not_there() / "WarmGun"
         self.fun_time = root / "fun_time"
         self.stats = self.fun_time / "state" / "watch_stats.json"
         self.favs = self.fun_time / "favs.csv"
@@ -175,6 +181,17 @@ class TestThePhonesFolderCannotBeReached(unittest.TestCase):
             self.assertFalse(s.favs.exists())
             self.assertFalse(s.cursor.exists())
         self.assertEqual(result.favorites_added, 0)
+
+    def test_a_folder_gone_from_a_drive_that_is_there_holds_nothing_back(self):
+        with _setting() as s:
+            _, upscale = s.sorted_clip("clip_a")
+            s.journal((10, "lock", "1_sorted/provider2/portrait/clip_a.mp4"))
+
+            with s.config(WARM_GUN_OUTBOX=s.journal_dir.parent / "retired_outbox"):
+                result = watch_weights.run()
+
+            self.assertEqual(_watch(upscale)["locks"], 1)
+        self.assertEqual(result.stamped, 1)
 
     def test_the_log_says_which_folder_could_not_be_reached(self):
         with _setting() as s:

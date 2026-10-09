@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import string
 import tempfile
 import time
 import unittest
@@ -69,6 +70,11 @@ class _LibraryTree:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload), encoding="utf-8")
         return path
+
+
+def a_drive_that_is_not_there() -> Path:
+    return next(drive for drive in (Path(f"{letter}:/") for letter in reversed(string.ascii_uppercase))
+                if not drive.exists())
 
 
 def write_sidecar(path: Path, payload: dict) -> dict:

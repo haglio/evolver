@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import scripts_sync
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
 
 
 def library_overrides(video_root, script_root, **extra):
@@ -181,7 +181,7 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
             script_path = script_root / "VR" / "finished" / "scene one.funscript"
             _write(script_path)
 
-            with library_overrides(video_root, script_root, VR_VIDEO_DIR=root / "cloud" / "VR"):
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=a_drive_that_is_not_there() / "VR"):
                 with patch("tasks.scripts_sync.show_error") as show_error:
                     scripts_sync.run(show_popup=True)
 
@@ -191,7 +191,8 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
 
     def test_says_how_many_went_unchecked_and_which_folder_could_not_be_reached(self):
         with workspace_temp_dir() as root:
-            video_root, script_root, vr_root = root / "videos", root / "scripts", root / "cloud" / "VR"
+            video_root, script_root = root / "videos", root / "scripts"
+            vr_root = a_drive_that_is_not_there() / "VR"
             _write(script_root / "VR" / "finished" / "scene one.funscript")
 
             with library_overrides(video_root, script_root, VR_VIDEO_DIR=vr_root):
@@ -202,7 +203,8 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
 
     def test_warns_in_the_log_which_folder_could_not_be_reached(self):
         with workspace_temp_dir() as root:
-            video_root, script_root, vr_root = root / "videos", root / "scripts", root / "cloud" / "VR"
+            video_root, script_root = root / "videos", root / "scripts"
+            vr_root = a_drive_that_is_not_there() / "VR"
             _write(script_root / "VR" / "finished" / "scene one.funscript")
 
             with library_overrides(video_root, script_root, VR_VIDEO_DIR=vr_root):
@@ -221,7 +223,7 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
             filed = Path("2D", "AI", "1_sorted", "src", "portrait")
             _write(video_root / filed / "clip.mp4", script_root / waiting / "clip.funscript")
 
-            with library_overrides(video_root, script_root, VR_VIDEO_DIR=root / "cloud" / "VR"):
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=a_drive_that_is_not_there() / "VR"):
                 result = scripts_sync.run()
 
             self.assertEqual((result.moved, result.not_checked), (1, 0))
@@ -233,7 +235,7 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
             stray = script_root / "unsorted" / "clip.funscript"
             _write(video_root / "alpha" / "clip.mp4", stray)
 
-            with library_overrides(video_root, script_root, VR_VIDEO_DIR=root / "cloud" / "VR"):
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=a_drive_that_is_not_there() / "VR"):
                 result = scripts_sync.run()
 
             self.assertEqual((result.moved, result.not_checked), (0, 1))
@@ -935,9 +937,21 @@ class TestFollowRetiredVideos(unittest.TestCase):
             self.assertEqual(result.unmatched, 1)
             self.assertTrue((root / "unmatched_scripts" / "scene one.funscript").exists())
 
+    def test_an_archive_not_made_yet_on_a_drive_that_is_there_holds_nothing_back(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root = root / "videos", root / "scripts"
+            _write(script_root / "2D" / "non_AI" / "studio" / "scene one.funscript")
+
+            with library_overrides(video_root, script_root, NONAI_RETIRED_ROOT=root / "archive"):
+                result = scripts_sync.run()
+
+            self.assertEqual((result.unmatched, result.not_checked), (1, 0))
+            self.assertTrue((root / "unmatched_scripts" / "scene one.funscript").exists())
+
     def test_a_script_matching_no_video_stays_put_with_no_popup_while_the_archive_cannot_be_reached(self):
         with workspace_temp_dir() as root:
-            video_root, script_root, archive_root = root / "videos", root / "scripts", root / "cloud" / "archive"
+            video_root, script_root = root / "videos", root / "scripts"
+            archive_root = a_drive_that_is_not_there() / "archive"
             script_path = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
             _write(script_path)
 
