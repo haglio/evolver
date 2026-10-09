@@ -472,6 +472,27 @@ class TestUpscaleNonAiOnTheToolbar:
         assert window.nonai_switch.isChecked()
 
 
+def _shown(window):
+    window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
+    window.show()
+    QAPP.processEvents()
+    [toolbar] = window.findChildren(QToolBar)
+    return toolbar
+
+
+class TestToolbarSpacing:
+
+    def test_pause_scheduling_has_no_more_room_around_its_words_than_run_now(self, window):
+        toolbar = _shown(window)
+
+        def room_around_the_words(action):
+            button = toolbar.widgetForAction(action)
+            return button.width() - button.fontMetrics().horizontalAdvance(button.text())
+
+        assert (room_around_the_words(window.pause_action)
+                == room_around_the_words(window.run_now_action))
+
+
 class TestTheWholeToolbarShows:
 
     @pytest.mark.parametrize("status", [
