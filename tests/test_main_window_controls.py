@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
-from PyQt6.QtWidgets import QLabel, QMessageBox, QToolBar
+from PyQt6.QtWidgets import QLabel, QMessageBox, QToolBar, QToolButton
 from shared_ui.colors import GREEN, RED
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -16,7 +16,7 @@ from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_resul
 from gui.schedule_state import ScheduleStatus
 from gui.tray import EvolverTray
 from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
-from tests.gui_support import build_evolver_app
+from tests.gui_support import QAPP, build_evolver_app
 from tests.temp_helpers import make_run_record, override_config
 
 
@@ -455,6 +455,24 @@ class TestToolbarMatchesTheTrayMenu:
         in_the_menu = [entry for entry in menu[menu.index("Run Now"):]
                        if entry != tray.pause_action.text()]
         assert bar[bar.index("Run Now"):] == in_the_menu
+
+
+class TestTheWholeToolbarShows:
+
+    @pytest.mark.parametrize("status", [
+        ScheduleStatus(next_run_at=datetime(2026, 10, 8, 19, 30)),
+        ScheduleStatus(is_running=True),
+        ScheduleStatus(is_paused=True),
+    ], ids=["scheduled", "running", "paused"])
+    def test_in_the_window_as_it_opens_whatever_the_schedule_line_says(self, window, status):
+        window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
+        window.show_schedule(status)
+        window.show()
+        QAPP.processEvents()
+
+        [toolbar] = window.findChildren(QToolBar)
+        more = toolbar.findChild(QToolButton, "qt_toolbar_ext_button")
+        assert not more.isVisible()
 
 
 class TestMainWindowToolbarExists:

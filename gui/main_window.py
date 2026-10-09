@@ -336,9 +336,8 @@ class EvolverMainWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("Evolver")
         self.setMinimumSize(800, 500)
-        self.resize(1000, 600)
-
-        self._build_toolbar()
+        toolbar = self._build_toolbar()
+        self.resize(max(1000, toolbar.sizeHint().width()), 600)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -391,6 +390,8 @@ class EvolverMainWindow(QMainWindow):
         toolbar.addSeparator()
 
         self._next_run_label = QLabel("")
+        self._next_run_label.setMinimumWidth(self._next_run_label.fontMetrics().horizontalAdvance(
+            ScheduleStatus.longest_toolbar_label()))
         toolbar.addWidget(self._next_run_label)
 
         spacer = QWidget()
@@ -429,6 +430,7 @@ class EvolverMainWindow(QMainWindow):
 
         self.quit_action = QUIT.action(self)
         toolbar.addAction(self.quit_action)
+        return toolbar
 
     def commands(self):
         """Each toolbar command's signal, by the name the app knows it as.
