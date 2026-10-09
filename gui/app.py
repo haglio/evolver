@@ -40,6 +40,9 @@ log = logging.getLogger(__name__)
 # How long a preview whose time is up waits for the run in flight to end.
 _HAND_BACK_RETRY_MS = 60_000
 
+_SHOW_WINDOW = "--show-window"
+_IF_NOT_RUNNING = "--if-not-running"
+
 
 def _unmarked_note(record, log_path) -> str:
     """Why a run's lines are not on screen, in the window's own words."""
@@ -189,7 +192,7 @@ class EvolverApp:
             self._hand_back.start()
             self._window.setWindowTitle(
                 f"{self._name}, until {branch_session.until(datetime.now())}")
-        if "--show-window" in sys.argv:
+        if _SHOW_WINDOW in sys.argv:
             self._show_window()
 
     def _keep_the_schedule(self) -> None:
@@ -228,10 +231,7 @@ class EvolverApp:
         self._shutdown()
 
     def run(self) -> int:
-        launch = single_instance.PREVIEW if self._branch_session else single_instance.USUAL
-        outcome = self._instance.take_over(launch, end_the_unanswering=self._branch_session)
-        if outcome is not Outcome.CLAIMED:
-            self._leave_this_launch(outcome)
+        if not self._become_evolver():
             return 0
 
         self._instance.serve_launches(steps_aside_for=self._steps_aside_for,
@@ -239,6 +239,22 @@ class EvolverApp:
                                       on_step_aside=self._step_aside)
         self.start()
         return self._app.exec()
+
+    def _become_evolver(self) -> bool:
+        if _IF_NOT_RUNNING in sys.argv:
+            return self._claim_unless_running()
+        launch = single_instance.PREVIEW if self._branch_session else single_instance.USUAL
+        outcome = self._instance.take_over(launch, end_the_unanswering=self._branch_session)
+        if outcome is not Outcome.CLAIMED:
+            self._leave_this_launch(outcome)
+        return outcome is Outcome.CLAIMED
+
+    def _claim_unless_running(self) -> bool:
+        if self._instance.claim():
+            return True
+        crash_log.write_info(
+            "Already running:", f"a start with {_IF_NOT_RUNNING} left it as it was\n")
+        return False
 
     def _leave_this_launch(self, outcome: Outcome):
         """This launch went to the Evolver already running; say why if it could not.
@@ -502,7 +518,7 @@ class EvolverApp:
         cmd = [sys.executable, str(config.PROJECT_DIR / "tray_app.py")]
         show = self._window.isVisible()
         if show:
-            cmd.append("--show-window")
+            cmd.append(_SHOW_WINDOW)
         proc = subprocess.Popen(
             cmd,
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,

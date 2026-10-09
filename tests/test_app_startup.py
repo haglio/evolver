@@ -685,6 +685,46 @@ class TestALaunchThatFindsEvolverUp:
         assert "already running" in logged.call_args[0][0].lower()
 
 
+class TestAStartForWhenEvolverIsNotRunning:
+
+    def _start(self, request, *, already_running):
+        app = build_evolver_app(request)
+
+        with patch.object(app._instance, "claim", return_value=not already_running), \
+             patch.object(app._instance, "take_over") as take_over, \
+             patch.object(app._instance, "serve_launches") as serve, \
+             patch.object(app, "start") as start, \
+             patch.object(app._app, "exec", return_value=0), \
+             patch("gui.app.show_error"), \
+             patch("gui.app.crash_log.write_info") as logged, \
+             patch("gui.app.sys") as mock_sys:
+            mock_sys.argv = ["tray_app.py", "--if-not-running"]
+            exit_code = app.run()
+
+        return SimpleNamespace(exit_code=exit_code, take_over=take_over, serve=serve,
+                               start=start, logged=logged)
+
+    def test_an_evolver_already_running_is_never_asked_to_open_its_window(self, request):
+        started = self._start(request, already_running=True)
+
+        started.take_over.assert_not_called()
+        assert started.exit_code == 0
+
+    def test_the_log_says_which_start_found_it_running(self, request):
+        started = self._start(request, already_running=True)
+
+        header, detail = started.logged.call_args.args
+        assert "already running" in header.lower()
+        assert "--if-not-running" in detail
+
+    def test_with_none_running_it_is_evolver_without_claiming_twice(self, request):
+        started = self._start(request, already_running=False)
+
+        started.take_over.assert_not_called()
+        started.serve.assert_called_once()
+        started.start.assert_called_once_with()
+
+
 class TestAnsweringLaunches:
     """The other half: without a listener, every later launch falls through
     to the error dialog and the window still never opens."""
