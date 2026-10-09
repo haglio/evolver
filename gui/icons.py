@@ -1,8 +1,8 @@
 """Evolver's icons.
 
 Most of the toolbar and the tray menu is still Font Awesome, which suits the
-verbs nothing else in the family draws -- a cog for settings, a chart, a film
-strip.  Five marks are not left to it, because the family draws them and the
+verbs nothing else in the family draws -- a cog for settings, a chart, a pair
+of tags.  Five marks are not left to it, because the family draws them and the
 apps sit open side by side:
 
 * quit, the power symbol -- Fun Time paints this same one on its bar,
