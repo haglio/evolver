@@ -129,7 +129,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
 pythonw.exe tray_app.py
 ```
 
-This starts a system tray icon. Right-click for the context menu (Open, Run Now, Pause/Resume Scheduling, Upscale Non-AI When Idle, Settings, Stats, Upscale Queue, Backfill Metadata, Review Weird, Restart, Quit) or double-click to open the main window with run history and live progress. The window's toolbar offers the same commands under the same names, Open aside; the switch at its left end is Pause/Resume Scheduling. Configure the run interval and Windows startup registration from Settings.
+This starts a system tray icon. Right-click for the context menu (Open, Run Now, Pause/Resume Scheduling, Upscale Non-AI When Idle, Settings, Stats, Upscale Queue, Backfill Metadata, Review Weird, Restart, Quit) or double-click to open the main window with run history and live progress. The window's toolbar offers the same commands under the same names, Open aside; the switch at its left end is Pause/Resume Scheduling. The menu's first line is the schedule's status: Scheduled with the time of the next run, Running, or Paused. Configure the run interval and Windows startup registration from Settings.
 
 Run history is stored as JSON files in `runs/` (gitignored). Settings are persisted to `gui_settings.json` (gitignored).
 

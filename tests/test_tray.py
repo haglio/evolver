@@ -1,7 +1,7 @@
 """Tests for the tray's schedule display — the app's primary surface.
 
-The window is normally hidden in the tray, so the tooltip and the two
-status lines at the top of the tray menu are what the user actually reads;
+The window is normally hidden in the tray, so the tooltip and the
+status line at the top of the tray menu are what the user actually reads;
 they show the same schedule (Running / Paused / Next run) the window's
 toolbar shows, off the one status the scheduler hands both.
 """
@@ -34,22 +34,29 @@ class TestTrayMenu:
         assert tray.commands()["review_weird"] == tray.review_weird_action.triggered
 
 
+def _status_lines(tray) -> list[str]:
+    lines = []
+    for action in tray.contextMenu().actions():
+        if action.isSeparator():
+            return lines
+        if action.isVisible():
+            lines.append(action.text())
+    return lines
+
+
 class TestTrayScheduleDisplay:
 
-    def test_a_scheduled_next_run_is_in_the_tooltip_and_the_menu(self):
+    def test_a_scheduled_next_run_is_in_the_tooltip_and_the_menus_one_status_line(self):
         tray = EvolverTray()
         tray.show_schedule(ScheduleStatus(next_run_at=datetime(2026, 3, 29, 14, 30)))
         assert "Next run: 14:30" in tray.toolTip()
-        assert tray._status_action.text() == "Status: Scheduled"
-        assert tray._next_run_action.isVisible()
-        assert "14:30" in tray._next_run_action.text()
+        assert _status_lines(tray) == ["Status: Scheduled for 14:30"]
 
-    def test_pausing_reads_paused_and_hides_the_next_run(self):
+    def test_pausing_reads_paused_with_no_time(self):
         tray = EvolverTray()
         tray.show_schedule(ScheduleStatus(is_paused=True))
         assert "Paused" in tray.toolTip()
-        assert tray._status_action.text() == "Status: Paused"
-        assert not tray._next_run_action.isVisible()
+        assert _status_lines(tray) == ["Status: Paused"]
 
     def test_pausing_turns_the_menu_item_into_resume(self):
         tray = EvolverTray()
@@ -63,9 +70,8 @@ class TestTrayScheduleDisplay:
         tray.show_schedule(ScheduleStatus(
             is_running=True, next_run_at=datetime(2026, 3, 29, 14, 30)))
         assert "Running..." in tray.toolTip()
-        assert tray._status_action.text() == "Status: Running"
+        assert _status_lines(tray) == ["Status: Running"]
         assert not tray.run_now_action.isEnabled()
-        assert not tray._next_run_action.isVisible()
 
     def test_a_finished_run_reenables_run_now(self):
         tray = EvolverTray()

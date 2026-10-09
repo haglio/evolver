@@ -41,10 +41,6 @@ class EvolverTray(QSystemTrayIcon):
         self._status_action.setEnabled(False)
         self._menu.addAction(self._status_action)
 
-        self._next_run_action = QAction("", self._menu)
-        self._next_run_action.setEnabled(False)
-        self._menu.addAction(self._next_run_action)
-
         self._menu.addSeparator()
 
         self.open_action = OPEN.action(self._menu)
@@ -129,7 +125,7 @@ class EvolverTray(QSystemTrayIcon):
         self.nonai_action.setChecked(enabled)
 
     def show_schedule(self, status: ScheduleStatus):
-        """Put the schedule on all five of the tray's surfaces at once.
+        """Put the schedule on every one of the tray's surfaces at once.
 
         Every one of them changes together on every change, so they are set
         together: updating any of them in a pass of its own is what lets the
@@ -140,8 +136,6 @@ class EvolverTray(QSystemTrayIcon):
         self.setToolTip(" - ".join(
             part for part in (self._name, status.activity()) if part))
         self._status_action.setText(f"Status: {status.headline()}")
-        self._next_run_action.setText(status.next_run_text())
-        self._next_run_action.setVisible(bool(status.next_run_text()))
 
     def _on_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
