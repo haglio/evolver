@@ -60,16 +60,21 @@ testpaths = ["tests"]
 [tool.haglio]
 siblings = ["app_support", "shared_ui", "voice_core"]
 
-# What Evolver's two launchers start: launch_evolver.vbs, which its pinned
-# shortcut runs and the broker's tray runs when it finds Evolver gone, and
-# launch_preview_branch.vbs, which opens a worktree's run-detail window. Both are
-# rendered from these by
-# `python -m app_support.launcher --write`.
+# Rendered into the .vbs files beside this one by
+# `python -m app_support.launcher --write`. The broker's tray names
+# launch_evolver_if_not_running.vbs in its own config, and runs it when it finds
+# Evolver gone.
 [tool.haglio.launchers."launch_evolver.vbs"]
 app = "Evolver"
 interpreter = "pythonw.exe"
 named-interpreter = "Evolver-Evolver.exe"
 run = '"{root}\tray_app.py"'
+
+[tool.haglio.launchers."launch_evolver_if_not_running.vbs"]
+app = "Evolver"
+interpreter = "pythonw.exe"
+named-interpreter = "Evolver-Evolver.exe"
+run = '"{root}\tray_app.py" --if-not-running'
 
 [tool.haglio.launchers."launch_preview_branch.vbs"]
 app = "Evolver (branch preview)"
@@ -88,7 +93,13 @@ copy-from-primary = ["content.local.json"]
 launcher = "launch_evolver.vbs"
 icon = "icon.ico"
 app-id = "Evolver.TrayApp"
-places = ["taskbar", "startup", "checkout"]
+places = ["taskbar", "checkout"]
+
+[tool.haglio.shortcuts."Evolver in the tray"]
+launcher = "launch_evolver_if_not_running.vbs"
+icon = "icon.ico"
+app-id = "Evolver.TrayApp"
+places = ["startup"]
 
 [tool.setuptools.packages.find]
 include = ["evolver*"]

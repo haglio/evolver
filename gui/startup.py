@@ -13,7 +13,7 @@ from app_support import win32, windows_settings
 
 import config
 
-_NAME = "Evolver"
+_NAME = "Evolver in the tray"
 _PLACE = "startup"
 
 

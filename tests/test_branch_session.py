@@ -227,11 +227,18 @@ class TestHandingTheWorkBack:
             branch_session.start_the_usual_evolver()
 
         popen.assert_called_once()
-        assert popen.call_args.args[0] == [
-            "wscript.exe", str(Path("C:/live/evolver") / "launch_evolver.vbs")]
+        assert Path(popen.call_args.args[0][1]).parent == Path("C:/live/evolver")
         assert popen.call_args.kwargs["cwd"] == str(Path("C:/live/evolver"))
         assert "EVOLVER_BRANCH_SESSION" not in popen.call_args.kwargs["env"]
         assert popen.call_args.kwargs["env"]["PATH"] == os.environ["PATH"]
+
+    def test_the_usual_evolver_is_started_only_if_none_is_running(self):
+        with override_config(LIVE_DIR=Path("C:/live/evolver")), \
+             patch("gui.branch_session.subprocess.Popen") as popen:
+            branch_session.start_the_usual_evolver()
+
+        assert popen.call_args.args[0] == [
+            "wscript.exe", str(Path("C:/live/evolver") / "launch_evolver_if_not_running.vbs")]
 
     def test_the_usual_evolver_loads_its_own_modules_rather_than_the_preview_s(self):
         a_sibling_branch_the_preview_was_tried_with = "C:/workspace/shared_ui/.claude/worktrees/a-change"
