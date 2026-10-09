@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt
-from PyQt6.QtGui import QAction, QPainter
-from PyQt6.QtWidgets import QMenu, QToolButton
+from PyQt6.QtGui import QAction, QPainter, QPixmap, QRegion
+from PyQt6.QtWidgets import QMenu, QToolButton, QWidget
 from shared_ui.spacing import BUTTON_ICON, BUTTON_PAD_H_TIGHT, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -10,8 +10,17 @@ from gui.toolbar_style import toolbar_padding
 
 
 def _draw_at_the_end(painter: QPainter, switch: ToggleSwitch, row: QRect, inset: int) -> None:
-    switch.render(painter, QPoint(row.right() - inset - switch.width(),
-                                  row.center().y() - switch.height() // 2))
+    painter.drawPixmap(QPoint(row.right() - inset - switch.width(),
+                              row.center().y() - switch.height() // 2),
+                       _picture_of(switch, painter.device().devicePixelRatioF()))
+
+
+def _picture_of(switch: ToggleSwitch, pixel_ratio: float) -> QPixmap:
+    picture = QPixmap(switch.size() * pixel_ratio)
+    picture.setDevicePixelRatio(pixel_ratio)
+    picture.fill(Qt.GlobalColor.transparent)
+    switch.render(picture, QPoint(), QRegion(), QWidget.RenderFlag.DrawChildren)
+    return picture
 
 
 def _repaint_on_toggle(switch: ToggleSwitch, widget) -> None:

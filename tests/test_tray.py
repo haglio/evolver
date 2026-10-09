@@ -41,11 +41,14 @@ class TestTrayMenu:
         assert tray.commands()["review_weird"] == tray.review_weird_action.triggered
 
 
-def _row_as_drawn(menu, action):
+def _row_as_drawn(menu, action, *, under_the_pointer=False):
     menu.popup(QPoint(0, 0))
     try:
+        if under_the_pointer:
+            menu.setActiveAction(action)
         QAPP.processEvents()
-        return menu.grab().toImage().copy(menu.actionGeometry(action))
+        painted = QAPP.primaryScreen().grabWindow(menu.winId()).toImage()
+        return painted.copy(menu.actionGeometry(action))
     finally:
         menu.hide()
 
@@ -85,17 +88,19 @@ class TestUpscaleNonAiWearsASwitch:
             menu.hide()
         assert widths[0] == widths[1]
 
+    def test_its_switch_is_drawn_without_a_ground_of_its_own(self):
+        tray = EvolverTray()
+        tray.set_nonai_enabled(True)
+        row = _the_upscale_non_ai_row(tray)
+        blue = [(x, y) for x in range(row.width()) for y in range(row.height())
+                if row.pixelColor(x, y).name() == TOGGLE_ON.name()]
+        corner = (min(x for x, _y in blue), min(y for _x, y in blue))
+        assert row.pixelColor(*corner).name() == BG_TERTIARY.name()
+
     def test_its_switch_wears_no_ring_on_the_row_under_the_pointer(self):
         tray = EvolverTray()
         tray.set_nonai_enabled(True)
-        menu = tray.contextMenu()
-        menu.popup(QPoint(0, 0))
-        try:
-            menu.setActiveAction(tray.nonai_action)
-            QAPP.processEvents()
-            row = menu.grab().toImage().copy(menu.actionGeometry(tray.nonai_action))
-        finally:
-            menu.hide()
+        row = _row_as_drawn(tray.contextMenu(), tray.nonai_action, under_the_pointer=True)
         assert _columns_wearing(row, BG_TERTIARY) == []
 
     def test_a_switch_on_the_widest_row_still_sits_clear_of_its_name(self):
