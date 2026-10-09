@@ -12,6 +12,7 @@ import config
 from tasks import nonai_encode, nonai_queue, nonai_upscale
 from tests.temp_helpers import (
     STARTED_UNDER,
+    a_drive_that_is_not_there,
     make_video,
     override_config,
     workspace_temp_dir,
@@ -1493,6 +1494,78 @@ class TestRunSupervisesAJob(unittest.TestCase):
                 nonai_upscale.run(allow_start=False)
 
             mocks["terminate"].assert_not_called()
+
+
+class TestAnArchiveThatCannotBeReached(unittest.TestCase):
+    def test_a_finished_encode_waits_with_its_original_and_its_output_where_they_are(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=a_drive_that_is_not_there() / "archive")
+            source, tmp, out = write_job(root, overrides, expected=100.0)
+
+            stack, _ = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False)
+
+            self.assertEqual((result.promoted, result.failed), ("", ""))
+            self.assertEqual((source.exists(), tmp.exists(), out.exists()), (True, True, False))
+            self.assertTrue(overrides["NONAI_JOB_STATE_FILE"].exists())
+
+    def test_nothing_new_starts_in_its_place(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=a_drive_that_is_not_there() / "archive")
+            source, _tmp, _out = write_job(root, overrides, expected=100.0)
+            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "next.mp4")
+
+            stack, mocks = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertEqual(result.started, "")
+            mocks["popen"].assert_not_called()
+            self.assertEqual(nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"])["source"], str(source))
+
+    def test_the_first_run_that_can_reach_the_archive_promotes_it(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=a_drive_that_is_not_there() / "archive")
+            source, _tmp, out = write_job(root, overrides, expected=100.0)
+
+            stack, _ = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                nonai_upscale.run(allow_start=False)
+                with override_config(NONAI_RETIRED_ROOT=root / "archive"):
+                    result = nonai_upscale.run(allow_start=False)
+
+            self.assertEqual(result.promoted, "larkin/0 unsorted/busy.mp4")
+            self.assertTrue(out.exists())
+            self.assertTrue((root / "archive" / "larkin" / "0 unsorted" / "busy.mp4").exists())
+            self.assertFalse(source.exists())
+
+    def test_says_which_archive_it_waits_for(self):
+        with workspace_temp_dir() as root:
+            archive = a_drive_that_is_not_there() / "archive"
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
+            write_job(root, overrides, expected=100.0)
+
+            stack, _ = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=False)
+
+            self.assertEqual((result.in_flight, result.unreachable_archive),
+                             ("larkin/0 unsorted/busy.mp4", str(archive)))
+
+    def test_the_log_says_which_archive_it_waits_for(self):
+        with workspace_temp_dir() as root:
+            archive = a_drive_that_is_not_there() / "archive"
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
+            source, _tmp, _out = write_job(root, overrides, expected=100.0)
+
+            stack, _ = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                with self.assertLogs("tasks.nonai_upscale", level="WARNING") as logged:
+                    nonai_upscale.run(allow_start=False)
+
+            self.assertIn(f"WARNING:tasks.nonai_upscale:The upscale of {source} is finished and waits "
+                          f"until {archive} can be reached to take the original.", logged.output)
 
 
 class TestPromotionCarriesTheRecord(unittest.TestCase):

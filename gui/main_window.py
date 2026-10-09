@@ -266,7 +266,10 @@ def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
     asked_for = " at your request" if result.get("on_request") else ""
     if result.get("started"):
         parts.append(f"started {result['started']}{asked_for}")
-    if result.get("in_flight"):
+    if result.get("unreachable_archive"):
+        parts.append(f"finished {result['in_flight']}, waiting until "
+                     f"{result['unreachable_archive']} can be reached to take the original")
+    elif result.get("in_flight"):
         parts.append(f"encoding {result['in_flight']} ({_encode_state(result)})")
     if result.get("promoted"):
         parts.append(f"finished {result['promoted']}")
