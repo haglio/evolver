@@ -106,7 +106,7 @@ class TestWhatABranchSessionTakesOver:
         assert app._peer_timer.isActive()
         assert app._scheduler.next_run_at is not None
         assert app._tray.pause_action.isEnabled()
-        assert app._window.active_toggle.isEnabled()
+        assert app._window.pause_action.isEnabled()
 
     def test_starting_it_is_asking_for_evolver_so_an_earlier_stand_down_goes(self, request):
         app = self._preview(request)

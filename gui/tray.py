@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
+from PyQt6.QtWidgets import QSystemTrayIcon
 from shared_ui.chrome import menu_rules
 from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
+from shared_ui.toggle_switch import ToggleSwitch
 
 import config
 from gui.commands import (
@@ -22,7 +23,9 @@ from gui.commands import (
     SETTINGS,
     STATS,
     pause_or_resume,
+    set_label,
 )
+from gui.menu_with_switches import MenuWithSwitches
 from gui.schedule_state import ScheduleStatus
 
 
@@ -32,7 +35,7 @@ class EvolverTray(QSystemTrayIcon):
         super().__init__(app_icon(config.PROJECT_DIR / "icon.ico", shown_as), parent)
         self._name = name
 
-        self._menu = QMenu()
+        self._menu = MenuWithSwitches()
         # A tray menu has no window to take the family's rules from; without
         # them it rendered native, beside the broker's dark one.
         self._menu.setStyleSheet(menu_rules())
@@ -59,8 +62,10 @@ class EvolverTray(QSystemTrayIcon):
         # GPU for hours. Once on, Evolver runs it only while the user is idle
         # and suspends it the moment they return — no manual flipping.
         self.nonai_action = NONAI.action(self._menu)
-        self.nonai_action.setCheckable(True)
+        self.nonai_switch = ToggleSwitch()
+        self.nonai_action.triggered.connect(self.nonai_switch.click)
         self._menu.addAction(self.nonai_action)
+        self._menu.put_switch_on(self.nonai_action, self.nonai_switch)
 
         self._menu.addSeparator()
 
@@ -110,7 +115,7 @@ class EvolverTray(QSystemTrayIcon):
             "open": self.open_action.triggered,
             "run_now": self.run_now_action.triggered,
             "pause": self.pause_action.triggered,
-            "nonai": self.nonai_action.triggered,
+            "nonai": self.nonai_switch.clicked,
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
@@ -122,7 +127,7 @@ class EvolverTray(QSystemTrayIcon):
 
     def set_nonai_enabled(self, enabled: bool):
         """Show the saved state of the non-AI opt-in, without re-announcing it."""
-        self.nonai_action.setChecked(enabled)
+        self.nonai_switch.setChecked(enabled)
 
     def show_schedule(self, status: ScheduleStatus):
         """Put the schedule on every one of the tray's surfaces at once.
@@ -132,7 +137,7 @@ class EvolverTray(QSystemTrayIcon):
         tooltip and the menu disagree about the same moment.
         """
         self.run_now_action.setEnabled(not status.is_running)
-        self.pause_action.setText(pause_or_resume(status.is_paused))
+        set_label(self.pause_action, pause_or_resume(status.is_paused))
         self.setToolTip(" - ".join(
             part for part in (self._name, status.activity()) if part))
         self._status_action.setText(f"Status: {status.headline()}")

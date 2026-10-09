@@ -9,10 +9,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from PyQt6.QtCore import QPoint
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QSystemTrayIcon
+from shared_ui.chrome import menu_rules
+from shared_ui.colors import BG_TERTIARY, TEXT_PRIMARY, TOGGLE_OFF, TOGGLE_ON
+from shared_ui.toggle_switch import ToggleSwitch
 
+from gui.menu_with_switches import MenuWithSwitches
 from gui.schedule_state import ScheduleStatus
 from gui.tray import EvolverTray
+from tests.gui_support import QAPP
 
 
 class TestTrayMenu:
@@ -32,6 +39,79 @@ class TestTrayMenu:
         assert entries[first - 1:first + 4] == [
             "---", "Upscale Queue...", "Backfill Metadata...", "Review Weird...", "---"]
         assert tray.commands()["review_weird"] == tray.review_weird_action.triggered
+
+
+def _row_as_drawn(menu, action):
+    menu.popup(QPoint(0, 0))
+    try:
+        QAPP.processEvents()
+        return menu.grab().toImage().copy(menu.actionGeometry(action))
+    finally:
+        menu.hide()
+
+
+def _the_upscale_non_ai_row(tray):
+    return _row_as_drawn(tray.contextMenu(), tray.nonai_action)
+
+
+def _columns_wearing(row, color) -> list[int]:
+    return [x for x in range(row.width()) for y in range(row.height())
+            if row.pixelColor(x, y).name() == color.name()]
+
+
+def _pixels_in_the_upscale_non_ai_row(tray, color) -> int:
+    return len(_columns_wearing(_the_upscale_non_ai_row(tray), color))
+
+
+class TestUpscaleNonAiWearsASwitch:
+
+    def test_its_switch_shows_on_in_the_menu_while_the_opt_in_is_on(self):
+        tray = EvolverTray()
+        tray.set_nonai_enabled(True)
+        assert _pixels_in_the_upscale_non_ai_row(tray, TOGGLE_ON) > 30
+
+    def test_its_switch_shows_off_in_the_menu_while_the_opt_in_is_off(self):
+        tray = EvolverTray()
+        assert _pixels_in_the_upscale_non_ai_row(tray, TOGGLE_OFF) > 30
+
+    def test_the_menu_opens_as_wide_the_second_time_as_the_first(self):
+        tray = EvolverTray()
+        menu = tray.contextMenu()
+        widths = []
+        for _opening in range(2):
+            menu.popup(QPoint(0, 0))
+            QAPP.processEvents()
+            widths.append(menu.width())
+            menu.hide()
+        assert widths[0] == widths[1]
+
+    def test_its_switch_keeps_its_outline_on_the_row_under_the_pointer(self):
+        tray = EvolverTray()
+        tray.set_nonai_enabled(True)
+        menu = tray.contextMenu()
+        menu.popup(QPoint(0, 0))
+        try:
+            menu.setActiveAction(tray.nonai_action)
+            QAPP.processEvents()
+            row = menu.grab().toImage().copy(menu.actionGeometry(tray.nonai_action))
+        finally:
+            menu.hide()
+        assert len(_columns_wearing(row, BG_TERTIARY)) > 30
+
+    def test_a_switch_on_the_widest_row_still_sits_clear_of_its_name(self):
+        menu = MenuWithSwitches()
+        menu.setStyleSheet(menu_rules())
+        menu.addAction(QAction("Short", menu))
+        longest = QAction("A row running longer than any other in its menu", menu)
+        menu.addAction(longest)
+        switch = ToggleSwitch()
+        switch.setChecked(True)
+        menu.put_switch_on(longest, switch)
+
+        row = _row_as_drawn(menu, longest)
+        name_ends = (min(_columns_wearing(row, TEXT_PRIMARY))
+                     + menu.fontMetrics().horizontalAdvance(longest.text()))
+        assert name_ends < min(_columns_wearing(row, TOGGLE_ON))
 
 
 def _status_lines(tray) -> list[str]:

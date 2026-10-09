@@ -447,10 +447,9 @@ class TestNonAiUpscaleToggle:
         with patch("gui.app.EvolverSettings.load", return_value=EvolverSettings()):
             return build_evolver_app(request)
 
-    def test_tray_toggle_starts_unchecked_by_default(self, request):
+    def test_the_trays_switch_starts_off_by_default(self, request):
         app = self._app_with_fresh_settings(request)
-        assert app._tray.nonai_action.isCheckable()
-        assert not app._tray.nonai_action.isChecked()
+        assert not app._tray.nonai_switch.isChecked()
 
     def test_toggling_flips_and_saves_the_setting(self, request):
         app = self._app_with_fresh_settings(request)
@@ -470,7 +469,7 @@ class TestNonAiUpscaleToggle:
         app = self._app_with_fresh_settings(request)
         with patch("gui.app.EvolverSettings.save"):
             app._window.nonai_switch.click()
-        assert app._tray.nonai_action.isChecked()
+        assert app._tray.nonai_switch.isChecked()
 
     def test_checking_it_in_the_tray_menu_switches_it_on_in_the_toolbar(self, request):
         app = self._app_with_fresh_settings(request)
@@ -483,7 +482,7 @@ class TestNonAiUpscaleToggle:
         settings.nonai_upscale_enabled = True
         with patch("gui.app.EvolverSettings.load", return_value=settings):
             app = build_evolver_app(request)
-        assert app._tray.nonai_action.isChecked()
+        assert app._tray.nonai_switch.isChecked()
         assert app._window.nonai_switch.isChecked()
 
     def test_worker_receives_the_toggle_state(self, request):

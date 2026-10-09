@@ -16,7 +16,15 @@ class Command:
     draw: Callable[[str], QIcon]
 
     def action(self, parent) -> QAction:
-        return QAction(self.draw(TEXT_SECONDARY.name()), self.label, parent)
+        action = QAction(self.draw(TEXT_SECONDARY.name()), "", parent)
+        set_label(action, self.label)
+        return action
+
+
+def set_label(action: QAction, label: str) -> None:
+    action.setText(label)
+    action.setIconText(label)
+    action.setToolTip(label)
 
 
 def _font_awesome(name: str) -> Callable[[str], QIcon]:
