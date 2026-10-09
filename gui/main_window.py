@@ -35,6 +35,7 @@ from gui.commands import (
     RUN_NOW,
     SETTINGS,
     STATS,
+    pause_or_resume,
 )
 from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
@@ -478,6 +479,7 @@ class EvolverMainWindow(QMainWindow):
         """Put the schedule on the toolbar's three surfaces."""
         self.run_now_action.setEnabled(not status.is_running)
         self.active_toggle.setChecked(not status.is_paused)
+        self.active_toggle.setToolTip(pause_or_resume(status.is_paused))
         self._next_run_label.setText(status.toolbar_label())
 
     def closeEvent(self, event):
