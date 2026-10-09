@@ -1,18 +1,30 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, QRect, QSize, Qt
-from PyQt6.QtGui import QAction, QPainter, QPixmap, QRegion
+from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt
+from PyQt6.QtGui import QAction, QPainter, QPen, QPixmap, QRegion
 from PyQt6.QtWidgets import QMenu, QToolButton, QWidget
+from shared_ui.colors import TOGGLE_HANDLE
 from shared_ui.spacing import BUTTON_ICON, BUTTON_PAD_H_TIGHT, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
 from gui.toolbar_style import toolbar_padding
 
 
-def _draw_at_the_end(painter: QPainter, switch: ToggleSwitch, row: QRect, inset: int) -> None:
-    painter.drawPixmap(QPoint(row.right() - inset - switch.width(),
-                              row.center().y() - switch.height() // 2),
-                       _picture_of(switch, painter.device().devicePixelRatioF()))
+def _draw_at_the_end(painter: QPainter, switch: ToggleSwitch, row: QRect, inset: int) -> QRectF:
+    pixel_ratio = painter.device().devicePixelRatioF()
+    picture = _picture_of(switch, pixel_ratio)
+    corner = QPoint(row.right() - inset - switch.width(), row.center().y() - switch.height() // 2)
+    painter.drawPixmap(corner, picture)
+    pill = QRectF(QRegion(picture.mask()).boundingRect())
+    return QRectF(pill.topLeft() / pixel_ratio, pill.size() / pixel_ratio).translated(QPointF(corner))
+
+
+def _outline(painter: QPainter, pill: QRectF) -> None:
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QPen(TOGGLE_HANDLE, 1))
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    edge = pill.adjusted(0.5, 0.5, -0.5, -0.5)
+    painter.drawRoundedRect(edge, edge.height() / 2, edge.height() / 2)
 
 
 def _picture_of(switch: ToggleSwitch, pixel_ratio: float) -> QPixmap:
@@ -50,7 +62,9 @@ class MenuWithSwitches(QMenu):
         super().paintEvent(event)
         painter = QPainter(self)
         for action, switch in self._switches.items():
-            _draw_at_the_end(painter, switch, self.actionGeometry(action), MARGIN_STANDARD)
+            pill = _draw_at_the_end(painter, switch, self.actionGeometry(action), MARGIN_STANDARD)
+            if action is self.activeAction():
+                _outline(painter, pill)
         painter.end()
 
 

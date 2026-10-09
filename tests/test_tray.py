@@ -13,7 +13,8 @@ from PyQt6.QtCore import QPoint
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QSystemTrayIcon
 from shared_ui.chrome import menu_rules
-from shared_ui.colors import BG_TERTIARY, TEXT_PRIMARY, TOGGLE_OFF, TOGGLE_ON
+from shared_ui.colors import BG_TERTIARY, BLUE, TEXT_PRIMARY, TOGGLE_OFF, TOGGLE_ON
+from shared_ui.spacing import MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
 from gui.schedule_state import ScheduleStatus
@@ -102,6 +103,13 @@ class TestUpscaleNonAiWearsASwitch:
         tray.set_nonai_enabled(True)
         row = _row_as_drawn(tray.contextMenu(), tray.nonai_action, under_the_pointer=True)
         assert _columns_wearing(row, BG_TERTIARY) == []
+
+    def test_its_switch_keeps_its_shape_on_the_row_under_the_pointer(self):
+        tray = EvolverTray()
+        tray.set_nonai_enabled(True)
+        row = _row_as_drawn(tray.contextMenu(), tray.nonai_action, under_the_pointer=True)
+        pill_left = row.width() - 1 - MARGIN_STANDARD - tray.nonai_switch.width()
+        assert row.pixelColor(pill_left, row.height() // 2).name() != BLUE.name()
 
     def test_a_switch_on_the_widest_row_still_sits_clear_of_its_name(self):
         menu = MenuWithSwitches()
