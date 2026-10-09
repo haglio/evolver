@@ -124,6 +124,11 @@ CONFIG_REFERENCE_LEDGER = {
     # The name the non-AI lane gives its outputs, which is how a hand export
     # made before the stage existed is told from an original.
     "tasks/provenance_sweep.py": 1,
+    # The two folders videos are kept in off the library's drive -- the VR
+    # videos' and the archive's -- so a reference into one that cannot be
+    # reached is left unchecked rather than called unresolved or matched by
+    # name to a library video.
+    "tasks/reference_sync.py": 2,
     "tasks/scene_scripts.py": 1,
     # The five folders this stage works between are its arguments, so the
     # four bucket classifiers take the roots rather than looking them up: what

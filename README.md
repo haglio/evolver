@@ -267,6 +267,8 @@ A clip's pairing also follows its scene to another version of it: when the non-A
 
 Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`. Videos sitting in either weird pile — `kinda_weird/` and Genau's — are excluded from the search, so a reference goes on naming the place its video was, which is where the video goes back to if you put it back.
 
+A reference into a folder whose videos are kept off the library's drive, `vr_videos` or `retired_root`, is not looked for at all while that folder cannot be reached: its video is not missing, its drive is down, and matching the name against the library could repoint it at a different video. The stage counts it as not checked and says once in the log which folder could not be reached.
+
 **When the name itself is gone.** A rename leaves nothing to match on, so there is one fallback, and only for the stores that can support it: a Clipper session and a Scripture project each record the `fps` and `total_frames` of the footage they were cut against, which is a usable fingerprint for the video itself. If the filename resolves to nothing, Evolver probes the videos in the one folder the reference named — a renamed file usually stays put, and probing the whole library on the off chance would cost minutes — and repoints only when exactly one of them reports that same frame rate and frame count. An inexact match is not a match: two cuts of the same scene have different frame counts, and a session's clip bounds are frame indices that mean nothing against the wrong one.
 
 `grep "REPOINT\|UNRESOLVED" evolver.log` is the quickest way to see what moved and what still needs a human.

@@ -20,7 +20,9 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+import config
 from util import reference_stores, video_locator
+from util.media_files import reachable
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ class ReferenceSyncResult:
     checked: int = 0
     relocated: int = 0
     unresolved: int = 0
+    not_checked: int = 0
     write_errors: int = 0
     refused: int = 0
 
@@ -55,6 +58,7 @@ class _Reconciled:
     checked: int = 0
     relocated: int = 0
     unresolved: int = 0
+    not_checked: int = 0
     write_errors: int = 0
     refused: int = 0
 
@@ -63,12 +67,15 @@ def run() -> ReferenceSyncResult:
     result = ReferenceSyncResult()
     log.info("=== Stage: follow videos that moved ===")
 
+    unreachable = [folder for folder in (config.VR_VIDEO_DIR, config.NONAI_RETIRED_ROOT)
+                   if folder is not None and not reachable(folder)]
     index = video_locator.build_index()
     for store in reference_stores.discover():
-        reconciled = _reconcile(store, index)
+        reconciled = _reconcile(store, index, unreachable)
         result.checked += reconciled.checked
         result.relocated += reconciled.relocated
         result.unresolved += reconciled.unresolved
+        result.not_checked += reconciled.not_checked
         result.write_errors += reconciled.write_errors
         result.refused += reconciled.refused
 
@@ -81,12 +88,16 @@ def run() -> ReferenceSyncResult:
         result.write_errors,
         result.refused,
     )
+    if result.not_checked:
+        log.warning("%d reference(s) not checked: %s cannot be reached.",
+                    result.not_checked, " and ".join(str(folder) for folder in unreachable))
     return result
 
 
 def _reconcile(
     store: reference_stores.ReferenceStore,
     index: dict[str, list[Path]],
+    unreachable: list[Path],
 ) -> _Reconciled:
     complaint = store.shape_complaint()
     if complaint is not None:
@@ -101,8 +112,12 @@ def _reconcile(
 
     moves: dict[str, str] = {}
     unresolved = 0
+    not_checked = 0
     for reference in references:
         was_at = Path(reference)
+        if any(was_at.is_relative_to(folder) for folder in unreachable):
+            not_checked += 1
+            continue
         if was_at.exists():
             continue
         now_at = (video_locator.relocate(was_at, index)
@@ -126,7 +141,8 @@ def _reconcile(
         else:
             relocated = len(moves)
     return _Reconciled(checked=len(references), relocated=relocated,
-                       unresolved=unresolved, write_errors=write_errors)
+                       unresolved=unresolved, not_checked=not_checked,
+                       write_errors=write_errors)
 
 
 def _another_version(
