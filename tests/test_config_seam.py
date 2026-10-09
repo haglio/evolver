@@ -149,8 +149,11 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/upscale.py": 13,
     "tasks/video_types.py": 5,
     # The lane walk it used to do itself, and the stage that walks the lanes
-    # after it to stamp the viewing on the same sidecars.
-    "tasks/watch_weights.py": 9,
+    # after it to stamp the viewing on the same sidecars. The 10th is the third
+    # shape: the folder of its own the phone writes its journal to, read so the
+    # stage holds while that folder cannot be reached rather than weigh every
+    # video without the viewing it holds.
+    "tasks/watch_weights.py": 10,
     # Every folder of this library a withdrawn clip can be sitting in by the time
     # the withdrawal is read -- the inbox, 1_sorted, the outbox, both condemned
     # piles -- plus the metadata tree its record mirrors into and the extensions

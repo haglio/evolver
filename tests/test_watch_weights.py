@@ -17,6 +17,7 @@ class _Setting(LaneLibrary):
     def __init__(self, root: Path):
         super().__init__(root)
         self.journal_dir = root / "videos" / "warm_gun"
+        self.phones_own_folder = root / "cloud" / "WarmGun"
         self.fun_time = root / "fun_time"
         self.stats = self.fun_time / "state" / "watch_stats.json"
         self.favs = self.fun_time / "favs.csv"
@@ -24,13 +25,14 @@ class _Setting(LaneLibrary):
         self.fun_time.mkdir(parents=True, exist_ok=True)
 
     def config(self, **extra):
-        return super().config(
-            WARM_GUN_JOURNAL_DIRS=(self.journal_dir,),
-            FUN_TIME_WATCH_STATS_FILE=self.stats,
-            FUN_TIME_FAVS_FILE=self.favs,
-            WARM_GUN_FAVORITES_CURSOR_FILE=self.cursor,
+        return super().config(**{
+            "WARM_GUN_JOURNAL_DIRS": (self.journal_dir,),
+            "WARM_GUN_OUTBOX": None,
+            "FUN_TIME_WATCH_STATS_FILE": self.stats,
+            "FUN_TIME_FAVS_FILE": self.favs,
+            "WARM_GUN_FAVORITES_CURSOR_FILE": self.cursor,
             **extra,
-        )
+        })
 
     def journal(self, *lines: tuple[int, str, str], name: str = "phone.jsonl") -> None:
         self.journal_dir.mkdir(parents=True, exist_ok=True)
@@ -147,6 +149,42 @@ class TestCounts(unittest.TestCase):
             result = watch_weights.run()
 
         self.assertEqual((result.unmapped, result.stamped), (1, 0))
+
+
+class TestThePhonesFolderCannotBeReached(unittest.TestCase):
+    def test_every_weight_is_left_as_it_was(self):
+        with _setting() as s:
+            _, upscale = s.sorted_clip("clip_a")
+            path = sidecar.sidecar_path(upscale)
+            stamped = write_sidecar(path, {"watch": {"completions": 3, "skips": 0, "locks": 0, "weight": 2.0}})
+
+            with s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
+                result = watch_weights.run()
+
+            self.assertEqual(sidecar.read(path), stamped)
+        self.assertEqual(result.stamped, 0)
+
+    def test_no_favorite_is_carried_and_none_is_skipped_for_good(self):
+        with _setting() as s:
+            s.sorted_clip("clip_a")
+            s.journal((20, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
+
+            with s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
+                result = watch_weights.run()
+
+            self.assertFalse(s.favs.exists())
+            self.assertFalse(s.cursor.exists())
+        self.assertEqual(result.favorites_added, 0)
+
+    def test_the_log_says_which_folder_could_not_be_reached(self):
+        with _setting() as s:
+            with s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
+                with self.assertLogs("tasks.watch_weights", level="WARNING") as logged:
+                    watch_weights.run()
+
+        self.assertEqual(logged.output, [
+            ("WARNING:tasks.watch_weights:Watch weights and the phone's favorites left as they "
+             f"were: {s.phones_own_folder} cannot be reached.")])
 
 
 class TestFavorites(unittest.TestCase):

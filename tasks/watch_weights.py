@@ -23,6 +23,7 @@ from app_support.file_channel import write_whole
 import config
 from util import favs_csv, lanes, sidecar, warm_gun, watch
 from util.json_reads import read_dict
+from util.media_files import reachable
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +57,11 @@ class _PhoneFavorites:
 def run() -> WatchWeightsResult:
     result = WatchWeightsResult()
     log.info("=== Stage: watch weights ===")
+    outbox = config.WARM_GUN_OUTBOX
+    if outbox is not None and not reachable(outbox):
+        log.warning("Watch weights and the phone's favorites left as they were: %s cannot be "
+                    "reached.", outbox)
+        return result
     events = warm_gun.read_journal(config.WARM_GUN_JOURNAL_DIRS)
     videos = {event.path: warm_gun.library_video(event.path) for event in events}
     result.unmapped = sum(1 for event in events if videos[event.path] is None)
