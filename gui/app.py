@@ -129,10 +129,7 @@ class EvolverApp:
         self._hand_back.setInterval(branch_session.HAND_BACK_AFTER_MINUTES * 60_000)
         self._hand_back.timeout.connect(self._hand_back_when_free)
 
-        self._tray = EvolverTray(self._name, shown_as=branch_session.shown_as())
-        self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
-        _wire(self._tray, {
-            "open": self._show_window,
+        shared_commands = {
             "run_now": self._scheduler.run_now,
             "pause": self._toggle_pause,
             "nonai": self._set_nonai_enabled,
@@ -142,8 +139,12 @@ class EvolverApp:
             "backfill": self._launch_backfill,
             "review_weird": self._launch_review_weird,
             "restart": self._restart,
-            "quit": self._quit_by_request,
-        })
+        }
+
+        self._tray = EvolverTray(self._name, shown_as=branch_session.shown_as())
+        self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
+        _wire(self._tray, {**shared_commands,
+                           "open": self._show_window, "quit": self._quit_by_request})
 
         self._app.commitDataRequest.connect(self._on_session_end)
 
@@ -152,18 +153,7 @@ class EvolverApp:
         self._window.set_nonai_enabled(self._settings.nonai_upscale_enabled)
         # Quit is the one command that means something different here: from the
         # window it asks first, because the window is where a stray click lands.
-        _wire(self._window, {
-            "run_now": self._scheduler.run_now,
-            "pause": self._toggle_pause,
-            "nonai": self._set_nonai_enabled,
-            "settings": self._show_settings,
-            "stats": self._show_stats,
-            "queue": self._show_queue,
-            "backfill": self._launch_backfill,
-            "review_weird": self._launch_review_weird,
-            "restart": self._restart,
-            "quit": self._confirm_quit,
-        })
+        _wire(self._window, {**shared_commands, "quit": self._confirm_quit})
         # Not one of the window's commands: those are the toolbar's, named the
         # same on the tray. This one carries the run that was clicked.
         self._window.log_requested.connect(self._show_run_log)
