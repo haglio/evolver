@@ -42,6 +42,8 @@ def _stores_under(temp: Path, **used):
             "FUN_TIME_FAVS_FILE": unused / "favs.csv",
             "NON_AI_DIR": unused / "non_AI",
             "METADATA_DIR": unused / "metadata",
+            "VR_VIDEO_DIR": None,
+            "NONAI_RETIRED_ROOT": None,
             **used,
         },
     ):
@@ -162,6 +164,63 @@ class TestWatchStats(unittest.TestCase):
             payload = json.loads(stats.read_text(encoding="utf-8"))
             self.assertEqual(payload[str(moved_to).lower()], {"completions": 9, "skips": 1, "locks": 2})
             self.assertEqual(payload[str(stayed).lower()], {"completions": 1, "skips": 0, "locks": 0})
+
+
+class TestAFolderThatCannotBeReached(unittest.TestCase):
+    def test_a_reference_into_it_is_not_checked_rather_than_called_unresolved(self):
+        with workspace_temp_dir() as temp:
+            (temp / "videos").mkdir()
+            vr_root = temp / "cloud" / "VR"
+            kept = str(vr_root / "finished" / "scene one.mp4").lower()
+            stats = _write_json(temp / "state" / "watch_stats.json",
+                                {kept: {"completions": 3, "skips": 0, "locks": 0}})
+
+            with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, VR_VIDEO_DIR=vr_root):
+                result = reference_sync.run()
+
+            self.assertEqual((result.unresolved, result.not_checked), (0, 1))
+
+    def test_the_log_says_once_which_folder_could_not_be_reached(self):
+        with workspace_temp_dir() as temp:
+            (temp / "videos").mkdir()
+            vr_root = temp / "cloud" / "VR"
+            stats = _write_json(temp / "state" / "watch_stats.json", {
+                str(vr_root / "finished" / name).lower(): {"completions": 1, "skips": 0, "locks": 0}
+                for name in ("scene one.mp4", "scene two.mp4")})
+
+            with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, VR_VIDEO_DIR=vr_root):
+                with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
+                    reference_sync.run()
+
+            self.assertEqual(logged.output, [
+                f"WARNING:tasks.reference_sync:2 reference(s) not checked: {vr_root} cannot be reached."])
+
+    def test_a_video_of_the_same_name_in_the_library_does_not_take_the_reference(self):
+        with workspace_temp_dir() as temp:
+            _write_video(temp / "videos" / "2D" / "scene one.mp4")
+            vr_root = temp / "cloud" / "VR"
+            kept = str(vr_root / "finished" / "scene one.mp4").lower()
+            stats = _write_json(temp / "state" / "watch_stats.json",
+                                {kept: {"completions": 3, "skips": 0, "locks": 0}})
+
+            with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, VR_VIDEO_DIR=vr_root):
+                result = reference_sync.run()
+
+            self.assertEqual(result.relocated, 0)
+            self.assertEqual(list(json.loads(stats.read_text(encoding="utf-8"))), [kept])
+
+    def test_a_reference_into_the_archive_waits_while_the_archive_cannot_be_reached(self):
+        with workspace_temp_dir() as temp:
+            (temp / "videos").mkdir()
+            archive_root = temp / "cloud" / "archive"
+            stats = _write_json(temp / "state" / "watch_stats.json", {
+                str(archive_root / "studio" / "scene one.mp4").lower():
+                    {"completions": 3, "skips": 0, "locks": 0}})
+
+            with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, NONAI_RETIRED_ROOT=archive_root):
+                result = reference_sync.run()
+
+            self.assertEqual((result.unresolved, result.not_checked), (0, 1))
 
 
 class TestFunTimeFavorites(unittest.TestCase):
@@ -424,7 +483,7 @@ class TestReferenceSyncResultSurface(unittest.TestCase):
         """Every field lands in a run record; one nothing reads is dead weight."""
         self.assertEqual(
             {f.name for f in dataclasses.fields(reference_sync.ReferenceSyncResult)},
-            {"checked", "relocated", "unresolved", "write_errors", "refused"},
+            {"checked", "relocated", "unresolved", "not_checked", "write_errors", "refused"},
         )
 
 
