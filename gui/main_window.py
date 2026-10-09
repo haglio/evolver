@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -28,6 +29,7 @@ import config
 from gui.commands import (
     BACKFILL,
     NONAI,
+    PAUSE,
     QUEUE,
     QUIT,
     RESTART,
@@ -36,6 +38,7 @@ from gui.commands import (
     SETTINGS,
     STATS,
     pause_or_resume,
+    set_label,
 )
 from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
@@ -384,12 +387,6 @@ class EvolverMainWindow(QMainWindow):
         left_pad.setFixedWidth(6)
         toolbar.addWidget(left_pad)
 
-        self.active_toggle = ToggleSwitch()
-        self.active_toggle.setChecked(True)
-        toolbar.addWidget(self.active_toggle)
-
-        toolbar.addSeparator()
-
         self._next_run_label = QLabel("")
         self._next_run_label.setMinimumWidth(self._next_run_label.fontMetrics().horizontalAdvance(
             ScheduleStatus.longest_toolbar_label()))
@@ -402,7 +399,14 @@ class EvolverMainWindow(QMainWindow):
         self.run_now_action = RUN_NOW.action(self)
         toolbar.addAction(self.run_now_action)
 
-        self.nonai_switch = ToggleSwitch(NONAI.label)
+        self.pause_action = PAUSE.action(self)
+        toolbar.addAction(self.pause_action)
+        _make_room_for(toolbar.widgetForAction(self.pause_action), pause_or_resume(is_paused=True))
+
+        self.nonai_action = NONAI.action(self)
+        toolbar.addAction(self.nonai_action)
+        self.nonai_switch = ToggleSwitch()
+        self.nonai_action.triggered.connect(self.nonai_switch.click)
         toolbar.addWidget(self.nonai_switch)
 
         toolbar.addSeparator()
@@ -442,7 +446,7 @@ class EvolverMainWindow(QMainWindow):
         """
         return {
             "run_now": self.run_now_action.triggered,
-            "pause": self.active_toggle.clicked,
+            "pause": self.pause_action.triggered,
             "nonai": self.nonai_switch.clicked,
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
@@ -478,14 +482,19 @@ class EvolverMainWindow(QMainWindow):
     def show_schedule(self, status: ScheduleStatus):
         """Put the schedule on the toolbar's three surfaces."""
         self.run_now_action.setEnabled(not status.is_running)
-        self.active_toggle.setChecked(not status.is_paused)
-        self.active_toggle.setToolTip(pause_or_resume(status.is_paused))
+        set_label(self.pause_action, pause_or_resume(status.is_paused))
         self._next_run_label.setText(status.toolbar_label())
 
     def closeEvent(self, event):
         """Hide instead of close — the tray icon keeps the app alive."""
         event.ignore()
         self.hide()
+
+
+def _make_room_for(button: QToolButton, longer_text: str) -> None:
+    metrics = button.fontMetrics()
+    growth = metrics.horizontalAdvance(longer_text) - metrics.horizontalAdvance(button.text())
+    button.setMinimumWidth(button.sizeHint().width() + max(0, growth))
 
 
 # The two stages whose results are names and words rather than counts, so the

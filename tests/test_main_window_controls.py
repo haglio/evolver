@@ -8,9 +8,8 @@ from zoneinfo import ZoneInfo
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
-from PyQt6.QtWidgets import QLabel, QMessageBox, QToolBar, QToolButton
+from PyQt6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToolButton
 from shared_ui.colors import GREEN, RED
-from shared_ui.toggle_switch import ToggleSwitch
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
 from gui.schedule_state import ScheduleStatus
@@ -436,34 +435,41 @@ def _menu_entries(tray):
 
 def _toolbar_entries(window):
     [toolbar] = window.findChildren(QToolBar)
-    return ["---" if action.isSeparator()
-            else action.text() or _words_on(toolbar.widgetForAction(action))
-            for action in toolbar.actions()]
+    entries = ["---" if action.isSeparator() else _words_on(toolbar.widgetForAction(action))
+               for action in toolbar.actions()]
+    return [entry for entry in entries if entry]
 
 
 def _words_on(widget):
-    return widget.text() if isinstance(widget, ToggleSwitch | QLabel) else ""
+    return widget.text() if isinstance(widget, QAbstractButton | QLabel) else ""
 
 
 class TestToolbarMatchesTheTrayMenu:
 
-    def test_it_offers_the_menus_commands_in_the_menus_words_groups_and_order(self, window):
-        tray = EvolverTray()
-        menu = _menu_entries(tray)
-        bar = _toolbar_entries(window)
-
-        in_the_menu = [entry for entry in menu[menu.index("Run Now"):]
-                       if entry != tray.pause_action.text()]
-        assert bar[bar.index("Run Now"):] == in_the_menu
-
     @pytest.mark.parametrize("status", [ScheduleStatus(), ScheduleStatus(is_paused=True)],
                              ids=["scheduling", "paused"])
-    def test_the_switch_at_its_left_end_is_named_as_the_menus_pause_item_is(self, window, status):
+    def test_it_offers_the_menus_commands_in_the_menus_words_groups_and_order(
+            self, window, status):
         tray = EvolverTray()
         tray.show_schedule(status)
         window.show_schedule(status)
+        menu = _menu_entries(tray)
+        bar = _toolbar_entries(window)
 
-        assert window.active_toggle.toolTip() == tray.pause_action.text()
+        assert bar[bar.index("Run Now"):] == menu[menu.index("Run Now"):]
+
+
+class TestUpscaleNonAiOnTheToolbar:
+
+    def test_its_switch_sits_right_after_its_name(self, window):
+        [toolbar] = window.findChildren(QToolBar)
+        actions = toolbar.actions()
+        after_the_name = actions[actions.index(window.nonai_action) + 1]
+        assert toolbar.widgetForAction(after_the_name) is window.nonai_switch
+
+    def test_clicking_its_name_throws_its_switch(self, window):
+        window.nonai_action.trigger()
+        assert window.nonai_switch.isChecked()
 
 
 class TestTheWholeToolbarShows:
@@ -489,14 +495,8 @@ class TestMainWindowToolbarExists:
     def test_restart_action_has_icon(self, window):
         assert not window.restart_action.icon().isNull()
 
-    def test_has_active_toggle(self, window):
-        assert window.active_toggle is not None
-
-    def test_active_toggle_is_toggle_switch(self, window):
-        assert isinstance(window.active_toggle, ToggleSwitch)
-
-    def test_active_toggle_starts_checked(self, window):
-        assert window.active_toggle.isChecked()
+    def test_the_pause_button_starts_as_pause_scheduling(self, window):
+        assert window.pause_action.text() == "Pause Scheduling"
 
 
 class TestToolbarStateUpdates:
@@ -530,14 +530,14 @@ class TestToolbarStateUpdates:
         window.show_schedule(ScheduleStatus(is_running=True, is_paused=True))
         assert window._next_run_label.text() == "Running..."
 
-    def test_toggle_unchecked_when_paused(self, window):
+    def test_the_pause_button_reads_resume_scheduling_while_paused(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
-        assert not window.active_toggle.isChecked()
+        assert window.pause_action.iconText() == "Resume Scheduling"
 
-    def test_toggle_checked_when_active(self, window):
+    def test_the_pause_button_reads_pause_scheduling_once_resumed(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
         window.show_schedule(ScheduleStatus(next_run_at=datetime.now()))
-        assert window.active_toggle.isChecked()
+        assert window.pause_action.iconText() == "Pause Scheduling"
 
 
 
@@ -620,11 +620,11 @@ class TestToolbarAppWiring:
             app._tray.stats_action.trigger()
         mock_stats.return_value.show.assert_called_once()
 
-    def test_the_active_toggle_pauses_and_resumes_the_scheduler(self, app):
+    def test_the_pause_button_pauses_and_resumes_the_scheduler(self, app):
         assert not app._scheduler.is_paused
-        app._window.active_toggle.clicked.emit(False)
+        app._window.pause_action.trigger()
         assert app._scheduler.is_paused
-        app._window.active_toggle.clicked.emit(True)
+        app._window.pause_action.trigger()
         assert not app._scheduler.is_paused
 
     def test_the_trays_pause_item_toggles_the_scheduler_too(self, app):
