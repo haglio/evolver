@@ -7,9 +7,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextDocument
+from PyQt6.QtGui import QPalette, QTextDocument
 from PyQt6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToolButton
-from shared_ui.colors import GREEN, RED
+from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
 from gui.schedule_state import ScheduleStatus
@@ -459,25 +459,54 @@ class TestToolbarMatchesTheTrayMenu:
         assert bar[bar.index("Run Now"):] == menu[menu.index("Run Now"):]
 
 
-class TestUpscaleNonAiOnTheToolbar:
-
-    def test_its_switch_sits_right_after_its_name(self, window):
-        [toolbar] = window.findChildren(QToolBar)
-        actions = toolbar.actions()
-        after_the_name = actions[actions.index(window.nonai_action) + 1]
-        assert toolbar.widgetForAction(after_the_name) is window.nonai_switch
-
-    def test_clicking_its_name_throws_its_switch(self, window):
-        window.nonai_action.trigger()
-        assert window.nonai_switch.isChecked()
-
-
 def _shown(window):
     window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
     window.show()
     QAPP.processEvents()
     [toolbar] = window.findChildren(QToolBar)
     return toolbar
+
+
+def _button_for(toolbar, action):
+    [button] = [widget for widget in map(toolbar.widgetForAction, toolbar.actions())
+                if isinstance(widget, QToolButton) and widget.defaultAction() is action]
+    return button
+
+
+def _columns_wearing(image, color) -> list[int]:
+    return [x for x in range(image.width()) for y in range(image.height())
+            if image.pixelColor(x, y).name() == color.name()]
+
+
+class TestUpscaleNonAiOnTheToolbar:
+
+    def test_its_switch_is_drawn_on_its_own_button(self, window):
+        window.set_nonai_enabled(True)
+        button = _button_for(_shown(window), window.nonai_action)
+        assert len(_columns_wearing(button.grab().toImage(), TOGGLE_ON)) > 30
+
+    def test_its_switch_sits_clear_of_its_name(self, window):
+        window.set_nonai_enabled(True)
+        button = _button_for(_shown(window), window.nonai_action)
+        drawn = button.grab().toImage()
+        words = button.palette().color(QPalette.ColorRole.ButtonText)
+
+        name_ends = (min(_columns_wearing(drawn, words))
+                     + button.fontMetrics().horizontalAdvance(button.text()))
+        assert name_ends < min(_columns_wearing(drawn, TOGGLE_ON))
+
+    def test_clicking_its_name_throws_its_switch(self, window):
+        window.nonai_action.trigger()
+        assert window.nonai_switch.isChecked()
+
+
+class TestToolbarButtonsLookLikeButtons:
+
+    def test_a_button_at_rest_wears_the_familys_border_round_its_ground(self, window):
+        drawn = _button_for(_shown(window), window.settings_action).grab().toImage()
+        middle = drawn.height() // 2
+        assert drawn.pixelColor(0, middle).name() == BORDER_SUBTLE.name()
+        assert drawn.pixelColor(3, middle).name() == BG_BUTTON.name()
 
 
 class TestToolbarSpacing:

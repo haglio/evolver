@@ -43,6 +43,8 @@ from gui.commands import (
 from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
 from gui.status_symbols import GRAY, mark_for, mark_icon
+from gui.switches import SwitchButton
+from gui.toolbar_style import toolbar_rules
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
 
@@ -381,6 +383,7 @@ class EvolverMainWindow(QMainWindow):
         toolbar.setFloatable(False)
         toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         toolbar.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
+        toolbar.setStyleSheet(toolbar_rules())
         self.addToolBar(toolbar)
 
         left_pad = QWidget()
@@ -403,10 +406,9 @@ class EvolverMainWindow(QMainWindow):
         toolbar.addAction(self.pause_action)
 
         self.nonai_action = NONAI.action(self)
-        toolbar.addAction(self.nonai_action)
         self.nonai_switch = ToggleSwitch()
         self.nonai_action.triggered.connect(self.nonai_switch.click)
-        toolbar.addWidget(self.nonai_switch)
+        toolbar.addWidget(SwitchButton(self.nonai_action, self.nonai_switch))
 
         toolbar.addSeparator()
 

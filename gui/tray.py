@@ -25,8 +25,8 @@ from gui.commands import (
     pause_or_resume,
     set_label,
 )
-from gui.menu_with_switches import MenuWithSwitches
 from gui.schedule_state import ScheduleStatus
+from gui.switches import MenuWithSwitches
 
 
 class EvolverTray(QSystemTrayIcon):
