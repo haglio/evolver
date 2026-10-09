@@ -341,7 +341,7 @@ class EvolverMainWindow(QMainWindow):
         self.setWindowTitle("Evolver")
         self.setMinimumSize(800, 500)
         toolbar = self._build_toolbar()
-        self.resize(max(1000, toolbar.sizeHint().width()), 600)
+        self.resize(max(1000, self._toolbar_width_when_paused(toolbar)), 600)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -401,7 +401,6 @@ class EvolverMainWindow(QMainWindow):
 
         self.pause_action = PAUSE.action(self)
         toolbar.addAction(self.pause_action)
-        _make_room_for(toolbar.widgetForAction(self.pause_action), pause_or_resume(is_paused=True))
 
         self.nonai_action = NONAI.action(self)
         toolbar.addAction(self.nonai_action)
@@ -436,6 +435,10 @@ class EvolverMainWindow(QMainWindow):
         self.quit_action = QUIT.action(self)
         toolbar.addAction(self.quit_action)
         return toolbar
+
+    def _toolbar_width_when_paused(self, toolbar: QToolBar) -> int:
+        pause = toolbar.widgetForAction(self.pause_action)
+        return toolbar.sizeHint().width() + _growth(pause, pause_or_resume(is_paused=True))
 
     def commands(self):
         """Each toolbar command's signal, by the name the app knows it as.
@@ -491,10 +494,9 @@ class EvolverMainWindow(QMainWindow):
         self.hide()
 
 
-def _make_room_for(button: QToolButton, longer_text: str) -> None:
+def _growth(button: QToolButton, longer_text: str) -> int:
     metrics = button.fontMetrics()
-    growth = metrics.horizontalAdvance(longer_text) - metrics.horizontalAdvance(button.text())
-    button.setMinimumWidth(button.sizeHint().width() + max(0, growth))
+    return max(0, metrics.horizontalAdvance(longer_text) - metrics.horizontalAdvance(button.text()))
 
 
 # The two stages whose results are names and words rather than counts, so the
