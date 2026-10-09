@@ -27,8 +27,8 @@ log = logging.getLogger(__name__)
 class PresenceThrottle:
     """Polls while it is running, and asks *is_enabled* before each poll.
 
-    The opt-in is read at every tick rather than at construction: the tray's
-    toggle flips it while this is running, and a throttle that had to be
+    The opt-in is read at every tick rather than at construction: it can be
+    switched while this is running, and a throttle that had to be
     rebuilt to notice would be a second place the setting lives.
     """
 

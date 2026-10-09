@@ -1,5 +1,5 @@
 #!/usr/bin/env pythonw
-"""Metadata backfill tool entry point, launched from Evolver's tray menu.
+"""Metadata backfill tool entry point, launched from Evolver's tray menu or toolbar.
 
 Plays every clip that still lacks a ``video.action``, looping in a stable order,
 and records the act the viewer speaks.  Runs as its own process so an open
