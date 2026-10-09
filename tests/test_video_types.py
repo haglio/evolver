@@ -482,3 +482,18 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
             self.assertEqual(
                 [kinds[f"whole-{i}.mp4"] for i in range(3)], [video_type.FULL_LENGTH] * 3
             )
+
+    def test_a_scene_carved_and_filed_beside_its_source_leaves_the_source_whole(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                batch = lib.non_ai / "alpha"
+                wholes = [touch_video(batch / "0 unsorted" / f"whole-{i}.mp4") for i in range(3)]
+                source = touch_video(batch / "3_good_to_go" / "processed" / "scene.mp4")
+                carved = touch_video(batch / "3_good_to_go" / "processed" / "scene-portrait.mp4")
+                write_sidecar(sidecar.sidecar_path(carved), {"clip": {"full_video": str(source)}})
+
+                video_types.run(probe=_probe({v.stem: 900.0 for v in [*wholes, source, carved]}))
+
+                kind = video_type.type_of(sidecar.read(sidecar.sidecar_path(source)))
+            self.assertEqual(kind, video_type.FULL_LENGTH)
