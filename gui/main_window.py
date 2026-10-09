@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.chrome import toolbar_rules
 from shared_ui.spacing import BUTTON_ICON
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -44,7 +45,6 @@ from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from gui.switches import SwitchButton
-from gui.toolbar_style import toolbar_rules
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
 
