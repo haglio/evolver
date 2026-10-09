@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QPoint, QRect, Qt
 from PyQt6.QtGui import QPalette, QTextDocument
 from PyQt6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToolButton
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
@@ -478,17 +478,25 @@ def _columns_wearing(image, color) -> list[int]:
             if image.pixelColor(x, y).name() == color.name()]
 
 
+def _as_painted(window, action):
+    window.show()
+    QAPP.processEvents()
+    [toolbar] = window.findChildren(QToolBar)
+    button = _button_for(toolbar, action)
+    painted = QAPP.primaryScreen().grabWindow(window.winId()).toImage()
+    return button, painted.copy(QRect(button.mapTo(window, QPoint(0, 0)), button.size()))
+
+
 class TestUpscaleNonAiOnTheToolbar:
 
-    def test_its_switch_is_drawn_on_its_own_button(self, window):
+    def test_its_switch_is_painted_on_its_own_button(self, window):
         window.set_nonai_enabled(True)
-        button = _button_for(_shown(window), window.nonai_action)
-        assert len(_columns_wearing(button.grab().toImage(), TOGGLE_ON)) > 30
+        _button, painted = _as_painted(window, window.nonai_action)
+        assert len(_columns_wearing(painted, TOGGLE_ON)) > 30
 
     def test_its_switch_sits_clear_of_its_name(self, window):
         window.set_nonai_enabled(True)
-        button = _button_for(_shown(window), window.nonai_action)
-        drawn = button.grab().toImage()
+        button, drawn = _as_painted(window, window.nonai_action)
         words = button.palette().color(QPalette.ColorRole.ButtonText)
 
         name_ends = (min(_columns_wearing(drawn, words))
@@ -503,7 +511,7 @@ class TestUpscaleNonAiOnTheToolbar:
 class TestToolbarButtonsLookLikeButtons:
 
     def test_a_button_at_rest_wears_the_familys_border_round_its_ground(self, window):
-        drawn = _button_for(_shown(window), window.settings_action).grab().toImage()
+        _button, drawn = _as_painted(window, window.settings_action)
         middle = drawn.height() // 2
         assert drawn.pixelColor(0, middle).name() == BORDER_SUBTLE.name()
         assert drawn.pixelColor(3, middle).name() == BG_BUTTON.name()
