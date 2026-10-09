@@ -290,6 +290,20 @@ class TestScriptsSyncSummary:
         summary = _summarize_result({"already_aligned": 53, "unmatched": 15}, None, "scripts")
         assert "15 match no video" in summary
 
+    def test_says_how_many_were_not_checked_and_which_folder_could_not_be_reached(self):
+        summary = self._result(already_aligned=350, not_checked=15, unreachable=["Q:/cloud/VR"])
+        assert summary == "15 not checked: Q:/cloud/VR cannot be reached; 350 already aligned"
+
+    def test_a_run_that_checked_nothing_says_why(self):
+        summary = self._result(not_checked=15, unreachable=["Q:/cloud/VR"])
+        assert summary == "15 not checked: Q:/cloud/VR cannot be reached"
+
+    def test_what_went_unchecked_follows_what_went_wrong(self):
+        summary = self._result(ambiguous=1, ambiguous_paths=["beta/scene two.funscript"],
+                               not_checked=15, unreachable=["Q:/cloud/VR"])
+        assert summary == ("1 match more than one video (beta/scene two.funscript); "
+                           "15 not checked: Q:/cloud/VR cannot be reached")
+
 
 class TestNonAiUpscaleSummary:
     """The non-AI row should read as prose: which video, how far, what happened.

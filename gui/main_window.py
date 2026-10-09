@@ -198,9 +198,7 @@ def _summarize_result(
 
 
 # What each scripts-sync counter means, in words. The first group is what a
-# person has to deal with, the second the work the stage got done. Every
-# counter the stage declares is in one of them, and a gate says so: one left
-# out is a run reporting it did nothing where it did something.
+# person has to deal with, the second the work the stage got done.
 #
 # Ambiguous variant groups are the one problem here that does not also make the
 # stage red -- whether they should is the stage's call, not the view's.
@@ -235,11 +233,13 @@ def _summarize_scripts_sync(result: dict[str, Any]) -> str:
     problems = [_naming(f"{result[key]} {label}", result.get(names) or [])
                 for key, label, names in _SCRIPTS_PROBLEMS
                 if isinstance(result.get(key), int) and result[key]]
-    if not problems:
-        routine = [f"{result[key]} {label}" for key, label in _SCRIPTS_ROUTINE
-                   if isinstance(result.get(key), int) and result[key]]
-        return ", ".join(routine) if routine else "no funscripts"
-    return "; ".join(problems)
+    unreachable = " and ".join(result.get("unreachable") or [])
+    not_checked = ([f"{result['not_checked']} not checked: {unreachable} cannot be reached"]
+                   if result.get("not_checked") else [])
+    routine = [] if problems else [f"{result[key]} {label}" for key, label in _SCRIPTS_ROUTINE
+                                   if isinstance(result.get(key), int) and result[key]]
+    said = problems + not_checked + ([", ".join(routine)] if routine else [])
+    return "; ".join(said) if said else "no funscripts"
 
 
 def _naming(said: str, names: list[str]) -> str:

@@ -11,7 +11,13 @@ from pathlib import Path
 
 import config
 from util.alert import show_error
-from util.media_files import library_videos, listed_videos, remove_empty_dirs, unique_path
+from util.media_files import (
+    library_videos,
+    listed_videos,
+    reachable,
+    remove_empty_dirs,
+    unique_path,
+)
 from util.script_library import (
     carry_mark,
     copy_mark,
@@ -39,6 +45,8 @@ class ScriptsSyncResult:
     rehomed_to_variants: int = 0
     followed_to_archive: int = 0
     discarded_duplicates: int = 0
+    not_checked: int = 0
+    unreachable: list[str] = field(default_factory=list)
     unmatched_paths: list[str] = field(default_factory=list)
     ambiguous_paths: list[str] = field(default_factory=list)
     collision_paths: list[str] = field(default_factory=list)
@@ -125,10 +133,16 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
     log.info("VIDEOS:  %s", trees.videos)
     log.info("SCRIPTS: %s", trees.scripts)
 
+    vr_out_of_reach = trees.vr is not None and not reachable(trees.vr)
+    if vr_out_of_reach:
+        result.unreachable.append(str(trees.vr))
     video_index = _index_videos(trees)
 
     orphans: list[Path] = []
     for script_path in _iter_funscripts(trees.scripts, trees.unmatched):
+        if vr_out_of_reach and _may_match_a_vr_video(script_path, trees):
+            result.not_checked += 1
+            continue
         matches = _matching_videos_for_script(script_path, video_index, trees)
         if not matches:
             orphans.append(script_path)
@@ -153,12 +167,16 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         carry_mark(script_path, dest)
         result.moved += 1
 
-    followed = _follow_retired_videos(orphans, video_index, trees)
-    result.unmatched_paths += [_park(script_path, trees) for script_path in followed.unmatched]
-    result.followed_to_archive += followed.followed_to_archive
-    result.rehomed_to_variants += followed.rehomed_to_variants
-    result.collision_paths += followed.collision_paths
-    result.discarded_duplicates += followed.discarded_duplicates
+    if orphans and trees.archive is not None and not reachable(trees.archive):
+        result.unreachable.append(str(trees.archive))
+        result.not_checked += len(orphans)
+    else:
+        followed = _follow_retired_videos(orphans, video_index, trees)
+        result.unmatched_paths += [_park(script_path, trees) for script_path in followed.unmatched]
+        result.followed_to_archive += followed.followed_to_archive
+        result.rehomed_to_variants += followed.rehomed_to_variants
+        result.collision_paths += followed.collision_paths
+        result.discarded_duplicates += followed.discarded_duplicates
     remove_empty_dirs(trees.scripts)
     remove_empty_mark_folders()
     variants = _copy_missing_variant_scripts(video_index, trees)
@@ -183,6 +201,9 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         result.followed_to_archive,
         result.discarded_duplicates,
     )
+    if result.not_checked:
+        log.warning("%d funscript(s) not checked: %s cannot be reached, so they stay where they "
+                    "are until it can be.", result.not_checked, " and ".join(result.unreachable))
     if not result.ok:
         log.error("Scripts sync failed. See log entries above for unresolved funscript alignment issues.")
         if show_popup:
@@ -391,18 +412,25 @@ def _iter_funscripts(*roots: Path):
 def _matching_videos_for_script(script_path: Path, video_index: dict[str, list[Path]],
                                 trees: Trees) -> list[Path]:
     matches = video_index.get(script_path.stem, [])
-    if not script_path.is_relative_to(trees.scripts):
-        return matches
-    mirrored = script_path.relative_to(trees.scripts)
-    if _ai_or_non_ai(mirrored) is None:
+    kind = _filed_2d_kind(script_path, trees)
+    if kind is None:
         return matches
     filed = {video_path: video_path.relative_to(trees.videos) for video_path in matches}
-    matches = [video_path for video_path in matches
-               if _ai_or_non_ai(filed[video_path]) == _ai_or_non_ai(mirrored)]
-    source = _ai_filing(mirrored).source
+    matches = [video_path for video_path in matches if _ai_or_non_ai(filed[video_path]) == kind]
+    source = _ai_filing(script_path.relative_to(trees.scripts)).source
     same_source = [video_path for video_path in matches
                    if _ai_filing(filed[video_path]).source == source]
     return same_source if source and same_source else matches
+
+
+def _may_match_a_vr_video(script_path: Path, trees: Trees) -> bool:
+    return _filed_2d_kind(script_path, trees) is None
+
+
+def _filed_2d_kind(script_path: Path, trees: Trees) -> str | None:
+    if not script_path.is_relative_to(trees.scripts):
+        return None
+    return _ai_or_non_ai(script_path.relative_to(trees.scripts))
 
 
 def _ai_or_non_ai(rel: Path) -> str | None:

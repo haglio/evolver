@@ -175,6 +175,70 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
             self.assertEqual(result.moved, 1)
             self.assertTrue((script_root / "VR" / "finished" / "scene one.funscript").exists())
 
+    def test_a_vr_script_stays_put_with_no_popup_while_the_vr_folder_cannot_be_reached(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root = root / "videos", root / "scripts"
+            script_path = script_root / "VR" / "finished" / "scene one.funscript"
+            _write(script_path)
+
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=root / "cloud" / "VR"):
+                with patch("tasks.scripts_sync.show_error") as show_error:
+                    scripts_sync.run(show_popup=True)
+
+            show_error.assert_not_called()
+            self.assertTrue(script_path.exists())
+            self.assertFalse((root / "unmatched_scripts").exists())
+
+    def test_says_how_many_went_unchecked_and_which_folder_could_not_be_reached(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, vr_root = root / "videos", root / "scripts", root / "cloud" / "VR"
+            _write(script_root / "VR" / "finished" / "scene one.funscript")
+
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=vr_root):
+                result = scripts_sync.run()
+
+            self.assertEqual(result.not_checked, 1)
+            self.assertEqual(result.unreachable, [str(vr_root)])
+
+    def test_warns_in_the_log_which_folder_could_not_be_reached(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, vr_root = root / "videos", root / "scripts", root / "cloud" / "VR"
+            _write(script_root / "VR" / "finished" / "scene one.funscript")
+
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=vr_root):
+                with self.assertLogs("tasks.scripts_sync", level="WARNING") as logged:
+                    scripts_sync.run()
+
+            self.assertEqual(
+                logged.output,
+                [(f"WARNING:tasks.scripts_sync:1 funscript(s) not checked: {vr_root} cannot be "
+                  "reached, so they stay where they are until it can be.")])
+
+    def test_a_2d_script_still_moves_to_its_video_while_the_vr_folder_cannot_be_reached(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root = root / "videos", root / "scripts"
+            waiting = Path("2D", "AI", "0_inbox", "src")
+            filed = Path("2D", "AI", "1_sorted", "src", "portrait")
+            _write(video_root / filed / "clip.mp4", script_root / waiting / "clip.funscript")
+
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=root / "cloud" / "VR"):
+                result = scripts_sync.run()
+
+            self.assertEqual((result.moved, result.not_checked), (1, 0))
+            self.assertTrue((script_root / filed / "clip.funscript").is_file())
+
+    def test_a_script_a_vr_video_could_share_a_name_with_waits_while_the_vr_folder_cannot_be_reached(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root = root / "videos", root / "scripts"
+            stray = script_root / "unsorted" / "clip.funscript"
+            _write(video_root / "alpha" / "clip.mp4", stray)
+
+            with library_overrides(video_root, script_root, VR_VIDEO_DIR=root / "cloud" / "VR"):
+                result = scripts_sync.run()
+
+            self.assertEqual((result.moved, result.not_checked), (0, 1))
+            self.assertTrue(stray.is_file())
+
 
 class TestUnmatchedScriptsFolder(unittest.TestCase):
     """A script that matches no video waits in unmatched_scripts until renamed."""
@@ -871,6 +935,20 @@ class TestFollowRetiredVideos(unittest.TestCase):
             self.assertEqual(result.unmatched, 1)
             self.assertTrue((root / "unmatched_scripts" / "scene one.funscript").exists())
 
+    def test_a_script_matching_no_video_stays_put_with_no_popup_while_the_archive_cannot_be_reached(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root, archive_root = root / "videos", root / "scripts", root / "cloud" / "archive"
+            script_path = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
+            _write(script_path)
+
+            with library_overrides(video_root, script_root, NONAI_RETIRED_ROOT=archive_root):
+                with patch("tasks.scripts_sync.show_error") as show_error:
+                    result = scripts_sync.run(show_popup=True)
+
+            show_error.assert_not_called()
+            self.assertTrue(script_path.exists())
+            self.assertEqual((result.not_checked, result.unreachable), (1, [str(archive_root)]))
+
 
 class TestScriptsSyncResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
@@ -881,6 +959,7 @@ class TestScriptsSyncResultSurface(unittest.TestCase):
                 "moved", "already_aligned", "unmatched", "ambiguous", "collisions",
                 "copied_variants", "ambiguous_variant_groups", "variant_copy_errors",
                 "rehomed_to_variants", "followed_to_archive", "discarded_duplicates",
+                "not_checked", "unreachable",
                 "unmatched_paths", "ambiguous_paths", "collision_paths",
                 "variant_copy_error_paths",
             },

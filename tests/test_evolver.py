@@ -36,7 +36,7 @@ def _stage_mocks() -> dict:
         "strays_run": Mock(return_value=Mock(ok=True)),
         "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
         "withdrawn_run": Mock(return_value=Mock(failed=0)),
-        "scripts_sync_run": Mock(return_value=Mock(ok=True)),
+        "scripts_sync_run": Mock(return_value=Mock(ok=True, not_checked=0)),
         "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
         "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
         "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
@@ -544,6 +544,16 @@ class TestRunPipeline:
             result = evolver.run_pipeline()
         statuses = {s.name: s.status for s in result.stages}
         assert statuses["upscale_non_ai"] == "warning"
+        assert not result.has_errors
+
+    def test_scripts_left_unchecked_while_a_folder_cannot_be_reached_warn_instead_of_failing(self):
+        stack, _ = self._patch_all_stages(
+            scripts_sync_run=Mock(return_value=Mock(ok=True, not_checked=15)),
+        )
+        with stack:
+            result = evolver.run_pipeline()
+        statuses = {s.name: s.status for s in result.stages}
+        assert statuses["scripts"] == "warning"
         assert not result.has_errors
 
     def test_a_dead_encode_outranks_a_hold_on_the_same_stage(self):
