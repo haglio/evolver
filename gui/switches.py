@@ -3,11 +3,10 @@ from __future__ import annotations
 from PyQt6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt
 from PyQt6.QtGui import QAction, QPainter, QPen, QPixmap, QRegion
 from PyQt6.QtWidgets import QMenu, QToolButton, QWidget
+from shared_ui.chrome import toolbar_padding
 from shared_ui.colors import TOGGLE_HANDLE
 from shared_ui.spacing import BUTTON_ICON, BUTTON_PAD_H_TIGHT, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
-
-from gui.toolbar_style import toolbar_padding
 
 
 def _draw_at_the_end(painter: QPainter, switch: ToggleSwitch, row: QRect, inset: int) -> QRectF:

@@ -103,7 +103,6 @@ The order above is the order they run in, and it is not maintained here: `tasks/
   - `gui/tray.py` - system tray icon and context menu
   - `gui/commands.py` - what each command is called and drawn with, on the tray menu and the toolbar alike
   - `gui/switches.py` - the switch Upscale Non-AI When Idle wears at the end of its menu row and on its toolbar button
-  - `gui/toolbar_style.py` - how the main window's toolbar buttons look: the family's border and ground, a gap between each
   - `gui/main_window.py` - run history list and detail/progress panel
   - `gui/progress_popup.py` - the floating per-stage progress window
   - `gui/stats_window.py` - the stacked-area chart of stage durations across runs
