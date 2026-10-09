@@ -17,6 +17,9 @@ _.drawFocus  # noqa: F821
 _.dropEvent  # noqa: F821
 _.startDrag  # noqa: F821
 _.option  # noqa: F821  — drawFocus override parameter (Qt signature)
+# Qt hands every event of the application to a filter installed on it
+# (gui/process_identity.py).
+_.eventFilter  # noqa: F821
 
 # -- Python HTMLParser overrides --
 _.handle_starttag  # noqa: F821

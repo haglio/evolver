@@ -260,14 +260,13 @@ class TestTellingTheTwoApart:
         assert "preview of the new queue window" in app._window.windowTitle()
         assert "preview of the new queue window" in app._tray.toolTip()
 
-    def test_a_preview_wears_its_letter_in_the_preview_ink(self, request):
+    def test_a_preview_s_tray_icon_wears_its_letter_in_the_preview_ink(self, request):
         with override_config(BRANCH_SESSION=True), \
              patch("util.preview.preview_of", return_value=Preview(feature=None)):
             app = build_evolver_app(request)
 
-        for icon in (app._tray.icon(), app._app.windowIcon()):
-            middle_of_the_e = icon.pixmap(256, 256).toImage().pixelColor(128, 128)
-            assert (middle_of_the_e.red(), middle_of_the_e.green(), middle_of_the_e.blue()) == PREVIEW_INK
+        middle_of_the_e = app._tray.icon().pixmap(256, 256).toImage().pixelColor(128, 128)
+        assert (middle_of_the_e.red(), middle_of_the_e.green(), middle_of_the_e.blue()) == PREVIEW_INK
 
     def test_a_preview_gets_a_taskbar_button_of_its_own(self):
         with override_config(BRANCH_SESSION=True), \

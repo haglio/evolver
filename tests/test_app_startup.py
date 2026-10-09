@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from PyQt6.QtCore import QEvent
@@ -11,7 +11,6 @@ from PyQt6.QtCore import QEvent
 import config
 from gui import single_instance
 from gui.app import _wire
-from gui.process_identity import APP_MODEL_ID
 from gui.run_history import RunHistory
 from gui.run_record import RunRecord
 from gui.settings import EvolverSettings
@@ -29,19 +28,6 @@ class TestAppStartup:
         assert app._tray is not None
         assert app._window is not None
         assert app._scheduler is not None
-
-    def test_app_window_icon_matches_tray_icon(self, request):
-        app = build_evolver_app(request)
-        # Taskbar icon should be set to the same icon as the tray
-        app_icon = app._app.windowIcon()
-        assert not app_icon.isNull(), "Application window icon should be set"
-
-    def test_app_sets_appusermodelid(self, request):
-        app = build_evolver_app(request)
-        with patch("gui.process_identity.set_app_user_model_id") as mock_set_id, \
-             patch("gui.process_identity.dress_window"):
-            app.start()
-        mock_set_id.assert_called_once_with(APP_MODEL_ID)
 
 
 class TestBuildingIsNotStarting:
@@ -74,7 +60,7 @@ class TestBuildingIsNotStarting:
              patch("gui.main_window.newest_runs", return_value=[]) as load:
             app.start()
 
-        claim.assert_called_once()
+        claim.assert_called_once_with(app._app)
         load.assert_called_once()
         assert app._presence.is_running
         assert app._scheduler.next_run_at is not None
@@ -642,47 +628,57 @@ class TestALaunchThatFindsEvolverUp:
         with override_config(BRANCH_SESSION=preview):
             app = build_evolver_app(request)
 
-        with patch.object(app._instance, "take_over", return_value=outcome) as take_over, \
+        launch = SimpleNamespace(order=Mock())
+        with patch.object(app._instance, "take_over", return_value=outcome) as launch.take_over, \
              patch.object(app._instance, "serve_launches"), \
-             patch("gui.app.show_error") as alert, \
-             patch("gui.app.crash_log.write_info") as logged:
-            exit_code = app.run()
+             patch("gui.app.process_identity.claim") as claim, \
+             patch("gui.app.show_error") as launch.alert, \
+             patch("gui.app.crash_log.write_info") as launch.logged:
+            launch.order.attach_mock(claim, "claim")
+            launch.order.attach_mock(launch.alert, "alert")
+            launch.exit_code = app.run()
 
-        return exit_code, take_over, alert, logged
+        return launch
 
     def test_the_usual_evolver_leaves_the_launch_with_the_running_one(self, request):
-        exit_code, take_over, _, _ = self._launch(request, Outcome.HANDED_OFF)
+        launch = self._launch(request, Outcome.HANDED_OFF)
 
-        take_over.assert_called_once_with(single_instance.USUAL, end_the_unanswering=False)
-        assert exit_code == 0
+        launch.take_over.assert_called_once_with(single_instance.USUAL, end_the_unanswering=False)
+        assert launch.exit_code == 0
 
     def test_a_preview_comes_to_take_the_work_and_ends_an_evolver_that_will_not_answer(
             self, request):
-        _, take_over, _, _ = self._launch(request, Outcome.HANDED_OFF, preview=True)
+        launch = self._launch(request, Outcome.HANDED_OFF, preview=True)
 
-        take_over.assert_called_once_with(single_instance.PREVIEW, end_the_unanswering=True)
+        launch.take_over.assert_called_once_with(single_instance.PREVIEW, end_the_unanswering=True)
 
     def test_a_taken_handoff_needs_no_dialog(self, request):
-        _, _, alert, _ = self._launch(request, Outcome.HANDED_OFF)
+        launch = self._launch(request, Outcome.HANDED_OFF)
 
-        alert.assert_not_called()
+        launch.alert.assert_not_called()
 
     def test_a_handoff_the_running_instance_never_answered_is_visible(self, request):
         """Exiting into silence here is the whole bug: the user clicked Evolver
         and nothing at all happened."""
-        exit_code, _, alert, _ = self._launch(request, Outcome.UNANSWERED)
+        launch = self._launch(request, Outcome.UNANSWERED)
 
-        alert.assert_called_once()
-        assert "evolver" in " ".join(alert.call_args[0]).lower()
-        assert exit_code == 0
+        launch.alert.assert_called_once()
+        assert "evolver" in " ".join(launch.alert.call_args[0]).lower()
+        assert launch.exit_code == 0
+
+    def test_what_a_launch_the_running_instance_never_answered_shows_is_evolver_on_the_taskbar(
+            self, request):
+        launch = self._launch(request, Outcome.UNANSWERED)
+
+        assert [name for name, _args, _kwargs in launch.order.mock_calls] == ["claim", "alert"]
 
     def test_the_launch_is_logged_as_the_ordinary_event_it_is(self, request):
         """A click on a running app is not a crash, and must not suppress the
         atexit line that says how this process really ended."""
-        _, _, _, logged = self._launch(request, Outcome.HANDED_OFF)
+        launch = self._launch(request, Outcome.HANDED_OFF)
 
-        logged.assert_called_once()
-        assert "already running" in logged.call_args[0][0].lower()
+        launch.logged.assert_called_once()
+        assert "already running" in launch.logged.call_args[0][0].lower()
 
 
 class TestAStartForWhenEvolverIsNotRunning:
@@ -808,6 +804,7 @@ class TestShowWindowFlag:
         with patch.object(app, "_show_window") as mock_show, \
              patch.object(app._instance, "take_over", return_value=Outcome.CLAIMED), \
              patch.object(app._instance, "serve_launches"), \
+             patch("gui.app.process_identity.claim"), \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \
@@ -822,6 +819,7 @@ class TestShowWindowFlag:
         with patch.object(app, "_show_window") as mock_show, \
              patch.object(app._instance, "take_over", return_value=Outcome.CLAIMED), \
              patch.object(app._instance, "serve_launches"), \
+             patch("gui.app.process_identity.claim"), \
              patch.object(app._tray, "show"), \
              patch.object(app._scheduler, "start"), \
              patch.object(app._app, "exec", return_value=0), \
