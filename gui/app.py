@@ -106,7 +106,7 @@ class EvolverApp:
 
         # Parks and thaws the in-flight non-AI encode between the slow pipeline
         # ticks, so returning to the machine suspends it in seconds. Reads the
-        # opt-in at every poll, since the tray toggle flips it while it runs.
+        # opt-in at every poll, since it can be switched while it runs.
         self._presence = PresenceThrottle(
             lambda: self._settings.nonai_upscale_enabled)
 
@@ -149,14 +149,17 @@ class EvolverApp:
 
         self._window = EvolverMainWindow()
         self._window.setWindowTitle(self._name)
+        self._window.set_nonai_enabled(self._settings.nonai_upscale_enabled)
         # Quit is the one command that means something different here: from the
         # window it asks first, because the window is where a stray click lands.
         _wire(self._window, {
             "run_now": self._scheduler.run_now,
             "pause": self._toggle_pause,
+            "nonai": self._set_nonai_enabled,
             "settings": self._show_settings,
             "stats": self._show_stats,
             "queue": self._show_queue,
+            "backfill": self._launch_backfill,
             "review_weird": self._launch_review_weird,
             "restart": self._restart,
             "quit": self._confirm_quit,
@@ -165,8 +168,8 @@ class EvolverApp:
         # same on the tray. This one carries the run that was clicked.
         self._window.log_requested.connect(self._show_run_log)
 
-        # The non-AI toggle is read at every start rather than held from
-        # construction: the tray flips it between runs.
+        # The non-AI opt-in is read at every start rather than held from
+        # construction: it can be switched between runs.
         self._runs = RunController(
             self._window, lambda: self._settings.nonai_upscale_enabled)
         self._scheduler.run_requested.connect(self._runs.start)
@@ -306,6 +309,8 @@ class EvolverApp:
         """Persist the one-time opt-in; presence polling and the next tick act on it."""
         self._settings.nonai_upscale_enabled = enabled
         self._settings.save()
+        self._tray.set_nonai_enabled(enabled)
+        self._window.set_nonai_enabled(enabled)
 
     def _show_settings(self):
         dialog = SettingsDialog(self._settings, self._window)

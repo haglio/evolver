@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-import qtawesome as qta
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -23,18 +21,25 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.spacing import BUTTON_ICON
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
-from gui.icons import quit_icon, restart_icon, review_weird_icon, run_now_icon
+from gui.commands import (
+    BACKFILL,
+    NONAI,
+    QUEUE,
+    QUIT,
+    RESTART,
+    REVIEW_WEIRD,
+    RUN_NOW,
+    SETTINGS,
+    STATS,
+)
 from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
 from gui.status_symbols import GRAY, mark_for, mark_icon
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
-
-_ICON_COLOR = TEXT_SECONDARY.name()
 
 
 class _NoFocusRectDelegate(QItemDelegate):
@@ -392,32 +397,37 @@ class EvolverMainWindow(QMainWindow):
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         toolbar.addWidget(spacer)
 
-        self.run_now_action = QAction(run_now_icon(_ICON_COLOR), "Run Now", self)
+        self.run_now_action = RUN_NOW.action(self)
         toolbar.addAction(self.run_now_action)
+
+        self.nonai_switch = ToggleSwitch(NONAI.label)
+        toolbar.addWidget(self.nonai_switch)
 
         toolbar.addSeparator()
 
-        self.settings_action = QAction(qta.icon("fa5s.cog", color=_ICON_COLOR), "Settings", self)
+        self.settings_action = SETTINGS.action(self)
         toolbar.addAction(self.settings_action)
 
-        self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats", self)
+        self.stats_action = STATS.action(self)
         toolbar.addAction(self.stats_action)
 
         toolbar.addSeparator()
 
-        self.queue_action = QAction(qta.icon("fa5s.list-ol", color=_ICON_COLOR),
-                                    "Queue", self)
+        self.queue_action = QUEUE.action(self)
         toolbar.addAction(self.queue_action)
 
-        self.review_weird_action = QAction(review_weird_icon(_ICON_COLOR), "Review Weird", self)
+        self.backfill_action = BACKFILL.action(self)
+        toolbar.addAction(self.backfill_action)
+
+        self.review_weird_action = REVIEW_WEIRD.action(self)
         toolbar.addAction(self.review_weird_action)
 
         toolbar.addSeparator()
 
-        self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self)
+        self.restart_action = RESTART.action(self)
         toolbar.addAction(self.restart_action)
 
-        self.quit_action = QAction(quit_icon(_ICON_COLOR), "Quit", self)
+        self.quit_action = QUIT.action(self)
         toolbar.addAction(self.quit_action)
 
     def commands(self):
@@ -430,13 +440,18 @@ class EvolverMainWindow(QMainWindow):
         return {
             "run_now": self.run_now_action.triggered,
             "pause": self.active_toggle.clicked,
+            "nonai": self.nonai_switch.clicked,
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
+            "backfill": self.backfill_action.triggered,
             "review_weird": self.review_weird_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,
         }
+
+    def set_nonai_enabled(self, enabled: bool):
+        self.nonai_switch.setChecked(enabled)
 
     def refresh_history(self):
         """Reload run records from disk."""

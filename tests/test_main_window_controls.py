@@ -8,12 +8,13 @@ from zoneinfo import ZoneInfo
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
-from PyQt6.QtWidgets import QMessageBox, QToolBar
+from PyQt6.QtWidgets import QLabel, QMessageBox, QToolBar
 from shared_ui.colors import GREEN, RED
 from shared_ui.toggle_switch import ToggleSwitch
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
 from gui.schedule_state import ScheduleStatus
+from gui.tray import EvolverTray
 from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
 from tests.gui_support import build_evolver_app
 from tests.temp_helpers import make_run_record, override_config
@@ -428,38 +429,38 @@ def window():
     return EvolverMainWindow()
 
 
+def _menu_entries(tray):
+    return ["---" if action.isSeparator() else action.text()
+            for action in tray.contextMenu().actions()]
+
+
+def _toolbar_entries(window):
+    [toolbar] = window.findChildren(QToolBar)
+    return ["---" if action.isSeparator()
+            else action.text() or _words_on(toolbar.widgetForAction(action))
+            for action in toolbar.actions()]
+
+
+def _words_on(widget):
+    return widget.text() if isinstance(widget, ToggleSwitch | QLabel) else ""
+
+
+class TestToolbarMatchesTheTrayMenu:
+
+    def test_it_offers_the_menus_commands_in_the_menus_words_groups_and_order(self, window):
+        tray = EvolverTray()
+        menu = _menu_entries(tray)
+        bar = _toolbar_entries(window)
+
+        in_the_menu = [entry for entry in menu[menu.index("Run Now"):]
+                       if entry != tray.pause_action.text()]
+        assert bar[bar.index("Run Now"):] == in_the_menu
+
+
 class TestMainWindowToolbarExists:
-    """The main window should have a toolbar with all tray-equivalent controls."""
-
-    def test_has_toolbar(self, window):
-        toolbars = window.findChildren(QToolBar)
-        assert len(toolbars) >= 1
-
-    def test_has_restart_action(self, window):
-        assert window.restart_action is not None
 
     def test_restart_action_has_icon(self, window):
         assert not window.restart_action.icon().isNull()
-
-    def test_has_quit_action(self, window):
-        assert window.quit_action is not None
-
-    def test_has_settings_action(self, window):
-        assert window.settings_action is not None
-
-    def test_has_queue_action(self, window):
-        assert window.queue_action is not None
-
-    def test_review_weird_sits_beside_the_queue_with_a_line_either_side(self, window):
-        [toolbar] = window.findChildren(QToolBar)
-        entries = ["|" if action.isSeparator() else action.text() for action in toolbar.actions()]
-        queue = entries.index("Queue")
-
-        assert entries[queue - 1:queue + 3] == ["|", "Queue", "Review Weird", "|"]
-        assert window.commands()["review_weird"] == window.review_weird_action.triggered
-
-    def test_has_run_now_action(self, window):
-        assert window.run_now_action is not None
 
     def test_has_active_toggle(self, window):
         assert window.active_toggle is not None

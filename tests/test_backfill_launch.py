@@ -43,6 +43,16 @@ class TestLaunch(unittest.TestCase):
         creationflags = popen.call_args.kwargs["creationflags"]
         self.assertTrue(creationflags & subprocess.DETACHED_PROCESS)
 
+    def test_the_toolbar_starts_the_backfill_tool_as_the_tray_does(self):
+        app = self._app()
+
+        with patch("gui.app.subprocess.Popen") as popen:
+            app._tray.backfill_action.trigger()
+            app._window.backfill_action.trigger()
+
+        expected = [sys.executable, str(config.PROJECT_DIR / "backfill_app.py")]
+        self.assertEqual([call.args[0] for call in popen.call_args_list], [expected, expected])
+
     def test_review_weird_starts_its_own_process_from_the_tray_and_the_window_alike(self):
         app = self._app()
 
