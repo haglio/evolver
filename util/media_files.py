@@ -52,6 +52,14 @@ def library_videos(root: Path):
             yield path
 
 
+def reachable(folder: Path) -> bool:
+    try:
+        with os.scandir(folder):
+            return True
+    except OSError:
+        return False
+
+
 def listed_videos(root: Path):
     """Every finished video under *root*, told apart by its folder's listing alone.
 

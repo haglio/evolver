@@ -20,6 +20,7 @@ from util.media_files import (
     listed_videos,
     partial_path,
     partial_stem,
+    reachable,
     remove_empty_dirs,
     remove_partial_files,
     retry_while_in_use,
@@ -81,6 +82,16 @@ class TestListedVideos(unittest.TestCase):
     def test_a_root_that_is_not_there_yields_nothing(self):
         with workspace_temp_dir() as root, override_config(VIDEO_EXTENSIONS={".mp4"}):
             self.assertEqual(list(listed_videos(root / "nope")), [])
+
+
+class TestReachable(unittest.TestCase):
+    def test_an_empty_folder_can_be_reached(self):
+        with workspace_temp_dir() as root:
+            self.assertTrue(reachable(root))
+
+    def test_a_folder_that_is_not_there_cannot_be_reached(self):
+        with workspace_temp_dir() as root:
+            self.assertFalse(reachable(root / "cloud" / "VR"))
 
 
 class TestPartialPath(unittest.TestCase):
