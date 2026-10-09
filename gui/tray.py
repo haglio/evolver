@@ -2,25 +2,30 @@
 
 from __future__ import annotations
 
-import qtawesome as qta
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 from shared_ui.chrome import menu_rules
-from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
 
 import config
-from gui.icons import pause_icon, quit_icon, restart_icon, review_weird_icon, run_now_icon
+from gui.commands import (
+    BACKFILL,
+    NONAI,
+    OPEN,
+    PAUSE,
+    QUEUE,
+    QUIT,
+    RESTART,
+    REVIEW_WEIRD,
+    RUN_NOW,
+    SETTINGS,
+    STATS,
+)
 from gui.schedule_state import ScheduleStatus
-
-_ICON_COLOR = TEXT_SECONDARY.name()
-
-
 
 
 class EvolverTray(QSystemTrayIcon):
-    """System tray icon with Open / Run Now / Pause / Settings / Quit menu."""
 
     def __init__(self, name: str = "Evolver", parent=None, *, shown_as: Preview | None = None):
         super().__init__(app_icon(config.PROJECT_DIR / "icon.ico", shown_as), parent)
@@ -41,51 +46,50 @@ class EvolverTray(QSystemTrayIcon):
 
         self._menu.addSeparator()
 
-        self.open_action = QAction(qta.icon("fa5s.external-link-alt", color=_ICON_COLOR), "Open", self._menu)
+        self.open_action = OPEN.action(self._menu)
         font = self.open_action.font()
         font.setBold(True)
         self.open_action.setFont(font)
         self._menu.addAction(self.open_action)
 
-        self.run_now_action = QAction(run_now_icon(_ICON_COLOR), "Run Now", self._menu)
+        self.run_now_action = RUN_NOW.action(self._menu)
         self._menu.addAction(self.run_now_action)
 
-        self.pause_action = QAction(pause_icon(_ICON_COLOR), "Pause Scheduling", self._menu)
+        self.pause_action = PAUSE.action(self._menu)
         self._menu.addAction(self.pause_action)
 
         # A one-time opt-in, off by default because a non-AI encode owns the
         # GPU for hours. Once on, Evolver runs it only while the user is idle
         # and suspends it the moment they return — no manual flipping.
-        self.nonai_action = QAction(qta.icon("fa5s.film", color=_ICON_COLOR), "Upscale Non-AI When Idle", self._menu)
+        self.nonai_action = NONAI.action(self._menu)
         self.nonai_action.setCheckable(True)
         self._menu.addAction(self.nonai_action)
 
         self._menu.addSeparator()
 
-        self.settings_action = QAction(qta.icon("fa5s.cog", color=_ICON_COLOR), "Settings...", self._menu)
+        self.settings_action = SETTINGS.action(self._menu)
         self._menu.addAction(self.settings_action)
 
-        self.stats_action = QAction(qta.icon("fa5s.chart-bar", color=_ICON_COLOR), "Stats...", self._menu)
+        self.stats_action = STATS.action(self._menu)
         self._menu.addAction(self.stats_action)
 
         self._menu.addSeparator()
 
-        self.queue_action = QAction(qta.icon("fa5s.list-ol", color=_ICON_COLOR),
-                                    "Upscale Queue...", self._menu)
+        self.queue_action = QUEUE.action(self._menu)
         self._menu.addAction(self.queue_action)
 
-        self.backfill_action = QAction(qta.icon("fa5s.microphone", color=_ICON_COLOR), "Backfill Metadata...", self._menu)
+        self.backfill_action = BACKFILL.action(self._menu)
         self._menu.addAction(self.backfill_action)
 
-        self.review_weird_action = QAction(review_weird_icon(_ICON_COLOR), "Review Weird...", self._menu)
+        self.review_weird_action = REVIEW_WEIRD.action(self._menu)
         self._menu.addAction(self.review_weird_action)
 
         self._menu.addSeparator()
 
-        self.restart_action = QAction(restart_icon(_ICON_COLOR), "Restart", self._menu)
+        self.restart_action = RESTART.action(self._menu)
         self._menu.addAction(self.restart_action)
 
-        self.quit_action = QAction(quit_icon(_ICON_COLOR), "Quit", self._menu)
+        self.quit_action = QUIT.action(self._menu)
         self._menu.addAction(self.quit_action)
 
         self.setContextMenu(self._menu)
@@ -109,7 +113,7 @@ class EvolverTray(QSystemTrayIcon):
             "open": self.open_action.triggered,
             "run_now": self.run_now_action.triggered,
             "pause": self.pause_action.triggered,
-            "nonai": self.nonai_action.toggled,
+            "nonai": self.nonai_action.triggered,
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,

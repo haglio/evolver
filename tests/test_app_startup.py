@@ -442,7 +442,6 @@ class TestUpscaleQueueWindow:
 
 
 class TestNonAiUpscaleToggle:
-    """The tray menu's opt-in switch for the multi-hour non-AI encodes."""
 
     def _app_with_fresh_settings(self, request):
         with patch("gui.app.EvolverSettings.load", return_value=EvolverSettings()):
@@ -459,6 +458,33 @@ class TestNonAiUpscaleToggle:
             app._tray.nonai_action.trigger()
         assert app._settings.nonai_upscale_enabled
         mock_save.assert_called_once()
+
+    def test_the_toolbars_switch_flips_and_saves_the_setting_too(self, request):
+        app = self._app_with_fresh_settings(request)
+        with patch("gui.app.EvolverSettings.save") as mock_save:
+            app._window.nonai_switch.click()
+        assert app._settings.nonai_upscale_enabled
+        mock_save.assert_called_once()
+
+    def test_switching_it_on_in_the_toolbar_checks_it_in_the_tray_menu(self, request):
+        app = self._app_with_fresh_settings(request)
+        with patch("gui.app.EvolverSettings.save"):
+            app._window.nonai_switch.click()
+        assert app._tray.nonai_action.isChecked()
+
+    def test_checking_it_in_the_tray_menu_switches_it_on_in_the_toolbar(self, request):
+        app = self._app_with_fresh_settings(request)
+        with patch("gui.app.EvolverSettings.save"):
+            app._tray.nonai_action.trigger()
+        assert app._window.nonai_switch.isChecked()
+
+    def test_a_saved_opt_in_starts_on_in_the_tray_menu_and_the_toolbar(self, request):
+        settings = EvolverSettings()
+        settings.nonai_upscale_enabled = True
+        with patch("gui.app.EvolverSettings.load", return_value=settings):
+            app = build_evolver_app(request)
+        assert app._tray.nonai_action.isChecked()
+        assert app._window.nonai_switch.isChecked()
 
     def test_worker_receives_the_toggle_state(self, request):
         app = self._app_with_fresh_settings(request)
