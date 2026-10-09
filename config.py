@@ -115,6 +115,11 @@ VIDEO_SEARCH_ROOT = LIBRARY_ROOT / "videos"
 METADATA_DIR = LIBRARY_ROOT / "videos" / "metadata"
 
 
+def warm_gun_outbox(content: dict[str, Any]) -> Path | None:
+    outbox = content.get("warm_gun_outbox")
+    return Path(outbox) if outbox else None
+
+
 def warm_gun_journal_dirs(content: dict[str, Any], library_root: Path) -> tuple[Path, ...]:
     """Every folder Warm Gun's journal is read from, in order.
 
@@ -128,13 +133,11 @@ def warm_gun_journal_dirs(content: dict[str, Any], library_root: Path) -> tuple[
     folder retired without a day where the two sides disagree; drop it once the
     folder is gone.
     """
-    dirs = [library_root / "videos" / "warm_gun"]
-    outbox = content.get("warm_gun_outbox")
-    if outbox:
-        dirs.append(Path(outbox))
-    return tuple(dirs)
+    outbox = warm_gun_outbox(content)
+    return (library_root / "videos" / "warm_gun", *([outbox] if outbox else []))
 
 
+WARM_GUN_OUTBOX = warm_gun_outbox(_CONTENT)
 WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, LIBRARY_ROOT)
 SCRIPT_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 UNMATCHED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "unmatched_scripts"

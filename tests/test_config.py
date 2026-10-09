@@ -234,3 +234,9 @@ class TestWarmGunJournalDirs(unittest.TestCase):
         self.assertEqual(
             len(config.warm_gun_journal_dirs({"warm_gun_outbox": ""}, Path("L:/library"))), 1
         )
+
+    def test_the_phone_s_own_folder_is_the_one_the_overlay_names(self):
+        self.assertEqual(config.warm_gun_outbox({"warm_gun_outbox": "S:/WarmGun"}), Path("S:/WarmGun"))
+
+    def test_with_none_named_the_phone_has_no_folder_of_its_own(self):
+        self.assertIsNone(config.warm_gun_outbox({"warm_gun_outbox": ""}))
