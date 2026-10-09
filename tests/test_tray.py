@@ -16,8 +16,8 @@ from shared_ui.chrome import menu_rules
 from shared_ui.colors import BG_TERTIARY, TEXT_PRIMARY, TOGGLE_OFF, TOGGLE_ON
 from shared_ui.toggle_switch import ToggleSwitch
 
-from gui.menu_with_switches import MenuWithSwitches
 from gui.schedule_state import ScheduleStatus
+from gui.switches import MenuWithSwitches
 from gui.tray import EvolverTray
 from tests.gui_support import QAPP
 
