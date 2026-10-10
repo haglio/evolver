@@ -113,7 +113,7 @@ class TestGenauDeliver(unittest.TestCase):
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
         """Fun Time's audio companion plays ``<audio folder>/<clip name>.mp3``
-        while a clip is up, as it does for the clips Clipper cuts."""
+        while a clip is up, as it does for the clips Genaumacher cuts."""
         with workspace_temp_dir() as root:
             outbox, sorted_dir, clips = _lane(root)
             _stage_clip(outbox, sorted_dir)

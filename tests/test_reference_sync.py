@@ -36,7 +36,7 @@ def _stores_under(temp: Path, **used):
     with override_config(
         VIDEO_SEARCH_ROOT=temp / "videos",
         **{
-            "CLIPPER_SESSIONS_DIR": unused,
+            "GENAUMACHER_SESSIONS_DIR": unused,
             "SCRIPTURE_SESSIONS_DIR": unused,
             "FUN_TIME_WATCH_STATS_FILE": unused / "watch_stats.json",
             "FUN_TIME_FAVS_FILE": unused / "favs.csv",
@@ -61,7 +61,7 @@ def _paired_library(temp: Path):
         yield library / "2D" / "non_AI"
 
 
-class TestClipperSessions(unittest.TestCase):
+class TestGenaumacherSessions(unittest.TestCase):
     def test_repoints_a_session_at_the_video_that_moved(self):
         with workspace_temp_dir() as temp:
             moved_to = _write_video(temp / "videos" / "2D" / "non_AI" / "other" / "clip.mp4")
@@ -70,7 +70,7 @@ class TestClipperSessions(unittest.TestCase):
                 {"session_name": "Clip", "video_path": str(temp / "videos" / "2D" / "other" / "clip.mp4")},
             )
 
-            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
                 result = reference_sync.run()
 
             payload = json.loads(session.read_text(encoding="utf-8"))
@@ -88,7 +88,7 @@ class TestClipperSessions(unittest.TestCase):
             )
 
             with (
-                _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"),
+                _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"),
                 patch("util.video_locator.ffprobe.frame_fingerprint", lambda _: (60.0, 70296)),
             ):
                 result = reference_sync.run()
@@ -102,7 +102,7 @@ class TestClipperSessions(unittest.TestCase):
             gone = str(temp / "Downloads" / "scratch.mp4")
             session = _write_json(temp / "sessions" / "Scratch.json", {"video_path": gone})
 
-            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
                 with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
                     result = reference_sync.run()
 
@@ -118,7 +118,7 @@ class TestClipperSessions(unittest.TestCase):
             session = _write_json(temp / "sessions" / "Clip.json", {"video_path": str(still_there)})
             written_at = session.stat().st_mtime_ns
 
-            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
                 result = reference_sync.run()
 
             self.assertEqual(session.stat().st_mtime_ns, written_at)
@@ -331,7 +331,7 @@ class TestUnwritableStore(unittest.TestCase):
             patched = patch.object(
                 reference_stores, "_rewrite_video_path_field", refuse_the_locked_one
             )
-            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"), patched:
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"), patched:
                 result = reference_sync.run()
 
             self.assertEqual(result.write_errors, 1)
@@ -409,7 +409,7 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
                 {"version": 2, "session_name": "Clip", "video_path": was_at},
             )
 
-            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
                 result = reference_sync.run()
 
             self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], was_at)
@@ -428,7 +428,7 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
                  "video_path": str(temp / "videos" / "2D" / "other" / "clip.mp4")},
             )
 
-            with _stores_under(temp, CLIPPER_SESSIONS_DIR=temp / "sessions"):
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
                 result = reference_sync.run()
 
             self.assertEqual(

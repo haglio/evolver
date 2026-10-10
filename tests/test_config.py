@@ -191,6 +191,32 @@ class TestLiveDir(unittest.TestCase):
             self.assertEqual(found, temp / "worktree")
 
 
+class TestASiblingKnownByTwoNames(unittest.TestCase):
+    """Genaumacher was Clipper; its checkout keeps the old folder name until the
+    folder moves, and the sessions are found under whichever name it has."""
+
+    def test_the_new_name_wins_where_both_folders_exist(self):
+        with workspace_temp_dir() as root:
+            (root / "genaumacher").mkdir()
+            (root / "clipper").mkdir()
+
+            self.assertEqual(config.sibling_known_as("genaumacher", "clipper", roots=(root,)),
+                             root / "genaumacher")
+
+    def test_the_old_name_is_found_while_the_folder_still_has_it(self):
+        with workspace_temp_dir() as root:
+            (root / "clipper").mkdir()
+
+            self.assertEqual(config.sibling_known_as("genaumacher", "clipper", roots=(root,)),
+                             root / "clipper")
+
+    def test_neither_folder_means_the_new_name(self):
+        with workspace_temp_dir() as root:
+
+            self.assertEqual(config.sibling_known_as("genaumacher", "clipper", roots=(root,)),
+                             root / "genaumacher")
+
+
 class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
     """The four sibling paths must come from the roots, not from the library root."""
 
@@ -198,7 +224,7 @@ class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
         for name, path in (
             ("FUN_TIME_PROJECT_DIR", config.FUN_TIME_PROJECT_DIR),
             ("ORIGENERATOR_DB_PATH", config.ORIGENERATOR_DB_PATH),
-            ("CLIPPER_SESSIONS_DIR", config.CLIPPER_SESSIONS_DIR),
+            ("GENAUMACHER_SESSIONS_DIR", config.GENAUMACHER_SESSIONS_DIR),
             ("SCRIPTURE_SESSIONS_DIR", config.SCRIPTURE_SESSIONS_DIR),
         ):
             with self.subTest(name):

@@ -2,7 +2,7 @@
 
 Evolver relocates videos — sorting them, retiring an upscaled original, and the
 library gets reorganized by hand between runs too. Every sibling app that saved
-a video's path (Clipper's clip bounds, Fun Time's favorites and watch counts)
+a video's path (Genaumacher's clip bounds, Fun Time's favorites and watch counts)
 is left pointing at where the file used to be, and so is the scene this app
 recorded each carved clip was found in. This stage walks those stores each run
 and follows the move.

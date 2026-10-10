@@ -67,7 +67,7 @@ STAGES: tuple[Stage, ...] = (
           "Verify 1_sorted and 2_outbox are in 1-to-1 correspondence",
           (0xFF, 0x9D, 0x83)),
     Stage("references", "Follow Moved Videos",
-          "Repoint the suite's saved video paths — Clipper sessions, Scripture projects, Fun Time favorites and watch counts — at videos that have since moved",
+          "Repoint the suite's saved video paths — Genaumacher sessions, Scripture projects, Fun Time favorites and watch counts — at videos that have since moved",
           (0x61, 0xCA, 0xF2)),
     Stage("watch_weights", "Watch Weights",
           "Sum Fun Time's and Warm Gun's completions, skips and locks on every library video's sidecar as the playback weight both apps shuffle by, carry the phone's favorites into favs.csv, and flag every favorite on its sidecar",
