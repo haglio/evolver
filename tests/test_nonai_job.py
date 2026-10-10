@@ -21,7 +21,7 @@ class TestJobRecord(unittest.TestCase):
         the record round-trips unchanged rather than through any schema."""
         with workspace_temp_dir() as root:
             path = root / "state" / "job.json"
-            job = {"pid": 4242, "source": "larkin/0 unsorted/a.mp4", "suspended": False}
+            job = {"pid": 4242, "source": "lagoon/0 unsorted/a.mp4", "suspended": False}
 
             nonai_job.save_job(path, job)
 
@@ -79,28 +79,28 @@ class TestJobRecord(unittest.TestCase):
 class TestAttempts(unittest.TestCase):
     def test_a_key_with_no_record_has_no_attempts(self):
         with workspace_temp_dir() as root:
-            self.assertEqual(nonai_job.attempts_of(root / "a.json", "larkin/a.mp4"), 0)
+            self.assertEqual(nonai_job.attempts_of(root / "a.json", "lagoon/a.mp4"), 0)
 
     def test_bumping_counts_per_key(self):
         with workspace_temp_dir() as root:
             path = root / "state" / "attempts.json"
 
-            nonai_job.bump_attempts(path, "larkin/a.mp4")
-            nonai_job.bump_attempts(path, "larkin/a.mp4")
+            nonai_job.bump_attempts(path, "lagoon/a.mp4")
+            nonai_job.bump_attempts(path, "lagoon/a.mp4")
             nonai_job.bump_attempts(path, "other/b.mp4")
 
-            self.assertEqual(nonai_job.attempts_of(path, "larkin/a.mp4"), 2)
+            self.assertEqual(nonai_job.attempts_of(path, "lagoon/a.mp4"), 2)
             self.assertEqual(nonai_job.attempts_of(path, "other/b.mp4"), 1)
 
     def test_clearing_one_key_leaves_the_others(self):
         with workspace_temp_dir() as root:
             path = root / "attempts.json"
-            nonai_job.bump_attempts(path, "larkin/a.mp4")
+            nonai_job.bump_attempts(path, "lagoon/a.mp4")
             nonai_job.bump_attempts(path, "other/b.mp4")
 
-            nonai_job.clear_attempts(path, "larkin/a.mp4")
+            nonai_job.clear_attempts(path, "lagoon/a.mp4")
 
-            self.assertEqual(nonai_job.attempts_of(path, "larkin/a.mp4"), 0)
+            self.assertEqual(nonai_job.attempts_of(path, "lagoon/a.mp4"), 0)
             self.assertEqual(nonai_job.attempts_of(path, "other/b.mp4"), 1)
 
     def test_clearing_a_key_that_was_never_counted_writes_nothing(self):
@@ -109,7 +109,7 @@ class TestAttempts(unittest.TestCase):
         with workspace_temp_dir() as root:
             path = root / "attempts.json"
 
-            nonai_job.clear_attempts(path, "larkin/a.mp4")
+            nonai_job.clear_attempts(path, "lagoon/a.mp4")
 
             self.assertFalse(path.exists())
 
@@ -118,7 +118,7 @@ class TestAttempts(unittest.TestCase):
             path = root / "attempts.json"
             path.write_text("not json", encoding="utf-8")
 
-            self.assertEqual(nonai_job.attempts_of(path, "larkin/a.mp4"), 0)
+            self.assertEqual(nonai_job.attempts_of(path, "lagoon/a.mp4"), 0)
 
 
 class TestCooldown(unittest.TestCase):
@@ -160,15 +160,15 @@ class TestRequest(unittest.TestCase):
         with workspace_temp_dir() as root:
             path = root / "state" / "request.json"
 
-            nonai_job.save_request(path, nonai_job.Request("larkin/0 unsorted/scene one.mp4"))
+            nonai_job.save_request(path, nonai_job.Request("lagoon/0 unsorted/scene one.mp4"))
 
             self.assertEqual(nonai_job.load_request(path),
-                             nonai_job.Request("larkin/0 unsorted/scene one.mp4"))
+                             nonai_job.Request("lagoon/0 unsorted/scene one.mp4"))
 
     def test_nothing_was_asked_for_when_the_file_is_absent_or_unreadable(self):
         """The window writes this while the pipeline reads it, and a reader
         that crashed on a half-written file would take the tick down with it."""
-        for written in (None, '{"video": "larkin/0 un', "[1, 2]", '{"held_back": "low_ram"}'):
+        for written in (None, '{"video": "lagoon/0 un', "[1, 2]", '{"held_back": "low_ram"}'):
             with self.subTest(written=written), workspace_temp_dir() as root:
                 path = root / "request.json"
                 if written is not None:
@@ -179,7 +179,7 @@ class TestRequest(unittest.TestCase):
     def test_a_request_the_machine_held_back_keeps_the_reason(self):
         with workspace_temp_dir() as root:
             path = root / "request.json"
-            held = nonai_job.Request("larkin/0 unsorted/scene one.mp4", held_back="low_ram")
+            held = nonai_job.Request("lagoon/0 unsorted/scene one.mp4", held_back="low_ram")
 
             nonai_job.save_request(path, held)
 
@@ -188,7 +188,7 @@ class TestRequest(unittest.TestCase):
     def test_clearing_removes_the_request_and_tolerates_it_being_gone(self):
         with workspace_temp_dir() as root:
             path = root / "request.json"
-            nonai_job.save_request(path, nonai_job.Request("larkin/0 unsorted/a.mp4"))
+            nonai_job.save_request(path, nonai_job.Request("lagoon/0 unsorted/a.mp4"))
 
             nonai_job.clear_request(path)
             nonai_job.clear_request(path)

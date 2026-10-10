@@ -35,10 +35,10 @@ class TestCollectCandidates(unittest.TestCase):
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
-            unsorted_video = make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
+            unsorted_video = make_video(non_ai / "lagoon" / "0 unsorted" / "a.mp4")
             flagged_video = make_video(non_ai / "other" / "1 could use work" / "b.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "retired.mp4")
-            make_video(non_ai / "larkin" / "3_good_to_go" / "processed" / "done_iris2.mp4")
+            make_video(non_ai / "lagoon" / "2 do not need work" / "retired.mp4")
+            make_video(non_ai / "lagoon" / "3_good_to_go" / "processed" / "done_iris2.mp4")
 
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
@@ -51,16 +51,16 @@ class TestCollectCandidates(unittest.TestCase):
             )
 
     def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
-        """A triage dir's first sub-stage holds manual pre-work (e.g. larkin's
+        """A triage dir's first sub-stage holds manual pre-work (e.g. lagoon's
         '1 could use work/1_originals_needing_trimming'); those clips are not
         ready for an unattended multi-hour encode."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
-            ready = make_video(non_ai / "larkin" / "1 could use work" / "ready.mp4")
+            ready = make_video(non_ai / "lagoon" / "1 could use work" / "ready.mp4")
             make_video(
-                non_ai / "larkin" / "1 could use work"
+                non_ai / "lagoon" / "1 could use work"
                 / "1_originals_needing_trimming" / "not yet.mp4"
             )
 
@@ -75,7 +75,7 @@ class TestCollectCandidates(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            work = non_ai / "larkin" / "1 could use work"
+            work = non_ai / "lagoon" / "1 could use work"
 
             good = make_video(
                 work / "2_originals_good_trimwise_but_need_upscaling" / "good.mp4"
@@ -98,11 +98,11 @@ class TestCollectCandidates(unittest.TestCase):
             non_ai = overrides["NON_AI_DIR"]
             pins = root / "next.txt"
 
-            make_video(non_ai / "larkin" / "1 could use work" / "a.mp4")
+            make_video(non_ai / "lagoon" / "1 could use work" / "a.mp4")
             second = make_video(non_ai / "other" / "0 unsorted" / "y.mp4")
-            first = make_video(non_ai / "larkin" / "0 unsorted" / "z.mp4")
+            first = make_video(non_ai / "lagoon" / "0 unsorted" / "z.mp4")
             pins.write_text(
-                "larkin/0 unsorted/z.mp4\nother/0 unsorted/y.mp4\n", encoding="utf-8"
+                "lagoon/0 unsorted/z.mp4\nother/0 unsorted/y.mp4\n", encoding="utf-8"
             )
 
             with override_config(**overrides):
@@ -119,11 +119,11 @@ class TestCollectCandidates(unittest.TestCase):
             non_ai = overrides["NON_AI_DIR"]
             pins = root / "next.txt"
 
-            original = make_video(non_ai / "larkin" / "1 could use work" / "scene.mp4")
+            original = make_video(non_ai / "lagoon" / "1 could use work" / "scene.mp4")
             make_video(
-                non_ai / "larkin" / "3_good_to_go" / "processed" / "scene_topaz.mp4"
+                non_ai / "lagoon" / "3_good_to_go" / "processed" / "scene_topaz.mp4"
             )
-            pins.write_text("larkin/1 could use work/scene.mp4\n", encoding="utf-8")
+            pins.write_text("lagoon/1 could use work/scene.mp4\n", encoding="utf-8")
 
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(
@@ -170,11 +170,11 @@ class TestCollectCandidates(unittest.TestCase):
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
-            watched = make_video(non_ai / "larkin" / "0 unsorted" / "watched.mp4")
-            scripted = make_video(non_ai / "larkin" / "0 unsorted" / "scripted.mp4")
-            plain = make_video(non_ai / "larkin" / "0 unsorted" / "plain.mp4")
-            disliked = make_video(non_ai / "larkin" / "0 unsorted" / "disliked.mp4")
-            script = (overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "larkin"
+            watched = make_video(non_ai / "lagoon" / "0 unsorted" / "watched.mp4")
+            scripted = make_video(non_ai / "lagoon" / "0 unsorted" / "scripted.mp4")
+            plain = make_video(non_ai / "lagoon" / "0 unsorted" / "plain.mp4")
+            disliked = make_video(non_ai / "lagoon" / "0 unsorted" / "disliked.mp4")
+            script = (overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "lagoon"
                       / "0 unsorted" / "scripted.funscript")
             script.parent.mkdir(parents=True)
             script.write_text("{}", encoding="utf-8")
@@ -195,10 +195,10 @@ class TestCollectCandidates(unittest.TestCase):
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
 
-            plain = make_video(non_ai / "larkin" / "0 unsorted" / "aaa plain.mp4")
-            scripted = make_video(non_ai / "larkin" / "0 unsorted" / "zzz scripted.mp4")
-            flagged = make_video(non_ai / "larkin" / "1 could use work" / "flagged.mp4")
-            script = (overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "larkin"
+            plain = make_video(non_ai / "lagoon" / "0 unsorted" / "aaa plain.mp4")
+            scripted = make_video(non_ai / "lagoon" / "0 unsorted" / "zzz scripted.mp4")
+            flagged = make_video(non_ai / "lagoon" / "1 could use work" / "flagged.mp4")
+            script = (overrides["SCRIPT_LIBRARY_DIR"] / "2D" / "non_AI" / "lagoon"
                       / "0 unsorted" / "zzz scripted.funscript")
             script.parent.mkdir(parents=True)
             script.write_text("{}", encoding="utf-8")
@@ -218,13 +218,13 @@ class TestManifestEntries(unittest.TestCase):
         with workspace_temp_dir() as root:
             path = root / "skip.txt"
             path.write_text(
-                "larkin/0 unsorted/a.mp4\tfailed twice\n\nother/0 unsorted/b.mp4\n",
+                "lagoon/0 unsorted/a.mp4\tfailed twice\n\nother/0 unsorted/b.mp4\n",
                 encoding="utf-8",
             )
 
             self.assertEqual(
                 nonai_queue.listed_videos(path),
-                ["larkin/0 unsorted/a.mp4", "other/0 unsorted/b.mp4"],
+                ["lagoon/0 unsorted/a.mp4", "other/0 unsorted/b.mp4"],
             )
 
 
@@ -233,14 +233,14 @@ class TestPinAhead(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             for name in ("a.mp4", "b.mp4"):
-                make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / name)
+                make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / name)
             pins = root / "next.txt"
 
             with override_config(**overrides):
-                nonai_queue.pin_ahead(pins, ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
+                nonai_queue.pin_ahead(pins, ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"])
 
             self.assertEqual(nonai_queue.listed_videos(pins),
-                             ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
+                             ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"])
 
     def test_the_pins_already_there_follow_in_their_order_with_their_notes(self):
         """The list is hand-edited too, so a line's note is the user's and
@@ -248,18 +248,18 @@ class TestPinAhead(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             for name in ("a.mp4", "b.mp4", "c.mp4"):
-                make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / name)
+                make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / name)
             pins = root / "next.txt"
-            pins.write_text("larkin/0 unsorted/a.mp4\tfor the weekend\n"
-                            "larkin/0 unsorted/c.mp4\tredo under v2\n", encoding="utf-8")
+            pins.write_text("lagoon/0 unsorted/a.mp4\tfor the weekend\n"
+                            "lagoon/0 unsorted/c.mp4\tredo under v2\n", encoding="utf-8")
 
             with override_config(**overrides):
-                nonai_queue.pin_ahead(pins, ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/c.mp4"])
+                nonai_queue.pin_ahead(pins, ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/c.mp4"])
 
             self.assertEqual(pins.read_text(encoding="utf-8").splitlines(), [
-                "larkin/0 unsorted/b.mp4",
-                "larkin/0 unsorted/c.mp4\tredo under v2",
-                "larkin/0 unsorted/a.mp4\tfor the weekend",
+                "lagoon/0 unsorted/b.mp4",
+                "lagoon/0 unsorted/c.mp4\tredo under v2",
+                "lagoon/0 unsorted/a.mp4\tfor the weekend",
             ])
 
     def test_a_pin_whose_video_has_left_the_library_is_dropped(self):
@@ -268,21 +268,21 @@ class TestPinAhead(unittest.TestCase):
         under the same name."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
             pins = root / "next.txt"
-            pins.write_text("larkin/0 unsorted/done.mp4\n", encoding="utf-8")
+            pins.write_text("lagoon/0 unsorted/done.mp4\n", encoding="utf-8")
 
             with override_config(**overrides):
-                nonai_queue.pin_ahead(pins, ["larkin/0 unsorted/a.mp4"])
+                nonai_queue.pin_ahead(pins, ["lagoon/0 unsorted/a.mp4"])
 
-            self.assertEqual(nonai_queue.listed_videos(pins), ["larkin/0 unsorted/a.mp4"])
+            self.assertEqual(nonai_queue.listed_videos(pins), ["lagoon/0 unsorted/a.mp4"])
 
 
 class TestAddToSkipManifest(unittest.TestCase):
     def test_appends_the_relative_path_and_the_reason(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            video = make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+            video = make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
             skip_list = root / "skip.txt"
             skip_list.write_text("other/0 unsorted/b.mp4\tearlier\n", encoding="utf-8")
 
@@ -292,7 +292,7 @@ class TestAddToSkipManifest(unittest.TestCase):
             self.assertEqual(
                 skip_list.read_text(encoding="utf-8").splitlines(),
                 ["other/0 unsorted/b.mp4\tearlier",
-                 "larkin/0 unsorted/a.mp4\talready tagged"],
+                 "lagoon/0 unsorted/a.mp4\talready tagged"],
             )
 
 

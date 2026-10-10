@@ -66,10 +66,10 @@ def click(window, row: int, column: int = 0) -> None:
 class TestWhatItShows:
     def test_every_video_is_a_numbered_row_in_order(self, window):
         window.show_lineup(lineup(None,
-                                  entry("larkin/0 unsorted/a.mp4", "Jane Doe - Alpha Study 3"),
-                                  entry("larkin/0 unsorted/b.mp4", "b", seconds=None)))
+                                  entry("lagoon/0 unsorted/a.mp4", "Jane Doe - Alpha Study 3"),
+                                  entry("lagoon/0 unsorted/b.mp4", "b", seconds=None)))
 
-        assert window._tree.videos() == ["larkin/0 unsorted/a.mp4", "larkin/0 unsorted/b.mp4"]
+        assert window._tree.videos() == ["lagoon/0 unsorted/a.mp4", "lagoon/0 unsorted/b.mp4"]
         assert window._tree.topLevelItem(0).text(1) == "Jane Doe - Alpha Study 3"
         assert window._tree.topLevelItem(0).text(3) == "12:34"
         assert window._tree.topLevelItem(0).text(0) == "1"
@@ -78,8 +78,8 @@ class TestWhatItShows:
 
     def test_the_first_row_says_what_is_happening_to_its_video(self, window):
         window.show_lineup(lineup(Head(UPSCALING, percent=41),
-                                  entry("larkin/0 unsorted/a.mp4"),
-                                  entry("larkin/0 unsorted/b.mp4")))
+                                  entry("lagoon/0 unsorted/a.mp4"),
+                                  entry("lagoon/0 unsorted/b.mp4")))
 
         assert window._tree.topLevelItem(0).text(2) == "Upscaling — 41% done"
         assert window._tree.topLevelItem(1).text(2) == ""
@@ -93,14 +93,14 @@ class TestWhatItShows:
         (Head(FINISHING), "Done upscaling; Evolver's next run replaces the original with it"),
     ])
     def test_each_state_reads_as_words_rather_than_the_stages_own(self, window, head, words):
-        window.show_lineup(lineup(head, entry("larkin/0 unsorted/a.mp4")))
+        window.show_lineup(lineup(head, entry("lagoon/0 unsorted/a.mp4")))
 
         assert window._tree.topLevelItem(0).text(2) == words
 
     def test_the_heading_counts_the_videos_and_their_hours(self, window):
         window.show_lineup(lineup(None,
-                                  entry("larkin/0 unsorted/a.mp4", seconds=3600.0),
-                                  entry("larkin/0 unsorted/b.mp4", seconds=1800.0)))
+                                  entry("lagoon/0 unsorted/a.mp4", seconds=3600.0),
+                                  entry("lagoon/0 unsorted/b.mp4", seconds=1800.0)))
 
         assert window._heading.text() == "2 videos, 1.5 hours of footage"
 
@@ -111,8 +111,8 @@ class TestWhatItShows:
         assert window._tree.videos() == []
 
     def test_the_picked_row_wears_the_familys_blue(self, window):
-        window.show_lineup(lineup(None, entry("larkin/0 unsorted/a.mp4"),
-                                  entry("larkin/0 unsorted/b.mp4")))
+        window.show_lineup(lineup(None, entry("lagoon/0 unsorted/a.mp4"),
+                                  entry("lagoon/0 unsorted/b.mp4")))
         window.show()
         window._tree.setCurrentItem(window._tree.topLevelItem(1))
 
@@ -125,37 +125,37 @@ class TestTheArrow:
 
     def test_it_is_filled_while_the_first_row_runs_whoever_is_here(self, window):
         window.show_lineup(lineup(Head(ASKED_FOR, percent=2),
-                                  entry("larkin/0 unsorted/a.mp4"),
-                                  entry("larkin/0 unsorted/b.mp4")))
+                                  entry("lagoon/0 unsorted/a.mp4"),
+                                  entry("lagoon/0 unsorted/b.mp4")))
 
         assert icon_of(window, 0) == arrow(filled=True)
         assert icon_of(window, 1) == blank_arrow()
 
     def test_it_is_hollow_while_the_first_row_waits_for_you_to_leave(self, window):
-        window.show_lineup(lineup(Head(PAUSED, percent=41), entry("larkin/0 unsorted/a.mp4")))
+        window.show_lineup(lineup(Head(PAUSED, percent=41), entry("lagoon/0 unsorted/a.mp4")))
 
         assert icon_of(window, 0) == arrow(filled=False)
 
     def test_a_video_whose_encode_has_ended_has_none_to_click(self, window):
-        window.show_lineup(lineup(Head(FINISHING), entry("larkin/0 unsorted/a.mp4")))
+        window.show_lineup(lineup(Head(FINISHING), entry("lagoon/0 unsorted/a.mp4")))
 
         assert icon_of(window, 0) == blank_arrow()
 
     def test_clicking_a_hollow_one_asks_for_that_video_now(self, window):
-        window.show_lineup(lineup(Head(NEXT), entry("larkin/0 unsorted/a.mp4"),
-                                  entry("larkin/0 unsorted/b.mp4")))
+        window.show_lineup(lineup(Head(NEXT), entry("lagoon/0 unsorted/a.mp4"),
+                                  entry("lagoon/0 unsorted/b.mp4")))
         asked, withdrawn = [], []
         window.now_requested.connect(asked.append)
         window.now_withdrawn.connect(lambda: withdrawn.append(True))
 
         click(window, 0)
 
-        assert asked == ["larkin/0 unsorted/a.mp4"]
+        assert asked == ["lagoon/0 unsorted/a.mp4"]
         assert withdrawn == []
         assert icon_of(window, 0) == arrow(filled=True)
 
     def test_clicking_a_filled_one_hands_the_video_back_to_your_presence(self, window):
-        window.show_lineup(lineup(Head(ASKED_FOR, percent=2), entry("larkin/0 unsorted/a.mp4")))
+        window.show_lineup(lineup(Head(ASKED_FOR, percent=2), entry("lagoon/0 unsorted/a.mp4")))
         asked, withdrawn = [], []
         window.now_requested.connect(asked.append)
         window.now_withdrawn.connect(lambda: withdrawn.append(True))
@@ -168,7 +168,7 @@ class TestTheArrow:
         assert window._tree.topLevelItem(0).text(2) == "Upscaling — 2% done"
 
     def test_the_rest_of_the_row_is_not_the_arrow(self, window):
-        window.show_lineup(lineup(Head(NEXT), entry("larkin/0 unsorted/a.mp4")))
+        window.show_lineup(lineup(Head(NEXT), entry("lagoon/0 unsorted/a.mp4")))
         asked = []
         window.now_requested.connect(asked.append)
 
@@ -177,8 +177,8 @@ class TestTheArrow:
         assert asked == []
 
     def test_a_second_row_is_not_the_arrow_either(self, window):
-        window.show_lineup(lineup(Head(NEXT), entry("larkin/0 unsorted/a.mp4"),
-                                  entry("larkin/0 unsorted/b.mp4")))
+        window.show_lineup(lineup(Head(NEXT), entry("lagoon/0 unsorted/a.mp4"),
+                                  entry("lagoon/0 unsorted/b.mp4")))
         asked = []
         window.now_requested.connect(asked.append)
 
@@ -197,19 +197,19 @@ class TestWhatItSaysTheUserDid:
         """Putting a video first is not asking for it now: the arrow stays
         off until it is clicked."""
         window.show_lineup(lineup(Head(UPSCALING, percent=41),
-                                  *(entry(f"larkin/0 unsorted/{name}.mp4") for name in "abc")))
+                                  *(entry(f"lagoon/0 unsorted/{name}.mp4") for name in "abc")))
         asked, first = [], []
         window.now_requested.connect(asked.append)
         window.placed_first.connect(first.append)
         seen = self._arrangements(window)
 
-        window._tree.move_video("larkin/0 unsorted/c.mp4", 0)
+        window._tree.move_video("lagoon/0 unsorted/c.mp4", 0)
 
-        assert first == ["larkin/0 unsorted/c.mp4"]
+        assert first == ["lagoon/0 unsorted/c.mp4"]
         assert asked == []
         assert seen == []
-        assert window._tree.videos() == ["larkin/0 unsorted/c.mp4", "larkin/0 unsorted/a.mp4",
-                                         "larkin/0 unsorted/b.mp4"]
+        assert window._tree.videos() == ["lagoon/0 unsorted/c.mp4", "lagoon/0 unsorted/a.mp4",
+                                         "lagoon/0 unsorted/b.mp4"]
         assert window._tree.topLevelItem(0).text(2) == "Next, once you're away from the computer"
         assert window._tree.topLevelItem(1).text(2) == ""
         assert icon_of(window, 0) == arrow(filled=False)
@@ -217,55 +217,55 @@ class TestWhatItSaysTheUserDid:
     def test_a_video_dragged_lower_down_keeps_everything_above_it_where_it_is(self, window):
         """Its place is only its place if the videos it was put after stay
         where they are."""
-        window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
+        window.show_lineup(lineup(None, *(entry(f"lagoon/0 unsorted/{name}.mp4")
                                           for name in "abcd")))
         seen = self._arrangements(window)
 
-        window._tree.move_video("larkin/0 unsorted/d.mp4", 2)
+        window._tree.move_video("lagoon/0 unsorted/d.mp4", 2)
 
-        assert seen == [["larkin/0 unsorted/a.mp4", "larkin/0 unsorted/b.mp4",
-                         "larkin/0 unsorted/d.mp4"]]
+        assert seen == [["lagoon/0 unsorted/a.mp4", "lagoon/0 unsorted/b.mp4",
+                         "lagoon/0 unsorted/d.mp4"]]
         assert window._tree.topLevelItem(2).text(0) == "3"
 
     def test_a_video_pushed_below_a_placed_one_keeps_that_place_in_the_order(self, window):
         window.show_lineup(lineup(None,
-                                  entry("larkin/0 unsorted/a.mp4", pinned=True),
-                                  entry("larkin/0 unsorted/b.mp4"),
-                                  entry("larkin/0 unsorted/c.mp4")))
+                                  entry("lagoon/0 unsorted/a.mp4", pinned=True),
+                                  entry("lagoon/0 unsorted/b.mp4"),
+                                  entry("lagoon/0 unsorted/c.mp4")))
         seen = self._arrangements(window)
 
-        window._tree.move_video("larkin/0 unsorted/c.mp4", 1)
+        window._tree.move_video("lagoon/0 unsorted/c.mp4", 1)
 
-        assert seen == [["larkin/0 unsorted/a.mp4", "larkin/0 unsorted/c.mp4"]]
+        assert seen == [["lagoon/0 unsorted/a.mp4", "lagoon/0 unsorted/c.mp4"]]
 
     def test_a_row_dropped_back_where_it_was_changes_nothing(self, window):
-        window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
+        window.show_lineup(lineup(None, *(entry(f"lagoon/0 unsorted/{name}.mp4")
                                           for name in "abc")))
         seen = self._arrangements(window)
 
-        window._tree.move_video("larkin/0 unsorted/b.mp4", 1)
-        window._tree.move_video("larkin/0 unsorted/b.mp4", 2)
+        window._tree.move_video("lagoon/0 unsorted/b.mp4", 1)
+        window._tree.move_video("lagoon/0 unsorted/b.mp4", 2)
 
         assert seen == []
 
     def test_the_video_being_upscaled_cannot_be_dragged_off_the_top(self, window):
         window.show_lineup(lineup(Head(UPSCALING, percent=41),
-                                  entry("larkin/0 unsorted/a.mp4"),
-                                  entry("larkin/0 unsorted/b.mp4")))
+                                  entry("lagoon/0 unsorted/a.mp4"),
+                                  entry("lagoon/0 unsorted/b.mp4")))
 
         assert not draggable(window, 0)
         assert draggable(window, 1)
 
     def test_a_first_row_that_is_merely_next_can_be_dragged(self, window):
-        window.show_lineup(lineup(Head(NEXT), entry("larkin/0 unsorted/a.mp4"),
-                                  entry("larkin/0 unsorted/b.mp4")))
+        window.show_lineup(lineup(Head(NEXT), entry("lagoon/0 unsorted/a.mp4"),
+                                  entry("lagoon/0 unsorted/b.mp4")))
 
         assert draggable(window, 0)
 
     def test_a_drag_that_ends_in_a_move_leaves_every_row_in_the_list(self, window):
         """What Qt does after a move of its own is to remove the row the drag
         started from -- which took the row the user had just placed."""
-        window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
+        window.show_lineup(lineup(None, *(entry(f"lagoon/0 unsorted/{name}.mp4")
                                           for name in "abc")))
         window._tree.setCurrentItem(window._tree.topLevelItem(2))
 
@@ -273,10 +273,10 @@ class TestWhatItSaysTheUserDid:
             drag.return_value.exec.return_value = Qt.DropAction.MoveAction
             window._tree.startDrag(Qt.DropAction.MoveAction)
 
-        assert window._tree.videos() == [f"larkin/0 unsorted/{name}.mp4" for name in "abc"]
+        assert window._tree.videos() == [f"lagoon/0 unsorted/{name}.mp4" for name in "abc"]
 
     def test_where_a_drop_lands_is_the_half_of_the_row_it_was_let_go_over(self, window):
-        window.show_lineup(lineup(None, *(entry(f"larkin/0 unsorted/{name}.mp4")
+        window.show_lineup(lineup(None, *(entry(f"lagoon/0 unsorted/{name}.mp4")
                                           for name in "abc")))
         tree = window._tree
         second = tree.visualItemRect(tree.topLevelItem(1))
@@ -288,22 +288,22 @@ class TestWhatItSaysTheUserDid:
     def test_a_lineup_arriving_mid_drag_waits_for_the_row_to_land(self, window):
         """The refresh timer goes on firing inside the drag's own event loop,
         and a rebuild there deletes the row being dragged."""
-        window.show_lineup(lineup(None, entry("larkin/0 unsorted/a.mp4")))
+        window.show_lineup(lineup(None, entry("lagoon/0 unsorted/a.mp4")))
         window._tree._dragging = True
 
-        window.show_lineup(lineup(None, entry("larkin/0 unsorted/z.mp4")))
+        window.show_lineup(lineup(None, entry("lagoon/0 unsorted/z.mp4")))
 
-        assert window._tree.videos() == ["larkin/0 unsorted/a.mp4"]
+        assert window._tree.videos() == ["lagoon/0 unsorted/a.mp4"]
 
     def test_the_lineup_that_waited_is_drawn_once_the_row_lands(self, window):
-        window.show_lineup(lineup(None, entry("larkin/0 unsorted/a.mp4")))
+        window.show_lineup(lineup(None, entry("lagoon/0 unsorted/a.mp4")))
         window._tree._dragging = True
-        window.show_lineup(lineup(None, entry("larkin/0 unsorted/z.mp4")))
+        window.show_lineup(lineup(None, entry("lagoon/0 unsorted/z.mp4")))
 
         window._tree._dragging = False
         window._tree.drag_ended.emit()
 
-        assert window._tree.videos() == ["larkin/0 unsorted/z.mp4"]
+        assert window._tree.videos() == ["lagoon/0 unsorted/z.mp4"]
 
 
 class TestRunningTime:

@@ -326,13 +326,13 @@ class TestNonAiUpscaleSummary:
         return _summarize_result(result, None, "upscale_non_ai")
 
     def test_names_the_video_being_encoded(self):
-        summary = self._result(in_flight="larkin/1 clips/Delia Moss.mp4",
+        summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4",
                                in_flight_percent=72)
-        assert "larkin/1 clips/Delia Moss.mp4" in summary
+        assert "lagoon/1 clips/Delia Moss.mp4" in summary
         assert "72%" in summary
 
     def test_a_frozen_encode_says_it_is_paused_and_why(self):
-        summary = self._result(in_flight="larkin/1 clips/Delia Moss.mp4",
+        summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4",
                                in_flight_percent=72, suspended=True)
         assert "paused" in summary
         assert "you're at the machine" in summary
@@ -340,39 +340,39 @@ class TestNonAiUpscaleSummary:
 
     def test_a_finished_encode_names_what_it_promoted(self):
         """Why an in-flight percent vanishes between runs: the encode landed."""
-        summary = self._result(promoted="larkin/1 clips/Scene Three 3.mp4",
+        summary = self._result(promoted="lagoon/1 clips/Scene Three 3.mp4",
                                start_deferred="user_present", pending=394)
         assert "finished" in summary
-        assert "larkin/1 clips/Scene Three 3.mp4" in summary
+        assert "lagoon/1 clips/Scene Three 3.mp4" in summary
 
     def test_a_finished_encode_waiting_for_the_archive_says_what_it_waits_for(self):
-        summary = self._result(in_flight="larkin/1 clips/scene one.mp4", unreachable_archive="Q:/archive")
+        summary = self._result(in_flight="lagoon/1 clips/scene one.mp4", unreachable_archive="Q:/archive")
         assert summary.startswith(
-            "finished larkin/1 clips/scene one.mp4, waiting until Q:/archive can be reached "
+            "finished lagoon/1 clips/scene one.mp4, waiting until Q:/archive can be reached "
             "to take the original, ")
 
     def test_a_died_encode_names_what_failed(self):
         """The other way a percent vanishes: ffmpeg died partway through."""
-        summary = self._result(failed="larkin/1 clips/Scene Five 1.mp4",
+        summary = self._result(failed="lagoon/1 clips/Scene Five 1.mp4",
                                start_deferred="cooldown", pending=399)
         assert "failed" in summary
-        assert "larkin/1 clips/Scene Five 1.mp4" in summary
+        assert "lagoon/1 clips/Scene Five 1.mp4" in summary
 
     def test_a_fresh_start_names_the_video_it_kicked_off(self):
-        summary = self._result(started="larkin/1 clips/Scene Three 9.mp4")
+        summary = self._result(started="lagoon/1 clips/Scene Three 9.mp4")
         assert "started" in summary
-        assert "larkin/1 clips/Scene Three 9.mp4" in summary
+        assert "lagoon/1 clips/Scene Three 9.mp4" in summary
 
     def test_an_encode_you_asked_for_says_so_beside_its_progress(self):
         """It is the one running while you are at the computer, which the row
         would otherwise leave looking like a presence check that failed."""
-        summary = self._result(in_flight="larkin/1 clips/Delia Moss.mp4",
+        summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4",
                                in_flight_percent=12, on_request=True)
-        assert "encoding larkin/1 clips/Delia Moss.mp4 (12%, at your request)" in summary
+        assert "encoding lagoon/1 clips/Delia Moss.mp4 (12%, at your request)" in summary
 
     def test_a_start_you_asked_for_says_so(self):
-        summary = self._result(started="larkin/1 clips/Scene Three 9.mp4", on_request=True)
-        assert "started larkin/1 clips/Scene Three 9.mp4 at your request" in summary
+        summary = self._result(started="lagoon/1 clips/Scene Three 9.mp4", on_request=True)
+        assert "started lagoon/1 clips/Scene Three 9.mp4 at your request" in summary
 
     def test_an_idle_stage_says_why_nothing_is_running(self):
         summary = self._result(start_deferred="cooldown")
@@ -381,7 +381,7 @@ class TestNonAiUpscaleSummary:
     def test_always_reports_how_many_clips_are_left(self):
         assert "395 queued" in self._result()
         assert "395 queued" in self._result(
-            in_flight="larkin/1 clips/Delia Moss.mp4", in_flight_percent=72,
+            in_flight="lagoon/1 clips/Delia Moss.mp4", in_flight_percent=72,
         )
 
     def test_says_how_far_along_the_project_is_and_not_only_the_count(self):
@@ -407,9 +407,9 @@ class TestNonAiUpscaleSummary:
 
     def test_a_stopped_encode_says_the_clip_keeps_its_place(self):
         """Stopping is no fault of the video, unlike failing — it stays queued."""
-        summary = self._result(stopped="larkin/1 clips/Scene Four 4.mp4")
+        summary = self._result(stopped="lagoon/1 clips/Scene Four 4.mp4")
         assert "stopped" in summary
-        assert "larkin/1 clips/Scene Four 4.mp4" in summary
+        assert "lagoon/1 clips/Scene Four 4.mp4" in summary
         assert "still queued" in summary
 
     def test_a_low_disk_hold_is_called_out(self):
@@ -419,7 +419,7 @@ class TestNonAiUpscaleSummary:
     def test_an_encode_that_has_not_reported_yet_reads_progress_unknown(self):
         """A non-AI encode reports no percent until ffmpeg's first progress
         line; the row must say so rather than render a blank or a crash."""
-        summary = self._result(in_flight="larkin/1 clips/Delia Moss.mp4")
+        summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4")
         assert "progress unknown" in summary
 
 
