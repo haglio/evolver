@@ -25,6 +25,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import config
+
+_FLICK = config.GENAU_FLICK_WORD
+
 
 @dataclass(frozen=True)
 class Stage:
@@ -41,7 +45,8 @@ STAGES: tuple[Stage, ...] = (
           "Repair a video whose extension separator is not a dot, send a funscript found in the video tree to its mirror path under the scripts -- marking one Origenerator handed over as a script no person wrote -- and report every other non-video file found there",
           (0x0A, 0x12, 0x2C)),
     Stage("withdrawn", "Taken Back",
-          "Delete every copy this library holds of a clip Origenerator has taken back -- the inbox copy, the 1_sorted copy, the upscale and, down the Genau lane, the delivered loop -- with their metadata and funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its sound once the video with its sound is there",
+          "Delete every copy this library holds of a clip Origenerator has taken back -- the inbox copy, the 1_sorted copy, the upscale and, down the Genau lane, the delivered "
+          f"{_FLICK} -- with their metadata and funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its sound once the video with its sound is there",
           (0x00, 0x00, 0x6C)),
     Stage("metadata", "Metadata Scrape",
           "Scrape AI prompt metadata into mirrored JSON files",
@@ -53,7 +58,7 @@ STAGES: tuple[Stage, ...] = (
           "Apply Topaz 60fps frame interpolation + 4x upscale + various AI enhancements to 1_sorted AI videos, placing them in 2_outbox",
           (0xED, 0xC9, 0x48)),
     Stage("genau_deliver", "Genau Delivery",
-          "Move each upscaled Genau-lane clip out of 2_outbox into the folder Genau plays from, retiring the 1_sorted copy it was made from — both halves leave together or the upscale stage redoes the clip forever",
+          f"Move each upscaled Genau-lane {_FLICK} out of 2_outbox into the folder Genau plays from, retiring the 1_sorted copy it was made from — both halves leave together or the upscale stage redoes the {_FLICK} forever",
           (0x7B, 0x41, 0x73)),
     Stage("upscale_non_ai", "Upscale non-AI",
           "Supervise one detached Topaz encode of a 2D/non_AI video (apo-8 60fps + iris-2 toward 4K); with the toggle on, run it while the user is idle and the AI queue is drained, suspending it the moment they return",
@@ -86,7 +91,7 @@ STAGES: tuple[Stage, ...] = (
           "Record what to call each 2D/non_AI video -- the performer and movie its clip record names, carried to the whole scene that clip was cut out of -- so every app reads one name instead of working it out at launch",
           (0xAA, 0x44, 0xCC)),
     Stage("video_types", "Video Kinds",
-          "Record what kind each library video is -- a generation, an excerpt, a Genau clip -- and how long it runs, on its mirrored sidecar",
+          f"Record what kind each library video is -- a generation, an excerpt, a Genau {_FLICK} -- and how long it runs, on its mirrored sidecar",
           (0x2B, 0x2B, 0xE8)),
     Stage("provenance", "Provenance",
           "Record on each library video's sidecar what made it -- which app, which version of its code, which recipe -- looking its clips up in Origenerator's gallery and reading the note Topaz wrote into each upscale, and marking unknown whatever neither can say",

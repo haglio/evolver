@@ -138,6 +138,9 @@ CONFIG_REFERENCE_LEDGER = {
     # stage's parking of a script that matches nothing.
     "tasks/scripts_sync.py": 8,
     "tasks/sort.py": 2,
+    # The third shape: the word the overlay gives Genau's flicks, which three
+    # stages' tooltips name, read once where the stages are declared.
+    "tasks/stages.py": 1,
     # The 9th is the third shape: the inbox, to tell a funscript Origenerator
     # handed over with its clip -- one no person wrote -- from any other.
     "tasks/stray_files.py": 9,
@@ -208,6 +211,7 @@ OVERLAY_KEYS = {
     "scrape_provider",
     "scrape_provider.base_url",
     "scrape_provider.source",
+    "genau_flick_words.one",
     "topaz_ffmpeg",
     "topaz_models",
     "version_overrides",

@@ -227,6 +227,15 @@ class TestStageRegistry(unittest.TestCase):
         self.assertEqual(ALL_STAGES.index("upscale_non_ai"), ALL_STAGES.index("genau_deliver") + 1)
         self.assertLess(ALL_STAGES.index("genau_deliver"), ALL_STAGES.index("verify"))
 
+    def test_the_stages_name_genaus_flicks_in_the_overlays_word(self):
+        tips = {stage.key: stage.tooltip for stage in STAGES}
+
+        self.assertIn("down the Genau lane, the delivered flick --", tips["withdrawn"])
+        self.assertTrue(tips["genau_deliver"].startswith(
+            "Move each upscaled Genau-lane flick out of 2_outbox into the folder Genau plays from"))
+        self.assertIn("redoes the flick forever", tips["genau_deliver"])
+        self.assertIn("a generation, an excerpt, a Genau flick --", tips["video_types"])
+
     def test_the_registry_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
         self.assertIn("group_non_ai", ALL_STAGES)
         self.assertEqual(ALL_STAGES.index("group_non_ai"), ALL_STAGES.index("scripts") + 1)
