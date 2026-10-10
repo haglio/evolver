@@ -1,4 +1,4 @@
-"""A funscript Origenerator hands over with its clip, carried to the upscale the players show.
+"""A funscript Origenerator hands over with its clip, carried to the upscale the Funestras show.
 
 Fixture values are fabricated throughout (see CLAUDE.md).
 """
