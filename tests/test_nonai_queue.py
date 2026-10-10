@@ -39,7 +39,6 @@ class TestCollectCandidates(unittest.TestCase):
             flagged_video = make_video(non_ai / "other" / "1 could use work" / "b.mp4")
             make_video(non_ai / "larkin" / "2 do not need work" / "retired.mp4")
             make_video(non_ai / "larkin" / "3_good_to_go" / "processed" / "done_iris2.mp4")
-            make_video(non_ai / "actually_AI_but_funscripted" / "0 unsorted" / "ai.mp4")
 
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))

@@ -165,9 +165,9 @@ def _non_ai_videos():
     company it keeps: a folder its librarian filed the batch's cuts into and
     nothing else (:func:`_cut_folders`), or one the overlay declares outright.
 
-    The whole tree, including the buckets the other non-AI stages exclude: those
-    exclusions are about what to group and what to re-encode, and the main player plays
-    every one of these, so every one of them is asked what it is.
+    The whole tree, including a folder that holds no stage folders and so is no
+    bucket: the main player plays every one of these, so every one of them is
+    asked what it is.
     """
     videos = lanes.non_ai_videos()
     payloads = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}

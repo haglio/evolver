@@ -289,13 +289,11 @@ class TestWhatItRefusesToGuess(unittest.TestCase):
 
 
 class TestReachingEveryVideoMainPlayerPlays(unittest.TestCase):
-    def test_a_bucket_the_non_ai_stages_skip_still_gets_its_kind(self):
-        """The exclusion keeps pipeline-output videos out of the grouping and
-        the encoder, but the main player plays them, so they are asked what they are too."""
+    def test_a_folder_holding_no_stage_folders_still_gets_its_kind(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(NONAI_EXCLUDED_BUCKETS={"parked_ai"}):
-                video = touch_video(lib.non_ai / "parked_ai" / "landscape" / "clip_f_topaz.mp4")
+            with lib.config():
+                video = touch_video(lib.non_ai / "loose" / "landscape" / "clip_f_topaz.mp4")
 
                 video_types.run(probe=_probe({video.stem: 4.0}))
 

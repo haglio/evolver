@@ -283,7 +283,6 @@ CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
 # Non-AI library upscaling, whose recipe is util/topaz.py's NON_AI_UPSCALE. These
 # encodes run for hours, so the stage launches one detached ffmpeg at a time and
 # checks on it each scheduler tick.
-NONAI_EXCLUDED_BUCKETS = {"actually_AI_but_funscripted"}  # AI-pipeline outputs parked in non_AI
 # Version families the naming rule cannot see. It reunites an original with a
 # variant whose stem is the original's plus a Topaz suffix; a version saved
 # under a name of its own keeps no such thread back, so it is declared instead.

@@ -54,17 +54,6 @@ class TestNonAiGroup(unittest.TestCase):
                 self.assertTrue(var["version"]["processed"])
                 self.assertEqual(result.written, 3)
 
-    def test_leaves_the_excluded_bucket_alone(self):
-        with workspace_temp_dir() as root:
-            video_lib, non_ai, metadata = _library(root)
-            with override_config(
-                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata,
-                NONAI_EXCLUDED_BUCKETS={"actually_AI_but_funscripted"},
-            ):
-                clip = _touch(non_ai / "actually_AI_but_funscripted" / "landscape" / "x_topaz.mp4")
-                nonai_group.run()
-                self.assertFalse(sidecar.sidecar_path(clip).exists())
-
     def test_merges_version_into_an_existing_clip_sidecar(self):
         """A clip carved from a compilation carries a `clip` object; grouping must
         add `version` alongside it, never clobber it."""

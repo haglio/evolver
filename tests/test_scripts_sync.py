@@ -436,7 +436,7 @@ class TestScriptsSync(unittest.TestCase):
             video_root = root / "videos"
             script_root = root / "scripts"
             ai_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
-            non_ai_duplicate = video_root / "2D" / "non_AI" / "actually_AI_but_funscripted" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
+            non_ai_duplicate = video_root / "2D" / "non_AI" / "parked" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
             script_path = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.funscript"
             ai_video.parent.mkdir(parents=True, exist_ok=True)
             non_ai_duplicate.parent.mkdir(parents=True, exist_ok=True)

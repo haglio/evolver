@@ -3,8 +3,7 @@
 A bucket is whatever folder holds the numbered stage folders, because that is
 the only thing every stage does with one: retire an original into its ``2*``,
 publish an upscale into its ``3*``, scan its ``0*``/``1*`` for work.  Usually
-that is a top-level folder like ``larkin`` or ``other`` — except the ones
-config excludes (``actually_AI_but_funscripted`` holds AI-pipeline outputs).
+that is a top-level folder like ``larkin`` or ``other``.
 
 A top-level folder can also be split into sub-libraries that each keep their own
 copy of the stages, and then the parent is not a bucket: it has no stages of its
@@ -61,14 +60,13 @@ def buckets() -> list[Path]:
     A top-level folder that holds the stages itself is one; a folder split into
     sub-libraries contributes each of those instead, and is not a bucket even
     while a leftover stage folder of its own is still standing — the split is
-    what it is *for* now, and half-finished is still split.  The exclusion list
-    names top-level folders, so it applies either way.
+    what it is *for* now, and half-finished is still split.
     """
     if not config.NON_AI_DIR.is_dir():
         return []
     found: list[Path] = []
     for child in sorted(config.NON_AI_DIR.iterdir()):
-        if not child.is_dir() or child.name in config.NONAI_EXCLUDED_BUCKETS:
+        if not child.is_dir():
             continue
         split = _sub_libraries(child)
         if split:
