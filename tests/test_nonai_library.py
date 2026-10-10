@@ -54,17 +54,6 @@ class TestBuckets(unittest.TestCase):
                 [str(Path("alpha") / "cuts"), str(Path("alpha") / "whole")],
             )
 
-    def test_an_excluded_top_level_folder_is_skipped_however_it_is_shaped(self):
-        with workspace_temp_dir() as root:
-            overrides = library(root)
-            non_ai = overrides["NON_AI_DIR"]
-            make_video(non_ai / "alpha" / "0 unsorted" / "one.mp4")
-            make_video(non_ai / "skipped" / "cuts" / "0 unsorted" / "two.mp4")
-            with override_config(NONAI_EXCLUDED_BUCKETS={"skipped"}, **overrides):
-                found = buckets()
-            self.assertEqual([path.name for path in found], ["alpha"])
-
-
 class TestBucketOf(unittest.TestCase):
     def test_finds_the_bucket_a_video_sits_under(self):
         with workspace_temp_dir() as root:

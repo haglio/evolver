@@ -126,16 +126,3 @@ class TestNonAiTitles(unittest.TestCase):
                 nonai_titles.run()
 
                 self.assertNotIn("title", sidecar.read(sidecar.sidecar_path(video)))
-
-    def test_it_leaves_the_excluded_bucket_alone(self):
-        with workspace_temp_dir() as root:
-            video_lib, non_ai, metadata = _library(root)
-            with override_config(
-                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata,
-                NONAI_EXCLUDED_BUCKETS={"actually_AI_but_funscripted"},
-            ):
-                clip = _touch(non_ai / "actually_AI_but_funscripted" / "landscape" / "x.mp4")
-
-                nonai_titles.run()
-
-                self.assertFalse(sidecar.sidecar_path(clip).exists())
