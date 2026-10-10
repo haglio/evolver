@@ -1,22 +1,22 @@
-"""Deliver upscaled Genau clips to the folder Genau plays from.
+"""Deliver upscaled Genau flicks to the folder Genau plays from.
 
 The last step of the Genau lane, which ``config.GENAU_SOURCE`` describes: once
-the upscale exists, move it into ``videos/genau/clips/2D/AI/`` and retire the
+the upscale exists, move it into ``videos/genau/flicks/2D/AI/`` and retire the
 ``1_sorted`` copy it was made from. A loop goes through the Topaz stage like
 any other AI video rather than being copied straight across, because one fresh
-out of the graph is visibly softer than the clips already in that folder, which
+out of the graph is visibly softer than the flicks already in that folder, which
 came from upscaled library video.
 
 Both halves leave together, and that is not tidiness:
 
 - The upscale stage decides what still needs doing by looking for the output
   beside the source (``upscale._already_processed``). Take the output away and
-  leave the source, and every future run upscales that clip again, forever.
+  leave the source, and every future run upscales that flick again, forever.
 - The correspondence check (``check_correspondence``) requires each ``1_sorted``
   video to have a ``_topaz`` counterpart in the outbox, and pops a Windows error
   dialog when one doesn't. Removing one side alone is exactly that mismatch.
 
-Nothing unique is lost with the sorted copy: it was itself a copy, and the clip
+Nothing unique is lost with the sorted copy: it was itself a copy, and the flick
 still sits in ComfyUI's output folder and in Origenerator's gallery.
 """
 from __future__ import annotations
@@ -42,11 +42,11 @@ class GenauDeliverResult:
     failed: int = 0
 
 
-def _upscaled_genau_clips(root: Path, genau_source: str):
+def _upscaled_genau_flicks(root: Path, genau_source: str):
     """Every finished Genau upscale waiting in the outbox, whatever its orientation.
 
     The upscale stage files its output under ``<orient>/<source>/``, so the lane's
-    clips are spread across the orientation folders rather than gathered in one.
+    flicks are spread across the orientation folders rather than gathered in one.
     """
     for orient_dir in child_dirs(root):
         source_dir = orient_dir / genau_source
@@ -76,50 +76,50 @@ def _deliver(upscaled: Path, delivery_dir: Path) -> Path:
     """Move one finished upscale into Genau's AI folder; return where it landed."""
     delivery_dir.mkdir(parents=True, exist_ok=True)
     # A name can genuinely already be taken there, and delivering must never
-    # overwrite a clip that is already being played.
+    # overwrite a flick that is already being played.
     destination = unique_path(delivery_dir / upscaled.name)
     upscaled.replace(destination)
     return destination
 
 
 def _move_sidecar(upscaled: Path, destination: Path) -> None:
-    """Re-file the clip's metadata under where it now lives, saying what it is.
+    """Re-file the flick's metadata under where it now lives, saying what it is.
 
-    The record travels with the clip rather than dying at the door: what a loop
+    The record travels with the flick rather than dying at the door: what a loop
     was generated from is worth as much in Genau's folder as it was in the
-    outbox, and the kind Genau's clips *are* (:mod:`util.video_type`) has to be
-    written down somewhere for the apps that ask.  A clip delivered with no
+    outbox, and the kind Genau's flicks *are* (:mod:`util.video_type`) has to be
+    written down somewhere for the apps that ask.  A flick delivered with no
     record at all still gets one, holding that one answer.
 
     Neither half is a reason to abandon a delivery that has already happened:
-    ``sidecar_path`` raises for a video under neither library root, and a clip
+    ``sidecar_path`` raises for a video under neither library root, and a flick
     that somehow sits outside them simply has nowhere to keep a record, while a
     metadata tree that cannot be written costs the generation record but not the
-    kind — ``tasks.video_types`` finds the delivered clip with none and writes
+    kind — ``tasks.video_types`` finds the delivered flick with none and writes
     one on its next run.
     """
     try:
         was, now = sidecar.sidecar_path(upscaled), sidecar.sidecar_path(destination)
         sidecar.update(
             now,
-            lambda _: video_type.stamped(sidecar.read(was), video_type.GENAU_CLIP),
+            lambda _: video_type.stamped(sidecar.read(was), video_type.GENAU_FLICK),
         )
         was.unlink(missing_ok=True)
     except (ValueError, OSError):
         log.warning("Could not re-file the metadata for %s", upscaled.name, exc_info=True)
 
 
-def _save_its_sound(clip: Path, audio_dir: Path) -> None:
-    if not has_sound(clip):
+def _save_its_sound(flick: Path, audio_dir: Path) -> None:
+    if not has_sound(flick):
         return
     try:
-        save_as_mp3(clip, audio_dir / f"{clip.stem}.mp3")
+        save_as_mp3(flick, audio_dir / f"{flick.stem}.mp3")
     except (OSError, subprocess.CalledProcessError):
-        log.warning("Could not save the sound of %s", clip.name, exc_info=True)
+        log.warning("Could not save the sound of %s", flick.name, exc_info=True)
 
 
 def _retire_source(upscaled: Path, genau_sorted_dir: Path) -> None:
-    """Remove the ``1_sorted`` copy the delivered clip was made from.
+    """Remove the ``1_sorted`` copy the delivered flick was made from.
 
     See the module docstring for why this is not optional.
     """
@@ -158,14 +158,14 @@ def run(
     result = GenauDeliverResult()
     log.info("=== Genau lane: 2_outbox -> %s ===", delivery_dir)
 
-    for upscaled in _upscaled_genau_clips(outbox_dir, genau_source):
+    for upscaled in _upscaled_genau_flicks(outbox_dir, genau_source):
         try:
             destination = _deliver(upscaled, delivery_dir)
             _move_sidecar(upscaled, destination)
             _save_its_sound(destination, genau_audio_dir)
             _retire_source(upscaled, genau_sorted_dir)
         except OSError:
-            # A clip Genau is playing right now is locked on Windows. Leaving it
+            # A flick Genau is playing right now is locked on Windows. Leaving it
             # is right: it is still a valid outbox entry with its source beside
             # it, so nothing is inconsistent and the next run delivers it.
             log.warning("Could not deliver %s; leaving it for the next run",

@@ -85,13 +85,13 @@ def upscale_filed_for(video: Path) -> Path | None:
 
 
 def genau_delivery_dir() -> Path:
-    return config.GENAU_CLIPS_DIR / "2D" / "AI"
+    return config.GENAU_FLICKS_DIR / "2D" / "AI"
 
 
-def genau_clips() -> Iterator[Path]:
-    if not config.GENAU_CLIPS_DIR.is_dir():
+def genau_flicks() -> Iterator[Path]:
+    if not config.GENAU_FLICKS_DIR.is_dir():
         return
-    for video in sorted(config.GENAU_CLIPS_DIR.rglob("*")):
+    for video in sorted(config.GENAU_FLICKS_DIR.rglob("*")):
         if is_finalized_video_file(video):
             yield video
 

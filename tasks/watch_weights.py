@@ -93,7 +93,7 @@ def run() -> WatchWeightsResult:
 def _played_videos() -> Iterator[Path]:
     for clip in lanes.ai_clips():
         yield clip.upscale
-    yield from lanes.genau_clips()
+    yield from lanes.genau_flicks()
     yield from lanes.non_ai_videos()
 
 

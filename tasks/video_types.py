@@ -18,7 +18,7 @@ before it knew.  A running time costs an ffprobe, so that answer is remembered
 once and never asked again; a video does not change length.
 
 Every video is measured, not only the ones a running time has to settle.  A
-free kind — an excerpt, a Genau clip — is named without asking how long the
+free kind — an excerpt, a Genau flick — is named without asking how long the
 video is, but the answer is worth having for its own sake: it is what
 :mod:`tasks.nonai_progress` weighs the non-AI upscale queue by, and two thirds
 of the videos that stage accounts for are excerpts.  Measuring them here costs
@@ -137,13 +137,13 @@ def _library_videos():
     it stands, plus the two signals a lane settles on its own, leaving only the
     running time to be measured.
     """
-    yield from _genau_clips()
+    yield from _genau_flicks()
     yield from _ai_clips()
     yield from _non_ai_videos()
 
 
-def _genau_clips():
-    for video in lanes.genau_clips():
+def _genau_flicks():
+    for video in lanes.genau_flicks():
         path = sidecar.sidecar_path(video)
         yield video, path, sidecar.read(path), True, False
 

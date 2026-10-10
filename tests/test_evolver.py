@@ -813,12 +813,12 @@ def _a_run(lib: LaneLibrary) -> None:
 
 
 class TestWhatIsMarkedWeird:
-    def test_a_run_leaves_a_clip_genau_marked_weird_where_it_is_with_its_record(self):
+    def test_a_run_leaves_a_flick_genau_marked_weird_where_it_is_with_its_record(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():
                 marked = touch_video(lib.genau_weird / "loop_7_topaz.mp4")
-                record = _a_record_for(lib.genau_clips / marked.name)
+                record = _a_record_for(lib.genau_flicks / marked.name)
 
             _a_run(lib)
 

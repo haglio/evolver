@@ -1,4 +1,4 @@
-"""The Genau lane's last step: an upscaled loop leaves the outbox for Genau's folder."""
+"""The Genau lane's last step: an upscaled flick leaves the outbox for Genau's folder."""
 from __future__ import annotations
 
 import dataclasses
@@ -18,11 +18,11 @@ def _lane(root):
     """The three folders the lane spans, wired into config for one test."""
     outbox = root / "2_outbox" / "upscaled_by_orientation"
     sorted_dir = root / "1_sorted"
-    clips = root / "genau" / "clips"
-    return outbox, sorted_dir, clips
+    flicks = root / "genau" / "flicks"
+    return outbox, sorted_dir, flicks
 
 
-def _stage_clip(outbox, sorted_dir, stem="loop_1", orient="landscape"):
+def _stage_flick(outbox, sorted_dir, stem="loop_1", orient="landscape"):
     """One finished upscale in the outbox with the sorted video it was made from."""
     upscaled = outbox / orient / GENAU_SOURCE / f"{stem}_topaz.mp4"
     upscaled.parent.mkdir(parents=True, exist_ok=True)
@@ -34,34 +34,34 @@ def _stage_clip(outbox, sorted_dir, stem="loop_1", orient="landscape"):
 
 
 class TestGenauDeliver(unittest.TestCase):
-    def test_a_finished_clip_moves_to_genaus_folder(self):
+    def test_a_finished_flick_moves_to_genaus_folder(self):
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            upscaled, original = _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            upscaled, original = _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
             self.assertEqual(result.delivered, 1)
-            delivered = clips / "2D" / "AI" / "loop_1_topaz.mp4"
+            delivered = flicks / "2D" / "AI" / "loop_1_topaz.mp4"
             self.assertTrue(delivered.is_file())
             self.assertEqual(delivered.read_text(encoding="utf-8"), "upscaled")
             self.assertFalse(upscaled.exists())
             # The source goes with it: left in place, the upscale stage would remake
-            # this clip every run and the correspondence check would call it a
+            # this flick every run and the correspondence check would call it a
             # mismatch (see the module docstring).
             self.assertFalse(original.exists())
 
-    def test_the_clips_metadata_travels_with_it_and_says_what_it_is(self):
+    def test_the_flicks_metadata_travels_with_it_and_says_what_it_is(self):
         """A delivered loop keeps the generation record it was made with, and
         carries the one thing every app asks a video: what kind it is."""
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            upscaled, _original = _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            upscaled, _original = _stage_flick(outbox, sorted_dir)
             metadata = root / "metadata"
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
                                  METADATA_DIR=metadata):
                 write_sidecar(sidecar.sidecar_path(upscaled),
@@ -69,15 +69,15 @@ class TestGenauDeliver(unittest.TestCase):
 
                 genau_deliver.run()
 
-                delivered = sidecar.read(sidecar.sidecar_path(clips / "2D" / "AI" / "loop_1_topaz.mp4"))
+                delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
             self.assertEqual(delivered["video"]["prompt"], "a prompt")
-            self.assertEqual(video_type.type_of(delivered), video_type.GENAU_CLIP)
+            self.assertEqual(video_type.type_of(delivered), video_type.GENAU_FLICK)
             # The outbox path it mirrored is gone, so the record must not stay there.
             self.assertFalse(
                 (metadata / "landscape" / GENAU_SOURCE / "loop_1_topaz.json").exists()
             )
 
-    def test_delivery_carries_what_made_the_clip_and_adds_nothing_to_it(self):
+    def test_delivery_carries_what_made_the_flick_and_adds_nothing_to_it(self):
         """Delivering moves a file; it makes none. The stamps a loop was
         generated and upscaled under go with it, and no new one is filed."""
         stamps = {
@@ -85,56 +85,56 @@ class TestGenauDeliver(unittest.TestCase):
             provenance.UPSCALE: provenance.reconstructed("evolver", recipe="ai_upscale"),
         }
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            upscaled, _original = _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            upscaled, _original = _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
                                  METADATA_DIR=root / "metadata"):
                 write_sidecar(sidecar.sidecar_path(upscaled), {provenance.BLOCK: stamps})
 
                 genau_deliver.run()
 
-                delivered = sidecar.read(sidecar.sidecar_path(clips / "2D" / "AI" / "loop_1_topaz.mp4"))
+                delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
             self.assertEqual(delivered[provenance.BLOCK], stamps)
 
-    def test_a_clip_delivered_without_any_metadata_still_gets_a_record(self):
+    def test_a_flick_delivered_without_any_metadata_still_gets_a_record(self):
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
                                  METADATA_DIR=root / "metadata"):
                 genau_deliver.run()
 
-                delivered = sidecar.read(sidecar.sidecar_path(clips / "2D" / "AI" / "loop_1_topaz.mp4"))
-            self.assertEqual(video_type.type_of(delivered), video_type.GENAU_CLIP)
+                delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
+            self.assertEqual(video_type.type_of(delivered), video_type.GENAU_FLICK)
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
-        """Fun Time's audio companion plays ``<audio folder>/<clip name>.mp3``
-        while a clip is up, as it does for the clips Genaumacher cuts."""
+        """Fun Time's audio companion plays ``<audio folder>/<flick name>.mp3``
+        while a flick is up, as it does for the flicks Genaumacher cuts."""
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            _stage_flick(outbox, sorted_dir)
             audio = root / "genau" / "audio"
             saved = []
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_AUDIO_DIR=audio,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_AUDIO_DIR=audio,
                                  GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
                  patch("tasks.genau_deliver.has_sound", return_value=True), \
                  patch("tasks.genau_deliver.save_as_mp3",
                        side_effect=lambda video, mp3: saved.append((video, mp3))):
                 genau_deliver.run()
 
-            self.assertEqual(saved, [(clips / "2D" / "AI" / "loop_1_topaz.mp4", audio / "loop_1_topaz.mp3")])
+            self.assertEqual(saved, [(flicks / "2D" / "AI" / "loop_1_topaz.mp4", audio / "loop_1_topaz.mp3")])
 
     def test_a_silent_loop_leaves_no_sound_behind(self):
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_AUDIO_DIR=root / "audio",
+                                 GENAU_FLICKS_DIR=flicks, GENAU_AUDIO_DIR=root / "audio",
                                  GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
                  patch("tasks.genau_deliver.has_sound", return_value=False), \
                  patch("tasks.genau_deliver.save_as_mp3") as save:
@@ -145,10 +145,10 @@ class TestGenauDeliver(unittest.TestCase):
 
     def test_a_sound_that_cannot_be_saved_leaves_the_loop_delivered(self):
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            _upscaled, original = _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            _upscaled, original = _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_AUDIO_DIR=root / "audio",
+                                 GENAU_FLICKS_DIR=flicks, GENAU_AUDIO_DIR=root / "audio",
                                  GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
                  patch("tasks.genau_deliver.has_sound", return_value=True), \
                  patch("tasks.genau_deliver.save_as_mp3", side_effect=OSError("disk full")), \
@@ -156,61 +156,61 @@ class TestGenauDeliver(unittest.TestCase):
                 result = genau_deliver.run()
 
             self.assertEqual((result.delivered, result.failed), (1, 0))
-            self.assertTrue((clips / "2D" / "AI" / "loop_1_topaz.mp4").is_file())
+            self.assertTrue((flicks / "2D" / "AI" / "loop_1_topaz.mp4").is_file())
             self.assertFalse(original.exists())
 
     def test_only_the_genau_source_is_delivered(self):
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            _stage_flick(outbox, sorted_dir)
             other = outbox / "landscape" / "origenerator" / "video_1_topaz.mp4"
             other.parent.mkdir(parents=True, exist_ok=True)
             other.write_text("a library video", encoding="utf-8")
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
             self.assertEqual(result.delivered, 1)
             self.assertTrue(other.is_file())  # the ordinary lane stays in the outbox
-            self.assertFalse((clips / "2D" / "AI" / "video_1_topaz.mp4").exists())
+            self.assertFalse((flicks / "2D" / "AI" / "video_1_topaz.mp4").exists())
 
-    def test_clips_are_found_under_every_orientation(self):
+    def test_flicks_are_found_under_every_orientation(self):
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            _stage_clip(outbox, sorted_dir, stem="wide", orient="landscape")
-            _stage_clip(outbox, sorted_dir, stem="tall", orient="portrait")
+            outbox, sorted_dir, flicks = _lane(root)
+            _stage_flick(outbox, sorted_dir, stem="wide", orient="landscape")
+            _stage_flick(outbox, sorted_dir, stem="tall", orient="portrait")
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
             self.assertEqual(result.delivered, 2)
-            self.assertTrue((clips / "2D" / "AI" / "wide_topaz.mp4").is_file())
-            self.assertTrue((clips / "2D" / "AI" / "tall_topaz.mp4").is_file())
+            self.assertTrue((flicks / "2D" / "AI" / "wide_topaz.mp4").is_file())
+            self.assertTrue((flicks / "2D" / "AI" / "tall_topaz.mp4").is_file())
 
     def test_a_name_already_in_genaus_folder_is_not_overwritten(self):
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            _stage_clip(outbox, sorted_dir)
-            (clips / "2D" / "AI").mkdir(parents=True)
-            existing = clips / "2D" / "AI" / "loop_1_topaz.mp4"
-            existing.write_text("a clip already being played", encoding="utf-8")
+            outbox, sorted_dir, flicks = _lane(root)
+            _stage_flick(outbox, sorted_dir)
+            (flicks / "2D" / "AI").mkdir(parents=True)
+            existing = flicks / "2D" / "AI" / "loop_1_topaz.mp4"
+            existing.write_text("a flick already being played", encoding="utf-8")
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 genau_deliver.run()
 
             self.assertEqual(existing.read_text(encoding="utf-8"),
-                             "a clip already being played")
-            self.assertTrue((clips / "2D" / "AI" / "loop_1_topaz (2).mp4").is_file())
+                             "a flick already being played")
+            self.assertTrue((flicks / "2D" / "AI" / "loop_1_topaz (2).mp4").is_file())
 
-    def test_a_clip_that_cannot_be_moved_is_left_whole_for_the_next_run(self):
+    def test_a_flick_that_cannot_be_moved_is_left_whole_for_the_next_run(self):
         # Genau holds the file open on Windows while it plays. Leaving both halves
         # in place keeps the outbox consistent, and the next run delivers it.
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
-            upscaled, original = _stage_clip(outbox, sorted_dir)
+            outbox, sorted_dir, flicks = _lane(root)
+            upscaled, original = _stage_flick(outbox, sorted_dir)
 
             def _locked(self, target):
                 raise OSError("the file is in use")
@@ -221,7 +221,7 @@ class TestGenauDeliver(unittest.TestCase):
             # for the rest of the session -- which silently disarms any later
             # patch("pathlib.Path.replace"). patch.object deletes instead.
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"), \
                  patch.object(type(upscaled), "replace", _locked):
                 result = genau_deliver.run()
@@ -232,45 +232,45 @@ class TestGenauDeliver(unittest.TestCase):
 
     def test_an_empty_lane_is_a_no_op(self):
         with workspace_temp_dir() as root:
-            outbox, sorted_dir, clips = _lane(root)
+            outbox, sorted_dir, flicks = _lane(root)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_CLIPS_DIR=clips, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
             self.assertEqual((result.delivered, result.failed), (0, 0))
-            self.assertFalse(clips.exists())  # nothing to deliver, nothing created
+            self.assertFalse(flicks.exists())  # nothing to deliver, nothing created
 
     def test_the_lane_runs_between_the_four_places_it_is_given(self):
         """The lane spans four places, and all four are arguments now.
 
         `config` still answers when the caller names none of them — the
         pipeline names none. The ambient four here are pointed at a second
-        staged clip, so a stage still reading them would deliver that one
+        staged flick, so a stage still reading them would deliver that one
         instead of this one.
         """
         with workspace_temp_dir() as root:
-            given_outbox, given_sorted, given_clips = _lane(root / "given")
-            _stage_clip(given_outbox, given_sorted, stem="loop_given")
+            given_outbox, given_sorted, given_flicks = _lane(root / "given")
+            _stage_flick(given_outbox, given_sorted, stem="loop_given")
 
-            ambient_outbox, ambient_sorted, ambient_clips = _lane(root / "ambient")
-            _stage_clip(ambient_outbox, ambient_sorted, stem="loop_ambient")
+            ambient_outbox, ambient_sorted, ambient_flicks = _lane(root / "ambient")
+            _stage_flick(ambient_outbox, ambient_sorted, stem="loop_ambient")
 
             with override_config(
                 OUT_UPSCALED_DIR=ambient_outbox, SORTED_DIR=ambient_sorted,
-                GENAU_CLIPS_DIR=ambient_clips, GENAU_SOURCE=GENAU_SOURCE,
+                GENAU_FLICKS_DIR=ambient_flicks, GENAU_SOURCE=GENAU_SOURCE,
                 METADATA_DIR=root / "metadata",
             ):
                 result = genau_deliver.run(
                     outbox_dir=given_outbox,
                     sorted_dir=given_sorted,
                     genau_source=GENAU_SOURCE,
-                    delivery_dir=given_clips / "2D" / "AI",
+                    delivery_dir=given_flicks / "2D" / "AI",
                 )
 
             self.assertEqual(result.delivered, 1)
-            self.assertTrue((given_clips / "2D" / "AI" / "loop_given_topaz.mp4").is_file())
-            self.assertFalse(ambient_clips.exists())
+            self.assertTrue((given_flicks / "2D" / "AI" / "loop_given_topaz.mp4").is_file())
+            self.assertFalse(ambient_flicks.exists())
             self.assertTrue((ambient_outbox / "landscape" / GENAU_SOURCE / "loop_ambient_topaz.mp4").is_file())
 
 class TestGenauDeliverResultSurface(unittest.TestCase):

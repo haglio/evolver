@@ -118,7 +118,7 @@ def _what_each_video_went_through(
             acts[provenance.UPSCALE] = lambda clip=clip: notes.made(clip.upscale)
         if acts:
             yield sidecar.sidecar_path(clip.upscale), acts
-    for video in lanes.genau_clips():
+    for video in lanes.genau_flicks():
         if is_upscaled_stem(video.stem):
             yield sidecar.sidecar_path(video), {
                 provenance.UPSCALE: lambda video=video: notes.made(video)}

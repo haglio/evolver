@@ -42,7 +42,7 @@ class TestRelocate(unittest.TestCase):
 
             self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
 
-    def test_leaves_a_reference_where_its_clip_was_while_the_clip_waits_in_genaus_weird_pile(self):
+    def test_leaves_a_reference_where_its_flick_was_while_the_flick_waits_in_genaus_weird_pile(self):
         with workspace_temp_dir() as temp:
             genau_weird = temp / "videos" / "genau" / "weird"
             _write_video(genau_weird / "loop.mp4")

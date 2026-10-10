@@ -16,8 +16,8 @@ correct in one place.
 Which the four are, and the order they settle in (a video that looks like two of
 them is the earlier one):
 
-``genau_clip``
-    A looping clip in Genau's own folder.  It is delivered there and nothing
+``genau_flick``
+    A flick in Genau's own folder.  It is delivered there and nothing
     else lives in it, so the lane is the whole test.
 
 ``excerpt``
@@ -46,13 +46,13 @@ from __future__ import annotations
 
 from util import provenance, watch
 
-GENAU_CLIP = "genau_clip"
+GENAU_FLICK = "genau_flick"
 EXCERPT = "excerpt"
 SHORT = "short"
 FULL_LENGTH = "full_length"
 
 #: Every kind, in the order :func:`classify` settles them.
-TYPES = (GENAU_CLIP, EXCERPT, SHORT, FULL_LENGTH)
+TYPES = (GENAU_FLICK, EXCERPT, SHORT, FULL_LENGTH)
 
 #: A video runs short when it is no longer than this.  One number for the whole
 #: family: the Main Funestra split its library at 60 seconds and Warm Gun at 10, so a clip
@@ -83,7 +83,7 @@ def free_kind(*, genau: bool, excerpt: bool) -> str:
     record written after the split) corrects itself rather than standing.
     """
     if genau:
-        return GENAU_CLIP
+        return GENAU_FLICK
     if excerpt:
         return EXCERPT
     return ""
@@ -92,7 +92,7 @@ def free_kind(*, genau: bool, excerpt: bool) -> str:
 def classify(*, genau: bool, excerpt: bool, duration_seconds: float | None) -> str:
     """Which kind a video is, from the three signals that can identify one.
 
-    *genau* is whether it sits in Genau's clips folder, *excerpt* whether
+    *genau* is whether it sits in Genau's flicks folder, *excerpt* whether
     something carved it out of a longer video, and *duration_seconds* its
     running time — ``None`` when it could not be measured.
     """

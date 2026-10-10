@@ -70,7 +70,7 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "metadata": lambda r: not r.ok,
     "upscale": lambda r: bool(r.failed),
     "upscale_non_ai": lambda r: bool(r.failed),
-    # A clip that could not be delivered is almost always one Genau has open right
+    # A flick that could not be delivered is almost always one Genau has open right
     # now, and the next run gets it — but it stays visible rather than silent,
     # because the alternative failure (a folder that cannot be written at all)
     # looks identical from here and would otherwise never be noticed.
@@ -339,9 +339,9 @@ def _run_stages(
                         upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
                     upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
 
-        # Straight after the upscale, so a clip made this run reaches Genau this run —
+        # Straight after the upscale, so a flick made this run reaches Genau this run —
         # and before the correspondence check, which would otherwise see the delivered
-        # clip's source still sitting in 1_sorted with nothing beside it in the outbox.
+        # flick's source still sitting in 1_sorted with nothing beside it in the outbox.
         _run_stage("genau_deliver", genau_deliver.run)
 
         upscale_still_pending = (

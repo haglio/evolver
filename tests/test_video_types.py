@@ -92,7 +92,7 @@ class TestAiLane(unittest.TestCase):
                 video_types.run(probe=_unmeasurable)
 
                 self.assertEqual(
-                    video_type.type_of(sidecar.read(path)), video_type.GENAU_CLIP
+                    video_type.type_of(sidecar.read(path)), video_type.GENAU_FLICK
                 )
 
 
@@ -101,12 +101,12 @@ class TestGenauLane(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                clip = touch_video(lib.genau_clips / "loop_2_topaz.mp4")
+                clip = touch_video(lib.genau_flicks / "loop_2_topaz.mp4")
 
                 result = video_types.run(probe=_unmeasurable)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
-            self.assertEqual(video_type.type_of(payload), video_type.GENAU_CLIP)
+            self.assertEqual(video_type.type_of(payload), video_type.GENAU_FLICK)
             self.assertEqual(result.recorded, 1)
 
 
@@ -251,7 +251,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(VIDEO_TYPE_BATCH_LIMIT=1):
                 for index in (1, 2):
-                    touch_video(lib.genau_clips / f"loop_{index}_topaz.mp4")
+                    touch_video(lib.genau_flicks / f"loop_{index}_topaz.mp4")
                 measured = []
 
                 video_types.run(probe=lambda video: measured.append(video) or 4.0)
@@ -262,12 +262,12 @@ class TestKeepingTheRunningTime(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                clip = touch_video(lib.genau_clips / "loop_4_topaz.mp4")
+                clip = touch_video(lib.genau_flicks / "loop_4_topaz.mp4")
 
                 result = video_types.run(probe=_unmeasurable)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
-            self.assertEqual(video_type.type_of(payload), video_type.GENAU_CLIP)
+            self.assertEqual(video_type.type_of(payload), video_type.GENAU_FLICK)
             self.assertIsNone(video_type.duration_of(payload))
             self.assertEqual((result.recorded, result.skipped), (1, 0))
 
@@ -341,14 +341,14 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(VIDEO_TYPE_BATCH_LIMIT=0):
-                clip = touch_video(lib.genau_clips / "loop_3_topaz.mp4")
+                clip = touch_video(lib.genau_flicks / "loop_3_topaz.mp4")
                 touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_g.mp4")
 
                 result = video_types.run(probe=_refuses_to_be_called)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(clip))),
-                    video_type.GENAU_CLIP,
+                    video_type.GENAU_FLICK,
                 )
             self.assertEqual((result.recorded, result.deferred), (1, 1))
 

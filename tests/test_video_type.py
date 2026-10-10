@@ -30,10 +30,10 @@ class TestClassify(unittest.TestCase):
             video_type.EXCERPT,
         )
 
-    def test_a_genau_loop_outranks_everything_else(self):
+    def test_a_genau_flick_outranks_everything_else(self):
         self.assertEqual(
             video_type.classify(genau=True, excerpt=True, duration_seconds=900.0),
-            video_type.GENAU_CLIP,
+            video_type.GENAU_FLICK,
         )
 
     def test_the_boundary_second_still_counts_as_short(self):

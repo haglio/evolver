@@ -153,7 +153,7 @@ class TestAnAiUpscale(unittest.TestCase):
         self.assertEqual(recorded[provenance.BLOCK], {provenance.UPSCALE: taken_at_the_time})
 
 
-class TestAGenauClip(unittest.TestCase):
+class TestAGenauFlick(unittest.TestCase):
     def test_a_loop_delivered_before_records_were_kept_says_the_recipe_its_note_names(self):
         """Delivery carries a record that was already there; a loop delivered
         before anything kept one arrives with none, and its note still says how
@@ -161,7 +161,7 @@ class TestAGenauClip(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
-                clip = touch_video(lib.genau_clips / "loop_one_topaz.mp4")
+                clip = touch_video(lib.genau_flicks / "loop_one_topaz.mp4")
 
                 provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
 

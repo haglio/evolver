@@ -1,6 +1,6 @@
-"""Where Genau puts a condemned clip, held to what Genau says it does.
+"""Where Genau puts a condemned flick, held to what Genau says it does.
 
-Evolver delivers upscaled clips into the folder Genau plays from and reads the
+Evolver delivers upscaled flicks into the folder Genau plays from and reads the
 pile Genau moves a condemned one to.  That pile's place -- beside the folder,
 not inside it -- is Genau's rule, and it was written out a second time here,
 from reading that repo's source, with nothing comparing the two.  A rename over
@@ -54,19 +54,19 @@ class GenauContract(unittest.TestCase):
         if self.promise is None:
             self.skipTest(f"no {CONTRACT.as_posix()} beside this checkout")
 
-    def test_the_pile_read_here_is_where_genau_condemns_a_clip_to(self):
-        """Delivered clips and condemned ones are the two ends of one folder
+    def test_the_pile_read_here_is_where_genau_condemns_a_flick_to(self):
+        """Delivered flicks and condemned ones are the two ends of one folder
         pair, and only one repo decides its shape."""
         beside = _section(self.promise, "beside_the_flicks_folder")
 
         self.assertEqual(config.GENAU_WEIRD_DIR,
-                         config.GENAU_CLIPS_DIR.parent / beside["condemned"])
+                         config.GENAU_FLICKS_DIR.parent / beside["condemned"])
 
     def test_a_loop_is_delivered_into_the_2d_folder_genau_plays(self):
         inside = _section(self.promise, "inside_the_flicks_folder")
 
         self.assertEqual(lanes.genau_delivery_dir().parent,
-                         config.GENAU_CLIPS_DIR / inside["flat"])
+                         config.GENAU_FLICKS_DIR / inside["flat"])
 
 
 if __name__ == "__main__":
