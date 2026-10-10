@@ -48,8 +48,7 @@ def _row_as_drawn(menu, action, *, under_the_pointer=False):
         if under_the_pointer:
             menu.setActiveAction(action)
         QAPP.processEvents()
-        painted = QAPP.primaryScreen().grabWindow(menu.winId()).toImage()
-        return painted.copy(menu.actionGeometry(action))
+        return menu.grab(menu.actionGeometry(action)).toImage()
     finally:
         menu.hide()
 
