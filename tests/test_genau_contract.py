@@ -22,6 +22,10 @@ import config
 from util import lanes
 
 CONTRACT = Path("genau") / "genau_contract.json"
+SECTIONS_BEFORE_THE_RENAME = {
+    "beside_the_flicks_folder": "beside_the_clips_folder",
+    "inside_the_flicks_folder": "inside_the_clips_folder",
+}
 
 
 def _promise() -> dict | None:
@@ -40,6 +44,10 @@ def _promise() -> dict | None:
     return None
 
 
+def _section(promise: dict, name: str) -> dict:
+    return promise[name] if name in promise else promise[SECTIONS_BEFORE_THE_RENAME[name]]
+
+
 class GenauContract(unittest.TestCase):
     def setUp(self):
         self.promise = _promise()
@@ -49,13 +57,13 @@ class GenauContract(unittest.TestCase):
     def test_the_pile_read_here_is_where_genau_condemns_a_clip_to(self):
         """Delivered clips and condemned ones are the two ends of one folder
         pair, and only one repo decides its shape."""
-        beside = self.promise["beside_the_clips_folder"]
+        beside = _section(self.promise, "beside_the_flicks_folder")
 
         self.assertEqual(config.GENAU_WEIRD_DIR,
                          config.GENAU_CLIPS_DIR.parent / beside["condemned"])
 
     def test_a_loop_is_delivered_into_the_2d_folder_genau_plays(self):
-        inside = self.promise["inside_the_clips_folder"]
+        inside = _section(self.promise, "inside_the_flicks_folder")
 
         self.assertEqual(lanes.genau_delivery_dir().parent,
                          config.GENAU_CLIPS_DIR / inside["flat"])
