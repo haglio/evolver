@@ -175,7 +175,7 @@ CONFIG_REFERENCE_LEDGER = {
     # funscript no person wrote, read where a mark is kept beside its script.
     "util/script_library.py": 6,
     "util/media_files.py": 1,
-    "util/nonai_library.py": 5,
+    "util/nonai_library.py": 4,
     # The two folders another app hands clips to this pipeline through, read
     # here so the published document says where they are TODAY rather than
     # where they were when somebody last wrote them out by hand.

@@ -31,19 +31,19 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                original = _touch(non_ai / "larkin" / "2 done" / "Jane-Doe-lA0JUsAd.mp4")
+                original = _touch(non_ai / "lagoon" / "2 done" / "Jane-Doe-lA0JUsAd.mp4")
                 variant = _touch(
-                    non_ai / "larkin" / "3_good_to_go" / "processed"
+                    non_ai / "lagoon" / "3_good_to_go" / "processed"
                     / "Jane-Doe-lA0JUsAd_3_apf2_iris2.mp4"
                 )
-                other = _touch(non_ai / "larkin" / "0 unsorted" / "Ada-Roe-1.mp4")
+                other = _touch(non_ai / "lagoon" / "0 unsorted" / "Ada-Roe-1.mp4")
 
                 result = nonai_group.run()
 
                 # The sidecar mirrors the clip's full path under metadata/.
                 self.assertEqual(
                     sidecar.sidecar_path(original),
-                    metadata / "2D" / "non_AI" / "larkin" / "2 done" / "Jane-Doe-lA0JUsAd.json",
+                    metadata / "2D" / "non_AI" / "lagoon" / "2 done" / "Jane-Doe-lA0JUsAd.json",
                 )
                 orig = sidecar.read(sidecar.sidecar_path(original))
                 var = sidecar.read(sidecar.sidecar_path(variant))
@@ -54,17 +54,6 @@ class TestNonAiGroup(unittest.TestCase):
                 self.assertTrue(var["version"]["processed"])
                 self.assertEqual(result.written, 3)
 
-    def test_leaves_the_excluded_bucket_alone(self):
-        with workspace_temp_dir() as root:
-            video_lib, non_ai, metadata = _library(root)
-            with override_config(
-                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata,
-                NONAI_EXCLUDED_BUCKETS={"actually_AI_but_funscripted"},
-            ):
-                clip = _touch(non_ai / "actually_AI_but_funscripted" / "landscape" / "x_topaz.mp4")
-                nonai_group.run()
-                self.assertFalse(sidecar.sidecar_path(clip).exists())
-
     def test_merges_version_into_an_existing_clip_sidecar(self):
         """A clip carved from a compilation carries a `clip` object; grouping must
         add `version` alongside it, never clobber it."""
@@ -73,7 +62,7 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                clip = _touch(non_ai / "larkin" / "1 clips" / "Ann Bly - Scene One.mp4")
+                clip = _touch(non_ai / "lagoon" / "1 clips" / "Ann Bly - Scene One.mp4")
                 write_sidecar(
                     sidecar.sidecar_path(clip),
                     {"video": {"action": "Alpha"},
@@ -95,9 +84,9 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                original = _touch(non_ai / "larkin" / "2 done" / "Lee-Poe.mp4")
+                original = _touch(non_ai / "lagoon" / "2 done" / "Lee-Poe.mp4")
                 variant = _touch(
-                    non_ai / "larkin" / "3_good_to_go" / "processed"
+                    non_ai / "lagoon" / "3_good_to_go" / "processed"
                     / "Lee-Poe_apo8_iris2.mp4"
                 )
                 write_sidecar(
@@ -119,13 +108,13 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                clip = _touch(non_ai / "larkin" / "1 clips" / "Ann Bly - Scene Two.mp4")
+                clip = _touch(non_ai / "lagoon" / "1 clips" / "Ann Bly - Scene Two.mp4")
                 upscaled = _touch(
-                    non_ai / "larkin" / "3_good_to_go" / "processed"
+                    non_ai / "lagoon" / "3_good_to_go" / "processed"
                     / "Ann Bly - Scene Two_apo8_iris2.mp4"
                 )
                 neighbour = _touch(
-                    non_ai / "larkin" / "0 unsorted"
+                    non_ai / "lagoon" / "0 unsorted"
                     / "Ann Bly - Scene Two (2009) Enhanced.mp4"
                 )
                 write_sidecar(sidecar.sidecar_path(clip), {"clip": {"compilation": "Vol6", "index": 9}})
@@ -146,9 +135,9 @@ class TestNonAiGroup(unittest.TestCase):
                     "Jane Doe Scene Two 4k 60fps": "jane-doe_540-Qv3Tn8Rd",
                 },
             ):
-                original = _touch(non_ai / "larkin" / "0 unsorted" / "jane-doe_540-Qv3Tn8Rd.mp4")
+                original = _touch(non_ai / "lagoon" / "0 unsorted" / "jane-doe_540-Qv3Tn8Rd.mp4")
                 upscale = _touch(
-                    non_ai / "larkin" / "3_good_to_go" / "processed"
+                    non_ai / "lagoon" / "3_good_to_go" / "processed"
                     / "Jane Doe Scene Two 4k 60fps.mp4"
                 )
 
@@ -165,7 +154,7 @@ class TestNonAiGroup(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                clip = _touch(non_ai / "larkin" / "0 unsorted" / "Scene-1.mp4")
+                clip = _touch(non_ai / "lagoon" / "0 unsorted" / "Scene-1.mp4")
                 self.assertEqual(nonai_group.run().written, 1)
                 self.assertEqual(nonai_group.run().written, 0)  # nothing changed
 
@@ -211,7 +200,7 @@ class TestOneVideoByItsPictures(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                unsorted = non_ai / "larkin" / "0 unsorted"
+                unsorted = non_ai / "lagoon" / "0 unsorted"
                 old = _scene(unsorted / "Jane Doe - studio video original.mp4", 850.57)
                 new = _scene(unsorted / "jane-doe-scene-two-enhanced-60fps-1080p.mp4", 850.51)
 
@@ -226,7 +215,7 @@ class TestOneVideoByItsPictures(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                unsorted = non_ai / "larkin" / "0 unsorted"
+                unsorted = non_ai / "lagoon" / "0 unsorted"
                 old = _scene(unsorted / "Jane Doe - studio video original.mp4", 850.57)
                 new = _scene(unsorted / "jane-doe-scene-two-enhanced-60fps-1080p.mp4", 850.51)
                 measured: list[str] = []
@@ -247,11 +236,11 @@ class TestOneVideoByItsPictures(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                unsorted = non_ai / "larkin" / "0 unsorted"
+                unsorted = non_ai / "lagoon" / "0 unsorted"
                 old = _scene(unsorted / "Jane Doe - studio video original.mp4", 850.57)
                 new = _scene(unsorted / "jane-doe-scene-two-enhanced-60fps-1080p.mp4", 850.51)
                 longer = _scene(unsorted / "Jane Doe - Scene Three.mp4", 851.2)
-                carved = _touch(non_ai / "larkin" / "1 clips" / "Jane Doe - Scene Two.mp4")
+                carved = _touch(non_ai / "lagoon" / "1 clips" / "Jane Doe - Scene Two.mp4")
                 write_sidecar(sidecar.sidecar_path(carved), {
                     "clip": {"compilation": "Vol6", "index": 2},
                     "video": {"type": "excerpt", "duration_seconds": 850.5},
@@ -274,7 +263,7 @@ class TestOneVideoByItsPictures(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                bucket = non_ai / "larkin"
+                bucket = non_ai / "lagoon"
                 old = _scene(bucket / "0 unsorted" / "Jane Doe - studio video original.mp4", 850.57)
                 upscale = _scene(bucket / "3_good_to_go" / "processed"
                                  / "Jane Doe - studio video original_apo8_iris2.mp4", 850.57)
@@ -297,7 +286,7 @@ class TestOneVideoByItsPictures(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                bucket = non_ai / "larkin"
+                bucket = non_ai / "lagoon"
                 upscale = bucket / "3_good_to_go" / "processed" / "Jane Doe - original_apo8_iris2.mp4"
                 _touch(upscale)
                 write_sidecar(sidecar.sidecar_path(upscale), {
@@ -322,7 +311,7 @@ class TestOneVideoByItsPictures(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ), patch.object(nonai_group, "MEASURED_PER_RUN", 3):
-                unsorted = non_ai / "larkin" / "0 unsorted"
+                unsorted = non_ai / "lagoon" / "0 unsorted"
                 for scene, seconds in ((1, 100.0), (2, 200.0), (3, 300.0)):
                     _scene(unsorted / f"Jane Doe - Scene {scene}.mp4", seconds)
                     _scene(unsorted / f"jane-doe-copy-{scene}-enhanced.mp4", seconds + 0.1)
@@ -343,7 +332,7 @@ class TestOneVideoByItsPictures(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                unsorted = non_ai / "larkin" / "0 unsorted"
+                unsorted = non_ai / "lagoon" / "0 unsorted"
                 first = _scene(unsorted / "various - Example Studio - finale 1.mp4", 60.0)
                 second = _scene(unsorted / "various - Example Studio - finale 2.mp4", 59.95)
                 other = [f"{int(moment, 16) ^ ((1 << 64) - 1):016x}" for moment in ONE_PICTURE]

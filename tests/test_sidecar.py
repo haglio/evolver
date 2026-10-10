@@ -44,14 +44,14 @@ class TestSidecarPath(unittest.TestCase):
             video_lib = root / "videos"
             metadata = root / "metadata"
             video = (
-                video_lib / "2D" / "non_AI" / "larkin" / "3_good_to_go" / "processed"
+                video_lib / "2D" / "non_AI" / "lagoon" / "3_good_to_go" / "processed"
                 / "clip_apo8_iris2.mp4"
             )
 
             with override_config(VIDEO_LIBRARY_DIR=video_lib, METADATA_DIR=metadata):
                 self.assertEqual(
                     sidecar_path(video),
-                    metadata / "2D" / "non_AI" / "larkin" / "3_good_to_go" / "processed"
+                    metadata / "2D" / "non_AI" / "lagoon" / "3_good_to_go" / "processed"
                     / "clip_apo8_iris2.json",
                 )
 

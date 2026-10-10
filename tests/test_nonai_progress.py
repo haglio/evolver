@@ -167,20 +167,5 @@ class TestWhatCountsAsDone(unittest.TestCase):
                 (400.0, 0.0, 0),
             )
 
-    def test_a_bucket_the_non_ai_stages_exclude_is_not_the_project(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            non_ai = overrides["NON_AI_DIR"]
-            with override_config(**overrides,
-                                 NONAI_EXCLUDED_BUCKETS={"actually_AI_but_funscripted"}):
-                lasting(make_video(non_ai / "actually_AI_but_funscripted"
-                                   / "3_good_to_go" / "processed"
-                                   / "Jane Doe scene 12_apo8_iris2.mp4"), 400.0)
-
-                progress = nonai_progress.so_far([])
-
-            self.assertEqual(progress.done_seconds, 0.0)
-
-
 if __name__ == "__main__":
     unittest.main()

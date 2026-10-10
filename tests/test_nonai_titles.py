@@ -41,7 +41,7 @@ class TestNonAiTitles(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                clip = _touch(non_ai / "larkin" / "3_good_to_go"
+                clip = _touch(non_ai / "lagoon" / "3_good_to_go"
                               / "Jane Doe - Alpha Study Part Two.mp4")
                 _record(clip, {"clip": {"performer": "Jane Doe",
                                         "source": "Alpha Study: Part Two"}})
@@ -59,9 +59,9 @@ class TestNonAiTitles(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                scene = _touch(non_ai / "larkin" / "0 unsorted" / "Jane-Doe_540-hQ2vLm8t.mp4")
+                scene = _touch(non_ai / "lagoon" / "0 unsorted" / "Jane-Doe_540-hQ2vLm8t.mp4")
                 _record(scene, {"version": {"group": "Jane-Doe_540-hQ2vLm8t"}})
-                clip = _touch(non_ai / "larkin" / "3_good_to_go"
+                clip = _touch(non_ai / "lagoon" / "3_good_to_go"
                               / "Jane Doe - Alpha Study 3.mp4")
                 _record(clip, {"version": {"group": "Jane Doe - Alpha Study 3"},
                                "clip": {"performer": "Jane Doe", "source": "Alpha Study 3",
@@ -80,12 +80,12 @@ class TestNonAiTitles(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                matched = _touch(non_ai / "larkin" / "0 unsorted" / "Jane-Doe_540-hQ2vLm8t.mp4")
-                upscale = _touch(non_ai / "larkin" / "3_good_to_go" / "processed"
+                matched = _touch(non_ai / "lagoon" / "0 unsorted" / "Jane-Doe_540-hQ2vLm8t.mp4")
+                upscale = _touch(non_ai / "lagoon" / "3_good_to_go" / "processed"
                                  / "Jane-Doe_540-hQ2vLm8t_apo8_iris2.mp4")
                 for rendition in (matched, upscale):
                     _record(rendition, {"version": {"group": "Jane-Doe_540-hQ2vLm8t"}})
-                clip = _touch(non_ai / "larkin" / "3_good_to_go"
+                clip = _touch(non_ai / "lagoon" / "3_good_to_go"
                               / "Jane Doe - Alpha Study 3.mp4")
                 _record(clip, {"version": {"group": "Jane Doe - Alpha Study 3"},
                                "clip": {"performer": "Jane Doe", "source": "Alpha Study 3",
@@ -102,7 +102,7 @@ class TestNonAiTitles(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                lone = _touch(non_ai / "larkin" / "0 unsorted" / "Ada-Roe-1.mp4")
+                lone = _touch(non_ai / "lagoon" / "0 unsorted" / "Ada-Roe-1.mp4")
                 _record(lone, {"version": {"group": "Ada-Roe-1"}})
 
                 result = nonai_titles.run()
@@ -119,23 +119,10 @@ class TestNonAiTitles(unittest.TestCase):
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
-                video = _touch(non_ai / "larkin" / "0 unsorted" / "Ada-Roe-1.mp4")
+                video = _touch(non_ai / "lagoon" / "0 unsorted" / "Ada-Roe-1.mp4")
                 _record(video, {"version": {"group": "Ada-Roe-1"},
                                 "title": "Jane Doe - Alpha Study 3"})
 
                 nonai_titles.run()
 
                 self.assertNotIn("title", sidecar.read(sidecar.sidecar_path(video)))
-
-    def test_it_leaves_the_excluded_bucket_alone(self):
-        with workspace_temp_dir() as root:
-            video_lib, non_ai, metadata = _library(root)
-            with override_config(
-                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata,
-                NONAI_EXCLUDED_BUCKETS={"actually_AI_but_funscripted"},
-            ):
-                clip = _touch(non_ai / "actually_AI_but_funscripted" / "landscape" / "x.mp4")
-
-                nonai_titles.run()
-
-                self.assertFalse(sidecar.sidecar_path(clip).exists())

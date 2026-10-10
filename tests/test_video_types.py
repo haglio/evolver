@@ -289,13 +289,11 @@ class TestWhatItRefusesToGuess(unittest.TestCase):
 
 
 class TestReachingEveryVideoMainPlayerPlays(unittest.TestCase):
-    def test_a_bucket_the_non_ai_stages_skip_still_gets_its_kind(self):
-        """The exclusion keeps pipeline-output videos out of the grouping and
-        the encoder, but the main player plays them, so they are asked what they are too."""
+    def test_a_folder_holding_no_stage_folders_still_gets_its_kind(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(NONAI_EXCLUDED_BUCKETS={"parked_ai"}):
-                video = touch_video(lib.non_ai / "parked_ai" / "landscape" / "clip_f_topaz.mp4")
+            with lib.config():
+                video = touch_video(lib.non_ai / "loose" / "landscape" / "clip_f_topaz.mp4")
 
                 video_types.run(probe=_probe({video.stem: 4.0}))
 
@@ -482,3 +480,18 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
             self.assertEqual(
                 [kinds[f"whole-{i}.mp4"] for i in range(3)], [video_type.FULL_LENGTH] * 3
             )
+
+    def test_a_scene_carved_and_filed_beside_its_source_leaves_the_source_whole(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                batch = lib.non_ai / "alpha"
+                wholes = [touch_video(batch / "0 unsorted" / f"whole-{i}.mp4") for i in range(3)]
+                source = touch_video(batch / "3_good_to_go" / "processed" / "scene.mp4")
+                carved = touch_video(batch / "3_good_to_go" / "processed" / "scene-portrait.mp4")
+                write_sidecar(sidecar.sidecar_path(carved), {"clip": {"full_video": str(source)}})
+
+                video_types.run(probe=_probe({v.stem: 900.0 for v in [*wholes, source, carved]}))
+
+                kind = video_type.type_of(sidecar.read(sidecar.sidecar_path(source)))
+            self.assertEqual(kind, video_type.FULL_LENGTH)

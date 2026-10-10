@@ -165,9 +165,9 @@ def _non_ai_videos():
     company it keeps: a folder its librarian filed the batch's cuts into and
     nothing else (:func:`_cut_folders`), or one the overlay declares outright.
 
-    The whole tree, including the buckets the other non-AI stages exclude: those
-    exclusions are about what to group and what to re-encode, and the main player plays
-    every one of these, so every one of them is asked what it is.
+    The whole tree, including a folder that holds no stage folders and so is no
+    bucket: the main player plays every one of these, so every one of them is
+    asked what it is.
     """
     videos = lanes.non_ai_videos()
     payloads = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
@@ -207,17 +207,13 @@ def _cut_folders(
 
     *carved* holds the folders of the videos something says are cuts, *others*
     those of everything else.  A batch earns an entry only when its cuts have a
-    *dominant* second folder, the rest of it has one too, and the two differ.
-    That is the whole of it: two sets under one batch that share their second
-    folders are separated by their sidecars alone, and the folders they share
-    are the pipeline's stages — which can never stand in for a division of the
-    library.
-
-    So a batch is absent from this unless its librarian drew the line on disk,
-    and one carved scene sitting in a stage folder full of whole videos can
-    never turn that stage folder into a folder of cuts.  Dominant rather than
-    unanimous, so one straggler stranded by a move cannot undo a batch that
-    HAS been separated.
+    *dominant* second folder, the rest of it has one too, the two differ, and
+    each of those folders holds more of its own set than of the other: two sets
+    under one batch that share their second folders are separated by their
+    sidecars alone, and the folders they share are the pipeline's stages —
+    which can never stand in for a division of the library.  Dominant rather
+    than unanimous, so one straggler stranded by a move cannot undo a batch
+    that HAS been separated.
 
     Fun Time reads a library the same way when it has no kind to go on
     (``library_handles.cut_folders``); the answer belongs here, where it is
@@ -233,10 +229,25 @@ def _cut_folders(
     cuts, rest = by_batch(carved), by_batch(others)
     found = {}
     for batch, folders in cuts.items():
-        mine, theirs = _dominant_second(folders), _dominant_second(rest.get(batch, []))
-        if mine and theirs and mine != theirs:
+        mine = _own_second(folders, rest.get(batch, []))
+        if mine:
             found[batch] = mine
     return found
+
+
+def _own_second(band: list[tuple[str, ...]], mate: list[tuple[str, ...]]) -> str:
+    mine, theirs = _dominant_second(band), _dominant_second(mate)
+    if not mine or not theirs or mine == theirs:
+        return ""
+    return mine if _holds_mostly(mine, band, mate) and _holds_mostly(theirs, mate, band) else ""
+
+
+def _holds_mostly(second: str, band: list[tuple[str, ...]], mate: list[tuple[str, ...]]) -> bool:
+    return _count_under(second, band) > _count_under(second, mate)
+
+
+def _count_under(second: str, folders: list[tuple[str, ...]]) -> int:
+    return sum(1 for path in folders if len(path) > 1 and path[1] == second)
 
 
 def _dominant_second(folders: list[tuple[str, ...]]) -> str:

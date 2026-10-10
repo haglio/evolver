@@ -781,18 +781,18 @@ class TestTheWindowsDoorToTheQueue:
     def test_rearranging_pins_the_videos_in_the_configured_pin_list(self):
         with patch("tasks.nonai_queue.pin_ahead") as pin_ahead, \
              override_config(NONAI_PIN_LIST=Path("next.txt")):
-            evolver.arrange_upscale_queue(["larkin/0 unsorted/a.mp4"])
-        pin_ahead.assert_called_once_with(Path("next.txt"), ["larkin/0 unsorted/a.mp4"])
+            evolver.arrange_upscale_queue(["lagoon/0 unsorted/a.mp4"])
+        pin_ahead.assert_called_once_with(Path("next.txt"), ["lagoon/0 unsorted/a.mp4"])
 
     def test_asking_for_one_now_reaches_the_stage(self):
         with patch("tasks.nonai_upscale.request_now") as request_now:
-            evolver.upscale_now("larkin/0 unsorted/a.mp4")
-        request_now.assert_called_once_with("larkin/0 unsorted/a.mp4")
+            evolver.upscale_now("lagoon/0 unsorted/a.mp4")
+        request_now.assert_called_once_with("lagoon/0 unsorted/a.mp4")
 
     def test_putting_one_first_reaches_the_stage(self):
         with patch("tasks.nonai_upscale.put_first") as put_first:
-            evolver.upscale_next("larkin/0 unsorted/a.mp4")
-        put_first.assert_called_once_with("larkin/0 unsorted/a.mp4")
+            evolver.upscale_next("lagoon/0 unsorted/a.mp4")
+        put_first.assert_called_once_with("lagoon/0 unsorted/a.mp4")
 
     def test_withdrawing_the_ask_reaches_the_stage(self):
         with patch("tasks.nonai_upscale.withdraw_request") as withdraw_request:
