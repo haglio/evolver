@@ -6,7 +6,7 @@ of is answerable only from the pictures -- :mod:`util.frame_hashes` samples both
 sides, hashes them and looks for the offset that lines them up. What it finds
 goes into the clip's sidecar as ``clip.full_video`` and ``clip.scene_offset``,
 where ``tasks.clip_scripts`` and ``tasks.scene_scripts`` read it back to carry a
-funscript between the two, and where the main player reads it to step from a clip to the
+funscript between the two, and where the Main Funestra reads it to step from a clip to the
 scene it belongs to.
 
 Not a pipeline stage, and deliberately: it reads every candidate video end to
@@ -208,7 +208,7 @@ def _clip_families(clips: list[Path], payloads: dict[Path, dict]) -> dict[Path, 
     """Each clip mapped to every version of it, itself included.
 
     From the family ``tasks.nonai_group`` recorded, which is this app's own
-    answer to "same video, other version" and the one the players read. A clip
+    answer to "same video, other version" and the one the Funestras read. A clip
     with no record yet stands alone -- it gains its family on the next run of
     that stage, and until then is nobody's re-encode.
     """

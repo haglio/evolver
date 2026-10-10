@@ -1,7 +1,7 @@
 """Stage: record what to call each 2D/non_AI video, on its mirrored sidecar.
 
 Every app in the family shows a video's name somewhere -- Fun Time's browser
-tiles, the name its players print over the picture, the same line in the headset
+tiles, the name its Funestras print over the picture, the same line in the headset
 -- and until this stage the only name any of them had was the filename, which is
 whatever the download called it.  A name is worked out once here and read
 everywhere, rather than each reader walking the library to work it out again at
