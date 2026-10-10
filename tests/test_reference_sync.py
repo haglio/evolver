@@ -80,7 +80,7 @@ class TestClipperSessions(unittest.TestCase):
     def test_follows_a_video_that_was_renamed_where_it_stood(self):
         """No name left to match on — but the session records the footage's shape."""
         with workspace_temp_dir() as temp:
-            folder = temp / "videos" / "larkin" / "0 unsorted"
+            folder = temp / "videos" / "lagoon" / "0 unsorted"
             renamed_to = _write_video(folder / "Clip_topaz.mp4")
             session = _write_json(
                 temp / "sessions" / "Clip.json",
@@ -128,11 +128,11 @@ class TestClipperSessions(unittest.TestCase):
 class TestScriptureProjects(unittest.TestCase):
     def test_repoints_a_project_at_the_video_that_moved(self):
         with workspace_temp_dir() as temp:
-            moved_to = _write_video(temp / "videos" / "non_AI" / "larkin" / "clip.mp4")
+            moved_to = _write_video(temp / "videos" / "non_AI" / "lagoon" / "clip.mp4")
             project = _write_json(
                 temp / "projects" / "Clip.scripture",
                 {
-                    "video_path": str(temp / "videos" / "larkin" / "clip.mp4").replace("\\", "/"),
+                    "video_path": str(temp / "videos" / "lagoon" / "clip.mp4").replace("\\", "/"),
                     "splits": [12, 340],
                 },
             )
@@ -257,7 +257,7 @@ class TestClipPairings(unittest.TestCase):
 
     def test_a_pairing_follows_its_scene_to_the_upscale_that_replaced_it(self):
         with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
-            bucket = non_ai / "larkin"
+            bucket = non_ai / "lagoon"
             retired = bucket / "0 unsorted" / "Nora-Quill_540-izb4ykfa.mp4"
             retired.parent.mkdir(parents=True)
             upscale = _write_video(
@@ -276,11 +276,11 @@ class TestClipPairings(unittest.TestCase):
 
     def test_of_several_versions_the_pairing_takes_the_smallest_the_matcher_would_decode(self):
         with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
-            processed = non_ai / "larkin" / "3_good_to_go" / "processed"
+            processed = non_ai / "lagoon" / "3_good_to_go" / "processed"
             _write_video(processed / "Nora-Quill_540-izb4ykfa_apo8_iris3.mp4").write_bytes(b"x" * 900)
             smaller = _write_video(processed / "Nora-Quill_540-izb4ykfa_apo8_iris2.mp4")
-            card = self._pair(temp, _write_video(non_ai / "larkin" / "1 clips" / "Brink.mp4"),
-                              non_ai / "larkin" / "0 unsorted" / "Nora-Quill_540-izb4ykfa.mp4")
+            card = self._pair(temp, _write_video(non_ai / "lagoon" / "1 clips" / "Brink.mp4"),
+                              non_ai / "lagoon" / "0 unsorted" / "Nora-Quill_540-izb4ykfa.mp4")
 
             reference_sync.run()
 
@@ -289,11 +289,11 @@ class TestClipPairings(unittest.TestCase):
 
     def test_a_same_named_upscale_in_another_bucket_is_not_that_scene(self):
         with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
-            (non_ai / "larkin" / "0 unsorted").mkdir(parents=True)
+            (non_ai / "lagoon" / "0 unsorted").mkdir(parents=True)
             _write_video(non_ai / "other" / "3_good_to_go" / "processed"
                          / "Nora-Quill_540-izb4ykfa_apo8_iris2.mp4")
-            gone = non_ai / "larkin" / "0 unsorted" / "Nora-Quill_540-izb4ykfa.mp4"
-            card = self._pair(temp, _write_video(non_ai / "larkin" / "1 clips" / "Brink.mp4"), gone)
+            gone = non_ai / "lagoon" / "0 unsorted" / "Nora-Quill_540-izb4ykfa.mp4"
+            card = self._pair(temp, _write_video(non_ai / "lagoon" / "1 clips" / "Brink.mp4"), gone)
 
             result = reference_sync.run()
 

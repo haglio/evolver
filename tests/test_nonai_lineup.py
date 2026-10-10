@@ -54,22 +54,22 @@ class TestTheList(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
-            make_video(non_ai / "larkin" / "0 unsorted" / "b.mp4")
+            make_video(non_ai / "lagoon" / "0 unsorted" / "a.mp4")
+            make_video(non_ai / "lagoon" / "0 unsorted" / "b.mp4")
             overrides["NONAI_PIN_LIST"].write_text(
-                "larkin/0 unsorted/b.mp4\n", encoding="utf-8")
+                "lagoon/0 unsorted/b.mp4\n", encoding="utf-8")
 
             with override_config(**overrides):
                 lineup = nonai_lineup.current()
 
             self.assertEqual(videos(lineup),
-                             ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
+                             ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"])
             self.assertEqual([entry.pinned for entry in lineup.rows], [True, False])
 
     def test_with_nothing_in_flight_row_one_is_simply_next(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
 
             with override_config(**overrides):
                 lineup = nonai_lineup.current()
@@ -83,8 +83,8 @@ class TestTheList(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            titled = make_video(non_ai / "larkin" / "0 unsorted" / "a.mp4")
-            make_video(non_ai / "larkin" / "0 unsorted" / "b.mp4")
+            titled = make_video(non_ai / "lagoon" / "0 unsorted" / "a.mp4")
+            make_video(non_ai / "lagoon" / "0 unsorted" / "b.mp4")
             with override_config(**overrides):
                 write_sidecar(sidecar.sidecar_path(titled),
                               {"title": "Jane Doe - Alpha Study 3",
@@ -102,14 +102,14 @@ class TestRowOne(unittest.TestCase):
     def test_the_video_in_flight_is_row_one_whatever_the_order_says(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
             write_job(root, overrides)
 
             with override_config(**overrides), running_encode(percent=41):
                 lineup = nonai_lineup.current()
 
             self.assertEqual(videos(lineup),
-                             ["larkin/0 unsorted/busy.mp4", "larkin/0 unsorted/a.mp4"])
+                             ["lagoon/0 unsorted/busy.mp4", "lagoon/0 unsorted/a.mp4"])
             self.assertEqual(lineup.head,
                              upscale_lineup.Head(upscale_lineup.UPSCALING, percent=41))
             self.assertFalse(lineup.head.runs_now)
@@ -151,17 +151,17 @@ class TestRowOne(unittest.TestCase):
     def test_a_video_asked_for_that_has_not_started_is_row_one_and_runs_now(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "a.mp4")
-            make_video(overrides["NON_AI_DIR"] / "larkin" / "0 unsorted" / "b.mp4")
+            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
+            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
             nonai_job.save_request(overrides["NONAI_REQUEST_FILE"],
-                                   nonai_job.Request("larkin/0 unsorted/b.mp4",
+                                   nonai_job.Request("lagoon/0 unsorted/b.mp4",
                                                      held_back="low_ram"))
 
             with override_config(**overrides), running_encode():
                 lineup = nonai_lineup.current()
 
             self.assertEqual(videos(lineup),
-                             ["larkin/0 unsorted/b.mp4", "larkin/0 unsorted/a.mp4"])
+                             ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"])
             self.assertEqual(lineup.head, upscale_lineup.Head(upscale_lineup.STARTING,
                                                               held_back="low_ram"))
             self.assertTrue(lineup.head.runs_now)

@@ -214,7 +214,7 @@ While the sign-in has expired, the AI upscale is skipped with the reason `topaz_
 
 ## Non-AI library upscaling
 
-The `2D/non_AI` buckets (`larkin`, `other`, …) hold full-length real-footage scenes that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the recipe the already-processed clips record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), as the AI clips do. The encode runs at half the AI stage's Topaz memory budget (`vram=0.5`, no extra model instance) — slower, but a background job never gets to push the machine toward memory exhaustion.
+The `2D/non_AI` buckets (`other/full`, `other/clips`, …) hold real-footage scenes, full videos and the clips cut out of them, that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the recipe the already-processed clips record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), as the AI clips do. The encode runs at half the AI stage's Topaz memory budget (`vram=0.5`, no extra model instance) — slower, but a background job never gets to push the machine toward memory exhaustion.
 
 It follows the bucket conventions already in use:
 
@@ -263,7 +263,7 @@ Those five are the stores that hold something you cannot get back cheaply: clip 
 
 The stage runs *before* the bookmarks sync on purpose: that stage drops favorites whose file is missing, so a favorite whose video merely moved has to be repointed first or it gets deleted on the very run that could have saved it.
 
-A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder like `_larkin_compilations_archive/` is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Clipper session's frame numbers only mean anything against the exact file they were set on.
+A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder, such as a compilations archive, is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Clipper session's frame numbers only mean anything against the exact file they were set on.
 
 A clip's pairing also follows its scene to another version of it: when the non-AI upscale replaces a scene with `<stem>_apo8_iris2` and moves the original out of the library, no file carries the old name any more, so the pairing is matched to the smallest file in the same bucket whose name, processing suffixes taken off, is the one it names. That is safe for a pairing and for nothing else here, because its offset is in seconds, which an upscale keeps, where a Clipper session's frame numbers are not.
 

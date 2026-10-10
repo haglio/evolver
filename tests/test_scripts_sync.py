@@ -586,9 +586,9 @@ class TestScriptsSync(unittest.TestCase):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
-            original_video = video_root / "2D" / "non_AI" / "larkin" / "0 unsorted" / "clip.mp4"
-            processed_video = video_root / "2D" / "non_AI" / "larkin" / "3_good_to_go" / "processed" / "clip_apo8_iris2.mp4"
-            processed_script = script_root / "2D" / "non_AI" / "larkin" / "3_good_to_go" / "processed" / "clip_apo8_iris2.funscript"
+            original_video = video_root / "2D" / "non_AI" / "lagoon" / "0 unsorted" / "clip.mp4"
+            processed_video = video_root / "2D" / "non_AI" / "lagoon" / "3_good_to_go" / "processed" / "clip_apo8_iris2.mp4"
+            processed_script = script_root / "2D" / "non_AI" / "lagoon" / "3_good_to_go" / "processed" / "clip_apo8_iris2.funscript"
             original_video.parent.mkdir(parents=True, exist_ok=True)
             processed_video.parent.mkdir(parents=True, exist_ok=True)
             processed_script.parent.mkdir(parents=True, exist_ok=True)
@@ -599,7 +599,7 @@ class TestScriptsSync(unittest.TestCase):
             with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
-            original_script = script_root / "2D" / "non_AI" / "larkin" / "0 unsorted" / "clip.funscript"
+            original_script = script_root / "2D" / "non_AI" / "lagoon" / "0 unsorted" / "clip.funscript"
             self.assertEqual(result.copied_variants, 1)
             self.assertTrue(original_script.exists())
             self.assertEqual(original_script.read_text(encoding="utf-8"), processed_script.read_text(encoding="utf-8"))
