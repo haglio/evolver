@@ -177,6 +177,7 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 # Origenerator reads the same key from its own overlay; the two must agree, the
 # folder being the only thing that passes between them.
 GENAU_SOURCE    = overlay_value(_CONTENT, "genau_source", path=LOCAL_CONTENT)
+GENAU_FLICK_WORD = overlay_value(_CONTENT, "genau_flick_words", "one", path=LOCAL_CONTENT)
 GENAU_CLIPS_DIR = LIBRARY_ROOT / "videos" / "genau" / "clips"
 # Where Genau moves a clip it is told to condemn. Beside the folder it plays
 # from rather than inside it: that is Genau's rule, published in its own
