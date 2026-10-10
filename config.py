@@ -59,6 +59,11 @@ def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
     return siblings.project_dir(name, PROJECT_ROOTS if roots is None else roots)
 
 
+def sibling_known_as(*names: str, roots: tuple[Path, ...] | None = None) -> Path:
+    return next((path for path in (project_dir(name, roots) for name in names) if path.is_dir()),
+                project_dir(names[0], roots))
+
+
 # This repo, located from the source file rather than the library root: the
 # app's own assets travel with the code, not with the media.
 PROJECT_DIR  = Path(__file__).resolve().parent
@@ -98,7 +103,7 @@ ORIGENERATOR_DB_PATH = ORIGENERATOR_PROJECT_DIR / "state" / "origenerator.db"
 # videos, so it owns keeping these pointed at the right file (see
 # tasks/reference_sync.py); left alone they strand hand-made clip bounds,
 # transcript splits, and favorites on paths that no longer exist.
-CLIPPER_SESSIONS_DIR = project_dir("clipper") / "sessions"
+GENAUMACHER_SESSIONS_DIR = sibling_known_as("genaumacher", "clipper") / "sessions"
 SCRIPTURE_SESSIONS_DIR = project_dir("scripture") / "sessions"
 # The OSR2 broker is the sibling Evolver pairs with to stay up: each watches the
 # other and starts it again when it finds it gone (gui/peer_watch.py). This is

@@ -8,7 +8,7 @@ new home for is left exactly as it was, for a human to judge.
 All but one kind of these files belong to another repo, and none of those repos
 hears about this one -- so before rewriting one, ``shape_complaint`` asks
 whether it is still the shape this stage was written against, and a file that is
-not is left alone and reported. Clipper and Scripture each stamp a version their
+not is left alone and reported. Genaumacher and Scripture each stamp a version their
 own tests hold. Fun Time's watch counts carry none and cannot, since every key
 there is a video path, so their shape is what is checked; its favorites file is
 a spreadsheet whose header row is its version. The one kind that is this app's
@@ -31,7 +31,7 @@ from util.json_reads import read_dict_strict
 # The versions the two apps that stamp one write today, and the ones this stage
 # was written against. A file saying anything else has moved on without this
 # stage, and rewriting it blind is how one app corrupts another's saved work.
-CLIPPER_SESSION_VERSION = 1
+GENAUMACHER_SESSION_VERSION = 1
 SCRIPTURE_PROJECT_VERSION = 1
 
 # What one row of Fun Time's watch counts holds.
@@ -99,7 +99,7 @@ class ReferenceStore:
 def discover() -> Iterator[ReferenceStore]:
     """Every store file that currently exists, in a stable order."""
     yield from _session_files(
-        config.CLIPPER_SESSIONS_DIR, "*.json", "clipper session", CLIPPER_SESSION_VERSION
+        config.GENAUMACHER_SESSIONS_DIR, "*.json", "Genaumacher session", GENAUMACHER_SESSION_VERSION
     )
     yield from _session_files(
         config.SCRIPTURE_SESSIONS_DIR,
