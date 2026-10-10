@@ -164,7 +164,7 @@ CONFIG_REFERENCE_LEDGER = {
     # know the whole layout, which is exactly why the app that sent the clip
     # cannot do it.
     "tasks/withdrawn.py": 8,
-    # Two more: the Genau lane's folder name and where its clips are delivered,
+    # Two more: the Genau lane's folder name and where its flicks are delivered,
     # both read where the lane table is built rather than by the stage reading
     # that table (tasks/withdrawn.py). Then one more: 1_sorted again, to say
     # where a sorted copy's upscale is filed, for the two stages that delete a
@@ -204,6 +204,8 @@ OVERLAY_KEYS = {
     "curated_examples",
     "display_timezone",
     "excerpt_folders",
+    "genau_flick_words.one",
+    "genau_flicks_folder",
     "genau_source",
     "library_root",
     "project_roots",
@@ -211,7 +213,6 @@ OVERLAY_KEYS = {
     "scrape_provider",
     "scrape_provider.base_url",
     "scrape_provider.source",
-    "genau_flick_words.one",
     "topaz_ffmpeg",
     "topaz_models",
     "version_overrides",

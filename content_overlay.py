@@ -1,8 +1,9 @@
 """Content overlay — the copy that must not be published, loaded at runtime.
 
 Everything here describes the machine and the library rather than the app: the
-library root, the browser profile, the folder Origenerator drops Genau clips
-in, the scraped provider, and the spoken act and camera vocabulary. All of it
+library root, the browser profile, the folder Origenerator drops Genau's videos
+in, Genau's flicks folder and the word for a flick, the scraped provider, and
+the spoken act and camera vocabulary. All of it
 lives in ``content.local.json`` (git-ignored) rather than in source; the
 committed ``content.example.json`` documents every key and is what a fresh or
 public checkout loads, so ``config``, the recognizer, the grid and the tests

@@ -100,7 +100,7 @@ class TestCounts(unittest.TestCase):
 
     def test_a_delivered_loop_and_a_scene_are_stamped_by_their_own_lanes(self):
         with _setting() as s:
-            loop = touch_video(s.genau_clips / "loop.mp4")
+            loop = touch_video(s.genau_flicks / "loop.mp4")
             scene = touch_video(s.non_ai / "alpha" / "scene one.mp4")
             s.journal(
                 (10, "skip", "genau/clips/loop.mp4"),

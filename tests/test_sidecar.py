@@ -55,8 +55,8 @@ class TestSidecarPath(unittest.TestCase):
                     / "clip_apo8_iris2.json",
                 )
 
-    def test_mirrors_a_genau_clip_from_beside_the_library(self):
-        """Genau's clips sit next to the video tree rather than inside it, so
+    def test_mirrors_a_genau_flick_from_beside_the_library(self):
+        """Genau's flicks sit next to the video tree rather than inside it, so
         they mirror from the folder that holds both."""
         with workspace_temp_dir() as root:
             videos = root / "videos"
@@ -67,8 +67,8 @@ class TestSidecarPath(unittest.TestCase):
                 METADATA_DIR=metadata,
             ):
                 self.assertEqual(
-                    sidecar_path(videos / "genau" / "clips" / "loop.mp4"),
-                    metadata / "genau" / "clips" / "loop.json",
+                    sidecar_path(videos / "genau" / "flicks" / "flick.mp4"),
+                    metadata / "genau" / "flicks" / "flick.json",
                 )
 
     def test_rejects_a_video_outside_the_library(self):

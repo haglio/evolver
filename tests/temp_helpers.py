@@ -124,7 +124,7 @@ class LaneLibrary:
         self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
         self.non_ai = self.library / "2D" / "non_AI"
         self.weird = self.ai / "2_outbox" / "kinda_weird"
-        self.genau_clips = videos / "genau" / "clips"
+        self.genau_flicks = videos / "genau" / "flicks"
         self.genau_weird = videos / "genau" / "weird"
         self.genau_audio = videos / "genau" / "audio"
         self.metadata = videos / "metadata"
@@ -140,7 +140,7 @@ class LaneLibrary:
             "SORTED_DIR": self.sorted_dir,
             "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
             "WEIRD_DIR": self.weird,
-            "GENAU_CLIPS_DIR": self.genau_clips, "GENAU_SOURCE": genau_source,
+            "GENAU_FLICKS_DIR": self.genau_flicks, "GENAU_SOURCE": genau_source,
             "GENAU_WEIRD_DIR": self.genau_weird, "GENAU_AUDIO_DIR": self.genau_audio,
             "EXCERPT_FOLDERS": (),
         }

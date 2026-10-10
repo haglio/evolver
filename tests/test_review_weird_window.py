@@ -44,7 +44,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         self.assertEqual(self._rows(window), [
             ("scene one_topaz.mp4",
              r"videos\2D\AI\2_outbox\upscaled_by_orientation\portrait\example-source"),
-            ("loop_1_topaz.mp4", r"genau\clips\2D\AI"),
+            ("loop_1_topaz.mp4", r"genau\flicks\2D\AI"),
         ])
 
     def test_the_heading_counts_one_video_as_one(self):
@@ -116,7 +116,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         row = self._window().videos.topLevelItem(0)
 
         self.assertEqual((row.toolTip(0), row.toolTip(1)),
-                         (str(marked), str(self.lib.genau_clips / "2D" / "AI" / "loop_14_topaz.mp4")))
+                         (str(marked), str(self.lib.genau_flicks / "2D" / "AI" / "loop_14_topaz.mp4")))
 
 
 class TestWatchingOne(_ReviewingALibrary):
@@ -187,8 +187,8 @@ class TestRestoring(_ReviewingALibrary):
 
         window.restore_button.click()
 
-        self.assertTrue((self.lib.genau_clips / "loop_5_topaz.mp4").is_file())
-        self.assertEqual(self._rows(window), [("loop_6_topaz.mp4", "genau\\clips")])
+        self.assertTrue((self.lib.genau_flicks / "loop_5_topaz.mp4").is_file())
+        self.assertEqual(self._rows(window), [("loop_6_topaz.mp4", "genau\\flicks")])
         self.assertEqual(_playing(window), after)
 
     def test_one_that_cannot_be_restored_is_named_and_the_rest_still_are(self):
@@ -196,13 +196,13 @@ class TestRestoring(_ReviewingALibrary):
         touch_video(self.lib.genau_weird / "loop_12_topaz.mp4")
         window = self._window()
         window.videos.selectAll()
-        touch_video(self.lib.genau_clips / "loop_11_topaz.mp4")
+        touch_video(self.lib.genau_flicks / "loop_11_topaz.mp4")
 
         with patch("review_weird.window.QMessageBox.warning") as warned:
             window.restore_button.click()
 
         self.assertIn("loop_11_topaz.mp4", warned.call_args.args[2])
-        self.assertTrue((self.lib.genau_clips / "loop_12_topaz.mp4").is_file())
+        self.assertTrue((self.lib.genau_flicks / "loop_12_topaz.mp4").is_file())
         self.assertEqual([row[0] for row in self._rows(window)], ["loop_11_topaz.mp4"])
 
 

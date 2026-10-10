@@ -164,27 +164,19 @@ OUTBOX_DIR   = AI_DIR / "2_outbox"
 OUT_UPSCALED_DIR = OUTBOX_DIR / "upscaled_by_orientation"
 WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 
-# The Genau lane. Origenerator drops a looping clip under this inbox source name
-# rather than its usual one, and the name is the whole signal: the clip is sorted
-# and upscaled like everything else, then delivered to the folder Genau plays from
-# instead of staying in the outbox. It has to leave — Genau reads that one folder
-# and nothing else, and a clip left in the outbox would be a library video nobody
-# ever plays.
-# From the overlay, not from source: this names a folder inside the library, and
-# a library folder name is exactly what the sanitize blocklist exists to keep out
-# of a public commit — so hardcoding one here writes it into the tracked tree.
-# Origenerator reads the same key from its own overlay; the two must agree, the
-# folder being the only thing that passes between them.
+# The Genau lane: Origenerator drops a looping video it made for Genau under the
+# genau_source inbox folder, and the lane delivers its upscale into Genau's flicks
+# folder, the one folder Genau plays. Both names come from the overlay because a
+# library folder name is what the sanitize blocklist keeps out of a public commit;
+# Origenerator reads genau_source from its own overlay, and the two must agree.
 GENAU_SOURCE    = overlay_value(_CONTENT, "genau_source", path=LOCAL_CONTENT)
 GENAU_FLICK_WORD = overlay_value(_CONTENT, "genau_flick_words", "one", path=LOCAL_CONTENT)
-GENAU_CLIPS_DIR = LIBRARY_ROOT / "videos" / "genau" / "clips"
-# Where Genau moves a clip it is told to condemn. Beside the folder it plays
-# from rather than inside it: that is Genau's rule, published in its own
-# genau_contract.json, and tests/test_genau_contract.py holds this end of it to
-# that document -- the two have to agree on a directory neither owns, and until
-# the rule was published each side simply spelled it and hoped.
-GENAU_WEIRD_DIR = GENAU_CLIPS_DIR.parent / "weird"
-GENAU_AUDIO_DIR = GENAU_CLIPS_DIR.parent / "audio"
+GENAU_FLICKS_DIR = LIBRARY_ROOT / "videos" / "genau" / overlay_value(
+    _CONTENT, "genau_flicks_folder", path=LOCAL_CONTENT)
+GENAU_AUDIO_DIR = GENAU_FLICKS_DIR.parent / "audio"
+# Where Genau condemns a flick to: beside the flicks folder, as Genau's own
+# genau_contract.json says; tests/test_genau_contract.py holds this end to it.
+GENAU_WEIRD_DIR = GENAU_FLICKS_DIR.parent / "weird"
 
 # The scraped provider: the 0_inbox folder its clips arrive under, and the site
 # root the metadata stage fetches their prompt pages from. Both are private, so

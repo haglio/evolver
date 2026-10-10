@@ -84,8 +84,8 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
         found = {marked.video: marked.restores_to for marked in weird_piles.marked_weird()}
 
         self.assertEqual(found, {
-            top: self.lib.genau_clips / "loop_5_topaz.mp4",
-            inside: self.lib.genau_clips / "2D" / "AI" / "loop_6_topaz.mp4",
+            top: self.lib.genau_flicks / "loop_5_topaz.mp4",
+            inside: self.lib.genau_flicks / "2D" / "AI" / "loop_6_topaz.mp4",
         })
 
     def test_a_genau_clip_was_upscaled_from_the_copy_its_lane_failed_to_retire(self):
@@ -98,7 +98,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
         self.assertEqual(found.upscaled_from, left_behind)
 
     def test_a_clip_whose_place_has_been_taken_since_has_nowhere_to_go_back_to(self):
-        touch_video(self.lib.genau_clips / "loop_7_topaz.mp4")
+        touch_video(self.lib.genau_flicks / "loop_7_topaz.mp4")
         touch_video(self.lib.genau_weird / "loop_7_topaz.mp4")
 
         [found] = weird_piles.marked_weird()
@@ -143,7 +143,7 @@ class TestRestoring(_InALibrary):
             weird_piles.restore(found)
 
         self.assertFalse(marked.exists())
-        self.assertTrue((self.lib.genau_clips / "2D" / "AI" / "loop_9_topaz.mp4").is_file())
+        self.assertTrue((self.lib.genau_flicks / "2D" / "AI" / "loop_9_topaz.mp4").is_file())
         self.assertEqual(said.records[0].args, (marked, found.restores_to))
 
     def test_the_funscript_that_followed_it_into_the_pile_comes_back_with_its_mark(self):
@@ -171,7 +171,7 @@ class TestRestoring(_InALibrary):
     def test_a_place_taken_since_the_list_was_read_keeps_what_took_it(self):
         marked = touch_video(self.lib.genau_weird / "loop_10_topaz.mp4")
         [found] = weird_piles.marked_weird()
-        taker = touch_video(self.lib.genau_clips / "loop_10_topaz.mp4")
+        taker = touch_video(self.lib.genau_flicks / "loop_10_topaz.mp4")
         taker.write_bytes(b"another")
 
         with self.assertRaises(FileExistsError):
