@@ -177,8 +177,8 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
     before encodes kept one.
     """
     non_ai = overrides["NON_AI_DIR"]
-    source = source or make_video(non_ai / "larkin" / "0 unsorted" / "busy.mp4")
-    out = non_ai / "larkin" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
+    source = source or make_video(non_ai / "lagoon" / "0 unsorted" / "busy.mp4")
+    out = non_ai / "lagoon" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
     tmp = partial_path(out, source.stem)
     if tmp_bytes is not None:
         tmp.parent.mkdir(parents=True, exist_ok=True)
@@ -249,7 +249,7 @@ def nonai_library_overrides(root: Path, **extra):
     return overrides
 
 
-LARKIN = Path("2D") / "non_AI" / "larkin"
+LAGOON = Path("2D") / "non_AI" / "lagoon"
 
 
 class CarvedClipLibraryCase(unittest.TestCase):
@@ -270,7 +270,7 @@ class CarvedClipLibraryCase(unittest.TestCase):
         self.metadata = self.root / "metadata"
 
     def make_scene(self, name="scene", actions=None):
-        scene = self.videos / LARKIN / "scenes" / f"{name}.mp4"
+        scene = self.videos / LAGOON / "scenes" / f"{name}.mp4"
         scene.parent.mkdir(parents=True, exist_ok=True)
         scene.write_bytes(b"scene")
         if actions is not None:
@@ -284,10 +284,10 @@ class CarvedClipLibraryCase(unittest.TestCase):
         return script
 
     def make_clip(self, scene, name="clip", scene_offset=10.0, clip=None, actions=None):
-        video = self.videos / LARKIN / "clips" / f"{name}.mp4"
+        video = self.videos / LAGOON / "clips" / f"{name}.mp4"
         video.parent.mkdir(parents=True, exist_ok=True)
         video.write_bytes(b"clip")
-        sidecar = self.metadata / LARKIN / "clips" / f"{name}.json"
+        sidecar = self.metadata / LAGOON / "clips" / f"{name}.json"
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         if clip is None:
             clip = {"full_video": str(scene), "scene_offset": scene_offset}
@@ -299,10 +299,10 @@ class CarvedClipLibraryCase(unittest.TestCase):
         return video
 
     def scene_script(self, name="scene"):
-        return self.scripts / LARKIN / "scenes" / f"{name}.funscript"
+        return self.scripts / LAGOON / "scenes" / f"{name}.funscript"
 
     def clip_script(self, name="clip"):
-        return self.scripts / LARKIN / "clips" / f"{name}.funscript"
+        return self.scripts / LAGOON / "clips" / f"{name}.funscript"
 
     def library_overrides(self):
         return override_config(

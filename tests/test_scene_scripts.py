@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from tasks import scene_scripts
-from tests.temp_helpers import LARKIN, CarvedClipLibraryCase
+from tests.temp_helpers import LAGOON, CarvedClipLibraryCase
 from util import provenance
 
 
@@ -89,10 +89,10 @@ class TestSceneScripts(SceneScriptsCase):
     def test_skips_a_clip_the_matcher_has_not_placed_yet(self):
         """Most clips have no ``full_video``: the scene they were cut from is
         not in the library at all, and nothing here can guess it."""
-        video = self.videos / LARKIN / "clips" / "unmatched.mp4"
+        video = self.videos / LAGOON / "clips" / "unmatched.mp4"
         video.parent.mkdir(parents=True, exist_ok=True)
         video.write_bytes(b"clip")
-        sidecar = self.metadata / LARKIN / "clips" / "unmatched.json"
+        sidecar = self.metadata / LAGOON / "clips" / "unmatched.json"
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         sidecar.write_text(json.dumps({"clip": {"compilation": "Vol1", "index": 3}}), encoding="utf-8")
 
@@ -104,7 +104,7 @@ class TestSceneScripts(SceneScriptsCase):
     def test_skips_a_scene_that_has_left_the_library(self):
         """A recorded match names a file that can since have been renamed,
         archived or deleted; writing its script would only litter the tree."""
-        gone = self.videos / LARKIN / "scenes" / "moved-away.mp4"
+        gone = self.videos / LAGOON / "scenes" / "moved-away.mp4"
         self.make_clip(gone, actions=[{"at": 0, "pos": 90}])
 
         result = self.run_stage()
@@ -115,7 +115,7 @@ class TestSceneScripts(SceneScriptsCase):
     def test_a_whole_video_that_is_not_a_clip_is_not_a_source(self):
         """Only a carved clip carries the record; an ordinary video has no
         sidecar ``clip`` object and is never read as one."""
-        plain = self.videos / LARKIN / "scenes" / "ordinary.mp4"
+        plain = self.videos / LAGOON / "scenes" / "ordinary.mp4"
         plain.parent.mkdir(parents=True, exist_ok=True)
         plain.write_bytes(b"scene")
 

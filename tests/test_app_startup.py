@@ -378,8 +378,8 @@ class TestUpscaleQueueWindow:
         app = build_evolver_app(request)
         self._open(app)
         with patch("evolver.arrange_upscale_queue") as arranged:
-            app._queue_window.arranged.emit(["larkin/0 unsorted/a.mp4"])
-        arranged.assert_called_once_with(["larkin/0 unsorted/a.mp4"])
+            app._queue_window.arranged.emit(["lagoon/0 unsorted/a.mp4"])
+        arranged.assert_called_once_with(["lagoon/0 unsorted/a.mp4"])
 
     def test_a_video_put_first_goes_first_and_starts_no_run(self, request):
         """Dragging a video to the top is ordering, not asking: it waits for
@@ -390,8 +390,8 @@ class TestUpscaleQueueWindow:
              patch("evolver.upscale_now") as asked, \
              patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
              patch.object(app._runs, "start_when_free") as run:
-            app._queue_window.placed_first.emit("larkin/0 unsorted/a.mp4")
-        put_first.assert_called_once_with("larkin/0 unsorted/a.mp4")
+            app._queue_window.placed_first.emit("lagoon/0 unsorted/a.mp4")
+        put_first.assert_called_once_with("lagoon/0 unsorted/a.mp4")
         asked.assert_not_called()
         run.assert_not_called()
         lineup.assert_called_once_with()
@@ -404,8 +404,8 @@ class TestUpscaleQueueWindow:
         with patch("evolver.upscale_now") as asked, \
              patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE), \
              patch.object(app._runs, "start_when_free") as run:
-            app._queue_window.now_requested.emit("larkin/0 unsorted/a.mp4")
-        asked.assert_called_once_with("larkin/0 unsorted/a.mp4")
+            app._queue_window.now_requested.emit("lagoon/0 unsorted/a.mp4")
+        asked.assert_called_once_with("lagoon/0 unsorted/a.mp4")
         run.assert_called_once_with("manual")
 
     def test_withdrawing_the_ask_parks_the_encode_for_your_presence_again(self, request):

@@ -32,14 +32,14 @@ class TestRetireIntoTheBucket(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
+            make_video(non_ai / "lagoon" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
                 nonai_retire.retire_original(source, archive_root=None)
 
             self.assertTrue(
-                (non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4").exists()
+                (non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4").exists()
             )
             self.assertFalse(source.exists())
 
@@ -49,8 +49,8 @@ class TestRetireIntoTheBucket(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
+            make_video(non_ai / "lagoon" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
                 write_sidecar(
@@ -60,7 +60,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
 
                 nonai_retire.retire_original(source, archive_root=None)
 
-                dest = non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4"
+                dest = non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4"
                 self.assertTrue(dest.exists())
                 self.assertFalse(source.exists())
                 self.assertFalse(sidecar.sidecar_path(source).exists())
@@ -77,8 +77,8 @@ class TestRetireIntoTheBucket(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
+            make_video(non_ai / "lagoon" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
                 script = script_library.script_path_for_video(source)
@@ -86,7 +86,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
 
                 nonai_retire.retire_original(source, archive_root=None)
 
-                dest = non_ai / "larkin" / "2 do not need work" / "Lee-Poe.mp4"
+                dest = non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4"
                 self.assertFalse(script.exists())
                 self.assertEqual(
                     funscript.read(script_library.script_path_for_video(dest)),
@@ -128,15 +128,15 @@ class TestRetireToAnArchive(unittest.TestCase):
             archive = root / "archive"
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            make_video(non_ai / "larkin" / "2 do not need work" / "placeholder.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
+            make_video(non_ai / "lagoon" / "2 do not need work" / "placeholder.mp4")
 
             with override_config(**overrides):
                 nonai_retire.retire_original(source, archive_root=archive)
 
             self.assertFalse(source.exists())
             self.assertTrue(
-                (archive / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
+                (archive / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
             )
 
     def test_the_funscript_goes_with_it_rather_than_being_stranded(self):
@@ -148,7 +148,7 @@ class TestRetireToAnArchive(unittest.TestCase):
             archive = root / "archive"
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
 
             with override_config(**overrides):
                 script = script_library.script_path_for_video(source)
@@ -157,7 +157,7 @@ class TestRetireToAnArchive(unittest.TestCase):
                 nonai_retire.retire_original(source, archive_root=archive)
 
                 self.assertFalse(script.exists())
-            archived = archive / "larkin" / "1 clips to upscale" / "Lee-Poe.funscript"
+            archived = archive / "lagoon" / "1 clips to upscale" / "Lee-Poe.funscript"
             self.assertEqual(
                 json.loads(archived.read_text(encoding="utf-8")),
                 {"actions": [{"at": 0, "pos": 20}]},
@@ -186,7 +186,7 @@ class TestRetireToAnArchive(unittest.TestCase):
             archive = root / "archive"
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
 
             with override_config(**overrides):
                 write_sidecar(
@@ -197,7 +197,7 @@ class TestRetireToAnArchive(unittest.TestCase):
                 nonai_retire.retire_original(source, archive_root=archive)
 
                 self.assertFalse(sidecar.sidecar_path(source).exists())
-            archived = archive / "larkin" / "1 clips to upscale" / "Lee-Poe.json"
+            archived = archive / "lagoon" / "1 clips to upscale" / "Lee-Poe.json"
             self.assertEqual(
                 json.loads(archived.read_text(encoding="utf-8"))["clip"],
                 {"compilation": "Volume One", "index": 1},
@@ -212,9 +212,9 @@ class TestCarryMetadata(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
             out = make_video(
-                non_ai / "larkin" / "3_good_to_go" / "processed"
+                non_ai / "lagoon" / "3_good_to_go" / "processed"
                 / "Lee-Poe_apo8_iris2.mp4"
             )
 
@@ -238,9 +238,9 @@ class TestCarryMetadata(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
             out = make_video(
-                non_ai / "larkin" / "3_good_to_go" / "processed"
+                non_ai / "lagoon" / "3_good_to_go" / "processed"
                 / "Lee-Poe_apo8_iris2.mp4"
             )
 
@@ -255,8 +255,8 @@ class TestCarryMetadata(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            source = make_video(non_ai / "larkin" / "1 clips to upscale" / "Lee-Poe.mp4")
-            out = make_video(non_ai / "larkin" / "3_good_to_go" / "Lee-Poe_iris2.mp4")
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
+            out = make_video(non_ai / "lagoon" / "3_good_to_go" / "Lee-Poe_iris2.mp4")
 
             with override_config(**overrides):
                 self.assertFalse(nonai_retire.carry_metadata(source, out))
@@ -267,14 +267,14 @@ class TestCarryMetadata(unittest.TestCase):
         archived copy describes itself from the file next to it."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            archived = root / "archive" / "larkin" / "Lee-Poe.mp4"
+            archived = root / "archive" / "lagoon" / "Lee-Poe.mp4"
             make_video(archived)
             archived.with_suffix(".json").write_text(
                 json.dumps({"clip": {"compilation": "Volume One", "index": 1}}),
                 encoding="utf-8",
             )
             out = make_video(
-                overrides["NON_AI_DIR"] / "larkin" / "3_good_to_go" / "processed"
+                overrides["NON_AI_DIR"] / "lagoon" / "3_good_to_go" / "processed"
                 / "Lee-Poe_apo8_iris2.mp4"
             )
 

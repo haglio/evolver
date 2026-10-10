@@ -109,7 +109,7 @@ BROKER_TRAY_LAUNCHER = project_dir("broker") / "launch_broker_tray.vbs"
 VIDEO_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "videos"
 # Where to hunt for a video a stored reference has lost track of. Wider than the
 # library itself, because videos also get parked in sibling folders such as
-# _larkin_compilations_archive/ — a reference into one of those still deserves
+# a compilations archive — a reference into one of those still deserves
 # to be followed rather than dropped.
 VIDEO_SEARCH_ROOT = LIBRARY_ROOT / "videos"
 METADATA_DIR = LIBRARY_ROOT / "videos" / "metadata"
