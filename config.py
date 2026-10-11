@@ -95,6 +95,9 @@ FUN_TIME_WATCH_STATS_FILE = FUN_TIME_STATE_DIR / "watch_stats.json"
 # (see tasks/origenerator_metadata.py). Origenerator never reaches into Evolver.
 ORIGENERATOR_PROJECT_DIR = project_dir("origenerator")
 ORIGENERATOR_DB_PATH = ORIGENERATOR_PROJECT_DIR / "state" / "origenerator.db"
+# Its overlay names the library folder its sound plays from, which
+# tasks/reference_sync.py follows when the folder is renamed.
+ORIGENERATOR_OVERLAY_FILE = ORIGENERATOR_PROJECT_DIR / "content.local.json"
 # Sibling apps that record a video's path in their own saved work. Evolver moves
 # videos, so it owns keeping these pointed at the right file (see
 # tasks/reference_sync.py); left alone they strand hand-made clip bounds,
@@ -317,6 +320,9 @@ NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
 # The last phone favorite applied to Fun Time's favorites, so one is applied
 # exactly once and Fun Time can undo it (tasks/watch_weights.py).
 WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
+# What each folder a sibling's setting names held at the last run, so a folder
+# renamed by hand can be found again by its videos (util/folder_settings.py).
+FOLLOWED_FOLDERS_FILE = LOCAL_STATE_DIR / "followed_folders.json"
 NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
 # The counterpart to the skip list: videos to encode next, in the order listed.
 # A pin outranks every ordering heuristic and re-queues a video the bucket
