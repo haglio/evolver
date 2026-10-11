@@ -85,9 +85,10 @@ LIVE_DIR = live_dir(os.environ, PROJECT_DIR, PROJECT_ROOTS)
 BRANCH_SESSION = LIVE_DIR != PROJECT_DIR
 FUN_TIME_PROJECT_DIR = project_dir("fun_time")
 FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
-# Fun Time's per-video watch counts ("breeding" data), read-only, populated by
-# satellite VLC plays. Keys are normalized as path.strip().lower().
-FUN_TIME_WATCH_STATS_FILE = FUN_TIME_PROJECT_DIR / "state" / "watch_stats.json"
+FUN_TIME_STATE_DIR = FUN_TIME_PROJECT_DIR / "state"
+# Fun Time's per-video watch counts, keyed by path.strip().lower() like each
+# player's *_play_points.json beside them.
+FUN_TIME_WATCH_STATS_FILE = FUN_TIME_STATE_DIR / "watch_stats.json"
 # Origenerator (a sibling video-generation app) is treated as a normal external
 # content source: for videos it drops in 0_inbox/origenerator/, Evolver pulls the
 # generation metadata straight from Origenerator's own gallery database, read-only

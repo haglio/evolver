@@ -187,7 +187,7 @@ CONFIG_REFERENCE_LEDGER = {
     # more fewer: an archived original's sidecar and funscript keep the suffix
     # their mirrors gave them, rather than one looked up again.
     "util/nonai_retire.py": 1,
-    "util/reference_stores.py": 6,
+    "util/reference_stores.py": 7,
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
     "util/video_locator.py": 1,

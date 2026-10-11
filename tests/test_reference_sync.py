@@ -40,6 +40,7 @@ def _stores_under(temp: Path, **used):
             "SCRIPTURE_SESSIONS_DIR": unused,
             "FUN_TIME_WATCH_STATS_FILE": unused / "watch_stats.json",
             "FUN_TIME_FAVS_FILE": unused / "favs.csv",
+            "FUN_TIME_STATE_DIR": unused / "state",
             "NON_AI_DIR": unused / "non_AI",
             "METADATA_DIR": unused / "metadata",
             "VR_VIDEO_DIR": None,
@@ -164,6 +165,73 @@ class TestWatchStats(unittest.TestCase):
             payload = json.loads(stats.read_text(encoding="utf-8"))
             self.assertEqual(payload[str(moved_to).lower()], {"completions": 9, "skips": 1, "locks": 2})
             self.assertEqual(payload[str(stayed).lower()], {"completions": 1, "skips": 0, "locks": 0})
+
+
+class TestFunTimePlayPoints(unittest.TestCase):
+    def test_carries_where_a_video_was_left_over_to_its_new_path(self):
+        with workspace_temp_dir() as temp:
+            moved_to = _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
+            stayed = _write_video(temp / "videos" / "stayed.mp4")
+            points = _write_json(
+                temp / "state" / "main_player_play_points.json",
+                {str(temp / "videos" / "other" / "clip.mp4").lower(): 61_000,
+                 str(stayed).lower(): 2_000},
+            )
+
+            with _stores_under(temp, FUN_TIME_STATE_DIR=temp / "state"):
+                reference_sync.run()
+
+            self.assertEqual(json.loads(points.read_text(encoding="utf-8")),
+                             {str(moved_to).lower(): 61_000, str(stayed).lower(): 2_000})
+
+    def test_follows_every_player_s_places(self):
+        with workspace_temp_dir() as temp:
+            moved_to = _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
+            was_at = str(temp / "videos" / "other" / "clip.mp4").lower()
+            players = [_write_json(temp / "state" / f"{player}_play_points.json", {was_at: 4_000})
+                       for player in ("portrait", "landscape")]
+
+            with _stores_under(temp, FUN_TIME_STATE_DIR=temp / "state"):
+                result = reference_sync.run()
+
+            for points in players:
+                self.assertEqual(json.loads(points.read_text(encoding="utf-8")),
+                                 {str(moved_to).lower(): 4_000})
+            self.assertEqual(result.relocated, 2)
+
+    def test_a_place_the_player_has_kept_at_the_new_path_since_the_move_stands(self):
+        """A session that was running across the move goes on writing the old
+        path back, and writes the new one the moment it plays the video there;
+        that later place is the one he left it at."""
+        with workspace_temp_dir() as temp:
+            moved_to = _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
+            points = _write_json(
+                temp / "state" / "main_player_play_points.json",
+                {str(temp / "videos" / "other" / "clip.mp4").lower(): 61_000,
+                 str(moved_to).lower(): 12_000},
+            )
+
+            with _stores_under(temp, FUN_TIME_STATE_DIR=temp / "state"):
+                reference_sync.run()
+
+            self.assertEqual(json.loads(points.read_text(encoding="utf-8")),
+                             {str(moved_to).lower(): 12_000})
+
+    def test_a_place_follows_its_video_to_the_upscale_that_replaced_it(self):
+        with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
+            bucket = non_ai / "lagoon"
+            (bucket / "0 unsorted").mkdir(parents=True)
+            upscale = _write_video(
+                bucket / "3_good_to_go" / "processed" / "scene-one_apo8_iris2.mp4")
+            points = _write_json(
+                temp / "state" / "main_player_play_points.json",
+                {str(bucket / "0 unsorted" / "scene-one.mp4").lower(): 90_000})
+
+            with override_config(FUN_TIME_STATE_DIR=temp / "state"):
+                reference_sync.run()
+
+            self.assertEqual(json.loads(points.read_text(encoding="utf-8")),
+                             {str(upscale).lower(): 90_000})
 
 
 class TestAFolderThatCannotBeReached(unittest.TestCase):
@@ -460,6 +528,20 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
                 result = reference_sync.run()
 
             self.assertEqual(json.loads(stats.read_text(encoding="utf-8")), {was_at: 9})
+            self.assertEqual(result.refused, 1)
+
+    def test_play_points_that_are_not_places_are_left_alone(self):
+        with workspace_temp_dir() as temp:
+            _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
+            was_at = str(temp / "videos" / "other" / "clip.mp4").lower()
+            points = _write_json(temp / "state" / "main_player_play_points.json",
+                                 {was_at: {"position": 9}})
+
+            with _stores_under(temp, FUN_TIME_STATE_DIR=temp / "state"):
+                result = reference_sync.run()
+
+            self.assertEqual(json.loads(points.read_text(encoding="utf-8")),
+                             {was_at: {"position": 9}})
             self.assertEqual(result.refused, 1)
 
     def test_a_favorites_file_with_no_local_path_column_is_left_alone(self):
