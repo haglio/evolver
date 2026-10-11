@@ -221,7 +221,7 @@ OVERLAY_KEYS = {
 # puts them, and an example naming one machine's install would read as the
 # answer rather than as the override it is.
 OPTIONAL_OVERLAY_KEYS = {
-    "display_timezone", "project_roots", "retired_root", "topaz_ffmpeg",
+    "display_timezone", "retired_root", "topaz_ffmpeg",
     "topaz_models", "version_overrides", "vr_videos", "warm_gun_outbox",
 }
 

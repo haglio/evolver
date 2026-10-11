@@ -22,19 +22,7 @@ _CONTENT = load_content()
 LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
 
 
-def project_roots(settings: dict[str, Any], library_root: Path) -> tuple[Path, ...]:
-    """The folders that hold the suite's sibling app checkouts, in search order.
-
-    Settings that say nothing mean ``library_root/projects``; the setting
-    exists because the two roots can come apart, the repos living outside the
-    file-synced tree the media library sits in. A *list* rather than one path so
-    a part-finished move resolves — each checkout is found wherever it actually
-    is right now, with no window where half the suite is unreachable.
-    """
-    return siblings.project_roots(settings.get("project_roots"), fallback=library_root / "projects")
-
-
-PROJECT_ROOTS = project_roots(haglio_settings.load(), LIBRARY_ROOT)
+PROJECT_ROOTS = haglio_settings.project_roots()
 
 
 def retired_root(content: dict[str, Any]) -> Path | None:

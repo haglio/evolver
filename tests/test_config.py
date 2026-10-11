@@ -3,37 +3,22 @@
 The media library and the sibling apps used to share one root, so every sibling
 path was derived as ``library_root / "projects" / <name>``. They no longer do:
 the repos were moved out of the file-synced tree the library still lives in, so
-their root is its own setting. These tests pin the resolution rules, including
-the half-migrated state where some checkouts have moved and some have not.
+their folders are a setting of their own, which all of Haglio shares.
 """
 from __future__ import annotations
 
 import unittest
 from pathlib import Path
 
+from app_support import haglio_settings
+
 import config
 from tests.temp_helpers import workspace_temp_dir
 
 
 class TestProjectRoots(unittest.TestCase):
-    def test_defaults_to_the_projects_folder_under_the_library_root(self):
-        """An overlay with no project_roots behaves exactly as it always did."""
-        roots = config.project_roots({}, Path("L:/library"))
-
-        self.assertEqual(roots, (Path("L:/library/projects"),))
-
-    def test_an_empty_list_falls_back_to_the_default_too(self):
-        roots = config.project_roots({"project_roots": []}, Path("L:/library"))
-
-        self.assertEqual(roots, (Path("L:/library/projects"),))
-
-    def test_reads_the_roots_from_the_overlay_in_the_order_given(self):
-        roots = config.project_roots(
-            {"project_roots": ["W:/workspace/suite", "L:/library/projects"]},
-            Path("L:/library"),
-        )
-
-        self.assertEqual(roots, (Path("W:/workspace/suite"), Path("L:/library/projects")))
+    def test_are_the_ones_all_of_haglio_shares(self):
+        self.assertEqual(config.PROJECT_ROOTS, haglio_settings.project_roots())
 
 
 class TestRetiredRoot(unittest.TestCase):
