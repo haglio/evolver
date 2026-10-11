@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from app_support import siblings
+from app_support import haglio_settings, siblings
 from app_support.flick_folder import audio_in, weird_pile_in
 from app_support.overlay import overlay_value
 
@@ -15,25 +15,26 @@ from content_overlay import LOCAL_CONTENT, load_content
 
 # Machine-specific and private: every value below that names something outside
 # this repo comes from the git-ignored content overlay (content.example.json
-# shows the shape and documents each key).
+# shows the shape and documents each key), or, where other apps need it too,
+# from the settings all of Haglio shares.
 _CONTENT = load_content()
 
-LIBRARY_ROOT = Path(overlay_value(_CONTENT, "library_root", path=LOCAL_CONTENT))
+LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
 
 
-def project_roots(content: dict[str, Any], library_root: Path) -> tuple[Path, ...]:
+def project_roots(settings: dict[str, Any], library_root: Path) -> tuple[Path, ...]:
     """The folders that hold the suite's sibling app checkouts, in search order.
 
-    An overlay that says nothing means ``library_root/projects``; the setting
+    Settings that say nothing mean ``library_root/projects``; the setting
     exists because the two roots can come apart, the repos living outside the
     file-synced tree the media library sits in. A *list* rather than one path so
     a part-finished move resolves — each checkout is found wherever it actually
     is right now, with no window where half the suite is unreachable.
     """
-    return siblings.project_roots(content.get("project_roots"), fallback=library_root / "projects")
+    return siblings.project_roots(settings.get("project_roots"), fallback=library_root / "projects")
 
 
-PROJECT_ROOTS = project_roots(_CONTENT, LIBRARY_ROOT)
+PROJECT_ROOTS = project_roots(haglio_settings.load(), LIBRARY_ROOT)
 
 
 def retired_root(content: dict[str, Any]) -> Path | None:
@@ -168,11 +169,10 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 # The Genau lane: Origenerator drops a looping video it made for Genau under the
 # genau_source inbox folder, and the lane delivers its upscale into Genau's flicks
 # folder, the one folder Genau plays. The inbox folder's name comes from the
-# overlay because a library folder name is what the sanitize blocklist keeps out
-# of a public commit; Origenerator reads genau_source from its own overlay, and
-# the two must agree.
-GENAU_SOURCE    = overlay_value(_CONTENT, "genau_source", path=LOCAL_CONTENT)
-GENAU_FLICK_WORD = overlay_value(_CONTENT, "genau_flick_words", "one", path=LOCAL_CONTENT)
+# settings all of Haglio shares, because a library folder name is what the
+# sanitize blocklist keeps out of a public commit and Origenerator reads it too.
+GENAU_SOURCE    = haglio_settings.value("genau_source")
+GENAU_FLICK_WORD = haglio_settings.value("genau_flick_words", "one")
 GENAU_DIR = LIBRARY_ROOT / "videos" / "genau"
 GENAU_AUDIO_DIR = audio_in(GENAU_DIR)
 GENAU_WEIRD_DIR = weird_pile_in(GENAU_DIR)
