@@ -11,6 +11,8 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
+from app_support.flick_folder import flat_flicks_in
+
 import config
 from gui.run_record import RunRecord
 from util import provenance
@@ -140,11 +142,12 @@ class LaneLibrary:
             "SORTED_DIR": self.sorted_dir,
             "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
             "WEIRD_DIR": self.weird,
-            "GENAU_FLICKS_DIR": self.genau_flicks, "GENAU_SOURCE": genau_source,
+            "GENAU_DIR": self.genau_flicks.parent, "GENAU_SOURCE": genau_source,
             "GENAU_WEIRD_DIR": self.genau_weird, "GENAU_AUDIO_DIR": self.genau_audio,
             "EXCERPT_FOLDERS": (),
         }
         settings.update(extra)
+        flat_flicks_in(self.genau_flicks).mkdir(parents=True, exist_ok=True)
         return override_config(**settings)
 
 

@@ -169,7 +169,7 @@ CONFIG_REFERENCE_LEDGER = {
     # that table (tasks/withdrawn.py). Then one more: 1_sorted again, to say
     # where a sorted copy's upscale is filed, for the two stages that delete a
     # clip's funscripts.
-    "util/lanes.py": 9,
+    "util/lanes.py": 7,
     # Origenerator's gallery file, read nowhere else now that both stages pulling
     # from it come through here.
     "util/origenerator_gallery.py": 1,
@@ -191,8 +191,8 @@ CONFIG_REFERENCE_LEDGER = {
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
     "util/video_locator.py": 1,
-    "util/warm_gun.py": 3,
-    "util/weird_piles.py": 10,
+    "util/warm_gun.py": 2,
+    "util/weird_piles.py": 9,
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or
@@ -205,7 +205,6 @@ OVERLAY_KEYS = {
     "display_timezone",
     "excerpt_folders",
     "genau_flick_words.one",
-    "genau_flicks_folder",
     "genau_source",
     "library_root",
     "project_roots",

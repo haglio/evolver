@@ -3,11 +3,23 @@ from __future__ import annotations
 
 import json
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+
+from app_support.flick_folder import flat_flicks_in
 
 from tests.temp_helpers import override_config, touch_video, workspace_temp_dir
 from util import warm_gun
 from util.warm_gun import Event
+
+
+@contextmanager
+def _genaus_flicks_folder():
+    with workspace_temp_dir() as root:
+        flicks = root / "genau" / "flicks"
+        flat_flicks_in(flicks).mkdir(parents=True)
+        with override_config(GENAU_DIR=flicks.parent):
+            yield flicks
 
 
 def _journal(path: Path, lines: list) -> Path:
@@ -84,32 +96,29 @@ class TestLibraryVideo(unittest.TestCase):
             )
 
     def test_a_delivered_flick_sits_in_genaus_folder(self):
-        with override_config(GENAU_FLICKS_DIR=Path("C:/lib/genau/flicks")):
-            self.assertEqual(
-                warm_gun.library_video(r"genau\flicks\flick_topaz.mp4"),
-                Path("C:/lib/genau/flicks/flick_topaz.mp4"),
-            )
+        with _genaus_flicks_folder() as flicks:
+            self.assertEqual(warm_gun.library_video(r"genau\flicks\flick_topaz.mp4"),
+                             flicks / "flick_topaz.mp4")
 
     def test_a_flick_in_genaus_folders_sits_at_that_place_under_them(self):
-        with override_config(GENAU_FLICKS_DIR=Path("C:/lib/genau/flicks")):
-            self.assertEqual(
-                warm_gun.library_video("genau/flicks/2D/AI/flick_topaz.mp4"),
-                Path("C:/lib/genau/flicks/2D/AI/flick_topaz.mp4"),
-            )
+        with _genaus_flicks_folder() as flicks:
+            self.assertEqual(warm_gun.library_video("genau/flicks/2D/AI/flick_topaz.mp4"),
+                             flicks / "2D" / "AI" / "flick_topaz.mp4")
 
-    def test_a_flick_the_phone_named_before_genaus_folder_was_renamed_is_found_in_it(self):
-        with override_config(GENAU_FLICKS_DIR=Path("C:/lib/genau/flicks")):
-            self.assertEqual(
-                warm_gun.library_video("genau/clips/2D/AI/flick_topaz.mp4"),
-                Path("C:/lib/genau/flicks/2D/AI/flick_topaz.mp4"),
-            )
+    def test_a_flick_the_phone_files_under_its_own_name_for_genaus_folder_is_found_in_it(self):
+        with _genaus_flicks_folder() as flicks:
+            self.assertEqual(warm_gun.library_video("genau/clips/2D/AI/flick_topaz.mp4"),
+                             flicks / "2D" / "AI" / "flick_topaz.mp4")
 
     def test_a_flick_the_phone_named_before_genaus_folders_split_is_found_where_it_went(self):
-        with workspace_temp_dir() as root:
-            flicks = root / "genau" / "flicks"
+        with _genaus_flicks_folder() as flicks:
             moved = touch_video(flicks / "2D" / "AI" / "flick_topaz.mp4")
-            with override_config(GENAU_FLICKS_DIR=flicks):
-                self.assertEqual(warm_gun.library_video("genau/clips/flick_topaz.mp4"), moved)
+
+            self.assertEqual(warm_gun.library_video("genau/clips/flick_topaz.mp4"), moved)
+
+    def test_a_flick_is_nobody_s_while_no_folder_in_genaus_has_their_shape(self):
+        with workspace_temp_dir() as root, override_config(GENAU_DIR=root / "genau"):
+            self.assertIsNone(warm_gun.library_video("genau/clips/2D/AI/flick_topaz.mp4"))
 
     def test_a_lane_this_library_has_no_folder_for_is_nobody_s(self):
         for path in ("VR/finished/scene.mp4", "1_sorted/short.mp4", "genau/audio/track.mp4", "non_AI", ""):
@@ -126,8 +135,6 @@ class TestPlayedVideo(unittest.TestCase):
             )
 
     def test_every_other_lane_is_played_where_it_is(self):
-        with override_config(GENAU_FLICKS_DIR=Path("C:/lib/genau/flicks")):
-            self.assertEqual(
-                warm_gun.played_video("genau/flicks/flick.mp4"), Path("C:/lib/genau/flicks/flick.mp4")
-            )
+        with _genaus_flicks_folder() as flicks:
+            self.assertEqual(warm_gun.played_video("genau/flicks/flick.mp4"), flicks / "flick.mp4")
         self.assertIsNone(warm_gun.played_video("VR/scene.mp4"))

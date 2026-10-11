@@ -1,7 +1,8 @@
 """Warm Gun's journal: one JSON line per event on the phone, each naming its
 video by the lane it was played from — ``1_sorted/<source>/<orientation>/x.mp4``,
-``non_AI/<bucket>/…`` or ``genau/<flicks folder>/2D/AI/x.mp4`` -- or, written
-before Genau's flicks folder split into 2D and VR, ``genau/<flicks folder>/x.mp4``."""
+``non_AI/<bucket>/…`` or ``genau/clips/2D/AI/x.mp4``, whatever Genau's flicks
+folder is called -- or, written before that folder split into 2D and VR,
+``genau/clips/x.mp4``."""
 
 from __future__ import annotations
 
@@ -11,10 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
+from util import lanes
 from util.sidecar import upscaled_video_path
 
 JOURNAL_PATTERN = "*.jsonl"
-GENAU_FLICKS_FOLDER_BEFORE_THE_RENAME = "clips"
+PHONES_NAME_FOR_GENAUS_FLICKS_FOLDER = "clips"
 
 
 @dataclass(frozen=True, order=True)
@@ -65,12 +67,12 @@ def library_video(journal_path: str) -> Path | None:
     if lane == "non_AI" and rest:
         return config.NON_AI_DIR.joinpath(*rest)
     if lane == "genau" and len(rest) >= 2:
-        return _genau_flick(config.GENAU_FLICKS_DIR, rest[0], rest[1:])
+        return _genau_flick(lanes.genau_flicks_dir(), rest[0], rest[1:])
     return None
 
 
-def _genau_flick(flicks_folder: Path, folder_named: str, inside: list[str]) -> Path | None:
-    if folder_named not in (flicks_folder.name, GENAU_FLICKS_FOLDER_BEFORE_THE_RENAME):
+def _genau_flick(flicks_folder: Path | None, folder_named: str, inside: list[str]) -> Path | None:
+    if flicks_folder is None or folder_named not in (flicks_folder.name, PHONES_NAME_FOR_GENAUS_FLICKS_FOLDER):
         return None
     named = flicks_folder.joinpath(*inside)
     if len(inside) == 1 and not named.exists():

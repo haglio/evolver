@@ -80,7 +80,8 @@ def _out_of_genau(video: Path, pile: Path, sorted_copies: dict[str, list[Path]])
     left_in_the_lane = [copy
                         for copy in sorted_copies.get(sorted_stem_of(strip_uniquifier(video.stem)), [])
                         if copy.is_relative_to(lane)]
-    return MarkedWeird(video, _the_one_vacant([config.GENAU_FLICKS_DIR / video.relative_to(pile)]),
+    flicks = lanes.genau_flicks_dir()
+    return MarkedWeird(video, _the_one_vacant([flicks / video.relative_to(pile)] if flicks else []),
                        left_in_the_lane[0] if len(left_in_the_lane) == 1 else None)
 
 
@@ -124,7 +125,7 @@ def _sound_only_it_plays(marked: MarkedWeird) -> Path | None:
     if not marked.video.is_relative_to(genau_pile):
         return None
     if any(video.stem == marked.video.stem and video != marked.video
-           for video in library_videos(config.GENAU_FLICKS_DIR.parent)):
+           for video in library_videos(config.GENAU_DIR)):
         return None
     return config.GENAU_AUDIO_DIR / f"{marked.video.stem}.mp3"
 

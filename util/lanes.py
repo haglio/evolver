@@ -6,6 +6,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.flick_folder import flat_flicks_in, flicks_folder_in
+
 import config
 from util.media_files import is_finalized_video_file, library_videos
 from util.sidecar import upscaled_video_path
@@ -44,8 +46,8 @@ def sent_lanes() -> tuple[SentLane, ...]:
     """Both lanes Origenerator sends down, resolved against config as it is now.
 
     A function rather than a table, for the reason ``weird_piles`` is one: the
-    Genau lane's folder name comes from the overlay, and a tuple built at import
-    freezes whatever ``config`` held then.
+    Genau lane's folder is found on disk each time, and a tuple built at import
+    freezes whatever was there then.
     """
     return (
         SentLane("evolver", ORIGENERATOR_SOURCE, "evolver_unsent_at",
@@ -84,14 +86,20 @@ def upscale_filed_for(video: Path) -> Path | None:
     return AiClip(video, source, orientation).upscale if inside else None
 
 
-def genau_delivery_dir() -> Path:
-    return config.GENAU_FLICKS_DIR / "2D" / "AI"
+def genau_flicks_dir() -> Path | None:
+    return flicks_folder_in(config.GENAU_DIR)
+
+
+def genau_delivery_dir() -> Path | None:
+    flicks = genau_flicks_dir()
+    return None if flicks is None else flat_flicks_in(flicks) / "AI"
 
 
 def genau_flicks() -> Iterator[Path]:
-    if not config.GENAU_FLICKS_DIR.is_dir():
+    flicks = genau_flicks_dir()
+    if flicks is None:
         return
-    for video in sorted(config.GENAU_FLICKS_DIR.rglob("*")):
+    for video in sorted(flicks.rglob("*")):
         if is_finalized_video_file(video):
             yield video
 
