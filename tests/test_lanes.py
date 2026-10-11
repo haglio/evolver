@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
+from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
 from util import lanes
 
 
@@ -38,6 +38,23 @@ class TestGenauFlicks(unittest.TestCase):
                 vr = touch_video(lib.genau_flicks / "VR" / "scene two_180.mp4")
 
                 self.assertEqual(list(lanes.genau_flicks()), [loop, cut, vr])
+
+    def test_finds_genaus_flicks_by_the_shape_of_their_folder_whatever_it_is_called(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                renamed = lib.genau_flicks.parent / "renamed"
+                lib.genau_flicks.rename(renamed)
+                flick = touch_video(renamed / "2D" / "AI" / "loop_2_topaz.mp4")
+
+                self.assertEqual(list(lanes.genau_flicks()), [flick])
+                self.assertEqual(lanes.genau_delivery_dir(), renamed / "2D" / "AI")
+
+    def test_finds_no_flicks_and_nowhere_to_deliver_where_no_folder_has_their_shape(self):
+        with workspace_temp_dir() as root:
+            with override_config(GENAU_DIR=root / "genau"):
+                self.assertEqual(list(lanes.genau_flicks()), [])
+                self.assertIsNone(lanes.genau_delivery_dir())
 
     def test_lists_the_delivered_loops_and_nothing_still_being_written(self):
         with workspace_temp_dir() as root:

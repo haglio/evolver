@@ -8,6 +8,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from app_support import siblings
+from app_support.flick_folder import audio_in, weird_pile_in
 from app_support.overlay import overlay_value
 
 from content_overlay import LOCAL_CONTENT, load_content
@@ -166,17 +167,15 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 
 # The Genau lane: Origenerator drops a looping video it made for Genau under the
 # genau_source inbox folder, and the lane delivers its upscale into Genau's flicks
-# folder, the one folder Genau plays. Both names come from the overlay because a
-# library folder name is what the sanitize blocklist keeps out of a public commit;
-# Origenerator reads genau_source from its own overlay, and the two must agree.
+# folder, the one folder Genau plays. The inbox folder's name comes from the
+# overlay because a library folder name is what the sanitize blocklist keeps out
+# of a public commit; Origenerator reads genau_source from its own overlay, and
+# the two must agree.
 GENAU_SOURCE    = overlay_value(_CONTENT, "genau_source", path=LOCAL_CONTENT)
 GENAU_FLICK_WORD = overlay_value(_CONTENT, "genau_flick_words", "one", path=LOCAL_CONTENT)
-GENAU_FLICKS_DIR = LIBRARY_ROOT / "videos" / "genau" / overlay_value(
-    _CONTENT, "genau_flicks_folder", path=LOCAL_CONTENT)
-GENAU_AUDIO_DIR = GENAU_FLICKS_DIR.parent / "audio"
-# Where Genau condemns a flick to: beside the flicks folder, as Genau's own
-# genau_contract.json says; tests/test_genau_contract.py holds this end to it.
-GENAU_WEIRD_DIR = GENAU_FLICKS_DIR.parent / "weird"
+GENAU_DIR = LIBRARY_ROOT / "videos" / "genau"
+GENAU_AUDIO_DIR = audio_in(GENAU_DIR)
+GENAU_WEIRD_DIR = weird_pile_in(GENAU_DIR)
 
 # The scraped provider: the 0_inbox folder its clips arrive under, and the site
 # root the metadata stage fetches their prompt pages from. Both are private, so

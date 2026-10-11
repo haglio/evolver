@@ -5,6 +5,8 @@ import dataclasses
 import unittest
 from unittest.mock import patch
 
+from app_support.flick_folder import flat_flicks_in
+
 from tasks import genau_deliver
 from tests.temp_helpers import override_config, workspace_temp_dir, write_sidecar
 from util import provenance, sidecar, video_type
@@ -19,6 +21,7 @@ def _lane(root):
     outbox = root / "2_outbox" / "upscaled_by_orientation"
     sorted_dir = root / "1_sorted"
     flicks = root / "genau" / "flicks"
+    flat_flicks_in(flicks).mkdir(parents=True)
     return outbox, sorted_dir, flicks
 
 
@@ -39,7 +42,7 @@ class TestGenauDeliver(unittest.TestCase):
             outbox, sorted_dir, flicks = _lane(root)
             upscaled, original = _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
@@ -61,7 +64,7 @@ class TestGenauDeliver(unittest.TestCase):
             upscaled, _original = _stage_flick(outbox, sorted_dir)
             metadata = root / "metadata"
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
                                  METADATA_DIR=metadata):
                 write_sidecar(sidecar.sidecar_path(upscaled),
@@ -88,7 +91,7 @@ class TestGenauDeliver(unittest.TestCase):
             outbox, sorted_dir, flicks = _lane(root)
             upscaled, _original = _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
                                  METADATA_DIR=root / "metadata"):
                 write_sidecar(sidecar.sidecar_path(upscaled), {provenance.BLOCK: stamps})
@@ -103,7 +106,7 @@ class TestGenauDeliver(unittest.TestCase):
             outbox, sorted_dir, flicks = _lane(root)
             _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
                                  METADATA_DIR=root / "metadata"):
                 genau_deliver.run()
@@ -120,7 +123,7 @@ class TestGenauDeliver(unittest.TestCase):
             audio = root / "genau" / "audio"
             saved = []
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_AUDIO_DIR=audio,
+                                 GENAU_DIR=flicks.parent, GENAU_AUDIO_DIR=audio,
                                  GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
                  patch("tasks.genau_deliver.has_sound", return_value=True), \
                  patch("tasks.genau_deliver.save_as_mp3",
@@ -134,7 +137,7 @@ class TestGenauDeliver(unittest.TestCase):
             outbox, sorted_dir, flicks = _lane(root)
             _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_AUDIO_DIR=root / "audio",
+                                 GENAU_DIR=flicks.parent, GENAU_AUDIO_DIR=root / "audio",
                                  GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
                  patch("tasks.genau_deliver.has_sound", return_value=False), \
                  patch("tasks.genau_deliver.save_as_mp3") as save:
@@ -148,7 +151,7 @@ class TestGenauDeliver(unittest.TestCase):
             outbox, sorted_dir, flicks = _lane(root)
             _upscaled, original = _stage_flick(outbox, sorted_dir)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_AUDIO_DIR=root / "audio",
+                                 GENAU_DIR=flicks.parent, GENAU_AUDIO_DIR=root / "audio",
                                  GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
                  patch("tasks.genau_deliver.has_sound", return_value=True), \
                  patch("tasks.genau_deliver.save_as_mp3", side_effect=OSError("disk full")), \
@@ -167,7 +170,7 @@ class TestGenauDeliver(unittest.TestCase):
             other.parent.mkdir(parents=True, exist_ok=True)
             other.write_text("a library video", encoding="utf-8")
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
@@ -181,7 +184,7 @@ class TestGenauDeliver(unittest.TestCase):
             _stage_flick(outbox, sorted_dir, stem="wide", orient="landscape")
             _stage_flick(outbox, sorted_dir, stem="tall", orient="portrait")
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
@@ -197,7 +200,7 @@ class TestGenauDeliver(unittest.TestCase):
             existing = flicks / "2D" / "AI" / "loop_1_topaz.mp4"
             existing.write_text("a flick already being played", encoding="utf-8")
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 genau_deliver.run()
 
@@ -221,7 +224,7 @@ class TestGenauDeliver(unittest.TestCase):
             # for the rest of the session -- which silently disarms any later
             # patch("pathlib.Path.replace"). patch.object deletes instead.
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"), \
                  patch.object(type(upscaled), "replace", _locked):
                 result = genau_deliver.run()
@@ -234,12 +237,12 @@ class TestGenauDeliver(unittest.TestCase):
         with workspace_temp_dir() as root:
             outbox, sorted_dir, flicks = _lane(root)
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_FLICKS_DIR=flicks, GENAU_SOURCE=GENAU_SOURCE,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
             self.assertEqual((result.delivered, result.failed), (0, 0))
-            self.assertFalse(flicks.exists())  # nothing to deliver, nothing created
+            self.assertFalse((flicks / "2D" / "AI").exists())  # nothing to deliver, nothing created
 
     def test_the_lane_runs_between_the_four_places_it_is_given(self):
         """The lane spans four places, and all four are arguments now.
@@ -258,7 +261,7 @@ class TestGenauDeliver(unittest.TestCase):
 
             with override_config(
                 OUT_UPSCALED_DIR=ambient_outbox, SORTED_DIR=ambient_sorted,
-                GENAU_FLICKS_DIR=ambient_flicks, GENAU_SOURCE=GENAU_SOURCE,
+                GENAU_DIR=ambient_flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                 METADATA_DIR=root / "metadata",
             ):
                 result = genau_deliver.run(
@@ -270,7 +273,7 @@ class TestGenauDeliver(unittest.TestCase):
 
             self.assertEqual(result.delivered, 1)
             self.assertTrue((given_flicks / "2D" / "AI" / "loop_given_topaz.mp4").is_file())
-            self.assertFalse(ambient_flicks.exists())
+            self.assertFalse((ambient_flicks / "2D" / "AI").exists())
             self.assertTrue((ambient_outbox / "landscape" / GENAU_SOURCE / "loop_ambient_topaz.mp4").is_file())
 
 class TestGenauDeliverResultSurface(unittest.TestCase):

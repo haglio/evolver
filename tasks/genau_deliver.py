@@ -156,6 +156,9 @@ def run(
     genau_sorted_dir = sorted_dir / genau_source
 
     result = GenauDeliverResult()
+    if delivery_dir is None:
+        log.warning("=== Genau lane: no folder is laid out as Genau's flicks are; nothing delivered ===")
+        return result
     log.info("=== Genau lane: 2_outbox -> %s ===", delivery_dir)
 
     for upscaled in _upscaled_genau_flicks(outbox_dir, genau_source):
