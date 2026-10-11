@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import math
-from collections import defaultdict
-from pathlib import Path
+from collections import Counter, defaultdict
+from pathlib import Path, PurePath
 
 import config
 from util import ffprobe
@@ -32,6 +32,24 @@ def relocate(was_at: Path, index: dict[str, list[Path]]) -> Path | None:
     """The one video now carrying that filename, or None if none or several do."""
     matches = index.get(was_at.name.lower(), [])
     return matches[0] if len(matches) == 1 else None
+
+
+def relocate_folder(held: list[PurePath], index: dict[str, list[Path]]) -> Path | None:
+    """The one folder more than half of *held* now sit under, laid out as before."""
+    homes: Counter[Path] = Counter()
+    for video in held:
+        depth = len(video.parts)
+        for candidate in index.get(video.name.lower(), []):
+            if _folded(candidate.parts[-depth:]) == _folded(video.parts):
+                homes[Path(*candidate.parts[:-depth])] += 1
+    if not homes:
+        return None
+    home, videos = homes.most_common(1)[0]
+    return home if 2 * videos > len(held) else None
+
+
+def _folded(parts: tuple[str, ...]) -> list[str]:
+    return [part.casefold() for part in parts]
 
 
 def another_version_of(was_at: Path, index: dict[str, list[Path]]) -> Path | None:

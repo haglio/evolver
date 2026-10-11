@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from tasks import reference_sync
 from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
-from util import reference_stores
+from util import folder_settings, reference_stores
 
 
 def _write_video(path: Path) -> Path:
@@ -41,6 +41,8 @@ def _stores_under(temp: Path, **used):
             "FUN_TIME_WATCH_STATS_FILE": unused / "watch_stats.json",
             "FUN_TIME_FAVS_FILE": unused / "favs.csv",
             "FUN_TIME_STATE_DIR": unused / "state",
+            "ORIGENERATOR_OVERLAY_FILE": unused / "content.local.json",
+            "FOLLOWED_FOLDERS_FILE": temp / "followed_folders.json",
             "NON_AI_DIR": unused / "non_AI",
             "METADATA_DIR": unused / "metadata",
             "VR_VIDEO_DIR": None,
@@ -232,6 +234,150 @@ class TestFunTimePlayPoints(unittest.TestCase):
 
             self.assertEqual(json.loads(points.read_text(encoding="utf-8")),
                              {str(upscale).lower(): 90_000})
+
+
+class TestOrigeneratorSoundFolder(unittest.TestCase):
+    def _overlay(self, temp: Path, sound_folder: str) -> Path:
+        return _write_json(temp / "origenerator" / "content.local.json", {
+            "library_root": str(temp), "ambient_audio_dir": sound_folder,
+            "recipe_categories": {"alpha": ["scene one"]}})
+
+    def test_follows_a_renamed_sound_folder_by_the_videos_it_held(self):
+        with workspace_temp_dir() as temp:
+            bites = temp / "videos" / "lagoon" / "bites"
+            for name in ("one.mp4", "two.mp4"):
+                _write_video(bites / "3_good_to_go" / "processed" / name)
+            overlay = self._overlay(temp, "videos/lagoon/bites")
+
+            with _stores_under(temp, ORIGENERATOR_OVERLAY_FILE=overlay):
+                reference_sync.run()
+                bites.rename(bites.with_name("clips"))
+                result = reference_sync.run()
+
+            self.assertEqual(json.loads(overlay.read_text(encoding="utf-8"))["ambient_audio_dir"],
+                             "videos/lagoon/clips")
+            self.assertEqual(result.relocated, 1)
+
+    def _renamed_between_two_runs(self, temp: Path, overlay: Path, folder: Path, to: str):
+        with _stores_under(temp, ORIGENERATOR_OVERLAY_FILE=overlay):
+            reference_sync.run()
+            folder.rename(folder.with_name(to))
+            return reference_sync.run()
+
+    def test_keeps_the_way_the_overlay_writes_the_folder(self):
+        for written, expected in (
+            (lambda bites: str(bites), lambda clips: str(clips)),
+            (lambda bites: "videos\\lagoon\\bites", lambda clips: "videos\\lagoon\\clips"),
+        ):
+            with self.subTest(written=written(Path("bites"))), workspace_temp_dir() as temp:
+                bites = _write_video(temp / "videos" / "lagoon" / "bites" / "one.mp4").parent
+                overlay = self._overlay(temp, written(bites))
+
+                self._renamed_between_two_runs(temp, overlay, bites, "clips")
+
+                self.assertEqual(
+                    json.loads(overlay.read_text(encoding="utf-8"))["ambient_audio_dir"],
+                    expected(bites.with_name("clips")))
+
+    def test_changes_nothing_else_in_the_overlay(self):
+        """It is written by hand, so its spacing and line endings are his too."""
+        with workspace_temp_dir() as temp:
+            bites = _write_video(temp / "videos" / "lagoon" / "bites" / "one.mp4").parent
+            overlay = temp / "origenerator" / "content.local.json"
+            overlay.parent.mkdir(parents=True)
+            before = ('{\r\n    "library_root": ' + json.dumps(str(temp)) + ",\r\n"
+                      '    "ambient_audio_dir":   "videos/lagoon/bites",\r\n'
+                      '    "recipe_categories": {"alpha": ["scene one"]}\r\n}\r\n')
+            overlay.write_bytes(before.encode("utf-8"))
+
+            self._renamed_between_two_runs(temp, overlay, bites, "clips")
+
+            self.assertEqual(overlay.read_bytes(),
+                             before.replace("lagoon/bites", "lagoon/clips").encode("utf-8"))
+
+    def test_a_folder_whose_videos_went_several_ways_is_left_as_it_was(self):
+        with workspace_temp_dir() as temp:
+            bites = temp / "videos" / "lagoon" / "bites"
+            for name in ("one.mp4", "two.mp4"):
+                _write_video(bites / name)
+            overlay = self._overlay(temp, "videos/lagoon/bites")
+
+            with _stores_under(temp, ORIGENERATOR_OVERLAY_FILE=overlay):
+                reference_sync.run()
+                for name, to in (("one.mp4", "north"), ("two.mp4", "south")):
+                    _write_video(temp / "videos" / to / name)
+                    (bites / name).unlink()
+                bites.rmdir()
+                with self.assertLogs("tasks.reference_sync", level="WARNING"):
+                    result = reference_sync.run()
+
+            self.assertEqual(json.loads(overlay.read_text(encoding="utf-8"))["ambient_audio_dir"],
+                             "videos/lagoon/bites")
+            self.assertEqual((result.relocated, result.unresolved), (0, 1))
+
+    def test_a_folder_gone_before_any_run_saw_it_is_left_as_it_was(self):
+        with workspace_temp_dir() as temp:
+            _write_video(temp / "videos" / "lagoon" / "clips" / "one.mp4")
+            overlay = self._overlay(temp, "videos/lagoon/bites")
+
+            with _stores_under(temp, ORIGENERATOR_OVERLAY_FILE=overlay):
+                with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
+                    result = reference_sync.run()
+
+            self.assertEqual(result.unresolved, 1)
+            self.assertIn(str(temp / "videos" / "lagoon" / "bites"), logged.records[0].getMessage())
+
+    def test_a_folder_on_a_drive_that_cannot_be_reached_is_not_checked(self):
+        with workspace_temp_dir() as temp:
+            (temp / "videos").mkdir()
+            overlay = self._overlay(temp, str(a_drive_that_is_not_there() / "bites"))
+
+            with _stores_under(temp, ORIGENERATOR_OVERLAY_FILE=overlay):
+                result = reference_sync.run()
+
+            self.assertEqual((result.checked, result.unresolved), (0, 0))
+
+    def test_an_overlay_naming_no_sound_folder_has_nothing_to_follow(self):
+        with workspace_temp_dir() as temp:
+            (temp / "videos").mkdir()
+            overlay = self._overlay(temp, "")
+
+            with _stores_under(temp, ORIGENERATOR_OVERLAY_FILE=overlay):
+                result = reference_sync.run()
+
+            self.assertEqual((result.checked, result.refused), (0, 0))
+
+    def test_an_overlay_that_cannot_be_written_is_counted_and_not_ok(self):
+        with workspace_temp_dir() as temp:
+            bites = _write_video(temp / "videos" / "lagoon" / "bites" / "one.mp4").parent
+            overlay = self._overlay(temp, "videos/lagoon/bites")
+
+            def held_open_by_origenerator(path: Path, folder: Path) -> None:
+                raise OSError("the app that owns it has it open")
+
+            setting_written = patch.object(
+                folder_settings, "_rewrite_sound_folder", held_open_by_origenerator)
+            with setting_written, self.assertLogs("tasks.reference_sync", level="ERROR"):
+                result = self._renamed_between_two_runs(temp, overlay, bites, "clips")
+
+            self.assertEqual((result.write_errors, result.ok), (1, False))
+
+    def test_an_overlay_this_stage_cannot_rewrite_is_left_alone(self):
+        for overlay_says in (
+            {"ambient_audio_dir": 5},
+            {"ambient_audio_dir": "videos/lagoon/bites", "genau_source": "videos/lagoon/bites"},
+        ):
+            with self.subTest(overlay_says=overlay_says), workspace_temp_dir() as temp:
+                (temp / "videos").mkdir()
+                overlay = _write_json(temp / "origenerator" / "content.local.json",
+                                      {"library_root": str(temp), **overlay_says})
+                before = overlay.read_bytes()
+
+                with _stores_under(temp, ORIGENERATOR_OVERLAY_FILE=overlay):
+                    result = reference_sync.run()
+
+                self.assertEqual(overlay.read_bytes(), before)
+                self.assertEqual(result.refused, 1)
 
 
 class TestAFolderThatCannotBeReached(unittest.TestCase):
