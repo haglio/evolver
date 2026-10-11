@@ -141,10 +141,9 @@ def run(
 
     The four places the lane spans are arguments, resolved here rather than in
     the signature: a default is evaluated at import, which would freeze the
-    value past ``override_config``. ``genau_source`` is the overlay's
-    ``genau_source`` folder name, which origenerator reads from its own overlay
-    under the same key; a parameter changes where the value can come from, not
-    what it is called.
+    value past ``override_config``. ``genau_source`` is the folder name the
+    settings all of Haglio share under that key, which origenerator reads too; a
+    parameter changes where the value can come from, not what it is called.
     """
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir

@@ -196,7 +196,7 @@ CONFIG_REFERENCE_LEDGER = {
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or
-# ``key.subkey``. ``genau_source`` is origenerator's too.
+# ``key.subkey``.
 OVERLAY_KEYS = {
     "acts",
     "cameras",
@@ -204,10 +204,6 @@ OVERLAY_KEYS = {
     "curated_examples",
     "display_timezone",
     "excerpt_folders",
-    "genau_flick_words.one",
-    "genau_source",
-    "library_root",
-    "project_roots",
     "retired_root",
     "scrape_provider",
     "scrape_provider.base_url",

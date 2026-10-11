@@ -1,18 +1,23 @@
 """Test package marker, the overlay pin, and the modal-dialog gag.
 
-The suite runs against the committed example overlay, never the developer's
-git-ignored content.local.json, so a run here matches a public checkout. This
+The suite runs against the committed example overlay and the example of the
+settings all of Haglio shares, never the developer's git-ignored
+content.local.json or ~/.haglio, so a run here matches a public checkout. This
 must happen before any test module imports the app, which loads content at
 import time.
 """
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+from app_support import haglio_settings
+
 import content_overlay
 
+os.environ[haglio_settings.SETTINGS_ENV] = haglio_settings.THE_EXAMPLE
 content_overlay.LOCAL_CONTENT = content_overlay.EXAMPLE_CONTENT
 
 import config  # noqa: E402
