@@ -54,8 +54,8 @@ def test_the_start_for_when_evolver_is_not_running_is_the_same_tray_saying_so():
 def test_a_preview_runs_this_worktree_as_a_branch_session_with_the_primarys_overlay():
     """The whole app, in place of the usual Evolver: the same tray_app the daily
     launcher runs, marked a branch session so the running one steps aside.  The
-    overlay is where library_root and project_roots live, so a copy taken weeks
-    ago resolves a library that has moved; it is brought across every time."""
+    overlay holds this machine's private values, and a copy taken weeks ago can
+    hold stale ones; it is brought across every time."""
     report = dry_run(PREVIEW_LAUNCHER)
 
     primary = REPO_ROOT.parents[2]
