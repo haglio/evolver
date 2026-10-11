@@ -2,10 +2,10 @@
 
 Evolver relocates videos — sorting them, retiring an upscaled original, and the
 library gets reorganized by hand between runs too. Every sibling app that saved
-a video's path (Genaumacher's clip bounds, Fun Time's favorites and watch counts)
-is left pointing at where the file used to be, and so is the scene this app
-recorded each carved clip was found in. This stage walks those stores each run
-and follows the move.
+a video's path (Genaumacher's clip bounds, Fun Time's favorites, watch counts and
+where each player left each video) is left pointing at where the file used to
+be, and so is the scene this app recorded each carved clip was found in. This
+stage walks those stores each run and follows the move.
 
 Each of those files belongs to a repo that has never heard of this one, so a
 format one of them changes would arrive here as a file that still parses and
