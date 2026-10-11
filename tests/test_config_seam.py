@@ -164,9 +164,6 @@ CONFIG_REFERENCE_LEDGER = {
     # know the whole layout, which is exactly why the app that sent the clip
     # cannot do it.
     "tasks/withdrawn.py": 8,
-    # Origenerator's overlay, which names the folder its sound plays from, and
-    # the file remembering what that folder held, read and written.
-    "util/folder_settings.py": 3,
     # Two more: the Genau lane's folder name and where its clips are delivered,
     # both read where the lane table is built rather than by the stage reading
     # that table (tasks/withdrawn.py). Then one more: 1_sorted again, to say
@@ -190,7 +187,7 @@ CONFIG_REFERENCE_LEDGER = {
     # more fewer: an archived original's sidecar and funscript keep the suffix
     # their mirrors gave them, rather than one looked up again.
     "util/nonai_retire.py": 1,
-    "util/reference_stores.py": 7,
+    "util/reference_stores.py": 6,
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
     "util/video_locator.py": 1,
