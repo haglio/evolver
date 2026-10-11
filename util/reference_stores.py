@@ -9,11 +9,10 @@ All but one kind of these files belong to another repo, and none of those repos
 hears about this one -- so before rewriting one, ``shape_complaint`` asks
 whether it is still the shape this stage was written against, and a file that is
 not is left alone and reported. Genaumacher and Scripture each stamp a version their
-own tests hold. Fun Time's watch counts and its players' play points carry none
-and cannot, since every key there is a video path, so their shape is what is
-checked; its favorites file is a spreadsheet whose header row is its version.
-The one kind that is this app's own is a carved clip's sidecar, naming the scene
-the clip was found in.
+own tests hold. Fun Time's watch counts carry none and cannot, since every key
+there is a video path, so their shape is what is checked; its favorites file is
+a spreadsheet whose header row is its version. The one kind that is this app's
+own is a carved clip's sidecar, naming the scene the clip was found in.
 """
 
 from __future__ import annotations
@@ -124,10 +123,6 @@ def discover() -> Iterator[ReferenceStore]:
             _rewrite_favorite_paths,
             _shape=_has_a_local_path_column,
         )
-    for points in sorted(config.FUN_TIME_STATE_DIR.glob("*_play_points.json")):
-        yield ReferenceStore(
-            "fun time play points", points, _read_json_object_keys, _rewrite_json_object_keys,
-            _shape=_is_places_by_path, any_version_will_do=True)
     yield from _clip_pairings()
 
 
@@ -203,13 +198,6 @@ def _is_counts_by_path(path: Path) -> str | None:
     for key, value in _load_json(path).items():
         if not isinstance(value, dict) or not set(value) >= _WATCH_COUNTS:
             return f"{key!r} does not hold the watch counts this stage re-keys"
-    return None
-
-
-def _is_places_by_path(path: Path) -> str | None:
-    for key, value in _load_json(path).items():
-        if not isinstance(value, int) or isinstance(value, bool):
-            return f"{key!r} does not hold the place in milliseconds this stage re-keys"
     return None
 
 

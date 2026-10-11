@@ -2,12 +2,10 @@
 
 Evolver relocates videos — sorting them, retiring an upscaled original, and the
 library gets reorganized by hand between runs too. Every sibling app that saved
-a video's path (Genaumacher's clip bounds, Fun Time's favorites, watch counts and
-where each player left each video) is left pointing at where the file used to
-be, and so is the scene this app recorded each carved clip was found in. This
-stage walks those stores each run and follows the move, and follows a renamed
-folder into a setting that names it, Origenerator's sound folder, by the videos
-the folder held (:mod:`util.folder_settings`).
+a video's path (Genaumacher's clip bounds, Fun Time's favorites and watch counts)
+is left pointing at where the file used to be, and so is the scene this app
+recorded each carved clip was found in. This stage walks those stores each run
+and follows the move.
 
 Each of those files belongs to a repo that has never heard of this one, so a
 format one of them changes would arrive here as a file that still parses and
@@ -23,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import folder_settings, reference_stores, video_locator
+from util import reference_stores, video_locator
 from util.media_files import reachable
 
 log = logging.getLogger(__name__)
@@ -72,15 +70,14 @@ def run() -> ReferenceSyncResult:
     unreachable = [folder for folder in (config.VR_VIDEO_DIR, config.NONAI_RETIRED_ROOT)
                    if folder is not None and not reachable(folder)]
     index = video_locator.build_index()
-    reconciled = [_reconcile(store, index, unreachable) for store in reference_stores.discover()]
-    reconciled += [_follow(setting, index) for setting in folder_settings.discover()]
-    for one in reconciled:
-        result.checked += one.checked
-        result.relocated += one.relocated
-        result.unresolved += one.unresolved
-        result.not_checked += one.not_checked
-        result.write_errors += one.write_errors
-        result.refused += one.refused
+    for store in reference_stores.discover():
+        reconciled = _reconcile(store, index, unreachable)
+        result.checked += reconciled.checked
+        result.relocated += reconciled.relocated
+        result.unresolved += reconciled.unresolved
+        result.not_checked += reconciled.not_checked
+        result.write_errors += reconciled.write_errors
+        result.refused += reconciled.refused
 
     log.info(
         "References done. Checked: %d, Relocated: %d, Unresolved: %d, Write errors: %d, "
@@ -104,7 +101,12 @@ def _reconcile(
 ) -> _Reconciled:
     complaint = store.shape_complaint()
     if complaint is not None:
-        return _refused(store.label, store.path, complaint)
+        log.warning(
+            "REFUSING %s (%s): %s. Its references are not being followed until "
+            "this stage is taught the new shape.",
+            store.label, store.path.name, complaint,
+        )
+        return _Reconciled(refused=1)
 
     references = store.read()
 
@@ -141,40 +143,6 @@ def _reconcile(
     return _Reconciled(checked=len(references), relocated=relocated,
                        unresolved=unresolved, not_checked=not_checked,
                        write_errors=write_errors)
-
-
-def _follow(setting: folder_settings.FolderSetting, index: dict[str, list[Path]]) -> _Reconciled:
-    complaint = setting.shape_complaint()
-    if complaint is not None:
-        return _refused(setting.label, setting.path, complaint)
-    folder = setting.folder()
-    if folder is None or not reachable(folder):
-        return _Reconciled()
-    if folder.is_dir():
-        folder_settings.remember(setting.label, folder, folder_settings.held(folder))
-        return _Reconciled(checked=1)
-
-    now_at = video_locator.relocate_folder(folder_settings.remembered(setting.label, folder), index)
-    if now_at is None:
-        log.warning("UNRESOLVED %s (%s): %s", setting.label, setting.path.name, folder)
-        return _Reconciled(checked=1, unresolved=1)
-    try:
-        setting.repoint(now_at)
-    except OSError:
-        log.exception("FAILED TO REWRITE %s (%s)", setting.label, setting.path)
-        return _Reconciled(checked=1, write_errors=1)
-    folder_settings.remember(setting.label, now_at, folder_settings.held(now_at))
-    log.info("REPOINT %s  %s  ->  %s", setting.label, folder, now_at)
-    return _Reconciled(checked=1, relocated=1)
-
-
-def _refused(label: str, path: Path, complaint: str) -> _Reconciled:
-    log.warning(
-        "REFUSING %s (%s): %s. Its references are not being followed until "
-        "this stage is taught the new shape.",
-        label, path.name, complaint,
-    )
-    return _Reconciled(refused=1)
 
 
 def _another_version(
