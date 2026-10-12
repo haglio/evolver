@@ -60,7 +60,7 @@ from util import (
 )
 from util.media_files import partial_path, reachable, remove_partial_files
 from util.nonai_library import buckets, stage_dirs
-from util.nonai_retire import carry_metadata, retire_original
+from util.nonai_retire import carry_funscript, carry_metadata, retire_original
 
 log = logging.getLogger(__name__)
 
@@ -502,8 +502,9 @@ def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclus
     nonai_job.stamp_encode_ended(files.cooldown)
     if finished:
         tmp.replace(out)
-        # Before the original leaves, and it takes its sidecar with it.
+        # Before the original leaves, and it takes its sidecar and funscript with it.
         carry_metadata(source, out)
+        carry_funscript(source, out)
         stamp = job.get("provenance") or nonai_encode.unrecorded_start()
         sidecar.update(sidecar.sidecar_path(out), lambda current: provenance.recorded(
             current, provenance.UPSCALE_NON_AI, stamp))

@@ -9,6 +9,7 @@ one and lives in :mod:`app_support.funscript`, not here.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from app_support.funscript import actions_of
@@ -82,6 +83,12 @@ def is_marked_generated(script: Path) -> bool:
 def copy_mark(script: Path, copied_to: Path) -> None:
     if is_marked_generated(script):
         mark_generated(copied_to)
+
+
+def copy_script(script: Path, copied_to: Path) -> None:
+    copied_to.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(script, copied_to)
+    copy_mark(script, copied_to)
 
 
 def carry_mark(script: Path, moved_to: Path) -> None:

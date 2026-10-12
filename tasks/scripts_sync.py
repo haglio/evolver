@@ -20,7 +20,7 @@ from util.media_files import (
 )
 from util.script_library import (
     carry_mark,
-    copy_mark,
+    copy_script,
     drop_mark,
     remove_empty_mark_folders,
     script_path_for_video,
@@ -219,11 +219,10 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     """Send each script whose video left the library for the archive after it.
 
     With one exception, checked first: when an upscaled sibling of the retired
-    video is still IN the library (upscaling archives the original and leaves
-    the new variant scriptless), the script's real home is that sibling — one
-    funscript serves every variant of a video. The library copy moves to the
-    sibling's mirror path, and the archived original merely keeps a duplicate
-    beside it for self-description.
+    video is still IN the library with no script of its own, the script's real
+    home is that sibling — one funscript serves every variant of a video. The
+    library copy moves to the sibling's mirror path, and the archived original
+    merely keeps a duplicate beside it for self-description.
 
     A retired original is moved out of the library entirely (see
     :func:`util.nonai_retire._archive_original`) and its funscript goes with
@@ -495,9 +494,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
             source_script = script_path_for_video(source_video)
             dest_script = script_path_for_video(target_video)
             try:
-                dest_script.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_script, dest_script)
-                copy_mark(source_script, dest_script)
+                copy_script(source_script, dest_script)
             except OSError:
                 copy_error_paths.append(str(source_script.relative_to(trees.scripts)))
                 log.exception("FAILED TO COPY VARIANT SCRIPT  %s  ->  %s", source_script, dest_script)
