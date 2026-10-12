@@ -262,28 +262,6 @@ class TestCarryMetadata(unittest.TestCase):
                 self.assertFalse(nonai_retire.carry_metadata(source, out))
                 self.assertFalse(sidecar.sidecar_path(out).exists())
 
-    def test_an_archived_originals_sidecar_is_read_from_beside_it(self):
-        """Outside the library the mirrored metadata tree cannot answer, so the
-        archived copy describes itself from the file next to it."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            archived = root / "archive" / "lagoon" / "Lee-Poe.mp4"
-            make_video(archived)
-            archived.with_suffix(".json").write_text(
-                json.dumps({"clip": {"compilation": "Volume One", "index": 1}}),
-                encoding="utf-8",
-            )
-            out = make_video(
-                overrides["NON_AI_DIR"] / "lagoon" / "3_good_to_go" / "processed"
-                / "Lee-Poe_apo8_iris2.mp4"
-            )
-
-            with override_config(**overrides):
-                self.assertTrue(nonai_retire.carry_metadata(archived, out))
-                carried = sidecar.read(sidecar.sidecar_path(out))
-
-            self.assertEqual(carried["clip"], {"compilation": "Volume One", "index": 1})
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -50,7 +50,7 @@ def carry_metadata(source: Path, out: Path) -> bool:
     by then there is none.  So without this the upscale reaches the library with
     nothing to say it was ever a cut.
     """
-    payload = sidecar.read(_sidecar_beside_or_mirrored(source))
+    payload = sidecar.read(sidecar.sidecar_path(source))
     carried = {
         key: value for key, value in payload.items()
         if key not in _FILE_SCOPED_SIDECAR_KEYS
@@ -62,8 +62,7 @@ def carry_metadata(source: Path, out: Path) -> bool:
         merged = {**existing, **carried}
         return merged if merged != existing else None
 
-    destination = _sidecar_beside_or_mirrored(out)
-    if sidecar.update(destination, carry_them_over) is None:
+    if sidecar.update(sidecar.sidecar_path(out), carry_them_over) is None:
         return False
     log.info("Carried metadata onto upscale: %s -> %s", source.name, out.name)
     return True
@@ -99,21 +98,6 @@ def retire_original(source: Path, *, archive_root: Path | None) -> None:
     source.replace(dest)
     _move_mirrored_files(source, dest)
     log.info("Retired original: %s -> %s", source, dest)
-
-
-def _sidecar_beside_or_mirrored(video: Path) -> Path:
-    """Where *video*'s sidecar lives: mirrored under ``METADATA_DIR``, or beside it.
-
-    The metadata tree mirrors the library and nothing else, so a retired original
-    that has left the library keeps its own copy next to the video instead (see
-    :func:`_archive_original`).  Asking the mirror where that is computes a path
-    under a tree the video is not in, which is the ``ValueError`` here — the
-    archive is the only thing outside the library this stage ever reads.
-    """
-    try:
-        return sidecar.sidecar_path(video)
-    except ValueError:
-        return video.with_suffix(".json")
 
 
 def _archive_original(source: Path, archive_root: Path) -> None:
