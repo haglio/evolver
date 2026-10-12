@@ -1,12 +1,13 @@
 """Moving a superseded non-AI original out of the way, once its upscale exists.
 
 Three things happen at promotion and they are easy to conflate: the upscale is
-handed what the original's sidecar says about the footage they share, the
-original leaves its triage folder, and its sidecar and funscript go wherever it
-went.  Getting the last two wrong is not a wrong number on a screen -- it is a
-video in the wrong place, an orphaned sidecar the grouping stage prunes, or a
-funscript the scripts sync then fails the whole run trying to relocate.  So
-they live here, together, away from the encode supervision that calls them.
+handed what the original's sidecar says about the footage they share and a copy
+of its funscript, the original leaves its triage folder, and its sidecar and
+funscript go wherever it went.  Getting the last two wrong is not a wrong number
+on a screen -- it is a video in the wrong place, an orphaned sidecar the
+grouping stage prunes, or a funscript the scripts sync then fails the whole run
+trying to relocate.  So they live here, together, away from the encode
+supervision that calls them.
 
 Where an original goes is the caller's to say: ``archive_root`` names an
 archive outside the library, or is None for the bucket's own ``2*`` folder.
@@ -48,10 +49,6 @@ def carry_metadata(source: Path, out: Path) -> bool:
     across from an in-library original, but it runs later in the same pass and
     by then there is none.  So without this the upscale reaches the library with
     nothing to say it was ever a cut.
-
-    Funscripts are deliberately not carried: :mod:`tasks.scripts_sync` already
-    copies an original's script onto its processed variants, and a second thing
-    writing scripts is a second thing to disagree with it.
     """
     payload = sidecar.read(_sidecar_beside_or_mirrored(source))
     carried = {
@@ -70,6 +67,14 @@ def carry_metadata(source: Path, out: Path) -> bool:
         return False
     log.info("Carried metadata onto upscale: %s -> %s", source.name, out.name)
     return True
+
+
+def carry_funscript(source: Path, out: Path) -> None:
+    script = script_library.script_path_for_video(source)
+    destination = script_library.script_path_for_video(out)
+    if script.is_file() and not destination.exists():
+        script_library.copy_script(script, destination)
+        log.info("Carried funscript onto upscale: %s -> %s", source.name, out.name)
 
 
 def retire_original(source: Path, *, archive_root: Path | None) -> None:

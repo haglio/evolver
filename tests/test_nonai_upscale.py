@@ -8,6 +8,8 @@ import unittest
 from contextlib import ExitStack
 from unittest.mock import Mock, patch
 
+from app_support import funscript
+
 import config
 from tasks import nonai_encode, nonai_queue, nonai_upscale
 from tests.temp_helpers import (
@@ -22,7 +24,7 @@ from tests.temp_helpers import (
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
-from util import nonai_job, orientation, provenance, sidecar, topaz, video_type
+from util import nonai_job, orientation, provenance, script_library, sidecar, topaz, video_type
 from util.media_files import partial_path
 
 
@@ -1635,6 +1637,52 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
                 nonai_upscale.run(allow_start=False)
 
                 self.assertNotIn("version", sidecar.read(sidecar.sidecar_path(out)))
+
+    def test_the_upscale_keeps_the_funscript_the_original_takes_to_the_archive(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=root / "archive")
+            source, _tmp, out = write_job(root, overrides, expected=100.0)
+            script = {"actions": [{"at": 0, "pos": 20}, {"at": 400, "pos": 80}]}
+
+            stack, _mocks = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                funscript.write(script_library.script_path_for_video(source), script)
+
+                nonai_upscale.run(allow_start=False)
+
+                self.assertEqual(funscript.read(script_library.script_path_for_video(out)), script)
+
+    def test_a_funscript_no_person_wrote_is_still_marked_so_on_the_upscale(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=root / "archive")
+            source, _tmp, out = write_job(root, overrides, expected=100.0)
+
+            stack, _mocks = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                original = script_library.script_path_for_video(source)
+                funscript.write(original, {"actions": [{"at": 0, "pos": 20}, {"at": 400, "pos": 80}]})
+                script_library.mark_generated(original)
+
+                nonai_upscale.run(allow_start=False)
+
+                self.assertTrue(script_library.is_marked_generated(script_library.script_path_for_video(out)))
+
+    def test_a_redone_upscale_keeps_the_funscript_written_for_it(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root, NONAI_RETIRED_ROOT=root / "archive")
+            source, _tmp, out = write_job(root, overrides, expected=100.0)
+            written_for_the_upscale = {"actions": [{"at": 0, "pos": 90}, {"at": 300, "pos": 10}]}
+
+            stack, _mocks = probes(is_running=False, duration=100.0)
+            with override_config(**overrides), stack:
+                funscript.write(script_library.script_path_for_video(source),
+                                {"actions": [{"at": 0, "pos": 20}, {"at": 400, "pos": 80}]})
+                funscript.write(script_library.script_path_for_video(out), written_for_the_upscale)
+
+                nonai_upscale.run(allow_start=False)
+
+                self.assertEqual(funscript.read(script_library.script_path_for_video(out)),
+                                 written_for_the_upscale)
 
 
 class TestReportingHowFarAlongItIs(unittest.TestCase):
