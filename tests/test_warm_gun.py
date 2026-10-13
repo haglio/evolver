@@ -31,8 +31,8 @@ def _journal(path: Path, lines: list) -> Path:
     return path
 
 
-class TestReadJournal(unittest.TestCase):
-    def test_reads_every_line_of_every_journal_in_time_order(self):
+class TestReadJournals(unittest.TestCase):
+    def test_reads_every_journal_by_name_each_in_time_order(self):
         with workspace_temp_dir() as root:
             _journal(root / "a.jsonl", [
                 {"t": 20, "event": "skip", "path": "1_sorted/provider2/portrait/b.mp4"},
@@ -40,23 +40,31 @@ class TestReadJournal(unittest.TestCase):
             ])
             _journal(root / "b.jsonl", [{"t": 15, "event": "lock", "path": "genau/clips/loop.mp4"}])
 
-            self.assertEqual(warm_gun.read_journal([root]), [
-                Event(10, "completion", "1_sorted/provider2/portrait/a.mp4"),
-                Event(15, "lock", "genau/clips/loop.mp4"),
-                Event(20, "skip", "1_sorted/provider2/portrait/b.mp4"),
-            ])
+            self.assertEqual(warm_gun.read_journals([root]), {
+                "a.jsonl": [
+                    Event(10, "completion", "1_sorted/provider2/portrait/a.mp4"),
+                    Event(20, "skip", "1_sorted/provider2/portrait/b.mp4"),
+                ],
+                "b.jsonl": [Event(15, "lock", "genau/clips/loop.mp4")],
+            })
 
-    def test_a_line_present_in_two_journals_counts_once(self):
-        """A copy seeded beside the phone's own file, the phone re-uploading its
-        whole history, or the same journal reached through two folders, must not
-        double every count."""
+    def test_a_line_twice_in_a_journal_counts_once(self):
+        """The phone re-uploading its whole history must not double every count."""
         with workspace_temp_dir() as root:
             line = {"t": 10, "event": "completion", "path": "1_sorted/provider2/portrait/a.mp4"}
-            _journal(root / "library" / "seeded.jsonl", [line])
-            _journal(root / "outbox" / "phone.jsonl", [line, line])
+            _journal(root / "phone.jsonl", [line, line])
+
+            self.assertEqual(len(warm_gun.read_journals([root])["phone.jsonl"]), 1)
+
+    def test_the_same_journal_reached_through_two_folders_is_one_journal(self):
+        with workspace_temp_dir() as root:
+            line = {"t": 10, "event": "completion", "path": "1_sorted/provider2/portrait/a.mp4"}
+            _journal(root / "library" / "phone.jsonl", [line])
+            _journal(root / "outbox" / "phone.jsonl", [line])
 
             self.assertEqual(
-                len(warm_gun.read_journal([root / "library", root / "outbox"])), 1
+                warm_gun.read_journals([root / "library", root / "outbox"]),
+                {"phone.jsonl": [Event(10, "completion", "1_sorted/provider2/portrait/a.mp4")]},
             )
 
     def test_a_line_that_is_not_a_record_is_skipped(self):
@@ -71,13 +79,13 @@ class TestReadJournal(unittest.TestCase):
             ])
 
             self.assertEqual(
-                warm_gun.read_journal([root]),
-                [Event(4, "skip", "1_sorted/provider2/portrait/a.mp4")],
+                warm_gun.read_journals([root]),
+                {"a.jsonl": [Event(4, "skip", "1_sorted/provider2/portrait/a.mp4")]},
             )
 
-    def test_no_folder_means_no_events(self):
+    def test_no_folder_means_no_journals(self):
         with workspace_temp_dir() as root:
-            self.assertEqual(warm_gun.read_journal([root / "absent"]), [])
+            self.assertEqual(warm_gun.read_journals([root / "absent"]), {})
 
 
 class TestLibraryVideo(unittest.TestCase):

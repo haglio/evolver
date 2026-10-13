@@ -29,15 +29,6 @@ class Event:
     path: str
 
 
-def read_journal(directories: Iterable[Path]) -> list[Event]:
-    """Every event the journals under *directories* record, in time order.
-
-    A set, so a line reached twice — the same journal read through two folders,
-    or the phone re-uploading its whole history — counts once.
-    """
-    return sorted({event for events in read_journals(directories).values() for event in events})
-
-
 def read_journals(directories: Iterable[Path]) -> dict[str, list[Event]]:
     """Each journal's events by the journal's file name, each in time order.
 
