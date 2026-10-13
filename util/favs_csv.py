@@ -61,7 +61,11 @@ def local_path(value: str, csv_dir: Path) -> Path | None:
     if parsed.scheme in {"http", "https"}:
         return None
     if parsed.scheme == "file":
-        return Path(unquote(parsed.path.lstrip("/")))
+        # The cell is written Windows-style, file:/// and then the path: for
+        # C:/x the slash before the drive is not part of the path, and for a
+        # POSIX path (the suite runs on a Mac too) it doubles the root.
+        path = re.sub(r"^/+(?=[A-Za-z]:)", "", unquote(parsed.path))
+        return Path(re.sub(r"^/{2,}", "/", path))
     if not _looks_like_a_path(candidate):
         return None
 
