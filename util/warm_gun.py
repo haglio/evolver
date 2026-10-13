@@ -1,4 +1,5 @@
-"""Warm Gun's journal: one JSON line per event on the phone, each naming its
+"""Warm Gun's journals: one JSON line per event, one file per machine that
+plays (the phone's, and since 2026-10 the laptop's beside it), each naming its
 video by the lane it was played from — ``1_sorted/<source>/<orientation>/x.mp4``,
 ``non_AI/<bucket>/…`` or ``genau/clips/2D/AI/x.mp4``, whatever Genau's flicks
 folder is called -- or, written before that folder split into 2D and VR,
@@ -16,6 +17,8 @@ from util import lanes
 from util.sidecar import upscaled_video_path
 
 JOURNAL_PATTERN = "*.jsonl"
+# What the phone's file is called -- the one journal there was before the laptop's.
+PHONE_JOURNAL = "warm-gun-journal.jsonl"
 PHONES_NAME_FOR_GENAUS_FLICKS_FOLDER = "clips"
 
 
@@ -32,16 +35,28 @@ def read_journal(directories: Iterable[Path]) -> list[Event]:
     A set, so a line reached twice — the same journal read through two folders,
     or the phone re-uploading its whole history — counts once.
     """
-    events: set[Event] = set()
+    return sorted({event for events in read_journals(directories).values() for event in events})
+
+
+def read_journals(directories: Iterable[Path]) -> dict[str, list[Event]]:
+    """Each journal's events by the journal's file name, each in time order.
+
+    A machine uploads its whole file every time, in its own order, so a file is
+    the unit that arrives in time order — and the one a cursor can be kept
+    for. The same name reached through two folders is one journal; a line
+    twice in it counts once.
+    """
+    events: dict[str, set[Event]] = {}
     for directory in directories:
         if not directory.is_dir():
             continue
         for journal in sorted(directory.glob(JOURNAL_PATTERN)):
+            found = events.setdefault(journal.name, set())
             for line in journal.read_text(encoding="utf-8").splitlines():
                 event = _event(line)
                 if event is not None:
-                    events.add(event)
-    return sorted(events)
+                    found.add(event)
+    return {name: sorted(found) for name, found in sorted(events.items())}
 
 
 def _event(line: str) -> Event | None:

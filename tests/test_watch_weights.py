@@ -229,6 +229,43 @@ class TestFavorites(unittest.TestCase):
             self.assertNotIn("favorite", sidecar.read(sidecar.sidecar_path(upscale)))
         self.assertEqual(result.favorites_removed, 1)
 
+    def test_a_second_journal_s_older_favorite_lands_after_the_first_s_newer_one(self):
+        """Two machines upload two files into the one folder, and one of them
+        can arrive late: a laptop is quit from the front as often as not, so
+        its favorite made at ten can reach the folder after the phone's made
+        at twenty has already been applied."""
+        with _setting() as s:
+            _, upscale_a = s.sorted_clip("clip_a")
+            _, upscale_b = s.sorted_clip("clip_b")
+            s.journal((20, "favorite", "1_sorted/provider2/portrait/clip_b.mp4"))
+            watch_weights.run()
+            s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"), name="laptop.jsonl")
+
+            result = watch_weights.run()
+
+            self.assertEqual(set(favs_csv.favorite_videos(s.favs)), {upscale_a, upscale_b})
+        self.assertEqual(result.favorites_added, 1)
+
+    def test_the_cursor_a_single_journal_left_behind_speaks_for_the_phone_s_file_only(self):
+        """Before the laptop there was one journal and one time; that time was
+        reached through the phone's file alone, so it holds that file back and
+        no other."""
+        with _setting() as s:
+            _, upscale_a = s.sorted_clip("clip_a")
+            s.sorted_clip("clip_b")
+            s.cursor.parent.mkdir(parents=True, exist_ok=True)
+            s.cursor.write_text(json.dumps({"applied_through": 20}), encoding="utf-8")
+            s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_b.mp4"), name="warm-gun-journal.jsonl")
+            s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"), name="warm-gun-journal-mac.jsonl")
+
+            result = watch_weights.run()
+
+            self.assertEqual(favs_csv.favorite_videos(s.favs), [upscale_a])
+            self.assertEqual(json.loads(s.cursor.read_text(encoding="utf-8")), {
+                "applied_through": {"warm-gun-journal.jsonl": 20, "warm-gun-journal-mac.jsonl": 10},
+            })
+        self.assertEqual(result.favorites_added, 1)
+
     def test_a_phone_favorite_is_applied_once_so_fun_time_can_undo_it(self):
         with _setting() as s:
             _, upscale = s.sorted_clip("clip_a")

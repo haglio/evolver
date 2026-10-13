@@ -62,10 +62,11 @@ def run() -> WatchWeightsResult:
         log.warning("Watch weights and the phone's favorites left as they were: %s cannot be "
                     "reached.", outbox)
         return result
-    events = warm_gun.read_journal(config.WARM_GUN_JOURNAL_DIRS)
+    journals = warm_gun.read_journals(config.WARM_GUN_JOURNAL_DIRS)
+    events = sorted({event for found in journals.values() for event in found})
     videos = {event.path: warm_gun.library_video(event.path) for event in events}
     result.unmapped = sum(1 for event in events if videos[event.path] is None)
-    phone_favorites = _apply_phone_favorites(events, videos)
+    phone_favorites = _apply_phone_favorites(journals, videos)
     result.favorites_added = phone_favorites.added
     result.favorites_removed = phone_favorites.removed
     result.write_errors = phone_favorites.write_errors
@@ -113,36 +114,59 @@ def _phone_counts(
 
 
 def _apply_phone_favorites(
-    events: list[warm_gun.Event], videos: dict[str, Path | None]
+    journals: dict[str, list[warm_gun.Event]], videos: dict[str, Path | None]
 ) -> _PhoneFavorites:
+    """Each journal's favorites past that journal's own cursor.
+
+    One time per file, not one across them: each machine uploads its whole
+    file in its own time order, but the laptop's can reach the folder after
+    the phone's later lines have been applied, and one time across both would
+    skip its favorites for good.
+    """
     if not config.FUN_TIME_FAVS_FILE.parent.is_dir():
         log.info("Fun Time is not installed here; the phone's favorites wait.")
         return _PhoneFavorites()
-    cursor = read_dict(config.WARM_GUN_FAVORITES_CURSOR_FILE).get(_CURSOR_FIELD, -1)
-    applied_through = cursor
-    added = 0
-    removed = 0
-    write_errors = 0
-    for event in events:
-        if event.event not in _FAVORITE_EVENTS or event.t <= cursor:
-            continue
-        video = videos[event.path]
-        if video is not None and video.exists():
-            try:
-                if _FAVORITE_EVENTS[event.event]:
-                    added += favs_csv.add_favorite(config.FUN_TIME_FAVS_FILE, video)
-                else:
-                    removed += favs_csv.remove_favorite(config.FUN_TIME_FAVS_FILE, video)
-            except OSError:
-                log.exception("Could not write %s", config.FUN_TIME_FAVS_FILE)
-                write_errors += 1
+    cursors = _cursors()
+    applied = dict(cursors)
+    added = removed = write_errors = 0
+    for name, events in journals.items():
+        cursor = cursors.get(name, -1)
+        applied_through = cursor
+        for event in events:
+            if event.event not in _FAVORITE_EVENTS or event.t <= cursor:
+                continue
+            video = videos[event.path]
+            if video is not None and video.exists():
+                try:
+                    if _FAVORITE_EVENTS[event.event]:
+                        added += favs_csv.add_favorite(config.FUN_TIME_FAVS_FILE, video)
+                    else:
+                        removed += favs_csv.remove_favorite(config.FUN_TIME_FAVS_FILE, video)
+                except OSError:
+                    log.exception("Could not write %s", config.FUN_TIME_FAVS_FILE)
+                    write_errors += 1
+                    break
+            elif video is not None and warm_gun.played_video(event.path).exists():
+                log.info("Phone %s of %s waits for its upscale.", event.event, video)
                 break
-        elif video is not None and warm_gun.played_video(event.path).exists():
-            log.info("Phone %s of %s waits for its upscale.", event.event, video)
+            applied_through = event.t
+        if applied_through != cursor:
+            applied[name] = applied_through
+        if write_errors:
             break
-        applied_through = event.t
-    if applied_through != cursor:
-        write_whole(
-            config.WARM_GUN_FAVORITES_CURSOR_FILE, json.dumps({_CURSOR_FIELD: applied_through})
-        )
+    if applied != cursors:
+        write_whole(config.WARM_GUN_FAVORITES_CURSOR_FILE, json.dumps({_CURSOR_FIELD: applied}))
     return _PhoneFavorites(added, removed, write_errors)
+
+
+def _cursors() -> dict[str, int]:
+    """How far each journal's favorites have been applied, by file name. The
+    file used to hold one time for the one journal there was; that time was
+    reached through the phone's file alone, so it holds that file back and no
+    other."""
+    stored = read_dict(config.WARM_GUN_FAVORITES_CURSOR_FILE).get(_CURSOR_FIELD)
+    if isinstance(stored, dict):
+        return {name: int(t) for name, t in stored.items()}
+    if isinstance(stored, int | float) and not isinstance(stored, bool):
+        return {warm_gun.PHONE_JOURNAL: int(stored)}
+    return {}
