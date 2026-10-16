@@ -186,7 +186,7 @@ class TestTheAppKeepsTheWatch:
         app = build_evolver_app(request)
 
         with patch("gui.app.peer_watch.stand_evolver_down") as stand_down, \
-             patch("gui.app.restart.start_again_after"), patch.object(app, "_shutdown"):
+             patch("gui.app.production_update.start_again_after"), patch.object(app, "_shutdown"):
             app._restart()
 
         stand_down.assert_not_called()

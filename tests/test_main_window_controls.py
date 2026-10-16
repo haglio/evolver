@@ -692,14 +692,14 @@ class TestToolbarAppWiring:
         assert not app._scheduler.is_paused
 
     def test_the_restart_button_relaunches_the_app_and_quits_this_one(self, app):
-        with patch("gui.app.restart.start_again_after") as start_again, \
+        with patch("gui.app.production_update.start_again_after") as start_again, \
              patch.object(app, "_shutdown") as mock_quit:
             app._window.restart_action.trigger()
         start_again.assert_called_once()
         mock_quit.assert_called_once()
 
     def test_the_trays_restart_item_relaunches_too(self, app):
-        with patch("gui.app.restart.start_again_after") as start_again, \
+        with patch("gui.app.production_update.start_again_after") as start_again, \
              patch.object(app, "_shutdown") as mock_quit:
             app._tray.restart_action.trigger()
         start_again.assert_called_once()
