@@ -14,6 +14,7 @@ from app_support.launcher import assert_launchers_match_their_specs, dry_run
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRAY_LAUNCHER = REPO_ROOT / "launch_evolver.vbs"
 IF_NOT_RUNNING_LAUNCHER = REPO_ROOT / "launch_evolver_if_not_running.vbs"
+SHOWING_LAUNCHER = REPO_ROOT / "launch_evolver_showing_its_window.vbs"
 PREVIEW_LAUNCHER = REPO_ROOT / "launch_preview_branch.vbs"
 
 on_windows = pytest.mark.skipif(sys.platform != "win32", reason="the Windows script host")
@@ -22,6 +23,7 @@ on_windows = pytest.mark.skipif(sys.platform != "win32", reason="the Windows scr
 def test_the_launchers_are_where_their_callers_point():
     assert TRAY_LAUNCHER.is_file()
     assert IF_NOT_RUNNING_LAUNCHER.is_file()
+    assert SHOWING_LAUNCHER.is_file()
     assert PREVIEW_LAUNCHER.is_file()
 
 
@@ -48,6 +50,23 @@ def test_the_start_for_when_evolver_is_not_running_is_the_same_tray_saying_so():
     assert if_not_running.value("directory") == tray.value("directory")
     assert if_not_running.value("arguments") == f'{tray.value("arguments")} --if-not-running'
     assert if_not_running.values("log") == []
+
+
+@on_windows
+def test_a_restart_from_the_window_is_the_same_tray_showing_it():
+    tray, showing = dry_run(TRAY_LAUNCHER), dry_run(SHOWING_LAUNCHER)
+
+    assert showing.value("interpreter") == tray.value("interpreter")
+    assert showing.value("arguments") == f'{tray.value("arguments")} --show-window'
+
+
+@on_windows
+def test_every_launch_waits_out_an_update_of_this_checkout_and_brings_it_up_first():
+    for launcher in (TRAY_LAUNCHER, IF_NOT_RUNNING_LAUNCHER, SHOWING_LAUNCHER):
+        report = dry_run(launcher)
+
+        assert report.values("gate") == [str(REPO_ROOT / ".git" / "production-update.turn")]
+        assert "app_support.production_update --before-launch" in report.value("update")
 
 
 @on_windows
