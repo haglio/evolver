@@ -88,11 +88,14 @@ This repo is public at `github.com/haglio/evolver` with a merge-queue ruleset on
   into its venv yourself.** `main` advances only on origin (via the queue), and
   app_support's production updater brings the primary checkout and its venv up
   to it, the libraries it pins first, as soon as nothing of his runs from it.
-  Evolver runs in the tray all day, so that happens when it is next quit or
-  restarted: **Restart** in the tray menu or the main window's toolbar ends this
+  Evolver runs in the tray all day, so it restarts itself for an update the
+  updater is waiting to make (app_support's `UpdateWatch`, checked every minute)
+  at the first minute no run is going and none of its windows is open, the way
+  **Restart** in the tray menu or the main window's toolbar does: it ends this
   copy and starts the next through Evolver's launcher, which brings the checkout
-  up before Evolver comes back. So say a change reaches Evolver once it is
-  restarted, and worktrees update with `git rebase origin/main`.
+  up before Evolver comes back. So say a change reaches Evolver within minutes
+  of shipping, or once the run going ends or he closes its window, and
+  worktrees update with `git rebase origin/main`.
 - **A red required check** (`.github/workflows/merge-gate.yml`) can't land.
 
 Everything else in the global CLAUDE.md — work in a worktree, green tests before

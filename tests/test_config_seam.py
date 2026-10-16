@@ -67,7 +67,7 @@ CONFIG_REFERENCE_LEDGER = {
     # the queue window's door to it is, so the window layer names no path of its
     # own, and the pipeline's turn (util/run_lock.py), read where the run is.
     "evolver.py": 10,
-    "gui/app.py": 5,
+    "gui/app.py": 4,
     # What a branch session is and where it runs from -- named in the window
     # title, the taskbar identity and the launcher a preview's button re-runs --
     # and the usual Evolver it hands the work back to: that checkout's

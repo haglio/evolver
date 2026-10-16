@@ -41,6 +41,7 @@ log = logging.getLogger(__name__)
 
 # How long a preview whose time is up waits for the run in flight to end.
 _HAND_BACK_RETRY_MS = 60_000
+_UPDATE_CHECK_MS = 60_000
 
 _SHOW_WINDOW = "--show-window"
 # AllowSetForegroundWindow's ASFW_ANY: the copy that will want the foreground is
@@ -98,6 +99,7 @@ class EvolverApp:
         # Read once: what this process is was settled by the launcher that
         # started it, and every branch below has to give the same answer.
         self._branch_session = branch_session.is_one()
+        self._checkout = config.PROJECT_DIR
         self._name = branch_session.app_name()
         self._settings = EvolverSettings.load()
         self._stats_window: StatsWindow | None = None
@@ -174,6 +176,18 @@ class EvolverApp:
         self._runs.run_failed.connect(self._on_error)
         self._runs.run_overran.connect(self._on_overrun)
 
+        self._updates = production_update.UpdateWatch(
+            self._checkout, a_good_moment=self._a_good_moment_for_an_update,
+            start_again=self._restart, logger=log)
+        self._update_timer = QTimer()
+        self._update_timer.setInterval(_UPDATE_CHECK_MS)
+        self._update_timer.timeout.connect(lambda: self._updates.tick())
+
+    def _a_good_moment_for_an_update(self) -> bool:
+        on_screen = (self._window, self._stats_window, self._queue_window, self._log_window)
+        return not self._branch_session and not self._runs.is_running and not any(
+            window is not None and window.isVisible() for window in on_screen)
+
     def start(self) -> None:
         """Everything the app does to the machine, in the order it must happen.
 
@@ -202,6 +216,7 @@ class EvolverApp:
         self._presence.start()
         self._scheduler.start()
         self._peer_timer.start()
+        self._update_timer.start()
         self._peer.tick()
 
     def _hand_back_when_free(self):
@@ -433,7 +448,7 @@ class EvolverApp:
         # Its own process: a tool plays video, and a media backend that wedges
         # or crashes must not take the tray down with it.
         subprocess.Popen(
-            [sys.executable, str(config.PROJECT_DIR / script)],
+            [sys.executable, str(self._checkout / script)],
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
 
@@ -518,7 +533,7 @@ class EvolverApp:
         showing = self._window.isVisible()
         launcher = ("launch_preview_branch.vbs" if self._branch_session
                     else "launch_evolver_showing_its_window.vbs" if showing else "launch_evolver.vbs")
-        production_update.start_again_after(os.getpid(), config.PROJECT_DIR / launcher)
+        production_update.start_again_after(os.getpid(), self._checkout / launcher)
         if showing:
             ctypes.windll.user32.AllowSetForegroundWindow(_ANY_PROCESS)
         self._shutdown()
@@ -544,5 +559,6 @@ class EvolverApp:
         self._runs.wait_for_exit(5000)
         self._scheduler.stop()
         self._peer_timer.stop()
+        self._update_timer.stop()
         self._tray.hide()
         self._app.quit()
