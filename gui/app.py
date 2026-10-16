@@ -11,12 +11,13 @@ import time
 from datetime import datetime
 from functools import partial
 
+from app_support import production_update
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 import config
 import evolver
-from gui import branch_session, peer_watch, process_identity, restart, single_instance
+from gui import branch_session, peer_watch, process_identity, single_instance
 from gui.background import BackgroundQueue
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
@@ -517,7 +518,7 @@ class EvolverApp:
         showing = self._window.isVisible()
         launcher = ("launch_preview_branch.vbs" if self._branch_session
                     else "launch_evolver_showing_its_window.vbs" if showing else "launch_evolver.vbs")
-        restart.start_again_after(os.getpid(), config.PROJECT_DIR / launcher)
+        production_update.start_again_after(os.getpid(), config.PROJECT_DIR / launcher)
         if showing:
             ctypes.windll.user32.AllowSetForegroundWindow(_ANY_PROCESS)
         self._shutdown()

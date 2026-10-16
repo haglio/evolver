@@ -586,7 +586,7 @@ class TestRestart:
     def _restarted(self, request, *, window_visible=False, branch_session=False):
         app = build_evolver_app(request)
         app._branch_session = branch_session
-        with patch("gui.app.restart.start_again_after") as start_again, \
+        with patch("gui.app.production_update.start_again_after") as start_again, \
              patch.object(app, "_shutdown") as quit_this_copy, \
              patch.object(app._window, "isVisible", return_value=window_visible), \
              patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as allow:
