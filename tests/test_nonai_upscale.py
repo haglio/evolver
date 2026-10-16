@@ -177,6 +177,18 @@ class TestRunStartsAJob(unittest.TestCase):
             self.assertEqual(result.started, "")
             mocks["popen"].assert_not_called()
 
+    def test_a_drive_with_30_gb_free_still_defers_the_start_leaving_room_for_sends(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
+
+            stack, mocks = probes(free_bytes=30 * 1024 ** 3)
+            with override_config(**overrides), stack:
+                result = nonai_upscale.run(allow_start=True)
+
+            self.assertTrue(result.deferred_low_disk)
+            mocks["popen"].assert_not_called()
+
 
 class TestStartGuards(unittest.TestCase):
     """A new multi-hour encode only starts on a machine with headroom."""

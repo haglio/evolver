@@ -205,7 +205,7 @@ def run(allow_start: bool = True, stop: bool = False,
 
     Every file the stage touches is named at this boundary and resolved once;
     see :class:`StageFiles`. So is what one encode may cost the machine, which
-    is :class:`tasks.nonai_encode.EncodeSettings` -- six numbers this stage
+    is :class:`tasks.nonai_encode.EncodeSettings` -- seven numbers this stage
     used to reach for off ``config`` one at a time.
     """
     files = StageFiles.configured(
@@ -350,7 +350,7 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
         if stop and not on_request:
             return Supervision(
                 stopped=_stop_in_flight(job, "the non-AI upscale toggle is off", files))
-        if _is_low_disk():
+        if _is_low_disk(settings):
             # The floor was clear at start, but a 4K60 output plus whatever
             # else writes overnight can cross it mid-encode.
             return Supervision(
@@ -538,7 +538,7 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
 
 
 def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartAttempt:
-    if _is_low_disk():
+    if _is_low_disk(settings):
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
         return StartAttempt(deferred_low_disk=True)
     busy = _machine_busy_reason(files.cooldown, settings)
@@ -554,7 +554,7 @@ def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartA
 
 def _start_requested(request: nonai_job.Request, files: StageFiles,
                      settings: EncodeSettings, *, ai_waiting: bool) -> StartAttempt:
-    low_disk = _is_low_disk()
+    low_disk = _is_low_disk(settings)
     busy = LOW_DISK if low_disk else _machine_busy_reason(
         files.cooldown, settings, asked_for=True, ai_waiting=ai_waiting)
     if busy:
@@ -616,9 +616,8 @@ def _output_path(candidate: Candidate) -> Path:
     return done_dir / config.NONAI_PROCESSED_DIR_NAME / f"{stem}{config.NONAI_OUTPUT_SUFFIX}.mp4"
 
 
-def _is_low_disk() -> bool:
-    free_gb = system_resources.free_bytes(config.NON_AI_DIR) / (1024 ** 3)
-    return free_gb < config.LOW_DISK_WARNING_GB
+def _is_low_disk(settings: EncodeSettings) -> bool:
+    return system_resources.free_gb(config.NON_AI_DIR) < settings.min_free_disk_gb
 
 
 def _machine_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
