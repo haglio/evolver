@@ -62,11 +62,12 @@ def retire_evolver_app(app) -> None:
 
     Not ``_shutdown()``: that asks the real application to exit, which would take
     the suite's own QApplication with it. This undoes construction instead -- all
-    three timers, the session-end connection, the tray and the window.
+    its timers, the session-end connection, the tray and the window.
     """
     app._presence.stop()
     app._runs._watchdog.stop()
     app._peer_timer.stop()
+    app._update_timer.stop()
     app._scheduler.stop()
     try:
         app._app.commitDataRequest.disconnect(app._on_session_end)
