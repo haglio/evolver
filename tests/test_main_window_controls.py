@@ -692,19 +692,17 @@ class TestToolbarAppWiring:
         assert not app._scheduler.is_paused
 
     def test_the_restart_button_relaunches_the_app_and_quits_this_one(self, app):
-        with patch("gui.app.subprocess.Popen") as mock_popen, \
+        with patch("gui.app.restart.start_again_after") as start_again, \
              patch.object(app, "_shutdown") as mock_quit:
             app._window.restart_action.trigger()
-        argv = mock_popen.call_args.args[0]
-        assert any("tray_app.py" in str(part) for part in argv)
+        start_again.assert_called_once()
         mock_quit.assert_called_once()
 
     def test_the_trays_restart_item_relaunches_too(self, app):
-        with patch("gui.app.subprocess.Popen") as mock_popen, \
+        with patch("gui.app.restart.start_again_after") as start_again, \
              patch.object(app, "_shutdown") as mock_quit:
             app._tray.restart_action.trigger()
-        argv = mock_popen.call_args.args[0]
-        assert any("tray_app.py" in str(part) for part in argv)
+        start_again.assert_called_once()
         mock_quit.assert_called_once()
 
     def test_the_trays_open_item_shows_the_window(self, app):

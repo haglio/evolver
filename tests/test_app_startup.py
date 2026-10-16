@@ -1,7 +1,7 @@
 """Smoke test: verify the tray app can be constructed without crashing."""
 from __future__ import annotations
 
-import sys
+import os
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
@@ -579,69 +579,42 @@ class TestSessionManagement:
 
 
 class TestRestart:
-    """_restart() should spawn a new process and quit the current one."""
+    """Restart ends this copy and starts the next through Evolver's launcher once
+    this one has gone, so the production updater can bring the checkout up in
+    between: Evolver runs all day, and a restart is when a change reaches it."""
 
-    def test_restart_spawns_process_and_quits(self, request):
+    def _restarted(self, request, *, window_visible=False, branch_session=False):
         app = build_evolver_app(request)
-
-        with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_shutdown") as mock_quit:
+        app._branch_session = branch_session
+        with patch("gui.app.restart.start_again_after") as start_again, \
+             patch.object(app, "_shutdown") as quit_this_copy, \
+             patch.object(app._window, "isVisible", return_value=window_visible), \
+             patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as allow:
             app._restart()
-            mock_popen.assert_called_once()
-            mock_quit.assert_called_once()
+        return start_again, quit_this_copy, allow
 
-    def test_restart_launches_tray_app_on_this_interpreter(self, request):
-        app = build_evolver_app(request)
+    def test_the_next_copy_starts_through_the_launcher_after_this_one_has_quit(self, request):
+        start_again, quit_this_copy, _ = self._restarted(request)
 
-        with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_shutdown"):
-            app._restart()
-            args = mock_popen.call_args[0][0]
-            assert args[0] == sys.executable
-            assert args[1] == str(config.PROJECT_DIR / "tray_app.py")
+        start_again.assert_called_once_with(os.getpid(), config.PROJECT_DIR / "launch_evolver.vbs")
+        quit_this_copy.assert_called_once()
 
-    def test_restart_passes_show_window_when_window_visible(self, request):
-        app = build_evolver_app(request)
+    def test_a_restart_from_the_window_comes_back_showing_it(self, request):
+        start_again, _, allow = self._restarted(request, window_visible=True)
 
-        with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_shutdown"), \
-             patch.object(app._window, "isVisible", return_value=True), \
-             patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow"):
-            app._restart()
-            args = mock_popen.call_args[0][0]
-            assert "--show-window" in args
+        start_again.assert_called_once_with(
+            os.getpid(), config.PROJECT_DIR / "launch_evolver_showing_its_window.vbs")
+        allow.assert_called_once_with(-1)
 
-    def test_restart_omits_show_window_when_window_hidden(self, request):
-        app = build_evolver_app(request)
+    def test_a_restart_from_the_tray_leaves_the_foreground_alone(self, request):
+        _, _, allow = self._restarted(request)
 
-        with patch("gui.app.subprocess.Popen") as mock_popen, \
-             patch.object(app, "_shutdown"), \
-             patch.object(app._window, "isVisible", return_value=False):
-            app._restart()
-            args = mock_popen.call_args[0][0]
-            assert "--show-window" not in args
+        allow.assert_not_called()
 
-    def test_restart_grants_foreground_to_child_when_window_visible(self, request):
-        app = build_evolver_app(request)
+    def test_a_preview_restarts_as_the_preview_it_is(self, request):
+        start_again, _, _ = self._restarted(request, branch_session=True)
 
-        mock_proc = MagicMock()
-        mock_proc.pid = 12345
-        with patch("gui.app.subprocess.Popen", return_value=mock_proc), \
-             patch.object(app, "_shutdown"), \
-             patch.object(app._window, "isVisible", return_value=True), \
-             patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as mock_allow:
-            app._restart()
-            mock_allow.assert_called_once_with(12345)
-
-    def test_restart_skips_foreground_grant_when_window_hidden(self, request):
-        app = build_evolver_app(request)
-
-        with patch("gui.app.subprocess.Popen"), \
-             patch.object(app, "_shutdown"), \
-             patch.object(app._window, "isVisible", return_value=False), \
-             patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as mock_allow:
-            app._restart()
-            mock_allow.assert_not_called()
+        start_again.assert_called_once_with(os.getpid(), config.PROJECT_DIR / "launch_preview_branch.vbs")
 
 
 class TestALaunchThatFindsEvolverUp:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -15,7 +16,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 import config
 import evolver
-from gui import branch_session, peer_watch, process_identity, single_instance
+from gui import branch_session, peer_watch, process_identity, restart, single_instance
 from gui.background import BackgroundQueue
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
@@ -41,6 +42,9 @@ log = logging.getLogger(__name__)
 _HAND_BACK_RETRY_MS = 60_000
 
 _SHOW_WINDOW = "--show-window"
+# AllowSetForegroundWindow's ASFW_ANY: the copy that will want the foreground is
+# the launcher's grandchild, whose pid nothing here can know.
+_ANY_PROCESS = -1
 _IF_NOT_RUNNING = "--if-not-running"
 
 
@@ -510,16 +514,12 @@ class EvolverApp:
             self._quit_by_request()
 
     def _restart(self):
-        cmd = [sys.executable, str(config.PROJECT_DIR / "tray_app.py")]
-        show = self._window.isVisible()
-        if show:
-            cmd.append(_SHOW_WINDOW)
-        proc = subprocess.Popen(
-            cmd,
-            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
-        )
-        if show:
-            ctypes.windll.user32.AllowSetForegroundWindow(proc.pid)
+        showing = self._window.isVisible()
+        launcher = ("launch_preview_branch.vbs" if self._branch_session
+                    else "launch_evolver_showing_its_window.vbs" if showing else "launch_evolver.vbs")
+        restart.start_again_after(os.getpid(), config.PROJECT_DIR / launcher)
+        if showing:
+            ctypes.windll.user32.AllowSetForegroundWindow(_ANY_PROCESS)
         self._shutdown()
 
     def _quit_by_request(self):
