@@ -71,7 +71,7 @@ def run(
         (outbox_dir / orient).mkdir(parents=True, exist_ok=True)
     weird_dir.mkdir(parents=True, exist_ok=True)
     removed_partial_outputs = remove_partial_files(outbox_dir, logger=log)
-    if not _is_low_disk(outbox_dir, low_disk_floor_gb):
+    if system_resources.free_gb(outbox_dir) >= low_disk_floor_gb:
         _bring_back_the_low_disk_warning(low_disk_dismissed_file)
 
     log.info("=== Stage: upscale from 1_sorted ===")
@@ -108,7 +108,7 @@ def run(
             )
             break
 
-        if _is_low_disk(outbox_dir, low_disk_floor_gb):
+        if system_resources.free_gb(outbox_dir) < low_disk_floor_gb:
             result.deferred_low_disk = True
             result.pending_after_run = total_pending - result.processed - result.failed
             _show_low_disk_warning(outbox_dir, low_disk_floor_gb, low_disk_dismissed_file)
@@ -300,15 +300,10 @@ def _already_processed(source: str, fname: str, outbox_dir: Path, weird_dir: Pat
     return weird.exists() and weird.stat().st_size > 0
 
 
-def _is_low_disk(outbox_dir: Path, floor_gb: float) -> bool:
-    free_gb = system_resources.free_bytes(outbox_dir) / (1024 ** 3)
-    return free_gb < floor_gb
-
-
 def _show_low_disk_warning(outbox_dir: Path, floor_gb: float, dismissed: Path) -> None:
     if dismissed.exists():
         return
-    free_gb = system_resources.free_bytes(outbox_dir) / (1024 ** 3)
+    free_gb = system_resources.free_gb(outbox_dir)
     clicked_dismiss = show_error(
         "Evolver - Low Disk Space",
         (

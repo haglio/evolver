@@ -297,6 +297,21 @@ class TestTheLowDiskWarning(unittest.TestCase):
 
         self.assertIs(show_error.call_args.kwargs["dismissible"], True)
 
+    def test_a_drive_with_30_gb_free_still_upscales_a_send(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            touch_video(sorted_dir / "src" / "landscape" / "clip.mp4")
+
+            with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                 patch("tasks.upscale.system_resources.free_bytes", return_value=30 * 1024 ** 3), \
+                 patch("tasks.upscale.show_error") as show_error:
+                result = upscale.run(max_items=5, sorted_dir=sorted_dir, outbox_dir=out_dir,
+                                     weird_dir=weird_dir,
+                                     low_disk_dismissed_file=root / "state" / "dismissed")
+
+        self.assertEqual(result.processed, 1)
+        show_error.assert_not_called()
+
     def test_no_test_can_reach_the_dismissal_on_the_machine_running_the_suite(self):
         """Every upscale test with room on its drive clears the dismissal it sees."""
         self.assertFalse(

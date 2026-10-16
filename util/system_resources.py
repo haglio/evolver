@@ -59,6 +59,10 @@ def free_bytes(path: Path) -> int:
     return shutil.disk_usage(path).free
 
 
+def free_gb(path: Path) -> float:
+    return free_bytes(path) / (1024 ** 3)
+
+
 class _MemoryStatusEx(ctypes.Structure):
     _fields_ = [
         ("dwLength", ctypes.c_ulong),

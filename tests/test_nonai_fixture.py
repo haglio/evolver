@@ -64,7 +64,6 @@ LEFT_AMBIENT = {
     "FFMPEG": "the Topaz install; named into a command line the tests mock away, "
               "and compared by file name against a pid's image -- never opened",
     "FUNSCRIPT_EXTENSION": "not a place",
-    "LOW_DISK_WARNING_GB": "not a place",
     "NONAI_FALLBACK_DONE_DIR_NAME": "a folder name, resolved under NON_AI_DIR",
     "NONAI_OUTPUT_SUFFIX": "not a place",
     "NONAI_PROCESSED_DIR_NAME": "a folder name, resolved under NON_AI_DIR",

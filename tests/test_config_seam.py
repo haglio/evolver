@@ -116,7 +116,7 @@ CONFIG_REFERENCE_LEDGER = {
     # into tasks.nonai_encode.EncodeSettings -- which is where they belong:
     # how long an encode may run and how much of the machine it may take are
     # this app's policy, not anything the machine or the overlay says.
-    "tasks/nonai_upscale.py": 13,
+    "tasks/nonai_upscale.py": 12,
     # The 6th is the camera words a scraped action is cased by. They were a
     # literal in this module; they are library vocabulary, so they are the
     # overlay's now, and a stage reaches the overlay through config alone.

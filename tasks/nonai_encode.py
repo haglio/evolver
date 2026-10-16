@@ -43,11 +43,11 @@ _LOG_WARNINGS_AND_PROGRESS_ONLY = ("-loglevel", "warning", "-stats")
 class EncodeSettings:
     """What one unattended non-AI encode may cost the machine, and when.
 
-    Six numbers the stage used to reach for off ``config`` one at a time, so
+    Seven numbers the stage used to reach for off ``config`` one at a time, so
     its signature said nothing about what governed it and a test moving one
     patched a module attribute rather than passing a value. They are one record
     because they are one policy: how long an encode may run, how complete its
-    output has to be to be believed, how many tries a clip gets, and the two
+    output has to be to be believed, how many tries a clip gets, and the three
     conditions the machine has to meet before the next one starts.
     """
 
@@ -57,6 +57,7 @@ class EncodeSettings:
     # believed. Short of it, the encode is treated as having died partway.
     complete_duration_fraction: float = 0.98
     min_available_ram_gb: float = 8.0
+    min_free_disk_gb: float = 250.0
     cooldown_minutes: int = 30
     # Presence throttle: once the toggle is on, Evolver auto-manages the encode
     # by how long the user has been away from the keyboard/mouse. Below this

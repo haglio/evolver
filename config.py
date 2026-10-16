@@ -255,7 +255,7 @@ VIDEO_TYPE_BATCH_LIMIT = 400
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
 PIPELINE_WALL_TIMEOUT_SECONDS = UPSCALE_RUN_BUDGET_SECONDS + 3 * 60  # 11 min
-LOW_DISK_WARNING_GB = 250
+LOW_DISK_WARNING_GB = 25
 CPU_BUSY_SKIP_THRESHOLD_PCT = 65.0
 CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
 
@@ -301,10 +301,9 @@ NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays v
 # a redo under a newer recipe.
 NONAI_PIN_LIST = LIVE_DIR / ".nonai-upscale-next.txt"
 # What one non-AI encode may cost the machine and when is
-# tasks.nonai_encode.EncodeSettings, not here: those six numbers are this app's
+# tasks.nonai_encode.EncodeSettings, not here: those numbers are this app's
 # own policy, and what belongs in this file is what the machine and the overlay
-# say. LOW_DISK_WARNING_GB stays, because free space is the drive's fact and
-# the AI upscale stage reads the same floor.
+# say.
 # The GUI polls presence far more often than the 10-minute pipeline tick, so a
 # returning user parks the encode within seconds instead of minutes.
 NONAI_PRESENCE_POLL_SECONDS = 20.0
