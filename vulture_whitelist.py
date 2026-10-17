@@ -29,7 +29,6 @@ _.handle_data  # noqa: F821
 # -- Win32 ctypes struct fields (consumed by C API, not Python) --
 _.dwSize  # noqa: F821  — _PROCESSENTRY32W.dwSize (required by Process32FirstW)
 _.dwLength  # noqa: F821  — _MemoryStatusEx.dwLength (required by GlobalMemoryStatusEx)
-_.cbSize  # noqa: F821  — _LastInputInfo.cbSize (required by GetLastInputInfo)
 
 # -- Dataclass fields consumed via dataclasses.asdict() --
 _.stopped_at_budget  # noqa: F821  — UpscaleResult.stopped_at_budget, serialized to run records
