@@ -50,6 +50,14 @@ class TestVrVideoDir(unittest.TestCase):
         self.assertEqual(config.vr_video_dir({"vr_videos": "Q:/cloud/VR"}), Path("Q:/cloud/VR"))
 
 
+class TestOrigeneratorVideosDir(unittest.TestCase):
+    def test_is_the_folder_the_shared_settings_name(self):
+        self.assertEqual(config.origenerator_videos_dir({"origenerator_videos_dir": "L:/library/videos/made"}),
+                         Path("L:/library/videos/made"))
+
+    def test_is_none_while_the_shared_settings_name_none(self):
+        self.assertIsNone(config.origenerator_videos_dir({}))
+
 class TestTopazPaths(unittest.TestCase):
     """Where Topaz Video is installed, which decides whether either upscale
     stage can run at all: they drive its own ffmpeg build and no other."""

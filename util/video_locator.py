@@ -14,15 +14,15 @@ from util.variants import strip_processing_suffixes
 from util.weird_piles import weird_pile_dirs
 
 
-def build_index() -> dict[str, list[Path]]:
+def build_index(leave_out: tuple[Path, ...] = ()) -> dict[str, list[Path]]:
     """Index every video under the search root by lowercased filename."""
     index: dict[str, list[Path]] = defaultdict(list)
     root = config.VIDEO_SEARCH_ROOT
     if not root.is_dir():
         return index
-    piles = weird_pile_dirs()
+    left_out = (*weird_pile_dirs(), *leave_out)
     for video_path in library_videos(root):
-        if any(video_path.is_relative_to(pile) for pile in piles):
+        if any(video_path.is_relative_to(folder) for folder in left_out):
             continue
         index[video_path.name.lower()].append(video_path)
     return index

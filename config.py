@@ -104,6 +104,14 @@ VIDEO_SEARCH_ROOT = LIBRARY_ROOT / "videos"
 METADATA_DIR = LIBRARY_ROOT / "videos" / "metadata"
 
 
+def origenerator_videos_dir(settings: dict[str, Any]) -> Path | None:
+    named = settings.get("origenerator_videos_dir")
+    return Path(named) if named else None
+
+
+ORIGENERATOR_VIDEOS_DIR = origenerator_videos_dir(haglio_settings.load())
+
+
 def warm_gun_outbox(content: dict[str, Any]) -> Path | None:
     outbox = content.get("warm_gun_outbox")
     return Path(outbox) if outbox else None
