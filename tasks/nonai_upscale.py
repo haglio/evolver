@@ -39,6 +39,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.win32 import seconds_since_input
+
 import config
 from tasks import nonai_encode, nonai_progress, nonai_queue
 from tasks.nonai_encode import EncodeSettings
@@ -657,7 +659,7 @@ def _user_present(settings: EncodeSettings) -> bool:
     unattended encode is always safer than hogging a machine someone is using.
     """
     try:
-        idle = system_resources.seconds_since_last_input()
+        idle = seconds_since_input()
     except OSError:
         return True
     return idle < settings.user_idle_threshold_seconds

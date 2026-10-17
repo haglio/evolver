@@ -72,53 +72,8 @@ class TestAvailableRamConversion:
             system_resources.available_ram_gb()
 
 
-class TestSecondsSinceLastInputConversion:
-
-    def _patched_idle(self, monkeypatch, last_input_ticks, now_ticks):
-        monkeypatch.setattr(
-            system_resources.ctypes.windll.user32, "GetLastInputInfo",
-            _fills(dwTime=last_input_ticks),
-        )
-        monkeypatch.setattr(
-            system_resources.ctypes.windll.kernel32, "GetTickCount",
-            lambda: now_ticks,
-        )
-        return system_resources.seconds_since_last_input()
-
-    def test_tick_millis_come_back_as_seconds(self, monkeypatch):
-        assert self._patched_idle(monkeypatch, 1000, 31000) == 30.0
-
-    def test_the_49_day_tick_wrap_still_reads_as_a_short_idle(self, monkeypatch):
-        # Input landed just before GetTickCount wrapped; now is just after.
-        # Signed arithmetic would answer -49.7 days; the 32-bit difference
-        # answers the true 8.192 s.
-        assert self._patched_idle(monkeypatch, 0xFFFFF000, 4096) == pytest.approx(8.192)
-
-    def test_a_failing_call_raises_instead_of_reporting_idle(self, monkeypatch):
-        monkeypatch.setattr(
-            system_resources.ctypes.windll.user32, "GetLastInputInfo",
-            lambda ref: 0,
-        )
-        with pytest.raises(OSError):
-            system_resources.seconds_since_last_input()
-
-
 class TestAvailableRam(unittest.TestCase):
     def test_reports_a_plausible_available_amount(self):
         available = system_resources.available_ram_gb()
         self.assertGreater(available, 0.0)
         self.assertLess(available, 4096.0)
-
-
-class TestSecondsSinceLastInput(unittest.TestCase):
-    def test_the_idle_time_is_never_negative_and_never_weeks(self):
-        idle = system_resources.seconds_since_last_input()
-        self.assertIsInstance(idle, float)
-        self.assertGreaterEqual(idle, 0.0)
-        # A real session is never idle for weeks; a wildly large value would
-        # mean the GetTickCount wrap arithmetic went wrong.
-        self.assertLess(idle, 60 * 60 * 24 * 30)
-
-
-if __name__ == "__main__":
-    unittest.main()
