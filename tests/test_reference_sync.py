@@ -96,6 +96,19 @@ class TestGenaumacherSessions(unittest.TestCase):
             self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], str(renamed_to))
             self.assertEqual(result.relocated, 1)
 
+    def test_leaves_a_session_alone_while_the_only_video_of_its_name_is_one_origenerator_made(self):
+        with workspace_temp_dir() as temp:
+            made = temp / "videos" / "origenerator"
+            _write_video(made / "video" / "clip.mp4")
+            was_at = str(temp / "videos" / "2D" / "other" / "clip.mp4")
+            session = _write_json(temp / "sessions" / "Clip.json", {"video_path": was_at})
+
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
+                result = reference_sync.run(origenerator_videos=made)
+
+            self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], was_at)
+            self.assertEqual(result.relocated, 0)
+
     def test_leaves_a_session_alone_when_the_video_is_nowhere(self):
         with workspace_temp_dir() as temp:
             (temp / "videos").mkdir()

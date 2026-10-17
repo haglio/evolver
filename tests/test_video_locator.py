@@ -54,6 +54,15 @@ class TestRelocate(unittest.TestCase):
             self.assertIsNone(video_locator.relocate(temp / "gone" / "loop.mp4", index))
 
 
+    def test_leaves_a_reference_where_its_video_was_while_the_only_video_of_its_name_is_one_origenerator_made(self):
+        with workspace_temp_dir() as temp:
+            made = temp / "videos" / "origenerator"
+            _write_video(made / "video" / "clip.mp4")
+            with override_config(VIDEO_SEARCH_ROOT=temp / "videos"):
+                index = video_locator.build_index(leave_out=(made,))
+
+            self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
+
 class TestRenamedInPlace(unittest.TestCase):
     def test_finds_the_renamed_file_by_its_frame_fingerprint(self):
         with workspace_temp_dir() as temp:

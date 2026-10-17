@@ -63,13 +63,13 @@ class _Reconciled:
     refused: int = 0
 
 
-def run() -> ReferenceSyncResult:
+def run(*, origenerator_videos: Path | None = None) -> ReferenceSyncResult:
     result = ReferenceSyncResult()
     log.info("=== Stage: follow videos that moved ===")
 
     unreachable = [folder for folder in (config.VR_VIDEO_DIR, config.NONAI_RETIRED_ROOT)
                    if folder is not None and not reachable(folder)]
-    index = video_locator.build_index()
+    index = video_locator.build_index(leave_out=(origenerator_videos,) if origenerator_videos else ())
     for store in reference_stores.discover():
         reconciled = _reconcile(store, index, unreachable)
         result.checked += reconciled.checked

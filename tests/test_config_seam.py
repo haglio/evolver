@@ -66,7 +66,9 @@ CONFIG_REFERENCE_LEDGER = {
     # The 10th and 11th are the third shape again: the pin list, read where
     # the queue window's door to it is, so the window layer names no path of its
     # own, and the pipeline's turn (util/run_lock.py), read where the run is.
-    "evolver.py": 10,
+    # One more of the third shape: the folder Origenerator keeps the videos
+    # it made in, which the references stage leaves out of its search.
+    "evolver.py": 11,
     "gui/app.py": 4,
     # What a branch session is and where it runs from -- named in the window
     # title, the taskbar identity and the launcher a preview's button re-runs --
