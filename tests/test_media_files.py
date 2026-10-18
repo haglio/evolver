@@ -240,7 +240,7 @@ class TestRetryWhileInUse(unittest.TestCase):
                 raise _IN_USE
             return "moved"
 
-        with patch("util.media_files.time.sleep") as sleep:
+        with patch("app_support.file_channel.time.sleep") as sleep:
             self.assertEqual(retry_while_in_use(held_open_once), "moved")
 
         self.assertEqual(len(tries), 2)
@@ -254,7 +254,7 @@ class TestRetryWhileInUse(unittest.TestCase):
             if len(tries) < 10:
                 raise _IN_USE
 
-        with patch("util.media_files.time.sleep") as sleep:
+        with patch("app_support.file_channel.time.sleep") as sleep:
             retry_while_in_use(held_open_until_the_last_chance)
 
         self.assertEqual(len(tries), 10)
@@ -264,7 +264,7 @@ class TestRetryWhileInUse(unittest.TestCase):
         def always_held_open():
             raise _IN_USE
 
-        with patch("util.media_files.time.sleep"), self.assertRaises(PermissionError):
+        with patch("app_support.file_channel.time.sleep"), self.assertRaises(PermissionError):
             retry_while_in_use(always_held_open)
 
 

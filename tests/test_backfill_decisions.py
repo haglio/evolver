@@ -177,7 +177,7 @@ class TestDiscardAsWeird(unittest.TestCase):
 
             with override_config(WEIRD_DIR=weird_dir):
                 with patch.object(type(video), "replace", replace_locked_once), \
-                     patch("util.media_files.time.sleep") as sleep:
+                     patch("app_support.file_channel.time.sleep") as sleep:
                     destination = discard_as_weird(video)
 
             self.assertEqual(len(attempts), 2)
