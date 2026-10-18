@@ -11,10 +11,11 @@ from __future__ import annotations
 import logging
 import os
 import re
-import time
 import uuid
 from collections.abc import Callable
 from pathlib import Path
+
+from app_support.file_channel import retried_while_held
 
 import config
 
@@ -84,12 +85,7 @@ _IN_USE_WAIT_SECONDS = 0.2
 def retry_while_in_use[T](action: Callable[[], T]) -> T:
     # Windows refuses to move or delete a file a player still has open, and a
     # player told to let go of one closes it a moment later, on a thread of its own.
-    for _ in range(_IN_USE_TRIES - 1):
-        try:
-            return action()
-        except PermissionError:
-            time.sleep(_IN_USE_WAIT_SECONDS)
-    return action()
+    return retried_while_held(action, attempts=_IN_USE_TRIES, delay_s=_IN_USE_WAIT_SECONDS)
 
 
 def file_size(path: Path) -> int:
