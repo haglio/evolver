@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import sys
 
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QMessageBox
+from shared_ui.application import application
 
 import evolver
 from backfill.queue import BackfillQueue, ScannedClip, library_scan, unlabeled_clips
@@ -39,7 +40,11 @@ def _ready_thumbnails(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[s
 
 def main() -> int:
     evolver.setup_logging()
-    app = QApplication(sys.argv)
+    with application(sys.argv) as app:
+        return _label_the_unlabeled(app)
+
+
+def _label_the_unlabeled(app) -> int:
     process_identity.claim(app)
 
     # One walk of the library, one parse of each sidecar: the work queue and

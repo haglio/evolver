@@ -90,8 +90,8 @@ class EvolverApp:
     of the session.
     """
 
-    def __init__(self):
-        self._app = QApplication(sys.argv)
+    def __init__(self, app: QApplication):
+        self._app = app
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("Evolver")
         apply_accent(self._app)
