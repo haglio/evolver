@@ -5,6 +5,7 @@ import json
 import subprocess
 import unittest
 from dataclasses import replace
+from fractions import Fraction
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,6 +14,11 @@ from util import orientation, topaz
 
 _EXAMPLE = topaz.Recipe(name="example", version="v000",
                         filter_complex="the-filter", videoai_tag="the-tag")
+
+
+def _turned_to_an_example_video(recipe: topaz.Recipe, orient: str) -> topaz.Recipe:
+    """*recipe* turned to a video written at 112 fps by a model generating at 16."""
+    return topaz.framed(recipe, orient, video_fps=Fraction(112), generated_fps=Fraction(16))
 
 
 class TestCommand(unittest.TestCase):
@@ -33,7 +39,7 @@ class TestCommand(unittest.TestCase):
     def test_every_recipe_keeps_the_soundtrack(self):
         for recipe in topaz.RECIPES:
             with self.subTest(recipe=recipe.name):
-                runnable = topaz.framed(recipe, orientation.LANDSCAPE) if recipe.frame else recipe
+                runnable = _turned_to_an_example_video(recipe, orientation.LANDSCAPE)
                 self.assertNotIn("-an", topaz.command(Path("in.mp4"), Path("tmp.mp4"), runnable))
 
     def test_names_the_container_outright_since_the_file_it_writes_has_no_extension(self):
@@ -46,6 +52,46 @@ class TestCommand(unittest.TestCase):
             topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.NON_AI_UPSCALE)
 
 
+# The chain chosen by comparing versions side by side, as the trial ran it on a
+# video Origenerator generated at 16 fps and wrote at 112.
+_THE_TRIALS_CHAIN = (
+    "select='not(mod(n,7))',fps=16,"
+    "tvai_up=model=rxl-1:scale=4:estimate=20:preblur=-0.4:noise=0:details=0.7:halo=0:blur=0.8:"
+    "compression=0.8:blend=0:download=0:device=0:vram=1:instances=1,"
+    "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:download=0:device=0:vram=1:instances=1"
+)
+
+
+def _frames_given_to_topaz(**rates) -> str:
+    turned = topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orientation.PORTRAIT, **rates)
+    return turned.filter_complex[:turned.filter_complex.index(",tvai_up=")]
+
+
+class TestTheOrigeneratorRecipe(unittest.TestCase):
+    def test_a_video_written_at_seven_times_its_generated_rate_runs_the_trials_chain(self):
+        turned = topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orientation.PORTRAIT,
+                              video_fps=Fraction(112), generated_fps=Fraction(16))
+
+        self.assertEqual(turned.filter_complex, _THE_TRIALS_CHAIN)
+
+    def test_a_video_written_at_no_whole_multiple_of_its_generated_rate_keeps_every_frame(self):
+        self.assertEqual(_frames_given_to_topaz(video_fps=Fraction(24), generated_fps=Fraction(16)),
+                         "select='not(mod(n,1))',fps=24")
+
+    def test_a_video_whose_generated_rate_nothing_publishes_keeps_every_frame(self):
+        self.assertEqual(_frames_given_to_topaz(video_fps=Fraction(112), generated_fps=None),
+                         "select='not(mod(n,1))',fps=112")
+
+    def test_a_video_whose_own_rate_cannot_be_read_keeps_every_frame_at_that_rate(self):
+        self.assertEqual(_frames_given_to_topaz(video_fps=None, generated_fps=Fraction(16)),
+                         "select='not(mod(n,1))',fps=source_fps")
+
+    def test_is_refused_until_it_is_turned_to_the_video(self):
+        """Unturned, its filter would reach Topaz still asking for {every}."""
+        with self.assertRaises(ValueError):
+            topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.AI_UPSCALE_ORIGENERATOR)
+
+
 # Every version a recipe has shipped under, and a fingerprint of everything that
 # version runs Topaz with. A retune bumps the recipe's version in util/topaz.py
 # and adds a line here for the new one; it never edits a line already here,
@@ -56,6 +102,7 @@ SHIPPED = {
     ("non_ai_upscale", "v001"): "7abba8acb076bb73",
     ("ai_upscale", "v002"): "81093271ab54e32e",
     ("ai_upscale_t2v", "v002"): "aebaf14fdcf41a06",
+    ("ai_upscale_origenerator", "v001"): "f1d39dc7491ac14e",
 }
 
 
@@ -63,8 +110,7 @@ def _fingerprint(recipe: topaz.Recipe) -> str:
     """Every command a recipe runs -- one per orientation -- bar the two file
     paths and the path to Topaz itself, which are the machine's, not the recipe's."""
     argvs = [
-        topaz.command(Path("in"), Path("out"),
-                      topaz.framed(recipe, orient) if recipe.frame else recipe)[1:]
+        topaz.command(Path("in"), Path("out"), _turned_to_an_example_video(recipe, orient))[1:]
         for orient in orientation.SORTED
     ]
     return hashlib.sha256(json.dumps(argvs).encode("utf-8")).hexdigest()[:16]

@@ -18,9 +18,9 @@ from pathlib import Path
 
 import config
 from tasks import origenerator_metadata, withdrawn
-from util import lanes
+from util import lanes, origenerator_gallery
 
-CONTRACT = Path("origenerator") / "origenerator_gallery_contract.json"
+CONTRACT = Path("origenerator") / origenerator_gallery.PUBLISHED
 
 
 def _promise() -> dict | None:
@@ -43,7 +43,7 @@ class OrigeneratorGalleryContract(unittest.TestCase):
     def setUp(self):
         self.promise = _promise()
         if self.promise is None:
-            self.skipTest("no origenerator/origenerator_gallery_contract.json beside this checkout")
+            self.skipTest(f"no {CONTRACT.as_posix()} beside this checkout")
 
     def test_every_column_read_here_is_one_origenerator_promises(self):
         """A column this repo selects and that repo does not promise is a

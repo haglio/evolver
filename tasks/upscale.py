@@ -9,7 +9,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import orientation, provenance, sidecar, system_resources, topaz, video_type
+from util import (
+    ffprobe,
+    lanes,
+    orientation,
+    origenerator_gallery,
+    provenance,
+    sidecar,
+    system_resources,
+    topaz,
+    video_type,
+)
 from util.alert import show_error
 from util.media_files import (
     child_dirs,
@@ -42,11 +52,13 @@ def run(
     weird_dir: Path | None = None,
     low_disk_floor_gb: float | None = None,
     low_disk_dismissed_file: Path | None = None,
+    origenerator_dir: Path | None = None,
 ) -> UpscaleResult:
     """Upscale the pending sorted videos into the outbox, within one run's budget.
 
-    The three trees the stage spans, the free-space floor it stops at and the
-    file that remembers the low-disk warning was dismissed are arguments,
+    The three trees the stage spans, the free-space floor it stops at, the
+    file that remembers the low-disk warning was dismissed and the Origenerator
+    checkout that says the rate its videos are generated at are arguments,
     resolved here rather than in the signature: a default is evaluated at
     import, which would freeze the value past ``override_config``.
     """
@@ -59,6 +71,9 @@ def run(
     low_disk_dismissed_file = (
         config.LOW_DISK_WARNING_DISMISSED_FILE if low_disk_dismissed_file is None
         else low_disk_dismissed_file
+    )
+    origenerator_dir = (
+        config.ORIGENERATOR_PROJECT_DIR if origenerator_dir is None else origenerator_dir
     )
 
     result = UpscaleResult()
@@ -121,8 +136,7 @@ def run(
 
         log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
 
-        recipe = (topaz.AI_UPSCALE_T2V if _is_t2v_provider(source, orient, in_file.stem, outbox_dir)
-                  else topaz.AI_UPSCALE)
+        recipe = _recipe_for(in_file, source, orient, outbox_dir, origenerator_dir)
 
         ffmpeg_timeout = max(remaining_budget, 1) if run_budget_seconds else None
         ffmpeg_ok = False
@@ -247,6 +261,17 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, recipe: topaz.Recipe,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
         creationflags=subprocess.CREATE_NO_WINDOW,
     ).returncode == 0
+
+
+def _recipe_for(in_file: Path, source: str, orient: str, outbox_dir: Path,
+                origenerator_dir: Path) -> topaz.Recipe:
+    if source == lanes.ORIGENERATOR_SOURCE:
+        return topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orient,
+                            video_fps=ffprobe.frame_rate(in_file),
+                            generated_fps=origenerator_gallery.generated_fps(origenerator_dir))
+    if _is_t2v_provider(source, orient, in_file.stem, outbox_dir):
+        return topaz.AI_UPSCALE_T2V
+    return topaz.AI_UPSCALE
 
 
 def _record_the_upscale(out: Path, recipe: topaz.Recipe) -> None:

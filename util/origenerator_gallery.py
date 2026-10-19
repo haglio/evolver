@@ -12,15 +12,32 @@ builds a clip's sidecar from the row that made it, and ``tasks.withdrawn``
 deletes the clips whose send that gallery has taken back. The connection and the
 read are here rather than in either of them, because there was one of each and
 the second stage would have been a copy.
+
+The upscale stage reads one thing from the document Origenerator publishes
+beside the gallery: the rate its video models generate at, so that Topaz is
+given only the frames a model made.
 """
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterable
+from fractions import Fraction
 from pathlib import Path
 
 import config
+
+PUBLISHED = "origenerator_gallery_contract.json"
+
+
+def generated_fps(checkout: Path) -> Fraction | None:
+    try:
+        published = json.loads((checkout / PUBLISHED).read_text(encoding="utf-8"))
+        rate = Fraction(str(published["generated_fps"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return rate if rate > 0 else None
 
 
 def database(db_path=None) -> Path:

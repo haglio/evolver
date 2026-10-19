@@ -4,6 +4,7 @@ import dataclasses
 import json
 import subprocess
 import unittest
+from fractions import Fraction
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -16,7 +17,7 @@ from tests.temp_helpers import (
     workspace_temp_dir,
     write_sidecar,
 )
-from util import provenance, sidecar, topaz, video_type
+from util import lanes, origenerator_gallery, provenance, sidecar, topaz, video_type
 from util.media_files import partial_path
 
 
@@ -678,6 +679,46 @@ class TestRecipeSelection(unittest.TestCase):
             )
 
             self.assertEqual(encoded_with, [topaz.AI_UPSCALE])
+
+
+class TestOrigeneratorsVideos(unittest.TestCase):
+    def _upscale(self, root: Path, source: str):
+        """Upscale one 112 fps video sorted under *source*, beside an Origenerator
+        whose published document says its model generates at 16 fps."""
+        lib = LaneLibrary(root)
+        video = touch_video(lib.sorted_dir / source / "portrait" / "scene one.mp4")
+        origenerator = root / "origenerator"
+        origenerator.mkdir()
+        (origenerator / origenerator_gallery.PUBLISHED).write_text(
+            json.dumps({"generated_fps": 16.0}), encoding="utf-8")
+        encoded_with = []
+
+        def encode(_in_file, tmp, _env, recipe, **kwargs):
+            encoded_with.append(recipe)
+            tmp.write_bytes(b"upscaled")
+            return True
+
+        with lib.config(), \
+             patch("tasks.upscale._run_ffmpeg", side_effect=encode), \
+             patch("tasks.upscale.ffprobe.frame_rate", return_value=Fraction(112)) as probed, \
+             patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+            upscale.run(max_items=1, origenerator_dir=origenerator)
+        return video, encoded_with, probed
+
+    def test_take_the_recipe_chosen_for_them_given_only_the_frames_their_model_made(self):
+        with workspace_temp_dir() as root:
+            video, encoded_with, probed = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
+
+        self.assertEqual(encoded_with, [topaz.framed(
+            topaz.AI_UPSCALE_ORIGENERATOR, "portrait",
+            video_fps=Fraction(112), generated_fps=Fraction(16))])
+        probed.assert_called_once_with(video)
+
+    def test_sent_down_the_genau_lane_keep_the_recipe_they_had(self):
+        with workspace_temp_dir() as root:
+            _, encoded_with, _ = self._upscale(root, "example-loop-clips")
+
+        self.assertEqual(encoded_with, [topaz.AI_UPSCALE])
 
 
 class TestUpscaleResultSurface(unittest.TestCase):

@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import os
 import re
+import string
 import subprocess
 from dataclasses import dataclass, replace
+from fractions import Fraction
 from pathlib import Path
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
@@ -80,7 +82,23 @@ NON_AI_UPSCALE = Recipe(
     frame=(3840, 2160),
 )
 
-RECIPES = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE)
+# download=0: Topaz otherwise stops to fetch model files it does not need, which
+# on a slow connection has outlasted the stage's run budget.
+AI_UPSCALE_ORIGENERATOR = Recipe(
+    name="ai_upscale_origenerator",
+    version="v001",
+    filter_complex=(
+        "select='not(mod(n,{every}))',fps={kept_fps},"
+        "tvai_up=model=rxl-1:scale=4:estimate=20:preblur=-0.4:noise=0:details=0.7:halo=0:"
+        "blur=0.8:compression=0.8:blend=0:download=0:device=0:vram=1:instances=1,"
+        "tvai_fi=model=apo-8:slowmo=1:fps=60:rdt=0.01:download=0:device=0:vram=1:instances=1"
+    ),
+    videoai_tag=("Processed using rxl-1 for 4x upscale of the generated frames and apo-8 "
+                 "for 60 fps interpolation, keeping the soundtrack"),
+    keep_audio=True,
+)
+
+RECIPES = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE, AI_UPSCALE_ORIGENERATOR)
 
 RETIRED_RECIPES = (
     replace(AI_UPSCALE, version="v001", keep_audio=False,
@@ -114,13 +132,26 @@ def recipe_noted(note: str) -> Recipe | None:
                  if _CLOSING_PARENTHETICAL.sub("", recipe.videoai_tag) == said), None)
 
 
-def framed(recipe: Recipe, orient: str) -> Recipe:
-    """*recipe* with its frame turned to *orient*: wide for landscape, tall otherwise."""
-    long_edge, short_edge = recipe.frame
-    width, height = ((long_edge, short_edge) if orient == orientation.LANDSCAPE
-                     else (short_edge, long_edge))
-    return replace(recipe, frame=None,
-                   filter_complex=recipe.filter_complex.format(width=width, height=height))
+def framed(recipe: Recipe, orient: str, video_fps: Fraction | None = None,
+           generated_fps: Fraction | None = None) -> Recipe:
+    """*recipe* turned to the video it runs over: {width} and {height} wide for
+    landscape and tall otherwise, and {every} and {kept_fps} picking out the frames
+    a model generating at *generated_fps* made."""
+    every = _generated_frame_spacing(video_fps, generated_fps)
+    settled = {"every": every, "kept_fps": video_fps / every if video_fps else "source_fps"}
+    if recipe.frame is not None:
+        long_edge, short_edge = recipe.frame
+        settled["width"], settled["height"] = ((long_edge, short_edge)
+                                               if orient == orientation.LANDSCAPE
+                                               else (short_edge, long_edge))
+    return replace(recipe, filter_complex=recipe.filter_complex.format(**settled))
+
+
+def _generated_frame_spacing(video_fps: Fraction | None, generated_fps: Fraction | None) -> int:
+    """A video written at a whole multiple of the rate its model generated at holds
+    the generated frames that many apart; any other is kept whole."""
+    multiple = video_fps / generated_fps if video_fps and generated_fps else Fraction(1)
+    return multiple.numerator if multiple.denominator == 1 else 1
 
 
 def environment() -> dict:
@@ -134,8 +165,10 @@ def environment() -> dict:
 
 def command(in_file: Path, out_file: Path, recipe: Recipe) -> list[str]:
     """The full Topaz ffmpeg argv for one video."""
-    if recipe.frame is not None:
-        raise ValueError(f"{recipe.name} aims at a frame: turn it to the video with framed()")
+    left = [name for _, name, _, _ in string.Formatter().parse(recipe.filter_complex) if name]
+    if left:
+        raise ValueError(f"{recipe.name} still names {', '.join(left)}: "
+                         "turn it to the video with framed()")
     audio_args = ["-c:a", "aac", "-b:a", "192k"] if recipe.keep_audio else ["-an"]
     return [
         _ffmpeg(),
