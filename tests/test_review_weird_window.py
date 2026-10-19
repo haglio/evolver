@@ -130,6 +130,13 @@ class TestWatchingOne(_ReviewingALibrary):
 
         self.assertEqual((playing_first, _playing(window)), (first, second))
 
+    def test_a_video_plays_with_no_sound_output_at_all(self):
+        touch_video(self.lib.genau_weird / "loop_5_topaz.mp4")
+
+        window = self._window()
+
+        self.assertIsNone(window.player.audioOutput())
+
     def test_what_the_player_reads_out_of_a_video_is_kept_out_of_every_log(self):
         with patch("review_weird.window.silence_the_ffmpeg_format_dump") as silenced:
             self._window()
