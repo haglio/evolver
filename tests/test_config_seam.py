@@ -181,10 +181,11 @@ CONFIG_REFERENCE_LEDGER = {
     "util/script_library.py": 6,
     "util/media_files.py": 1,
     "util/nonai_library.py": 4,
-    # The two folders another app hands clips to this pipeline through, read
-    # here so the published document says where they are TODAY rather than
-    # where they were when somebody last wrote them out by hand.
-    "util/contract.py": 3,
+    # The two folders another app hands clips to this pipeline through, and the
+    # one holding every library video's record, read here so the published
+    # document says where they are TODAY rather than where they were when
+    # somebody last wrote them out by hand.
+    "util/contract.py": 4,
     # One fewer with the archive lookup gone (item 27's last piece), then one
     # more fewer: an archived original's sidecar and funscript keep the suffix
     # their mirrors gave them, rather than one looked up again.

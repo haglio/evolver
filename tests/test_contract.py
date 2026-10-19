@@ -15,6 +15,8 @@ import json
 import unittest
 from pathlib import Path
 
+from app_support.mirrored_tree import library_roots_beside, mirrored_path
+
 import config
 from tests.temp_helpers import workspace_temp_dir
 from util import contract, media_files, sidecar, video_type, watch
@@ -46,6 +48,16 @@ class PublishedDocument(unittest.TestCase):
              for name, value in document["library_relative"].items()},
             {"inbox_dir": config.INBOX_DIR,
              "upscaled_dir": config.OUT_UPSCALED_DIR},
+        )
+
+    def test_a_videos_record_is_where_the_mirrored_tree_puts_it_under_the_named_folder(self):
+        metadata = config.LIBRARY_ROOT / Path(_document()["library_record"]["folder"])
+        video = config.OUT_UPSCALED_DIR / "portrait" / "a-source" / "clip_topaz.mp4"
+
+        self.assertEqual(
+            mirrored_path(video, roots=library_roots_beside(metadata), mirror_root=metadata,
+                          suffix=".json"),
+            sidecar.sidecar_path(video),
         )
 
     def test_a_name_carrying_the_marker_is_one_this_repo_refuses_to_ingest(self):
