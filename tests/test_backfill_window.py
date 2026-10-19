@@ -291,12 +291,11 @@ class TestBackfillWindow(unittest.TestCase):
 
             self.assertFalse(window.tile_for("side beta").icon().isNull())
 
-    def test_the_clips_own_soundtrack_is_muted(self):
+    def test_the_clip_plays_with_no_sound_output_at_all(self):
         """The microphone is open the whole session; a clip's audio would be
-        one more thing for the recognizer to mishear. Unmuting survived the
-        whole suite before (audit probe 23)."""
+        one more thing for the recognizer to mishear."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
-        self.assertTrue(window._audio.isMuted())
+        self.assertIsNone(window._player.audioOutput())
 
     def test_the_clip_loops_until_a_decision_lands(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))

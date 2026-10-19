@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QSize, Qt, QUrl
 from PyQt6.QtGui import QIcon, QKeySequence, QPainter, QPixmap, QShortcut
-from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
+from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import (
     QFrame,
@@ -71,8 +71,8 @@ class BackfillWindow(QWidget):
     frame — passed in ready at construction, already cached — so the panel opens
     as a gallery with nothing to load.
 
-    Audio is muted: the microphone is open the whole time, and a clip's own
-    soundtrack would be one more thing for the recognizer to mishear.
+    The clip plays with no sound output: the microphone is open the whole time,
+    and a clip's own soundtrack would be one more thing for the recognizer to mishear.
     """
 
     def __init__(
@@ -106,10 +106,7 @@ class BackfillWindow(QWidget):
             self.set_thumbnail(label, path)
 
         silence_the_ffmpeg_format_dump()
-        self._audio = QAudioOutput()
-        self._audio.setMuted(True)
         self._player = QMediaPlayer()
-        self._player.setAudioOutput(self._audio)
         self._player.setVideoOutput(self._video)
         self._player.setLoops(QMediaPlayer.Loops.Infinite)
 

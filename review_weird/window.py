@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer, QUrl
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
+from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -59,10 +59,7 @@ class ReviewWeirdWindow(QWidget):
 
         screen = QVideoWidget()
         silence_the_ffmpeg_format_dump()
-        self._sound = QAudioOutput()
-        self._sound.setMuted(True)
         self.player = QMediaPlayer()
-        self.player.setAudioOutput(self._sound)
         self.player.setVideoOutput(screen)
         self.player.setLoops(QMediaPlayer.Loops.Infinite)
 
