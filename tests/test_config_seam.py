@@ -150,8 +150,10 @@ CONFIG_REFERENCE_LEDGER = {
     # four fewer: the two recipes it chooses between are util.topaz's, named and
     # versioned beside the settings they run with, not four loose strings here.
     # Then one more, the third shape: where a dismissed low-disk warning is
-    # remembered, read once in run() and handed to the two helpers.
-    "tasks/upscale.py": 13,
+    # remembered, read once in run() and handed to the two helpers. And one more
+    # of it: the Origenerator checkout whose published document says the rate its
+    # videos are generated at, read once in run() and handed to the recipe choice.
+    "tasks/upscale.py": 14,
     "tasks/video_types.py": 5,
     # The lane walk it used to do itself, and the stage that walks the lanes
     # after it to stamp the viewing on the same sidecars. The 10th is the third

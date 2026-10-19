@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import subprocess
 import unittest
+from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -19,6 +20,7 @@ from unittest.mock import patch
 from util.ffprobe import (
     duration_seconds,
     frame_fingerprint,
+    frame_rate,
     has_sound,
     orientation_of,
     video_dimensions,
@@ -60,6 +62,22 @@ class TestFrameFingerprint(unittest.TestCase):
         fake = _ffprobe_answering({"stream=r_frame_rate,nb_frames": "19001/317,N/A"})
         with patch("util.ffprobe.subprocess.run", side_effect=fake):
             self.assertIsNone(frame_fingerprint(Path("x.mkv")))
+
+
+class TestFrameRate(unittest.TestCase):
+    def test_the_first_video_streams_rate_is_read_exactly(self):
+        calls = []
+        fake = _ffprobe_answering({"stream=r_frame_rate": "30000/1001"}, calls)
+        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+            self.assertEqual(frame_rate(Path("x.mp4")), Fraction(30000, 1001))
+        self.assertEqual(_selectors(calls), ["stream=r_frame_rate"])
+        self.assertIn("-select_streams", calls[0])
+
+    def test_a_rate_ffprobe_cannot_read_is_unknown(self):
+        for said in ("", "N/A", "0/0"):
+            fake = _ffprobe_answering({"stream=r_frame_rate": said})
+            with self.subTest(said=said), patch("util.ffprobe.subprocess.run", side_effect=fake):
+                self.assertIsNone(frame_rate(Path("x.mp4")))
 
 
 class TestDurationSeconds(unittest.TestCase):

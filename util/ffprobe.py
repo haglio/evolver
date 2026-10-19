@@ -94,6 +94,10 @@ def frame_fingerprint(file: Path) -> tuple[float, int] | None:
     return float(rate), int(fields[1])
 
 
+def frame_rate(file: Path) -> Fraction | None:
+    return _rate(_probe(file, "stream=r_frame_rate"))
+
+
 def _rate(said: str) -> Fraction | None:
     try:
         return Fraction(said)
