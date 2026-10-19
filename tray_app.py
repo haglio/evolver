@@ -34,8 +34,11 @@ def main():
     atexit.register(crash_log.on_exit)
     # Late so that a Qt or dependency failure raises inside the __main__
     # try below, where report_startup_crash can put it on the screen.
+    from shared_ui.application import application  # noqa: PLC0415
+
     from gui.app import EvolverApp  # noqa: PLC0415
-    sys.exit(EvolverApp().run())
+    with application(sys.argv) as app:
+        sys.exit(EvolverApp(app).run())
 
 
 def report_startup_crash(detail: str) -> None:

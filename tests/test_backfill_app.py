@@ -19,11 +19,15 @@ import backfill_app
 from tests.product_sources import PROJECT_ROOT
 
 
+def _the_application_made(application):
+    return application.return_value.__enter__.return_value
+
+
 class TestMain(unittest.TestCase):
     def _patched(self, videos, **extra):
         patches = dict(
             setup_logging=patch("backfill_app.evolver.setup_logging"),
-            qapplication=patch("backfill_app.QApplication"),
+            application=patch("backfill_app.application"),
             claim=patch("backfill_app.process_identity.claim"),
             alert=patch("backfill_app.QMessageBox"),
             unlabeled=patch("backfill_app.unlabeled_clips", return_value=videos),
@@ -40,13 +44,13 @@ class TestMain(unittest.TestCase):
     def _run_main(self, videos=(Path("a_topaz.mp4"),)):
         with ExitStack() as stack:
             mocks = {name: stack.enter_context(p) for name, p in self._patched(list(videos)).items()}
-            mocks["qapplication"].return_value.exec.return_value = 0
+            _the_application_made(mocks["application"]).exec.return_value = 0
             backfill_app.main()
         return mocks
 
     def test_an_empty_queue_reports_and_exits_zero_without_a_window(self):
         patches = self._patched([])
-        with patches["setup_logging"], patches["qapplication"], patches["claim"], \
+        with patches["setup_logging"], patches["application"], patches["claim"], \
              patches["alert"] as alert, patches["unlabeled"], \
              patches["window"] as window:
             exit_code = backfill_app.main()
@@ -59,7 +63,7 @@ class TestMain(unittest.TestCase):
     def test_it_is_evolver_on_the_taskbar_before_it_shows_anything(self):
         patches = self._patched([])
         order = Mock()
-        with patches["setup_logging"], patches["qapplication"] as qapp, patches["claim"] as claim, \
+        with patches["setup_logging"], patches["application"] as application, patches["claim"] as claim, \
              patches["alert"] as alert, patches["unlabeled"], patches["window"], \
              patch("backfill_app.library_scan", return_value=[]):
             order.attach_mock(claim, "claim")
@@ -67,16 +71,16 @@ class TestMain(unittest.TestCase):
 
             backfill_app.main()
 
-        self.assertEqual(order.mock_calls[0], call.claim(qapp.return_value))
+        self.assertEqual(order.mock_calls[0], call.claim(_the_application_made(application)))
         self.assertEqual([name for name, _args, _kwargs in order.mock_calls], ["claim", "alert"])
 
     def test_a_session_stops_the_listener_and_worker_on_the_way_out(self):
         patches = self._patched([Path("a_topaz.mp4")])
-        with patches["setup_logging"], patches["qapplication"] as qapp, patches["claim"], \
+        with patches["setup_logging"], patches["application"] as application, patches["claim"], \
              patches["alert"], patches["unlabeled"], patches["thumbnails"], \
              patches["window"] as window, patches["listener"] as listener, \
              patches["worker"] as worker, patches["vocabulary"]:
-            qapp.return_value.exec.return_value = 0
+            _the_application_made(application).exec.return_value = 0
             exit_code = backfill_app.main()
 
         self.assertEqual(exit_code, 0)
@@ -97,11 +101,11 @@ class TestMain(unittest.TestCase):
         """The finally clause is what keeps a crashed session from leaving the
         microphone open and the worker thread alive."""
         patches = self._patched([Path("a_topaz.mp4")])
-        with patches["setup_logging"], patches["qapplication"] as qapp, patches["claim"], \
+        with patches["setup_logging"], patches["application"] as application, patches["claim"], \
              patches["alert"], patches["unlabeled"], patches["thumbnails"], \
              patches["window"], patches["listener"] as listener, \
              patches["worker"] as worker, patches["vocabulary"]:
-            qapp.return_value.exec.side_effect = RuntimeError("backend gone")
+            _the_application_made(application).exec.side_effect = RuntimeError("backend gone")
             with self.assertRaises(RuntimeError):
                 backfill_app.main()
 
@@ -160,7 +164,7 @@ class TestReadyThumbnails(unittest.TestCase):
         with no window on screen for twice as long as it needs to."""
         with patch("backfill_app.library_scan", return_value=[]) as scan, \
                 patch("backfill_app.unlabeled_clips", return_value=[]), \
-                patch("backfill_app.QApplication"), \
+                patch("backfill_app.application"), \
                 patch("backfill_app.process_identity.claim"), \
                 patch("backfill_app.QMessageBox"), \
                 patch("backfill_app.evolver.setup_logging"):

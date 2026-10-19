@@ -13,7 +13,6 @@ widgets down again; the heaviest object in the repo did not.
 from __future__ import annotations
 
 import os
-from unittest.mock import patch
 
 # Before the QApplication below: agents run this suite on every commit, on the
 # machine Evolver itself runs on, and a tray icon or a window appearing there is
@@ -46,10 +45,9 @@ def build_evolver_app(owner):
 
     ``owner`` is whatever can register the teardown: a ``unittest.TestCase`` or
     a pytest ``request`` fixture. Wrap any other patches the test needs around
-    the call; this owns only the QApplication substitution and the teardown.
+    the call; this owns only the teardown.
     """
-    with patch("gui.app.QApplication", return_value=QAPP):
-        app = EvolverApp()
+    app = EvolverApp(QAPP)
     if hasattr(owner, "addCleanup"):
         owner.addCleanup(retire_evolver_app, app)
     else:
