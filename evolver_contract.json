@@ -5,6 +5,7 @@
   },
   "partial_marker": ".partial.",
   "library_record": {
+    "folder": "videos/metadata",
     "blocks": {
       "video": {
         "fields": [

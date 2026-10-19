@@ -52,7 +52,8 @@ def declaration() -> dict:
     return {
         "library_relative": library_relative(),
         "partial_marker": PARTIAL_MARKER,
-        "library_record": library_records.declaration(),
+        "library_record": {"folder": _under_library(config.METADATA_DIR),
+                           **library_records.declaration()},
     }
 
 
