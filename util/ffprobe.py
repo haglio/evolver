@@ -9,6 +9,7 @@ in -- an escaping FileNotFoundError left it never appearing on screen.
 from __future__ import annotations
 
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 
 from util import orientation
@@ -87,9 +88,15 @@ def frame_fingerprint(file: Path) -> tuple[float, int] | None:
     fields = _probe(file, "stream=r_frame_rate,nb_frames").split(",")
     if len(fields) != 2:
         return None
-    numerator, _, denominator = fields[0].partition("/")
+    rate = _rate(fields[0])
+    if rate is None or not fields[1].isdigit():
+        return None
+    return float(rate), int(fields[1])
+
+
+def _rate(said: str) -> Fraction | None:
     try:
-        return int(numerator) / int(denominator or 1), int(fields[1])
+        return Fraction(said)
     except (ValueError, ZeroDivisionError):
         return None
 
