@@ -6,6 +6,7 @@ import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 import config
@@ -27,6 +28,7 @@ from util.media_files import (
     library_videos,
     partial_path,
     remove_partial_files,
+    retry_while_in_use,
 )
 from util.sidecar import sidecar_path, upscaled_video_path
 
@@ -159,12 +161,16 @@ def run(
         if ffmpeg_ok:
             if tmp.exists() and tmp.stat().st_size > 0:
                 try:
-                    tmp.replace(out)
+                    retry_while_in_use(partial(tmp.replace, out))
+                except OSError:
+                    result.failed += 1
+                    log.info("FAILED (a player still holds the upscale it replaces): %s", out)
+                else:
+                    result.processed += 1
+                    log.info("Wrote: %s", out)
+                    _record_the_upscale(out, recipe)
                 finally:
                     tmp.unlink(missing_ok=True)
-                result.processed += 1
-                log.info("Wrote: %s", out)
-                _record_the_upscale(out, recipe)
             else:
                 tmp.unlink(missing_ok=True)
                 result.failed += 1
@@ -212,14 +218,17 @@ def collect_candidates(
     weird_dir = config.WEIRD_DIR if weird_dir is None else weird_dir
 
     candidates: list[tuple[Path, str, str]] = []
+    remakes: list[tuple[Path, str, str]] = []
     seen: set[Path] = set()
 
     def add_candidate(in_file: Path, source: str, orient: str) -> bool:
         if in_file in seen or not in_file.exists():
             return False
         seen.add(in_file)
-        name = upscaled_video_path(source, orient, in_file.stem, outbox_dir).name
-        if _already_processed(source, name, outbox_dir, weird_dir):
+        out = upscaled_video_path(source, orient, in_file.stem, outbox_dir)
+        if _already_processed(source, out.name, outbox_dir, weird_dir):
+            if out.is_file() and _made_by_a_superseded_recipe(source, out):
+                remakes.append((in_file, source, orient))
             return False
         candidates.append((in_file, source, orient))
         return True
@@ -248,7 +257,8 @@ def collect_candidates(
                 if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
                     return candidates
 
-    return candidates
+    pending = candidates + remakes
+    return pending if limit is None else pending[:limit]
 
 
 def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, recipe: topaz.Recipe,
@@ -263,9 +273,25 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, recipe: topaz.Recipe,
     ).returncode == 0
 
 
+def _sent_by_origenerator(source: str) -> bool:
+    return source in {lane.source for lane in lanes.sent_lanes()}
+
+
+def _made_by_a_superseded_recipe(source: str, upscaled: Path) -> bool:
+    if not _sent_by_origenerator(source):
+        return False
+    try:
+        payload = sidecar.read(sidecar_path(upscaled))
+    except ValueError:
+        return False
+    made_by = provenance.stamps_of(payload).get(provenance.UPSCALE) or {}
+    current = topaz.AI_UPSCALE_ORIGENERATOR
+    return (made_by.get("recipe"), made_by.get("recipe_version")) != (current.name, current.version)
+
+
 def _recipe_for(in_file: Path, source: str, orient: str, outbox_dir: Path,
                 origenerator_dir: Path) -> topaz.Recipe:
-    if source == lanes.ORIGENERATOR_SOURCE:
+    if _sent_by_origenerator(source):
         return topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orient,
                             video_fps=ffprobe.frame_rate(in_file),
                             generated_fps=origenerator_gallery.generated_fps(origenerator_dir))
