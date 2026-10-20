@@ -19,6 +19,7 @@ from tests.temp_helpers import (
 )
 from util import lanes, origenerator_gallery, provenance, sidecar, topaz, video_type
 from util.media_files import partial_path
+from util.sidecar import upscaled_video_path
 
 
 def library_dirs(root):
@@ -714,9 +715,69 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             video_fps=Fraction(112), generated_fps=Fraction(16))])
         probed.assert_called_once_with(video)
 
-    def test_sent_down_the_genau_lane_keep_the_recipe_they_had(self):
+    def test_sent_down_the_genau_lane_take_the_same_recipe(self):
         with workspace_temp_dir() as root:
             _, encoded_with, _ = self._upscale(root, "example-loop-clips")
+
+        self.assertEqual(encoded_with, [topaz.framed(
+            topaz.AI_UPSCALE_ORIGENERATOR, "portrait",
+            video_fps=Fraction(112), generated_fps=Fraction(16))])
+
+    def _upscaled_before(self, lib: LaneLibrary, source: str, stem: str, recipe: topaz.Recipe) -> Path:
+        upscaled = touch_video(upscaled_video_path(source, "portrait", stem, lib.outbox))
+        stamp = provenance.reconstructed("evolver", recipe=recipe.name, recipe_version=recipe.version)
+        sidecar.update(sidecar.sidecar_path(upscaled),
+                       lambda current: provenance.recorded(current, provenance.UPSCALE, stamp))
+        return upscaled
+
+    def test_upscaled_by_an_earlier_recipe_are_upscaled_again_in_place(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                upscaled = self._upscaled_before(
+                    lib, lanes.ORIGENERATOR_SOURCE, "scene one", topaz.AI_UPSCALE)
+            _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
+
+            self.assertEqual([recipe.name for recipe in encoded_with],
+                             [topaz.AI_UPSCALE_ORIGENERATOR.name])
+            self.assertEqual(upscaled.read_bytes(), b"upscaled")
+
+    def test_never_upscaled_come_before_those_upscaled_again(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                self._upscaled_before(lib, lanes.ORIGENERATOR_SOURCE, "a scene", topaz.AI_UPSCALE)
+                touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "a scene.mp4")
+                fresh = touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "b scene.mp4")
+
+                self.assertEqual(upscale.collect_candidates(limit=1),
+                                 [(fresh, lanes.ORIGENERATOR_SOURCE, "portrait")])
+
+    def test_one_a_player_holds_keeps_its_old_upscale_until_a_later_run(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                upscaled = self._upscaled_before(
+                    lib, lanes.ORIGENERATOR_SOURCE, "scene one", topaz.AI_UPSCALE)
+            with patch("tasks.upscale.retry_while_in_use", side_effect=PermissionError):
+                self._upscale(root, lanes.ORIGENERATOR_SOURCE)
+
+            self.assertEqual(upscaled.read_bytes(), b"video")
+            self.assertEqual(sorted(p.name for p in upscaled.parent.iterdir()), [upscaled.name])
+
+    def test_upscaled_by_the_current_recipe_are_left_alone(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                self._upscaled_before(
+                    lib, lanes.ORIGENERATOR_SOURCE, "scene one", topaz.AI_UPSCALE_ORIGENERATOR)
+            _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
+
+        self.assertEqual(encoded_with, [])
+
+    def test_from_any_other_source_keep_the_recipe_they_had(self):
+        with workspace_temp_dir() as root:
+            _, encoded_with, _ = self._upscale(root, "example-provider-two")
 
         self.assertEqual(encoded_with, [topaz.AI_UPSCALE])
 
