@@ -23,8 +23,8 @@ from util import lanes, origenerator_gallery
 CONTRACT = Path("origenerator") / origenerator_gallery.PUBLISHED
 
 
-def _promise() -> dict | None:
-    """Origenerator's published document, or ``None`` where it is not beside this.
+def _origenerator_beside_this() -> Path | None:
+    """The Origenerator checkout publishing its document beside this one, or ``None``.
 
     Walked up from here rather than resolved through the content overlay: the
     overlay is git-ignored, so a worktree -- which is where every suite runs --
@@ -33,17 +33,18 @@ def _promise() -> dict | None:
     clone alike.
     """
     for parent in Path(__file__).resolve().parents:
-        published = parent / CONTRACT
-        if published.is_file():
-            return json.loads(published.read_text(encoding="utf-8"))
+        if (parent / CONTRACT).is_file():
+            return parent / CONTRACT.parent
     return None
 
 
 class OrigeneratorGalleryContract(unittest.TestCase):
     def setUp(self):
-        self.promise = _promise()
-        if self.promise is None:
+        self.origenerator = _origenerator_beside_this()
+        if self.origenerator is None:
             self.skipTest(f"no {CONTRACT.as_posix()} beside this checkout")
+        self.promise = json.loads(
+            (self.origenerator / origenerator_gallery.PUBLISHED).read_text(encoding="utf-8"))
 
     def test_every_column_read_here_is_one_origenerator_promises(self):
         """A column this repo selects and that repo does not promise is a
@@ -74,6 +75,9 @@ class OrigeneratorGalleryContract(unittest.TestCase):
         """A run's model is named under one of these inside ``params_json``."""
         self.assertEqual(list(origenerator_metadata.MODEL_KEYS),
                          self.promise["params_model_keys"])
+
+    def test_the_rate_its_videos_are_generated_at_is_read_where_origenerator_publishes_it(self):
+        self.assertIsNotNone(origenerator_gallery.generated_fps(self.origenerator))
 
     def test_the_database_is_where_origenerator_says_it_keeps_it(self):
         """This repo resolves that checkout through its own overlay, so what has
