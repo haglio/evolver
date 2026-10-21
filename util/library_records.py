@@ -19,18 +19,21 @@ reader may still take it, but it can move without warning.
 """
 from __future__ import annotations
 
+from shared_ui.orientation import ORIENTATIONS
+
 from util import video_type, watch
 from util.sidecar import WRONG_ACTION_FIELD
 
 #: The block holding what a video is and what it was made from.
 VIDEO_BLOCK = video_type.BLOCK
 
-#: Inside it: the kind of video (:data:`VIDEO_KINDS`), its running time, the act
-#: it depicts, and -- written by Fun Time rather than here -- the act a viewer
-#: struck out as wrong, which is what tells the backfill tool this clip was
-#: REJECTED rather than never labeled.
+#: Inside it: the kind of video (:data:`VIDEO_KINDS`), its running time, whether
+#: it is portrait or landscape, the act it depicts, and -- written by Fun Time
+#: rather than here -- the act a viewer struck out as wrong, which is what tells
+#: the backfill tool this clip was REJECTED rather than never labeled.
 VIDEO_TYPE_FIELD = video_type.FIELD
 VIDEO_DURATION_FIELD = video_type.DURATION_FIELD
+VIDEO_ORIENTATION_FIELD = video_type.ORIENTATION_FIELD
 VIDEO_ACTION_FIELD = "action"
 VIDEO_WRONG_ACTION_FIELD = WRONG_ACTION_FIELD
 
@@ -84,6 +87,7 @@ def declaration() -> dict:
                 "fields": [
                     VIDEO_TYPE_FIELD,
                     VIDEO_DURATION_FIELD,
+                    VIDEO_ORIENTATION_FIELD,
                     VIDEO_ACTION_FIELD,
                     VIDEO_WRONG_ACTION_FIELD,
                     *VIDEO_GENERATION_FIELDS,
@@ -99,4 +103,5 @@ def declaration() -> dict:
         },
         "top_level_keys": [TITLE_KEY, FAVORITE_KEY],
         "video_kinds": list(VIDEO_KINDS),
+        "video_orientations": list(ORIENTATIONS),
     }

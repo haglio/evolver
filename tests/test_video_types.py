@@ -6,7 +6,7 @@ from pathlib import Path
 
 from tasks import video_types
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
-from util import sidecar, video_type
+from util import orientation, sidecar, video_type
 
 # Fabricated: the real folder name is library vocabulary and lives in the
 # overlay, so a test names its own and overrides the config with it.
@@ -16,6 +16,14 @@ GENAU_SOURCE = "example-loop-clips"
 def _probe(durations: dict[str, float]):
     """A stand-in ffprobe answering by stem, so a test says what it means."""
     return lambda video: durations.get(video.stem)
+
+
+def _orientations(by_stem: dict[str, str]):
+    return lambda video: by_stem.get(video.stem, orientation.UNKNOWN)
+
+
+def _orientation_unknown(_video):
+    return orientation.UNKNOWN
 
 
 class TestAiLane(unittest.TestCase):
@@ -29,7 +37,8 @@ class TestAiLane(unittest.TestCase):
                 )
                 write_sidecar(path, {"video": {"prompt": "a prompt"}})
 
-                result = video_types.run(probe=_probe({video.stem: 5.0}))
+                result = video_types.run(probe=_probe({video.stem: 5.0}),
+                                         orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
             self.assertEqual(video_type.type_of(payload), video_type.SHORT)
@@ -56,7 +65,8 @@ class TestAiLane(unittest.TestCase):
                     write_sidecar(path, {"video": {"wrong_action": "Alpha"}})
                     return 5.0
 
-                video_types.run(probe=measure_while_a_viewer_rejects)
+                video_types.run(probe=measure_while_a_viewer_rejects,
+                                orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
             self.assertEqual(payload["video"]["wrong_action"], "Alpha")
@@ -72,7 +82,8 @@ class TestAiLane(unittest.TestCase):
                     lib.outbox / "landscape" / "provider2" / "clip_b_topaz.mp4"
                 )
 
-                video_types.run(probe=_probe({video.stem: 240.0}))
+                video_types.run(probe=_probe({video.stem: 240.0}),
+                                orientation_probe=_orientation_unknown)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(path)), video_type.FULL_LENGTH
@@ -89,7 +100,7 @@ class TestAiLane(unittest.TestCase):
                     lib.outbox / "portrait" / GENAU_SOURCE / "loop_1_topaz.mp4"
                 )
 
-                video_types.run(probe=_unmeasurable)
+                video_types.run(probe=_unmeasurable, orientation_probe=_orientation_unknown)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(path)), video_type.GENAU_FLICK
@@ -103,7 +114,8 @@ class TestGenauLane(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 clip = touch_video(lib.genau_flicks / "loop_2_topaz.mp4")
 
-                result = video_types.run(probe=_unmeasurable)
+                result = video_types.run(probe=_unmeasurable,
+                                         orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
             self.assertEqual(video_type.type_of(payload), video_type.GENAU_FLICK)
@@ -122,7 +134,7 @@ class TestNonAiLane(unittest.TestCase):
                 path = sidecar.sidecar_path(video)
                 write_sidecar(path, {"clip": {"index": 2, "count": 9}})
 
-                video_types.run(probe=_unmeasurable)
+                video_types.run(probe=_unmeasurable, orientation_probe=_orientation_unknown)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(path)), video_type.EXCERPT
@@ -134,7 +146,8 @@ class TestNonAiLane(unittest.TestCase):
             with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 video = touch_video(self._bucket(lib) / "excerpts" / "0 unsorted" / "Ada-Roe-7.mp4")
 
-                video_types.run(probe=_probe({video.stem: 900.0}))
+                video_types.run(probe=_probe({video.stem: 900.0}),
+                                orientation_probe=_orientation_unknown)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
@@ -147,7 +160,8 @@ class TestNonAiLane(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 video = touch_video(self._bucket(lib) / "3_good_to_go" / "Jane-Doe-scene-1.mp4")
 
-                video_types.run(probe=_probe({video.stem: 1800.0}))
+                video_types.run(probe=_probe({video.stem: 1800.0}),
+                                orientation_probe=_orientation_unknown)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
@@ -164,10 +178,11 @@ class TestRunningItAgain(unittest.TestCase):
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_c_topaz.mp4"
                 )
-                write_sidecar(path, video_type.timed(
-                    video_type.stamped({}, video_type.FULL_LENGTH), 240.0))
+                write_sidecar(path, video_type.oriented(video_type.timed(
+                    video_type.stamped({}, video_type.FULL_LENGTH), 240.0), orientation.PORTRAIT))
 
-                result = video_types.run(probe=_refuses_to_be_called)
+                result = video_types.run(probe=_refuses_to_be_called,
+                                         orientation_probe=_refuses_to_be_called)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(path)), video_type.FULL_LENGTH
@@ -187,8 +202,10 @@ class TestRunningItAgain(unittest.TestCase):
                 )
                 write_sidecar(path, video_type.stamped({}, video_type.FULL_LENGTH))
 
-                first = video_types.run(probe=_probe({"clip_i": 240.0}))
-                again = video_types.run(probe=_refuses_to_be_called)
+                first = video_types.run(probe=_probe({"clip_i": 240.0}),
+                                        orientation_probe=_orientation_unknown)
+                again = video_types.run(probe=_refuses_to_be_called,
+                                        orientation_probe=_refuses_to_be_called)
 
                 self.assertEqual(video_type.duration_of(sidecar.read(path)), 240.0)
             self.assertEqual((first.recorded, again.already), (1, 1))
@@ -199,8 +216,10 @@ class TestRunningItAgain(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 video = touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_d.mp4")
 
-                video_types.run(probe=_probe({video.stem: 6.0}))
-                again = video_types.run(probe=_refuses_to_be_called)
+                video_types.run(probe=_probe({video.stem: 6.0}),
+                                orientation_probe=_orientation_unknown)
+                again = video_types.run(probe=_refuses_to_be_called,
+                                        orientation_probe=_refuses_to_be_called)
 
             self.assertEqual((again.recorded, again.already), (0, 1))
 
@@ -223,7 +242,8 @@ class TestKeepingTheRunningTime(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-4.mp4")
 
-                video_types.run(probe=_probe({video.stem: 1800.0}))
+                video_types.run(probe=_probe({video.stem: 1800.0}),
+                                orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(sidecar.sidecar_path(video))
             self.assertEqual(video_type.duration_of(payload), 1800.0)
@@ -239,7 +259,8 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                 path = sidecar.sidecar_path(video)
                 write_sidecar(path, {"clip": {"index": 5, "count": 9}})
 
-                video_types.run(probe=_probe({video.stem: 240.0}))
+                video_types.run(probe=_probe({video.stem: 240.0}),
+                                orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
             self.assertEqual(video_type.type_of(payload), video_type.EXCERPT)
@@ -254,7 +275,8 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                     touch_video(lib.genau_flicks / f"loop_{index}_topaz.mp4")
                 measured = []
 
-                video_types.run(probe=lambda video: measured.append(video) or 4.0)
+                video_types.run(probe=lambda video: measured.append(video) or 4.0,
+                                orientation_probe=_orientation_unknown)
 
             self.assertEqual(len(measured), 1)
 
@@ -264,12 +286,125 @@ class TestKeepingTheRunningTime(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 clip = touch_video(lib.genau_flicks / "loop_4_topaz.mp4")
 
-                result = video_types.run(probe=_unmeasurable)
+                result = video_types.run(probe=_unmeasurable,
+                                         orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
             self.assertEqual(video_type.type_of(payload), video_type.GENAU_FLICK)
             self.assertIsNone(video_type.duration_of(payload))
             self.assertEqual((result.recorded, result.skipped), (1, 0))
+
+
+class TestRecordingTheOrientation(unittest.TestCase):
+    def test_a_scene_s_orientation_is_measured_and_lands_beside_its_kind(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-6.mp4")
+
+                video_types.run(
+                    probe=_probe({video.stem: 1800.0}),
+                    orientation_probe=_orientations({video.stem: orientation.PORTRAIT}))
+
+                payload = sidecar.read(sidecar.sidecar_path(video))
+            self.assertEqual(video_type.orientation_of(payload), orientation.PORTRAIT)
+            self.assertEqual(video_type.type_of(payload), video_type.FULL_LENGTH)
+
+    def test_a_genau_flick_s_orientation_is_measured_too(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                flick = touch_video(lib.genau_flicks / "loop_5_topaz.mp4")
+
+                video_types.run(
+                    probe=_probe({flick.stem: 4.0}),
+                    orientation_probe=_orientations({flick.stem: orientation.LANDSCAPE}))
+
+                payload = sidecar.read(sidecar.sidecar_path(flick))
+            self.assertEqual(video_type.orientation_of(payload), orientation.LANDSCAPE)
+
+    def test_a_generated_clip_s_orientation_is_the_folder_it_was_sorted_into(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.sorted_dir / "provider2" / "landscape" / "clip_j.mp4")
+                path = sidecar.sidecar_path(
+                    lib.outbox / "landscape" / "provider2" / "clip_j_topaz.mp4"
+                )
+
+                video_types.run(probe=_probe({video.stem: 5.0}),
+                                orientation_probe=_refuses_to_be_called)
+
+                self.assertEqual(
+                    video_type.orientation_of(sidecar.read(path)), orientation.LANDSCAPE
+                )
+
+    def test_a_generated_clip_s_orientation_costs_no_measurement(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE, VIDEO_TYPE_BATCH_LIMIT=0):
+                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_k.mp4")
+                path = sidecar.sidecar_path(
+                    lib.outbox / "portrait" / "provider2" / "clip_k_topaz.mp4"
+                )
+                write_sidecar(path, video_type.timed(
+                    video_type.stamped({}, video_type.SHORT), 5.0))
+
+                result = video_types.run(probe=_refuses_to_be_called,
+                                         orientation_probe=_refuses_to_be_called)
+
+                self.assertEqual(
+                    video_type.orientation_of(sidecar.read(path)), orientation.PORTRAIT
+                )
+            self.assertEqual(result.recorded, 1)
+
+    def test_an_orientation_is_measured_once(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-7.mp4")
+
+                video_types.run(
+                    probe=_probe({video.stem: 1800.0}),
+                    orientation_probe=_orientations({video.stem: orientation.LANDSCAPE}))
+                again = video_types.run(probe=_refuses_to_be_called,
+                                        orientation_probe=_refuses_to_be_called)
+
+            self.assertEqual((again.recorded, again.already), (0, 1))
+
+    def test_a_video_whose_orientation_nothing_could_tell_waits_for_a_run_that_can(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-8.mp4")
+                path = sidecar.sidecar_path(video)
+
+                video_types.run(probe=_probe({video.stem: 1800.0}),
+                                orientation_probe=_orientation_unknown)
+                unmeasured = video_type.orientation_of(sidecar.read(path))
+                video_types.run(
+                    probe=_refuses_to_be_called,
+                    orientation_probe=_orientations({video.stem: orientation.PORTRAIT}))
+
+                measured = video_type.orientation_of(sidecar.read(path))
+            self.assertEqual((unmeasured, measured), ("", orientation.PORTRAIT))
+
+    def test_measuring_an_orientation_counts_against_the_batch_limit(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE, VIDEO_TYPE_BATCH_LIMIT=1):
+                for index in range(3):
+                    video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / f"scene-{index}.mp4")
+                    write_sidecar(sidecar.sidecar_path(video), video_type.timed(
+                        video_type.stamped({}, video_type.FULL_LENGTH), 1800.0))
+                measured = []
+
+                result = video_types.run(
+                    probe=_refuses_to_be_called,
+                    orientation_probe=lambda video: measured.append(video) or orientation.PORTRAIT)
+
+            self.assertEqual(len(measured), 1)
+            self.assertEqual((result.recorded, result.deferred), (1, 2))
 
 
 class TestWhatItRefusesToGuess(unittest.TestCase):
@@ -282,7 +417,8 @@ class TestWhatItRefusesToGuess(unittest.TestCase):
                     lib.outbox / "portrait" / "provider2" / "clip_e_topaz.mp4"
                 )
 
-                result = video_types.run(probe=_unmeasurable)
+                result = video_types.run(probe=_unmeasurable,
+                                         orientation_probe=_orientation_unknown)
 
                 self.assertEqual(video_type.type_of(sidecar.read(path)), "")
             self.assertEqual((result.recorded, result.skipped), (0, 1))
@@ -295,7 +431,8 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
             with lib.config():
                 video = touch_video(lib.non_ai / "loose" / "landscape" / "clip_f_topaz.mp4")
 
-                video_types.run(probe=_probe({video.stem: 4.0}))
+                video_types.run(probe=_probe({video.stem: 4.0}),
+                                orientation_probe=_orientation_unknown)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
@@ -318,9 +455,12 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
                     touch_video(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
                 measured = []
 
-                first = video_types.run(probe=lambda video: measured.append(video) or 4.0)
-                second = video_types.run(probe=lambda video: measured.append(video) or 4.0)
-                third = video_types.run(probe=lambda video: measured.append(video) or 4.0)
+                first = video_types.run(probe=lambda video: measured.append(video) or 4.0,
+                                        orientation_probe=_orientation_unknown)
+                second = video_types.run(probe=lambda video: measured.append(video) or 4.0,
+                                         orientation_probe=_orientation_unknown)
+                third = video_types.run(probe=lambda video: measured.append(video) or 4.0,
+                                        orientation_probe=_orientation_unknown)
 
             self.assertEqual([first.recorded, second.recorded, third.recorded], [2, 2, 1])
             self.assertEqual(len(measured), 5)
@@ -332,7 +472,8 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
                 for index in range(3):
                     touch_video(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
 
-                result = video_types.run(probe=_probe({f"clip_{i}": 4.0 for i in range(3)}))
+                result = video_types.run(probe=_probe({f"clip_{i}": 4.0 for i in range(3)}),
+                                         orientation_probe=_orientation_unknown)
 
             self.assertEqual((result.recorded, result.already, result.deferred), (1, 0, 2))
 
@@ -344,7 +485,8 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
                 clip = touch_video(lib.genau_flicks / "loop_3_topaz.mp4")
                 touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_g.mp4")
 
-                result = video_types.run(probe=_refuses_to_be_called)
+                result = video_types.run(probe=_refuses_to_be_called,
+                                         orientation_probe=_refuses_to_be_called)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(clip))),
@@ -367,14 +509,16 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
             video = lib.non_ai / "alpha" / "excerpts" / "0 unsorted" / "Ada-Roe-7.mp4"
             with lib.config(GENAU_SOURCE):
                 touch_video(video)
-                video_types.run(probe=_probe({video.stem: 900.0}))
+                video_types.run(probe=_probe({video.stem: 900.0}),
+                                orientation_probe=_orientation_unknown)
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
                     video_type.FULL_LENGTH,
                 )
 
             with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
-                result = video_types.run(probe=_refuses_to_be_called)
+                result = video_types.run(probe=_refuses_to_be_called,
+                                         orientation_probe=_orientation_unknown)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
@@ -390,11 +534,12 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
             video = lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-3.mp4"
             with lib.config(GENAU_SOURCE):
                 touch_video(video)
-                video_types.run(probe=_probe({video.stem: 900.0}))
+                video_types.run(probe=_probe({video.stem: 900.0}),
+                                orientation_probe=_orientation_unknown)
 
                 path = sidecar.sidecar_path(video)
                 write_sidecar(path, dict(sidecar.read(path), clip={"index": 3}))
-                video_types.run(probe=_refuses_to_be_called)
+                video_types.run(probe=_refuses_to_be_called, orientation_probe=_orientation_unknown)
 
                 self.assertEqual(video_type.type_of(sidecar.read(path)), video_type.EXCERPT)
 
@@ -406,10 +551,11 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
             video = lib.non_ai / "alpha" / "excerpts" / "0 unsorted" / "Ada-Roe-8.mp4"
             with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 touch_video(video)
-                video_types.run(probe=_probe({video.stem: 900.0}))
+                video_types.run(probe=_probe({video.stem: 900.0}),
+                                orientation_probe=_orientation_unknown)
 
             with lib.config(GENAU_SOURCE):
-                video_types.run(probe=_refuses_to_be_called)
+                video_types.run(probe=_refuses_to_be_called, orientation_probe=_orientation_unknown)
 
                 self.assertEqual(
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
@@ -422,8 +568,10 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_h.mp4")
 
-                video_types.run(probe=_probe({"clip_h": 4.0}))
-                again = video_types.run(probe=_refuses_to_be_called)
+                video_types.run(probe=_probe({"clip_h": 4.0}),
+                                orientation_probe=_orientation_unknown)
+                again = video_types.run(probe=_refuses_to_be_called,
+                                        orientation_probe=_refuses_to_be_called)
 
             self.assertEqual((again.recorded, again.already), (0, 1))
 
@@ -451,7 +599,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                 unrecorded = self._batch(lib, "cuts", "carved-3.mp4")
                 wholes = [self._batch(lib, "wholes", f"whole-{i}.mp4") for i in range(3)]
 
-                video_types.run(probe=_probe({v.stem: 900.0 for v in [*carved, unrecorded, *wholes]}))
+                video_types.run(probe=_probe({v.stem: 900.0 for v in [*carved, unrecorded, *wholes]}),
+                                orientation_probe=_orientation_unknown)
 
                 kinds = {
                     v.name: video_type.type_of(sidecar.read(sidecar.sidecar_path(v)))
@@ -470,7 +619,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                 carved = self._batch(lib, "batch", "carved-1.mp4", carved=True)
                 wholes = [self._batch(lib, "batch", f"whole-{i}.mp4") for i in range(3)]
 
-                video_types.run(probe=_probe({v.stem: 900.0 for v in [carved, *wholes]}))
+                video_types.run(probe=_probe({v.stem: 900.0 for v in [carved, *wholes]}),
+                                orientation_probe=_orientation_unknown)
 
                 kinds = {
                     v.name: video_type.type_of(sidecar.read(sidecar.sidecar_path(v)))
@@ -491,7 +641,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                 carved = touch_video(batch / "3_good_to_go" / "processed" / "scene-portrait.mp4")
                 write_sidecar(sidecar.sidecar_path(carved), {"clip": {"full_video": str(source)}})
 
-                video_types.run(probe=_probe({v.stem: 900.0 for v in [*wholes, source, carved]}))
+                video_types.run(probe=_probe({v.stem: 900.0 for v in [*wholes, source, carved]}),
+                                orientation_probe=_orientation_unknown)
 
                 kind = video_type.type_of(sidecar.read(sidecar.sidecar_path(source)))
             self.assertEqual(kind, video_type.FULL_LENGTH)

@@ -1,9 +1,10 @@
-"""Stage: record what kind every library video is, and how long it runs.
+"""Stage: record what kind every library video is, how long it runs, and whether
+it is portrait or landscape.
 
-Two fields, ``video.type`` and ``video.duration_seconds``
-(:mod:`util.video_type`), written once per video and read by every app in the
-family in place of the five different tests they each used to run.  This stage
-is the only thing that writes them, so the vocabulary has one author.
+Three fields, ``video.type``, ``video.duration_seconds`` and
+``video.orientation`` (:mod:`util.video_type`), written once per video and read
+by every app in the family in place of the tests they each used to run.  This
+stage is the only thing that writes them, so the vocabulary has one author.
 
 It is a *backfill that never ends*: it walks the whole library every run, so
 the videos already in the library and the ones that arrive tomorrow are
@@ -46,8 +47,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import lanes, sidecar, video_type
-from util.ffprobe import duration_seconds
+from util import lanes, orientation, sidecar, video_type
+from util.ffprobe import duration_seconds, orientation_of
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class VideoTypesResult:
     ``recorded`` wrote a sidecar, ``already`` found nothing left to ask,
     ``skipped`` could not be measured and so has no kind to write down, and
     ``deferred`` still owes a later run something — a measurement this run had
-    none left to spend, or one that failed on a video whose kind was free
+    none left to spend, or one that failed on a video whose kind it could name
     anyway.
     """
 
@@ -69,12 +70,13 @@ class VideoTypesResult:
     deferred: int = 0
 
 
-def run(probe=duration_seconds) -> VideoTypesResult:
-    """Record what kind every library video is and how long it runs.
+def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoTypesResult:
+    """Record what kind every library video is, how long it runs, and whether it
+    is portrait or landscape.
 
-    *probe* reads a video's running time; it is the one thing here that costs
-    anything, so it is the only thing the batch limit counts, and it is a test
-    seam.
+    *probe* reads a video's running time and *orientation_probe* its
+    orientation; they are the only things here that cost anything, so they are
+    what the batch limit counts, and both are test seams.
 
     A video is measured once — the first run that reaches it and has a
     measurement left to spend — and thereafter its sidecar answers.  The kind
@@ -83,14 +85,13 @@ def run(probe=duration_seconds) -> VideoTypesResult:
     """
     log.info("=== Stage: record video kinds ===")
     result = VideoTypesResult()
-    measured = 0
-    for video, path, payload, genau, excerpt in _library_videos():
+    measurements_left = config.VIDEO_TYPE_BATCH_LIMIT
+    for video, path, payload, genau, excerpt, free_orientation in _library_videos():
         free = video_type.free_kind(genau=genau, excerpt=excerpt)
         seconds = video_type.duration_of(payload)
-        out_of_measurements = seconds is None and measured >= config.VIDEO_TYPE_BATCH_LIMIT
         unmeasurable = False
-        if seconds is None and not out_of_measurements:
-            measured += 1
+        if seconds is None and measurements_left > 0:
+            measurements_left -= 1
             seconds = probe(video)
             unmeasurable = seconds is None
             if unmeasurable:
@@ -105,21 +106,28 @@ def run(probe=duration_seconds) -> VideoTypesResult:
                 result.deferred += 1
             continue
 
-        def record_the_kind(
-            current: dict, genau=genau, excerpt=excerpt, seconds=seconds,
+        orient = free_orientation or video_type.orientation_of(payload)
+        if not orient and measurements_left > 0:
+            measurements_left -= 1
+            orient = _orientation_measured(video, orientation_probe)
+
+        def record_what_is_known(
+            current: dict, genau=genau, excerpt=excerpt, seconds=seconds, orient=orient,
         ) -> dict | None:
             written = video_type.stamped(
                 current, video_type.classify(genau=genau, excerpt=excerpt,
                                              duration_seconds=seconds))
             if seconds is not None:
                 written = video_type.timed(written, seconds)
+            if orient:
+                written = video_type.oriented(written, orient)
             return written if written != current else None
 
-        if sidecar.update(path, record_the_kind) is not None:
+        if sidecar.update(path, record_what_is_known) is not None:
             result.recorded += 1
-        elif seconds is None:
-            # A free kind already on file, still owing the running time that
-            # this run had no measurement left for, or could not take.
+        elif seconds is None or not orient:
+            # What it could say already on file, still owing a measurement that
+            # this run had none left for, or could not take.
             result.deferred += 1
         else:
             result.already += 1
@@ -130,12 +138,22 @@ def run(probe=duration_seconds) -> VideoTypesResult:
     return result
 
 
+def _orientation_measured(video: Path, orientation_probe) -> str:
+    measured = orientation_probe(video)
+    if measured == orientation.UNKNOWN:
+        log.info("Could not tell whether %s is portrait or landscape; leaving it "
+                 "for the next run", video)
+        return ""
+    return measured
+
+
 def _library_videos():
     """Every video whose kind this stage owns, with where its record lives.
 
-    Yields ``(video, sidecar path, payload, genau, excerpt)`` — the record as
-    it stands, plus the two signals a lane settles on its own, leaving only the
-    running time to be measured.
+    Yields ``(video, sidecar path, payload, genau, excerpt, orientation)`` — the
+    record as it stands, plus what a lane settles on its own: the two signals a
+    kind is read off, and the orientation of a video the lane files by it (empty
+    where it has to be measured).
     """
     yield from _genau_flicks()
     yield from _ai_clips()
@@ -145,7 +163,7 @@ def _library_videos():
 def _genau_flicks():
     for video in lanes.genau_flicks():
         path = sidecar.sidecar_path(video)
-        yield video, path, sidecar.read(path), True, False
+        yield video, path, sidecar.read(path), True, False, ""
 
 
 def _ai_clips():
@@ -154,7 +172,9 @@ def _ai_clips():
     mirrored path either way."""
     for clip in lanes.ai_clips():
         path = sidecar.sidecar_path(clip.upscale)
-        yield clip.video, path, sidecar.read(path), clip.source == config.GENAU_SOURCE, False
+        filed_under = clip.orientation if clip.orientation in orientation.SORTED else ""
+        yield (clip.video, path, sidecar.read(path), clip.source == config.GENAU_SOURCE, False,
+               filed_under)
 
 
 def _non_ai_videos():
@@ -178,7 +198,7 @@ def _non_ai_videos():
     )
     for video in videos:
         excerpt = video in carved or _in_a_cut_folder(_below_the_library(video), cuts)
-        yield video, sidecar.sidecar_path(video), payloads[video], False, excerpt
+        yield video, sidecar.sidecar_path(video), payloads[video], False, excerpt, ""
 
 
 def _was_carved(video: Path, payload: dict) -> bool:

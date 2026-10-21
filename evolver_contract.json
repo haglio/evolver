@@ -11,6 +11,7 @@
         "fields": [
           "type",
           "duration_seconds",
+          "orientation",
           "action",
           "wrong_action",
           "prompt",
@@ -72,6 +73,10 @@
       "excerpt",
       "short",
       "full_length"
+    ],
+    "video_orientations": [
+      "portrait",
+      "landscape"
     ]
   }
 }

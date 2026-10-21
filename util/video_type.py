@@ -1,8 +1,9 @@
-"""What kind of video this is and how long it runs — the ``video`` block.
+"""What kind of video this is, how long it runs, and whether it is portrait or
+landscape — the ``video`` block.
 
-Two facts about the file itself, recorded together on its metadata sidecar
-because one is read off the other, and owned here so that the block has a
-single author: :mod:`tasks.video_types` writes both, and everything else reads.
+Facts about the file itself, recorded together on its metadata sidecar and
+owned here so that the block has a single author: :mod:`tasks.video_types`
+writes them, and everything else reads.
 
 Four kinds, and every video in the library is exactly one of them.  The answer
 lives on the video's metadata sidecar, in the ``video`` block beside the act and
@@ -44,6 +45,8 @@ part of the library already done without probing four hundred files a tick.
 
 from __future__ import annotations
 
+from shared_ui.orientation import ORIENTATIONS
+
 from util import provenance, watch
 
 GENAU_FLICK = "genau_flick"
@@ -67,10 +70,12 @@ FIELD = "type"
 #: And the running time beside it: ``payload["video"]["duration_seconds"]``.
 DURATION_FIELD = "duration_seconds"
 
+ORIENTATION_FIELD = "orientation"
+
 #: Everything this module records, which is what tells a sidecar holding
 #: nothing but these from one that holds a scrape or a generation
 #: (:func:`only_the_video_itself`).
-_OWN_FIELDS = frozenset({FIELD, DURATION_FIELD})
+_OWN_FIELDS = frozenset({FIELD, DURATION_FIELD, ORIENTATION_FIELD})
 
 
 def free_kind(*, genau: bool, excerpt: bool) -> str:
@@ -110,11 +115,16 @@ def type_of(payload: dict) -> str:
     Empty is the ordinary answer for a sidecar written before this field
     existed, not an error: every reader falls back to what it did before.
     """
-    block = payload.get(BLOCK)
-    if not isinstance(block, dict):
-        return ""
-    recorded = str(block.get(FIELD) or "")
-    return recorded if recorded in TYPES else ""
+    return _word_recorded(payload, FIELD, TYPES)
+
+
+def orientation_of(payload: dict) -> str:
+    return _word_recorded(payload, ORIENTATION_FIELD, ORIENTATIONS)
+
+
+def _word_recorded(payload: dict, field: str, words: tuple[str, ...]) -> str:
+    recorded = str(_block(payload).get(field) or "")
+    return recorded if recorded in words else ""
 
 
 def duration_of(payload: dict) -> float | None:
@@ -124,11 +134,13 @@ def duration_of(payload: dict) -> float | None:
     video could not be measured — both mean "ask ffprobe", which is what
     :mod:`tasks.video_types` does with the one measurement it is allowed.
     """
-    block = payload.get(BLOCK)
-    if not isinstance(block, dict):
-        return None
-    seconds = block.get(DURATION_FIELD)
+    seconds = _block(payload).get(DURATION_FIELD)
     return float(seconds) if isinstance(seconds, (int, float)) else None
+
+
+def _block(payload: dict) -> dict:
+    block = payload.get(BLOCK)
+    return block if isinstance(block, dict) else {}
 
 
 def only_the_video_itself(payload: dict) -> bool:
@@ -165,9 +177,7 @@ def stamped(payload: dict, video_type: str) -> dict:
     carries no generation parameters, so its sidecar holds nothing but a version
     family until the kind arrives to join it.
     """
-    if video_type not in TYPES:
-        raise ValueError(f"not a video type: {video_type!r}")
-    return _recorded(payload, FIELD, video_type)
+    return _recorded(payload, FIELD, _one_of(TYPES, video_type, "a video type"))
 
 
 def timed(payload: dict, duration_seconds: float) -> dict:
@@ -177,10 +187,16 @@ def timed(payload: dict, duration_seconds: float) -> dict:
     return _recorded(payload, DURATION_FIELD, float(duration_seconds))
 
 
+def oriented(payload: dict, orientation: str) -> dict:
+    return _recorded(payload, ORIENTATION_FIELD,
+                     _one_of(ORIENTATIONS, orientation, "an orientation"))
+
+
+def _one_of(words: tuple[str, ...], word: str, what: str) -> str:
+    if word not in words:
+        raise ValueError(f"not {what}: {word!r}")
+    return word
+
+
 def _recorded(payload: dict, field: str, value) -> dict:
-    written = dict(payload)
-    block = written.get(BLOCK)
-    block = dict(block) if isinstance(block, dict) else {}
-    block[field] = value
-    written[BLOCK] = block
-    return written
+    return {**payload, BLOCK: {**_block(payload), field: value}}
