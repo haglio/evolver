@@ -20,7 +20,7 @@ from shared_ui.orientation import ORIENTATIONS, PORTRAIT
 
 import config
 from tests.temp_helpers import workspace_temp_dir
-from util import contract, media_files, sidecar, video_type, watch
+from util import contract, media_files, sidecar, video_type, warm_gun, watch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -116,3 +116,28 @@ class TheLibraryRecord(unittest.TestCase):
         self.assertEqual(set(stamped[video_type.BLOCK]), own)
         declared = self.record["blocks"][video_type.BLOCK]["fields"]
         self.assertLessEqual(own, set(declared))
+
+
+class TheJournals(unittest.TestCase):
+    """What another app writes for the favorites stage to carry into Fun Time's
+    list, the way the phone's journal is carried."""
+
+    def setUp(self):
+        self.journals = _document()["journals"]
+
+    def test_the_folder_it_names_is_the_one_inside_the_library_the_journals_are_read_from(self):
+        self.assertEqual(config.LIBRARY_ROOT / Path(self.journals["folder"]),
+                         config.WARM_GUN_JOURNAL_DIRS[0])
+
+    def test_a_line_in_the_fields_it_names_is_an_event_the_favorites_stage_applies(self):
+        upscale = (config.OUT_UPSCALED_DIR / "portrait" / "a-source" / "clip_topaz.mp4")
+        line = dict(zip(self.journals["fields"],
+                        (5, "favorite", upscale.relative_to(config.LIBRARY_ROOT).as_posix()),
+                        strict=True))
+
+        with workspace_temp_dir() as root:
+            (root / "another-app.jsonl").write_text(f"{json.dumps(line)}\n", encoding="utf-8")
+            [[event]] = warm_gun.read_journals([root]).values()
+
+        self.assertIn(event.event, self.journals["favorite_events"])
+        self.assertEqual(warm_gun.library_video(event.path), upscale)

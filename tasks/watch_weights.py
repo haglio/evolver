@@ -27,7 +27,6 @@ from util.media_files import reachable
 
 log = logging.getLogger(__name__)
 
-_FAVORITE_EVENTS = {"favorite": True, "unfavorite": False}
 _COUNTED_EVENTS = {"completion": "completions", "skip": "skips", "lock": "locks"}
 _CURSOR_FIELD = "applied_through"
 
@@ -133,12 +132,12 @@ def _apply_phone_favorites(
         cursor = cursors.get(name, -1)
         applied_through = cursor
         for event in events:
-            if event.event not in _FAVORITE_EVENTS or event.t <= cursor:
+            if event.event not in warm_gun.FAVORITE_EVENTS or event.t <= cursor:
                 continue
             video = videos[event.path]
             if video is not None and video.exists():
                 try:
-                    if _FAVORITE_EVENTS[event.event]:
+                    if warm_gun.FAVORITE_EVENTS[event.event]:
                         added += favs_csv.add_favorite(config.FUN_TIME_FAVS_FILE, video)
                     else:
                         removed += favs_csv.remove_favorite(config.FUN_TIME_FAVS_FILE, video)

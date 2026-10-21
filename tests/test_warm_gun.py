@@ -128,6 +128,15 @@ class TestLibraryVideo(unittest.TestCase):
         with workspace_temp_dir() as root, override_config(GENAU_DIR=root / "genau"):
             self.assertIsNone(warm_gun.library_video("genau/clips/2D/AI/flick_topaz.mp4"))
 
+    def test_an_upscale_another_app_names_by_its_place_under_the_library_is_that_upscale(self):
+        with override_config(LIBRARY_ROOT=Path("C:/lib"),
+                             OUT_UPSCALED_DIR=Path("C:/lib/AI/2_outbox/upscaled_by_orientation")):
+            self.assertEqual(
+                warm_gun.library_video(
+                    "AI/2_outbox/upscaled_by_orientation/portrait/provider2/clip a_topaz.mp4"),
+                Path("C:/lib/AI/2_outbox/upscaled_by_orientation/portrait/provider2/clip a_topaz.mp4"),
+            )
+
     def test_a_lane_this_library_has_no_folder_for_is_nobody_s(self):
         for path in ("VR/finished/scene.mp4", "1_sorted/short.mp4", "genau/audio/track.mp4", "non_AI", ""):
             with self.subTest(path=path):
