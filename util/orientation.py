@@ -12,8 +12,7 @@ was a silently empty listing rather than an error.
 
 from __future__ import annotations
 
-LANDSCAPE = "landscape"
-PORTRAIT = "portrait"
+from shared_ui.orientation import LANDSCAPE, PORTRAIT
 
 # The third answer, and not a folder: a video ffprobe cannot measure is left
 # where it is rather than guessed into one of the two.
