@@ -16,6 +16,7 @@ import unittest
 from pathlib import Path
 
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
+from shared_ui.orientation import ORIENTATIONS, PORTRAIT
 
 import config
 from tests.temp_helpers import workspace_temp_dir
@@ -87,6 +88,9 @@ class TheLibraryRecord(unittest.TestCase):
         """A reader branching on the kind has to know the whole set."""
         self.assertEqual(self.record["video_kinds"], list(video_type.TYPES))
 
+    def test_the_orientations_it_names_are_the_familys_two_words(self):
+        self.assertEqual(self.record["video_orientations"], list(ORIENTATIONS))
+
     def test_the_field_the_reader_writes_is_the_one_this_repo_clears(self):
         """Fun Time strikes an act out and leaves this in its place; only the
         backfill tool clears it, once a viewer has finally named the act."""
@@ -103,12 +107,12 @@ class TheLibraryRecord(unittest.TestCase):
                          sorted(self.record["blocks"][watch.BLOCK]["fields"]))
         self.assertIn(watch.FAVORITE_FIELD, self.record["top_level_keys"])
 
-    def test_the_kind_and_the_running_time_sit_where_it_says(self):
-        """Both go in the video block, which is where a reader looks for them."""
-        stamped = video_type.timed(video_type.stamped({}, video_type.SHORT), 12.5)
+    def test_the_kind_the_running_time_and_the_orientation_sit_where_it_says(self):
+        """All three go in the video block, which is where a reader looks for them."""
+        stamped = video_type.oriented(
+            video_type.timed(video_type.stamped({}, video_type.SHORT), 12.5), PORTRAIT)
+        own = {video_type.FIELD, video_type.DURATION_FIELD, video_type.ORIENTATION_FIELD}
 
-        self.assertEqual(sorted(stamped[video_type.BLOCK]),
-                         sorted((video_type.FIELD, video_type.DURATION_FIELD)))
+        self.assertEqual(set(stamped[video_type.BLOCK]), own)
         declared = self.record["blocks"][video_type.BLOCK]["fields"]
-        self.assertLessEqual({video_type.FIELD, video_type.DURATION_FIELD},
-                             set(declared))
+        self.assertLessEqual(own, set(declared))

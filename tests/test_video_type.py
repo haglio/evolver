@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from util import provenance, video_type
+from util import orientation, provenance, video_type
 
 
 class TestClassify(unittest.TestCase):
@@ -114,6 +114,39 @@ class TestTheRunningTime(unittest.TestCase):
             video_type.timed({}, -1.0)
 
 
+class TestTheOrientation(unittest.TestCase):
+    def test_reads_the_orientation_off_the_video_block(self):
+        self.assertEqual(
+            video_type.orientation_of({"video": {"orientation": orientation.PORTRAIT}}),
+            orientation.PORTRAIT,
+        )
+
+    def test_a_sidecar_that_records_none_reads_as_nothing(self):
+        self.assertEqual(video_type.orientation_of({"video": {"type": video_type.SHORT}}), "")
+        self.assertEqual(video_type.orientation_of({}), "")
+
+    def test_a_word_that_is_neither_orientation_reads_as_nothing(self):
+        self.assertEqual(
+            video_type.orientation_of({"video": {"orientation": orientation.UNKNOWN}}), "")
+
+    def test_orienting_keeps_the_rest_of_the_block_and_the_payload(self):
+        payload = {"video": {"type": video_type.SHORT}, "version": {"group": "g"}}
+
+        oriented = video_type.oriented(payload, orientation.LANDSCAPE)
+
+        self.assertEqual(
+            oriented,
+            {"video": {"type": video_type.SHORT, "orientation": orientation.LANDSCAPE},
+             "version": {"group": "g"}},
+        )
+        self.assertEqual(payload, {"video": {"type": video_type.SHORT},
+                                   "version": {"group": "g"}})
+
+    def test_the_third_answer_is_never_written_down(self):
+        with self.assertRaises(ValueError):
+            video_type.oriented({}, orientation.UNKNOWN)
+
+
 class TestTellingABareSidecarApart(unittest.TestCase):
     """Two stages read a sidecar's contents as evidence that something else
     happened to the clip — a scrape, a generation. Everything this module
@@ -127,6 +160,12 @@ class TestTellingABareSidecarApart(unittest.TestCase):
     def test_a_sidecar_holding_a_kind_and_a_running_time_records_nothing_else(self):
         self.assertTrue(video_type.only_the_video_itself(
             {"video": {"type": video_type.SHORT, "duration_seconds": 4.0}}
+        ))
+
+    def test_a_sidecar_holding_its_orientation_beside_them_records_nothing_else(self):
+        self.assertTrue(video_type.only_the_video_itself(
+            {"video": {"type": video_type.SHORT, "duration_seconds": 4.0,
+                       "orientation": orientation.PORTRAIT}}
         ))
 
     def test_the_viewing_stamped_beside_them_is_still_nothing_else(self):

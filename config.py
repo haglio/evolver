@@ -256,8 +256,8 @@ VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm", ".m4v"}
 FUNSCRIPT_EXTENSION = ".funscript"
 
 UPSCALE_BATCH_LIMIT = 5
-# How many videos one run of the video-kinds stage will measure. Only videos
-# whose kind is not yet recorded cost anything, so this bounds the first runs
+# How many ffprobes one run of the video-kinds stage will spend. Only a running
+# time or an orientation not yet recorded costs one, so this bounds the first runs
 # over a library that has never been asked and is never reached again after.
 VIDEO_TYPE_BATCH_LIMIT = 400
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
