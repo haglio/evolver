@@ -3,7 +3,9 @@ plays (the phone's, and since 2026-10 the laptop's beside it), each naming its
 video by the lane it was played from — ``1_sorted/<source>/<orientation>/x.mp4``,
 ``non_AI/<bucket>/…`` or ``genau/clips/2D/AI/x.mp4``, whatever Genau's flicks
 folder is called -- or, written before that folder split into 2D and VR,
-``genau/clips/x.mp4``."""
+``genau/clips/x.mp4``.  Another app of the family names an upscale by its
+place under the library root instead (``evolver_contract.json`` publishes the
+folder and the fields)."""
 
 from __future__ import annotations
 
@@ -17,6 +19,8 @@ from util import lanes
 from util.sidecar import upscaled_video_path
 
 JOURNAL_PATTERN = "*.jsonl"
+FIELDS = ("t", "event", "path")
+FAVORITE_EVENTS = {"favorite": True, "unfavorite": False}
 # What the phone's file is called -- the one journal there was before the laptop's.
 PHONE_JOURNAL = "warm-gun-journal.jsonl"
 PHONES_NAME_FOR_GENAUS_FLICKS_FOLDER = "clips"
@@ -57,7 +61,7 @@ def _event(line: str) -> Event | None:
         return None
     if not isinstance(record, dict):
         return None
-    t, event, path = record.get("t"), record.get("event"), record.get("path")
+    t, event, path = (record.get(field) for field in FIELDS)
     if isinstance(t, bool) or not isinstance(t, int | float):
         return None
     if not (isinstance(event, str) and event and isinstance(path, str) and path):
@@ -74,7 +78,8 @@ def library_video(journal_path: str) -> Path | None:
         return config.NON_AI_DIR.joinpath(*rest)
     if lane == "genau" and len(rest) >= 2:
         return _genau_flick(lanes.genau_flicks_dir(), rest[0], rest[1:])
-    return None
+    named = config.LIBRARY_ROOT.joinpath(lane, *rest)
+    return named if named.is_relative_to(config.OUT_UPSCALED_DIR) else None
 
 
 def _genau_flick(flicks_folder: Path | None, folder_named: str, inside: list[str]) -> Path | None:

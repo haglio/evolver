@@ -25,7 +25,7 @@ import json
 from pathlib import Path
 
 import config
-from util import library_records
+from util import library_records, warm_gun
 from util.media_files import PARTIAL_MARKER
 
 #: At the checkout root beside the launcher, which is the path an app that
@@ -54,6 +54,9 @@ def declaration() -> dict:
         "partial_marker": PARTIAL_MARKER,
         "library_record": {"folder": _under_library(config.METADATA_DIR),
                            **library_records.declaration()},
+        "journals": {"folder": _under_library(config.WARM_GUN_JOURNAL_DIRS[0]),
+                     "fields": list(warm_gun.FIELDS),
+                     "favorite_events": list(warm_gun.FAVORITE_EVENTS)},
     }
 
 

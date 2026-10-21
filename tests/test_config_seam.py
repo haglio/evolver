@@ -187,7 +187,7 @@ CONFIG_REFERENCE_LEDGER = {
     # one holding every library video's record, read here so the published
     # document says where they are TODAY rather than where they were when
     # somebody last wrote them out by hand.
-    "util/contract.py": 4,
+    "util/contract.py": 5,
     # One fewer with the archive lookup gone (item 27's last piece), then one
     # more fewer: an archived original's sidecar and funscript keep the suffix
     # their mirrors gave them, rather than one looked up again.
@@ -196,7 +196,7 @@ CONFIG_REFERENCE_LEDGER = {
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
     "util/video_locator.py": 1,
-    "util/warm_gun.py": 2,
+    "util/warm_gun.py": 4,
     "util/weird_piles.py": 9,
 }
 

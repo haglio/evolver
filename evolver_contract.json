@@ -78,5 +78,17 @@
       "portrait",
       "landscape"
     ]
+  },
+  "journals": {
+    "folder": "videos/warm_gun",
+    "fields": [
+      "t",
+      "event",
+      "path"
+    ],
+    "favorite_events": [
+      "favorite",
+      "unfavorite"
+    ]
   }
 }
