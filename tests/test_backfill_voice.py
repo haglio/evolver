@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 from PyQt6.QtCore import Qt
 from voice_core.listener import Engines, PauseSettings
+from voice_core.speech import HearsSpeech
 from voice_core.whisper_reader import WhisperReader
 
 import config
@@ -257,14 +258,15 @@ class TestWhichReadingsAreTrusted(unittest.TestCase):
 
         self.assertEqual(told.heard, ["undo"])
 
-    def test_left_to_itself_it_has_whisper_read_each_command_too(self):
+    def test_left_to_itself_it_has_whisper_read_each_command_and_ends_one_when_its_speaker_pauses(self):
         with patch("backfill.voice.CommandListener") as built:
             listener = VoiceListener(PHRASES)
             listener.start()
             listener.stop()
 
         engines = built.call_args.args[3]
-        self.assertIsInstance(engines.second_opinion, WhisperReader)
+        self.assertEqual((type(engines.second_opinion), type(engines.hears_speech)),
+                         (WhisperReader, HearsSpeech))
 
 
 class TestWhatItListensWith(unittest.TestCase):

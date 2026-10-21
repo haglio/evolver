@@ -17,10 +17,10 @@ from voice_core.listener import (
     ListenerSettings,
     MicrophoneUnavailable,
     RecognizerUnavailable,
+    engines_for,
 )
 from voice_core.listening import Heard
 from voice_core.listening_thread import ListeningThread
-from voice_core.whisper_reader import WhisperReader
 
 import config
 
@@ -41,7 +41,8 @@ class VoiceListener(QObject):
             never_rescued=frozenset(never_repaired).__contains__,
             confidence_threshold=config.VOICE_CONFIDENCE_THRESHOLD,
         )
-        self._engines = engines or Engines(second_opinion=WhisperReader())
+        self._events = ListenerEvents(heard=self._on_heard, partial=self.hearing.emit)
+        self._engines = engines or engines_for(self._rules, self._events)
         self._thread = ListeningThread(self._listener, failed=self._give_up)
 
     def start(self) -> None:
@@ -56,7 +57,7 @@ class VoiceListener(QObject):
             ListenerSettings(model_name=config.VOICE_MODEL_NAME,
                              device_name=config.VOICE_DEVICE_NAME,
                              sample_rate=config.VOICE_SAMPLE_RATE),
-            ListenerEvents(heard=self._on_heard, partial=self.hearing.emit),
+            self._events,
             self._engines)
 
     def _give_up(self, exc: Exception) -> None:
