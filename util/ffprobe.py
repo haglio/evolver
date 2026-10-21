@@ -12,6 +12,8 @@ import subprocess
 from fractions import Fraction
 from pathlib import Path
 
+from shared_ui.orientation import orientation_of_size
+
 from util import orientation
 
 # Width, height and the rotation tag in one invocation. ffprobe takes several
@@ -65,9 +67,7 @@ def orientation_of(file: Path) -> str:
     width, height, rotation = geometry
     if rotation % 180 != 0:
         width, height = height, width
-    # Square counts as landscape: it is a tie the sorted-folder choice has to
-    # break somehow, and this is the side it has always fallen.
-    return orientation.PORTRAIT if height > width else orientation.LANDSCAPE
+    return orientation_of_size(width, height)
 
 
 def duration_seconds(file: Path) -> float | None:
