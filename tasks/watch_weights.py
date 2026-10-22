@@ -36,6 +36,7 @@ class WatchWeightsResult:
     stamped: int = 0
     favorites_added: int = 0
     favorites_removed: int = 0
+    acts_named: int = 0
     unmapped: int = 0
     write_errors: int = 0
 
@@ -69,6 +70,7 @@ def run() -> WatchWeightsResult:
     result.favorites_added = phone_favorites.added
     result.favorites_removed = phone_favorites.removed
     result.write_errors = phone_favorites.write_errors
+    result.acts_named = _apply_picked_acts(journals, videos)
     phone_counts = _phone_counts(events, videos)
     fun_time_counts = read_dict(config.FUN_TIME_WATCH_STATS_FILE)
     favorites = {_key(video) for video in favs_csv.favorite_videos(config.FUN_TIME_FAVS_FILE)}
@@ -84,8 +86,9 @@ def run() -> WatchWeightsResult:
             result.stamped += 1
     log.info(
         "Watch weights: stamped %d sidecar(s); phone favorites added %d, removed %d; "
-        "%d journal line(s) named no video here.",
-        result.stamped, result.favorites_added, result.favorites_removed, result.unmapped,
+        "%d picked act(s) written into records; %d journal line(s) named no video here.",
+        result.stamped, result.favorites_added, result.favorites_removed, result.acts_named,
+        result.unmapped,
     )
     return result
 
@@ -139,6 +142,22 @@ def _apply_phone_favorites(
         log.exception("Could not write %s", config.FUN_TIME_FAVS_FILE)
         return _PhoneFavorites(carried[True], carried[False], 1)
     return _PhoneFavorites(carried[True], carried[False])
+
+
+def _apply_picked_acts(
+    journals: dict[str, list[warm_gun.Event]], videos: dict[str, Path | None]
+) -> int:
+    named = []
+
+    def name_the_act(event: warm_gun.Event) -> bool:
+        video = videos[event.path]
+        if video is not None and video.exists():
+            sidecar.record_action(video, event.action)
+            named.append(video)
+        return True
+
+    _applied_once(journals, config.PICKED_ACTS_CURSOR_FILE, (warm_gun.ACT_EVENT,), name_the_act)
+    return len(named)
 
 
 def _applied_once(
