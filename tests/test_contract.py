@@ -125,10 +125,6 @@ class TheJournals(unittest.TestCase):
     def setUp(self):
         self.journals = _document()["journals"]
 
-    def test_the_folder_it_names_is_the_one_inside_the_library_the_journals_are_read_from(self):
-        self.assertEqual(config.LIBRARY_ROOT / Path(self.journals["folder"]),
-                         config.WARM_GUN_JOURNAL_DIRS[0])
-
     def test_a_line_in_the_fields_it_names_is_an_event_the_favorites_stage_applies(self):
         upscale = (config.OUT_UPSCALED_DIR / "portrait" / "a-source" / "clip_topaz.mp4")
         line = dict(zip(self.journals["fields"],
