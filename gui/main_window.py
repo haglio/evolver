@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -15,6 +16,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QSizePolicy,
     QSplitter,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
@@ -23,6 +25,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.chrome import toolbar_rules
+from shared_ui.icons import inline_mark
 from shared_ui.spacing import BUTTON_ICON
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -57,6 +60,17 @@ class _NoFocusRectDelegate(QItemDelegate):
 
     def drawFocus(self, painter, option, rect):
         pass  # Don't draw the focus rectangle
+
+    def paint(self, painter, option, index):
+        mark = index.data(Qt.ItemDataRole.DecorationRole)
+        if index.data(Qt.ItemDataRole.DisplayRole) or not isinstance(mark, QIcon) or mark.isNull():
+            super().paint(painter, option, index)
+            return
+        self.drawBackground(painter, option, index)
+        pixmap = mark.pixmap(option.decorationSize)
+        painter.drawPixmap(QStyle.alignedRect(option.direction, Qt.AlignmentFlag.AlignCenter,
+                                              pixmap.deviceIndependentSize().toSize(), option.rect),
+                           pixmap)
 
 
 class RunDetailWidget(QWidget):
@@ -113,12 +127,13 @@ class RunDetailWidget(QWidget):
         # link in whichever theme Qt has given the rest of the window.
         self._header.setText(f'<a href="log">Run: {record.started_at}</a>')
         self._header.setToolTip("Show what this run wrote to the log")
-        glyph, color = mark_for(record.status)
+        mark, color = mark_for(record.status)
         # Rich text so the mark alone is colored; the rest of the line stays
         # the label's own color, matching the history list beside it.
+        status = inline_mark(mark, color=color, size=self._info_label.fontMetrics().height()) if mark else ""
         self._info_label.setText(
             f"Trigger: {record.trigger}  |  Duration: {record.duration_seconds:.1f}s"
-            f'  |  Status: <span style="color: {color.name()}">{glyph}</span>'
+            f"  |  Status: {status}"
         )
         self._info_label.setToolTip(record.status)
 
@@ -144,13 +159,11 @@ class RunDetailWidget(QWidget):
             name_item.setFlags(no_edit)
             self._table.setItem(i, 1, name_item)
 
-            # Column 2: status, as its symbol — the word is the tooltip, so the
-            # color lands on a glyph rather than on a block of text.
+            # Column 2: status, as its mark — the word is the tooltip, so the
+            # color lands on a mark rather than on a block of text.
             status = stage.get("status", "")
-            glyph, color = mark_for(status)
-            status_item = QTableWidgetItem(glyph)
-            status_item.setForeground(color)
-            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            status_item = QTableWidgetItem()
+            status_item.setIcon(mark_icon(status))
             status_item.setToolTip(status)
             status_item.setFlags(no_edit)
             self._table.setItem(i, 2, status_item)
