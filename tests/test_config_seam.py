@@ -187,7 +187,7 @@ CONFIG_REFERENCE_LEDGER = {
     # one holding every library video's record, read here so the published
     # document says where they are TODAY rather than where they were when
     # somebody last wrote them out by hand.
-    "util/contract.py": 5,
+    "util/contract.py": 4,
     # One fewer with the archive lookup gone (item 27's last piece), then one
     # more fewer: an archived original's sidecar and funscript keep the suffix
     # their mirrors gave them, rather than one looked up again.

@@ -54,8 +54,7 @@ def declaration() -> dict:
         "partial_marker": PARTIAL_MARKER,
         "library_record": {"folder": _under_library(config.METADATA_DIR),
                            **library_records.declaration()},
-        "journals": {"folder": _under_library(config.WARM_GUN_JOURNAL_DIRS[0]),
-                     "fields": list(warm_gun.FIELDS),
+        "journals": {"fields": list(warm_gun.FIELDS),
                      "favorite_events": list(warm_gun.FAVORITE_EVENTS),
                      "act_event": warm_gun.ACT_EVENT, "act_field": warm_gun.ACT_FIELD},
     }
