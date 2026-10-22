@@ -7,9 +7,10 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from PyQt6.QtCore import QPoint, QRect, Qt
-from PyQt6.QtGui import QPalette, QTextDocument
+from PyQt6.QtGui import QIcon, QPalette, QTextDocument
 from PyQt6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToolButton
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
+from shared_ui.icons import glyph_pixmap, inline_mark
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
 from gui.schedule_state import ScheduleStatus
@@ -119,6 +120,10 @@ class TestRunHistoryMarks:
         assert not self.window.isVisible()  # ...and the window hid itself
 
 
+def _drawn(icon: QIcon):
+    return icon.pixmap(16).toImage()
+
+
 class TestStageStatusColumn:
     """The Status column is a symbol, and only the symbol carries the color."""
 
@@ -136,14 +141,24 @@ class TestStageStatusColumn:
 
     def test_a_completed_stage_shows_a_green_check(self):
         cell = self._status_cell("completed")
-        assert cell.text() == "✔"
-        assert cell.foreground().color().name() == GREEN.name()
+        assert _drawn(cell.icon()) == _drawn(QIcon(glyph_pixmap("check", 16, GREEN)))
 
     def test_an_errored_stage_shows_a_red_cross(self):
         """The row a low-disk hold now produces, which no run record had before."""
         cell = self._status_cell("error")
-        assert cell.text() == "✘"
-        assert cell.foreground().color().name() == RED.name()
+        assert _drawn(cell.icon()) == _drawn(QIcon(glyph_pixmap("cross", 16, RED)))
+
+    def test_a_cell_that_is_its_mark_alone_wears_it_in_the_middle(self):
+        cell = self._status_cell("completed")
+        table = self.widget._table
+        table.resize(600, 200)
+        table.setColumnWidth(2, 80)
+        rect = table.visualItemRect(cell)
+        image = table.viewport().grab(rect).toImage()
+        inked = [x for y in range(image.height()) for x in range(image.width())
+                 if image.pixelColor(x, y).green() > 120 and image.pixelColor(x, y).red() < 100]
+        assert inked
+        assert abs((min(inked) + max(inked)) / 2 - image.width() / 2) <= 2
 
     def test_the_word_survives_as_the_cell_tooltip(self):
         assert self._status_cell("skipped").toolTip() == "skipped"
@@ -164,39 +179,37 @@ class TestRunVerdictInDetailPane:
 
     def test_a_failed_run_is_marked_with_the_red_cross(self):
         text = self._info_text("error")
-        assert "✘" in text
-        assert RED.name() in text
+        assert inline_mark("cross", color=RED, size=self._mark_side()) in text
 
     def test_a_successful_run_is_marked_with_the_green_check(self):
         text = self._info_text("success")
-        assert "✔" in text
-        assert GREEN.name() in text
+        assert inline_mark("check", color=GREEN, size=self._mark_side()) in text
+
+    def _mark_side(self) -> int:
+        return self.widget._info_label.fontMetrics().height()
 
     def test_qt_binds_the_color_to_the_mark_and_to_nothing_else(self):
         """The markup is only a promise until Qt's text engine has read it.
 
-        The label carries a colored ``<span>``; left on AutoText, Qt decides
+        The label carries the mark as an image; left on AutoText, Qt decides
         rich-versus-plain by a heuristic on the string, and a wrong guess would
-        show the user a literal ``<span style=…>`` and no color anywhere. So
-        parse the label's text the way the label does and ask the resulting
-        document what color it gave each run of characters.
-
-        Not by rendering it: the drawn pixels also depend on the platform's font
-        having a ✘ at all, which a headless runner's does not — it draws the rest
-        of the line and simply omits the glyph.
+        show the user literal markup and no mark. So parse the label's text the
+        way the label does and ask the resulting document what it holds: one
+        image, the mark, and no run of words in a color of its own.
         """
         document = QTextDocument()
         document.setHtml(self._info_text("error"))
-        colored = {}
+        images, colored = 0, []
         block = document.firstBlock()
         iterator = block.begin()
         while not iterator.atEnd():
             fragment = iterator.fragment()
-            color = fragment.charFormat().foreground()
-            if color.style() != Qt.BrushStyle.NoBrush:
-                colored[fragment.text()] = color.color().name()
+            if fragment.charFormat().isImageFormat():
+                images += 1
+            elif fragment.charFormat().foreground().style() != Qt.BrushStyle.NoBrush:
+                colored.append(fragment.text())
             iterator += 1
-        assert colored == {"✘": RED.name()}
+        assert (images, colored) == (1, [])
 
 
 class TestSummarizeResult:

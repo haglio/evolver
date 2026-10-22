@@ -10,9 +10,9 @@ verdict distinguishable from a stage of it having gone wrong.
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QColor, QIcon
 from shared_ui.colors import GREEN, RED, TEXT_MUTED
+from shared_ui.icons import glyph_pixmap
 
 # No work happened here: the muted gray everything else inert wears.
 GRAY = TEXT_MUTED
@@ -21,9 +21,9 @@ GRAY = TEXT_MUTED
 # view draws them and nothing has ever asked for another.
 _MARK_PX = 16
 
-CHECK = "✔"
-CROSS = "✘"
-CIRCLE = "○"  # no work happened here — an outline, not a filled dot
+CHECK = "check"
+CROSS = "cross"
+CIRCLE = "circle"  # no work happened here — an outline, not a filled dot
 
 _MARKS = {
     "success": (CHECK, GREEN),
@@ -41,11 +41,11 @@ _NO_MARK = ("", GRAY)
 
 
 def mark_for(status: str) -> tuple[str, QColor]:
-    """The glyph and color that stand for *status*.
+    """The family's mark and the color that stand for *status*.
 
     A status this build does not draw — run records on disk go back months —
-    gets an empty glyph, so an old record renders blank instead of raising in
-    the middle of painting the history.
+    gets no mark, so an old record renders blank instead of raising in the
+    middle of painting the history.
     """
     return _MARKS.get(status, _NO_MARK)
 
@@ -58,13 +58,7 @@ def mark_icon(status: str) -> QIcon:
     mark as the item's icon puts the color back on the symbol, and drawing that
     icon from the same glyph keeps it the same symbol the stage table shows.
     """
-    glyph, color = mark_for(status)
-    if not glyph:
+    mark, color = mark_for(status)
+    if not mark:
         return QIcon()
-    pixmap = QPixmap(_MARK_PX, _MARK_PX)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setPen(color)
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, glyph)
-    painter.end()
-    return QIcon(pixmap)
+    return QIcon(glyph_pixmap(mark, _MARK_PX, color))

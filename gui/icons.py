@@ -1,9 +1,7 @@
-"""Evolver's icons.
+"""Evolver's icons, every one the family's own mark.
 
-Most of the toolbar and the tray menu is still Font Awesome, which suits the
-verbs nothing else in the family draws -- a cog for settings, a chart, a pair
-of tags.  Five marks are not left to it, because the family draws them and the
-apps sit open side by side:
+Five of them are named here because other apps of the family wear the same
+mark for the same thing, and the apps sit open side by side:
 
 * quit, the power symbol -- Fun Time paints this same one on its bar,
 * restart, that power symbol with its ring running on into an arrowhead, so the
