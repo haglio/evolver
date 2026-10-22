@@ -1,8 +1,8 @@
 """Deliver upscaled Genau flicks to the folder Genau plays from.
 
 The last step of the Genau lane, which ``config.GENAU_SOURCE`` describes: once
-the upscale exists, move it into ``videos/genau/flicks/2D/AI/`` and retire the
-``1_sorted`` copy it was made from. A loop goes through the Topaz stage like
+the upscale exists, move it into ``2D/AI/`` in Genau's flicks folder and retire
+the ``1_sorted`` copy it was made from. A loop goes through the Topaz stage like
 any other AI video rather than being copied straight across, because one fresh
 out of the graph is visibly softer than the flicks already in that folder, which
 came from upscaled library video.

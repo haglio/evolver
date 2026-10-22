@@ -22,7 +22,7 @@ class _Setting(LaneLibrary):
 
     def __init__(self, root: Path):
         super().__init__(root)
-        self.journal_dir = root / "videos" / "warm_gun"
+        self.journal_dir = root / "app_data" / "warm_gun"
         self.phones_own_folder = a_drive_that_is_not_there() / "WarmGun"
         self.fun_time = root / "fun_time"
         self.stats = self.fun_time / "state" / "watch_stats.json"
