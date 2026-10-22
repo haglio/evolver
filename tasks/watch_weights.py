@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -115,55 +115,66 @@ def _phone_counts(
 def _apply_phone_favorites(
     journals: dict[str, list[warm_gun.Event]], videos: dict[str, Path | None]
 ) -> _PhoneFavorites:
-    """Each journal's favorites past that journal's own cursor.
+    """Each journal's favorites past that journal's own cursor."""
+    if not config.FUN_TIME_FAVS_FILE.parent.is_dir():
+        log.info("Fun Time is not installed here; the phone's favorites wait.")
+        return _PhoneFavorites()
+    carried = {True: 0, False: 0}
+
+    def carry(event: warm_gun.Event) -> bool:
+        video = videos[event.path]
+        if video is not None and video.exists():
+            favorite = warm_gun.FAVORITE_EVENTS[event.event]
+            change = favs_csv.add_favorite if favorite else favs_csv.remove_favorite
+            carried[favorite] += change(config.FUN_TIME_FAVS_FILE, video)
+        elif video is not None and warm_gun.played_video(event.path).exists():
+            log.info("Phone %s of %s waits for its upscale.", event.event, video)
+            return False
+        return True
+
+    try:
+        _applied_once(journals, config.WARM_GUN_FAVORITES_CURSOR_FILE, warm_gun.FAVORITE_EVENTS,
+                      carry)
+    except OSError:
+        log.exception("Could not write %s", config.FUN_TIME_FAVS_FILE)
+        return _PhoneFavorites(carried[True], carried[False], 1)
+    return _PhoneFavorites(carried[True], carried[False])
+
+
+def _applied_once(
+    journals: dict[str, list[warm_gun.Event]], cursor_file: Path, kinds: Collection[str],
+    apply: Callable[[warm_gun.Event], bool],
+) -> None:
+    """Hand *apply* each journal's events of *kinds* past that journal's own
+    cursor, in time order, so each is applied once and another app may undo it.
 
     One time per file, not one across them: each machine uploads its whole
     file in its own time order, but the laptop's can reach the folder after
     the phone's later lines have been applied, and one time across both would
-    skip its favorites for good.
+    skip its events for good.  *apply* answers False to hold the rest of its
+    journal for a later run; an OSError from it holds every journal.
     """
-    if not config.FUN_TIME_FAVS_FILE.parent.is_dir():
-        log.info("Fun Time is not installed here; the phone's favorites wait.")
-        return _PhoneFavorites()
-    cursors = _cursors()
+    cursors = _cursors(cursor_file)
     applied = dict(cursors)
-    added = removed = write_errors = 0
-    for name, events in journals.items():
-        cursor = cursors.get(name, -1)
-        applied_through = cursor
-        for event in events:
-            if event.event not in warm_gun.FAVORITE_EVENTS or event.t <= cursor:
-                continue
-            video = videos[event.path]
-            if video is not None and video.exists():
-                try:
-                    if warm_gun.FAVORITE_EVENTS[event.event]:
-                        added += favs_csv.add_favorite(config.FUN_TIME_FAVS_FILE, video)
-                    else:
-                        removed += favs_csv.remove_favorite(config.FUN_TIME_FAVS_FILE, video)
-                except OSError:
-                    log.exception("Could not write %s", config.FUN_TIME_FAVS_FILE)
-                    write_errors += 1
+    try:
+        for name, events in journals.items():
+            for event in events:
+                if event.event not in kinds or event.t <= cursors.get(name, -1):
+                    continue
+                if not apply(event):
                     break
-            elif video is not None and warm_gun.played_video(event.path).exists():
-                log.info("Phone %s of %s waits for its upscale.", event.event, video)
-                break
-            applied_through = event.t
-        if applied_through != cursor:
-            applied[name] = applied_through
-        if write_errors:
-            break
-    if applied != cursors:
-        write_whole(config.WARM_GUN_FAVORITES_CURSOR_FILE, json.dumps({_CURSOR_FIELD: applied}))
-    return _PhoneFavorites(added, removed, write_errors)
+                applied[name] = event.t
+    finally:
+        if applied != cursors:
+            write_whole(cursor_file, json.dumps({_CURSOR_FIELD: applied}))
 
 
-def _cursors() -> dict[str, int]:
-    """How far each journal's favorites have been applied, by file name. The
-    file used to hold one time for the one journal there was; that time was
-    reached through the phone's file alone, so it holds that file back and no
-    other."""
-    stored = read_dict(config.WARM_GUN_FAVORITES_CURSOR_FILE).get(_CURSOR_FIELD)
+def _cursors(cursor_file: Path) -> dict[str, int]:
+    """How far each journal's events have been applied, by file name. The
+    favorites' file used to hold one time for the one journal there was; that
+    time was reached through the phone's file alone, so it holds that file back
+    and no other."""
+    stored = read_dict(cursor_file).get(_CURSOR_FIELD)
     if isinstance(stored, dict):
         return {name: int(t) for name, t in stored.items()}
     if isinstance(stored, int | float) and not isinstance(stored, bool):
