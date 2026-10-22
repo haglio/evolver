@@ -35,7 +35,7 @@ _WIN32_CTYPES_NAMES = (
 # dependency, so a dependency is imported while the surface is still there and
 # is served from sys.modules afterwards.  A new one announces itself here, as a
 # collection error naming its own file.
-_DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT = ("qtawesome", "app_support.processes")
+_DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT = ("app_support.processes",)
 
 _STRIP_WIN32_FROM_CTYPES = f"""
 import ctypes, ctypes.wintypes

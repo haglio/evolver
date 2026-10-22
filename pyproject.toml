@@ -29,7 +29,6 @@ dependencies = [
     "faster-whisper>=1,<2",
     "numpy>=2.4,<3",
     "PyQt6>=6,<7",
-    "qtawesome>=1,<2",
     "tzdata",
 ]
 

@@ -184,13 +184,13 @@ class TestStartupCrashIsVisible(unittest.TestCase):
         with patch.object(crash_log, "write_crash"), \
              patch("tray_app.show_error") as mock_alert:
             tray_app.report_startup_crash(
-                "Traceback...\nModuleNotFoundError: No module named 'qtawesome'\n"
+                "Traceback...\nModuleNotFoundError: No module named 'example_dependency'\n"
             )
 
         mock_alert.assert_called_once()
         title, body = mock_alert.call_args[0]
         self.assertIn("evolver", title.lower())
-        self.assertIn("qtawesome", body)
+        self.assertIn("example_dependency", body)
         self.assertIn(str(crash_log.CRASH_LOG), body)
 
 
