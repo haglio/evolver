@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui import colors, palette
 
 from gui.run_history import RunHistory
 from gui.run_record import in_display_zone
@@ -227,14 +228,14 @@ class StackedAreaChart(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.fillRect(self.rect(), QColor(255, 255, 255))
+        painter.fillRect(self.rect(), colors.WHITE)
 
         plot = self._plot()
         if plot is None:
             painter.end()
             return
         if not self._history:
-            painter.setPen(QColor(0x80, 0x80, 0x80))
+            painter.setPen(colors.TEXT_MUTED)
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No run data")
             painter.end()
             return
@@ -298,14 +299,14 @@ class StackedAreaChart(QWidget):
         if plot.y_max < _LIMIT_SECONDS:
             return
         limit_y = int(plot.y_of(_LIMIT_SECONDS))
-        painter.setPen(QPen(QColor(0x80, 0x80, 0x80), 1, Qt.PenStyle.DotLine))
+        painter.setPen(QPen(colors.TEXT_MUTED, 1, Qt.PenStyle.DotLine))
         painter.drawLine(plot.left, limit_y, plot.left + plot.width, limit_y)
-        painter.setPen(QColor(0x80, 0x80, 0x80))
+        painter.setPen(colors.TEXT_MUTED)
         painter.drawText(plot.left + plot.width - 40, limit_y - 4, "10 min")
 
     def _paint_y_axis(self, painter: QPainter, plot: _Plot):
         """The duration ticks, their labels, and the rotated axis name."""
-        painter.setPen(QColor(0x60, 0x60, 0x60))
+        painter.setPen(colors.BORDER_SUBTLE)
         for secs in _pick_y_ticks(plot.y_max):
             y = int(plot.y_of(secs))
             painter.drawLine(plot.left - 4, y, plot.left, y)
@@ -313,7 +314,7 @@ class StackedAreaChart(QWidget):
                              f"{secs / 60:.0f}m" if secs >= 60 else f"{secs:.0f}s")
 
         painter.save()
-        painter.setPen(QColor(0x50, 0x50, 0x50))
+        painter.setPen(colors.BG_KEYCAP)
         label_font = QFont()
         label_font.setPointSize(9)
         painter.setFont(label_font)
@@ -325,14 +326,14 @@ class StackedAreaChart(QWidget):
     def _paint_x_axis(self, painter: QPainter, plot: _Plot):
         """The baseline, the left border, and the dates under the runs."""
         baseline_y = int(plot.y_of(0))
-        painter.setPen(QColor(0xA0, 0xA0, 0xA0))
+        painter.setPen(colors.TEXT_MUTED)
         painter.drawLine(plot.left, baseline_y, plot.left + plot.width, baseline_y)
         painter.drawLine(plot.left, plot.top, plot.left, baseline_y)
 
         font = QFont()
         font.setPointSize(8)
         painter.setFont(font)
-        painter.setPen(QColor(0x60, 0x60, 0x60))
+        painter.setPen(colors.BORDER_SUBTLE)
         labels = _x_axis_labels(plot.t_min, plot.t_max, _label_count(plot.width))
         for i, label in enumerate(labels):
             x = int(plot.left + plot.width * i / (len(labels) - 1))
@@ -354,9 +355,9 @@ class StackedAreaChart(QWidget):
 
         legend_h = len(ALL_STAGES) * line_height + padding * 2
 
-        bg = QColor(255, 255, 255, 220)
+        bg = QColor(*palette.WHITE, 220)
         painter.setBrush(bg)
-        painter.setPen(QColor(0xC0, 0xC0, 0xC0))
+        painter.setPen(colors.BORDER_DEFAULT)
         painter.drawRect(lx, ly, legend_w, legend_h)
 
         for i, stage_key in enumerate(ALL_STAGES):
@@ -365,7 +366,7 @@ class StackedAreaChart(QWidget):
             painter.setBrush(color)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(lx + padding, y_pos, swatch_size, swatch_size)
-            painter.setPen(QColor(0x30, 0x30, 0x30))
+            painter.setPen(colors.BG_TERTIARY)
             painter.drawText(lx + padding + swatch_size + _LEGEND_TEXT_GAP,
                              y_pos + swatch_size - 1, STAGE_LABELS[stage_key])
 
