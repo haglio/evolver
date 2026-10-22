@@ -124,3 +124,20 @@ def wrong_action_of(payload: dict) -> str:
     wrong.  The backfill queue asks about those first.
     """
     return _video_field(payload, WRONG_ACTION_FIELD)
+
+
+def record_action(clip: Path, action: str) -> None:
+    """Record *action* as *clip*'s act, leaving any other metadata it has intact.
+
+    A ``wrong_action`` marker is the exception: it is the standing question this
+    answers — a viewer's "that label is wrong, ask me again" — so naming the act
+    retires it.  Left in place it would send the clip to the head of this queue
+    every time the tool opened.
+    """
+    def name_the_act(payload: dict) -> dict:
+        block = payload.setdefault("video", {})
+        block["action"] = action
+        block.pop(WRONG_ACTION_FIELD, None)
+        return payload
+
+    update(sidecar_path(clip), name_the_act)

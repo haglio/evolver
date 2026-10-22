@@ -12,24 +12,7 @@ from pathlib import Path
 import config
 from util import sidecar, weird_piles
 from util.media_files import retry_while_in_use
-from util.sidecar import WRONG_ACTION_FIELD, sidecar_path
-
-
-def record_action(clip: Path, action: str) -> None:
-    """Record *action* as *clip*'s act, leaving any other metadata it has intact.
-
-    A ``wrong_action`` marker is the exception: it is the standing question this
-    answers — a viewer's "that label is wrong, ask me again" — so naming the act
-    retires it.  Left in place it would send the clip to the head of this queue
-    every time the tool opened.
-    """
-    def name_the_act(payload: dict) -> dict:
-        block = payload.setdefault("video", {})
-        block["action"] = action
-        block.pop(WRONG_ACTION_FIELD, None)
-        return payload
-
-    sidecar.update(sidecar_path(clip), name_the_act)
+from util.sidecar import sidecar_path
 
 
 def sidecar_snapshot(clip: Path) -> dict | None:
