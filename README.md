@@ -28,6 +28,8 @@ The order above is the order they run in, and it is not maintained here: `tasks/
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
+The video library, `videos/videos`, also holds two folders that are not Evolver's library: Genau's (`genau_dir` in the settings all of Haglio shares) and the one Origenerator keeps its videos in (`origenerator_videos_dir`). Every stage walks the library as though neither were there. Only the stages that work with Genau's flicks — delivery, video kinds, the weird piles and the search for videos that moved — go into Genau's folder, and no stage touches Origenerator's.
+
 ## Current architecture
 
 - **Tray app**: `pythonw.exe tray_app.py` — system tray icon with GUI, configurable timer (default 10 min), manual run trigger, run history, and live progress bars
@@ -267,7 +269,7 @@ A reference whose file is missing is matched against the library by **exact file
 
 A clip's pairing also follows its scene to another version of it: when the non-AI upscale replaces a scene with `<stem>_apo8_iris2` and moves the original out of the library, no file carries the old name any more, so the pairing is matched to the smallest file in the same bucket whose name, processing suffixes taken off, is the one it names. That is safe for a pairing and for nothing else here, because its offset is in seconds, which an upscale keeps, where a Genaumacher session's frame numbers are not.
 
-Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`. Videos sitting in either weird pile — `kinda_weird/` and Genau's — are excluded from the search, so a reference goes on naming the place its video was, which is where the video goes back to if you put it back.
+Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`. Videos sitting in either weird pile — `kinda_weird/` and Genau's — are excluded from the search, so a reference goes on naming the place its video was, which is where the video goes back to if you put it back. So are the videos Origenerator keeps in its own folder (`origenerator_videos_dir` in the settings all of Haglio shares): they are not Evolver's to follow.
 
 A reference into a folder whose videos are kept off the library's drive, `vr_videos` or `retired_root`, is not looked for at all while the drive that folder is on is not there: its video is not missing, its drive is down, and matching the name against the library could repoint it at a different video. The stage counts it as not checked and says once in the log which folder could not be reached.
 

@@ -477,13 +477,6 @@ class TestRunPipeline:
             allow_start=False, stop=False, presence_managed=True,
             take_requests=True, ai_waiting=True)
 
-    def test_the_references_stage_leaves_out_the_folder_origenerator_keeps_its_videos_in(self):
-        made = Path("D:/example-library/videos/origenerator")
-        stack, mocks = self._patch_all_stages()
-        with stack, override_config(ORIGENERATOR_VIDEOS_DIR=made):
-            evolver.run_pipeline(nonai_enabled=True)
-        assert mocks["reference_sync_run"].call_args.kwargs == {"origenerator_videos": made}
-
     def test_ai_clips_held_back_by_a_topaz_encode_evolver_did_not_start_are_still_waiting(self):
         stack, mocks = self._patch_all_stages(
             has_pending_work=Mock(return_value=True),

@@ -126,11 +126,14 @@ class LaneLibrary:
         self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
         self.non_ai = self.library / "2D" / "non_AI"
         self.weird = self.ai / "2_outbox" / "kinda_weird"
-        self.genau_flicks = videos / "genau" / "flicks"
-        self.genau_weird = videos / "genau" / "weird"
-        self.genau_audio = videos / "genau" / "audio"
+        self.genau = self.library / "genau"
+        self.genau_flicks = self.genau / "flicks"
+        self.genau_weird = self.genau / "weird"
+        self.genau_audio = videos / "audio" / "genau"
+        self.origenerator = self.library / "origenerator"
         self.metadata = videos / "metadata"
         self.scripts = videos / "scripts" / "scripts"
+        self.unmatched = videos / "scripts" / "unmatched_scripts"
         self.generated = videos / "scripts" / "generated"
         self.search_root = videos
 
@@ -138,11 +141,13 @@ class LaneLibrary:
         settings = {
             "VIDEO_LIBRARY_DIR": self.library, "VIDEO_SEARCH_ROOT": self.search_root,
             "METADATA_DIR": self.metadata, "INBOX_DIR": self.inbox,
-            "SCRIPT_LIBRARY_DIR": self.scripts, "GENERATED_SCRIPTS_DIR": self.generated,
+            "SCRIPT_LIBRARY_DIR": self.scripts, "UNMATCHED_SCRIPTS_DIR": self.unmatched,
+            "GENERATED_SCRIPTS_DIR": self.generated,
             "SORTED_DIR": self.sorted_dir,
             "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
             "WEIRD_DIR": self.weird,
-            "GENAU_DIR": self.genau_flicks.parent, "GENAU_SOURCE": genau_source,
+            "GENAU_DIR": self.genau, "GENAU_SOURCE": genau_source,
+            "ORIGENERATOR_VIDEOS_DIR": self.origenerator,
             "GENAU_WEIRD_DIR": self.genau_weird, "GENAU_AUDIO_DIR": self.genau_audio,
             "EXCERPT_FOLDERS": (),
         }

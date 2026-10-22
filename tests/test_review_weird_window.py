@@ -44,7 +44,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         self.assertEqual(self._rows(window), [
             ("scene one_topaz.mp4",
              r"videos\2D\AI\2_outbox\upscaled_by_orientation\portrait\example-source"),
-            ("loop_1_topaz.mp4", r"genau\flicks\2D\AI"),
+            ("loop_1_topaz.mp4", r"videos\genau\flicks\2D\AI"),
         ])
 
     def test_the_heading_counts_one_video_as_one(self):
@@ -195,7 +195,7 @@ class TestRestoring(_ReviewingALibrary):
         window.restore_button.click()
 
         self.assertTrue((self.lib.genau_flicks / "loop_5_topaz.mp4").is_file())
-        self.assertEqual(self._rows(window), [("loop_6_topaz.mp4", "genau\\flicks")])
+        self.assertEqual(self._rows(window), [("loop_6_topaz.mp4", "videos\\genau\\flicks")])
         self.assertEqual(_playing(window), after)
 
     def test_one_that_cannot_be_restored_is_named_and_the_rest_still_are(self):

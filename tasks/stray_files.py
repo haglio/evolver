@@ -20,7 +20,7 @@ from pathlib import Path
 
 import config
 from util import lanes, script_library
-from util.media_files import is_partial_path
+from util.media_files import is_partial_path, library_files
 
 log = logging.getLogger(__name__)
 
@@ -71,9 +71,7 @@ def run() -> StrayFilesResult:
     log.info("=== Stray files: non-videos in the video tree ===")
     log.info("VIDEOS: %s", root)
 
-    for path in sorted(root.rglob("*")):
-        if not path.is_file():
-            continue
+    for path in sorted(library_files(root)):
         handled = _handle(path)
         if handled.renamed:
             result.renamed += 1

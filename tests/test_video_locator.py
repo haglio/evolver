@@ -58,8 +58,8 @@ class TestRelocate(unittest.TestCase):
         with workspace_temp_dir() as temp:
             made = temp / "videos" / "origenerator"
             _write_video(made / "video" / "clip.mp4")
-            with override_config(VIDEO_SEARCH_ROOT=temp / "videos"):
-                index = video_locator.build_index(leave_out=(made,))
+            with override_config(VIDEO_SEARCH_ROOT=temp / "videos", ORIGENERATOR_VIDEOS_DIR=made):
+                index = video_locator.build_index()
 
             self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
 

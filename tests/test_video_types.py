@@ -120,6 +120,7 @@ class TestGenauLane(unittest.TestCase):
                 payload = sidecar.read(sidecar.sidecar_path(clip))
             self.assertEqual(video_type.type_of(payload), video_type.GENAU_FLICK)
             self.assertEqual(result.recorded, 1)
+            self.assertTrue((lib.metadata / "genau" / "flicks" / "loop_2_topaz.json").is_file())
 
 
 class TestNonAiLane(unittest.TestCase):

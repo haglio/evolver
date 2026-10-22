@@ -168,6 +168,11 @@ GENAU_DIR = Path(haglio_settings.value("genau_dir"))
 GENAU_AUDIO_DIR = Path(haglio_settings.value("genau_audio_dir"))
 GENAU_WEIRD_DIR = weird_pile_in(GENAU_DIR)
 
+
+def kept_by_other_apps() -> tuple[Path, Path]:
+    return GENAU_DIR, ORIGENERATOR_VIDEOS_DIR
+
+
 # The scraped provider: the 0_inbox folder its clips arrive under, and the site
 # root the metadata stage fetches their prompt pages from. Both are private, so
 # they come from the overlay for the same reason GENAU_SOURCE does. They live

@@ -379,7 +379,7 @@ def _run_stages(
         # After every stage that moves a video, and before bookmarks: both stages
         # touch favs.csv, and bookmarks drops the rows whose file is missing, so a
         # favorite has to be repointed before it can be mistaken for a dead one.
-        _run_stage("references", reference_sync.run, origenerator_videos=config.ORIGENERATOR_VIDEOS_DIR)
+        _run_stage("references", reference_sync.run)
         # Between the two: it reads favs.csv only once the references stage has
         # repointed it, and adds the phone's favorites for bookmarks to pick up.
         _run_stage("watch_weights", watch_weights.run)
