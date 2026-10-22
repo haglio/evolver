@@ -103,8 +103,9 @@ class TestGenaumacherSessions(unittest.TestCase):
             was_at = str(temp / "videos" / "2D" / "other" / "clip.mp4")
             session = _write_json(temp / "sessions" / "Clip.json", {"video_path": was_at})
 
-            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
-                result = reference_sync.run(origenerator_videos=made)
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions",
+                               ORIGENERATOR_VIDEOS_DIR=made):
+                result = reference_sync.run()
 
             self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], was_at)
             self.assertEqual(result.relocated, 0)

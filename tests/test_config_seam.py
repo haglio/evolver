@@ -42,10 +42,11 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 # comes from the syntax tree, so a mention in a comment or a docstring does not
 # move it.
 #
-# util/media_files.py's 1 is the other shape a number may go up for: one read
+# util/media_files.py's 3 is the other shape a number may go up for: one read
 # of VIDEO_EXTENSIONS in the module that owns "what is a video", replacing
 # eleven that were threaded through call sites and five identical one-line
-# wrappers to say the same thing.
+# wrappers to say the same thing, and two of the folders other apps keep inside
+# the library, which every walk of it must go round whichever stage walks.
 #
 # gui/app.py's 5th and evolver.py's 10th are the third shape: a value a NEW
 # feature needs that no module read before. LOG_FILE, read once on each side
@@ -66,9 +67,7 @@ CONFIG_REFERENCE_LEDGER = {
     # The 10th and 11th are the third shape again: the pin list, read where
     # the queue window's door to it is, so the window layer names no path of its
     # own, and the pipeline's turn (util/run_lock.py), read where the run is.
-    # One more of the third shape: the folder Origenerator keeps the videos
-    # it made in, which the references stage leaves out of its search.
-    "evolver.py": 11,
+    "evolver.py": 10,
     "gui/app.py": 4,
     # What a branch session is and where it runs from -- named in the window
     # title, the taskbar identity and the launcher a preview's button re-runs --
@@ -181,7 +180,7 @@ CONFIG_REFERENCE_LEDGER = {
     # Three more, the third shape: the tree of marks Fun Time reads to know a
     # funscript no person wrote, read where a mark is kept beside its script.
     "util/script_library.py": 6,
-    "util/media_files.py": 1,
+    "util/media_files.py": 3,
     "util/nonai_library.py": 4,
     # The two folders another app hands clips to this pipeline through, and the
     # one holding every library video's record, read here so the published
@@ -195,7 +194,7 @@ CONFIG_REFERENCE_LEDGER = {
     "util/reference_stores.py": 6,
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
-    "util/video_locator.py": 1,
+    "util/video_locator.py": 2,
     "util/warm_gun.py": 4,
     "util/weird_piles.py": 9,
 }

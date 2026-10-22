@@ -17,7 +17,7 @@ from app_support.mirrored_tree import mirrored_path
 
 import config
 from util import provenance
-from util.media_files import remove_empty_dirs
+from util.media_files import kept_by_another_app, remove_empty_dirs
 
 
 def script_path_for_video(video: Path) -> Path:
@@ -30,7 +30,7 @@ def script_path_for_video(video: Path) -> Path:
     Raises ``ValueError`` for a video outside the library, which has no script
     here: an archived original keeps its own copy beside it instead.
     """
-    script = mirrored_path(
+    script = None if kept_by_another_app(video) else mirrored_path(
         video,
         roots=(config.VIDEO_LIBRARY_DIR,),
         mirror_root=config.SCRIPT_LIBRARY_DIR,

@@ -46,10 +46,29 @@ def is_finalized_video_file(path: Path) -> bool:
     return _is_finished_video_name(path) and path.is_file()
 
 
+def kept_by_another_app(path: Path) -> bool:
+    return any(path.is_relative_to(folder) for folder in config.kept_by_other_apps())
+
+
+def _walked(root: Path):
+    left_out = config.kept_by_other_apps()
+    for folder, subfolders, names in root.walk():
+        subfolders[:] = [name for name in subfolders if folder / name not in left_out]
+        for name in names:
+            yield folder / name
+
+
 def library_videos(root: Path):
-    """Every finished video under *root*, at any depth, unordered."""
-    for path in root.rglob("*"):
+    """Every finished video under *root*, at any depth, unordered, but for the folders other apps keep inside it."""
+    for path in _walked(root):
         if is_finalized_video_file(path):
+            yield path
+
+
+def library_files(root: Path):
+    """Every file under *root*, at any depth, unordered, but for the folders other apps keep inside it."""
+    for path in _walked(root):
+        if path.is_file():
             yield path
 
 
