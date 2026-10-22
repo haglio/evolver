@@ -158,8 +158,9 @@ CONFIG_REFERENCE_LEDGER = {
     # after it to stamp the viewing on the same sidecars. One is the third
     # shape: the folder of its own the phone writes its journal to, read so the
     # stage holds while that folder cannot be reached rather than weigh every
-    # video without the viewing it holds.
-    "tasks/watch_weights.py": 8,
+    # video without the viewing it holds. Another is how far the acts picked in
+    # Origenerator have been written into their records, beside the favorites' cursor.
+    "tasks/watch_weights.py": 9,
     # Every folder of this library a withdrawn clip can be sitting in by the time
     # the withdrawal is read -- the inbox, 1_sorted, the outbox, both condemned
     # piles -- plus the metadata tree its record mirrors into and the extensions

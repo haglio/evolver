@@ -22,12 +22,14 @@ class _Setting(LaneLibrary):
 
     def __init__(self, root: Path):
         super().__init__(root)
+        self.root = root
         self.journal_dir = root / "app_data" / "warm_gun"
         self.phones_own_folder = a_drive_that_is_not_there() / "WarmGun"
         self.fun_time = root / "fun_time"
         self.stats = self.fun_time / "state" / "watch_stats.json"
         self.favs = self.fun_time / "favs.csv"
         self.cursor = root / "local" / "warm_gun_favorites.json"
+        self.acts_cursor = root / "local" / "picked_acts.json"
         self.fun_time.mkdir(parents=True, exist_ok=True)
 
     def config(self, **extra):
@@ -37,6 +39,8 @@ class _Setting(LaneLibrary):
             "FUN_TIME_WATCH_STATS_FILE": self.stats,
             "FUN_TIME_FAVS_FILE": self.favs,
             "WARM_GUN_FAVORITES_CURSOR_FILE": self.cursor,
+            "PICKED_ACTS_CURSOR_FILE": self.acts_cursor,
+            "LIBRARY_ROOT": self.root,
             **extra,
         })
 
@@ -46,6 +50,14 @@ class _Setting(LaneLibrary):
             "".join(json.dumps({"t": t, "event": event, "path": path}) + "\n" for t, event, path in lines),
             encoding="utf-8",
         )
+
+    def pick_act(self, t: int, video: Path, act: str) -> None:
+        """A line Origenerator writes when an act is picked on a video's Action row."""
+        self.journal_dir.mkdir(parents=True, exist_ok=True)
+        line = {"t": t, "event": "action", "path": video.relative_to(self.root).as_posix(),
+                "action": act}
+        with (self.journal_dir / "origenerator.jsonl").open("a", encoding="utf-8") as journal:
+            journal.write(json.dumps(line) + "\n")
 
     def fun_time_counts(self, **counts_by_video: tuple[Path, dict]) -> None:
         self.stats.parent.mkdir(parents=True, exist_ok=True)
@@ -326,3 +338,38 @@ class TestFavorites(unittest.TestCase):
             self.assertFalse(s.favs.exists())
             self.assertFalse(s.cursor.exists())
         self.assertEqual(result.favorites_added, 0)
+
+
+class TestActsPickedInOrigenerator(unittest.TestCase):
+    def test_a_picked_act_is_written_into_the_videos_record(self):
+        with _setting() as s:
+            _, upscale = s.sorted_clip("clip_a")
+            s.pick_act(10, upscale, "Act Beta")
+
+            watch_weights.run()
+
+            self.assertEqual(sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))),
+                             "Act Beta")
+
+    def test_a_pick_is_written_once_so_fun_time_can_strike_it_out_after(self):
+        with _setting() as s:
+            _, upscale = s.sorted_clip("clip_a")
+            s.pick_act(10, upscale, "Act Beta")
+            watch_weights.run()
+            write_sidecar(sidecar.sidecar_path(upscale), {"video": {"wrong_action": "Act Beta"}})
+
+            watch_weights.run()
+
+            self.assertEqual(sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))), "")
+
+    def test_the_last_of_two_picks_is_the_act_the_record_keeps(self):
+        with _setting() as s:
+            _, upscale = s.sorted_clip("clip_a")
+            s.pick_act(10, upscale, "Act Beta")
+            s.pick_act(20, upscale, "Act Gamma")
+
+            result = watch_weights.run()
+
+            self.assertEqual(sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))),
+                             "Act Gamma")
+        self.assertEqual(result.acts_named, 2)

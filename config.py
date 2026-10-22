@@ -302,6 +302,8 @@ NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
 # The last phone favorite applied to Fun Time's favorites, so one is applied
 # exactly once and Fun Time can undo it (tasks/watch_weights.py).
 WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
+# The same for acts picked in Origenerator, written into each video's record.
+PICKED_ACTS_CURSOR_FILE = LOCAL_STATE_DIR / "picked_acts.json"
 NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
 # The counterpart to the skip list: videos to encode next, in the order listed.
 # A pin outranks every ordering heuristic and re-queues a video the bucket
