@@ -7,6 +7,11 @@ their folders are a setting of their own, which all of Haglio shares.
 """
 from __future__ import annotations
 
+import copy
+import json
+import os
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -50,13 +55,34 @@ class TestVrVideoDir(unittest.TestCase):
         self.assertEqual(config.vr_video_dir({"vr_videos": "Q:/cloud/VR"}), Path("Q:/cloud/VR"))
 
 
-class TestOrigeneratorVideosDir(unittest.TestCase):
-    def test_is_the_folder_the_shared_settings_name(self):
-        self.assertEqual(config.origenerator_videos_dir({"origenerator_videos_dir": "L:/library/videos/made"}),
-                         Path("L:/library/videos/made"))
+class TestFoldersTheSharedSettingsPlace(unittest.TestCase):
+    def test_each_one_is_where_the_shared_settings_say_and_nowhere_else(self):
+        places = {
+            "genau_dir": "Q:/example-places/genau-folder",
+            "genau_audio_dir": "Q:/example-places/genau-sounds",
+            "origenerator_videos_dir": "Q:/example-places/origenerator-videos",
+            "warm_gun_journal_dir": "Q:/example-places/journal",
+        }
+        reading = (
+            "import json, config; print(json.dumps({"
+            "'genau_dir': str(config.GENAU_DIR), "
+            "'genau_audio_dir': str(config.GENAU_AUDIO_DIR), "
+            "'origenerator_videos_dir': str(config.ORIGENERATOR_VIDEOS_DIR), "
+            "'warm_gun_journal_dir': str(config.WARM_GUN_JOURNAL_DIRS[0])}))"
+        )
+        with workspace_temp_dir() as root:
+            settings = root / "settings.json"
+            settings.write_text(
+                json.dumps({**copy.deepcopy(haglio_settings.EXAMPLE), **places}), encoding="utf-8")
+            read = subprocess.run(
+                [sys.executable, "-c", reading], cwd=config.PROJECT_DIR, check=True,
+                capture_output=True, text=True,
+                env={**os.environ, haglio_settings.SETTINGS_ENV: str(settings)},
+            )
 
-    def test_is_none_while_the_shared_settings_name_none(self):
-        self.assertIsNone(config.origenerator_videos_dir({}))
+        self.assertEqual(json.loads(read.stdout),
+                         {key: str(Path(place)) for key, place in places.items()})
+
 
 class TestTopazPaths(unittest.TestCase):
     """Where Topaz Video is installed, which decides whether either upscale
@@ -213,19 +239,21 @@ if __name__ == "__main__":
 class TestWarmGunJournalDirs(unittest.TestCase):
     def test_the_library_holds_the_journal_when_the_overlay_says_nothing(self):
         self.assertEqual(
-            config.warm_gun_journal_dirs({}, Path("L:/library")),
-            (Path("L:/library/videos/warm_gun"),),
+            config.warm_gun_journal_dirs({}, Path("L:/library/app_data/warm_gun")),
+            (Path("L:/library/app_data/warm_gun"),),
         )
 
     def test_the_folder_the_phone_still_writes_to_is_read_as_well(self):
         self.assertEqual(
-            config.warm_gun_journal_dirs({"warm_gun_outbox": "S:/WarmGun"}, Path("L:/library")),
-            (Path("L:/library/videos/warm_gun"), Path("S:/WarmGun")),
+            config.warm_gun_journal_dirs({"warm_gun_outbox": "S:/WarmGun"},
+                                         Path("L:/library/app_data/warm_gun")),
+            (Path("L:/library/app_data/warm_gun"), Path("S:/WarmGun")),
         )
 
     def test_an_empty_value_counts_as_unset(self):
         self.assertEqual(
-            len(config.warm_gun_journal_dirs({"warm_gun_outbox": ""}, Path("L:/library"))), 1
+            len(config.warm_gun_journal_dirs({"warm_gun_outbox": ""},
+                                             Path("L:/library/app_data/warm_gun"))), 1
         )
 
     def test_the_phone_s_own_folder_is_the_one_the_overlay_names(self):

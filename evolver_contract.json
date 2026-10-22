@@ -80,7 +80,7 @@
     ]
   },
   "journals": {
-    "folder": "videos/warm_gun",
+    "folder": "app_data/warm_gun",
     "fields": [
       "t",
       "event",

@@ -47,13 +47,13 @@ def sidecar_path(video: Path) -> Path:
     y.mp4`` -> ``2D/non_AI/other/y.json``), so AI generation metadata and
     non-AI version families share one tree that parallels the video tree.
 
-    A video that is *beside* that tree rather than inside it — Genau's delivered
-    flicks, which live in its flicks folder under ``videos/genau`` while the
-    library is ``videos/videos`` — mirrors from the folder holding both, so
-    ``videos/genau/flicks/2D/AI/y.mp4`` lands at ``metadata/genau/flicks/2D/AI/
-    y.json``.  Their kind (:mod:`util.video_type`) has to be recorded somewhere,
-    and a delivered flick keeps the generation metadata it was made with rather
-    than losing it at the door.
+    A video that is *beside* that tree rather than inside it mirrors from the
+    folder holding both.  Genau's delivered flicks land at
+    ``metadata/genau/flicks/2D/AI/y.json`` either way, whether the shared
+    settings place its folder inside the library or beside it.  Their kind
+    (:mod:`util.video_type`) has to be recorded somewhere, and a delivered flick
+    keeps the generation metadata it was made with rather than losing it at the
+    door.
 
     Raises ``ValueError`` for a video under neither.
     """

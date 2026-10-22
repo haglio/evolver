@@ -8,7 +8,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from app_support import haglio_settings, siblings
-from app_support.flick_folder import audio_in, weird_pile_in
+from app_support.flick_folder import weird_pile_in
 from app_support.overlay import overlay_value
 
 from content_overlay import LOCAL_CONTENT, load_content
@@ -104,12 +104,7 @@ VIDEO_SEARCH_ROOT = LIBRARY_ROOT / "videos"
 METADATA_DIR = LIBRARY_ROOT / "videos" / "metadata"
 
 
-def origenerator_videos_dir(settings: dict[str, Any]) -> Path | None:
-    named = settings.get("origenerator_videos_dir")
-    return Path(named) if named else None
-
-
-ORIGENERATOR_VIDEOS_DIR = origenerator_videos_dir(haglio_settings.load())
+ORIGENERATOR_VIDEOS_DIR = Path(haglio_settings.value("origenerator_videos_dir"))
 
 
 def warm_gun_outbox(content: dict[str, Any]) -> Path | None:
@@ -117,7 +112,7 @@ def warm_gun_outbox(content: dict[str, Any]) -> Path | None:
     return Path(outbox) if outbox else None
 
 
-def warm_gun_journal_dirs(content: dict[str, Any], library_root: Path) -> tuple[Path, ...]:
+def warm_gun_journal_dirs(content: dict[str, Any], library_dir: Path) -> tuple[Path, ...]:
     """Every folder Warm Gun's journal is read from, in order.
 
     Inside the library is where it belongs: the folder sync that carries the
@@ -131,11 +126,11 @@ def warm_gun_journal_dirs(content: dict[str, Any], library_root: Path) -> tuple[
     folder is gone.
     """
     outbox = warm_gun_outbox(content)
-    return (library_root / "videos" / "warm_gun", *([outbox] if outbox else []))
+    return (library_dir, *([outbox] if outbox else []))
 
 
 WARM_GUN_OUTBOX = warm_gun_outbox(_CONTENT)
-WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, LIBRARY_ROOT)
+WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, Path(haglio_settings.value("warm_gun_journal_dir")))
 SCRIPT_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 UNMATCHED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "unmatched_scripts"
 # Fun Time's F-mode reads this mirror of the video tree (fun_time/modes.py): an
@@ -169,8 +164,8 @@ WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
 # sanitize blocklist keeps out of a public commit and Origenerator reads it too.
 GENAU_SOURCE    = haglio_settings.value("genau_source")
 GENAU_FLICK_WORD = haglio_settings.value("genau_flick_words", "one")
-GENAU_DIR = LIBRARY_ROOT / "videos" / "genau"
-GENAU_AUDIO_DIR = audio_in(GENAU_DIR)
+GENAU_DIR = Path(haglio_settings.value("genau_dir"))
+GENAU_AUDIO_DIR = Path(haglio_settings.value("genau_audio_dir"))
 GENAU_WEIRD_DIR = weird_pile_in(GENAU_DIR)
 
 # The scraped provider: the 0_inbox folder its clips arrive under, and the site
