@@ -7,68 +7,11 @@ from unittest.mock import patch
 from backfill.decisions import (
     discard_as_weird,
     reclaim_from_weird,
-    record_action,
     restore_sidecar,
     sidecar_snapshot,
 )
 from tests.temp_helpers import library_tree, override_config, workspace_temp_dir
-from util.sidecar import sidecar_path
-
-
-class TestRecordAction(unittest.TestCase):
-    def test_writes_a_sidecar_recording_the_action(self):
-        with library_tree() as lib:
-            video = lib.video()
-
-            record_action(video, "Side Beta")
-            payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
-
-            self.assertEqual(payload, {"video": {"action": "Side Beta"}})
-
-    def test_naming_the_act_answers_a_viewers_rejection_of_the_old_one(self):
-        """``wrong_action`` is a standing question — "this clip is mislabeled,
-        ask me again" — and recording an act is the answer, so the marker goes
-        with it.  Left in place it would jump the queue on every future open."""
-        with library_tree() as lib:
-            video = lib.video()
-            path = sidecar_path(video)
-            path.parent.mkdir(parents=True)
-            path.write_text(
-                json.dumps({"video": {"prompt": "p", "wrong_action": "Alpha"}}), encoding="utf-8"
-            )
-
-            record_action(video, "Side Beta")
-            payload = json.loads(path.read_text(encoding="utf-8"))
-
-            self.assertEqual(payload, {"video": {"prompt": "p", "action": "Side Beta"}})
-
-    def test_keeps_the_metadata_an_existing_sidecar_already_holds(self):
-        with library_tree() as lib:
-            video = lib.video()
-            path = sidecar_path(video)
-            path.parent.mkdir(parents=True)
-            path.write_text(
-                json.dumps({"video": {"prompt": "a prompt"}, "source_image": {"seed": "7"}}),
-                encoding="utf-8",
-            )
-
-            record_action(video, "Dancing")
-            payload = json.loads(path.read_text(encoding="utf-8"))
-
-            self.assertEqual(
-                payload,
-                {"video": {"prompt": "a prompt", "action": "Dancing"}, "source_image": {"seed": "7"}},
-            )
-
-    def test_relabelling_replaces_the_previous_action(self):
-        with library_tree() as lib:
-            video = lib.video()
-
-            record_action(video, "Dancing")
-            record_action(video, "XYZ Gamma")
-            payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
-
-            self.assertEqual(payload, {"video": {"action": "XYZ Gamma"}})
+from util.sidecar import record_action, sidecar_path
 
 
 class TestSidecarSnapshotAndRestore(unittest.TestCase):

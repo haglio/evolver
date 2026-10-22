@@ -19,13 +19,13 @@ from typing import Protocol
 from backfill.decisions import (
     discard_as_weird,
     reclaim_from_weird,
-    record_action,
     restore_sidecar,
     sidecar_snapshot,
 )
 from backfill.queue import BackfillQueue
 from backfill.vocabulary import SAME, SKIP, UNDO, WEIRD, Vocabulary
 from backfill.work import SerialWorker
+from util.sidecar import record_action
 
 NOTHING_TO_UNDO = "nothing to undo"
 NOTHING_TO_REPEAT = "nothing to repeat"
