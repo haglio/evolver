@@ -13,6 +13,7 @@ from app_support.launcher import assert_launchers_match_their_specs, dry_run
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRAY_LAUNCHER = REPO_ROOT / "launch_evolver.vbs"
+SHORTCUT_LAUNCHER = REPO_ROOT / "launch_evolver_from_its_shortcut.vbs"
 IF_NOT_RUNNING_LAUNCHER = REPO_ROOT / "launch_evolver_if_not_running.vbs"
 SHOWING_LAUNCHER = REPO_ROOT / "launch_evolver_showing_its_window.vbs"
 PREVIEW_LAUNCHER = REPO_ROOT / "launch_preview_branch.vbs"
@@ -22,6 +23,7 @@ on_windows = pytest.mark.skipif(sys.platform != "win32", reason="the Windows scr
 
 def test_the_launchers_are_where_their_callers_point():
     assert TRAY_LAUNCHER.is_file()
+    assert SHORTCUT_LAUNCHER.is_file()
     assert IF_NOT_RUNNING_LAUNCHER.is_file()
     assert SHOWING_LAUNCHER.is_file()
     assert PREVIEW_LAUNCHER.is_file()
@@ -40,6 +42,16 @@ def test_the_tray_runs_windowed_from_this_checkout_on_its_venv():
     assert Path(report.value("directory")) == REPO_ROOT
     assert report.value("arguments") == f'"{REPO_ROOT / "tray_app.py"}"'
     assert report.values("log") == []
+
+
+@on_windows
+def test_the_pinned_shortcut_starts_the_same_tray_with_the_loading_screen_up_from_the_click():
+    tray, clicked = dry_run(TRAY_LAUNCHER), dry_run(SHORTCUT_LAUNCHER)
+
+    assert clicked.value("interpreter") == tray.value("interpreter")
+    assert clicked.value("arguments") == tray.value("arguments")
+    assert "app_support.loading_screen" in clicked.value("loading screen")
+    assert tray.values("loading screen") == []
 
 
 @on_windows
