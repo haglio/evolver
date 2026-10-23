@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui import colors, palette
+from shared_ui.fonts import SIZE_SMALL, SIZE_TINY
+from shared_ui.spacing import BUTTON_GROUP_GAP
 
 from gui.run_history import RunHistory
 from gui.run_record import in_display_zone
@@ -294,7 +296,7 @@ class StackedAreaChart(QWidget):
     def _paint_limit_line(self, painter: QPainter, plot: _Plot):
         """The watchdog's ten minutes, dotted -- only when the scale reaches it."""
         font = QFont()
-        font.setPointSize(8)
+        font.setPointSize(SIZE_TINY)
         painter.setFont(font)
         if plot.y_max < _LIMIT_SECONDS:
             return
@@ -316,7 +318,7 @@ class StackedAreaChart(QWidget):
         painter.save()
         painter.setPen(colors.BG_KEYCAP)
         label_font = QFont()
-        label_font.setPointSize(9)
+        label_font.setPointSize(SIZE_SMALL)
         painter.setFont(label_font)
         painter.translate(14, plot.top + plot.height // 2)
         painter.rotate(-90)
@@ -331,7 +333,7 @@ class StackedAreaChart(QWidget):
         painter.drawLine(plot.left, plot.top, plot.left, baseline_y)
 
         font = QFont()
-        font.setPointSize(8)
+        font.setPointSize(SIZE_TINY)
         painter.setFont(font)
         painter.setPen(colors.BORDER_SUBTLE)
         labels = _x_axis_labels(plot.t_min, plot.t_max, _label_count(plot.width))
@@ -411,7 +413,7 @@ class StatsWindow(QDialog):
         self._scale = _either_or(self, self._10m_btn, self._fit_btn)
         for button in (self._historical_btn, self._averages_btn):
             btn_row.addWidget(button)
-        btn_row.addSpacing(20)
+        btn_row.addSpacing(BUTTON_GROUP_GAP)
         for button in (self._10m_btn, self._fit_btn):
             btn_row.addWidget(button)
         btn_row.addStretch()

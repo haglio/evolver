@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.chrome import toolbar_rules
 from shared_ui.icons import inline_mark
-from shared_ui.spacing import BUTTON_ICON
+from shared_ui.spacing import BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
@@ -84,7 +84,7 @@ class RunDetailWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD, MARGIN_STANDARD, MARGIN_STANDARD)
 
         self._record: RunRecord | None = None
 
@@ -368,7 +368,7 @@ class EvolverMainWindow(QMainWindow):
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(8, 8, 4, 8)
+        left_layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD, GAP_SMALL, MARGIN_STANDARD)
 
         history_header = QLabel("Run History")
         font = history_header.font()
