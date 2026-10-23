@@ -26,6 +26,16 @@ log = logging.getLogger(__name__)
 # The Windows identity contract. A pinned shortcut belongs to whatever this
 # says, so it is the one string that must not drift.
 APP_MODEL_ID = "Evolver.TrayApp"
+LETTER = config.PROJECT_DIR / "icon.ico"
+
+
+def identity() -> str:
+    return branch_session.model_id(APP_MODEL_ID)
+
+
+def taskbar_app() -> TaskbarApp:
+    return TaskbarApp(name=branch_session.app_name(), icon=icon_file(LETTER, shown_as(), config.LOCAL_STATE_DIR),
+                      relaunch=branch_session.relaunch_command())
 
 
 def claim(app: QApplication) -> QObject:
@@ -35,18 +45,13 @@ def claim(app: QApplication) -> QObject:
     A refusal is logged, not raised: a button wearing Python's icon is still a
     button, and an icon is never worth failing to start over.
     """
-    identity = branch_session.model_id(APP_MODEL_ID)
+    claimed = identity()
     try:
-        set_app_user_model_id(identity)
+        set_app_user_model_id(claimed)
     except OSError:
         log.warning("Could not claim the taskbar identity", exc_info=True)
-    letter, shown = config.PROJECT_DIR / "icon.ico", shown_as()
-    app.setWindowIcon(app_icon(letter, shown))
-    dresser = _WindowDresser(app, identity, TaskbarApp(
-        name=branch_session.app_name(),
-        icon=icon_file(letter, shown, config.LOCAL_STATE_DIR),
-        relaunch=branch_session.relaunch_command(),
-    ))
+    app.setWindowIcon(app_icon(LETTER, shown_as()))
+    dresser = _WindowDresser(app, claimed, taskbar_app())
     app.installEventFilter(dresser)
     return dresser
 

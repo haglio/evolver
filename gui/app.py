@@ -14,6 +14,7 @@ from functools import partial
 from app_support import production_update
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
+from shared_ui.loading_window import Loading, LoadingCanceled
 
 import config
 import evolver
@@ -48,6 +49,16 @@ _SHOW_WINDOW = "--show-window"
 # the launcher's grandchild, whose pid nothing here can know.
 _ANY_PROCESS = -1
 _IF_NOT_RUNNING = "--if-not-running"
+STEPS = (("Loading Evolver...", 1.0),)
+
+
+def open_the_loading_screen():
+    from shared_ui.loading_process import LoadingProcess  # noqa: PLC0415
+
+    return LoadingProcess.open(
+        caption="Evolver Loading", wordmark="Evolver", icon=process_identity.LETTER, preview=branch_session.shown_as(),
+        steps=STEPS, cancel_hint="Press Esc to cancel opening Evolver",
+        app_id=process_identity.identity(), taskbar=process_identity.taskbar_app())
 
 
 def _unmarked_note(record, log_path) -> str:
@@ -245,11 +256,18 @@ class EvolverApp:
     def run(self) -> int:
         if not self._become_evolver():
             return 0
+        loading = Loading.at_the_click(self._app, log, open_the_loading_screen)
+        try:
+            for step, _weight in STEPS:
+                loading.say(step)
+        except LoadingCanceled:
+            return 0
 
         self._instance.serve_launches(steps_aside_for=self._steps_aside_for,
                                       on_show=self._show_window,
                                       on_step_aside=self._step_aside)
         self.start()
+        loading.done()
         return self._app.exec()
 
     def _become_evolver(self) -> bool:

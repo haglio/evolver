@@ -75,6 +75,17 @@ interpreter = "pythonw.exe"
 named-interpreter = "Evolver-Evolver.exe"
 run = '"{root}\tray_app.py"'
 
+# What the pinned shortcut runs: the same tray, with the family's loading screen
+# up from the click. launch_evolver.vbs stays the start nobody clicked, which
+# Evolver runs itself to take an update, so that one shows none.
+[tool.haglio.launchers."launch_evolver_from_its_shortcut.vbs"]
+app = "Evolver"
+interpreter = "pythonw.exe"
+named-interpreter = "Evolver-Evolver.exe"
+run = '"{root}\tray_app.py"'
+log = 'state\evolver_launcher.log'
+loading-screen = ["Updating Evolver..."]
+
 [tool.haglio.launchers."launch_evolver_if_not_running.vbs"]
 app = "Evolver"
 interpreter = "pythonw.exe"
@@ -94,6 +105,7 @@ interpreter = "pythonw.exe"
 venv = "primary"
 run = '"{root}\tray_app.py" --show-window'
 log = 'state\preview_branch.log'
+loading-screen = ["Updating Evolver..."]
 environment = { EVOLVER_BRANCH_SESSION = "1" }
 copy-from-primary = ["content.local.json"]
 
@@ -102,7 +114,7 @@ copy-from-primary = ["content.local.json"]
 # from this list. `python -m app_support.windows_settings --write` makes this
 # machine match every checkout's list.
 [tool.haglio.shortcuts."Evolver"]
-launcher = "launch_evolver.vbs"
+launcher = "launch_evolver_from_its_shortcut.vbs"
 icon = "icon.ico"
 app-id = "Evolver.TrayApp"
 places = ["taskbar", "checkout"]
