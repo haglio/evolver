@@ -56,7 +56,7 @@ class TestPidsOfImage:
 class TestCommandLine:
     def test_reads_a_child_processes_arguments(self):
         proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"],
+            [_base_python(), "-c", "import time; time.sleep(60)"],
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         try:
@@ -94,7 +94,7 @@ class TestPipeServer:
 class TestTerminate:
     def test_kills_a_live_process(self):
         proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"],
+            [_base_python(), "-c", "import time; time.sleep(60)"],
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         try:
