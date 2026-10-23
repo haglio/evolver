@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui.spacing import MARGIN_DIALOG
 
 from tasks.stages import ALL_STAGES, STAGE_LABELS
 
@@ -42,7 +43,7 @@ class ProgressPopup(QWidget):
         self.setFixedWidth(400)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)
 
         header = QLabel("Pipeline Progress")
         font = header.font()
