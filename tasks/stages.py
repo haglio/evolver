@@ -54,6 +54,11 @@ STAGES: tuple[Stage, ...] = (
     Stage("sort", "Sort Inbox",
           "Move AI videos from 0_inbox into 1_sorted by source and orientation",
           (0x38, 0x6A, 0x9C)),
+    Stage("origenerator_downtime", "Origenerator Downtime",
+          "While Origenerator is closed, start the work it leaves for then: training a fix whose "
+          "photos have changed, and the experiments and other runs it used to hand ComfyUI as it "
+          "closed. The upscale waits while a fix trains, since the training needs the graphics card",
+          (0x30, 0xD0, 0x40)),
     Stage("upscale", "Upscale",
           "Apply Topaz 60fps frame interpolation + 4x upscale + various AI enhancements to 1_sorted AI videos, placing them in 2_outbox",
           (0xED, 0xC9, 0x48)),

@@ -40,6 +40,15 @@ def generated_fps(checkout: Path) -> Fraction | None:
     return rate if rate > 0 else None
 
 
+def downtime_command(checkout: Path) -> tuple[str, ...] | None:
+    try:
+        published = json.loads((checkout / PUBLISHED).read_text(encoding="utf-8"))
+        command = tuple(str(part) for part in published["downtime_command"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return command or None
+
+
 def database(db_path=None) -> Path:
     """The gallery to read — *db_path*, else the configured one — which must exist.
 

@@ -39,6 +39,8 @@ def _stage_mocks() -> dict:
         "scripts_sync_run": Mock(return_value=Mock(ok=True, not_checked=0)),
         "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
         "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
+        "origenerator_downtime_run": Mock(return_value=Mock(holds_the_graphics_card=False,
+                                                            failed=False)),
         "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
         "genau_deliver_run": Mock(return_value=Mock(failed=0)),
         "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, unreachable_archive="")),
@@ -63,6 +65,7 @@ def _stage_mocks() -> dict:
 _STAGE_PATCHES = [
     ("evolver.stray_files.run", "strays_run"),
     ("evolver.sort.run", "sort_run"),
+    ("evolver.origenerator_downtime.run", "origenerator_downtime_run"),
     ("evolver.video_types.run", "video_types_run"),
     ("evolver.provenance_sweep.run", "provenance_sweep_run"),
     ("evolver.withdrawn.run", "withdrawn_run"),
@@ -206,6 +209,16 @@ class TestEvolverMain:
         mocks["upscale_run"].assert_not_called()
         mocks["frozen_for_ai_clips"].assert_not_called()
         mocks["correspondence_run"].assert_not_called()
+
+    def test_ai_upscale_waits_while_origenerator_trains_a_fix_on_the_graphics_card(self):
+        mocks = self._run_pipeline(
+            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            has_pending_work=Mock(return_value=True),
+            origenerator_downtime_run=Mock(return_value=Mock(holds_the_graphics_card=True,
+                                                             failed=False)),
+        )
+        assert mocks["exit_code"] == 0
+        mocks["upscale_run"].assert_not_called()
 
     def test_ai_clips_upscale_with_the_library_encode_frozen_around_every_topaz_step(self):
         steps = []
