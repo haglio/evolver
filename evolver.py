@@ -36,6 +36,7 @@ from tasks import (
     nonai_queue,
     nonai_titles,
     nonai_upscale,
+    origenerator_downtime,
     prompt_scrape,
     provenance_sweep,
     reference_sync,
@@ -81,6 +82,9 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     # from here, and a withdrawal that silently never happens leaves the clip in
     # the library after the user was told it was going.
     "withdrawn": lambda r: bool(r.failed),
+    # Origenerator could not be asked: the work it leaves for while it is closed
+    # would otherwise stop happening with nothing to say so.
+    "origenerator_downtime": lambda r: r.failed,
     "verify": lambda r: not r.ok,
     "references": lambda r: not r.ok,
     "watch_weights": lambda r: not r.ok,
@@ -309,6 +313,7 @@ def _run_stages(
         _run_stage("withdrawn", withdrawn.run)
         _run_stage("metadata", prompt_scrape.run)
         sort_result = _run_stage("sort", sort.run)
+        downtime_result = _run_stage("origenerator_downtime", origenerator_downtime.run)
 
         priority_files = getattr(sort_result, "moved_files", [])
         upscale_result = None
@@ -316,6 +321,10 @@ def _run_stages(
         if not upscale.has_pending_work(priority_files=priority_files):
             log.info("No pending upscale work found. Skipping upscale.")
             _skip_stage("upscale", "no_pending_work")
+        elif downtime_result is not None and downtime_result.holds_the_graphics_card:
+            log.info("Skipping upscale: Origenerator is training a fix on the graphics card.")
+            upscale_skipped = True
+            _skip_stage("upscale", "origenerator_training")
         elif nonai_upscale.foreign_topaz_running():
             log.info("Skipping upscale: a Topaz encode Evolver did not start is running.")
             upscale_skipped = True

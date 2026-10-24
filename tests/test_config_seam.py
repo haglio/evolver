@@ -121,6 +121,8 @@ CONFIG_REFERENCE_LEDGER = {
     # The 6th is the camera words a scraped action is cased by. They were a
     # literal in this module; they are library vocabulary, so they are the
     # overlay's now, and a stage reaches the overlay through config alone.
+    # Where Origenerator is, to run the command it publishes there.
+    "tasks/origenerator_downtime.py": 1,
     "tasks/prompt_scrape.py": 6,
     # The name the non-AI lane gives its outputs, which is how a hand export
     # made before the stage existed is told from an original.

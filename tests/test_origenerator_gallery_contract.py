@@ -46,6 +46,14 @@ class OrigeneratorGalleryContract(unittest.TestCase):
         self.promise = json.loads(
             (self.origenerator / origenerator_gallery.PUBLISHED).read_text(encoding="utf-8"))
 
+    def test_the_command_for_origenerators_work_while_closed_is_read_as_it_promises_it(self):
+        """Until the Origenerator beside this one publishes the command, there is
+        nothing to read, and the stage that runs it does nothing."""
+        promised = self.promise.get("downtime_command")
+        read = origenerator_gallery.downtime_command(self.origenerator)
+
+        self.assertEqual(read, None if promised is None else tuple(promised))
+
     def test_every_column_read_here_is_one_origenerator_promises(self):
         """A column this repo selects and that repo does not promise is a
         ``SELECT`` that raises on the next run."""
