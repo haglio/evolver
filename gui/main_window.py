@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.chrome import toolbar_rules
+from shared_ui.fonts import SIZE_BODY
 from shared_ui.icons import inline_mark
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
@@ -90,7 +91,7 @@ class RunDetailWidget(QWidget):
 
         self._header = QLabel("Select a run to view details")
         font = self._header.font()
-        font.setPointSize(font.pointSize() + 1)
+        font.setPointSize(SIZE_BODY)
         font.setBold(True)
         self._header.setFont(font)
         # The title carries an <a href> once a run is in hand, so the format is

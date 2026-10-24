@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui import colors, palette
 from shared_ui.fonts import SIZE_SMALL, SIZE_TINY
-from shared_ui.spacing import BUTTON_GROUP_GAP
+from shared_ui.spacing import BUTTON_GROUP_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
 from gui.run_history import RunHistory
 from gui.run_record import in_display_zone
@@ -40,12 +40,12 @@ _MARGIN_LOWER = 50
 # closer together than the colors themselves are.
 BAND_ALPHA = 180
 
-_LEGEND_POINT_SIZE = 8
+_LEGEND_POINT_SIZE = SIZE_TINY
 _LEGEND_SWATCH = 10
-_LEGEND_PADDING = 6
-_LEGEND_TEXT_GAP = 6
+_LEGEND_PADDING = GAP_MEDIUM
+_LEGEND_TEXT_GAP = GAP_MEDIUM
 _LEGEND_LINE_HEIGHT = 16
-_LEGEND_INSET = 10  # between the legend panel and both the chart and the widget edge
+_LEGEND_INSET = MARGIN_STANDARD  # between the legend panel and both the chart and the widget edge
 
 
 def _legend_font() -> QFont:
