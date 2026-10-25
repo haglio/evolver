@@ -12,13 +12,47 @@ import json
 import os
 import subprocess
 import sys
+import tomllib
 import unittest
 from pathlib import Path
 
 from app_support import haglio_settings
 
 import config
+import content_overlay
 from tests.temp_helpers import workspace_temp_dir
+
+
+class TestWhatEvolverWillNotOpenWithout(unittest.TestCase):
+    def _import_config_on(self, overlay: Path) -> subprocess.CompletedProcess:
+        driver = ("import pathlib, content_overlay as c;"
+                  f"c.LOCAL_CONTENT = pathlib.Path({str(overlay)!r});"
+                  "import config")
+        return subprocess.run([sys.executable, "-c", driver], cwd=content_overlay.PROJECT_DIR,
+                              capture_output=True, text=True, check=False)
+
+    def test_a_settings_file_missing_a_line_its_example_documents_stops_it_before_any_line_is_read(self):
+        lines = json.loads(content_overlay.EXAMPLE_CONTENT.read_text(encoding="utf-8"))
+        del lines["excerpt_folders"]
+        with workspace_temp_dir() as root:
+            short = root / "content.local.json"
+            short.write_text(json.dumps(lines), encoding="utf-8")
+            started = self._import_config_on(short)
+
+        self.assertNotEqual(started.returncode, 0)
+        self.assertIn("MissingOverlayKey", started.stderr)
+        self.assertIn("excerpt_folders", started.stderr)
+
+    def test_the_pyproject_says_it_needs_every_key_of_the_example_in_the_local_overlay(self):
+        root = content_overlay.PROJECT_DIR
+        declared = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
+            "tool"]["haglio"]["opens-only-with"]
+        compared = subprocess.run(
+            [sys.executable, "-c", "import content_overlay as c; print(c.EXAMPLE_CONTENT); print(c.LOCAL_CONTENT)"],
+            cwd=root, capture_output=True, text=True, check=True)
+
+        self.assertEqual([root / declared["every-key-of"], root / declared["in"]],
+                         [Path(line) for line in compared.stdout.splitlines()])
 
 
 class TestProjectRoots(unittest.TestCase):

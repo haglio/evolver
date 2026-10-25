@@ -11,12 +11,13 @@ from app_support import haglio_settings, siblings
 from app_support.flick_folder import weird_pile_in
 from app_support.overlay import overlay_value
 
-from content_overlay import LOCAL_CONTENT, load_content
+from content_overlay import LOCAL_CONTENT, load_content, refuse_an_incomplete_overlay
 
 # Machine-specific and private: every value below that names something outside
 # this repo comes from the git-ignored content overlay (content.example.json
 # shows the shape and documents each key), or, where other apps need it too,
 # from the settings all of Haglio shares.
+refuse_an_incomplete_overlay()
 _CONTENT = load_content()
 
 LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
