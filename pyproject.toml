@@ -113,6 +113,7 @@ venv = "primary"
 run = '"{root}\tray_app.py" --show-window'
 log = 'state\preview_branch.log'
 loading-screen = ["Updating Evolver..."]
+preview = true
 environment = { EVOLVER_BRANCH_SESSION = "1" }
 copy-from-primary = ["content.local.json"]
 
