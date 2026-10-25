@@ -37,6 +37,12 @@ _WIN32_CTYPES_NAMES = (
 # collection error naming its own file.
 _DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT = ("app_support.processes",)
 
+# The same holds for what a dependency does on Windows while one of this repo's
+# modules is being imported: util.provenance has app_support read the checkout,
+# which runs git in a Win32 job object, so that reading is taken while the
+# surface is still there and app_support serves it from its cache afterwards.
+_CHECKOUT_READ_WHILE_IMPORTING = REPO_DIR / "util" / "provenance.py"
+
 _STRIP_WIN32_FROM_CTYPES = f"""
 import ctypes, ctypes.wintypes
 for _name in {_DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT!r}:
@@ -44,6 +50,8 @@ for _name in {_DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT!r}:
         __import__(_name)
     except ImportError:
         pass
+import app_support.provenance
+app_support.provenance.stamp("evolver", anchor={str(_CHECKOUT_READ_WHILE_IMPORTING)!r})
 for _name in {_WIN32_CTYPES_NAMES!r}:
     if hasattr(ctypes, _name):
         delattr(ctypes, _name)
