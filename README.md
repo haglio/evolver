@@ -11,9 +11,9 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 7. **Genau Delivery** — moves the Genau lane's upscaled flicks — Origenerator's looping single-cycle videos, which arrive under their own `0_inbox` source folder, named by the content overlay — out of the outbox into `2D/AI/` in Genau's flicks folder, the one folder holding a `2D` folder inside Genau's own (`genau_dir` in the settings all of Haglio shares): the place for the flicks Origenerator made (Genaumacher's cuts are in `2D/non_AI` beside it, and the VR ones in `VR`). The `1_sorted` copy is retired along with them. A flick with sound also leaves it as `<its name>.mp3` in Genau's sounds folder (`genau_audio_dir` in the same settings), beside the soundtracks Genaumacher saves, which is what Fun Time plays while that flick is up. Those flicks come through the pipeline only to be upscaled: one straight out of the graph is visibly softer than the flicks already in that folder, which came from upscaled library video. Both halves have to leave together — the upscale stage decides what still needs doing by looking for the output beside its source, and the correspondence check requires each sorted video to have a `_topaz` counterpart.
 8. **Upscale non-AI** — gradually upscales the `2D/non_AI` library too, with the Topaz settings its already-processed clips carry in their `videoai` tags (see "Non-AI library upscaling" below). Off by default — a one-time opt-in from the tray menu or the main window's toolbar, after which Evolver runs at most one detached encode while you are idle and the AI queue is drained, suspending it the moment you return to the machine.
 9. **Correspondence Check** — verifies `1_sorted` and `2_outbox` are in 1-to-1 correspondence, each sorted file having an outbox counterpart named `<sorted_stem>_topaz<ext>`, with a Windows error dialog if mismatches remain.
-10. **Follow Moved Videos** — repoints the suite's saved video paths at videos that have since moved, so a Genaumacher session or a Fun Time favorite survives the library being rearranged (see "Following videos that moved" below).
-11. **Watch Weights** — sums what Fun Time and Warm Gun each completed, skipped and locked onto every library video's sidecar, as a `watch` block carrying the playback weight both apps shuffle by; applies the phone's favorites and unfavorites to `fun_time/favs.csv`; and flags every favorite on its sidecar. See "What both apps watched" below.
-12. **Bookmarks Sync** — prunes stale rows from `fun_time/favs.csv` whose local file is gone, then syncs the remaining `web_url` values into a `Fun Time Favs` folder on the Chrome bookmarks bar. It runs after the repointing above, so a row is dropped only when its video is genuinely gone rather than merely moved.
+10. **Follow Moved Videos** — repoints the suite's saved video paths at videos that have since moved, so a Genaumacher session or Fun Time's watch counts survive the library being rearranged (see "Following videos that moved" below).
+11. **Watch Weights** — sums what Fun Time and Warm Gun each completed, skipped and locked onto every library video's sidecar, as a `watch` block carrying the playback weight both apps shuffle by, and marks the phone's favorites and unfavorites on the same sidecars. See "What both apps watched" below.
+12. **Bookmarks Sync** — writes the `web_url` of every favorite whose video is still there into a `Fun Time Favs` folder on the Chrome bookmarks bar, keeping the folder's order and adding a new favorite at its end.
 13. **Clip Scripts** — cuts each carved clip's funscript out of its source scene's, using the offset the clip was matched at.
 14. **Scene Scripts** — gives an unscripted source scene a mostly-blank funscript holding its carved clip's, placed where the clip sits in it.
 15. **Scripts Sync** — rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match: scripts under `2D/AI` only consider `2D/AI` videos, and scripts under `2D/non_AI` only consider `2D/non_AI` videos. Where several `2D/AI` videos share its name, the one filed under the same source folder as the script is its match (`0_inbox/<source>`, `1_sorted/<source>`, or the outbox's `<orientation>/<source>`): Origenerator can send one video down both of its lanes, so it arrives under two source folders, and only the library lane's copy comes with a funscript. A script whose video is gone from the library but present in the `retired_root` archive (see "Non-AI library upscaling" below) follows it out and comes to sit beside it; a stranded duplicate of a script the archive already holds is discarded once the two compare byte-identical. A script that matches no video at all moves to `videos/scripts/unmatched_scripts`, and the popup names it with a link to that folder; renamed there to match its video, it moves into place on the next run, and while it waits there it brings no popup back. A script that matches more than one video is left where it is and named in the popup. VR videos kept off the library's drive (`vr_videos` in the content overlay) are matched as though they sat in `videos/videos/VR`. While the drive that folder or the `retired_root` archive is on is not there (the cloud drive is down, say), a script that could belong to a video kept there stays where it is, unchecked: the log says so in a warning, the stage's row says how many went unchecked and which folder could not be reached, and no popup comes up. It also copies missing funscripts across matching processed/original video variants.
@@ -59,14 +59,13 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `util/nonai_job.py` - the four JSON files that encode keeps its state in
   - `util/nonai_retire.py` - moving a superseded original out of the library, record and all
   - `tasks/reference_sync.py` - repointing the suite's saved video paths at videos that moved
-  - `tasks/watch_weights.py` - both apps' viewing summed on every sidecar, and favorites carried both ways
+  - `tasks/watch_weights.py` - both apps' viewing summed on every sidecar, and the phone's favorites marked there
   - `util/watch.py` - the `watch` block and the weight formula, in one place
   - `util/warm_gun.py` - the phone's journal, and which library video each line means
   - `util/lanes.py` - every video the library holds, lane by lane
   - `util/frame_hashes.py` - a video read down to comparable frames, and one run of them found inside another
   - `util/weird_piles.py` - the two folders a video marked weird waits in, where each one goes back to, and restoring it or deleting it permanently
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
-  - `util/favs_csv.py` - Fun Time's favorites CSV: its rows, and the local path each cell links to
   - `util/video_locator.py` - where a video a reference has lost track of now lives
   - `check_duplicate_sizes.py` - duplicate-size scan for likely source duplicates
   - `check_correspondence.py` - integrity verification and one-time manual check
@@ -258,13 +257,11 @@ Each run, after every stage that could have moved something, Evolver walks the s
 | --- | --- |
 | `genaumacher/sessions/*.json` | a session's `video_path` — the clip bounds you set by hand |
 | `scripture/sessions/*.scripture` | a project's `video_path` — its splits, tracking and ground truth |
-| `fun_time/favs.csv` | the `local_file` hyperlink on every favorite, URL and label alike |
+
 | `fun_time/state/watch_stats.json` | the completions/skips/locks keyed by video path, re-keyed in Fun Time's own lowercased form |
 | `videos/metadata/2D/non_AI/**/*.json` | a carved clip's `clip.full_video` — the scene the matching batch found it in, which Fun Time's jumps between the two go by |
 
-Those five are the stores that hold something you cannot get back cheaply: clip bounds and splits made by hand, a curated favorites list, watch counts accumulated over months, and a pairing it takes the matching batch minutes of decoding to find again. Playlists, HUD state, duration caches and thumbnail caches are all regenerated from the library on demand, so a stale entry in one costs a rebuild rather than the data, and Evolver leaves them alone.
-
-The stage runs *before* the bookmarks sync on purpose: that stage drops favorites whose file is missing, so a favorite whose video merely moved has to be repointed first or it gets deleted on the very run that could have saved it.
+Those four are the stores that hold something you cannot get back cheaply: clip bounds and splits made by hand, watch counts accumulated over months, and a pairing it takes the matching batch minutes of decoding to find again. Playlists, HUD state, duration caches and thumbnail caches are all regenerated from the library on demand, so a stale entry in one costs a rebuild rather than the data, and Evolver leaves them alone.
 
 A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder, such as a compilations archive, is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Genaumacher session's frame numbers only mean anything against the exact file they were set on.
 
@@ -286,10 +283,11 @@ The **Watch Weights** stage sums the two on every library video's sidecar — fo
 
 ```json
 "watch": {"completions": 4, "skips": 1, "locks": 1, "weight": 4.0},
-"favorite": true
+"favorite": true,
+"web_url": "https://example.com/gallery/101"
 ```
 
-`weight` is the playback multiplier both apps shuffle by: 2 to the power of `(completions + 3·locks − skips) / 3`, clamped to an eighth and eightfold. Neither app keeps the formula; a sidecar with no `watch` block weighs 1, and `favorite` is present only when true. A favorite or unfavorite from the phone is applied to `fun_time/favs.csv` exactly once — the last one applied is kept in `%LOCALAPPDATA%\Evolver\warm_gun_favorites.json` — so a favorite undone in Fun Time stays undone; the flag on the sidecar mirrors that file, so the phone sees Fun Time's favorites as well as its own.
+`weight` is the playback multiplier both apps shuffle by: 2 to the power of `(completions + 3·locks − skips) / 3`, clamped to an eighth and eightfold. Neither app keeps the formula; a sidecar with no `watch` block weighs 1. `favorite` is present only when true, and is the one place a favorite is kept: Fun Time marks one at a lock, with the `web_url` of the page a website's video came from, and takes it off at a discard, and this stage marks a favorite or unfavorite from the phone exactly once — the last one applied is kept in `%LOCALAPPDATA%\Evolver\warm_gun_favorites.json` — so a favorite undone in Fun Time stays undone. Both write it through `app_support.favorites`.
 
 ## Run manually (CLI)
 
@@ -390,7 +388,7 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 
 - Nothing Evolver runs deletes a video marked weird: one in `2_outbox/kinda_weird/` or in the `weird` folder inside Genau's own stays there, with its `1_sorted` source, its metadata and its funscripts, until you review it with **Review Weird...** in the tray menu.
 - Scripts Sync always runs. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` tree within `videos/videos` (or exactly one in the script's own source folder), then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously.
-- Bookmarks Sync resolves the Chrome profile from Chrome's `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the remaining CSV `web_url` values, after dropping rows whose local favorite file no longer exists.
+- Bookmarks Sync resolves the Chrome profile from Chrome's `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the `web_url` of every favorite whose video is still there, skipping the run when the library's records cannot be reached.
 - Metadata Scrape writes prompt JSON files under `videos/metadata/2_outbox/.../<video-name>_topaz.json`, skipping any video that already has a JSON. A video whose scrape fails (for example, its source page was deleted) gets a sibling `<video-name>_topaz.json.failed` marker so it is not retried every run; delete the marker to force a retry. The current scraper only extracts Provider prompts.
 - Upscale runs whenever pending work exists, even if nothing new arrived in `0_inbox` during that scheduler tick, and is conservative by default: at most `config.UPSCALE_BATCH_LIMIT` videos per run.
 - If CPU usage is already above `config.CPU_BUSY_SKIP_THRESHOLD_PCT`, Evolver skips the upscale for that scheduler tick instead of competing with other work.

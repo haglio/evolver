@@ -1,10 +1,12 @@
-"""The stage that puts both apps' viewing on every sidecar, and passes favorites both ways."""
+"""The stage that puts both apps' viewing on every sidecar, and marks the phone's favorites there."""
 from __future__ import annotations
 
 import json
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+
+from app_support.favorites import is_favorite, mark
 
 from tasks import watch_weights
 from tests.temp_helpers import (
@@ -14,7 +16,7 @@ from tests.temp_helpers import (
     workspace_temp_dir,
     write_sidecar,
 )
-from util import favs_csv, sidecar
+from util import sidecar
 
 
 class _Setting(LaneLibrary):
@@ -27,7 +29,6 @@ class _Setting(LaneLibrary):
         self.phones_own_folder = a_drive_that_is_not_there() / "WarmGun"
         self.fun_time = root / "fun_time"
         self.stats = self.fun_time / "state" / "watch_stats.json"
-        self.favs = self.fun_time / "favs.csv"
         self.cursor = root / "local" / "warm_gun_favorites.json"
         self.acts_cursor = root / "local" / "picked_acts.json"
         self.fun_time.mkdir(parents=True, exist_ok=True)
@@ -37,7 +38,6 @@ class _Setting(LaneLibrary):
             "WARM_GUN_JOURNAL_DIRS": (self.journal_dir,),
             "WARM_GUN_OUTBOX": None,
             "FUN_TIME_WATCH_STATS_FILE": self.stats,
-            "FUN_TIME_FAVS_FILE": self.favs,
             "WARM_GUN_FAVORITES_CURSOR_FILE": self.cursor,
             "PICKED_ACTS_CURSOR_FILE": self.acts_cursor,
             "LIBRARY_ROOT": self.root,
@@ -83,6 +83,10 @@ def _setting():
 
 def _watch(video: Path) -> dict | None:
     return sidecar.read(sidecar.sidecar_path(video)).get("watch")
+
+
+def _favorite(video: Path) -> bool:
+    return is_favorite(sidecar.read(sidecar.sidecar_path(video)))
 
 
 class TestCounts(unittest.TestCase):
@@ -184,13 +188,13 @@ class TestThePhonesFolderCannotBeReached(unittest.TestCase):
 
     def test_no_favorite_is_carried_and_none_is_skipped_for_good(self):
         with _setting() as s:
-            s.sorted_clip("clip_a")
+            _, upscale = s.sorted_clip("clip_a")
             s.journal((20, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
 
             with s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
                 result = watch_weights.run()
 
-            self.assertFalse(s.favs.exists())
+            self.assertFalse(_favorite(upscale))
             self.assertFalse(s.cursor.exists())
         self.assertEqual(result.favorites_added, 0)
 
@@ -217,27 +221,24 @@ class TestThePhonesFolderCannotBeReached(unittest.TestCase):
 
 
 class TestFavorites(unittest.TestCase):
-    def test_a_favorite_on_the_phone_joins_fun_time_s_favorites_and_is_flagged(self):
+    def test_a_favorite_on_the_phone_marks_its_videos_record(self):
         with _setting() as s:
             _, upscale = s.sorted_clip("clip_a")
             s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
 
             result = watch_weights.run()
 
-            self.assertEqual(favs_csv.favorite_videos(s.favs), [upscale])
-            self.assertIs(sidecar.read(sidecar.sidecar_path(upscale)).get("favorite"), True)
+            self.assertTrue(_favorite(upscale))
         self.assertEqual(result.favorites_added, 1)
 
-    def test_an_unfavorite_on_the_phone_removes_the_row_and_the_flag(self):
+    def test_an_unfavorite_on_the_phone_takes_the_mark_off(self):
         with _setting() as s:
             _, upscale = s.sorted_clip("clip_a")
-            favs_csv.add_favorite(s.favs, upscale)
             write_sidecar(sidecar.sidecar_path(upscale), {"video": {"type": "short"}, "favorite": True})
             s.journal((10, "unfavorite", "1_sorted/provider2/portrait/clip_a.mp4"))
 
             result = watch_weights.run()
 
-            self.assertEqual(favs_csv.favorite_videos(s.favs), [])
             self.assertNotIn("favorite", sidecar.read(sidecar.sidecar_path(upscale)))
         self.assertEqual(result.favorites_removed, 1)
 
@@ -255,7 +256,7 @@ class TestFavorites(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertEqual(set(favs_csv.favorite_videos(s.favs)), {upscale_a, upscale_b})
+            self.assertTrue(_favorite(upscale_a) and _favorite(upscale_b))
         self.assertEqual(result.favorites_added, 1)
 
     def test_the_cursor_a_single_journal_left_behind_speaks_for_the_phone_s_file_only(self):
@@ -264,7 +265,7 @@ class TestFavorites(unittest.TestCase):
         no other."""
         with _setting() as s:
             _, upscale_a = s.sorted_clip("clip_a")
-            s.sorted_clip("clip_b")
+            _, upscale_b = s.sorted_clip("clip_b")
             s.cursor.parent.mkdir(parents=True, exist_ok=True)
             s.cursor.write_text(json.dumps({"applied_through": 20}), encoding="utf-8")
             s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_b.mp4"), name="warm-gun-journal.jsonl")
@@ -272,7 +273,7 @@ class TestFavorites(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertEqual(favs_csv.favorite_videos(s.favs), [upscale_a])
+            self.assertEqual((_favorite(upscale_a), _favorite(upscale_b)), (True, False))
             self.assertEqual(json.loads(s.cursor.read_text(encoding="utf-8")), {
                 "applied_through": {"warm-gun-journal.jsonl": 20, "warm-gun-journal-mac.jsonl": 10},
             })
@@ -283,11 +284,11 @@ class TestFavorites(unittest.TestCase):
             _, upscale = s.sorted_clip("clip_a")
             s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
             watch_weights.run()
-            favs_csv.remove_favorite(s.favs, upscale)
+            mark(sidecar.sidecar_path(upscale), False)
 
             result = watch_weights.run()
 
-            self.assertEqual(favs_csv.favorite_videos(s.favs), [])
+            self.assertFalse(_favorite(upscale))
         self.assertEqual(result.favorites_added, 0)
 
     def test_a_phone_favorite_for_a_video_not_here_yet_is_left_for_a_later_run(self):
@@ -296,11 +297,11 @@ class TestFavorites(unittest.TestCase):
             s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
 
             watch_weights.run()
-            self.assertEqual(favs_csv.favorite_videos(s.favs), [])
+            self.assertFalse(_favorite(s.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4"))
             _, upscale = s.sorted_clip("clip_a")
             watch_weights.run()
 
-            self.assertEqual(favs_csv.favorite_videos(s.favs), [upscale])
+            self.assertTrue(_favorite(upscale))
 
     def test_a_phone_favorite_for_a_video_that_is_gone_holds_nothing_back(self):
         with _setting() as s:
@@ -313,31 +314,34 @@ class TestFavorites(unittest.TestCase):
             first = watch_weights.run()
             again = watch_weights.run()
 
-            self.assertEqual(favs_csv.favorite_videos(s.favs), [upscale])
+            self.assertTrue(_favorite(upscale))
         self.assertEqual((first.favorites_added, again.favorites_added), (1, 0))
 
-    def test_fun_time_s_own_favorites_are_flagged_on_their_sidecars(self):
+    def test_a_favorite_fun_time_marked_stays_marked_through_the_stamping(self):
         with _setting() as s:
             loved = touch_video(s.non_ai / "alpha" / "loved.mp4")
             other = touch_video(s.non_ai / "alpha" / "other.mp4")
-            favs_csv.add_favorite(s.favs, loved)
+            mark(sidecar.sidecar_path(loved), True, page="https://example.com/gallery/101")
+            s.fun_time_counts(loved=(loved, {"completions": 3}), other=(other, {"completions": 3}))
 
             watch_weights.run()
 
-            self.assertIs(sidecar.read(sidecar.sidecar_path(loved)).get("favorite"), True)
-            self.assertNotIn("favorite", sidecar.read(sidecar.sidecar_path(other)))
+            loved_record = sidecar.read(sidecar.sidecar_path(loved))
+            self.assertEqual((loved_record["favorite"], loved_record["web_url"]),
+                             (True, "https://example.com/gallery/101"))
+            self.assertIn("watch", loved_record)
+            self.assertFalse(_favorite(other))
 
-    def test_without_fun_time_installed_the_phone_s_favorites_wait(self):
+    def test_the_phone_s_favorites_are_marked_where_fun_time_is_not_installed(self):
         with _setting() as s:
-            s.sorted_clip("clip_a")
+            _, upscale = s.sorted_clip("clip_a")
             s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
             s.fun_time.rmdir()
 
             result = watch_weights.run()
 
-            self.assertFalse(s.favs.exists())
-            self.assertFalse(s.cursor.exists())
-        self.assertEqual(result.favorites_added, 0)
+            self.assertTrue(_favorite(upscale))
+        self.assertEqual(result.favorites_added, 1)
 
 
 class TestActsPickedInOrigenerator(unittest.TestCase):

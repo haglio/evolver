@@ -71,6 +71,7 @@ LEFT_AMBIENT = {
                         "which no non-AI code path calls",
     "TVAI_MODEL_DIR": "the Topaz install; goes into the encoder's environment, "
                       "and no test launches one",
+    "VIDEO_EXTENSIONS": "not a place: the suffixes a record's video may have",
 }
 
 

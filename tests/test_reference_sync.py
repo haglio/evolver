@@ -39,7 +39,6 @@ def _stores_under(temp: Path, **used):
             "GENAUMACHER_SESSIONS_DIR": unused,
             "SCRIPTURE_SESSIONS_DIR": unused,
             "FUN_TIME_WATCH_STATS_FILE": unused / "watch_stats.json",
-            "FUN_TIME_FAVS_FILE": unused / "favs.csv",
             "NON_AI_DIR": unused / "non_AI",
             "METADATA_DIR": unused / "metadata",
             "VR_VIDEO_DIR": None,
@@ -235,30 +234,6 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
                 result = reference_sync.run()
 
             self.assertEqual((result.unresolved, result.not_checked), (0, 1))
-
-
-class TestFunTimeFavorites(unittest.TestCase):
-    def _favs_csv(self, path: Path, was_at: Path) -> Path:
-        url = "file:///" + str(was_at).replace("\\", "/")
-        path.write_text(
-            "local_file,web_url\n"
-            f'"=HYPERLINK(""{url}"";""{was_at}"")",https://example.test/clip\n',
-            encoding="utf-8",
-        )
-        return path
-
-    def test_repoints_a_favorite_at_the_video_that_moved(self):
-        with workspace_temp_dir() as temp:
-            moved_to = _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
-            favs = self._favs_csv(temp / "favs.csv", temp / "videos" / "other" / "clip.mp4")
-
-            with _stores_under(temp, FUN_TIME_FAVS_FILE=favs):
-                reference_sync.run()
-
-            cell = favs.read_text(encoding="utf-8").splitlines()[1]
-            self.assertIn("file:///" + str(moved_to).replace("\\", "/"), cell)
-            self.assertIn(str(moved_to), cell)
-            self.assertIn("https://example.test/clip", cell)
 
 
 class TestClipPairings(unittest.TestCase):
@@ -474,21 +449,6 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
                 result = reference_sync.run()
 
             self.assertEqual(json.loads(stats.read_text(encoding="utf-8")), {was_at: 9})
-            self.assertEqual(result.refused, 1)
-
-    def test_a_favorites_file_with_no_local_path_column_is_left_alone(self):
-        """The header row is this one's version, and a rewrite without that
-        column silently repoints nothing at all."""
-        with workspace_temp_dir() as temp:
-            _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
-            favs = temp / "favs.csv"
-            favs.write_text("web_url\nhttps://example.test/clip\n", encoding="utf-8")
-            before = favs.read_text(encoding="utf-8")
-
-            with _stores_under(temp, FUN_TIME_FAVS_FILE=favs):
-                result = reference_sync.run()
-
-            self.assertEqual(favs.read_text(encoding="utf-8"), before)
             self.assertEqual(result.refused, 1)
 
 

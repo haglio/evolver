@@ -162,7 +162,7 @@ CONFIG_REFERENCE_LEDGER = {
     # stage holds while that folder cannot be reached rather than weigh every
     # video without the viewing it holds. Another is how far the acts picked in
     # Origenerator have been written into their records, beside the favorites' cursor.
-    "tasks/watch_weights.py": 9,
+    "tasks/watch_weights.py": 5,
     # Every folder of this library a withdrawn clip can be sitting in by the time
     # the withdrawal is read -- the inbox, 1_sorted, the outbox, both condemned
     # piles -- plus the metadata tree its record mirrors into and the extensions
@@ -194,8 +194,11 @@ CONFIG_REFERENCE_LEDGER = {
     # more fewer: an archived original's sidecar and funscript keep the suffix
     # their mirrors gave them, rather than one looked up again.
     "util/nonai_retire.py": 1,
-    "util/reference_stores.py": 6,
-    "util/sidecar.py": 4,
+    "util/reference_stores.py": 4,
+    # Two more than its mirrored paths need: the library's favorites are listed
+    # off the records, under the same roots, for the videos of the suffixes
+    # every stage finds videos by.
+    "util/sidecar.py": 6,
     "util/topaz.py": 3,
     "util/video_locator.py": 2,
     "util/warm_gun.py": 4,

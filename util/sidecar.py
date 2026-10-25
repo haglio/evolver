@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from app_support import favorites
 from app_support.json_store import locked_update
 from app_support.mirrored_tree import mirrored_path
 
@@ -67,13 +68,21 @@ def sidecar_folder(folder: Path) -> Path | None:
     return _mirrored(folder, folder.suffix)
 
 
+def _video_roots() -> tuple[Path, Path]:
+    return config.VIDEO_LIBRARY_DIR, config.VIDEO_SEARCH_ROOT
+
+
 def _mirrored(path: Path, suffix: str) -> Path | None:
-    return mirrored_path(
-        path,
-        roots=(config.VIDEO_LIBRARY_DIR, config.VIDEO_SEARCH_ROOT),
-        mirror_root=config.METADATA_DIR,
-        suffix=suffix,
-    )
+    return mirrored_path(path, roots=_video_roots(), mirror_root=config.METADATA_DIR, suffix=suffix)
+
+
+def mark_favorite(video: Path, favorite: bool) -> bool:
+    return favorites.mark(sidecar_path(video), favorite)
+
+
+def library_favorites() -> list[favorites.Favorite]:
+    return favorites.favorites_under(config.METADATA_DIR, video_roots=_video_roots(),
+                                     video_suffixes=sorted(config.VIDEO_EXTENSIONS))
 
 
 def read(path: Path) -> dict:
