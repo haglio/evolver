@@ -49,7 +49,7 @@ class TestClipScripts(ClipScriptsCase):
 
         written = json.loads(self.clip_script().read_text(encoding="utf-8"))
         stamp = written["metadata"][provenance.BLOCK][provenance.CLIP_SCRIPTS]
-        self.assertEqual((stamp["app"], stamp["recipe"], stamp["recipe_version"]),
+        self.assertEqual((stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
                          ("evolver", None, None))
 
     def test_what_made_the_scene_script_comes_along_into_the_clips(self):

@@ -84,8 +84,8 @@ class TestGenauDeliver(unittest.TestCase):
         """Delivering moves a file; it makes none. The stamps a loop was
         generated and upscaled under go with it, and no new one is filed."""
         stamps = {
-            provenance.GENERATION: provenance.reconstructed("origenerator", recipe="loop"),
-            provenance.UPSCALE: provenance.reconstructed("evolver", recipe="ai_upscale"),
+            provenance.GENERATION: provenance.reconstructed("origenerator", method="loop"),
+            provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale"),
         }
         with workspace_temp_dir() as root:
             outbox, sorted_dir, flicks = _lane(root)

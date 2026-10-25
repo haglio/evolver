@@ -104,7 +104,7 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/genau_deliver.py": 5,
     # One fewer: the runtime cap is a field of the EncodeSettings this
     # module now declares, rather than a number it looks up. Then six fewer: the
-    # recipe it launches is util.topaz's NON_AI_UPSCALE, named and versioned
+    # settings it launches are util.topaz's NON_AI_UPSCALE, named and versioned
     # beside its settings, not a template, two edges and a tag looked up here.
     "tasks/nonai_encode.py": 5,
     "tasks/nonai_group.py": 1,
@@ -147,13 +147,13 @@ CONFIG_REFERENCE_LEDGER = {
     # The 9th is the third shape: the inbox, to tell a funscript Origenerator
     # handed over with its clip -- one no person wrote -- from any other.
     "tasks/stray_files.py": 9,
-    # One more for the provider's source name in the recipe guard (bug 7), then
-    # four fewer: the two recipes it chooses between are util.topaz's, named and
+    # One more for the provider's source name in the settings guard (bug 7), then
+    # four fewer: the two settings it chooses between are util.topaz's, named and
     # versioned beside the settings they run with, not four loose strings here.
     # Then one more, the third shape: where a dismissed low-disk warning is
     # remembered, read once in run() and handed to the two helpers. And one more
     # of it: the Origenerator checkout whose published document says the rate its
-    # videos are generated at, read once in run() and handed to the recipe choice.
+    # videos are generated at, read once in run() and handed to the choice of settings.
     "tasks/upscale.py": 14,
     "tasks/video_types.py": 5,
     # The lane walk it used to do itself, and the stage that walks the lanes

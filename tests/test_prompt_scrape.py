@@ -221,7 +221,7 @@ class TestPromptScrape(unittest.TestCase):
         stamped it first: a scrape that failed and was let retry lands after its
         clip was upscaled. Dropping that stamp leaves an upscale nothing says
         anything about."""
-        upscaled = provenance.reconstructed("evolver", recipe="ai_upscale")
+        upscaled = provenance.reconstructed("evolver", method="ai_upscale")
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
@@ -241,9 +241,9 @@ class TestPromptScrape(unittest.TestCase):
             self.assertEqual(sidecar.read(existing)[provenance.BLOCK], {"upscale": upscaled})
 
     def test_the_stamp_a_scrape_brings_joins_the_ones_already_there(self):
-        upscaled = provenance.reconstructed("evolver", recipe="ai_upscale")
-        generated = provenance.reconstructed("origenerator", recipe="wan22_i2v",
-                                             recipe_version="v007")
+        upscaled = provenance.reconstructed("evolver", method="ai_upscale")
+        generated = provenance.reconstructed("origenerator", method="wan22_i2v",
+                                             method_version="v007")
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "origenerator", "portrait", "wan22_i2v_00001_.mp4")

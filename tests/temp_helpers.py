@@ -169,8 +169,8 @@ def make_video(path: Path) -> Path:
     return path
 
 
-STARTED_UNDER = provenance.reconstructed("evolver", recipe="non_ai_upscale",
-                                         recipe_version="v000")
+STARTED_UNDER = provenance.reconstructed("evolver", method="non_ai_upscale",
+                                         method_version="v000")
 
 
 def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,

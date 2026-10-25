@@ -1,4 +1,4 @@
-"""How both upscale stages run Topaz: the recipes, the ffmpeg invocation that carries one, and whether Topaz's sign-in has expired."""
+"""How both upscale stages run Topaz: the settings, the ffmpeg invocation that carries them, and whether Topaz's sign-in has expired."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class Recipe:
+class Settings:
     """One way of running Topaz over a video, under the name and version every
     output made with it records (:mod:`util.provenance`)."""
 
@@ -29,16 +29,16 @@ class Recipe:
     filter_complex: str
     videoai_tag: str
     keep_audio: bool = False
-    # The long and short edge of the frame a recipe aims at, where it aims at one
+    # The long and short edge of the frame the settings aim at, where it aims at one
     # rather than at a scale. Its filter names them {width} and {height}, which
     # only the video's orientation settles: see framed().
     frame: tuple[int, int] | None = None
 
 
-# A change to anything a recipe runs with owes it a new version: that is how a
+# A change to anything a set of settings runs with owes it a new version: that is how a
 # later sweep tells what it made before the change from what it made after, and
 # tests/test_topaz.py holds each version to the settings it shipped with.
-AI_UPSCALE = Recipe(
+AI_UPSCALE = Settings(
     name="ai_upscale",
     version="v002",
     filter_complex=(
@@ -49,7 +49,7 @@ AI_UPSCALE = Recipe(
                  "keeping the soundtrack"),
     keep_audio=True,
 )
-AI_UPSCALE_T2V = Recipe(
+AI_UPSCALE_T2V = Settings(
     name="ai_upscale_t2v",
     version="v002",
     filter_complex=(
@@ -64,11 +64,11 @@ AI_UPSCALE_T2V = Recipe(
 # What the non-AI clips processed by hand in the Topaz GUI carry in their videoai
 # tags: apo-8 60 fps interpolation, then an iris-2 upscale in auto mode with
 # recover-original-detail at 100 (blend=1), aimed at a 4K frame, keeping the
-# soundtrack. vram=0.5 and instances=0 where the AI recipes have 1 and 1: an
+# soundtrack. vram=0.5 and instances=0 where the AI settings have 1 and 1: an
 # unattended multi-hour encode shares the machine with whatever else is running,
 # so it gets half the VRAM budget and no extra model instance -- slower, but far
 # harder to push the machine into memory exhaustion.
-NON_AI_UPSCALE = Recipe(
+NON_AI_UPSCALE = Settings(
     name="non_ai_upscale",
     version="v001",
     filter_complex=(
@@ -84,7 +84,7 @@ NON_AI_UPSCALE = Recipe(
 
 # download=0: Topaz otherwise stops to fetch model files it does not need, which
 # on a slow connection has outlasted the stage's run budget.
-AI_UPSCALE_ORIGENERATOR = Recipe(
+AI_UPSCALE_ORIGENERATOR = Settings(
     name="ai_upscale_origenerator",
     version="v001",
     filter_complex=(
@@ -98,9 +98,9 @@ AI_UPSCALE_ORIGENERATOR = Recipe(
     keep_audio=True,
 )
 
-RECIPES = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE, AI_UPSCALE_ORIGENERATOR)
+ALL_SETTINGS = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE, AI_UPSCALE_ORIGENERATOR)
 
-RETIRED_RECIPES = (
+RETIRED_SETTINGS = (
     replace(AI_UPSCALE, version="v001", keep_audio=False,
             videoai_tag="Processed using apo-8 for 60 fps interpolation and gcg-5 for 4x upscale"),
     replace(AI_UPSCALE_T2V, version="v001", keep_audio=False,
@@ -108,8 +108,8 @@ RETIRED_RECIPES = (
                          "upscale (t2v provider)")),
 )
 
-# A name in parentheses closing a note: the one part of a recipe's note that has
-# been reworded while the recipe stayed the same.
+# A name in parentheses closing a note: the one part of the settings' note that has
+# been reworded while the settings stayed the same.
 _CLOSING_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
 
 SIGN_IN_EXPIRED = "topaz_sign_in_expired"
@@ -125,26 +125,26 @@ _EXPIRED_SIGN_IN_MESSAGES = (
 _SIGN_IN_CHECK_TIMEOUT_SECONDS = 90
 
 
-def recipe_noted(note: str) -> Recipe | None:
-    """The recipe whose note Topaz wrote into a file is *note*, or None."""
+def settings_noted(note: str) -> Settings | None:
+    """The settings whose note Topaz wrote into a file is *note*, or None."""
     said = _CLOSING_PARENTHETICAL.sub("", note)
-    return next((recipe for recipe in (*RECIPES, *RETIRED_RECIPES)
-                 if _CLOSING_PARENTHETICAL.sub("", recipe.videoai_tag) == said), None)
+    return next((settings for settings in (*ALL_SETTINGS, *RETIRED_SETTINGS)
+                 if _CLOSING_PARENTHETICAL.sub("", settings.videoai_tag) == said), None)
 
 
-def framed(recipe: Recipe, orient: str, video_fps: Fraction | None = None,
-           generated_fps: Fraction | None = None) -> Recipe:
-    """*recipe* turned to the video it runs over: {width} and {height} wide for
+def framed(settings: Settings, orient: str, video_fps: Fraction | None = None,
+           generated_fps: Fraction | None = None) -> Settings:
+    """*settings* turned to the video they run over: {width} and {height} wide for
     landscape and tall otherwise, and {every} and {kept_fps} picking out the frames
     a model generating at *generated_fps* made."""
     every = _generated_frame_spacing(video_fps, generated_fps)
     settled = {"every": every, "kept_fps": video_fps / every if video_fps else "source_fps"}
-    if recipe.frame is not None:
-        long_edge, short_edge = recipe.frame
+    if settings.frame is not None:
+        long_edge, short_edge = settings.frame
         settled["width"], settled["height"] = ((long_edge, short_edge)
                                                if orient == orientation.LANDSCAPE
                                                else (short_edge, long_edge))
-    return replace(recipe, filter_complex=recipe.filter_complex.format(**settled))
+    return replace(settings, filter_complex=settings.filter_complex.format(**settled))
 
 
 def _generated_frame_spacing(video_fps: Fraction | None, generated_fps: Fraction | None) -> int:
@@ -163,13 +163,13 @@ def environment() -> dict:
     }
 
 
-def command(in_file: Path, out_file: Path, recipe: Recipe) -> list[str]:
+def command(in_file: Path, out_file: Path, settings: Settings) -> list[str]:
     """The full Topaz ffmpeg argv for one video."""
-    left = [name for _, name, _, _ in string.Formatter().parse(recipe.filter_complex) if name]
+    left = [name for _, name, _, _ in string.Formatter().parse(settings.filter_complex) if name]
     if left:
-        raise ValueError(f"{recipe.name} still names {', '.join(left)}: "
+        raise ValueError(f"{settings.name} still names {', '.join(left)}: "
                          "turn it to the video with framed()")
-    audio_args = ["-c:a", "aac", "-b:a", "192k"] if recipe.keep_audio else ["-an"]
+    audio_args = ["-c:a", "aac", "-b:a", "192k"] if settings.keep_audio else ["-an"]
     return [
         _ffmpeg(),
         "-hide_banner", "-nostdin", "-y",
@@ -177,7 +177,7 @@ def command(in_file: Path, out_file: Path, recipe: Recipe) -> list[str]:
         "-hwaccel", "cuda",
         "-i", str(in_file),
         "-sws_flags", "spline+accurate_rnd+full_chroma_int",
-        "-filter_complex", recipe.filter_complex,
+        "-filter_complex", settings.filter_complex,
         "-c:v", "hevc_nvenc",
         "-profile:v", "main",
         "-pix_fmt", "yuv420p",
@@ -198,7 +198,7 @@ def command(in_file: Path, out_file: Path, recipe: Recipe) -> list[str]:
         "-fps_mode:v", "cfr",
         "-movflags", "frag_keyframe+empty_moov+delay_moov+use_metadata_tags+write_colr",
         "-bf", "0",
-        "-metadata", f"videoai={recipe.videoai_tag}",
+        "-metadata", f"videoai={settings.videoai_tag}",
         "-f", "mp4",
         str(out_file),
     ]

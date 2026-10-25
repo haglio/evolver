@@ -48,7 +48,7 @@ class TestSceneScripts(SceneScriptsCase):
 
         written = json.loads(self.scene_script().read_text(encoding="utf-8"))
         stamp = written["metadata"][provenance.BLOCK][provenance.SCENE_SCRIPTS]
-        self.assertEqual((stamp["app"], stamp["recipe"], stamp["recipe_version"]),
+        self.assertEqual((stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
                          ("evolver", None, None))
 
     def test_the_rest_of_the_scene_is_left_unscripted(self):

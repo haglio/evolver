@@ -746,7 +746,7 @@ class TestTheJobFilesKeys(unittest.TestCase):
 
 
 class TestWhatMadeTheUpscale(unittest.TestCase):
-    def test_a_started_encode_keeps_the_stamp_of_the_recipe_and_code_that_started_it(self):
+    def test_a_started_encode_keeps_the_stamp_of_the_settings_and_code_that_started_it(self):
         """An encode runs for hours and concludes on a later tick -- sometimes
         after a restart onto newer code -- so what made it is taken when it
         starts, not when it is promoted."""
@@ -760,7 +760,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
             stamp = json.loads(
                 overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))["provenance"]
-            self.assertEqual((stamp["app"], stamp["recipe"], stamp["recipe_version"]),
+            self.assertEqual((stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
                              ("evolver", "non_ai_upscale", "v001"))
 
     def test_a_promoted_upscale_files_the_stamp_its_encode_started_under(self):
@@ -777,7 +777,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
     def test_an_encode_started_before_stamps_were_kept_files_one_that_says_so(self):
         """The encode in flight on the day this lands has a record with no stamp
-        in it: it was ours, on our recipe, and nothing more is known."""
+        in it: it was ours, on our settings, and nothing more is known."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _source, _tmp, out = write_job(root, overrides, expected=100.0, stamp=None)
@@ -788,7 +788,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
                 stamps = sidecar.read(sidecar.sidecar_path(out)).get(provenance.BLOCK)
             self.assertEqual(stamps, {provenance.UPSCALE_NON_AI: provenance.reconstructed(
-                "evolver", recipe="non_ai_upscale")})
+                "evolver", method="non_ai_upscale")})
 
 
 class TestOrphanAdoption(unittest.TestCase):

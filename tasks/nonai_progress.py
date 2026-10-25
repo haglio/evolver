@@ -83,10 +83,10 @@ def _upscaled() -> dict[str, float | None]:
     """Each original the library already holds an upscale of, and how long it ran.
 
     Keyed by the *original's* stem rather than the variant's, because one
-    original can have several variants — a second recipe, or a version saved
+    original can have several variants — other settings, or a version saved
     under a name of its own (``config.NONAI_VERSION_OVERRIDES``) — and it is one
     video's worth of the project either way.  The variant's own running time
-    answers for the original's: the recipe interpolates frames rather than
+    answers for the original's: the settings interpolate frames rather than
     changing the length, which is the same equality the stage checks an encode's
     completeness against.
     """

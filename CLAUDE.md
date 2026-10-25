@@ -34,14 +34,14 @@ in irritation and takes whatever else he was running with it. The windowless
 pre-handoff check is `python -m pytest tests/test_launch_smoke.py`, which
 replays the launch's whole import phase.
 
-## Retuning a Topaz recipe owes it a new version
+## Retuning a Topaz setting owes its settings a new version
 
-Every upscale records the recipe it was made with and that recipe's version
+Every upscale records the Topaz settings it was made with and their version
 (`util/topaz.py`), so a later sweep can find whatever an old version made and
 remake it. A version left unbumped after a retune is worse than no record: the
 sweep reads the old files as current and skips them. So a change to anything a
-recipe runs Topaz with -- a filter, a videoai tag, the frame it aims at, an
-encoder argument in `topaz.command` -- bumps that recipe's version in the same
+set of settings runs Topaz with -- a filter, a videoai tag, the frame it aims at,
+an encoder argument in `topaz.command` -- bumps those settings' version in the same
 commit.
 `tests/test_topaz.py` fails until it does, and until the new version's
 fingerprint is added to `SHIPPED`. Never edit a fingerprint already there:

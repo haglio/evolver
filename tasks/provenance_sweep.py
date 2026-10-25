@@ -47,7 +47,7 @@ class ProvenanceResult:
         for act, stamp in filled.written.items():
             if act == provenance.GENERATION:
                 self.looked_up += 1
-            elif stamp.get("recipe") is not None:
+            elif stamp.get(provenance.METHOD) is not None:
                 self.from_notes += 1
             else:
                 self.unknown += 1
@@ -84,10 +84,10 @@ class _Notes:
         if self._left <= 0:
             return None
         self._left -= 1
-        recipe = topaz.recipe_noted(self._read_note(video))
-        if recipe is None:
+        settings = topaz.settings_noted(self._read_note(video))
+        if settings is None:
             return provenance.reconstructed(None)
-        return provenance.reconstructed("evolver", recipe=recipe.name)
+        return provenance.reconstructed("evolver", method=settings.name)
 
 
 def run(read_note: Callable[[Path], str] = ffprobe.videoai_tag,

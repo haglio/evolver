@@ -158,8 +158,8 @@ def _generation_provenance(row: dict) -> dict:
         return its_own
     return provenance.reconstructed(
         "origenerator",
-        recipe=_named(row.get("workflow_name")),
-        recipe_version=_named(row.get("workflow_version")))
+        method=_named(row.get("workflow_name")),
+        method_version=_named(row.get("workflow_version")))
 
 
 def _named(column: str | None) -> str | None:
