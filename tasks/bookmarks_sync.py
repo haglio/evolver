@@ -1,24 +1,24 @@
-"""Stage: sync Fun Time favorites into a Chrome bookmarks folder."""
+"""Stage: sync the library's favorites into a Chrome bookmarks folder."""
 
 from __future__ import annotations
 
 import json
 import logging
-import re
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
+from app_support.favorites import Favorite
 from app_support.file_channel import write_whole
 
 import config
-from util import favs_csv
+from util import sidecar
 
 log = logging.getLogger(__name__)
 
-_HYPERLINK_URL_RE = re.compile(r'^=HYPERLINK\("([^"]+)"[;,]', re.IGNORECASE)
 _PROFILE_INFO_KEY = "profile"
 _PROFILE_CACHE_KEY = "info_cache"
 _BOOKMARKS_BAR_KEY = "bookmark_bar"
@@ -27,10 +27,8 @@ _BOOKMARKS_BAR_KEY = "bookmark_bar"
 @dataclass
 class BookmarksSyncResult:
     synced: int = 0
-    pruned: int = 0
     no_url: int = 0
     bad_url: int = 0
-    source_missing: bool = False
     profile_missing: bool = False
     write_error: str = ""
 
@@ -41,31 +39,26 @@ class BookmarksSyncResult:
 
 @dataclass(frozen=True)
 class _Favorites:
-    """The web addresses the favorites file yielded, and what reading it found."""
+    """The web addresses the favorites carry, and what reading them found."""
 
     urls: list[str] = field(default_factory=list)
-    pruned: int = 0
     no_url: int = 0
     bad_url: int = 0
-    source_missing: bool = False
 
 
 def run(
     *,
-    favs_file: Path | None = None,
     chrome_user_data_dir: Path | None = None,
     chrome_profile_name: str | None = None,
     bookmarks_folder_name: str | None = None,
 ) -> BookmarksSyncResult:
     """Write the favorites' web URLs into one folder of a Chrome profile.
 
-    Every one of the four things this stage reaches for lives outside the
-    repo — a sibling app's CSV, and a browser profile on this machine — so
-    each is an argument rather than a name to grep the body for. They are
+    The three things this stage reaches for in a browser profile on this
+    machine are arguments rather than names to grep the body for. They are
     resolved here rather than in the signature: a default is evaluated at
     import, which would freeze the value past ``override_config``.
     """
-    favs_file = config.FUN_TIME_FAVS_FILE if favs_file is None else favs_file
     chrome_user_data_dir = (
         config.CHROME_USER_DATA_DIR if chrome_user_data_dir is None else chrome_user_data_dir
     )
@@ -80,17 +73,14 @@ def run(
 
     result = BookmarksSyncResult()
     log.info("=== Stage: bookmarks -> Chrome profile %s ===", chrome_profile_name)
-    log.info("SOURCE CSV: %s", favs_file)
     log.info("CHROME USER DATA: %s", chrome_user_data_dir)
 
-    favorites = _read_urls(favs_file)
-    result.pruned = favorites.pruned
+    if not config.METADATA_DIR.is_dir():
+        log.info("The library's records cannot be reached. Skipping bookmarks sync.")
+        return result
+    favorites = _pages_of(sidecar.library_favorites())
     result.no_url = favorites.no_url
     result.bad_url = favorites.bad_url
-    result.source_missing = favorites.source_missing
-    if result.source_missing:
-        log.info("Favorites CSV not found. Skipping bookmarks sync.")
-        return result
 
     profile_dir = _find_profile_dir(chrome_user_data_dir, chrome_profile_name)
     if profile_dir is None:
@@ -127,68 +117,20 @@ def run(
     return result
 
 
-def _read_urls(path: Path) -> _Favorites:
-    if not path.is_file():
-        return _Favorites(source_missing=True)
-
-    fieldnames, rows, pruned = _load_and_prune_rows(path)
-
+def _pages_of(favorites: Iterable[Favorite]) -> _Favorites:
     urls: list[str] = []
-    seen: set[str] = set()
-    no_url = 0
-    bad_url = 0
-    for row in rows:
-        raw_value = (row.get("web_url") or "").strip()
-        if not raw_value:
+    no_url = bad_url = 0
+    for favorite in favorites:
+        if not favorite.page:
             no_url += 1
             continue
-
-        url = _extract_url(raw_value)
-        if url is None:
+        parsed = urlparse(favorite.page)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             bad_url += 1
-            log.warning("Skipping invalid web_url cell: %s", raw_value)
+            log.warning("Skipping a favorite whose page is no web address: %s", favorite.video)
             continue
-        if url in seen:
-            continue
-        seen.add(url)
-        urls.append(url)
-
-    if pruned:
-        favs_csv.write_rows(path, fieldnames, rows)
-        log.info("Removed %d stale favorite row(s) whose source file is gone.", pruned)
-    return _Favorites(urls=urls, pruned=pruned, no_url=no_url, bad_url=bad_url)
-
-
-def _load_and_prune_rows(path: Path) -> tuple[list[str], list[dict[str, str]], int]:
-    """Read the favorites, dropping rows whose local file is really gone.
-
-    "Really" gone: the references stage runs first and has already followed
-    every favorite it could to the video's new home, so anything still missing
-    here has no counterpart left in the library.
-    """
-    fieldnames, rows = favs_csv.read_rows(path)
-    file_column = favs_csv.file_column_name(fieldnames)
-    if file_column is None:
-        return fieldnames, rows, 0
-
-    kept_rows: list[dict[str, str]] = []
-    pruned = 0
-    for row in rows:
-        local = favs_csv.local_path((row.get(file_column) or "").strip(), path.parent)
-        if local is not None and not local.exists():
-            pruned += 1
-            continue
-        kept_rows.append(row)
-    return fieldnames, kept_rows, pruned
-
-
-def _extract_url(value: str) -> str | None:
-    match = _HYPERLINK_URL_RE.match(value)
-    candidate = match.group(1) if match else value
-    parsed = urlparse(candidate)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return None
-    return candidate
+        urls.append(favorite.page)
+    return _Favorites(urls=list(dict.fromkeys(urls)), no_url=no_url, bad_url=bad_url)
 
 
 def _find_profile_dir(user_data_dir: Path, profile_name: str) -> Path | None:
@@ -270,8 +212,10 @@ def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> int:
     else:
         folder["date_modified"] = now
 
+    wanted = set(urls)
+    kept = [child.get("url") for child in folder.get("children", []) if child.get("url") in wanted]
     folder["children"] = []
-    for url in urls:
+    for url in dict.fromkeys([*kept, *urls]):
         folder["children"].append(
             {
                 "date_added": now,
