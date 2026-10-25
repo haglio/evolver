@@ -38,7 +38,7 @@ class TestAnOrigeneratorClip(unittest.TestCase):
 
         self.assertEqual(recorded[provenance.BLOCK], {
             provenance.GENERATION: provenance.reconstructed(
-                "origenerator", recipe="wan22_i2v", recipe_version="v007"),
+                "origenerator", method="wan22_i2v", method_version="v007"),
         })
 
     def test_one_its_gallery_has_no_record_of_is_recorded_as_generated_there_and_no_more(self):
@@ -96,10 +96,10 @@ class TestAnOrigeneratorClip(unittest.TestCase):
 
 
 class TestAnAiUpscale(unittest.TestCase):
-    def test_one_made_before_upscales_kept_a_record_says_the_recipe_its_note_names(self):
+    def test_one_made_before_upscales_kept_a_record_says_the_settings_its_note_names(self):
         """Topaz wrote a note into the file naming the models it used. When that
-        is one of Evolver's recipes, Evolver made it with that recipe; which
-        version of the recipe, and under which commit, went unrecorded."""
+        is one of Evolver's settings, Evolver made it with those settings; which
+        version of them, and under which commit, went unrecorded."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
@@ -111,9 +111,9 @@ class TestAnAiUpscale(unittest.TestCase):
                 recorded = sidecar.read(sidecar.sidecar_path(upscaled))
 
         self.assertEqual(recorded[provenance.BLOCK],
-                         {provenance.UPSCALE: provenance.reconstructed("evolver", recipe="ai_upscale")})
+                         {provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale")})
 
-    def test_one_whose_note_names_no_recipe_here_is_recorded_with_its_maker_unknown(self):
+    def test_one_whose_note_names_no_settings_here_is_recorded_with_its_maker_unknown(self):
         """A hand export from the Topaz GUI can sit in the outbox under an
         upscale's name; its note is in Topaz's own words, and nothing says who
         made it."""
@@ -131,11 +131,11 @@ class TestAnAiUpscale(unittest.TestCase):
                          {provenance.UPSCALE: provenance.reconstructed(None)})
 
     def test_a_stamp_taken_when_the_upscale_was_made_is_left_as_it_stands(self):
-        """The stage that made the file knew the recipe, its version and the
+        """The stage that made the file knew the settings, their version and the
         commit; a guess written over that would be the wrong record the stamp
         exists to prevent."""
-        taken_at_the_time = {**provenance.reconstructed("evolver", recipe="ai_upscale",
-                                                        recipe_version="v001"),
+        taken_at_the_time = {**provenance.reconstructed("evolver", method="ai_upscale",
+                                                        method_version="v001"),
                              "app_commit": "0123abc", "app_dirty": False,
                              "stamped_at": "2026-09-01T20:15:00+00:00"}
         with workspace_temp_dir() as root:
@@ -154,7 +154,7 @@ class TestAnAiUpscale(unittest.TestCase):
 
 
 class TestAGenauFlick(unittest.TestCase):
-    def test_a_loop_delivered_before_records_were_kept_says_the_recipe_its_note_names(self):
+    def test_a_loop_delivered_before_records_were_kept_says_the_settings_its_note_names(self):
         """Delivery carries a record that was already there; a loop delivered
         before anything kept one arrives with none, and its note still says how
         it was upscaled."""
@@ -168,7 +168,7 @@ class TestAGenauFlick(unittest.TestCase):
                 recorded = sidecar.read(sidecar.sidecar_path(clip))
 
         self.assertEqual(recorded[provenance.BLOCK],
-                         {provenance.UPSCALE: provenance.reconstructed("evolver", recipe="ai_upscale")})
+                         {provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale")})
 
 
 class TestANonAiUpscale(unittest.TestCase):
@@ -187,13 +187,13 @@ class TestANonAiUpscale(unittest.TestCase):
                 recorded = sidecar.read(sidecar.sidecar_path(upscale))
 
         self.assertEqual(recorded[provenance.BLOCK], {
-            provenance.UPSCALE_NON_AI: provenance.reconstructed("evolver", recipe="non_ai_upscale"),
+            provenance.UPSCALE_NON_AI: provenance.reconstructed("evolver", method="non_ai_upscale"),
         })
 
 
 class TestWhatARunSays(unittest.TestCase):
     def test_records_a_note_named_are_counted_apart_from_ones_nothing_named(self):
-        """Most upscales name their recipe in their note; the run detail has to
+        """Most upscales name their settings in their note; the run detail has to
         show those apart from the few whose maker nobody can say."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)

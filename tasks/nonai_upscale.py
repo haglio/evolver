@@ -1,4 +1,4 @@
-"""Stage: gradually upscale the 2D/non_AI library with its own established recipe.
+"""Stage: gradually upscale the 2D/non_AI library with its own established settings.
 
 The non_AI buckets (``other/full``, ``other/clips``, …) hold real-footage
 scenes the user has been enhancing by hand in the Topaz GUI: apo-8 60 fps
@@ -597,8 +597,8 @@ def _launch(candidate: Candidate, files: StageFiles, *, on_request: bool = False
         "out": str(out),
         "expected_duration": expected_duration,
         "started_at": time.time(),
-        "provenance": provenance.by_evolver(recipe=topaz.NON_AI_UPSCALE.name,
-                                            recipe_version=topaz.NON_AI_UPSCALE.version),
+        "provenance": provenance.by_evolver(method=topaz.NON_AI_UPSCALE.name,
+                                            method_version=topaz.NON_AI_UPSCALE.version),
     }
     if on_request:
         job["on_request"] = True

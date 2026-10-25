@@ -10,6 +10,7 @@ from app_support import provenance
 
 from tasks import origenerator_metadata as om
 from tests.temp_helpers import workspace_temp_dir
+from util.provenance import METHOD, METHOD_VERSION
 
 _SCHEMA = (
     "CREATE TABLE generations ("
@@ -77,7 +78,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
         self.assertEqual(payload["provenance"], {"generation": {
             "schema": provenance.SCHEMA, "app": "origenerator",
             "app_commit": None, "app_dirty": None,
-            "recipe": "wan22_i2v", "recipe_version": "v007", "stamped_at": None,
+            METHOD: "wan22_i2v", METHOD_VERSION: "v007", "stamped_at": None,
         }})
 
     def test_what_an_import_writes_in_place_of_a_workflow_is_recorded_as_unknown(self):
@@ -92,7 +93,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
 
         generation = payload["provenance"]["generation"]
-        self.assertEqual((generation["recipe"], generation["recipe_version"]), (None, None))
+        self.assertEqual((generation[METHOD], generation[METHOD_VERSION]), (None, None))
 
     def test_a_record_the_gallery_keeps_of_its_own_is_carried_as_it_stands(self):
         """Once Origenerator stamps its own rows it knows what nothing here can
@@ -100,7 +101,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
         its_own = {
             "schema": provenance.SCHEMA, "app": "origenerator",
             "app_commit": "0123abc", "app_dirty": False,
-            "recipe": "wan22_i2v", "recipe_version": "v007",
+            METHOD: "wan22_i2v", METHOD_VERSION: "v007",
             "stamped_at": "2026-09-01T20:15:00+00:00",
         }
         with workspace_temp_dir() as root:

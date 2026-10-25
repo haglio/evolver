@@ -138,12 +138,12 @@ def run(
 
         log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
 
-        recipe = _recipe_for(in_file, source, orient, outbox_dir, origenerator_dir)
+        settings = _settings_for(in_file, source, orient, outbox_dir, origenerator_dir)
 
         ffmpeg_timeout = max(remaining_budget, 1) if run_budget_seconds else None
         ffmpeg_ok = False
         try:
-            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, recipe, timeout=ffmpeg_timeout)
+            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, settings, timeout=ffmpeg_timeout)
         except subprocess.TimeoutExpired:
             elapsed_at_stop = time.monotonic() - started_at
             log.info(
@@ -168,7 +168,7 @@ def run(
                 else:
                     result.processed += 1
                     log.info("Wrote: %s", out)
-                    _record_the_upscale(out, recipe)
+                    _record_the_upscale(out, settings)
                 finally:
                     tmp.unlink(missing_ok=True)
             else:
@@ -227,7 +227,7 @@ def collect_candidates(
         seen.add(in_file)
         out = upscaled_video_path(source, orient, in_file.stem, outbox_dir)
         if _already_processed(source, out.name, outbox_dir, weird_dir):
-            if out.is_file() and _made_by_a_superseded_recipe(source, out):
+            if out.is_file() and _made_by_superseded_settings(source, out):
                 remakes.append((in_file, source, orient))
             return False
         candidates.append((in_file, source, orient))
@@ -261,13 +261,13 @@ def collect_candidates(
     return pending if limit is None else pending[:limit]
 
 
-def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, recipe: topaz.Recipe,
+def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, settings: topaz.Settings,
                 timeout: float | None = None) -> bool:
     # check=False, said out loud: a non-zero exit is this function's answer --
     # the caller counts the clip failed, deletes the partial and moves on --
     # not an exception for the loop to catch around every encode.
     return subprocess.run(
-        topaz.command(in_file, tmp, recipe), env=env, timeout=timeout,
+        topaz.command(in_file, tmp, settings), env=env, timeout=timeout,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
         creationflags=subprocess.CREATE_NO_WINDOW,
     ).returncode == 0
@@ -277,7 +277,7 @@ def _sent_by_origenerator(source: str) -> bool:
     return source in {lane.source for lane in lanes.sent_lanes()}
 
 
-def _made_by_a_superseded_recipe(source: str, upscaled: Path) -> bool:
+def _made_by_superseded_settings(source: str, upscaled: Path) -> bool:
     if not _sent_by_origenerator(source):
         return False
     try:
@@ -286,11 +286,11 @@ def _made_by_a_superseded_recipe(source: str, upscaled: Path) -> bool:
         return False
     made_by = provenance.stamps_of(payload).get(provenance.UPSCALE) or {}
     current = topaz.AI_UPSCALE_ORIGENERATOR
-    return (made_by.get("recipe"), made_by.get("recipe_version")) != (current.name, current.version)
+    return (made_by.get(provenance.METHOD), made_by.get(provenance.METHOD_VERSION)) != (current.name, current.version)
 
 
-def _recipe_for(in_file: Path, source: str, orient: str, outbox_dir: Path,
-                origenerator_dir: Path) -> topaz.Recipe:
+def _settings_for(in_file: Path, source: str, orient: str, outbox_dir: Path,
+                origenerator_dir: Path) -> topaz.Settings:
     if _sent_by_origenerator(source):
         return topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orient,
                             video_fps=ffprobe.frame_rate(in_file),
@@ -300,25 +300,25 @@ def _recipe_for(in_file: Path, source: str, orient: str, outbox_dir: Path,
     return topaz.AI_UPSCALE
 
 
-def _record_the_upscale(out: Path, recipe: topaz.Recipe) -> None:
+def _record_the_upscale(out: Path, settings: topaz.Settings) -> None:
     """File what made *out* on its sidecar, which an outbox given from outside
     the library does not have (see :func:`_is_t2v_provider`)."""
     try:
         path = sidecar_path(out)
     except ValueError:
         return
-    stamp = provenance.by_evolver(recipe=recipe.name, recipe_version=recipe.version)
+    stamp = provenance.by_evolver(method=settings.name, method_version=settings.version)
     sidecar.update(path, lambda current: provenance.recorded(current, provenance.UPSCALE, stamp))
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> bool:
-    """Whether this clip is a text-to-video one, which takes the other recipe.
+    """Whether this clip is a text-to-video one, which takes the other settings.
 
     The sidecar mirror is the *library's*, so ``sidecar_path`` can only answer
     for a clip inside it and raises for anything else. An outbox given from
     outside the library therefore has no sidecar to consult, which is a
     question with no answer rather than a failure: the clip takes the default
-    recipe, exactly as one with no sidecar on disk already does.
+    settings, exactly as one with no sidecar on disk already does.
     """
     if source != config.PROVIDER_SOURCE:
         return False
@@ -329,7 +329,7 @@ def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> b
     # An absent or unreadable sidecar reads back empty, and a sidecar holding
     # nothing but the video's own kind and running time
     # (util.video_type.only_the_video_itself) records no generation at all:
-    # neither says text-to-video, so both take the default recipe -- the wrong
+    # neither says text-to-video, so both take the default settings -- the wrong
     # Topaz model is baked into a finished encode nobody re-runs.
     payload = sidecar.read(meta_path)
     if not payload or video_type.only_the_video_itself(payload):

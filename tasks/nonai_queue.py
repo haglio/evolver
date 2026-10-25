@@ -2,8 +2,8 @@
 
 Candidates come from the buckets' triage folders (``0 unsorted``, ``1 could
 use work``), most-wanted first: a pin in the pin list beats everything and
-also re-queues a video whose only processed variant came from an older
-recipe, then an explicit ``1`` flag, then Fun Time's watch score, then clips
+also re-queues a video whose only processed variant came from older
+settings, then an explicit ``1`` flag, then Fun Time's watch score, then clips
 with a funscript — the only per-video engagement signal the non_AI library has
 of its own.
 
@@ -62,7 +62,7 @@ def collect_candidates(*, skip_list: Path, pin_list: Path,
                         continue
                     # A variant of this video already existing normally means
                     # there is nothing to do. A pin overrides that: the variant
-                    # is an older recipe, and the redo is the whole point.
+                    # is from older settings, and the redo is the whole point.
                     if video.stem in processed_stems and rel not in pinned:
                         continue
                     if rel in skipped:

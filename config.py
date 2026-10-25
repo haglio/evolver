@@ -268,7 +268,7 @@ LOW_DISK_WARNING_GB = 25
 CPU_BUSY_SKIP_THRESHOLD_PCT = 65.0
 CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
 
-# Non-AI library upscaling, whose recipe is util/topaz.py's NON_AI_UPSCALE. These
+# Non-AI library upscaling, whose Topaz settings are util/topaz.py's NON_AI_UPSCALE. These
 # encodes run for hours, so the stage launches one detached ffmpeg at a time and
 # checks on it each scheduler tick.
 # Version families the naming rule cannot see. It reunites an original with a
@@ -309,7 +309,7 @@ NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays v
 # The counterpart to the skip list: videos to encode next, in the order listed.
 # A pin outranks every ordering heuristic and re-queues a video the bucket
 # already holds an older processed variant of, which is the only way to ask for
-# a redo under a newer recipe.
+# a redo under newer settings.
 NONAI_PIN_LIST = LIVE_DIR / ".nonai-upscale-next.txt"
 # What one non-AI encode may cost the machine and when is
 # tasks.nonai_encode.EncodeSettings, not here: those numbers are this app's

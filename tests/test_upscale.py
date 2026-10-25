@@ -27,7 +27,7 @@ def library_dirs(root):
     return root / "sorted", root / "out", root / "weird"
 
 
-def fake_run_ffmpeg(_in_file, tmp, _env, _recipe=None, **kwargs):
+def fake_run_ffmpeg(_in_file, tmp, _env, _settings=None, **kwargs):
     """A successful encode: writes the temp output the stage promotes."""
     tmp.write_bytes(b"upscaled")
     return True
@@ -122,7 +122,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
         A given outbox is not under the library root, and the sidecar mirror
         is the library's — so asking for one there is a question with no
-        answer rather than an error. The recipe choice degrades to the default
+        answer rather than an error. The choice of settings degrades to the default
         exactly as it does for a clip that simply has no sidecar; it must not
         take the stage down before it has processed anything.
         """
@@ -257,7 +257,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            def fake_run_ffmpeg_empty(_in_file, tmp, _env, _recipe=None, **kwargs):
+            def fake_run_ffmpeg_empty(_in_file, tmp, _env, _settings=None, **kwargs):
                 tmp.write_bytes(b"")
                 return True
 
@@ -345,7 +345,7 @@ class TestTheLowDiskWarning(unittest.TestCase):
 
 
 class TestWhatMadeTheUpscale(unittest.TestCase):
-    def test_an_upscale_records_the_recipe_and_the_version_of_it_that_made_it(self):
+    def test_an_upscale_records_the_settings_and_the_version_of_them_that_made_it(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             touch_video(lib.sorted_dir / "examplesource" / "landscape" / "clip.mp4")
@@ -359,11 +359,11 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
                 stamp = sidecar.read(sidecar.sidecar_path(upscaled))[provenance.BLOCK][provenance.UPSCALE]
 
         self.assertEqual(
-            (stamp["app"], stamp["recipe"], stamp["recipe_version"]),
+            (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
             ("evolver", "ai_upscale", topaz.AI_UPSCALE.version),
         )
 
-    def test_a_text_to_video_clip_records_the_recipe_it_was_given_instead(self):
+    def test_a_text_to_video_clip_records_the_settings_it_was_given_instead(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(PROVIDER_SOURCE="exampleprovider"):
@@ -377,7 +377,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
                 stamp = sidecar.read(sidecar.sidecar_path(upscaled))[provenance.BLOCK][provenance.UPSCALE]
 
-        self.assertEqual((stamp["recipe"], stamp["recipe_version"]),
+        self.assertEqual((stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
                          ("ai_upscale_t2v", topaz.AI_UPSCALE_T2V.version))
 
 
@@ -420,7 +420,7 @@ class TestIsT2vProvider(unittest.TestCase):
         # The source name comes from the git-ignored overlay, and the deployed
         # one is not the committed placeholder.  Compared against a literal
         # "provider", every text-to-video clip of the real provider took the
-        # default recipe and the wrong tag -- silently wrong output (bug 7).
+        # default settings and the wrong tag -- silently wrong output (bug 7).
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "examplesource" / "clip_topaz.json"
@@ -432,7 +432,7 @@ class TestIsT2vProvider(unittest.TestCase):
                 self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
 
     def test_false_when_the_sidecar_is_not_readable_as_json(self):
-        """A half-written sidecar must take the default recipe, not the t2v one:
+        """A half-written sidecar must take the default settings, not the t2v ones:
         the wrong Topaz model is baked into a finished encode nobody re-runs."""
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
@@ -629,10 +629,10 @@ class TestFfmpegWindowSuppression(unittest.TestCase):
             self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
 
 
-class TestRecipeSelection(unittest.TestCase):
-    def _run_capturing_the_recipe(self, root, sidecar_payload):
+class TestSettingsSelection(unittest.TestCase):
+    def _run_capturing_the_settings(self, root, sidecar_payload):
         """Upscale one provider clip whose sidecar holds *sidecar_payload*, capturing the
-        recipe it is encoded with.  The video tree nests under VIDEO_LIBRARY_DIR because a
+        settings it is encoded with.  The video tree nests under VIDEO_LIBRARY_DIR because a
         sidecar mirrors its clip's path relative to that root.
         """
         video_lib = root / "videos"
@@ -655,8 +655,8 @@ class TestRecipeSelection(unittest.TestCase):
 
         encoded_with = []
 
-        def fake_run_ffmpeg(_in_file, tmp, _env, recipe, **kwargs):
-            encoded_with.append(recipe)
+        def fake_run_ffmpeg(_in_file, tmp, _env, settings, **kwargs):
+            encoded_with.append(settings)
             tmp.write_bytes(b"upscaled")
             return True
 
@@ -667,15 +667,15 @@ class TestRecipeSelection(unittest.TestCase):
                 upscale.run(max_items=1)
         return encoded_with
 
-    def test_run_uses_the_t2v_recipe_for_t2v_provider(self):
+    def test_run_uses_the_t2v_settings_for_t2v_provider(self):
         with workspace_temp_dir() as root:
-            encoded_with = self._run_capturing_the_recipe(root, {"video": {"prompt": "test"}})
+            encoded_with = self._run_capturing_the_settings(root, {"video": {"prompt": "test"}})
 
             self.assertEqual(encoded_with, [topaz.AI_UPSCALE_T2V])
 
-    def test_run_uses_the_default_recipe_for_i2v_provider(self):
+    def test_run_uses_the_default_settings_for_i2v_provider(self):
         with workspace_temp_dir() as root:
-            encoded_with = self._run_capturing_the_recipe(
+            encoded_with = self._run_capturing_the_settings(
                 root, {"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}
             )
 
@@ -694,8 +694,8 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             json.dumps({"generated_fps": 16.0}), encoding="utf-8")
         encoded_with = []
 
-        def encode(_in_file, tmp, _env, recipe, **kwargs):
-            encoded_with.append(recipe)
+        def encode(_in_file, tmp, _env, settings, **kwargs):
+            encoded_with.append(settings)
             tmp.write_bytes(b"upscaled")
             return True
 
@@ -706,7 +706,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             upscale.run(max_items=1, origenerator_dir=origenerator)
         return video, encoded_with, probed
 
-    def test_take_the_recipe_chosen_for_them_given_only_the_frames_their_model_made(self):
+    def test_take_the_settings_chosen_for_them_given_only_the_frames_their_model_made(self):
         with workspace_temp_dir() as root:
             video, encoded_with, probed = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
 
@@ -715,7 +715,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             video_fps=Fraction(112), generated_fps=Fraction(16))])
         probed.assert_called_once_with(video)
 
-    def test_sent_down_the_genau_lane_take_the_same_recipe(self):
+    def test_sent_down_the_genau_lane_take_the_same_settings(self):
         with workspace_temp_dir() as root:
             _, encoded_with, _ = self._upscale(root, "example-loop-clips")
 
@@ -723,14 +723,14 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             topaz.AI_UPSCALE_ORIGENERATOR, "portrait",
             video_fps=Fraction(112), generated_fps=Fraction(16))])
 
-    def _upscaled_before(self, lib: LaneLibrary, source: str, stem: str, recipe: topaz.Recipe) -> Path:
+    def _upscaled_before(self, lib: LaneLibrary, source: str, stem: str, settings: topaz.Settings) -> Path:
         upscaled = touch_video(upscaled_video_path(source, "portrait", stem, lib.outbox))
-        stamp = provenance.reconstructed("evolver", recipe=recipe.name, recipe_version=recipe.version)
+        stamp = provenance.reconstructed("evolver", method=settings.name, method_version=settings.version)
         sidecar.update(sidecar.sidecar_path(upscaled),
                        lambda current: provenance.recorded(current, provenance.UPSCALE, stamp))
         return upscaled
 
-    def test_upscaled_by_an_earlier_recipe_are_upscaled_again_in_place(self):
+    def test_upscaled_by_earlier_settings_are_upscaled_again_in_place(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():
@@ -738,7 +738,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
                     lib, lanes.ORIGENERATOR_SOURCE, "scene one", topaz.AI_UPSCALE)
             _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
 
-            self.assertEqual([recipe.name for recipe in encoded_with],
+            self.assertEqual([settings.name for settings in encoded_with],
                              [topaz.AI_UPSCALE_ORIGENERATOR.name])
             self.assertEqual(upscaled.read_bytes(), b"upscaled")
 
@@ -765,7 +765,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             self.assertEqual(upscaled.read_bytes(), b"video")
             self.assertEqual(sorted(p.name for p in upscaled.parent.iterdir()), [upscaled.name])
 
-    def test_upscaled_by_the_current_recipe_are_left_alone(self):
+    def test_upscaled_by_the_current_settings_are_left_alone(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():
@@ -775,7 +775,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
 
         self.assertEqual(encoded_with, [])
 
-    def test_from_any_other_source_keep_the_recipe_they_had(self):
+    def test_from_any_other_source_keep_the_settings_they_had(self):
         with workspace_temp_dir() as root:
             _, encoded_with, _ = self._upscale(root, "example-provider-two")
 

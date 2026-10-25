@@ -113,7 +113,7 @@ class TestCollectCandidates(unittest.TestCase):
 
     def test_a_pin_re_queues_a_video_that_already_has_a_processed_variant(self):
         """An existing variant normally reads as "already done". When it came
-        from an older recipe, pinning is how the user asks for the redo."""
+        from older settings, pinning is how the user asks for the redo."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]

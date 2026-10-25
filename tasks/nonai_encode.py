@@ -3,7 +3,7 @@
 One non-AI encode takes hours while the tray watchdog kills a pipeline run at
 eleven minutes, so nothing here ever waits on ffmpeg. What it does instead is
 everything that touches the process: launching it detached with the non-AI
-recipe, rebuilding the record for one whose job file went missing, suspending
+settings, rebuilding the record for one whose job file went missing, suspending
 and resuming it as the user comes and goes, reading how far it has got off the
 partial it is still writing, and killing it.
 
@@ -13,7 +13,7 @@ which lives here rather than in ``config``: how long an encode may run and how
 much of the machine it may take are this app's own policy, not anything the
 machine or the overlay says, and ``config`` is for the second kind.
 
-The encode recipe is :data:`util.topaz.NON_AI_UPSCALE`, named and versioned
+The encode's settings are :data:`util.topaz.NON_AI_UPSCALE`, named and versioned
 beside its settings so that every upscale made with it can say which; the
 encoder's own log stays ambient config, the way VIDEO_EXTENSIONS does. The job
 record's file is a parameter, because the stage owns where its state lives.
@@ -70,9 +70,9 @@ class EncodeSettings:
 
 def unrecorded_start() -> dict:
     """What made an encode of ours whose start nobody recorded -- one adopted
-    after its record was lost, or begun before encodes kept a stamp: our recipe,
-    but which version of it, and under which commit, is gone."""
-    return provenance.reconstructed("evolver", recipe=topaz.NON_AI_UPSCALE.name)
+    after its record was lost, or begun before encodes kept a stamp: our settings,
+    but which version of them, and under which commit, is gone."""
+    return provenance.reconstructed("evolver", method=topaz.NON_AI_UPSCALE.name)
 
 
 def topaz_pids() -> list[int]:

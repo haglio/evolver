@@ -117,7 +117,7 @@ class TestWhatItWillNotGuessAt(unittest.TestCase):
 
 class TestWhatCountsAsDone(unittest.TestCase):
     def test_an_original_with_two_variants_is_one_video_of_the_project(self):
-        """A second recipe, or a version saved under a name of its own, is not
+        """Other settings, or a version saved under a name of its own, is not
         a second video's worth of work."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)

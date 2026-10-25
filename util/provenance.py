@@ -10,6 +10,9 @@ from __future__ import annotations
 import app_support.provenance
 
 #: Where the stamps sit on a record: ``payload["provenance"][<act>]``.
+#: What made the file, and its version, under the keys a stamp was first
+#: written with, which every sidecar and funscript already holds.
+METHOD, METHOD_VERSION = "recipe", "recipe_version"
 BLOCK = "provenance"
 
 #: The acts a stamp is filed under.
@@ -26,10 +29,10 @@ SCENE_SCRIPTS = "scene_scripts"
 app_support.provenance.stamp("evolver", anchor=__file__)
 
 
-def by_evolver(*, recipe: str | None = None, recipe_version: str | None = None) -> dict:
+def by_evolver(*, method: str | None = None, method_version: str | None = None) -> dict:
     """The stamp for something this app is writing now."""
     return app_support.provenance.stamp(
-        "evolver", anchor=__file__, recipe=recipe, recipe_version=recipe_version)
+        "evolver", anchor=__file__, recipe=method, recipe_version=method_version)
 
 
 def recorded(payload: dict, act: str, stamp: dict) -> dict:
@@ -53,8 +56,8 @@ def stamps_of(payload: dict) -> dict:
     return stamps if isinstance(stamps, dict) else {}
 
 
-def reconstructed(app: str | None, *, recipe: str | None = None,
-                  recipe_version: str | None = None) -> dict:
+def reconstructed(app: str | None, *, method: str | None = None,
+                  method_version: str | None = None) -> dict:
     return {"schema": app_support.provenance.SCHEMA, "app": app,
             "app_commit": None, "app_dirty": None,
-            "recipe": recipe, "recipe_version": recipe_version, "stamped_at": None}
+            METHOD: method, METHOD_VERSION: method_version, "stamped_at": None}
