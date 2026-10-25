@@ -12,6 +12,7 @@ from datetime import datetime
 from functools import partial
 
 from app_support import production_update
+from app_support.loading_screen import AppWindow, meeting_place
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 from shared_ui.loading_window import Loading, LoadingCanceled
@@ -256,6 +257,8 @@ class EvolverApp:
     def run(self) -> int:
         if not self._become_evolver():
             return 0
+        if (next_launch := meeting_place(os.environ)) is not None:
+            next_launch.say_where_the_app_comes_up(AppWindow(size=(self._window.width(), self._window.height())))
         loading = Loading.at_the_click(self._app, log, open_the_loading_screen)
         try:
             for step, _weight in STEPS:
