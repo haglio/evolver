@@ -5,9 +5,7 @@ read by Fun Time and Warm Gun, so the formula lives here alone."""
 from __future__ import annotations
 
 BLOCK = "watch"
-FAVORITE_FIELD = "favorite"
 COUNT_FIELDS = ("completions", "skips", "locks")
-STAMPED_KEYS = frozenset({BLOCK, FAVORITE_FIELD})
 
 # score = completions + 3*locks - skips, softened by /3 and clamped so one
 # video can be at most 8x more (or 8x less) frequent than a fresh one.
@@ -36,11 +34,9 @@ def add_counts(*sources: dict | None) -> dict[str, int]:
     return total
 
 
-def stamped(payload: dict, counts: dict[str, int], *, favorite: bool) -> dict:
-    result = {key: value for key, value in payload.items() if key not in STAMPED_KEYS}
+def stamped(payload: dict, counts: dict[str, int]) -> dict:
+    result = {key: value for key, value in payload.items() if key != BLOCK}
     counts = add_counts(counts)
     if any(counts.values()):
         result[BLOCK] = {**counts, "weight": weight_for(counts)}
-    if favorite:
-        result[FAVORITE_FIELD] = True
     return result

@@ -399,17 +399,12 @@ class TestRunPipeline:
         names = [s.name for s in result.stages]
         assert names == _EXPECTED_STAGE_ORDER
 
-    def test_references_run_before_bookmarks_prunes_the_favorites(self):
-        """Both stages touch favs.csv, and bookmarks drops rows whose file is gone.
-
-        Repointing has to come first, or a favorite whose video merely moved is
-        deleted on the very run that could have saved it.
-        """
+    def test_the_phone_s_favorites_are_marked_before_bookmarks_reads_the_marks(self):
         stack, _ = self._patch_all_stages()
         with stack:
             result = evolver.run_pipeline()
         names = [s.name for s in result.stages]
-        assert names.index("references") < names.index("bookmarks")
+        assert names.index("watch_weights") < names.index("bookmarks")
 
     def test_skipped_stages_have_skip_status(self):
         stack, _ = self._patch_all_stages()

@@ -15,6 +15,7 @@ import json
 import unittest
 from pathlib import Path
 
+from app_support import favorites
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
 from shared_ui.orientation import ORIENTATIONS, PORTRAIT
 
@@ -101,11 +102,19 @@ class TheLibraryRecord(unittest.TestCase):
 
     def test_the_watch_block_it_names_is_the_one_this_repo_stamps(self):
         """The counts and the weight a shuffled playlist draws by."""
-        stamped = watch.stamped({}, dict.fromkeys(watch.COUNT_FIELDS, 1), favorite=True)
+        stamped = watch.stamped({}, dict.fromkeys(watch.COUNT_FIELDS, 1))
 
         self.assertEqual(sorted(stamped[watch.BLOCK]),
                          sorted(self.record["blocks"][watch.BLOCK]["fields"]))
-        self.assertIn(watch.FAVORITE_FIELD, self.record["top_level_keys"])
+
+    def test_a_favorite_and_its_page_are_the_ones_the_apps_that_mark_them_write(self):
+        """Fun Time and this repo mark a favorite through app_support.favorites,
+        so the keys this repo promises are that module's, and they are the
+        readers' to write rather than anything this repo derives."""
+        both = [favorites.FAVORITE_KEY, favorites.PAGE_KEY]
+
+        self.assertLessEqual(set(both), set(self.record["top_level_keys"]))
+        self.assertEqual(self.record["top_level_written_by_the_reader"], both)
 
     def test_the_kind_the_running_time_and_the_orientation_sit_where_it_says(self):
         """All three go in the video block, which is where a reader looks for them."""
@@ -119,8 +128,8 @@ class TheLibraryRecord(unittest.TestCase):
 
 
 class TheJournals(unittest.TestCase):
-    """What another app writes for the favorites stage to carry into Fun Time's
-    list, the way the phone's journal is carried."""
+    """What another app writes for the favorites stage to mark on a video's
+    record, the way the phone's journal is carried."""
 
     def setUp(self):
         self.journals = _document()["journals"]

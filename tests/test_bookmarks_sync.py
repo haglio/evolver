@@ -2,9 +2,21 @@ from __future__ import annotations
 
 import json
 import unittest
+from pathlib import Path
+
+from app_support.favorites import mark
 
 from tasks import bookmarks_sync
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
+from util import sidecar
+
+
+def favorite(library: LaneLibrary, name: str, page: str = "") -> Path:
+    """A video on disk whose record marks it a favorite, with the page it came from."""
+    video = touch_video(library.non_ai / "alpha" / name)
+    with library.config():
+        mark(sidecar.sidecar_path(video), True, page=page)
+    return video
 
 
 def chrome_profile(root, profile="Profile 2", name="Jane Doe"):
@@ -50,27 +62,6 @@ def chrome_bookmarks_payload(favs_children=()):
     }
 
 
-class TestExtractUrl(unittest.TestCase):
-    def test_extracts_plain_urls(self):
-        cases = [
-            ("https://example.com/page", "https://example.com/page"),
-            ("http://example.com/", "http://example.com/"),
-            ("not-a-url", None),
-            ("ftp://example.com/", None),
-            ("", None),
-        ]
-        for value, expected in cases:
-            with self.subTest(value=value):
-                self.assertEqual(bookmarks_sync._extract_url(value), expected)
-
-    def test_extracts_hyperlink_formulas(self):
-        self.assertEqual(
-            bookmarks_sync._extract_url('=HYPERLINK("https://example.com/abc";"label")'),
-            "https://example.com/abc",
-        )
-        self.assertIsNone(bookmarks_sync._extract_url('=HYPERLINK("not-a-url";"label")'))
-
-
 class TestBookmarkName(unittest.TestCase):
     def test_generates_name_from_url(self):
         cases = [
@@ -85,86 +76,21 @@ class TestBookmarkName(unittest.TestCase):
 
 
 class TestBookmarksSync(unittest.TestCase):
-    def test_run_prunes_rows_with_missing_source_files_before_sync(self):
+    def _sync(self, library: LaneLibrary, user_data_dir: Path, **given) -> bookmarks_sync.BookmarksSyncResult:
+        with library.config(), override_config(
+            CHROME_USER_DATA_DIR=user_data_dir,
+            CHROME_PROFILE_NAME="Jane Doe",
+            CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
+        ):
+            return bookmarks_sync.run(**given)
+
+    def test_run_syncs_the_favorites_pages_into_named_profile_folder(self):
         with workspace_temp_dir() as root:
-            existing_media = root / "clips" / "keep.mp4"
-            existing_media.parent.mkdir(parents=True, exist_ok=True)
-            existing_media.write_text("x", encoding="utf-8")
-            missing_media = root / "clips" / "missing.mp4"
-            favs_path = root / "favs.csv"
+            library = LaneLibrary(root)
             user_data_dir, bookmarks_path = chrome_profile(root)
-            favs_path.write_text(
-                "file,web_url\n"
-                f"{existing_media.relative_to(root)},https://example.com/keep\n"
-                f"{missing_media.relative_to(root)},https://example.com/drop\n",
-                encoding="utf-8",
-            )
-
-            with override_config(
-                FUN_TIME_FAVS_FILE=favs_path,
-                CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Jane Doe",
-                CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
-            ):
-                result = bookmarks_sync.run()
-
-            self.assertTrue(result.ok)
-            self.assertEqual(result.pruned, 1)
-            self.assertEqual(result.synced, 1)
-            self.assertEqual(
-                favs_path.read_text(encoding="utf-8").splitlines(),
-                [
-                    "file,web_url",
-                    "clips\\keep.mp4,https://example.com/keep",
-                ],
-            )
-            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
-            folder = written["roots"]["bookmark_bar"]["children"][0]
-            self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/keep"])
-
-    def test_run_prunes_hyperlink_local_file_rows_with_missing_sources(self):
-        with workspace_temp_dir() as root:
-            existing_media = root / "clips" / "keep clip.mp4"
-            existing_media.parent.mkdir(parents=True, exist_ok=True)
-            existing_media.write_text("x", encoding="utf-8")
-            missing_media = root / "clips" / "missing clip.mp4"
-            favs_path = root / "favs.csv"
-            user_data_dir, bookmarks_path = chrome_profile(root)
-            favs_path.write_text(
-                "local_file,web_url\n"
-                f'"=HYPERLINK(""file:///{existing_media.as_posix()}"";""{existing_media!s}"")",https://example.com/keep\n'
-                f'"=HYPERLINK(""file:///{missing_media.as_posix()}"";""{missing_media!s}"")",https://example.com/drop\n',
-                encoding="utf-8",
-            )
-
-            with override_config(
-                FUN_TIME_FAVS_FILE=favs_path,
-                CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Jane Doe",
-                CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
-            ):
-                result = bookmarks_sync.run()
-
-            self.assertTrue(result.ok)
-            self.assertEqual(result.pruned, 1)
-            self.assertEqual(result.synced, 1)
-            self.assertIn("https://example.com/keep", favs_path.read_text(encoding="utf-8"))
-            self.assertNotIn("https://example.com/drop", favs_path.read_text(encoding="utf-8"))
-            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
-            folder = written["roots"]["bookmark_bar"]["children"][0]
-            self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/keep"])
-
-    def test_run_syncs_web_urls_into_named_profile_folder(self):
-        with workspace_temp_dir() as root:
-            favs_path = root / "favs.csv"
-            user_data_dir, bookmarks_path = chrome_profile(root)
-            favs_path.write_text(
-                "local_file,web_url\n"
-                'one,"=HYPERLINK(""https://example.net/image/abc"";""https://example.net/image/abc"")"\n'
-                "two,https://example.com/image/xyz\n"
-                "three,\n",
-                encoding="utf-8",
-            )
+            favorite(library, "scene one.mp4", "https://example.net/image/abc")
+            favorite(library, "scene two.mp4", "https://example.com/image/xyz")
+            favorite(library, "scene three.mp4")
             bookmarks_path.write_text(
                 json.dumps(chrome_bookmarks_payload([
                     {"id": "20", "name": "old", "type": "url", "url": "https://old.example/"},
@@ -172,13 +98,7 @@ class TestBookmarksSync(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with override_config(
-                FUN_TIME_FAVS_FILE=favs_path,
-                CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Jane Doe",
-                CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
-            ):
-                result = bookmarks_sync.run()
+            result = self._sync(library, user_data_dir)
 
             self.assertTrue(result.ok)
             self.assertEqual(result.synced, 2)
@@ -187,88 +107,132 @@ class TestBookmarksSync(unittest.TestCase):
             folder = written["roots"]["bookmark_bar"]["children"][0]
             self.assertEqual(folder["name"], "Fun Time Favs")
             self.assertEqual(
-                [child["url"] for child in folder["children"]],
-                [
-                    "https://example.net/image/abc",
-                    "https://example.com/image/xyz",
-                ],
+                sorted(child["url"] for child in folder["children"]),
+                ["https://example.com/image/xyz", "https://example.net/image/abc"],
             )
+
+    def test_a_video_no_longer_a_favorite_leaves_the_folder(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            kept = favorite(library, "scene one.mp4", "https://example.com/keep")
+            dropped = favorite(library, "scene two.mp4", "https://example.com/drop")
+            self._sync(library, user_data_dir)
+            with library.config():
+                sidecar.mark_favorite(dropped, False)
+
+            self._sync(library, user_data_dir)
+
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
+            self.assertEqual(urls, ["https://example.com/keep"])
+            self.assertTrue(kept.exists())
+
+    def test_a_favorite_whose_video_is_gone_is_left_out(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            favorite(library, "scene one.mp4", "https://example.com/keep")
+            favorite(library, "scene two.mp4", "https://example.com/drop").unlink()
+
+            result = self._sync(library, user_data_dir)
+
+            self.assertEqual(result.synced, 1)
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
+            self.assertEqual(urls, ["https://example.com/keep"])
+
+    def test_the_folder_keeps_its_order_and_a_new_favorite_joins_the_end(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            favorite(library, "b scene.mp4", "https://example.com/b")
+            favorite(library, "c scene.mp4", "https://example.com/c")
+            bookmarks_path.write_text(json.dumps(chrome_bookmarks_payload([
+                {"id": "20", "name": "c", "type": "url", "url": "https://example.com/c"},
+                {"id": "21", "name": "b", "type": "url", "url": "https://example.com/b"},
+            ])), encoding="utf-8")
+            favorite(library, "a scene.mp4", "https://example.com/a")
+
+            self._sync(library, user_data_dir)
+
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
+            self.assertEqual(urls, ["https://example.com/c", "https://example.com/b", "https://example.com/a"])
 
     def test_run_deduplicates_identical_urls(self):
         with workspace_temp_dir() as root:
-            favs_path = root / "favs.csv"
-            user_data_dir, bookmarks_path = chrome_profile(root)
-            favs_path.write_text(
-                "local_file,web_url\n"
-                "one,https://example.com/same\n"
-                "two,https://example.com/same\n"
-                "three,https://example.com/different\n",
-                encoding="utf-8",
-            )
+            library = LaneLibrary(root)
+            user_data_dir, _bookmarks_path = chrome_profile(root)
+            favorite(library, "scene one.mp4", "https://example.com/same")
+            favorite(library, "scene two.mp4", "https://example.com/same")
+            favorite(library, "scene three.mp4", "https://example.com/different")
 
-            with override_config(
-                FUN_TIME_FAVS_FILE=favs_path,
-                CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Jane Doe",
-                CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
-            ):
-                result = bookmarks_sync.run()
+            result = self._sync(library, user_data_dir)
 
             self.assertTrue(result.ok)
             self.assertEqual(result.synced, 2)
-            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
-            folder = written["roots"]["bookmark_bar"]["children"][0]
-            urls = [child["url"] for child in folder["children"]]
-            self.assertEqual(urls, ["https://example.com/same", "https://example.com/different"])
+
+    def test_a_page_that_is_no_web_address_is_counted_and_left_out(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, _bookmarks_path = chrome_profile(root)
+            favorite(library, "scene one.mp4", "file:///C:/not/a/page")
+
+            result = self._sync(library, user_data_dir)
+
+            self.assertEqual((result.synced, result.bad_url), (0, 1))
+
+    def test_records_that_cannot_be_reached_leave_the_folder_as_it_was(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            before = json.dumps(chrome_bookmarks_payload([
+                {"id": "20", "name": "a", "type": "url", "url": "https://example.com/a"},
+            ]))
+            bookmarks_path.write_text(before, encoding="utf-8")
+
+            result = self._sync(library, user_data_dir)
+
+            self.assertEqual(result.synced, 0)
+            self.assertEqual(bookmarks_path.read_text(encoding="utf-8"), before)
 
     def test_run_reports_missing_profile(self):
         with workspace_temp_dir() as root:
-            favs_path = root / "favs.csv"
+            library = LaneLibrary(root)
             user_data_dir = root / "User Data"
             user_data_dir.mkdir(parents=True, exist_ok=True)
-            favs_path.write_text("local_file,web_url\nx,https://example.com/\n", encoding="utf-8")
+            favorite(library, "scene one.mp4", "https://example.com/")
             (user_data_dir / "Local State").write_text(
                 json.dumps({"profile": {"info_cache": {"Default": {"name": "Alex"}}}}),
                 encoding="utf-8",
             )
 
-            with override_config(
-                FUN_TIME_FAVS_FILE=favs_path,
-                CHROME_USER_DATA_DIR=user_data_dir,
-                CHROME_PROFILE_NAME="Jane Doe",
-            ):
-                result = bookmarks_sync.run()
+            result = self._sync(library, user_data_dir)
 
             self.assertFalse(result.ok)
             self.assertTrue(result.profile_missing)
 
-    def test_run_uses_the_favorites_file_and_profile_it_is_given(self):
-        """Four things reach outside this repo, and all four are arguments now.
+    def test_run_uses_the_profile_it_is_given(self):
+        """Three things reach outside this repo, and all three are arguments now.
 
         `config` still answers when the caller names none of them, which is
         every other test here and the pipeline itself. Pointing the ambient
-        four at a profile that would sync a different URL is what proves the
-        given ones are the ones used, rather than merely accepted.
+        three at a profile of its own is what proves the given ones are the
+        ones used, rather than merely accepted.
         """
         with workspace_temp_dir() as root:
-            given_favs = root / "given" / "favs.csv"
-            given_favs.parent.mkdir(parents=True)
-            given_favs.write_text("web_url\nhttps://example.com/given\n", encoding="utf-8")
+            library = LaneLibrary(root)
+            favorite(library, "scene one.mp4", "https://example.com/given")
             given_user_data, given_bookmarks = chrome_profile(root / "given", name="Robin")
-
-            ambient_favs = root / "ambient" / "favs.csv"
-            ambient_favs.parent.mkdir(parents=True)
-            ambient_favs.write_text("web_url\nhttps://example.com/ambient\n", encoding="utf-8")
             ambient_user_data, _ = chrome_profile(root / "ambient", name="Ambient")
 
-            with override_config(
-                FUN_TIME_FAVS_FILE=ambient_favs,
+            with library.config(), override_config(
                 CHROME_USER_DATA_DIR=ambient_user_data,
                 CHROME_PROFILE_NAME="Ambient",
                 CHROME_BOOKMARKS_FOLDER_NAME="Ambient Folder",
             ):
                 result = bookmarks_sync.run(
-                    favs_file=given_favs,
                     chrome_user_data_dir=given_user_data,
                     chrome_profile_name="Robin",
                     bookmarks_folder_name="Given Folder",

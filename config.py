@@ -75,7 +75,6 @@ def live_dir(environ: dict, project_dir_path: Path, roots: tuple[Path, ...]) -> 
 LIVE_DIR = live_dir(os.environ, PROJECT_DIR, PROJECT_ROOTS)
 BRANCH_SESSION = LIVE_DIR != PROJECT_DIR
 FUN_TIME_PROJECT_DIR = project_dir("fun_time")
-FUN_TIME_FAVS_FILE = FUN_TIME_PROJECT_DIR / "favs.csv"
 # Fun Time's per-video watch counts, keyed by path.strip().lower().
 FUN_TIME_WATCH_STATS_FILE = FUN_TIME_PROJECT_DIR / "state" / "watch_stats.json"
 # Origenerator (a sibling video-generation app) is treated as a normal external
@@ -87,7 +86,7 @@ ORIGENERATOR_DB_PATH = ORIGENERATOR_PROJECT_DIR / "state" / "origenerator.db"
 # Sibling apps that record a video's path in their own saved work. Evolver moves
 # videos, so it owns keeping these pointed at the right file (see
 # tasks/reference_sync.py); left alone they strand hand-made clip bounds,
-# transcript splits, and favorites on paths that no longer exist.
+# transcript splits, and watch counts on paths that no longer exist.
 GENAUMACHER_SESSIONS_DIR = project_dir("genaumacher") / "sessions"
 SCRIPTURE_SESSIONS_DIR = project_dir("scripture") / "sessions"
 # The OSR2 broker is the sibling Evolver pairs with to stay up: each watches the
@@ -304,7 +303,7 @@ LOW_DISK_WARNING_DISMISSED_FILE = LOCAL_STATE_DIR / "low_disk_warning_dismissed"
 # Whose turn it is to run the pipeline, when two Evolvers are up (util/run_lock.py).
 PIPELINE_LOCK_FILE = LOCAL_STATE_DIR / "pipeline.lock"
 NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
-# The last phone favorite applied to Fun Time's favorites, so one is applied
+# The last phone favorite marked on a video's sidecar, so one is applied
 # exactly once and Fun Time can undo it (tasks/watch_weights.py).
 WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
 # The same for acts picked in Origenerator, written into each video's record.

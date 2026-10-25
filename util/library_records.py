@@ -19,6 +19,7 @@ reader may still take it, but it can move without warning.
 """
 from __future__ import annotations
 
+from app_support import favorites
 from shared_ui.orientation import ORIENTATIONS
 
 from util import video_type, watch
@@ -73,10 +74,12 @@ WATCH_BLOCK = watch.BLOCK
 WATCH_COUNT_FIELDS = watch.COUNT_FIELDS
 WATCH_WEIGHT_FIELD = "weight"
 
-#: At the top level rather than in a block: what to call the video, and whether
-#: it is a favorite.
+#: At the top level rather than in a block: what to call the video, whether it
+#: is a favorite, and the page a favorite came from.  The apps that mark a
+#: favorite write those two themselves, through ``app_support.favorites``.
 TITLE_KEY = "title"
-FAVORITE_KEY = watch.FAVORITE_FIELD
+FAVORITE_KEY = favorites.FAVORITE_KEY
+PAGE_KEY = favorites.PAGE_KEY
 
 
 def declaration() -> dict:
@@ -101,7 +104,8 @@ def declaration() -> dict:
                 "fields": [*WATCH_COUNT_FIELDS, WATCH_WEIGHT_FIELD],
             },
         },
-        "top_level_keys": [TITLE_KEY, FAVORITE_KEY],
+        "top_level_keys": [TITLE_KEY, FAVORITE_KEY, PAGE_KEY],
+        "top_level_written_by_the_reader": [FAVORITE_KEY, PAGE_KEY],
         "video_kinds": list(VIDEO_KINDS),
         "video_orientations": list(ORIENTATIONS),
     }
