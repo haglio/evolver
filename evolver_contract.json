@@ -66,7 +66,12 @@
     },
     "top_level_keys": [
       "title",
-      "favorite"
+      "favorite",
+      "web_url"
+    ],
+    "top_level_written_by_the_reader": [
+      "favorite",
+      "web_url"
     ],
     "video_kinds": [
       "genau_flick",

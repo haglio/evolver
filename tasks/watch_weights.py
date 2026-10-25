@@ -1,12 +1,12 @@
 """Stage: every app's viewing of a video summed on its sidecar as one weight,
-and favorites carried both ways.
+and the phone's favorites marked there.
 
 Fun Time's counts come from its own stats file, the phone's from Warm Gun's
 journal, which reaches this machine inside the synced library.  The sum and
 its weight go on the sidecar (``util.watch``), where Fun Time and Warm Gun
-read one number instead of each keeping a formula.  A favorite made on the
-phone goes into Fun Time's favorites file; every favorite in that file is
-flagged on its sidecar for the phone.
+read one number instead of each keeping a formula.  A favorite made or taken
+back on the phone goes onto the same sidecar, which is where Fun Time keeps
+its own.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from pathlib import Path
 from app_support.file_channel import write_whole
 
 import config
-from util import favs_csv, lanes, sidecar, warm_gun, watch
+from util import lanes, sidecar, warm_gun, watch
 from util.json_reads import read_dict
 from util.media_files import reachable
 
@@ -47,7 +47,7 @@ class WatchWeightsResult:
 
 @dataclass(frozen=True)
 class _PhoneFavorites:
-    """What carrying the phone's favorites into Fun Time's file came to."""
+    """What marking the phone's favorites came to."""
 
     added: int = 0
     removed: int = 0
@@ -73,13 +73,12 @@ def run() -> WatchWeightsResult:
     result.acts_named = _apply_picked_acts(journals, videos)
     phone_counts = _phone_counts(events, videos)
     fun_time_counts = read_dict(config.FUN_TIME_WATCH_STATS_FILE)
-    favorites = {_key(video) for video in favs_csv.favorite_videos(config.FUN_TIME_FAVS_FILE)}
     for video in _played_videos():
         key = _key(video)
         counts = watch.add_counts(fun_time_counts.get(key), phone_counts.get(key))
 
-        def stamp_the_watching(payload: dict, counts=counts, key=key) -> dict | None:
-            stamped = watch.stamped(payload, counts, favorite=key in favorites)
+        def stamp_the_watching(payload: dict, counts=counts) -> dict | None:
+            stamped = watch.stamped(payload, counts)
             return stamped if stamped != payload else None
 
         if sidecar.update(sidecar.sidecar_path(video), stamp_the_watching) is not None:
@@ -119,17 +118,13 @@ def _apply_phone_favorites(
     journals: dict[str, list[warm_gun.Event]], videos: dict[str, Path | None]
 ) -> _PhoneFavorites:
     """Each journal's favorites past that journal's own cursor."""
-    if not config.FUN_TIME_FAVS_FILE.parent.is_dir():
-        log.info("Fun Time is not installed here; the phone's favorites wait.")
-        return _PhoneFavorites()
     carried = {True: 0, False: 0}
 
     def carry(event: warm_gun.Event) -> bool:
         video = videos[event.path]
         if video is not None and video.exists():
             favorite = warm_gun.FAVORITE_EVENTS[event.event]
-            change = favs_csv.add_favorite if favorite else favs_csv.remove_favorite
-            carried[favorite] += change(config.FUN_TIME_FAVS_FILE, video)
+            carried[favorite] += sidecar.mark_favorite(video, favorite)
         elif video is not None and warm_gun.played_video(event.path).exists():
             log.info("Phone %s of %s waits for its upscale.", event.event, video)
             return False
@@ -139,7 +134,7 @@ def _apply_phone_favorites(
         _applied_once(journals, config.WARM_GUN_FAVORITES_CURSOR_FILE, warm_gun.FAVORITE_EVENTS,
                       carry)
     except OSError:
-        log.exception("Could not write %s", config.FUN_TIME_FAVS_FILE)
+        log.exception("Could not mark the phone's favorites")
         return _PhoneFavorites(carried[True], carried[False], 1)
     return _PhoneFavorites(carried[True], carried[False])
 
@@ -190,7 +185,7 @@ def _applied_once(
 
 def _cursors(cursor_file: Path) -> dict[str, int]:
     """How far each journal's events have been applied, by file name. The
-    favorites' file used to hold one time for the one journal there was; that
+    favorites' cursor used to hold one time for the one journal there was; that
     time was reached through the phone's file alone, so it holds that file back
     and no other."""
     stored = read_dict(cursor_file).get(_CURSOR_FIELD)

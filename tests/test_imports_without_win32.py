@@ -37,6 +37,13 @@ _WIN32_CTYPES_NAMES = (
 # collection error naming its own file.
 _DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT = ("app_support.processes",)
 
+# The same holds for a dependency's call this repo makes while it is imported:
+# util.provenance takes app_support's stamp then, and app_support reads the
+# checkout's commit through a Windows job object on Windows, once a process.
+# So that stamp is taken while the surface is still there, and the import is
+# served from app_support's cache.
+_STAMP_TAKEN_AT_IMPORT = REPO_DIR / "util" / "provenance.py"
+
 _STRIP_WIN32_FROM_CTYPES = f"""
 import ctypes, ctypes.wintypes
 for _name in {_DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT!r}:
@@ -44,6 +51,8 @@ for _name in {_DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT!r}:
         __import__(_name)
     except ImportError:
         pass
+import app_support.provenance
+app_support.provenance.stamp("evolver", anchor={str(_STAMP_TAKEN_AT_IMPORT)!r})
 for _name in {_WIN32_CTYPES_NAMES!r}:
     if hasattr(ctypes, _name):
         delattr(ctypes, _name)

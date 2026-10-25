@@ -385,12 +385,10 @@ def _run_stages(
         else:
             _run_stage("verify", check_correspondence.run, show_popup=True)
 
-        # After every stage that moves a video, and before bookmarks: both stages
-        # touch favs.csv, and bookmarks drops the rows whose file is missing, so a
-        # favorite has to be repointed before it can be mistaken for a dead one.
+        # After every stage that moves a video, so a saved path is followed
+        # before anything counts it lost.
         _run_stage("references", reference_sync.run)
-        # Between the two: it reads favs.csv only once the references stage has
-        # repointed it, and adds the phone's favorites for bookmarks to pick up.
+        # Before bookmarks, which then picks up the phone's favorites it marked.
         _run_stage("watch_weights", watch_weights.run)
         _run_stage("bookmarks", bookmarks_sync.run)
         # Before the scripts sync: these write new funscripts into the tree, and the

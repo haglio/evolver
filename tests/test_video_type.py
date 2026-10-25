@@ -172,7 +172,13 @@ class TestTellingABareSidecarApart(unittest.TestCase):
         self.assertTrue(video_type.only_the_video_itself({
             "video": {"type": video_type.SHORT},
             "watch": {"completions": 2, "skips": 0, "locks": 0, "weight": 1.5874},
+        }))
+
+    def test_a_favorite_marked_beside_them_with_its_page_is_still_nothing_else(self):
+        self.assertTrue(video_type.only_the_video_itself({
+            "video": {"type": video_type.SHORT},
             "favorite": True,
+            "web_url": "https://example.com/gallery/101",
         }))
 
     def test_a_record_of_what_made_the_file_beside_them_is_still_nothing_else(self):

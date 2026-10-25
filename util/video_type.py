@@ -45,6 +45,7 @@ part of the library already done without probing four hundred files a tick.
 
 from __future__ import annotations
 
+from app_support import favorites
 from shared_ui.orientation import ORIENTATIONS
 
 from util import provenance, watch
@@ -76,6 +77,9 @@ ORIENTATION_FIELD = "orientation"
 #: nothing but these from one that holds a scrape or a generation
 #: (:func:`only_the_video_itself`).
 _OWN_FIELDS = frozenset({FIELD, DURATION_FIELD, ORIENTATION_FIELD})
+
+# What other stages and apps stamp on a record, none of it saying what made the clip.
+_STAMPS = frozenset({watch.BLOCK, provenance.BLOCK, favorites.FAVORITE_KEY, favorites.PAGE_KEY})
 
 
 def free_kind(*, genau: bool, excerpt: bool) -> str:
@@ -161,7 +165,7 @@ def only_the_video_itself(payload: dict) -> bool:
     landed, or its kind.  A document holding nothing at all still is, because
     that is also what an unreadable one reads as.
     """
-    besides_the_stamps = set(payload) - watch.STAMPED_KEYS - {provenance.BLOCK}
+    besides_the_stamps = set(payload) - _STAMPS
     if not besides_the_stamps:
         return provenance.BLOCK in payload
     if besides_the_stamps != {BLOCK}:

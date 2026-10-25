@@ -261,9 +261,7 @@ class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
                 )
 
     def test_the_derived_sibling_files_stay_anchored_to_the_fun_time_checkout(self):
-        for path in (config.FUN_TIME_FAVS_FILE, config.FUN_TIME_WATCH_STATS_FILE):
-            with self.subTest(str(path)):
-                self.assertTrue(path.is_relative_to(config.FUN_TIME_PROJECT_DIR))
+        self.assertTrue(config.FUN_TIME_WATCH_STATS_FILE.is_relative_to(config.FUN_TIME_PROJECT_DIR))
 
 
 if __name__ == "__main__":

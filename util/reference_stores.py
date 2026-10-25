@@ -10,9 +10,8 @@ hears about this one -- so before rewriting one, ``shape_complaint`` asks
 whether it is still the shape this stage was written against, and a file that is
 not is left alone and reported. Genaumacher and Scripture each stamp a version their
 own tests hold. Fun Time's watch counts carry none and cannot, since every key
-there is a video path, so their shape is what is checked; its favorites file is
-a spreadsheet whose header row is its version. The one kind that is this app's
-own is a carved clip's sidecar, naming the scene the clip was found in.
+there is a video path, so their shape is what is checked. The one kind that is
+this app's own is a carved clip's sidecar, naming the scene the clip was found in.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ from pathlib import Path
 from app_support.file_channel import write_whole
 
 import config
-from util import favs_csv, lanes, sidecar
+from util import lanes, sidecar
 from util.json_reads import read_dict_strict
 
 # The versions the two apps that stamp one write today, and the ones this stage
@@ -115,14 +114,6 @@ def discover() -> Iterator[ReferenceStore]:
             _rewrite_json_object_keys,
             _shape=_is_counts_by_path,
         )
-    if config.FUN_TIME_FAVS_FILE.is_file():
-        yield ReferenceStore(
-            "fun time favorite",
-            config.FUN_TIME_FAVS_FILE,
-            _read_favorite_paths,
-            _rewrite_favorite_paths,
-            _shape=_has_a_local_path_column,
-        )
     yield from _clip_pairings()
 
 
@@ -201,13 +192,6 @@ def _is_counts_by_path(path: Path) -> str | None:
     return None
 
 
-def _has_a_local_path_column(path: Path) -> str | None:
-    """The favorites file is a spreadsheet, and its header row is its version."""
-    fieldnames, _rows = favs_csv.read_rows(path)
-    if favs_csv.file_column_name(fieldnames) is None:
-        return f"no column holding a local path, only {fieldnames}"
-    return None
-
 
 _VIDEO_PATH_FIELD = "video_path"
 
@@ -245,29 +229,6 @@ def _rewrite_json_object_keys(path: Path, moves: dict[str, str]) -> None:
     payload = _load_json(path)
     _write_json(path, {moves.get(key, key).lower(): value for key, value in payload.items()})
 
-
-def _read_favorite_paths(path: Path) -> list[str]:
-    return [str(video) for video in favs_csv.favorite_videos(path)]
-
-
-def _rewrite_favorite_paths(path: Path, moves: dict[str, str]) -> None:
-    fieldnames, rows = favs_csv.read_rows(path)
-    column = favs_csv.file_column_name(fieldnames)
-    for index, local in _favorite_locals(rows, column, path.parent).items():
-        moved_to = moves.get(str(local))
-        if moved_to is not None:
-            rows[index][column] = favs_csv.with_local_path(rows[index][column], Path(moved_to))
-    favs_csv.write_rows(path, fieldnames, rows)
-
-
-def _favorite_locals(rows: list[dict[str, str]], column: str, csv_dir: Path) -> dict[int, Path]:
-    """Every row that links to a local file, by row index."""
-    found: dict[int, Path] = {}
-    for index, row in enumerate(rows):
-        local = favs_csv.local_path((row.get(column) or "").strip(), csv_dir)
-        if local is not None:
-            found[index] = local
-    return found
 
 
 def _load_json(path: Path) -> dict:
