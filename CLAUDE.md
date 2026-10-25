@@ -24,6 +24,14 @@ give the whole app each time").
 The launcher re-copies the primary's `content.local.json` every time — a stale
 copy resolves a library that has moved and the preview comes up empty.
 
+That launcher runs the production venv, which holds the siblings at the
+versions `pyproject.toml` pins and nothing newer, so a branch leaning on an
+app_support or shared_ui change that has not shipped needs a launcher of its
+own in the worktree's git-ignored `state/`: one that puts each such sibling's
+own worktree first on `PYTHONPATH` and then runs `launch_preview_branch.vbs`,
+whose loading screen and app both inherit it. Never reinstall the shared venv
+for a preview: other sessions' suites run out of it.
+
 **The preview is part of delivering a user-facing change, not an extra, and it
 comes BEFORE the pull request** — opening one here lands the change hands-off
 within about twenty minutes, so a preview handed over beside an open PR is a

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from app_support import loading_screen
 from shared_ui import loading_process
 from shared_ui.loading_window import Loading, LoadingCanceled
 
@@ -27,8 +28,8 @@ class _Loading:
         self._happened.append("done")
 
 
-def _launch(request, outcome: Outcome, *, canceled: bool = False) -> tuple[int, list[str], int]:
-    app = build_evolver_app(request)
+def _launch(request, outcome: Outcome, *, canceled: bool = False, app=None) -> tuple[int, list[str], int]:
+    app = app or build_evolver_app(request)
     happened: list[str] = []
     with patch.object(Loading, "at_the_click", return_value=_Loading(happened, canceled=canceled)) as opened, \
          patch.object(app._instance, "take_over", return_value=outcome), \
@@ -69,3 +70,13 @@ def test_the_loading_screen_runs_in_a_process_of_its_own_wearing_evolvers_taskba
         caption="Evolver Loading", wordmark="Evolver", icon=config.PROJECT_DIR / "icon.ico", preview=shown_as(),
         steps=evolver_app.STEPS, cancel_hint="Press Esc to cancel opening Evolver",
         app_id=process_identity.identity(), taskbar=process_identity.taskbar_app())
+
+
+def test_a_launch_from_its_launcher_tells_its_loading_screen_how_big_its_window_is(request, tmp_path, monkeypatch):
+    place = loading_screen.MeetingPlace(tmp_path / "screen", ())
+    monkeypatch.setenv(loading_screen.FOLDER, str(place.folder))
+    app = build_evolver_app(request)
+
+    _launch(request, Outcome.CLAIMED, app=app)
+
+    assert place.where_the_app_comes_up() == loading_screen.AppWindow(size=(app._window.width(), app._window.height()))
