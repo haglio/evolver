@@ -1,7 +1,9 @@
-"""The product's own Python files, for the tests that read the tree as text."""
+"""The product's own Python files, and the strings they hold, for the tests that read the tree as text."""
 from __future__ import annotations
 
+import ast
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -26,3 +28,16 @@ def product_sources(root: Path) -> list[str]:
             for name in filenames if name.endswith(".py")
         ]
     return sorted(found)
+
+
+def strings_outside_docstrings(tree: ast.AST) -> Iterator[ast.Constant]:
+    docstrings = {
+        id(scope.body[0].value)
+        for scope in ast.walk(tree)
+        if isinstance(scope, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        and scope.body and isinstance(scope.body[0], ast.Expr)
+        and isinstance(scope.body[0].value, ast.Constant)
+    }
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
+            yield node

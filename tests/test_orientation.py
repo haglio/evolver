@@ -13,8 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.product_sources import PROJECT_ROOT, product_sources
-from tests.test_variants import _string_constants
+from tests.product_sources import PROJECT_ROOT, product_sources, strings_outside_docstrings
 from util import orientation
 
 # The module that owns them, plus the one that names them in an assertion of
@@ -49,7 +48,7 @@ class TestOnlyOneModuleSpellsThem(unittest.TestCase):
                 continue
             tree = ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
             offenders += [
-                f"{name}:{node.lineno}" for node in _string_constants(tree)
+                f"{name}:{node.lineno}" for node in strings_outside_docstrings(tree)
                 if node.value in wanted and (name, node.value) not in _SAME_WORD_ELSEWHERE
             ]
 
