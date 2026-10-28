@@ -113,6 +113,7 @@ def _string_constants(tree: ast.AST):
 
 
 class TestOnlyOneModuleSpellsIt:
+    @pytest.mark.repo_check
     def test_the_suffix_is_a_literal_in_exactly_one_place(self):
         offenders = []
         for name in product_sources(PROJECT_ROOT):

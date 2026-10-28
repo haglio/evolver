@@ -26,7 +26,11 @@ import json
 import unittest
 from pathlib import Path
 
+import pytest
+
 from tests.product_sources import PROJECT_ROOT, product_sources
+
+pytestmark = pytest.mark.repo_check
 
 # What each module reads off the ambient ``config`` singleton today, held
 # exactly. Lower a number when a conversion removes reads. A number goes UP only

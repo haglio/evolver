@@ -18,7 +18,11 @@ from __future__ import annotations
 import ast
 import unittest
 
+import pytest
+
 from tests.product_sources import PROJECT_ROOT, product_sources
+
+pytestmark = pytest.mark.repo_check
 
 # The verbs that must stay under their module's name. Names that describe what they
 # answer -- ``sidecar_path``, ``action_of`` -- carry their subject with them

@@ -22,7 +22,10 @@ import ast
 import re
 from pathlib import Path
 
+import pytest
 from shared_ui import palette
+
+pytestmark = pytest.mark.repo_check
 
 _ROOT = Path(__file__).resolve().parent.parent
 _TREES = (_ROOT / "gui", _ROOT / "evolver", _ROOT / "backfill", _ROOT / "review_weird", _ROOT / "tasks",

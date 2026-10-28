@@ -21,7 +21,11 @@ from __future__ import annotations
 import ast
 import unittest
 
+import pytest
+
 from tests.product_sources import PROJECT_ROOT, product_sources
+
+pytestmark = pytest.mark.repo_check
 
 # Methods that change what they are called on. A call to one of these on a
 # result's field is the same write as an assignment, spelled through the list.

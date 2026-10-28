@@ -13,6 +13,7 @@ import re
 import unittest
 from pathlib import Path
 
+import pytest
 from PyQt6.QtGui import QColor
 
 import evolver
@@ -265,6 +266,7 @@ class TestStageRegistry(unittest.TestCase):
 
         self.assertEqual(listed, [STAGE_LABELS[key] for key in ALL_STAGES])
 
+    @pytest.mark.repo_check
     def test_nothing_writes_a_stage_number_of_its_own(self):
         """Ordering has one home, `STAGES`. A number typed into a log line, a
         docstring or a paragraph is a second copy that cannot be kept in step
