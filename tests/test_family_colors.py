@@ -25,6 +25,8 @@ from pathlib import Path
 import pytest
 from shared_ui import palette
 
+from tests.product_sources import strings_outside_docstrings
+
 pytestmark = pytest.mark.repo_check
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -54,33 +56,13 @@ def _sources() -> list[Path]:
     return files
 
 
-def _painted_strings(tree: ast.AST):
-    """Every string constant except a docstring.
-
-    A docstring is prose -- this file's own names the colors it forbids, to
-    explain the rule -- and nothing ever paints with one.
-    """
-    documented = set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
-                             ast.AsyncFunctionDef)):
-            first = node.body[0] if node.body else None
-            if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
-                    and isinstance(first.value.value, str)):
-                documented.add(id(first.value))
-    for node in ast.walk(tree):
-        if (isinstance(node, ast.Constant) and isinstance(node.value, str)
-                and id(node) not in documented):
-            yield node
-
-
 def test_no_color_here_is_a_hand_copy_of_a_family_token():
     # Parsed rather than grepped, so a "#" in a comment or a path is not a hit --
     # only text the app actually paints with, or a test asserts on.
     family = _family_hex()
     offenders = []
     for path in _sources():
-        for node in _painted_strings(ast.parse(path.read_text(encoding="utf-8"))):
+        for node in strings_outside_docstrings(ast.parse(path.read_text(encoding="utf-8"))):
             for found in _HEX.findall(node.value):
                 if found.lower() in family:
                     offenders.append(

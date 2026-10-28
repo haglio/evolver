@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.product_sources import PROJECT_ROOT, product_sources
+from tests.product_sources import PROJECT_ROOT, product_sources, strings_outside_docstrings
 from util.variants import (
     UPSCALE_SUFFIX,
     is_processed_stem,
@@ -95,23 +95,6 @@ class TestSourceStem:
         assert source_stem(stem) == expected
 
 
-def _string_constants(tree: ast.AST):
-    """Every string literal in *tree* except the docstrings.
-
-    Docstrings name the convention in prose all over the repo, and should:
-    what must not be spread around is the rule as something code acts on.
-    """
-    docstrings = set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            first = node.body[0] if node.body else None
-            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
-                docstrings.add(id(first.value))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
-            yield node
-
-
 class TestOnlyOneModuleSpellsIt:
     @pytest.mark.repo_check
     def test_the_suffix_is_a_literal_in_exactly_one_place(self):
@@ -121,7 +104,7 @@ class TestOnlyOneModuleSpellsIt:
                 continue
             tree = ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
             offenders += [
-                f"{name}:{node.lineno}" for node in _string_constants(tree)
+                f"{name}:{node.lineno}" for node in strings_outside_docstrings(tree)
                 if UPSCALE_SUFFIX in node.value
             ]
 
