@@ -11,6 +11,8 @@ import ast
 import unittest
 from pathlib import Path
 
+import pytest
+
 from tests.product_sources import PROJECT_ROOT, product_sources
 from tests.test_variants import _string_constants
 from util import orientation
@@ -38,6 +40,7 @@ class TestTheOrientations(unittest.TestCase):
 
 
 class TestOnlyOneModuleSpellsThem(unittest.TestCase):
+    @pytest.mark.repo_check
     def test_the_three_strings_are_literals_in_exactly_one_place(self):
         wanted = {orientation.LANDSCAPE, orientation.PORTRAIT, orientation.UNKNOWN}
         offenders = []

@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from PyQt6.QtWidgets import QApplication
 from shared_ui.alert import Link
 from shared_ui.palette import PREVIEW_INK
@@ -14,6 +15,7 @@ from util import alert
 
 
 class TestTheOnlyWayToAModalDialog(unittest.TestCase):
+    @pytest.mark.repo_check
     def test_no_other_module_opens_a_dialog_for_itself(self):
         """``tests/__init__.py`` gags the two calls ``util/alert.py`` makes.
 

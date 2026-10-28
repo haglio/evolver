@@ -19,7 +19,11 @@ import ast
 import unittest
 from pathlib import Path
 
+import pytest
+
 from tests.product_sources import PROJECT_ROOT, product_sources
+
+pytestmark = pytest.mark.repo_check
 
 # Every package and root module of this checkout, so an import of one can be
 # told from an import of a third-party library or the standard one.
