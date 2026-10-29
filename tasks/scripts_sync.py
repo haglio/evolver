@@ -10,10 +10,10 @@ from enum import Enum, auto
 from pathlib import Path
 
 import config
+from util import lanes
 from util.alert import show_error
 from util.media_files import (
     library_videos,
-    listed_videos,
     reachable,
     remove_empty_dirs,
     unique_path,
@@ -28,8 +28,6 @@ from util.script_library import (
 from util.variants import strip_processing_suffixes
 
 log = logging.getLogger(__name__)
-
-VR_FOLDER = "VR"
 
 
 @dataclass
@@ -396,9 +394,8 @@ def _index_videos(trees: Trees) -> dict[str, list[Path]]:
 def _library_videos(trees: Trees):
     if trees.videos.is_dir():
         yield from library_videos(trees.videos)
-    if trees.vr is not None:
-        for kept in listed_videos(trees.vr):
-            yield trees.videos / VR_FOLDER / kept.relative_to(trees.vr)
+    for vr in lanes.vr_videos(trees.vr, trees.videos):
+        yield vr.in_library
 
 
 def _iter_funscripts(*roots: Path):

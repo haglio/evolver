@@ -9,11 +9,13 @@ from pathlib import Path
 from app_support.flick_folder import flat_flicks_in, flicks_folder_in
 
 import config
-from util.media_files import is_finalized_video_file, library_videos
+from util.media_files import is_finalized_video_file, library_videos, listed_videos
 from util.sidecar import upscaled_video_path
 
 #: The source folder Origenerator's videos arrive under, in 0_inbox and 1_sorted.
 ORIGENERATOR_SOURCE = "origenerator"
+
+VR_FOLDER = "VR"
 
 
 @dataclass(frozen=True)
@@ -108,3 +110,16 @@ def non_ai_videos() -> list[Path]:
     if not config.NON_AI_DIR.is_dir():
         return []
     return sorted(library_videos(config.NON_AI_DIR))
+
+
+@dataclass(frozen=True)
+class VrVideo:
+    video: Path
+    in_library: Path
+
+
+def vr_videos(kept_in: Path | None, library: Path) -> Iterator[VrVideo]:
+    if kept_in is None:
+        return
+    for video in listed_videos(kept_in):
+        yield VrVideo(video, library / VR_FOLDER / video.relative_to(kept_in))
