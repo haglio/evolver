@@ -1,9 +1,9 @@
-"""Whether two differently named files hold one video, told by their pictures.
+"""Whether two differently named files hold one video, told by their frames.
 
 The naming rule (:mod:`util.version_groups`) finds a version by the thread its
 name keeps back to its original. A copy saved under a name of its own keeps no
 such thread, so the only thing left to go on is the footage: two files that run
-the same length and show the same pictures at the same moments are one video.
+the same length and show the same frames at the same moments are one video.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def fingerprint(
     video: Path, seconds: float, *,
     grab: Callable[[Path, list[float]], np.ndarray] = frames_at,
 ) -> list[str] | None:
-    """*video*'s picture at evenly spaced moments through its *seconds*, or None
+    """*video*'s frame at evenly spaced moments through its *seconds*, or None
     when ffmpeg could not read every one of them."""
     frames = grab(video, [seconds * (moment + 0.5) / MOMENTS for moment in range(MOMENTS)])
     if len(frames) != MOMENTS:

@@ -19,7 +19,7 @@ def _written(values: list[int]) -> list[str]:
 
 def _reencoded(agreeing: int) -> list[int]:
     """*MOMENTS* as another encode shows them at *agreeing* of the moments,
-    and as a different picture altogether at the rest."""
+    and as a different frame altogether at the rest."""
     return [value ^ 0b1011 if moment < agreeing else value ^ MASK
             for moment, value in enumerate(MOMENTS)]
 

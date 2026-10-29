@@ -140,7 +140,7 @@ class TestClipMatch(unittest.TestCase):
 
     def test_decodes_the_cheapest_version_of_a_scene(self):
         """Upscales cost minutes where the original costs seconds, and they hold
-        the same pictures, so only the smallest file of a family is ever read."""
+        the same frames, so only the smallest file of a family is ever read."""
         with workspace_temp_dir() as root:
             _, settings = _library(root, ONE_SCENE_TWO_CLIPS)
             sampled = []
@@ -254,7 +254,7 @@ class TestClipMatch(unittest.TestCase):
 
     def test_a_family_entry_that_is_another_encode_still_gets_the_answer(self):
         """The family is worth having: a genuine re-encode holds the same
-        pictures, aligns in the same scene, and is recorded without being
+        frames, aligns in the same scene, and is recorded without being
         decoded twice for the search."""
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, (

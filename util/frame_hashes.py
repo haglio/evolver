@@ -1,15 +1,15 @@
 """Reading a video down to comparable frames, and finding one run inside another.
 
 A carved clip is a literal excerpt of a library scene, so the scene's timeline
-holds the clip's pictures verbatim. Sampling frames from both, hashing them and
+holds the clip's frames verbatim. Sampling frames from both, hashing them and
 looking for the offset that lines them up therefore answers a question the
 filenames cannot -- which scene a clip came out of, and where in it.
 
 Black bars come off both sides before any of that. A hash reads a frame as a
-grid of cells, so it is a statement about where things sit in the picture -- and
+grid of cells, so it is a statement about where things sit in the frame -- and
 a compilation that pillarboxed a 4:3 scene into a 16:9 frame has moved
 everything inward by an eighth without changing a pixel of it. Bars are the
-frame around a picture rather than part of it, so they are cut first and the
+frame around the content rather than part of it, so they are cut first and the
 grid lands on the same content either side.
 
 Nothing here reads the library or writes a sidecar: it takes paths and returns
@@ -42,7 +42,7 @@ SAMPLE_HEIGHT, SAMPLE_WIDTH = _ROWS * 4, _COLS * 4
 SAMPLE_FPS = 8.0
 
 # A frame survives re-encoding, rescaling and upscaling with its hash almost but
-# not quite intact, so "the same picture" is a small Hamming distance, not zero.
+# not quite intact, so "the same frame" is a small Hamming distance, not zero.
 TOLERANCE = 8
 
 # How far either side of an offset its own frames can land, in samples. The two
@@ -61,7 +61,7 @@ _POPCOUNT = np.array([i.bit_count() for i in range(256)], dtype=np.uint8)
 # long each time. Bars are a constant of the encode, so a few seconds anywhere
 # show them -- but a fade or a dark shot reads as bars that are not there, and
 # cropping a scene its clip does not crop is how a real pair *stops* matching. So
-# several windows are unioned: the widest picture any of them saw is the one
+# several windows are unioned: the widest content any of them saw is the one
 # really there, which makes a mistake here cost a crop rather than a match.
 PROBE_POINTS = (0.2, 0.5, 0.8)
 PROBE_SECONDS = 4.0
@@ -70,17 +70,17 @@ PROBE_SECONDS = 4.0
 # rounds the rectangle it finds to.
 _CROP_LIMIT, _CROP_ROUND = 24, 2
 
-# A picture smaller than this much of the frame is a dark scene being read as
+# Content smaller than this much of the frame is a dark scene being read as
 # bars rather than bars: no real letterbox takes half the height.
-MIN_PICTURE_FRACTION = 0.5
+MIN_CONTENT_FRACTION = 0.5
 
 _CROP_REPORT = re.compile(r"crop=(\d+):(\d+):(\d+):(\d+)")
 
 
-def picture_crop(
+def content_crop_in(
     reports: Iterable[str], width: int, height: int,
 ) -> tuple[int, int, int, int] | None:
-    """The ``crop=w:h:x:y`` of the picture inside *width* x *height*, or None.
+    """The ``crop=w:h:x:y`` of the content inside *width* x *height*, or None.
 
     None means "use the frame as it is" -- either nothing was measured, or what
     was measured is the whole frame, or it is so small that a dark shot is the
@@ -109,7 +109,7 @@ def picture_crop(
 
     if crop_width >= width and crop_height >= height:
         return None
-    if crop_width < width * MIN_PICTURE_FRACTION or crop_height < height * MIN_PICTURE_FRACTION:
+    if crop_width < width * MIN_CONTENT_FRACTION or crop_height < height * MIN_CONTENT_FRACTION:
         return None
     return crop_width, crop_height, left, upper
 
@@ -134,7 +134,7 @@ def _cropdetect(video: Path, at: float) -> str:
 
 
 def content_crop(video: Path) -> tuple[int, int, int, int] | None:
-    """The ``crop=w:h:x:y`` that leaves *video*'s picture without its bars.
+    """The ``crop=w:h:x:y`` that leaves *video*'s content without its bars.
 
     None when it has none worth cutting, which is most videos.
     """
@@ -143,7 +143,7 @@ def content_crop(video: Path) -> tuple[int, int, int, int] | None:
     if dimensions is None or duration is None:
         return None
     width, height = dimensions
-    return picture_crop(
+    return content_crop_in(
         [_cropdetect(video, duration * point) for point in PROBE_POINTS], width, height,
     )
 
@@ -151,26 +151,26 @@ def content_crop(video: Path) -> tuple[int, int, int, int] | None:
 def sample_frames(video: Path, fps: float) -> np.ndarray:
     """*video* decoded to gray thumbnails, *fps* of them a second.
 
-    Its black bars are cropped off first, so the thumbnails hold the picture and
+    Its black bars are cropped off first, so the thumbnails hold the content and
     nothing else -- a pillarboxed clip and the unpadded scene it came out of are
-    the same picture, and have to reach the hash as the same grid of cells.
+    the same frames, and have to reach the hash as the same grid of cells.
 
     Empty when ffmpeg cannot read the file, which leaves that video matching
     nothing rather than stopping the batch. Files with damaged frames do decode,
     complaining on stderr the whole way -- held back unless the run really fails,
     since a batch over hundreds of videos is unreadable otherwise.
     """
-    filters = ",".join([f"fps={fps}", *_picture_filters(content_crop(video))])
+    filters = ",".join([f"fps={fps}", *_content_filters(content_crop(video))])
     return _thumbnails(_decode(video, ["-i", str(video), "-an", "-vf", filters]))
 
 
 def frames_at(video: Path, seconds: Iterable[float]) -> np.ndarray:
-    """*video*'s picture at each of *seconds*, as :func:`sample_frames` reads one.
+    """*video*'s frame at each of *seconds*, as :func:`sample_frames` reads one.
 
     A moment ffmpeg cannot read is left out, so a caller that needs them all
     counts what came back.
     """
-    filters = ",".join(_picture_filters(content_crop(video)))
+    filters = ",".join(_content_filters(content_crop(video)))
     moments = [
         _thumbnails(_decode(video, ["-ss", f"{at:.3f}", "-i", str(video), "-an",
                                     "-frames:v", "1", "-vf", filters]))
@@ -179,7 +179,7 @@ def frames_at(video: Path, seconds: Iterable[float]) -> np.ndarray:
     return np.concatenate([_thumbnails(b""), *moments])
 
 
-def _picture_filters(crop: tuple[int, int, int, int] | None) -> list[str]:
+def _content_filters(crop: tuple[int, int, int, int] | None) -> list[str]:
     bars = [] if crop is None else ["crop={}:{}:{}:{}".format(*crop)]
     # Averaging the whole source block, rather than sampling a few pixels of it,
     # is what makes a 4K upscale thumbnail like its 540p original.

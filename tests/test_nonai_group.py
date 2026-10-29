@@ -178,7 +178,7 @@ class TestNonAiGroup(unittest.TestCase):
                 self.assertTrue(sidecar.sidecar_path(clip).exists())
 
 
-ONE_PICTURE = [f"{0x5A5A5A5A5A5A5A5A + moment:016x}" for moment in range(16)]
+ONE_FINGERPRINT = [f"{0x5A5A5A5A5A5A5A5A + moment:016x}" for moment in range(16)]
 
 
 def _scene(path: Path, seconds: float) -> Path:
@@ -193,8 +193,8 @@ def _group(video: Path) -> str:
     return sidecar.read(sidecar.sidecar_path(video))["version"]["group"]
 
 
-class TestOneVideoByItsPictures(unittest.TestCase):
-    def test_two_differently_named_copies_with_the_same_pictures_are_one_video(self):
+class TestOneVideoByItsFrames(unittest.TestCase):
+    def test_two_differently_named_copies_with_the_same_frames_are_one_video(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -204,12 +204,12 @@ class TestOneVideoByItsPictures(unittest.TestCase):
                 old = _scene(unsorted / "Jane Doe - studio video original.mp4", 850.57)
                 new = _scene(unsorted / "jane-doe-scene-two-enhanced-60fps-1080p.mp4", 850.51)
 
-                result = nonai_group.run(fingerprint=lambda video, seconds: ONE_PICTURE)
+                result = nonai_group.run(fingerprint=lambda video, seconds: ONE_FINGERPRINT)
 
                 self.assertEqual(_group(old), _group(new))
                 self.assertEqual(result.joined, 1)
 
-    def test_a_video_is_measured_once_and_its_pictures_kept(self):
+    def test_a_video_is_measured_once_and_its_frames_kept(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -222,7 +222,7 @@ class TestOneVideoByItsPictures(unittest.TestCase):
 
                 def fingerprint(video: Path, seconds: float) -> list[str]:
                     measured.append(video.name)
-                    return ONE_PICTURE
+                    return ONE_FINGERPRINT
 
                 nonai_group.run(fingerprint=fingerprint)
                 nonai_group.run(fingerprint=fingerprint)
@@ -249,7 +249,7 @@ class TestOneVideoByItsPictures(unittest.TestCase):
 
                 def fingerprint(video: Path, seconds: float) -> list[str]:
                     measured.append(video.name)
-                    return ONE_PICTURE
+                    return ONE_FINGERPRINT
 
                 nonai_group.run(fingerprint=fingerprint)
 
@@ -273,14 +273,14 @@ class TestOneVideoByItsPictures(unittest.TestCase):
 
                 def fingerprint(video: Path, seconds: float) -> list[str]:
                     measured.append(video.name)
-                    return ONE_PICTURE
+                    return ONE_FINGERPRINT
 
                 nonai_group.run(fingerprint=fingerprint)
 
                 self.assertEqual(sorted(measured), sorted([old.name, new.name]))
                 self.assertEqual(_group(upscale), _group(new))
 
-    def test_pictures_an_upscale_was_handed_are_not_measured_again(self):
+    def test_frames_an_upscale_was_handed_are_not_measured_again(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -291,14 +291,14 @@ class TestOneVideoByItsPictures(unittest.TestCase):
                 _touch(upscale)
                 write_sidecar(sidecar.sidecar_path(upscale), {
                     "video": {"type": "full_length", "duration_seconds": 850.57},
-                    "footage": {"fingerprint": ONE_PICTURE},
+                    "footage": {"fingerprint": ONE_FINGERPRINT},
                 })
                 new = _scene(bucket / "0 unsorted" / "jane-doe-scene-two-enhanced.mp4", 850.51)
                 measured: list[str] = []
 
                 def fingerprint(video: Path, seconds: float) -> list[str]:
                     measured.append(video.name)
-                    return ONE_PICTURE
+                    return ONE_FINGERPRINT
 
                 nonai_group.run(fingerprint=fingerprint)
 
@@ -319,14 +319,14 @@ class TestOneVideoByItsPictures(unittest.TestCase):
 
                 def fingerprint(video: Path, seconds: float) -> list[str]:
                     measured.append(video.name)
-                    return ONE_PICTURE
+                    return ONE_FINGERPRINT
 
                 result = nonai_group.run(fingerprint=fingerprint)
 
                 self.assertEqual(len(measured), 3)
                 self.assertEqual(result.measured, 3)
 
-    def test_the_same_length_with_other_pictures_is_another_video(self):
+    def test_the_same_length_with_other_frames_is_another_video(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -335,10 +335,10 @@ class TestOneVideoByItsPictures(unittest.TestCase):
                 unsorted = non_ai / "lagoon" / "0 unsorted"
                 first = _scene(unsorted / "various - Example Studio - finale 1.mp4", 60.0)
                 second = _scene(unsorted / "various - Example Studio - finale 2.mp4", 59.95)
-                other = [f"{int(moment, 16) ^ ((1 << 64) - 1):016x}" for moment in ONE_PICTURE]
+                other = [f"{int(moment, 16) ^ ((1 << 64) - 1):016x}" for moment in ONE_FINGERPRINT]
 
                 nonai_group.run(fingerprint=lambda video, seconds:
-                                ONE_PICTURE if video == first else other)
+                                ONE_FINGERPRINT if video == first else other)
 
                 self.assertNotEqual(_group(first), _group(second))
 

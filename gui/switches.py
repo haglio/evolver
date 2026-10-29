@@ -11,10 +11,10 @@ from shared_ui.toggle_switch import ToggleSwitch
 
 def _draw_at_the_end(painter: QPainter, switch: ToggleSwitch, row: QRect, inset: int) -> QRectF:
     pixel_ratio = painter.device().devicePixelRatioF()
-    picture = _picture_of(switch, pixel_ratio)
+    pixmap = _pixmap_of(switch, pixel_ratio)
     corner = QPoint(row.right() - inset - switch.width(), row.center().y() - switch.height() // 2)
-    painter.drawPixmap(corner, picture)
-    pill = QRectF(QRegion(picture.mask()).boundingRect())
+    painter.drawPixmap(corner, pixmap)
+    pill = QRectF(QRegion(pixmap.mask()).boundingRect())
     return QRectF(pill.topLeft() / pixel_ratio, pill.size() / pixel_ratio).translated(QPointF(corner))
 
 
@@ -26,12 +26,12 @@ def _outline(painter: QPainter, pill: QRectF) -> None:
     painter.drawRoundedRect(edge, edge.height() / 2, edge.height() / 2)
 
 
-def _picture_of(switch: ToggleSwitch, pixel_ratio: float) -> QPixmap:
-    picture = QPixmap(switch.size() * pixel_ratio)
-    picture.setDevicePixelRatio(pixel_ratio)
-    picture.fill(Qt.GlobalColor.transparent)
-    switch.render(picture, QPoint(), QRegion(), QWidget.RenderFlag.DrawChildren)
-    return picture
+def _pixmap_of(switch: ToggleSwitch, pixel_ratio: float) -> QPixmap:
+    pixmap = QPixmap(switch.size() * pixel_ratio)
+    pixmap.setDevicePixelRatio(pixel_ratio)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    switch.render(pixmap, QPoint(), QRegion(), QWidget.RenderFlag.DrawChildren)
+    return pixmap
 
 
 def _repaint_on_toggle(switch: ToggleSwitch, widget) -> None:

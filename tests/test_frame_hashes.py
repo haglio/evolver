@@ -9,13 +9,13 @@ import numpy as np
 
 from util import frame_hashes as fh
 from util.frame_hashes import (
-    MIN_PICTURE_FRACTION,
+    MIN_CONTENT_FRACTION,
     SAMPLE_HEIGHT,
     SAMPLE_WIDTH,
     align,
+    content_crop_in,
     frame_hashes,
     locate,
-    picture_crop,
 )
 
 
@@ -27,7 +27,7 @@ def _hashes(n: int, seed: int = 0) -> np.ndarray:
 
 class TestFrameHashes:
     def test_a_dimmer_copy_of_a_frame_hashes_the_same(self):
-        """The clip and the scene are different encodes of one picture, so what
+        """The clip and the scene are different encodes of one frame, so what
         the hash reads has to be the shape of the frame, not its exposure."""
         rng = np.random.default_rng(3)
         frames = rng.integers(40, 200, size=(5, SAMPLE_HEIGHT, SAMPLE_WIDTH), dtype=np.uint8)
@@ -49,7 +49,7 @@ class TestFrameHashes:
         assert len(set(frame_hashes(frames).tolist())) == 20
 
 
-class TestPictureCrop:
+class TestContentCropIn:
     """What to crop off a frame, read out of ffmpeg's cropdetect reports."""
 
     def _report(self, width: int, height: int, x: int = 0, y: int = 0) -> str:
@@ -58,39 +58,39 @@ class TestPictureCrop:
             f"x:{x} y:{y} pts:1 t:0.04 limit:24 crop={width}:{height}:{x}:{y}"
         )
 
-    def test_finds_the_picture_inside_a_pillarboxed_frame(self):
+    def test_finds_the_content_inside_a_pillarboxed_frame(self):
         report = self._report(1440, 1080, x=240)
 
-        assert picture_crop([report], 1920, 1080) == (1440, 1080, 240, 0)
+        assert content_crop_in([report], 1920, 1080) == (1440, 1080, 240, 0)
 
     def test_a_frame_with_no_bars_is_left_alone(self):
         report = self._report(1920, 1080)
 
-        assert picture_crop([report], 1920, 1080) is None
+        assert content_crop_in([report], 1920, 1080) is None
 
     def test_the_widest_window_wins(self):
         """A window that lands on a fade or a dark shot reads black where there
-        is picture. Cropping a scene its own clip does not crop is how a real
+        is content. Cropping a scene its own clip does not crop is how a real
         pair stops matching, so a narrow reading never overrides a wide one."""
         dark = self._report(600, 400, x=660, y=340)
         lit = self._report(1440, 1080, x=240)
 
-        assert picture_crop([dark, lit, dark], 1920, 1080) == (1440, 1080, 240, 0)
+        assert content_crop_in([dark, lit, dark], 1920, 1080) == (1440, 1080, 240, 0)
 
     def test_a_video_that_reads_as_nearly_all_black_is_left_alone(self):
-        """Below this much picture the likelier story is a dark video, not a
+        """Below this much content the likelier story is a dark video, not a
         letterbox -- no real one takes half the frame."""
-        sliver = int(1080 * MIN_PICTURE_FRACTION) - 20
+        sliver = int(1080 * MIN_CONTENT_FRACTION) - 20
         report = self._report(1920, sliver, y=(1080 - sliver) // 2)
 
-        assert picture_crop([report], 1920, 1080) is None
+        assert content_crop_in([report], 1920, 1080) is None
 
     def test_nothing_measured_means_nothing_cropped(self):
-        assert picture_crop(["ffmpeg version 7.1", ""], 1920, 1080) is None
+        assert content_crop_in(["ffmpeg version 7.1", ""], 1920, 1080) is None
 
     def test_the_rectangle_is_even_on_every_side(self):
         """Chroma is subsampled, so ffmpeg's crop refuses an odd rectangle."""
-        crop = picture_crop([self._report(1437, 1077, x=241, y=1)], 1920, 1080)
+        crop = content_crop_in([self._report(1437, 1077, x=241, y=1)], 1920, 1080)
 
         assert crop is not None
         assert not any(value % 2 for value in crop)
@@ -125,7 +125,7 @@ class TestSampleFrames:
 
     def test_the_bars_come_off_before_the_frame_is_scaled_down(self):
         """Scaling first would squash the bars into the thumbnail, which is the
-        whole problem -- the picture has to fill the grid the hash reads."""
+        whole problem -- the content has to fill the grid the hash reads."""
         assert self._filters((1440, 1080, 240, 0)) == (
             f"fps=8.0,crop=1440:1080:240:0,scale={SAMPLE_WIDTH}:{SAMPLE_HEIGHT}:flags=area"
         )
@@ -177,7 +177,7 @@ class TestFramesAt:
 class TestAlign:
     def test_bars_stop_a_clip_aligning_with_the_scene_it_came_from(self):
         """Why the crop happens at all. A hash says where things sit in the
-        frame, so pillarboxing a scene into a wider one moves its whole picture
+        frame, so pillarboxing a scene into a wider one moves its whole content
         inward and hashes as a different video -- a real excerpt then places
         none of itself, which is what a 4:3 scene cut into a 16:9 compilation
         did."""
