@@ -8,6 +8,7 @@ in -- an escaping FileNotFoundError left it never appearing on screen.
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from fractions import Fraction
 from pathlib import Path
@@ -15,6 +16,13 @@ from pathlib import Path
 from shared_ui.orientation import orientation_of_size
 
 from util import orientation
+
+log = logging.getLogger(__name__)
+
+# A video on the cloud drive that has stalled keeps ffprobe reading it for good,
+# and a kill does not end a process stuck there, so a probe stops waiting after
+# this long and never waits on the process again.
+ANSWER_WITHIN_S = 60
 
 # Width, height and the rotation tag in one invocation. ffprobe takes several
 # -show_entries sections at once, and the tag is optional, so the CSV comes
@@ -128,18 +136,24 @@ def _run_ffprobe(args: list[str]) -> str:
 
     OSError covers ffprobe not being installed, which is the case that used to
     escape: every function here documents itself as answering None when the
-    probe is unavailable, and none of them did. check=False is deliberate --
+    probe is unavailable, and none of them did. The exit code goes unread --
     a non-zero exit means ffprobe had nothing to say about this file, which is
     the same "" as any other silence.
     """
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             ["ffprobe", "-v", "error", "-of", "csv=p=0", *args],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             text=True,
-            check=False,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
     except OSError:
         return ""
-    return result.stdout.strip()
+    try:
+        said, _ = process.communicate(timeout=ANSWER_WITHIN_S)
+    except subprocess.TimeoutExpired:
+        log.warning("ffprobe gave no answer about %s in %ds; leaving it", args[-1], ANSWER_WITHIN_S)
+        process.kill()
+        return ""
+    return said.strip()
