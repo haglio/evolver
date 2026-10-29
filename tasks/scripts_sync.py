@@ -394,7 +394,7 @@ def _index_videos(trees: Trees) -> dict[str, list[Path]]:
 def _library_videos(trees: Trees):
     if trees.videos.is_dir():
         yield from library_videos(trees.videos)
-    for vr in lanes.vr_videos(trees.vr, trees.videos):
+    for vr in lanes.vr_videos_kept_in(trees.vr, trees.videos):
         yield vr.in_library
 
 

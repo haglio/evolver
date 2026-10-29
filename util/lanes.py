@@ -118,7 +118,11 @@ class VrVideo:
     in_library: Path
 
 
-def vr_videos(kept_in: Path | None, library: Path) -> Iterator[VrVideo]:
+def vr_videos() -> Iterator[VrVideo]:
+    return vr_videos_kept_in(config.VR_VIDEO_DIR, config.VIDEO_LIBRARY_DIR)
+
+
+def vr_videos_kept_in(kept_in: Path | None, library: Path) -> Iterator[VrVideo]:
     if kept_in is None:
         return
     for video in listed_videos(kept_in):
