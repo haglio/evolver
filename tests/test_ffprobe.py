@@ -29,13 +29,14 @@ from util.ffprobe import (
 
 
 def _ffprobe_answering(answers: dict[str, str], calls: list | None = None):
-    """A subprocess.run stand-in that answers by the -show_entries selector."""
-    def run(argv, **kwargs):
+    """A subprocess.Popen stand-in that answers by the -show_entries selector."""
+    def popen(argv, **kwargs):
         if calls is not None:
             calls.append(argv)
         selector = argv[argv.index("-show_entries") + 1]
-        return SimpleNamespace(stdout=answers.get(selector, "") + "\n")
-    return run
+        said = answers.get(selector, "") + "\n"
+        return SimpleNamespace(communicate=lambda timeout=None: (said, None))
+    return popen
 
 
 def _selectors(calls: list) -> list[str]:
@@ -46,7 +47,7 @@ class TestFrameFingerprint(unittest.TestCase):
     def test_a_rational_frame_rate_is_divided_out(self):
         calls = []
         fake = _ffprobe_answering({"stream=r_frame_rate,nb_frames": "30000/1001,40561"}, calls)
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertEqual(frame_fingerprint(Path("x.mp4")), (29.97002997002997, 40561))
         self.assertEqual(_selectors(calls), ["stream=r_frame_rate,nb_frames"])
         self.assertIn("-select_streams", calls[0])  # the first video stream's numbers
@@ -55,12 +56,12 @@ class TestFrameFingerprint(unittest.TestCase):
         # Some containers report "30", not "30/1"; the empty denominator must
         # default to 1 rather than raise.
         fake = _ffprobe_answering({"stream=r_frame_rate,nb_frames": "30,100"})
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertEqual(frame_fingerprint(Path("x.mp4")), (30.0, 100))
 
     def test_a_container_with_no_frame_count_has_no_fingerprint(self):
         fake = _ffprobe_answering({"stream=r_frame_rate,nb_frames": "19001/317,N/A"})
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertIsNone(frame_fingerprint(Path("x.mkv")))
 
 
@@ -68,7 +69,7 @@ class TestFrameRate(unittest.TestCase):
     def test_the_first_video_streams_rate_is_read_exactly(self):
         calls = []
         fake = _ffprobe_answering({"stream=r_frame_rate": "30000/1001"}, calls)
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertEqual(frame_rate(Path("x.mp4")), Fraction(30000, 1001))
         self.assertEqual(_selectors(calls), ["stream=r_frame_rate"])
         self.assertIn("-select_streams", calls[0])
@@ -76,7 +77,7 @@ class TestFrameRate(unittest.TestCase):
     def test_a_rate_ffprobe_cannot_read_is_unknown(self):
         for said in ("", "N/A", "0/0"):
             fake = _ffprobe_answering({"stream=r_frame_rate": said})
-            with self.subTest(said=said), patch("util.ffprobe.subprocess.run", side_effect=fake):
+            with self.subTest(said=said), patch("util.ffprobe.subprocess.Popen", side_effect=fake):
                 self.assertIsNone(frame_rate(Path("x.mp4")))
 
 
@@ -84,28 +85,61 @@ class TestDurationSeconds(unittest.TestCase):
     def test_the_containers_duration_is_read_in_seconds(self):
         calls = []
         fake = _ffprobe_answering({"format=duration": "1434.877098"}, calls)
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertAlmostEqual(duration_seconds(Path("x.mp4")), 1434.877098)
         self.assertEqual(_selectors(calls), ["format=duration"])
 
     def test_a_duration_ffprobe_cannot_read_is_unknown(self):
         fake = _ffprobe_answering({"format=duration": "N/A"})
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertIsNone(duration_seconds(Path("x.mp4")))
+
+
+class _GivesNoAnswer:
+    """An ffprobe stuck on a file the cloud drive never hands over, which a kill
+    does not end either."""
+
+    def __init__(self):
+        self.killed = False
+
+    def communicate(self, timeout=None):
+        if timeout is None:
+            raise AssertionError("waited on ffprobe with no limit")
+        raise subprocess.TimeoutExpired("ffprobe", timeout)
+
+    def kill(self):
+        self.killed = True
+
+    def wait(self, timeout=None):
+        raise AssertionError("waited on an ffprobe that a kill does not end")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        self.wait()
+
+
+class TestAProbeGivenNoAnswer(unittest.TestCase):
+    def test_it_ends_the_probe_and_answers_unknown_rather_than_wait_on_it(self):
+        silent = _GivesNoAnswer()
+        with patch("util.ffprobe.subprocess.Popen", return_value=silent):
+            self.assertIsNone(duration_seconds(Path("cloud/scene one.mp4")))
+        self.assertTrue(silent.killed)
 
 
 class TestVideoaiTag(unittest.TestCase):
     def test_the_topaz_tag_names_the_models_used(self):
         calls = []
         fake = _ffprobe_answering({"format_tags=videoai": "Enhanced using iris-2"}, calls)
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertEqual(videoai_tag(Path("x.mp4")), "Enhanced using iris-2")
         self.assertEqual(_selectors(calls), ["format_tags=videoai"])
         self.assertNotIn("-select_streams", calls[0])  # a format probe, not a stream one
 
     def test_an_untagged_video_reads_as_empty(self):
         fake = _ffprobe_answering({})
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertEqual(videoai_tag(Path("x.mp4")), "")
 
 
@@ -126,7 +160,7 @@ def _geometry_csv(width, height, rotate=""):
 class TestFfprobeOrientation(unittest.TestCase):
     def _orientation(self, width, height, rotate="", calls=None):
         fake = _ffprobe_answering({GEOMETRY: _geometry_csv(width, height, rotate)}, calls)
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             return orientation_of(Path("x.mp4"))
 
     def test_one_process_answers_width_height_and_rotation(self):
@@ -165,7 +199,7 @@ class TestFfprobeOrientation(unittest.TestCase):
 class TestVideoDimensions(unittest.TestCase):
     def _dimensions(self, width, height):
         fake = _ffprobe_answering({GEOMETRY: _geometry_csv(width, height)})
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             return video_dimensions(Path("x.mp4"))
 
     def test_reads_the_streams_stored_width_and_height(self):
@@ -182,14 +216,14 @@ class TestHasSound(unittest.TestCase):
     def test_a_file_with_an_audio_stream_has_sound(self):
         calls = []
         fake = _ffprobe_answering({"stream=codec_type": "audio"}, calls)
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             self.assertTrue(has_sound(Path("x.mp4")))
         self.assertEqual(calls[0][calls[0].index("-select_streams") + 1], "a")
 
     def test_a_file_with_no_audio_stream_or_no_answer_has_none(self):
-        with patch("util.ffprobe.subprocess.run", side_effect=_ffprobe_answering({})):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=_ffprobe_answering({})):
             self.assertFalse(has_sound(Path("x.mp4")))
-        with patch("util.ffprobe.subprocess.run", side_effect=FileNotFoundError("ffprobe")):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=FileNotFoundError("ffprobe")):
             self.assertFalse(has_sound(Path("x.mp4")))
 
 
@@ -199,16 +233,16 @@ class TestFfprobeInvocation(unittest.TestCase):
         parses; dropping it used to leave every test green (audit probe 38)."""
         calls = []
         fake = _ffprobe_answering({"format=duration": "1.0"}, calls)
-        with patch("util.ffprobe.subprocess.run", side_effect=fake):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             duration_seconds(Path("x.mp4"))
         self.assertEqual(calls[0][:5], ["ffprobe", "-v", "error", "-of", "csv=p=0"])
 
     def test_a_missing_ffprobe_is_no_answer_rather_than_a_crash(self):
         """Every one of these documents itself as answering None when the probe
-        is unavailable, and none of them did: subprocess.run raises
+        is unavailable, and none of them did: starting it raises
         FileNotFoundError, which escaped all the way out of the backfill tool's
         startup and left it never appearing at all under pythonw."""
-        with patch("util.ffprobe.subprocess.run",
+        with patch("util.ffprobe.subprocess.Popen",
                    side_effect=FileNotFoundError("ffprobe")):
             self.assertIsNone(duration_seconds(Path("x.mp4")))
             self.assertIsNone(video_dimensions(Path("x.mp4")))
@@ -217,10 +251,10 @@ class TestFfprobeInvocation(unittest.TestCase):
             self.assertEqual(videoai_tag(Path("x.mp4")), "")
 
     def test_ffprobe_never_flashes_a_console_window(self):
-        with patch("util.ffprobe.subprocess.run") as mock_run:
-            mock_run.return_value = SimpleNamespace(stdout="1.0\n")
+        with patch("util.ffprobe.subprocess.Popen") as mock_popen:
+            mock_popen.return_value.communicate.return_value = ("1.0\n", None)
             duration_seconds(Path("x.mp4"))
-            kwargs = mock_run.call_args.kwargs
+            kwargs = mock_popen.call_args.kwargs
             self.assertIn("creationflags", kwargs)
             self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
 
