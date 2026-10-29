@@ -10,7 +10,7 @@ Matching a bare token *prefix* is too loose to hold: every scene of a performer
 starts with her name, so a stem that is only her name anchors all of them.
 
 A version renamed rather than suffixed keeps no such thread back to its
-original: the grouping stage finds one of the same length by its pictures
+original: the grouping stage finds one of the same length by its frames
 (:mod:`util.same_footage`), and any other pair is declared
 (``config.NONAI_VERSION_OVERRIDES``).
 

@@ -2,7 +2,7 @@
 
 The library names its scenes for the performer and a hash, with no movie title
 to match a clip's own name against, so which scene a compilation clip came out
-of is answerable only from the pictures -- :mod:`util.frame_hashes` samples both
+of is answerable only from the frames -- :mod:`util.frame_hashes` samples both
 sides, hashes them and looks for the offset that lines them up. What it finds
 goes into the clip's sidecar as ``clip.full_video`` and ``clip.scene_offset``,
 where ``tasks.clip_scripts`` and ``tasks.scene_scripts`` read it back to carry a
@@ -50,7 +50,7 @@ def could_be_cut_from(clip_record: dict, scene: Path) -> bool:
 
     The performer is the one thing a library filename reliably carries, so this
     is the widest net worth casting -- and the set the frame search then narrows
-    by looking at the pictures. A clip recording no performer casts none.
+    by looking at the frames. A clip recording no performer casts none.
     """
     performer = _undoubled_tokens(str(clip_record.get("performer", "")))
     return bool(performer) and performer <= _undoubled_tokens(scene.stem)
@@ -177,7 +177,7 @@ class _SceneCut:
     ``named_by`` is the version whose filename gates the candidates -- the
     biggest, whose name is the fullest. ``cheapest`` is the one actually
     decoded: an upscale is many times the size of its original, minutes rather
-    than seconds to read, for pictures that are the same either way.
+    than seconds to read, for frames that are the same either way.
     """
 
     named_by: Path

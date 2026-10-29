@@ -5,7 +5,7 @@ still wants to fold an original together with its Topaz-enhanced variants into
 one rotation slot. This stage is the source of truth for that grouping: it
 scans every non_AI bucket, families the clips by name (:mod:`util.version_groups`)
 plus the pairs ``config.NONAI_VERSION_OVERRIDES`` declares, folds together the
-differently named copies whose pictures show them to be one video
+differently named copies whose frames show them to be one video
 (:mod:`util.same_footage`), and writes each a sidecar — mirrored under ``METADATA_DIR`` exactly like the AI tree — recording
 its family id and whether it is a processed variant.
 
@@ -31,7 +31,7 @@ from util.video_type import duration_of
 
 log = logging.getLogger(__name__)
 
-# Measuring a video's pictures costs a few seconds of decoding, and a folder of
+# Measuring a video's frames costs a few seconds of decoding, and a folder of
 # same-length videos arrives all at once; the rest wait for the next run.
 MEASURED_PER_RUN = 8
 
@@ -65,7 +65,7 @@ def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupRes
             continue
         named = group_ids([video.stem for video in videos], config.NONAI_VERSION_OVERRIDES)
         existing_by_video = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
-        ids = _joined_by_pictures(videos, existing_by_video, named, measure)
+        ids = _joined_by_frames(videos, existing_by_video, named, measure)
         # A `clip` object (compilation, source, performer) describes one carved
         # scene, and its re-encodes are the same scene — so an upscaled variant
         # inherits it and stays a navigable short. Keying that on the *family*
@@ -106,7 +106,7 @@ def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupRes
     result.measured = measure.taken
     log.info(
         "Non-AI grouping: %d clip(s) in %d family(ies), %d of them joined by their "
-        "pictures (%d measured); wrote %d, pruned %d sidecar(s).",
+        "frames (%d measured); wrote %d, pruned %d sidecar(s).",
         result.grouped, result.families, result.joined, result.measured,
         result.written, result.pruned,
     )
@@ -127,7 +127,7 @@ class _Allowance:
         return self._fingerprint(video, seconds)
 
 
-def _joined_by_pictures(
+def _joined_by_frames(
     videos: list[Path], payloads: dict[Path, dict], ids: dict[str, str],
     fingerprint: Fingerprint,
 ) -> dict[str, str]:
