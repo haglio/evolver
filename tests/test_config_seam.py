@@ -159,7 +159,9 @@ CONFIG_REFERENCE_LEDGER = {
     # of it: the Origenerator checkout whose published document says the rate its
     # videos are generated at, read once in run() and handed to the choice of settings.
     "tasks/upscale.py": 14,
-    "tasks/video_types.py": 5,
+    # One more: how many of a run's measurements may go to the VR videos kept
+    # on the cloud drive, which it asks about too.
+    "tasks/video_types.py": 6,
     # The lane walk it used to do itself, and the stage that walks the lanes
     # after it to stamp the viewing on the same sidecars. One is the third
     # shape: the folder of its own the phone writes its journal to, read so the
@@ -178,8 +180,10 @@ CONFIG_REFERENCE_LEDGER = {
     # both read where the lane table is built rather than by the stage reading
     # that table (tasks/withdrawn.py). Then one more: 1_sorted again, to say
     # where a sorted copy's upscale is filed, for the two stages that delete a
-    # clip's funscripts.
-    "util/lanes.py": 7,
+    # clip's funscripts. Then two more: where the VR videos are kept off the
+    # library's drive and the library they are filed under, for the kinds stage
+    # that asks about them as it does every other lane's videos.
+    "util/lanes.py": 9,
     # Origenerator's gallery file, read nowhere else now that both stages pulling
     # from it come through here.
     "util/origenerator_gallery.py": 1,

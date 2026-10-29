@@ -52,6 +52,41 @@ from util.ffprobe import duration_seconds, orientation_of
 
 log = logging.getLogger(__name__)
 
+_NEITHER_PORTRAIT_NOR_LANDSCAPE = None
+
+
+@dataclass(frozen=True)
+class _Listed:
+    """A video whose kind this stage owns, its record as it stands, and what its
+    lane settles on its own: the two signals a kind is read off, and the
+    orientation of a video the lane files by it (empty where it has to be
+    measured)."""
+
+    video: Path
+    sidecar: Path
+    payload: dict
+    genau: bool = False
+    excerpt: bool = False
+    orientation: str | None = ""
+    on_the_cloud_drive: bool = False
+
+
+@dataclass
+class _Measurements:
+    left: int
+    left_on_the_cloud_drive: int
+
+    def spent_on(self, listed: _Listed) -> bool:
+        if self.left <= 0 or (listed.on_the_cloud_drive and self.left_on_the_cloud_drive <= 0):
+            return False
+        self.left -= 1
+        if listed.on_the_cloud_drive:
+            self.left_on_the_cloud_drive -= 1
+        return True
+
+    def none_more_from_the_cloud_drive(self) -> None:
+        self.left_on_the_cloud_drive = 0
+
 
 @dataclass
 class VideoTypesResult:
@@ -85,17 +120,19 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoTypesR
     """
     log.info("=== Stage: record video kinds ===")
     result = VideoTypesResult()
-    measurements_left = config.VIDEO_TYPE_BATCH_LIMIT
-    for video, path, payload, genau, excerpt, free_orientation in _library_videos():
-        free = video_type.free_kind(genau=genau, excerpt=excerpt)
-        seconds = video_type.duration_of(payload)
+    measurements = _Measurements(config.VIDEO_TYPE_BATCH_LIMIT,
+                                 config.CLOUD_VIDEO_TYPE_BATCH_LIMIT)
+    for listed in _library_videos():
+        free = video_type.free_kind(genau=listed.genau, excerpt=listed.excerpt)
+        seconds = video_type.duration_of(listed.payload)
         unmeasurable = False
-        if seconds is None and measurements_left > 0:
-            measurements_left -= 1
-            seconds = probe(video)
+        if seconds is None and measurements.spent_on(listed):
+            seconds = probe(listed.video)
             unmeasurable = seconds is None
             if unmeasurable:
-                log.info("Could not measure %s; leaving it for the next run", video)
+                log.info("Could not measure %s; leaving it for the next run", listed.video)
+                if listed.on_the_cloud_drive:
+                    measurements.none_more_from_the_cloud_drive()
         if seconds is None and not free:
             # Nothing free says what this is and no running time did either, so
             # it is left alone: the sidecar's silence is recoverable on a later
@@ -106,13 +143,14 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoTypesR
                 result.deferred += 1
             continue
 
-        orient = free_orientation or video_type.orientation_of(payload)
-        if not orient and measurements_left > 0:
-            measurements_left -= 1
-            orient = _orientation_measured(video, orientation_probe)
+        oriented = listed.orientation is not _NEITHER_PORTRAIT_NOR_LANDSCAPE
+        orient = (listed.orientation or video_type.orientation_of(listed.payload)) if oriented else ""
+        if oriented and not orient and measurements.spent_on(listed):
+            orient = _orientation_measured(listed.video, orientation_probe)
 
         def record_what_is_known(
-            current: dict, genau=genau, excerpt=excerpt, seconds=seconds, orient=orient,
+            current: dict, genau=listed.genau, excerpt=listed.excerpt, seconds=seconds,
+            orient=orient,
         ) -> dict | None:
             written = video_type.stamped(
                 current, video_type.classify(genau=genau, excerpt=excerpt,
@@ -123,9 +161,9 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoTypesR
                 written = video_type.oriented(written, orient)
             return written if written != current else None
 
-        if sidecar.update(path, record_what_is_known) is not None:
+        if sidecar.update(listed.sidecar, record_what_is_known) is not None:
             result.recorded += 1
-        elif seconds is None or not orient:
+        elif seconds is None or (oriented and not orient):
             # What it could say already on file, still owing a measurement that
             # this run had none left for, or could not take.
             result.deferred += 1
@@ -148,22 +186,16 @@ def _orientation_measured(video: Path, orientation_probe) -> str:
 
 
 def _library_videos():
-    """Every video whose kind this stage owns, with where its record lives.
-
-    Yields ``(video, sidecar path, payload, genau, excerpt, orientation)`` — the
-    record as it stands, plus what a lane settles on its own: the two signals a
-    kind is read off, and the orientation of a video the lane files by it (empty
-    where it has to be measured).
-    """
     yield from _genau_flicks()
     yield from _ai_clips()
     yield from _non_ai_videos()
+    yield from _vr_videos()
 
 
 def _genau_flicks():
     for video in lanes.genau_flicks():
         path = sidecar.sidecar_path(video)
-        yield video, path, sidecar.read(path), True, False, ""
+        yield _Listed(video, path, sidecar.read(path), genau=True)
 
 
 def _ai_clips():
@@ -173,8 +205,8 @@ def _ai_clips():
     for clip in lanes.ai_clips():
         path = sidecar.sidecar_path(clip.upscale)
         filed_under = clip.orientation if clip.orientation in orientation.SORTED else ""
-        yield (clip.video, path, sidecar.read(path), clip.source == config.GENAU_SOURCE, False,
-               filed_under)
+        yield _Listed(clip.video, path, sidecar.read(path),
+                      genau=clip.source == config.GENAU_SOURCE, orientation=filed_under)
 
 
 def _non_ai_videos():
@@ -198,7 +230,14 @@ def _non_ai_videos():
     )
     for video in videos:
         excerpt = video in carved or _in_a_cut_folder(_below_the_library(video), cuts)
-        yield video, sidecar.sidecar_path(video), payloads[video], False, excerpt, ""
+        yield _Listed(video, sidecar.sidecar_path(video), payloads[video], excerpt=excerpt)
+
+
+def _vr_videos():
+    for vr in lanes.vr_videos():
+        path = sidecar.sidecar_path(vr.in_library)
+        yield _Listed(vr.video, path, sidecar.read(path),
+                      orientation=_NEITHER_PORTRAIT_NOR_LANDSCAPE, on_the_cloud_drive=True)
 
 
 def _was_carved(video: Path, payload: dict) -> bool:

@@ -261,6 +261,10 @@ UPSCALE_BATCH_LIMIT = 5
 # time or an orientation not yet recorded costs one, so this bounds the first runs
 # over a library that has never been asked and is never reached again after.
 VIDEO_TYPE_BATCH_LIMIT = 400
+# And how many of those it spends on the VR videos kept on the cloud drive, where
+# each one fetches part of a file that is not on this computer, perhaps while the
+# headset is playing another from the same drive.
+CLOUD_VIDEO_TYPE_BATCH_LIMIT = 10
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
 PIPELINE_WALL_TIMEOUT_SECONDS = UPSCALE_RUN_BUDGET_SECONDS + 3 * 60  # 11 min

@@ -5,7 +5,13 @@ import unittest
 from pathlib import Path
 
 from tasks import video_types
-from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
+from tests.temp_helpers import (
+    LaneLibrary,
+    a_drive_that_is_not_there,
+    touch_video,
+    workspace_temp_dir,
+    write_sidecar,
+)
 from util import orientation, sidecar, video_type
 
 # Fabricated: the real folder name is library vocabulary and lives in the
@@ -439,6 +445,77 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                     video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
                     video_type.SHORT,
                 )
+
+    def test_a_vr_video_kept_on_the_cloud_drive_gets_its_running_time_where_the_library_files_it(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            vr_root = root / "cloud" / "VR"
+            video = touch_video(vr_root / "finished" / "scene one.mp4")
+            with lib.config(VR_VIDEO_DIR=vr_root):
+                video_types.run(probe=_probe({video.stem: 1800.0}),
+                                orientation_probe=_orientation_unknown)
+
+            recorded = sidecar.read(lib.metadata / "VR" / "finished" / "scene one.json")
+            self.assertEqual(video_type.duration_of(recorded), 1800.0)
+
+    def test_nothing_asks_whether_a_vr_video_is_portrait_or_landscape(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            vr_root = root / "cloud" / "VR"
+            video = touch_video(vr_root / "finished" / "scene one.mp4")
+            with lib.config(VR_VIDEO_DIR=vr_root):
+                result = video_types.run(probe=_probe({video.stem: 1800.0}),
+                                         orientation_probe=_refuses_to_be_called)
+
+            self.assertEqual(result.recorded, 1)
+
+    def test_a_vr_video_whose_running_time_is_on_file_is_known_and_owes_nothing(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            vr_root = root / "cloud" / "VR"
+            touch_video(vr_root / "finished" / "scene one.mp4")
+            write_sidecar(lib.metadata / "VR" / "finished" / "scene one.json",
+                          video_type.timed(video_type.stamped({}, video_type.FULL_LENGTH), 1800.0))
+            with lib.config(VR_VIDEO_DIR=vr_root):
+                result = video_types.run(probe=_refuses_to_be_called,
+                                         orientation_probe=_refuses_to_be_called)
+
+            self.assertEqual((result.already, result.deferred), (1, 0))
+
+    def test_nothing_is_asked_of_the_cloud_drive_while_it_is_not_there(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(VR_VIDEO_DIR=a_drive_that_is_not_there() / "VR"):
+                result = video_types.run(probe=_refuses_to_be_called,
+                                         orientation_probe=_refuses_to_be_called)
+
+            self.assertEqual(result, video_types.VideoTypesResult())
+
+    def test_a_run_asks_the_cloud_drive_about_only_so_many_vr_videos(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            vr_root = root / "cloud" / "VR"
+            for index in range(5):
+                touch_video(vr_root / "finished" / f"scene {index}.mp4")
+            measured = []
+            with lib.config(VR_VIDEO_DIR=vr_root, CLOUD_VIDEO_TYPE_BATCH_LIMIT=2):
+                result = video_types.run(probe=lambda video: measured.append(video) or 1800.0,
+                                         orientation_probe=_refuses_to_be_called)
+
+            self.assertEqual((len(measured), result.recorded, result.deferred), (2, 2, 3))
+
+    def test_a_vr_video_the_cloud_drive_gives_no_answer_about_ends_its_asking_for_the_run(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            vr_root = root / "cloud" / "VR"
+            for index in range(3):
+                touch_video(vr_root / "finished" / f"scene {index}.mp4")
+            asked = []
+            with lib.config(VR_VIDEO_DIR=vr_root):
+                result = video_types.run(probe=lambda video: asked.append(video),
+                                         orientation_probe=_refuses_to_be_called)
+
+            self.assertEqual((len(asked), result.skipped, result.deferred), (1, 1, 2))
 
 
 class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
