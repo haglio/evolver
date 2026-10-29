@@ -100,7 +100,7 @@ def test_a_preview_runs_this_worktree_as_a_branch_session_with_the_primarys_over
 
 
 @on_windows
-def test_a_new_previews_first_click_shows_the_pictures_an_earlier_preview_left():
+def test_a_new_previews_first_click_shows_the_snapshots_an_earlier_preview_left():
     report = dry_run(PREVIEW_LAUNCHER)
 
     primary = REPO_ROOT.parents[2]
