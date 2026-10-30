@@ -62,6 +62,7 @@ class OrigeneratorGalleryContract(unittest.TestCase):
             *origenerator_metadata.COLUMNS,
             origenerator_metadata.OWN_PROVENANCE,
             *withdrawn.COLUMNS,
+            origenerator_gallery.REMADE_AT,
             *(lane.unsent_column for lane in lanes.sent_lanes()),
         }
 

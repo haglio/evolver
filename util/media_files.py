@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -105,6 +106,23 @@ def retry_while_in_use[T](action: Callable[[], T]) -> T:
     # Windows refuses to move or delete a file a player still has open, and a
     # player told to let go of one closes it a moment later, on a thread of its own.
     return retried_while_held(action, attempts=_IN_USE_TRIES, delay_s=_IN_USE_WAIT_SECONDS)
+
+
+def take_its_place(new: Path, old: Path) -> None:
+    """Move *new* over *old*, dated a second after it, or keep its own date
+    where no *old* is there.
+
+    The players order a library by date, so the replacement keeps its place
+    among the others, and they read a changed date as a changed file, so what
+    they keep of the old one, its thumbnail, is made again.
+    """
+    try:
+        dated = old.stat().st_mtime
+    except FileNotFoundError:
+        new.replace(old)
+        return
+    new.replace(old)
+    os.utime(old, (time.time(), dated + 1))
 
 
 def file_size(path: Path) -> int:

@@ -59,6 +59,10 @@ def sent_lanes() -> tuple[SentLane, ...]:
     )
 
 
+def sent_by_origenerator(source: str) -> bool:
+    return source in {lane.source for lane in sent_lanes()}
+
+
 @dataclass(frozen=True)
 class AiClip:
     video: Path

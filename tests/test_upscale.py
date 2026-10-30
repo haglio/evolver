@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import subprocess
 import unittest
 from fractions import Fraction
@@ -764,6 +765,18 @@ class TestOrigeneratorsVideos(unittest.TestCase):
 
             self.assertEqual(upscaled.read_bytes(), b"video")
             self.assertEqual(sorted(p.name for p in upscaled.parent.iterdir()), [upscaled.name])
+
+    def test_upscaled_again_keep_their_place_by_date_a_second_after_the_old_one(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                upscaled = self._upscaled_before(
+                    lib, lanes.ORIGENERATOR_SOURCE, "scene one", topaz.AI_UPSCALE)
+            os.utime(upscaled, (1_700_000_000, 1_700_000_000))
+            self._upscale(root, lanes.ORIGENERATOR_SOURCE)
+
+            self.assertEqual(upscaled.read_bytes(), b"upscaled")
+            self.assertEqual(upscaled.stat().st_mtime, 1_700_000_001)
 
     def test_upscaled_by_the_current_settings_are_left_alone(self):
         with workspace_temp_dir() as root:

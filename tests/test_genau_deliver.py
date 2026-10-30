@@ -2,13 +2,19 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 import unittest
 from unittest.mock import patch
 
 from app_support.flick_folder import flat_flicks_in
 
 from tasks import genau_deliver
-from tests.temp_helpers import override_config, workspace_temp_dir, write_sidecar
+from tests.temp_helpers import (
+    gallery_of_videos_made_again,
+    override_config,
+    workspace_temp_dir,
+    write_sidecar,
+)
 from util import provenance, sidecar, video_type
 
 # Fabricated: the real folder name is library vocabulary and lives in the
@@ -207,6 +213,34 @@ class TestGenauDeliver(unittest.TestCase):
             self.assertEqual(existing.read_text(encoding="utf-8"),
                              "a flick already being played")
             self.assertTrue((flicks / "2D" / "AI" / "loop_1_topaz (2).mp4").is_file())
+
+    def test_a_flick_origenerator_made_again_takes_the_place_of_the_one_genau_plays(self):
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, flicks = _lane(root)
+            upscaled, original = _stage_flick(outbox, sorted_dir)
+            played = flicks / "2D" / "AI" / "loop_1_topaz.mp4"
+            played.parent.mkdir(parents=True)
+            played.write_text("the flick first made", encoding="utf-8")
+            os.utime(played, (1_700_000_000, 1_700_000_000))
+            gallery = gallery_of_videos_made_again(root / "gallery.db", ["loop_1.mp4"])
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
+                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
+                                 METADATA_DIR=root / "metadata", ORIGENERATOR_DB_PATH=gallery):
+                write_sidecar(sidecar.sidecar_path(played),
+                              {"favorite": True, "genau": {"flipped": True}})
+                write_sidecar(sidecar.sidecar_path(upscaled), {"video": {"seed": "2"}})
+
+                result = genau_deliver.run()
+
+                record = sidecar.read(sidecar.sidecar_path(played))
+            self.assertEqual(result.delivered, 1)
+            self.assertEqual(sorted(path.name for path in played.parent.iterdir()), [played.name])
+            self.assertEqual(played.read_text(encoding="utf-8"), "upscaled")
+            self.assertEqual(played.stat().st_mtime, 1_700_000_001)
+            self.assertEqual((record["favorite"], record["genau"], record["video"]["seed"]),
+                             (True, {"flipped": True}, "2"))
+            self.assertFalse(original.exists())
 
     def test_a_flick_that_cannot_be_moved_is_left_whole_for_the_next_run(self):
         # Genau holds the file open on Windows while it plays. Leaving both halves

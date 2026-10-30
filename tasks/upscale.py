@@ -29,6 +29,7 @@ from util.media_files import (
     partial_path,
     remove_partial_files,
     retry_while_in_use,
+    take_its_place,
 )
 from util.sidecar import sidecar_path, upscaled_video_path
 
@@ -161,7 +162,7 @@ def run(
         if ffmpeg_ok:
             if tmp.exists() and tmp.stat().st_size > 0:
                 try:
-                    retry_while_in_use(partial(tmp.replace, out))
+                    retry_while_in_use(partial(take_its_place, tmp, out))
                 except OSError:
                     result.failed += 1
                     log.info("FAILED (a player still holds the upscale it replaces): %s", out)
@@ -273,12 +274,8 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, settings: topaz.Settings,
     ).returncode == 0
 
 
-def _sent_by_origenerator(source: str) -> bool:
-    return source in {lane.source for lane in lanes.sent_lanes()}
-
-
 def _made_by_superseded_settings(source: str, upscaled: Path) -> bool:
-    if not _sent_by_origenerator(source):
+    if not lanes.sent_by_origenerator(source):
         return False
     try:
         payload = sidecar.read(sidecar_path(upscaled))
@@ -291,7 +288,7 @@ def _made_by_superseded_settings(source: str, upscaled: Path) -> bool:
 
 def _settings_for(in_file: Path, source: str, orient: str, outbox_dir: Path,
                 origenerator_dir: Path) -> topaz.Settings:
-    if _sent_by_origenerator(source):
+    if lanes.sent_by_origenerator(source):
         return topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orient,
                             video_fps=ffprobe.frame_rate(in_file),
                             generated_fps=origenerator_gallery.generated_fps(origenerator_dir))
