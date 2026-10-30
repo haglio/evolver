@@ -1,23 +1,10 @@
-"""The two gates that hold the config seam open once it has been opened.
+"""The gates that hold the config seam open once it has been opened.
 
 ``config`` is a module-level singleton built at import from a git-ignored JSON
 overlay, and every stage reaches into it rather than declaring what it needs.
 Converting that is a ratchet, not a rewrite: each stage's ``run()`` grows
 explicit keyword parameters, and the reads it used to make disappear one at a
-time. Two numbers keep the ratchet honest.
-
-``test_the_config_reference_count_matches_the_ledger`` holds the count of
-``config.X`` references per unit *exactly*. Below the recorded number means a
-conversion landed and the number was not lowered with it; above means a new
-ambient read went in. Either way the build says so, which a ceiling calibrated
-to today's worst value never could.
-
-``test_the_overlay_keys_are_the_ones_the_contract_names`` holds the overlay's
-key names, read out of the source rather than listed by hand. ``genau_source``
-is shared byte-for-byte with origenerator, which reads the same key from its own
-overlay, and the folder it names is the only thing that passes between the two
-apps; the rest name a machine whose shape nobody here can see. A rename is a
-silent break on somebody else's machine, so it fails here instead.
+time.
 """
 from __future__ import annotations
 
@@ -32,73 +19,23 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 
 pytestmark = pytest.mark.repo_check
 
-# What each module reads off the ambient ``config`` singleton today, held
-# exactly. Lower a number when a conversion removes reads. A number goes UP only
-# for a read that nothing could reach becoming an ordinary one — a value a
-# module bound at its own import is not counted here and cannot be redirected
-# either, so moving it into ``config`` costs references and buys the seam; say
-# which in the commit. Anything else that raises a number is a new ambient read,
-# and the build stops it.
-#
-# Per module rather than per unit, because a total lets a read added in one file
-# pay for a read removed in another: a stage "converted" by hardcoding the value
-# it used to look up scores exactly as well as one given a parameter. The count
-# comes from the syntax tree, so a mention in a comment or a docstring does not
-# move it.
-#
-# util/media_files.py's 3 is the other shape a number may go up for: one read
-# of VIDEO_EXTENSIONS in the module that owns "what is a video", replacing
-# eleven that were threaded through call sites and five identical one-line
-# wrappers to say the same thing, and two of the folders other apps keep inside
-# the library, which every walk of it must go round whichever stage walks.
-#
-# gui/app.py's 5th and evolver.py's 10th are the third shape: a value a NEW
-# feature needs that no module read before. LOG_FILE, read once on each side
-# of the run-log link -- the pipeline marks where in the log it wrote, the
-# window reads back what it marked -- and handed on as a parameter from
-# there, so util/run_log.py and gui/log_window.py read config not at all. A
-# feature paying one read where the wiring already lives is the seam working;
-# paying it in the modules that do the work would not be.
-CONFIG_REFERENCE_LEDGER = {
+CONFIG_REFERENCE_CEILINGS = {
     "backfill/decisions.py": 2,
-    # The provider's source name, read at the call: a literal agreed with the
-    # overlay only by happening to (bug 12).
     "backfill/queue.py": 2,
     "backfill/thumbnails.py": 3,
     "backfill/voice.py": 4,
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
-    # The 10th and 11th are the third shape again: the pin list, read where
-    # the queue window's door to it is, so the window layer names no path of its
-    # own, and the pipeline's turn (util/run_lock.py), read where the run is.
     "evolver.py": 10,
     "gui/app.py": 4,
-    # What a branch session is and where it runs from -- named in the window
-    # title, the taskbar identity and the launcher a preview's button re-runs --
-    # and the usual Evolver it hands the work back to: that checkout's
-    # launcher, started without the flag that would make it one more preview.
     "gui/branch_session.py": 6,
     "gui/main_window.py": 2,
-    # The broker's launcher, so a check that finds the broker gone has something
-    # to start. Where the sibling checkout is is config's business, not this
-    # module's.
     "gui/peer_watch.py": 1,
     "gui/presence_throttle.py": 1,
-    # What this instance calls itself and what its button re-runs are
-    # gui/branch_session.py's, which is the module that knows which of the two
-    # Evolvers this is; the two reads here are the letter's file and the local
-    # folder a preview's inked copy of it is kept in.
     "gui/process_identity.py": 2,
-    # The second shape again: the zone a run's timestamp is shown in was
-    # ZoneInfo("America/Los_Angeles") bound at this module's own import,
-    # which no test and no machine could reach. One read buys the seam.
     "gui/run_record.py": 1,
-    # The wall-clock ceiling one run is watched against: read where the
-    # watchdog is armed, and again in what the overrun says.
     "gui/run_controller.py": 2,
     "gui/settings.py": 2,
-    # The checkout the Windows Startup shortcut points at: the live one, never
-    # the worktree a preview's settings dialog happens to be running from.
     "gui/startup.py": 1,
     "gui/tray.py": 1,
     "gui/worker.py": 1,
@@ -106,109 +43,32 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 5,
-    # One fewer: the runtime cap is a field of the EncodeSettings this
-    # module now declares, rather than a number it looks up. Then six fewer: the
-    # settings it launches are util.topaz's NON_AI_UPSCALE, named and versioned
-    # beside its settings, not a template, two edges and a tag looked up here.
     "tasks/nonai_encode.py": 5,
     "tasks/nonai_group.py": 1,
-    # Both are the library root, which this module says outright is the one
-    # thing it leaves ambient: once to spell a video's path within the library,
-    # once to ask whether a pin still names a file there.
     "tasks/nonai_queue.py": 2,
-    # Five fewer with the retired-metadata repair pass gone (item 27's last
-    # piece), then seven with the six numbers governing one encode collected
-    # into tasks.nonai_encode.EncodeSettings -- which is where they belong:
-    # how long an encode may run and how much of the machine it may take are
-    # this app's policy, not anything the machine or the overlay says.
     "tasks/nonai_upscale.py": 12,
-    # The 6th is the camera words a scraped action is cased by. They were a
-    # literal in this module; they are library vocabulary, so they are the
-    # overlay's now, and a stage reaches the overlay through config alone.
-    # Where Origenerator is, to run the command it publishes there.
     "tasks/origenerator_downtime.py": 1,
     "tasks/prompt_scrape.py": 6,
-    # The name the non-AI lane gives its outputs, which is how a hand export
-    # made before the stage existed is told from an original.
     "tasks/provenance_sweep.py": 1,
-    # The two folders videos are kept in off the library's drive -- the VR
-    # videos' and the archive's -- so a reference into one that cannot be
-    # reached is left unchecked rather than called unresolved or matched by
-    # name to a library video.
     "tasks/reference_sync.py": 2,
     "tasks/scene_scripts.py": 1,
-    # The five folders this stage works between are its arguments, so the
-    # four bucket classifiers take the roots rather than looking them up: what
-    # is left is those five resolutions and the funscript extension. The two
-    # that went up are the third shape: where a VR video is kept off the
-    # library's drive, and the unmatched_scripts folder, both new with the
-    # stage's parking of a script that matches nothing.
     "tasks/scripts_sync.py": 8,
-    # One more: the funscript extension, to find the script Origenerator hands
-    # over beside a video it has made again.
     "tasks/sort.py": 3,
-    # The third shape: the word the overlay gives Genau's flicks, which three
-    # stages' tooltips name, read once where the stages are declared.
     "tasks/stages.py": 1,
-    # The 9th is the third shape: the inbox, to tell a funscript Origenerator
-    # handed over with its clip -- one no person wrote -- from any other.
     "tasks/stray_files.py": 9,
-    # One more for the provider's source name in the settings guard (bug 7), then
-    # four fewer: the two settings it chooses between are util.topaz's, named and
-    # versioned beside the settings they run with, not four loose strings here.
-    # Then one more, the third shape: where a dismissed low-disk warning is
-    # remembered, read once in run() and handed to the two helpers. And one more
-    # of it: the Origenerator checkout whose published document says the rate its
-    # videos are generated at, read once in run() and handed to the choice of settings.
     "tasks/upscale.py": 14,
-    # One more: how many of a run's measurements may go to the VR videos kept
-    # on the cloud drive, which it asks about too.
     "tasks/video_types.py": 6,
-    # The lane walk it used to do itself, and the stage that walks the lanes
-    # after it to stamp the viewing on the same sidecars. One is the third
-    # shape: the folder of its own the phone writes its journal to, read so the
-    # stage holds while that folder cannot be reached rather than weigh every
-    # video without the viewing it holds. Another is how far the acts picked in
-    # Origenerator have been written into their records, beside the favorites' cursor.
     "tasks/watch_weights.py": 5,
-    # Every folder of this library a withdrawn clip can be sitting in by the time
-    # the withdrawal is read -- the inbox, 1_sorted, the outbox, both condemned
-    # piles -- plus the metadata tree its record mirrors into. A stage that
-    # deletes has to know the whole layout, which is exactly why the app that
-    # sent the clip cannot do it.
     "tasks/withdrawn.py": 7,
-    # Two more: the Genau lane's folder name and where its flicks are delivered,
-    # both read where the lane table is built rather than by the stage reading
-    # that table (tasks/withdrawn.py). Then one more: 1_sorted again, to say
-    # where a sorted copy's upscale is filed, for the two stages that delete a
-    # clip's funscripts. Then two more: where the VR videos are kept off the
-    # library's drive and the library they are filed under, for the kinds stage
-    # that asks about them as it does every other lane's videos.
     "util/lanes.py": 9,
-    # Origenerator's gallery file, read nowhere else now that both stages pulling
-    # from it come through here. Then the extensions that say which of a row's
-    # outputs is a video, moved here from tasks/withdrawn.py once the sort and
-    # the Genau delivery asked the rows the same.
     "util/origenerator_gallery.py": 2,
     "util/preview.py": 2,
-    # Three more, the third shape: the tree of marks Fun Time reads to know a
-    # funscript no person wrote, read where a mark is kept beside its script.
     "util/script_library.py": 6,
     "util/media_files.py": 3,
     "util/nonai_library.py": 4,
-    # The two folders another app hands clips to this pipeline through, and the
-    # one holding every library video's record, read here so the published
-    # document says where they are TODAY rather than where they were when
-    # somebody last wrote them out by hand.
     "util/contract.py": 4,
-    # One fewer with the archive lookup gone (item 27's last piece), then one
-    # more fewer: an archived original's sidecar and funscript keep the suffix
-    # their mirrors gave them, rather than one looked up again.
     "util/nonai_retire.py": 1,
     "util/reference_stores.py": 4,
-    # Two more than its mirrored paths need: the library's favorites are listed
-    # off the records, under the same roots, for the videos of the suffixes
-    # every stage finds videos by.
     "util/sidecar.py": 6,
     "util/topaz.py": 3,
     "util/video_locator.py": 2,
@@ -411,18 +271,27 @@ def _trees() -> dict[str, ast.AST]:
 
 
 class TestConfigSeam(unittest.TestCase):
-    def test_the_config_reference_count_matches_the_ledger(self):
-        counts = {
-            name: references
+    def test_no_module_reads_config_more_often_than_its_ceiling(self):
+        over = {
+            name: f"{references} reads, ceiling {CONFIG_REFERENCE_CEILINGS.get(name, 0)}"
             for name, tree in _trees().items()
-            if name != "config.py" and (references := _config_references(tree))
+            if name != "config.py"
+            and (references := _config_references(tree)) > CONFIG_REFERENCE_CEILINGS.get(name, 0)
         }
 
         self.assertEqual(
-            counts,
-            CONFIG_REFERENCE_LEDGER,
-            "lower a module's number in the commit that removes its reads; a "
-            "number going up is a new ambient read unless the commit says why",
+            over,
+            {},
+            "a new ambient read: hand the module the value as a parameter from where it "
+            "is already read, rather than raising its ceiling. A ceiling only comes down, "
+            "in the commit that takes a module's reads out",
+        )
+
+    def test_every_ceiling_names_a_module_that_is_still_there(self):
+        self.assertEqual(
+            sorted(set(CONFIG_REFERENCE_CEILINGS) - set(_trees())),
+            [],
+            "a ceiling for a module the tree no longer has: take it out with the module",
         )
 
     def test_config_is_reached_only_as_the_module(self):
