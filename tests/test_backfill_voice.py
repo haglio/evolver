@@ -252,9 +252,9 @@ class TestWhichReadingsAreTrusted(unittest.TestCase):
 
         self.assertEqual(told.heard, ["undo"])
 
-    def test_a_phrase_the_second_listener_reads_differently_does_not_act(self):
+    def test_a_phrase_the_verifying_listener_reads_differently_does_not_act(self):
         told = _listen([_said("side beta"), _said("undo")], until_heard="undo",
-                       second_opinion=lambda audio, hint: "and then" if "beta" in hint else hint)
+                       verifying_listener=lambda audio, hint: "and then" if "beta" in hint else hint)
 
         self.assertEqual(told.heard, ["undo"])
 
@@ -265,7 +265,7 @@ class TestWhichReadingsAreTrusted(unittest.TestCase):
             listener.stop()
 
         engines = built.call_args.args[3]
-        self.assertEqual((type(engines.second_opinion), type(engines.hears_speech)),
+        self.assertEqual((type(engines.verifying_listener), type(engines.hears_speech)),
                          (WhisperReader, HearsSpeech))
 
 

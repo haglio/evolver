@@ -38,7 +38,7 @@ class VoiceListener(QObject):
         super().__init__(parent)
         self._rules = CommandRules(
             phrases=frozenset(phrases),
-            never_rescued=frozenset(never_repaired).__contains__,
+            never_repaired=frozenset(never_repaired).__contains__,
             confidence_threshold=config.VOICE_CONFIDENCE_THRESHOLD,
         )
         self._events = ListenerEvents(heard=self._on_heard, partial=self.hearing.emit)
