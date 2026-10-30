@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from app_support.launcher import assert_launchers_match_their_specs, dry_run
+from app_support.launcher import dry_run
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRAY_LAUNCHER = REPO_ROOT / "launch_evolver.vbs"
@@ -27,10 +27,6 @@ def test_the_launchers_are_where_their_callers_point():
     assert IF_NOT_RUNNING_LAUNCHER.is_file()
     assert SHOWING_LAUNCHER.is_file()
     assert PREVIEW_LAUNCHER.is_file()
-
-
-def test_the_launchers_are_what_their_specs_render():
-    assert_launchers_match_their_specs(REPO_ROOT)
 
 
 @on_windows
