@@ -12,8 +12,7 @@ requires-python = ">=3.14"
 # PyPI served that morning, which is how this family's gates came to run a major
 # version of the imaging stack past the one the machines have. Floors are what
 # this repo's venv holds today. tzdata is the exception and says so in
-# tests/test_dependencies.py: it is the time zone database, and a ceiling on it
-# would pin a fact about the world.
+# [tool.haglio.dependencies] below.
 # The family repos this one runs are named at the tags it was built against
 # rather than left to be whatever checkouts sit beside it. Unpinned, a change
 # landing in one of them reached every consumer the same minute, and one whose
@@ -46,18 +45,31 @@ dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-timeout>=2.4,<3", "vulture>=
 # tests/test_imports_without_win32.py is 180 s, so that one still trips this
 # rather than its own message. --timeout-method=thread is the half that pays
 # for itself: it dumps the stack of the test that stopped, which turns a
-# stalled required check into a one-line diagnosis. app_support.clocks
+# stalled required check into a one-line diagnosis. app_support.gates
 # holds all three halves of it.
-addopts = "--timeout=120 --timeout-method=thread -p app_support.sanitize.pytest_plugin -p app_support.clocks.pytest_plugin -p app_support.coverage_gate --cov --cov-report="
+addopts = "--timeout=120 --timeout-method=thread -p app_support.sanitize.pytest_plugin -p app_support.gates.pytest_plugin -p app_support.coverage_gate --cov --cov-report="
 testpaths = ["tests"]
 
 # The family checkouts this one is installed beside. Both were imported and
 # named nowhere -- this file said nothing about either while the tray and the
 # stages reach for both. Neither is published, so neither can go in
-# [project.dependencies]; tests/test_dependencies.py holds this list against the
-# tree instead.
+# [project.dependencies]; the family's dependency gate holds this list against
+# the tree instead.
 [tool.haglio]
 siblings = ["app_support", "shared_ui", "voice_core"]
+
+# What the family's gates (app_support.gates) let stand here, each for the
+# reason beside it. An entry nothing is reported for any more fails the gate.
+[tool.haglio.dead-code]
+# finished_at is a key of the run records on disk, written by asdict and never
+# read back: retiring a persisted key is item 56's, not a deletion here.
+unread-dataclass-fields = ["RunRecord.finished_at"]
+
+[tool.haglio.dependencies]
+# tzdata is left open on purpose: it is the time zone database, republished
+# whenever a government moves a clock, and a ceiling on it would pin a fact
+# about the world rather than an interface.
+unbounded = ["tzdata"]
 
 # Declared, so that every launcher here brings this checkout up to what has
 # shipped, and waits out an update of it already under way, before it starts
