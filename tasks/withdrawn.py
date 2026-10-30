@@ -25,15 +25,14 @@ usually) leaves its source where it is for the next run to take both together.
 from __future__ import annotations
 
 import glob
-import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 import config
 from util import lanes, origenerator_gallery, script_library
-from util.media_files import child_dirs, library_videos, strip_uniquifier
-from util.variants import strip_processing_suffixes
+from util.media_files import child_dirs, library_videos
+from util.origenerator_gallery import is_video_name, origin_stem, output_entries
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +66,8 @@ def run() -> WithdrawnResult:
 
     log.info("=== Stage: clips Origenerator has taken back ===")
     for lane in lanes.sent_lanes():
-        result = result + _empty_lane(lane, _withdrawn_stems(rows, lane))
+        result = result + _empty_lane(lane, origenerator_gallery.video_stems(
+            rows, lambda row, lane=lane: row.get(lane.unsent_column)))
         result = result + _empty_lane(lane, _soundless_copies_beside_their_sound(rows, lane))
 
     log.info("Withdrawn done. Deleted: %d, deleted metadata: %d, failed: %d",
@@ -96,59 +96,18 @@ def _gallery_rows() -> list[dict]:
     )
 
 
-def _withdrawn_stems(rows: list[dict], lane: lanes.SentLane) -> set[str]:
-    """The stem of every video whose send down *lane* has been taken back.
-
-    A stem rather than a name, because what arrived and what is here now differ
-    by everything this library appends: a uniquifier where the name was already
-    taken, and the upscale's own suffix.
-    """
-    stems = set()
-    for row in rows:
-        if row.get(lane.unsent_column):
-            stems.update(Path(name).stem for name in _output_names(row)
-                         if _is_video_name(name))
-    return stems
-
-
 def _soundless_copies_beside_their_sound(rows: list[dict], lane: lanes.SentLane) -> set[str]:
     reachable = {origin_stem(video.stem) for video in _videos_under(_reachable_roots(lane))}
     stems = set()
     for row in rows:
-        videos = [entry for entry in _output_entries(row) or []
-                  if _is_video_name(entry["filename"])]
+        videos = [entry for entry in output_entries(row) or []
+                  if is_video_name(entry["filename"])]
         soundless = {Path(entry["filename"]).stem for entry in videos
                      if entry.get("role") == SILENT_COPY_ROLE}
         with_sound = {Path(entry["filename"]).stem for entry in videos} - soundless
         if with_sound & reachable:
             stems |= soundless
     return stems
-
-
-def _output_names(row: dict) -> list[str]:
-    """The file names a generation row says it produced, or none if it says badly.
-
-    A row is another app's data, so a column holding something other than the
-    list of ``{"filename": ...}`` it usually holds costs that one row, not the run.
-    """
-    entries = _output_entries(row)
-    if entries is None:
-        log.warning("Could not read what a withdrawn generation produced: %r",
-                    row.get("output_files"))
-        return []
-    return [entry["filename"] for entry in entries]
-
-
-def _output_entries(row: dict) -> list[dict] | None:
-    try:
-        return [entry for entry in json.loads(row.get("output_files") or "[]")
-                if entry.get("filename")]
-    except (AttributeError, TypeError, ValueError):
-        return None
-
-
-def _is_video_name(name: str) -> bool:
-    return Path(name).suffix.lower() in config.VIDEO_EXTENSIONS
 
 
 def _empty_lane(lane: lanes.SentLane, stems: set[str]) -> WithdrawnResult:
@@ -214,22 +173,6 @@ def _matches(roots, stems: set[str]) -> list[Path]:
 def _videos_under(roots) -> list[Path]:
     return [video for root in roots if Path(root).is_dir()
             for video in sorted(library_videos(Path(root)))]
-
-
-def origin_stem(stem: str) -> str:
-    """*stem* with everything this library appends taken back off.
-
-    A clip arrives under the name Origenerator gave it, is uniquified if that
-    name was taken, upscaled under a ``_topaz`` suffix and uniquified again if
-    the delivered folder had it -- so the pair of reductions runs until neither
-    one changes anything, rather than once each in an order that leaves what the
-    other would have taken off still on the end.
-    """
-    while True:
-        reduced = strip_processing_suffixes(strip_uniquifier(stem))
-        if reduced == stem:
-            return stem
-        stem = reduced
 
 
 def _delete_all(videos: list[Path]) -> WithdrawnResult:

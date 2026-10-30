@@ -21,12 +21,17 @@ given only the frames a model made.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from fractions import Fraction
 from pathlib import Path
 
 import config
+from util.media_files import strip_uniquifier
+from util.variants import strip_processing_suffixes
+
+log = logging.getLogger(__name__)
 
 PUBLISHED = "origenerator_gallery_contract.json"
 
@@ -78,6 +83,72 @@ def rows(columns: Iterable[str], *, optional: Iterable[str] = (),
         return [dict(zip(selected, row)) for row in cursor.fetchall()]
     finally:
         conn.close()
+
+
+#: The stamp Origenerator puts on a video it has made again in place, under the
+#: name it was sent by. Optional: a gallery from before it has made nothing again.
+REMADE_AT = "remade_at"
+
+
+def stems_made_again() -> set[str]:
+    """The stem of every video Origenerator has made again in place -- none when
+    no gallery is beside this library."""
+    try:
+        made = rows(("output_files",), optional=(REMADE_AT,))
+    except FileNotFoundError:
+        return set()
+    return video_stems(made, lambda row: row.get(REMADE_AT))
+
+
+def video_stems(made: Iterable[dict], where: Callable[[dict], object]) -> set[str]:
+    """The stem of every video the rows of *made* that *where* holds of produced.
+
+    A stem rather than a name, because what arrived and what is here now differ
+    by everything this library appends (:func:`origin_stem`).
+    """
+    return {Path(name).stem for row in made if where(row)
+            for name in output_names(row) if is_video_name(name)}
+
+
+def origin_stem(stem: str) -> str:
+    """*stem* with everything this library appends taken back off.
+
+    A clip arrives under the name Origenerator gave it, is uniquified if that
+    name was taken, upscaled under a ``_topaz`` suffix and uniquified again if
+    the delivered folder had it -- so the pair of reductions runs until neither
+    one changes anything, rather than once each in an order that leaves what the
+    other would have taken off still on the end.
+    """
+    while True:
+        reduced = strip_processing_suffixes(strip_uniquifier(stem))
+        if reduced == stem:
+            return stem
+        stem = reduced
+
+
+def output_names(row: dict) -> list[str]:
+    """The file names a generation row says it produced, or none if it says badly.
+
+    A row is another app's data, so a column holding something other than the
+    list of ``{"filename": ...}`` it usually holds costs that one row, not the run.
+    """
+    entries = output_entries(row)
+    if entries is None:
+        log.warning("Could not read what a generation produced: %r", row.get("output_files"))
+        return []
+    return [entry["filename"] for entry in entries]
+
+
+def output_entries(row: dict) -> list[dict] | None:
+    try:
+        return [entry for entry in json.loads(row.get("output_files") or "[]")
+                if entry.get("filename")]
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def is_video_name(name: str) -> bool:
+    return Path(name).suffix.lower() in config.VIDEO_EXTENSIONS
 
 
 def _connect_ro(db_path: Path) -> sqlite3.Connection:

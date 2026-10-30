@@ -23,13 +23,21 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 
 import config
-from util import lanes, sidecar, video_type
+from util import lanes, origenerator_gallery, provenance, sidecar, video_type
 from util.ffprobe import has_sound
-from util.media_files import child_dirs, library_videos, remove_empty_dirs, unique_path
+from util.media_files import (
+    child_dirs,
+    library_videos,
+    remove_empty_dirs,
+    take_its_place,
+    unique_path,
+)
 from util.sound import save_as_mp3
 from util.variants import is_upscaled_stem, sorted_stem_of
 
@@ -72,12 +80,16 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
     return None
 
 
-def _deliver(upscaled: Path, delivery_dir: Path) -> Path:
+def _deliver(upscaled: Path, delivery_dir: Path, made_again: Callable[[], set[str]]) -> Path:
     """Move one finished upscale into Genau's AI folder; return where it landed."""
     delivery_dir.mkdir(parents=True, exist_ok=True)
+    played = delivery_dir / upscaled.name
+    if played.exists() and origenerator_gallery.origin_stem(upscaled.stem) in made_again():
+        take_its_place(upscaled, played)
+        return played
     # A name can genuinely already be taken there, and delivering must never
     # overwrite a flick that is already being played.
-    destination = unique_path(delivery_dir / upscaled.name)
+    destination = unique_path(played)
     upscaled.replace(destination)
     return destination
 
@@ -100,10 +112,9 @@ def _move_sidecar(upscaled: Path, destination: Path) -> None:
     """
     try:
         was, now = sidecar.sidecar_path(upscaled), sidecar.sidecar_path(destination)
-        sidecar.update(
-            now,
-            lambda _: video_type.stamped(sidecar.read(was), video_type.GENAU_FLICK),
-        )
+        sidecar.update(now, lambda delivered: video_type.stamped(
+            provenance.carried_forward(delivered, {**delivered, **sidecar.read(was)}),
+            video_type.GENAU_FLICK))
         was.unlink(missing_ok=True)
     except (ValueError, OSError):
         log.warning("Could not re-file the metadata for %s", upscaled.name, exc_info=True)
@@ -155,6 +166,7 @@ def run(
     genau_sorted_dir = sorted_dir / genau_source
 
     result = GenauDeliverResult()
+    made_again = cache(origenerator_gallery.stems_made_again)
     if delivery_dir is None:
         log.warning("=== Genau lane: no folder is laid out as Genau's flicks are; nothing delivered ===")
         return result
@@ -162,7 +174,7 @@ def run(
 
     for upscaled in _upscaled_genau_flicks(outbox_dir, genau_source):
         try:
-            destination = _deliver(upscaled, delivery_dir)
+            destination = _deliver(upscaled, delivery_dir, made_again)
             _move_sidecar(upscaled, destination)
             _save_its_sound(destination, genau_audio_dir)
             _retire_source(upscaled, genau_sorted_dir)

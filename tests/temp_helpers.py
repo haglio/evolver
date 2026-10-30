@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sqlite3
 import string
 import tempfile
 import time
@@ -154,6 +155,18 @@ class LaneLibrary:
         settings.update(extra)
         flat_flicks_in(self.genau_flicks).mkdir(parents=True, exist_ok=True)
         return override_config(**settings)
+
+
+def gallery_of_videos_made_again(path: Path, names) -> Path:
+    """An Origenerator gallery in which each video named in *names* was made again in place."""
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE generations (prompt_id TEXT, output_files TEXT, remade_at TEXT)")
+    for number, name in enumerate(names):
+        conn.execute("INSERT INTO generations VALUES (?, ?, '2026-01-02 03:04:05')",
+                     (f"made-{number}", json.dumps([{"filename": name, "subfolder": "video"}])))
+    conn.commit()
+    conn.close()
+    return path
 
 
 def touch_video(path: Path) -> Path:

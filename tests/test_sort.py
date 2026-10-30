@@ -1,10 +1,21 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from tasks import sort as sort_task
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tasks import upscale
+from tests.temp_helpers import (
+    LaneLibrary,
+    gallery_of_videos_made_again,
+    override_config,
+    touch_video,
+    workspace_temp_dir,
+    write_sidecar,
+)
+from util import lanes, provenance, sidecar, topaz
+from util.sidecar import upscaled_video_path
 
 
 class TestSortHelpers(unittest.TestCase):
@@ -90,6 +101,57 @@ class TestSortHelpers(unittest.TestCase):
             self.assertEqual(result.moved, 1)
             self.assertTrue((sorted_dir / "examplesource" / "portrait" / "clip one.mp4").exists())
             self.assertFalse(ambient.exists())
+
+
+class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
+    def _sent_before(self, lib: LaneLibrary, name: str) -> tuple[Path, Path]:
+        source = lanes.ORIGENERATOR_SOURCE
+        sorted_copy = lib.sorted_dir / source / "portrait" / name
+        sorted_copy.parent.mkdir(parents=True)
+        sorted_copy.write_bytes(b"first made")
+        upscaled = touch_video(upscaled_video_path(source, "portrait", sorted_copy.stem))
+        current = topaz.AI_UPSCALE_ORIGENERATOR
+        write_sidecar(sidecar.sidecar_path(upscaled), provenance.recorded(
+            {"favorite": True}, provenance.UPSCALE,
+            provenance.reconstructed("evolver", method=current.name,
+                                     method_version=current.version)))
+        return sorted_copy, upscaled
+
+    def _sent_again(self, lib: LaneLibrary, name: str, content: bytes) -> Path:
+        handed_over = lib.inbox / lanes.ORIGENERATOR_SOURCE / name
+        handed_over.parent.mkdir(parents=True)
+        handed_over.write_bytes(content)
+        with patch("tasks.sort.orientation_of", return_value="portrait"):
+            sort_task.run()
+        return handed_over
+
+    def test_takes_the_place_of_its_sorted_copy_and_has_its_upscale_made_again(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            gallery = gallery_of_videos_made_again(root / "gallery.db", ["made_00001.mp4"])
+            with lib.config(ORIGENERATOR_DB_PATH=gallery):
+                sorted_copy, upscaled = self._sent_before(lib, "made_00001.mp4")
+
+                handed_over = self._sent_again(lib, "made_00001.mp4", b"made again")
+
+                self.assertFalse(handed_over.exists())
+                self.assertEqual(sorted_copy.read_bytes(), b"made again")
+                self.assertEqual(upscale.collect_candidates(),
+                                 [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")])
+                self.assertTrue(sidecar.read(sidecar.sidecar_path(upscaled))["favorite"])
+
+    def test_sent_again_as_it_already_is_leaves_its_upscale_alone(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            gallery = gallery_of_videos_made_again(root / "gallery.db", ["made_00001.mp4"])
+            with lib.config(ORIGENERATOR_DB_PATH=gallery):
+                sorted_copy, _upscaled = self._sent_before(lib, "made_00001.mp4")
+
+                handed_over = self._sent_again(lib, "made_00001.mp4", b"first made")
+
+                self.assertFalse(handed_over.exists())
+                self.assertEqual(sorted_copy.read_bytes(), b"first made")
+                self.assertEqual(upscale.collect_candidates(), [])
 
 
 if __name__ == "__main__":

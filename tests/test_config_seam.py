@@ -144,7 +144,9 @@ CONFIG_REFERENCE_LEDGER = {
     # library's drive, and the unmatched_scripts folder, both new with the
     # stage's parking of a script that matches nothing.
     "tasks/scripts_sync.py": 8,
-    "tasks/sort.py": 2,
+    # One more: the funscript extension, to find the script Origenerator hands
+    # over beside a video it has made again.
+    "tasks/sort.py": 3,
     # The third shape: the word the overlay gives Genau's flicks, which three
     # stages' tooltips name, read once where the stages are declared.
     "tasks/stages.py": 1,
@@ -171,11 +173,10 @@ CONFIG_REFERENCE_LEDGER = {
     "tasks/watch_weights.py": 5,
     # Every folder of this library a withdrawn clip can be sitting in by the time
     # the withdrawal is read -- the inbox, 1_sorted, the outbox, both condemned
-    # piles -- plus the metadata tree its record mirrors into and the extensions
-    # that say which of a row's outputs is a video. A stage that deletes has to
-    # know the whole layout, which is exactly why the app that sent the clip
-    # cannot do it.
-    "tasks/withdrawn.py": 8,
+    # piles -- plus the metadata tree its record mirrors into. A stage that
+    # deletes has to know the whole layout, which is exactly why the app that
+    # sent the clip cannot do it.
+    "tasks/withdrawn.py": 7,
     # Two more: the Genau lane's folder name and where its flicks are delivered,
     # both read where the lane table is built rather than by the stage reading
     # that table (tasks/withdrawn.py). Then one more: 1_sorted again, to say
@@ -185,8 +186,10 @@ CONFIG_REFERENCE_LEDGER = {
     # that asks about them as it does every other lane's videos.
     "util/lanes.py": 9,
     # Origenerator's gallery file, read nowhere else now that both stages pulling
-    # from it come through here.
-    "util/origenerator_gallery.py": 1,
+    # from it come through here. Then the extensions that say which of a row's
+    # outputs is a video, moved here from tasks/withdrawn.py once the sort and
+    # the Genau delivery asked the rows the same.
+    "util/origenerator_gallery.py": 2,
     "util/preview.py": 2,
     # Three more, the third shape: the tree of marks Fun Time reads to know a
     # funscript no person wrote, read where a mark is kept beside its script.

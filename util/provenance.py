@@ -38,6 +38,12 @@ def recorded(payload: dict, act: str, stamp: dict) -> dict:
     return {**payload, BLOCK: {**stamps_of(payload), act: stamp}}
 
 
+def without(payload: dict, act: str) -> dict:
+    """*payload* with no stamp filed under *act* -- a copy."""
+    return {**payload, BLOCK: {kept: stamp for kept, stamp in stamps_of(payload).items()
+                               if kept != act}}
+
+
 def carried_forward(earlier: dict, later: dict) -> dict:
     """*later*, holding every stamp *earlier* did beside its own -- a copy.
 
