@@ -23,6 +23,7 @@ from gui import branch_session, peer_watch, process_identity, single_instance
 from gui.background import BackgroundQueue
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
+from gui.one_window import OneWindow
 from gui.palette import apply_accent
 from gui.presence_throttle import PresenceThrottle
 from gui.queue_window import UpscaleQueueWindow
@@ -114,8 +115,8 @@ class EvolverApp:
         self._checkout = config.PROJECT_DIR
         self._name = branch_session.app_name()
         self._settings = EvolverSettings.load()
-        self._stats_window: StatsWindow | None = None
-        self._queue_window: UpscaleQueueWindow | None = None
+        self._stats = OneWindow()
+        self._queue = OneWindow()
         # The queue window's reads and verbs reach into the non-AI stage, which
         # a run can hold for as long as starting an encode takes.
         self._background = BackgroundQueue()
@@ -196,9 +197,9 @@ class EvolverApp:
         self._update_timer.timeout.connect(lambda: self._updates.tick())
 
     def _a_good_moment_for_an_update(self) -> bool:
-        on_screen = (self._window, self._stats_window, self._queue_window, self._log_window)
-        return not self._branch_session and not self._runs.is_running and not any(
-            window is not None and window.isVisible() for window in on_screen)
+        on_screen = (self._window.isVisible(), self._stats.is_on_screen, self._queue.is_on_screen,
+                     self._log_window is not None and self._log_window.isVisible())
+        return not self._branch_session and not self._runs.is_running and not any(on_screen)
 
     def start(self) -> None:
         """Everything the app does to the machine, in the order it must happen.
@@ -350,47 +351,27 @@ class EvolverApp:
             self._scheduler.set_interval_minutes(self._settings.interval_minutes)
 
     def _show_stats(self):
-        if self._stats_window is not None:
-            if self._stats_window.isVisible():
-                self._stats_window.raise_()
-                self._stats_window.activateWindow()
-                return
-            # Closed, but parented to the main window, so one replaced without
-            # being taken down stays alive for the process's whole life.
-            self._stats_window.close()
-            self._stats_window.deleteLater()
-        window = StatsWindow(self._window)
-        self._stats_window = window
-        window.show()
-        self._background.run(partial(RunHistory.read, config.RUNS_DIR),
-                             then=partial(self._chart_history, window))
+        window = self._stats.show(partial(StatsWindow, self._window))
+        if window is not None:
+            self._background.run(partial(RunHistory.read, config.RUNS_DIR),
+                                 then=partial(self._chart_history, window))
 
     def _chart_history(self, window: StatsWindow, history: RunHistory):
-        if window is self._stats_window:
+        if window is self._stats.current:
             window.show_history(history)
 
     def _show_queue(self):
-        """Open the upscale queue, or raise the one already open.
+        self._queue.show(self._queue_window_wired_to_its_verbs)
 
-        Held like the stats window is, and for the same reason: parented to the
-        main window, one replaced without being taken down would live for the
-        rest of the session.
-        """
-        if self._queue_window is not None:
-            if self._queue_window.isVisible():
-                self._queue_window.raise_()
-                self._queue_window.activateWindow()
-                return
-            self._queue_window.close()
-            self._queue_window.deleteLater()
-        self._queue_window = UpscaleQueueWindow(self._window)
-        self._queue_window.arranged.connect(self._arrange_queue)
-        self._queue_window.placed_first.connect(self._upscale_next)
-        self._queue_window.now_requested.connect(self._upscale_now)
-        self._queue_window.now_withdrawn.connect(self._withdraw_upscale_now)
-        self._queue_window.refresh_wanted.connect(self._refresh_queue)
-        self._refresh_queue()
-        self._queue_window.show()
+    def _queue_window_wired_to_its_verbs(self) -> UpscaleQueueWindow:
+        window = UpscaleQueueWindow(self._window)
+        window.arranged.connect(self._arrange_queue)
+        window.placed_first.connect(self._upscale_next)
+        window.now_requested.connect(self._upscale_now)
+        window.now_withdrawn.connect(self._withdraw_upscale_now)
+        window.refresh_wanted.connect(self._refresh_queue)
+        self._background.run(evolver.upscale_lineup, then=self._draw_queue)
+        return window
 
     def _arrange_queue(self, videos: list):
         """Keep the order the window was just put in — it leads the next run."""
@@ -428,12 +409,12 @@ class EvolverApp:
         self._refresh_queue()
 
     def _refresh_queue(self):
-        if self._queue_window is not None:
+        if self._queue.current is not None:
             self._background.run(evolver.upscale_lineup, then=self._draw_queue)
 
     def _draw_queue(self, lineup):
-        if self._queue_window is not None:
-            self._queue_window.show_lineup(lineup)
+        if self._queue.current is not None:
+            self._queue.current.show_lineup(lineup)
 
     def _show_run_log(self, record: RunRecord):
         """Open the log where this run wrote, rather than at its top.
