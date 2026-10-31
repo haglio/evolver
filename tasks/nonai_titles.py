@@ -26,6 +26,8 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.video_names import clip_title, version_group_of
+
 from util import sidecar
 from util.library_records import TITLE_KEY as TITLE_FIELD
 from util.media_files import is_finalized_video_file
@@ -43,26 +45,6 @@ class NonAiTitleResult:
     titled: int = 0
     videos: int = 0
     written: int = 0
-
-
-def clip_title(payload: dict) -> str:
-    """What *payload*'s clip record calls the scene -- "performer - movie".
-
-    ``""`` for a video no clip record describes, and for one naming neither half.
-    """
-    clip = payload.get("clip")
-    if not isinstance(clip, dict):
-        return ""
-    parts = (str(clip.get(field, "") or "").strip() for field in ("performer", "source"))
-    return " - ".join(part for part in parts if part)
-
-
-def family_of(payload: dict) -> str:
-    """The version family Evolver grouped *payload*'s video under, or ""."""
-    version = payload.get("version")
-    if not isinstance(version, dict):
-        return ""
-    return str(version.get("group") or "")
 
 
 def _scene_matched(payload: dict) -> str:
@@ -83,14 +65,14 @@ def titles_by_family(payloads: dict[Path, dict]) -> dict[str, str]:
     Keyed by family rather than by path, since a match is recorded against the
     one rendition that was searched while the apps play whichever they like.
     """
-    family_by_path = {_path_key(video): family_of(payload)
+    family_by_path = {_path_key(video): version_group_of(payload)
                       for video, payload in payloads.items()}
     titles: dict[str, str] = {}
     for payload in payloads.values():
         title = clip_title(payload)
         if not title:
             continue
-        for family in (family_of(payload), family_by_path.get(_path_key(_scene_matched(payload)))):
+        for family in (version_group_of(payload), family_by_path.get(_path_key(_scene_matched(payload)))):
             if family:
                 titles[family] = title
     return titles
@@ -109,7 +91,7 @@ def run() -> NonAiTitleResult:
     titles = titles_by_family(payloads)
 
     for video, payload in payloads.items():
-        title = clip_title(payload) or titles.get(family_of(payload), "")
+        title = clip_title(payload) or titles.get(version_group_of(payload), "")
         if title:
             result.titled += 1
 

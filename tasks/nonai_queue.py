@@ -23,13 +23,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.file_channel import write_whole
+from app_support.video_names import strip_processing_suffixes
 
 import config
 from util import script_library
 from util.json_reads import read_dict
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets, stage_dirs
-from util.variants import is_processed_stem, strip_processing_suffixes
+from util.variants import is_processed_stem
 
 log = logging.getLogger(__name__)
 

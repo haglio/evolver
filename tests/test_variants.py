@@ -4,40 +4,16 @@ import ast
 from pathlib import Path
 
 import pytest
+from app_support.video_names import UPSCALE_SUFFIX, strip_processing_suffixes
 
 from tests.product_sources import PROJECT_ROOT, product_sources, strings_outside_docstrings
 from util.variants import (
-    UPSCALE_SUFFIX,
     is_processed_stem,
     is_upscaled_stem,
     sorted_stem_of,
     source_stem,
-    strip_processing_suffixes,
     upscaled_stem,
 )
-
-
-class TestStripProcessingSuffixes:
-    def test_strips_single_model_suffix(self):
-        assert strip_processing_suffixes("clip_iris2") == "clip"
-
-    def test_strips_composite_model_chains(self):
-        assert strip_processing_suffixes("clip_apo8_iris2") == "clip"
-        assert strip_processing_suffixes("clip_apo8_prob4") == "clip"
-        assert strip_processing_suffixes("clip_apo8_ghq5") == "clip"
-        assert strip_processing_suffixes("clip_apo8_gcg5_topaz") == "clip"
-        assert strip_processing_suffixes("clip_apo8_gcg5_topaz_cfr") == "clip"
-
-    def test_plain_stem_unchanged(self):
-        assert strip_processing_suffixes("Corin Waverly - Beta Cut (1080)") == (
-            "Corin Waverly - Beta Cut (1080)"
-        )
-
-    def test_mid_name_tokens_are_not_suffixes(self):
-        # The stem must actually carry a model token mid-name, or this is the
-        # plain-stem case again -- the old fixture held no token at all, so the
-        # end-anchoring this test is named for was never reached.
-        assert strip_processing_suffixes("clip_iris2_scene") == "clip_iris2_scene"
 
 
 class TestIsProcessedStem:
@@ -72,10 +48,6 @@ class TestTheUpscaleNamingRule:
         of the upscale stage's own naming and nothing else."""
         assert sorted_stem_of("clip_apo8_topaz") == "clip_apo8"
         assert strip_processing_suffixes("clip_apo8_topaz") == "clip"
-
-    def test_the_suffix_tuple_is_built_from_the_same_constant(self):
-        assert UPSCALE_SUFFIX in strip_processing_suffixes.__globals__["PROCESSING_SUFFIXES"]
-        assert f"{UPSCALE_SUFFIX}_cfr" in strip_processing_suffixes.__globals__["PROCESSING_SUFFIXES"]
 
 
 class TestSourceStem:

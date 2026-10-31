@@ -9,12 +9,7 @@ from __future__ import annotations
 
 import re
 
-# What the AI upscale stage appends to a 1_sorted video's stem. It is the
-# library's most-depended-on naming rule -- three stages, the backfill tool and
-# two sibling repos read which video a file came from out of it -- and it was written
-# out as a bare literal at six sites, each expressing it differently (append,
-# endswith, slice by len, regex-strip, containment in a tuple).
-UPSCALE_SUFFIX = "_topaz"
+from app_support.video_names import UPSCALE_SUFFIX, strip_processing_suffixes
 
 
 def upscaled_stem(sorted_stem: str) -> str:
@@ -31,8 +26,8 @@ def sorted_stem_of(stem: str) -> str:
     """The 1_sorted stem an upscale came from — *stem* itself when it is not one.
 
     The exact inverse of :func:`upscaled_stem`, and only that: it takes one
-    suffix off the end and nothing else. :func:`strip_processing_suffixes`
-    below is the general form, which strips every Topaz token iteratively.
+    suffix off the end and nothing else. ``strip_processing_suffixes`` is the
+    general form, which strips every Topaz token iteratively.
     """
     return stem[: -len(UPSCALE_SUFFIX)] if is_upscaled_stem(stem) else stem
 
@@ -43,21 +38,6 @@ def source_stem(stem: str) -> str:
         return stripped_topaz
     return re.sub(r"_apo8_gcg5(?:_.*)?$", "", stem)
 
-
-# Elementary suffix tokens; composites like "_apo8_iris2" strip iteratively.
-# "_topaz_cfr" stays composite because "_cfr" alone is too generic to strip.
-PROCESSING_SUFFIXES = (
-    f"{UPSCALE_SUFFIX}_cfr",
-    UPSCALE_SUFFIX,
-    "_gcg5",
-    "_prob4",
-    "_ghq5",
-    "_iris3",
-    "_iris2",
-    "_apf2",
-    "_apo8",
-    "_enh",
-)
 
 # Words the user appends by hand to keep a second copy of a video distinct from
 # the first — the pipeline never writes these, so they arrive as ordinary
@@ -79,18 +59,3 @@ def is_processed_stem(stem: str) -> bool:
     """Whether *stem* names a processed variant rather than an original."""
     return strip_processing_suffixes(stem) != stem
 
-
-def strip_processing_suffixes(stem: str) -> str:
-    """The stem with every trailing processing suffix removed."""
-    while True:
-        stripped = _strip_once(stem)
-        if stripped == stem:
-            return stem
-        stem = stripped
-
-
-def _strip_once(stem: str) -> str:
-    for suffix in PROCESSING_SUFFIXES:
-        if stem.endswith(suffix):
-            return stem[: -len(suffix)]
-    return stem

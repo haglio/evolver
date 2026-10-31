@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 
+from app_support.video_names import strip_processing_suffixes
+
 import config
 from util import lanes
 from util.alert import show_error
@@ -25,7 +27,6 @@ from util.script_library import (
     remove_empty_mark_folders,
     script_path_for_video,
 )
-from util.variants import strip_processing_suffixes
 
 log = logging.getLogger(__name__)
 

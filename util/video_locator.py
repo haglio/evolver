@@ -7,11 +7,12 @@ from collections import defaultdict
 from itertools import chain
 from pathlib import Path
 
+from app_support.video_names import strip_processing_suffixes
+
 import config
 from util import ffprobe
 from util.media_files import file_size, is_finalized_video_file, library_videos
 from util.nonai_library import bucket_of
-from util.variants import strip_processing_suffixes
 from util.weird_piles import weird_pile_dirs
 
 
