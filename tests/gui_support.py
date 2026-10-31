@@ -24,12 +24,30 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication
 
 from gui.app import EvolverApp
+from util.upscale_lineup import Lineup
 
 # Built at import, not in a fixture: the GUI modules construct widgets at class
 # scope and a QApplication has to exist before the first of them is imported.
 # conftest.py imports this module for that reason, so it happens once, before any
 # test module.
 QAPP = QApplication.instance() or QApplication([])
+
+EMPTY_QUEUE = Lineup(rows=(), head=None)
+
+
+class DoneAtOnce:
+    """The app's background queue, doing each piece of work as it is handed over.
+
+    So the patches a test stands up are still standing when the work runs.
+    """
+
+    def run(self, work, then=None):
+        answer = work()
+        if then is not None:
+            then(answer)
+
+    def stop(self):
+        pass
 
 
 def row_ground(view, row: int) -> str:

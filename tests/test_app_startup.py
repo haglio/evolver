@@ -16,9 +16,8 @@ from gui.run_history import RunHistory
 from gui.run_record import RunRecord
 from gui.settings import EvolverSettings
 from gui.single_instance import Outcome
-from tests.gui_support import QAPP, build_evolver_app
+from tests.gui_support import EMPTY_QUEUE, QAPP, DoneAtOnce, build_evolver_app
 from tests.temp_helpers import make_run_record, override_config
-from util.upscale_lineup import Lineup
 
 
 class TestAppStartup:
@@ -319,126 +318,52 @@ class TestOneRunAfterAnother:
         assert worker_cls.call_count == 1
 
 
-EMPTY_QUEUE = Lineup(rows=(), head=None)
+class TestTheUpscaleQueueWindowsWiring:
+    """What the queue window's controller asks for, the app answers: a run
+    through the run controller, a presence check through the presence poll."""
 
+    def _opened(self, request):
+        with patch("gui.app.BackgroundQueue", DoneAtOnce):
+            app = build_evolver_app(request)
+        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE):
+            app._tray.queue_action.trigger()
+        return app
 
-class DoneAtOnce:
-    """The app's background queue, doing each piece of work as it is handed over.
+    def test_the_queue_command_opens_the_queue_window(self, request):
+        app = self._opened(request)
 
-    So the patches a test stands up are still standing when the work runs.
-    """
+        assert app._queue.is_on_screen
 
-    def run(self, work, then=None):
-        answer = work()
-        if then is not None:
-            then(answer)
+    def test_a_video_asked_for_now_starts_a_run_through_the_run_controller(self, request):
+        app = self._opened(request)
 
-    def stop(self):
-        pass
-
-
-class TestUpscaleQueueWindow:
-    """The window that shows the upscale queue, and the verbs it offers."""
-
-    def _open(self, app):
-        app._background = DoneAtOnce()
-        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
-            app._show_queue()
-        return lineup
-
-    def test_the_queue_is_read_off_the_windows_thread(self, request):
-        """A run holding the stage, or a slow library drive, must not stop
-        the window answering the mouse."""
-        app = build_evolver_app(request)
-        app._background = MagicMock()
-
-        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
-            app._show_queue()
-            lineup.assert_not_called()
-            work, then = app._background.run.call_args.args[0], \
-                app._background.run.call_args.kwargs["then"]
-            then(work())
-
-        lineup.assert_called_once_with()
-        assert app._queue.current._heading.text() == "Nothing is waiting to be upscaled"
-
-    def test_opening_it_hands_it_the_queue_as_it_stands(self, request):
-        app = build_evolver_app(request)
-        lineup = self._open(app)
-        lineup.assert_called_once_with()
-        assert app._queue.current.isVisible()
-
-    def test_a_second_open_raises_the_one_already_up(self, request):
-        app = build_evolver_app(request)
-        self._open(app)
-        first = app._queue.current
-        self._open(app)
-        assert app._queue.current is first
-
-    def test_rearranging_it_pins_the_order_through_the_pipeline_module(self, request):
-        app = build_evolver_app(request)
-        self._open(app)
-        with patch("evolver.arrange_upscale_queue") as arranged:
-            app._queue.current.arranged.emit(["lagoon/0 unsorted/a.mp4"])
-        arranged.assert_called_once_with(["lagoon/0 unsorted/a.mp4"])
-
-    def test_a_video_put_first_goes_first_and_starts_no_run(self, request):
-        """Dragging a video to the top is ordering, not asking: it waits for
-        the usual moment like any other."""
-        app = build_evolver_app(request)
-        self._open(app)
-        with patch("evolver.upscale_next") as put_first, \
-             patch("evolver.upscale_now") as asked, \
-             patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
-             patch.object(app._runs, "start_when_free") as run:
-            app._queue.current.placed_first.emit("lagoon/0 unsorted/a.mp4")
-        put_first.assert_called_once_with("lagoon/0 unsorted/a.mp4")
-        asked.assert_not_called()
-        run.assert_not_called()
-        lineup.assert_called_once_with()
-
-    def test_asking_for_one_now_records_it_and_runs_the_pipeline_at_once(self, request):
-        """The stage starts encodes on a run and nowhere else, so asking for
-        one has to bring the next run forward rather than wait ten minutes."""
-        app = build_evolver_app(request)
-        self._open(app)
-        with patch("evolver.upscale_now") as asked, \
+        with patch("evolver.upscale_now"), \
              patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE), \
-             patch.object(app._runs, "start_when_free") as run:
-            app._queue.current.now_requested.emit("lagoon/0 unsorted/a.mp4")
-        asked.assert_called_once_with("lagoon/0 unsorted/a.mp4")
-        run.assert_called_once_with("manual")
+             patch("gui.run_controller.PipelineWorker") as worker_cls:
+            app._queue._window.current.now_requested.emit("lagoon/0 unsorted/a.mp4")
 
-    def test_withdrawing_the_ask_parks_the_encode_for_your_presence_again(self, request):
-        """The poll that parks it fires every twenty seconds; the click that
-        hands it back should not wait them out."""
-        app = build_evolver_app(request)
-        self._open(app)
-        with patch("evolver.withdraw_upscale_now") as withdrawn, \
-             patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
-             patch.object(app._presence, "poll") as poll:
-            app._queue.current.now_withdrawn.emit()
-        withdrawn.assert_called_once_with()
-        poll.assert_called_once_with()
-        lineup.assert_called_once_with()
+        assert worker_cls.call_args.kwargs["trigger"] == "manual"
+
+    def test_withdrawing_the_ask_parks_the_encode_through_the_presence_poll(self, request):
+        app = self._opened(request)
+        app._settings.nonai_upscale_enabled = True
+
+        with patch("evolver.withdraw_upscale_now"), \
+             patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE), \
+             patch("evolver.throttle_nonai_to_presence") as parked:
+            app._queue._window.current.now_withdrawn.emit()
+
+        parked.assert_called_once_with()
 
     def test_a_finished_run_redraws_it(self, request):
         """A run is what starts, promotes and fails encodes, so the window is
         stale the moment one ends."""
-        app = build_evolver_app(request)
-        self._open(app)
+        app = self._opened(request)
+
         with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
              patch("gui.main_window.newest_runs", return_value=[]):
-            app._on_run_ended()
-        lineup.assert_called_once_with()
+            app._runs.run_ended.emit()
 
-    def test_it_asks_to_be_redrawn_while_it_is_open(self, request):
-        """Presence parks and thaws the encode between runs, and the percent
-        climbs the whole time."""
-        app = build_evolver_app(request)
-        self._open(app)
-        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
-            app._queue.current.refresh_wanted.emit()
         lineup.assert_called_once_with()
 
 
@@ -623,14 +548,13 @@ def _the_main_window(app):
 
 
 def _the_stats_window(app):
-    app._background = MagicMock()
-    app._show_stats()
+    with patch("gui.run_history.RunHistory.read", return_value=RunHistory.of([])):
+        app._show_stats()
 
 
 def _the_queue_window(app):
-    app._background = DoneAtOnce()
     with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE):
-        app._show_queue()
+        app._queue.show()
 
 
 def _the_log_window(app):
@@ -646,7 +570,8 @@ class TestTakingAnUpdate:
         monkeypatch.setattr(production_update, "UP_BEFORE_AN_UPDATE_S", 0.0)
         monkeypatch.setattr(production_update, "waits_for_programs_to_close",
                             lambda checkout: checkout == config.PROJECT_DIR)
-        app = build_evolver_app(request)
+        with patch("gui.app.BackgroundQueue", DoneAtOnce):
+            app = build_evolver_app(request)
         app._branch_session = branch_session
         if open_window is not None:
             open_window(app)
