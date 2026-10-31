@@ -20,9 +20,9 @@ class TestMalformedExtensions(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos):
                 result = stray_files.run()
 
-            self.assertEqual(result.renamed, 1)
-            self.assertTrue((videos / "clip.mp4").is_file())
-            self.assertFalse((videos / "clip mp4").exists())
+            assert result.renamed == 1
+            assert (videos / "clip.mp4").is_file()
+            assert not (videos / "clip mp4").exists()
 
     def test_an_ordinary_video_is_left_alone(self):
         with workspace_temp_dir() as root:
@@ -33,8 +33,8 @@ class TestMalformedExtensions(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos):
                 result = stray_files.run()
 
-            self.assertEqual(result.renamed, 0)
-            self.assertTrue((videos / "clip.mp4").is_file())
+            assert result.renamed == 0
+            assert (videos / "clip.mp4").is_file()
 
     def test_an_underscore_or_a_hyphen_separator_is_repaired_too(self):
         for name, repaired in (("clip_mkv", "clip.mkv"), ("clip-webm", "clip.webm")):
@@ -46,8 +46,8 @@ class TestMalformedExtensions(unittest.TestCase):
                 with override_config(VIDEO_LIBRARY_DIR=videos):
                     result = stray_files.run()
 
-                self.assertEqual(result.renamed, 1)
-                self.assertTrue((videos / repaired).is_file())
+                assert result.renamed == 1
+                assert (videos / repaired).is_file()
 
     def test_a_taken_repaired_name_is_reported_rather_than_overwritten(self):
         with workspace_temp_dir() as root:
@@ -59,10 +59,10 @@ class TestMalformedExtensions(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos):
                 result = stray_files.run()
 
-            self.assertEqual(result.renamed, 0)
-            self.assertEqual(result.reported, ["clip mp4"])
-            self.assertEqual((videos / "clip mp4").read_bytes(), b"malformed")
-            self.assertEqual((videos / "clip.mp4").read_bytes(), b"already here")
+            assert result.renamed == 0
+            assert result.reported == ["clip mp4"]
+            assert (videos / "clip mp4").read_bytes() == b"malformed"
+            assert (videos / "clip.mp4").read_bytes() == b"already here"
 
 
 class TestStrayFunscripts(unittest.TestCase):
@@ -77,12 +77,10 @@ class TestStrayFunscripts(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos, SCRIPT_LIBRARY_DIR=scripts):
                 result = stray_files.run()
 
-            self.assertEqual(result.rehomed_scripts, 1)
-            self.assertEqual(result.reported, [])
-            self.assertFalse((bucket / "scene one.funscript").exists())
-            self.assertTrue(
-                (scripts / "2D" / "non_AI" / "example" / "scene one.funscript").is_file()
-            )
+            assert result.rehomed_scripts == 1
+            assert result.reported == []
+            assert not (bucket / "scene one.funscript").exists()
+            assert (scripts / "2D" / "non_AI" / "example" / "scene one.funscript").is_file()
 
     def test_a_malformed_script_name_is_repaired_and_then_rehomed(self):
         with workspace_temp_dir() as root:
@@ -94,10 +92,10 @@ class TestStrayFunscripts(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos, SCRIPT_LIBRARY_DIR=scripts):
                 result = stray_files.run()
 
-            self.assertEqual(result.renamed, 1)
-            self.assertEqual(result.rehomed_scripts, 1)
-            self.assertEqual(result.reported, [])
-            self.assertTrue((scripts / "scene one.funscript").is_file())
+            assert result.renamed == 1
+            assert result.rehomed_scripts == 1
+            assert result.reported == []
+            assert (scripts / "scene one.funscript").is_file()
 
     def test_a_taken_mirror_path_is_reported_rather_than_overwritten(self):
         with workspace_temp_dir() as root:
@@ -111,14 +109,10 @@ class TestStrayFunscripts(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos, SCRIPT_LIBRARY_DIR=scripts):
                 result = stray_files.run()
 
-            self.assertEqual(result.rehomed_scripts, 0)
-            self.assertEqual(result.reported, ["scene one.funscript"])
-            self.assertEqual(
-                (videos / "scene one.funscript").read_text(encoding="utf-8"), "stray"
-            )
-            self.assertEqual(
-                (scripts / "scene one.funscript").read_text(encoding="utf-8"), "already here"
-            )
+            assert result.rehomed_scripts == 0
+            assert result.reported == ["scene one.funscript"]
+            assert (videos / "scene one.funscript").read_text(encoding="utf-8") == "stray"
+            assert (scripts / "scene one.funscript").read_text(encoding="utf-8") == "already here"
 
 
 class TestScriptsOrigeneratorHandsOver(unittest.TestCase):
@@ -138,8 +132,8 @@ class TestScriptsOrigeneratorHandsOver(unittest.TestCase):
             with override_config(**folders):
                 stray_files.run()
 
-            self.assertTrue((root / "scripts" / lane / "made_00001.funscript").is_file())
-            self.assertTrue((root / "generated" / lane / "made_00001.generated").is_file())
+            assert (root / "scripts" / lane / "made_00001.funscript").is_file()
+            assert (root / "generated" / lane / "made_00001.generated").is_file()
 
     def test_a_script_found_anywhere_else_carries_no_mark(self):
         with workspace_temp_dir() as root:
@@ -151,8 +145,8 @@ class TestScriptsOrigeneratorHandsOver(unittest.TestCase):
             with override_config(**folders):
                 stray_files.run()
 
-            self.assertTrue((root / "scripts" / bucket / "scene one.funscript").is_file())
-            self.assertFalse((root / "generated").exists())
+            assert (root / "scripts" / bucket / "scene one.funscript").is_file()
+            assert not (root / "generated").exists()
 
 
 class TestEverythingElse(unittest.TestCase):
@@ -166,10 +160,8 @@ class TestEverythingElse(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos):
                 result = stray_files.run()
 
-            self.assertEqual(
-                result.reported, [str(Path("2D") / "non_AI" / "example" / "cover.jpg")]
-            )
-            self.assertTrue((bucket / "cover.jpg").is_file())
+            assert result.reported == [str(Path("2D") / "non_AI" / "example" / "cover.jpg")]
+            assert (bucket / "cover.jpg").is_file()
 
     def test_the_files_windows_writes_by_itself_are_not_reported(self):
         with workspace_temp_dir() as root:
@@ -181,8 +173,8 @@ class TestEverythingElse(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos):
                 result = stray_files.run()
 
-            self.assertEqual(result.reported, [])
-            self.assertTrue((videos / "desktop.ini").is_file())
+            assert result.reported == []
+            assert (videos / "desktop.ini").is_file()
 
     def test_a_partial_upscale_output_is_left_alone(self):
         with workspace_temp_dir() as root:
@@ -194,8 +186,8 @@ class TestEverythingElse(unittest.TestCase):
             with override_config(VIDEO_LIBRARY_DIR=videos):
                 result = stray_files.run()
 
-            self.assertEqual(result.reported, [])
-            self.assertTrue(partial.is_file())
+            assert result.reported == []
+            assert partial.is_file()
 
 
 if __name__ == "__main__":

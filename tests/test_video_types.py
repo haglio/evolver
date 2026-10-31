@@ -47,9 +47,9 @@ class TestAiLane(unittest.TestCase):
                                          orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
-            self.assertEqual(video_type.type_of(payload), video_type.SHORT)
-            self.assertEqual(payload["video"]["prompt"], "a prompt")
-            self.assertEqual(result.recorded, 1)
+            assert video_type.type_of(payload) == video_type.SHORT
+            assert payload["video"]["prompt"] == "a prompt"
+            assert result.recorded == 1
 
     def test_an_act_struck_out_while_the_stage_measures_is_still_there_after(self):
         """Bug 8's lost update, from the stage's side.
@@ -75,9 +75,9 @@ class TestAiLane(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
-            self.assertEqual(payload["video"]["wrong_action"], "Alpha")
-            self.assertNotIn("action", payload["video"])
-            self.assertEqual(video_type.type_of(payload), video_type.SHORT)
+            assert payload["video"]["wrong_action"] == "Alpha"
+            assert "action" not in payload["video"]
+            assert video_type.type_of(payload) == video_type.SHORT
 
     def test_a_long_generated_clip_is_full_length(self):
         with workspace_temp_dir() as root:
@@ -91,9 +91,7 @@ class TestAiLane(unittest.TestCase):
                 video_types.run(probe=_probe({video.stem: 240.0}),
                                 orientation_probe=_orientation_unknown)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(path)), video_type.FULL_LENGTH
-                )
+                assert video_type.type_of(sidecar.read(path)) == video_type.FULL_LENGTH
 
     def test_a_clip_in_the_genau_source_is_a_genau_loop_before_it_is_delivered(self):
         """It is bound for Genau's folder, and its kind does not wait on a
@@ -108,9 +106,7 @@ class TestAiLane(unittest.TestCase):
 
                 video_types.run(probe=_unmeasurable, orientation_probe=_orientation_unknown)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(path)), video_type.GENAU_FLICK
-                )
+                assert video_type.type_of(sidecar.read(path)) == video_type.GENAU_FLICK
 
 
 class TestGenauLane(unittest.TestCase):
@@ -124,9 +120,9 @@ class TestGenauLane(unittest.TestCase):
                                          orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
-            self.assertEqual(video_type.type_of(payload), video_type.GENAU_FLICK)
-            self.assertEqual(result.recorded, 1)
-            self.assertTrue((lib.metadata / "genau" / "flicks" / "loop_2_topaz.json").is_file())
+            assert video_type.type_of(payload) == video_type.GENAU_FLICK
+            assert result.recorded == 1
+            assert (lib.metadata / "genau" / "flicks" / "loop_2_topaz.json").is_file()
 
 
 class TestNonAiLane(unittest.TestCase):
@@ -143,9 +139,7 @@ class TestNonAiLane(unittest.TestCase):
 
                 video_types.run(probe=_unmeasurable, orientation_probe=_orientation_unknown)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(path)), video_type.EXCERPT
-                )
+                assert video_type.type_of(sidecar.read(path)) == video_type.EXCERPT
 
     def test_a_folder_the_overlay_declares_holds_excerpts_needs_no_record(self):
         with workspace_temp_dir() as root:
@@ -156,10 +150,7 @@ class TestNonAiLane(unittest.TestCase):
                 video_types.run(probe=_probe({video.stem: 900.0}),
                                 orientation_probe=_orientation_unknown)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
-                    video_type.EXCERPT,
-                )
+                assert video_type.type_of(sidecar.read(sidecar.sidecar_path(video))) == video_type.EXCERPT
 
     def test_an_ordinary_scene_is_full_length(self):
         with workspace_temp_dir() as root:
@@ -170,10 +161,7 @@ class TestNonAiLane(unittest.TestCase):
                 video_types.run(probe=_probe({video.stem: 1800.0}),
                                 orientation_probe=_orientation_unknown)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
-                    video_type.FULL_LENGTH,
-                )
+                assert video_type.type_of(sidecar.read(sidecar.sidecar_path(video))) == video_type.FULL_LENGTH
 
 
 class TestRunningItAgain(unittest.TestCase):
@@ -191,11 +179,9 @@ class TestRunningItAgain(unittest.TestCase):
                 result = video_types.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(path)), video_type.FULL_LENGTH
-                )
-            self.assertEqual((result.recorded, result.already), (0, 1))
-            self.assertEqual(video.name, "clip_c.mp4")
+                assert video_type.type_of(sidecar.read(path)) == video_type.FULL_LENGTH
+            assert (result.recorded, result.already) == (0, 1)
+            assert video.name == "clip_c.mp4"
 
     def test_a_kind_recorded_before_running_times_were_kept_is_measured_once(self):
         """The sidecars this stage wrote before it began keeping the
@@ -214,8 +200,8 @@ class TestRunningItAgain(unittest.TestCase):
                 again = video_types.run(probe=_refuses_to_be_called,
                                         orientation_probe=_refuses_to_be_called)
 
-                self.assertEqual(video_type.duration_of(sidecar.read(path)), 240.0)
-            self.assertEqual((first.recorded, again.already), (1, 1))
+                assert video_type.duration_of(sidecar.read(path)) == 240.0
+            assert (first.recorded, again.already) == (1, 1)
 
     def test_a_second_run_writes_nothing(self):
         with workspace_temp_dir() as root:
@@ -228,7 +214,7 @@ class TestRunningItAgain(unittest.TestCase):
                 again = video_types.run(probe=_refuses_to_be_called,
                                         orientation_probe=_refuses_to_be_called)
 
-            self.assertEqual((again.recorded, again.already), (0, 1))
+            assert (again.recorded, again.already) == (0, 1)
 
 
 def _unmeasurable(_video):
@@ -253,8 +239,8 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(sidecar.sidecar_path(video))
-            self.assertEqual(video_type.duration_of(payload), 1800.0)
-            self.assertEqual(video_type.type_of(payload), video_type.FULL_LENGTH)
+            assert video_type.duration_of(payload) == 1800.0
+            assert video_type.type_of(payload) == video_type.FULL_LENGTH
 
     def test_an_excerpt_is_measured_even_though_its_kind_was_free(self):
         """Two thirds of the videos the non-AI upscale project accounts for are
@@ -270,8 +256,8 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
-            self.assertEqual(video_type.type_of(payload), video_type.EXCERPT)
-            self.assertEqual(video_type.duration_of(payload), 240.0)
+            assert video_type.type_of(payload) == video_type.EXCERPT
+            assert video_type.duration_of(payload) == 240.0
 
     def test_measuring_a_free_kind_still_counts_against_the_batch_limit(self):
         """It is an ffprobe like any other, and the pipeline has a wall clock."""
@@ -285,7 +271,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                 video_types.run(probe=lambda video: measured.append(video) or 4.0,
                                 orientation_probe=_orientation_unknown)
 
-            self.assertEqual(len(measured), 1)
+            assert len(measured) == 1
 
     def test_a_free_kind_still_lands_when_nothing_can_measure_it(self):
         with workspace_temp_dir() as root:
@@ -297,9 +283,9 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                                          orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
-            self.assertEqual(video_type.type_of(payload), video_type.GENAU_FLICK)
-            self.assertIsNone(video_type.duration_of(payload))
-            self.assertEqual((result.recorded, result.skipped), (1, 0))
+            assert video_type.type_of(payload) == video_type.GENAU_FLICK
+            assert video_type.duration_of(payload) is None
+            assert (result.recorded, result.skipped) == (1, 0)
 
 
 class TestRecordingTheOrientation(unittest.TestCase):
@@ -314,8 +300,8 @@ class TestRecordingTheOrientation(unittest.TestCase):
                     orientation_probe=_orientations({video.stem: orientation.PORTRAIT}))
 
                 payload = sidecar.read(sidecar.sidecar_path(video))
-            self.assertEqual(video_type.orientation_of(payload), orientation.PORTRAIT)
-            self.assertEqual(video_type.type_of(payload), video_type.FULL_LENGTH)
+            assert video_type.orientation_of(payload) == orientation.PORTRAIT
+            assert video_type.type_of(payload) == video_type.FULL_LENGTH
 
     def test_a_genau_flick_s_orientation_is_measured_too(self):
         with workspace_temp_dir() as root:
@@ -328,7 +314,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
                     orientation_probe=_orientations({flick.stem: orientation.LANDSCAPE}))
 
                 payload = sidecar.read(sidecar.sidecar_path(flick))
-            self.assertEqual(video_type.orientation_of(payload), orientation.LANDSCAPE)
+            assert video_type.orientation_of(payload) == orientation.LANDSCAPE
 
     def test_a_generated_clip_s_orientation_is_the_folder_it_was_sorted_into(self):
         with workspace_temp_dir() as root:
@@ -342,9 +328,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
                 video_types.run(probe=_probe({video.stem: 5.0}),
                                 orientation_probe=_refuses_to_be_called)
 
-                self.assertEqual(
-                    video_type.orientation_of(sidecar.read(path)), orientation.LANDSCAPE
-                )
+                assert video_type.orientation_of(sidecar.read(path)) == orientation.LANDSCAPE
 
     def test_a_generated_clip_s_orientation_costs_no_measurement(self):
         with workspace_temp_dir() as root:
@@ -360,10 +344,8 @@ class TestRecordingTheOrientation(unittest.TestCase):
                 result = video_types.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
 
-                self.assertEqual(
-                    video_type.orientation_of(sidecar.read(path)), orientation.PORTRAIT
-                )
-            self.assertEqual(result.recorded, 1)
+                assert video_type.orientation_of(sidecar.read(path)) == orientation.PORTRAIT
+            assert result.recorded == 1
 
     def test_an_orientation_is_measured_once(self):
         with workspace_temp_dir() as root:
@@ -377,7 +359,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
                 again = video_types.run(probe=_refuses_to_be_called,
                                         orientation_probe=_refuses_to_be_called)
 
-            self.assertEqual((again.recorded, again.already), (0, 1))
+            assert (again.recorded, again.already) == (0, 1)
 
     def test_a_video_whose_orientation_nothing_could_tell_waits_for_a_run_that_can(self):
         with workspace_temp_dir() as root:
@@ -394,7 +376,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
                     orientation_probe=_orientations({video.stem: orientation.PORTRAIT}))
 
                 measured = video_type.orientation_of(sidecar.read(path))
-            self.assertEqual((unmeasured, measured), ("", orientation.PORTRAIT))
+            assert (unmeasured, measured) == ("", orientation.PORTRAIT)
 
     def test_measuring_an_orientation_counts_against_the_batch_limit(self):
         with workspace_temp_dir() as root:
@@ -410,8 +392,8 @@ class TestRecordingTheOrientation(unittest.TestCase):
                     probe=_refuses_to_be_called,
                     orientation_probe=lambda video: measured.append(video) or orientation.PORTRAIT)
 
-            self.assertEqual(len(measured), 1)
-            self.assertEqual((result.recorded, result.deferred), (1, 2))
+            assert len(measured) == 1
+            assert (result.recorded, result.deferred) == (1, 2)
 
 
 class TestWhatItRefusesToGuess(unittest.TestCase):
@@ -427,8 +409,8 @@ class TestWhatItRefusesToGuess(unittest.TestCase):
                 result = video_types.run(probe=_unmeasurable,
                                          orientation_probe=_orientation_unknown)
 
-                self.assertEqual(video_type.type_of(sidecar.read(path)), "")
-            self.assertEqual((result.recorded, result.skipped), (0, 1))
+                assert video_type.type_of(sidecar.read(path)) == ""
+            assert (result.recorded, result.skipped) == (0, 1)
 
 
 class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
@@ -441,10 +423,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 video_types.run(probe=_probe({video.stem: 4.0}),
                                 orientation_probe=_orientation_unknown)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
-                    video_type.SHORT,
-                )
+                assert video_type.type_of(sidecar.read(sidecar.sidecar_path(video))) == video_type.SHORT
 
     def test_a_vr_video_kept_on_the_cloud_drive_gets_its_running_time_where_the_library_files_it(self):
         with workspace_temp_dir() as root:
@@ -456,7 +435,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
             recorded = sidecar.read(lib.metadata / "VR" / "finished" / "scene one.json")
-            self.assertEqual(video_type.duration_of(recorded), 1800.0)
+            assert video_type.duration_of(recorded) == 1800.0
 
     def test_nothing_asks_whether_a_vr_video_is_portrait_or_landscape(self):
         with workspace_temp_dir() as root:
@@ -467,7 +446,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 result = video_types.run(probe=_probe({video.stem: 1800.0}),
                                          orientation_probe=_refuses_to_be_called)
 
-            self.assertEqual(result.recorded, 1)
+            assert result.recorded == 1
 
     def test_a_vr_video_whose_running_time_is_on_file_is_known_and_owes_nothing(self):
         with workspace_temp_dir() as root:
@@ -480,7 +459,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 result = video_types.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
 
-            self.assertEqual((result.already, result.deferred), (1, 0))
+            assert (result.already, result.deferred) == (1, 0)
 
     def test_nothing_is_asked_of_the_cloud_drive_while_it_is_not_there(self):
         with workspace_temp_dir() as root:
@@ -489,7 +468,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 result = video_types.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
 
-            self.assertEqual(result, video_types.VideoTypesResult())
+            assert result == video_types.VideoTypesResult()
 
     def test_a_run_asks_the_cloud_drive_about_only_so_many_vr_videos(self):
         with workspace_temp_dir() as root:
@@ -502,7 +481,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 result = video_types.run(probe=lambda video: measured.append(video) or 1800.0,
                                          orientation_probe=_refuses_to_be_called)
 
-            self.assertEqual((len(measured), result.recorded, result.deferred), (2, 2, 3))
+            assert (len(measured), result.recorded, result.deferred) == (2, 2, 3)
 
     def test_a_vr_video_the_cloud_drive_gives_no_answer_about_ends_its_asking_for_the_run(self):
         with workspace_temp_dir() as root:
@@ -515,7 +494,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 result = video_types.run(probe=lambda video: asked.append(video),
                                          orientation_probe=_refuses_to_be_called)
 
-            self.assertEqual((len(asked), result.skipped, result.deferred), (1, 1, 2))
+            assert (len(asked), result.skipped, result.deferred) == (1, 1, 2)
 
 
 class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
@@ -540,8 +519,8 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
                 third = video_types.run(probe=lambda video: measured.append(video) or 4.0,
                                         orientation_probe=_orientation_unknown)
 
-            self.assertEqual([first.recorded, second.recorded, third.recorded], [2, 2, 1])
-            self.assertEqual(len(measured), 5)
+            assert [first.recorded, second.recorded, third.recorded] == [2, 2, 1]
+            assert len(measured) == 5
 
     def test_the_ones_it_did_not_reach_are_not_counted_as_known(self):
         with workspace_temp_dir() as root:
@@ -553,7 +532,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
                 result = video_types.run(probe=_probe({f"clip_{i}": 4.0 for i in range(3)}),
                                          orientation_probe=_orientation_unknown)
 
-            self.assertEqual((result.recorded, result.already, result.deferred), (1, 0, 2))
+            assert (result.recorded, result.already, result.deferred) == (1, 0, 2)
 
     def test_the_free_answers_are_not_held_back_by_it(self):
         """Only measuring costs anything, so only measuring is counted."""
@@ -566,11 +545,8 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
                 result = video_types.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(sidecar.sidecar_path(clip))),
-                    video_type.GENAU_FLICK,
-                )
-            self.assertEqual((result.recorded, result.deferred), (1, 1))
+                assert video_type.type_of(sidecar.read(sidecar.sidecar_path(clip))) == video_type.GENAU_FLICK
+            assert (result.recorded, result.deferred) == (1, 1)
 
 
 class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
@@ -589,20 +565,14 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 touch_video(video)
                 video_types.run(probe=_probe({video.stem: 900.0}),
                                 orientation_probe=_orientation_unknown)
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
-                    video_type.FULL_LENGTH,
-                )
+                assert video_type.type_of(sidecar.read(sidecar.sidecar_path(video))) == video_type.FULL_LENGTH
 
             with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 result = video_types.run(probe=_refuses_to_be_called,
                                          orientation_probe=_orientation_unknown)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
-                    video_type.EXCERPT,
-                )
-            self.assertEqual((result.recorded, result.already), (1, 0))
+                assert video_type.type_of(sidecar.read(sidecar.sidecar_path(video))) == video_type.EXCERPT
+            assert (result.recorded, result.already) == (1, 0)
 
     def test_a_scene_carved_after_it_was_recorded_is_corrected_too(self):
         """The `clip` record arrives when something splits the video, which is
@@ -619,7 +589,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 write_sidecar(path, dict(sidecar.read(path), clip={"index": 3}))
                 video_types.run(probe=_refuses_to_be_called, orientation_probe=_orientation_unknown)
 
-                self.assertEqual(video_type.type_of(sidecar.read(path)), video_type.EXCERPT)
+                assert video_type.type_of(sidecar.read(path)) == video_type.EXCERPT
 
     def test_a_scene_that_is_no_longer_an_excerpt_is_reclassified(self):
         """Undeclaring the folder puts the running time back in charge, and the
@@ -635,10 +605,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 video_types.run(probe=_refuses_to_be_called, orientation_probe=_orientation_unknown)
 
-                self.assertEqual(
-                    video_type.type_of(sidecar.read(sidecar.sidecar_path(video))),
-                    video_type.FULL_LENGTH,
-                )
+                assert video_type.type_of(sidecar.read(sidecar.sidecar_path(video))) == video_type.FULL_LENGTH
 
     def test_a_measured_kind_is_still_never_measured_twice(self):
         with workspace_temp_dir() as root:
@@ -651,7 +618,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 again = video_types.run(probe=_refuses_to_be_called,
                                         orientation_probe=_refuses_to_be_called)
 
-            self.assertEqual((again.recorded, again.already), (0, 1))
+            assert (again.recorded, again.already) == (0, 1)
 
 
 class TestFindingTheExcerptFoldersItself(unittest.TestCase):
@@ -684,8 +651,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                     v.name: video_type.type_of(sidecar.read(sidecar.sidecar_path(v)))
                     for v in [*carved, unrecorded, *wholes]
                 }
-            self.assertEqual(kinds["carved-3.mp4"], video_type.EXCERPT)
-            self.assertEqual(kinds["whole-0.mp4"], video_type.FULL_LENGTH)
+            assert kinds["carved-3.mp4"] == video_type.EXCERPT
+            assert kinds["whole-0.mp4"] == video_type.FULL_LENGTH
 
     def test_a_batch_that_never_separated_its_cuts_keeps_every_whole_video(self):
         """The pipeline's own stage folders can never stand in for a division
@@ -704,10 +671,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                     v.name: video_type.type_of(sidecar.read(sidecar.sidecar_path(v)))
                     for v in [carved, *wholes]
                 }
-            self.assertEqual(kinds["carved-1.mp4"], video_type.EXCERPT)
-            self.assertEqual(
-                [kinds[f"whole-{i}.mp4"] for i in range(3)], [video_type.FULL_LENGTH] * 3
-            )
+            assert kinds["carved-1.mp4"] == video_type.EXCERPT
+            assert [kinds[f"whole-{i}.mp4"] for i in range(3)] == [video_type.FULL_LENGTH] * 3
 
     def test_a_scene_carved_and_filed_beside_its_source_leaves_the_source_whole(self):
         with workspace_temp_dir() as root:
@@ -723,4 +688,4 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
                 kind = video_type.type_of(sidecar.read(sidecar.sidecar_path(source)))
-            self.assertEqual(kind, video_type.FULL_LENGTH)
+            assert kind == video_type.FULL_LENGTH

@@ -28,14 +28,12 @@ _SAME_WORD_ELSEWHERE = {("tasks/origenerator_metadata.py", orientation.UNKNOWN)}
 
 class TestTheOrientations(unittest.TestCase):
     def test_the_walk_order_is_the_two_folder_names(self):
-        self.assertEqual(
-            orientation.SORTED, (orientation.LANDSCAPE, orientation.PORTRAIT)
-        )
+        assert orientation.SORTED == (orientation.LANDSCAPE, orientation.PORTRAIT)
 
     def test_the_third_answer_is_not_one_of_the_two(self):
         """A video ffprobe cannot measure is left where it is rather than
         guessed into a folder, so UNKNOWN must never pass a `in SORTED` test."""
-        self.assertNotIn(orientation.UNKNOWN, orientation.SORTED)
+        assert orientation.UNKNOWN not in orientation.SORTED
 
 
 class TestOnlyOneModuleSpellsThem(unittest.TestCase):
@@ -52,12 +50,7 @@ class TestOnlyOneModuleSpellsThem(unittest.TestCase):
                 if node.value in wanted and (name, node.value) not in _SAME_WORD_ELSEWHERE
             ]
 
-        self.assertEqual(
-            offenders,
-            [],
-            "the orientations belong to util.orientation -- LANDSCAPE, PORTRAIT, "
-            "UNKNOWN, and SORTED for the walk order",
-        )
+        assert offenders == [], "the orientations belong to util.orientation -- LANDSCAPE, PORTRAIT, UNKNOWN, and SORTED for the walk order"
 
 
 if __name__ == "__main__":

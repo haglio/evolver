@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+import pytest
+
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
 from util import weird_piles
 from util.script_library import is_marked_generated, mark_generated, script_path_for_video
@@ -40,10 +42,8 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertEqual(found.video, marked)
-        self.assertEqual(
-            found.restores_to,
-            self.lib.outbox / "portrait" / "example-source" / "scene one_topaz.mp4")
+        assert found.video == marked
+        assert found.restores_to == self.lib.outbox / "portrait" / "example-source" / "scene one_topaz.mp4"
 
     def test_a_second_video_marked_under_a_taken_name_goes_back_under_its_own(self):
         touch_video(self.lib.sorted_dir / "example-source" / "landscape" / "scene two.mp4")
@@ -51,9 +51,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertEqual(
-            found.restores_to,
-            self.lib.outbox / "landscape" / "example-source" / "scene two_topaz.mp4")
+        assert found.restores_to == self.lib.outbox / "landscape" / "example-source" / "scene two_topaz.mp4"
 
     def test_of_two_sources_sharing_a_name_it_restores_to_the_one_missing_its_upscale(self):
         for source in ("example-source", "example-loop-clips"):
@@ -63,11 +61,8 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertEqual(
-            found.restores_to,
-            self.lib.outbox / "portrait" / "example-loop-clips" / "loop_3_topaz.mp4")
-        self.assertEqual(found.upscaled_from,
-                         self.lib.sorted_dir / "example-loop-clips" / "portrait" / "loop_3.mkv")
+        assert found.restores_to == self.lib.outbox / "portrait" / "example-loop-clips" / "loop_3_topaz.mp4"
+        assert found.upscaled_from == self.lib.sorted_dir / "example-loop-clips" / "portrait" / "loop_3.mkv"
 
     def test_a_copy_left_outside_the_orientation_folders_is_no_upscale_s_source(self):
         touch_video(self.lib.sorted_dir / "example-source" / "loop_4.mp4")
@@ -75,7 +70,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertIsNone(found.restores_to)
+        assert found.restores_to is None
 
     def test_a_genau_clip_restores_to_its_own_place_in_genaus_folder(self):
         top = touch_video(self.lib.genau_weird / "loop_5_topaz.mp4")
@@ -83,10 +78,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         found = {marked.video: marked.restores_to for marked in weird_piles.marked_weird()}
 
-        self.assertEqual(found, {
-            top: self.lib.genau_flicks / "loop_5_topaz.mp4",
-            inside: self.lib.genau_flicks / "2D" / "AI" / "loop_6_topaz.mp4",
-        })
+        assert found == {top: self.lib.genau_flicks / "loop_5_topaz.mp4", inside: self.lib.genau_flicks / "2D" / "AI" / "loop_6_topaz.mp4"}
 
     def test_a_genau_clip_was_upscaled_from_the_copy_its_lane_failed_to_retire(self):
         left_behind = touch_video(self.lib.sorted_dir / "example-loop-clips" / "portrait" / "loop_8.mp4")
@@ -95,7 +87,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertEqual(found.upscaled_from, left_behind)
+        assert found.upscaled_from == left_behind
 
     def test_a_clip_whose_place_has_been_taken_since_has_nowhere_to_go_back_to(self):
         touch_video(self.lib.genau_flicks / "loop_7_topaz.mp4")
@@ -103,7 +95,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertIsNone(found.restores_to)
+        assert found.restores_to is None
 
     def test_a_video_no_upscale_explains_goes_back_where_its_record_still_is(self):
         scene = self.lib.non_ai / "example-bucket" / "full" / "scene three.mp4"
@@ -112,7 +104,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertEqual(found.restores_to, scene)
+        assert found.restores_to == scene
 
     def test_a_namesake_still_in_its_place_is_not_where_the_video_goes_back(self):
         scene = self.lib.non_ai / "example-bucket" / "full" / "scene four.mp4"
@@ -122,7 +114,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertEqual(found.restores_to, scene)
+        assert found.restores_to == scene
 
     def test_two_places_a_video_could_have_left_are_no_answer(self):
         for bucket in ("example-bucket", "other-bucket"):
@@ -131,7 +123,7 @@ class TestWhereAVideoMarkedWeirdCameFrom(_InALibrary):
 
         [found] = weird_piles.marked_weird()
 
-        self.assertIsNone(found.restores_to)
+        assert found.restores_to is None
 
 
 class TestRestoring(_InALibrary):
@@ -142,9 +134,9 @@ class TestRestoring(_InALibrary):
         with self.assertLogs("util.weird_piles", level="INFO") as said:
             weird_piles.restore(found)
 
-        self.assertFalse(marked.exists())
-        self.assertTrue((self.lib.genau_flicks / "2D" / "AI" / "loop_9_topaz.mp4").is_file())
-        self.assertEqual(said.records[0].args, (marked, found.restores_to))
+        assert not marked.exists()
+        assert (self.lib.genau_flicks / "2D" / "AI" / "loop_9_topaz.mp4").is_file()
+        assert said.records[0].args == (marked, found.restores_to)
 
     def test_the_funscript_that_followed_it_into_the_pile_comes_back_with_its_mark(self):
         touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene six.mp4")
@@ -155,18 +147,18 @@ class TestRestoring(_InALibrary):
         weird_piles.restore(found)
 
         script = script_path_for_video(found.restores_to)
-        self.assertTrue(script.is_file())
-        self.assertTrue(is_marked_generated(script))
-        self.assertFalse(script_path_for_video(marked).exists())
+        assert script.is_file()
+        assert is_marked_generated(script)
+        assert not script_path_for_video(marked).exists()
 
     def test_a_video_with_nowhere_to_go_back_to_stays_in_the_pile(self):
         marked = touch_video(self.lib.weird / "scene seven.mp4")
         [found] = weird_piles.marked_weird()
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError, match="was marked weird from"):
             weird_piles.restore(found)
 
-        self.assertTrue(marked.is_file())
+        assert marked.is_file()
 
     def test_a_place_taken_since_the_list_was_read_keeps_what_took_it(self):
         marked = touch_video(self.lib.genau_weird / "loop_10_topaz.mp4")
@@ -174,11 +166,11 @@ class TestRestoring(_InALibrary):
         taker = touch_video(self.lib.genau_flicks / "loop_10_topaz.mp4")
         taker.write_bytes(b"another")
 
-        with self.assertRaises(FileExistsError):
+        with pytest.raises(FileExistsError):
             weird_piles.restore(found)
 
-        self.assertTrue(marked.is_file())
-        self.assertEqual(taker.read_bytes(), b"another")
+        assert marked.is_file()
+        assert taker.read_bytes() == b"another"
 
 
 class TestDeletingPermanently(_InALibrary):
@@ -189,8 +181,8 @@ class TestDeletingPermanently(_InALibrary):
 
         weird_piles.delete_permanently(found)
 
-        self.assertFalse(marked.exists())
-        self.assertFalse(source.exists())
+        assert not marked.exists()
+        assert not source.exists()
 
     def test_its_own_record_goes_and_every_namesake_keeps_its_own(self):
         touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene nine.mp4")
@@ -204,8 +196,8 @@ class TestDeletingPermanently(_InALibrary):
 
         weird_piles.delete_permanently(found)
 
-        self.assertFalse(own.exists())
-        self.assertTrue(all(record.exists() for record in namesakes))
+        assert not own.exists()
+        assert all(record.exists() for record in namesakes)
 
     def test_every_funscript_it_and_its_copy_held_goes_with_its_mark(self):
         source = touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene ten.mp4")
@@ -215,8 +207,8 @@ class TestDeletingPermanently(_InALibrary):
 
         weird_piles.delete_permanently(found)
 
-        self.assertEqual([script for script in scripts if script.exists()], [])
-        self.assertEqual([script for script in scripts if is_marked_generated(script)], [])
+        assert [script for script in scripts if script.exists()] == []
+        assert [script for script in scripts if is_marked_generated(script)] == []
 
     def test_a_genau_clips_sound_goes_with_it(self):
         touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_11_topaz.mp4")
@@ -225,7 +217,7 @@ class TestDeletingPermanently(_InALibrary):
 
         weird_piles.delete_permanently(found)
 
-        self.assertFalse(sound.exists())
+        assert not sound.exists()
 
     def test_a_sound_another_clip_of_that_name_still_plays_is_kept(self):
         touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_12_topaz.mp4")
@@ -235,7 +227,7 @@ class TestDeletingPermanently(_InALibrary):
 
         weird_piles.delete_permanently(first)
 
-        self.assertTrue(sound.exists())
+        assert sound.exists()
 
     def test_the_log_names_everything_it_deleted_the_copy_first(self):
         source = touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene eleven.mp4")
@@ -247,7 +239,7 @@ class TestDeletingPermanently(_InALibrary):
         with self.assertLogs("util.weird_piles", level="INFO") as said:
             weird_piles.delete_permanently(found)
 
-        self.assertEqual([entry.args[0] for entry in said.records], [source, marked, record, script])
+        assert [entry.args[0] for entry in said.records] == [source, marked, record, script]
 
 
 if __name__ == "__main__":

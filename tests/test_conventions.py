@@ -50,12 +50,7 @@ class TestOneWordPerConcept(unittest.TestCase):
                 ast.parse((PROJECT_ROOT / name).read_text(encoding="utf-8")))
         )
 
-        self.assertEqual(
-            offenders,
-            [],
-            "`from util import sidecar` and `sidecar.read(...)`, so the verb "
-            "says what it reads",
-        )
+        assert offenders == [], "`from util import sidecar` and `sidecar.read(...)`, so the verb says what it reads"
 
 
 if __name__ == "__main__":

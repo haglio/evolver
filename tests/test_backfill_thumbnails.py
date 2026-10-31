@@ -33,21 +33,21 @@ class TestExampleClips(unittest.TestCase):
             video = lib.video("portrait", "provider2", "a_topaz.mp4")
             self._tag(lib, "portrait", "provider2", "a_topaz", "Side Beta")
 
-            self.assertEqual(self._examples(), {"Side Beta": video})
+            assert self._examples() == {"Side Beta": video}
 
     def test_the_examples_are_for_the_tiles_of_the_vocabulary_handed_in(self):
         with library_tree() as lib:
             video = lib.video("portrait", "provider2", "k_topaz.mp4")
             self._tag(lib, "portrait", "provider2", "k_topaz", "Side Kappa")
 
-            self.assertEqual(self._examples(vocabulary_of(Act("kappa", "Kappa"))), {"Side Kappa": video})
-            self.assertEqual(self._examples(VOCABULARY), {})
+            assert self._examples(vocabulary_of(Act("kappa", "Kappa"))) == {"Side Kappa": video}
+            assert self._examples(VOCABULARY) == {}
 
     def test_an_unlabeled_clip_contributes_no_example(self):
         with library_tree() as lib:
             lib.video("portrait", "provider2", "a_topaz.mp4")  # no sidecar
 
-            self.assertEqual(self._examples(), {})
+            assert self._examples() == {}
 
     def test_a_scraped_source_is_a_valid_example(self):
         """Unlike the work queue, the gallery welcomes already-labeled scraped clips."""
@@ -55,7 +55,7 @@ class TestExampleClips(unittest.TestCase):
             video = lib.video("landscape", "provider", "b_topaz.mp4")
             self._tag(lib, "landscape", "provider", "b_topaz", "XYZ Gamma")
 
-            self.assertEqual(self._examples(), {"XYZ Gamma": video})
+            assert self._examples() == {"XYZ Gamma": video}
 
     def test_the_first_clip_found_wins_for_an_action(self):
         with library_tree() as lib:
@@ -64,7 +64,7 @@ class TestExampleClips(unittest.TestCase):
             self._tag(lib, "portrait", "provider2", "a_topaz", "Side Alpha")
             self._tag(lib, "portrait", "provider2", "z_topaz", "Side Alpha")
 
-            self.assertEqual(self._examples(), {"Side Alpha": first})
+            assert self._examples() == {"Side Alpha": first}
 
     def test_a_compound_tag_illustrates_each_of_its_parts(self):
         with library_tree() as lib:
@@ -73,15 +73,15 @@ class TestExampleClips(unittest.TestCase):
 
             examples = self._examples()
 
-            self.assertEqual(examples["XYZ Gamma"], video)
-            self.assertEqual(examples["Side Alpha"], video)
+            assert examples["XYZ Gamma"] == video
+            assert examples["Side Alpha"] == video
 
     def test_a_curated_pin_supplies_a_tile_the_library_never_tags(self):
         with library_tree() as lib:
             pinned = lib.video("portrait", "provider", f"{PINNED_ID}_topaz.mp4")
 
             with override_config(CURATED_EXAMPLES={PINNED_TILE: PINNED_ID}):
-                self.assertEqual(self._examples(), {PINNED_TILE: pinned})
+                assert self._examples() == {PINNED_TILE: pinned}
 
     def test_a_curated_pin_wins_over_an_auto_match(self):
         with library_tree() as lib:
@@ -90,7 +90,7 @@ class TestExampleClips(unittest.TestCase):
             self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
 
             with override_config(CURATED_EXAMPLES={PINNED_TILE: PINNED_ID}):
-                self.assertEqual(self._examples()[PINNED_TILE], pinned)
+                assert self._examples()[PINNED_TILE] == pinned
 
     def test_a_pin_naming_a_clip_the_library_does_not_hold_falls_through(self):
         """Which is every pin on every machine but the one whose library the
@@ -100,7 +100,7 @@ class TestExampleClips(unittest.TestCase):
             self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
 
             with override_config(CURATED_EXAMPLES={PINNED_TILE: "not-in-this-library"}):
-                self.assertEqual(self._examples()[PINNED_TILE], auto)
+                assert self._examples()[PINNED_TILE] == auto
 
     def test_no_pins_at_all_leaves_every_tile_to_the_automatic_match(self):
         """A public checkout's overlay carries an empty curated_examples."""
@@ -109,13 +109,13 @@ class TestExampleClips(unittest.TestCase):
             self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
 
             with override_config(CURATED_EXAMPLES={}):
-                self.assertEqual(self._examples(), {PINNED_TILE: auto})
+                assert self._examples() == {PINNED_TILE: auto}
 
 
 class TestThumbnailCachePath(unittest.TestCase):
     def test_slugifies_the_action_into_a_stable_filename(self):
         with override_config(BACKFILL_THUMBNAIL_DIR=Path("/cache")):
-            self.assertEqual(thumbnails.thumbnail_cache_path("XYZ Beta"), Path("/cache/xyz_beta.jpg"))
+            assert thumbnails.thumbnail_cache_path("XYZ Beta") == Path("/cache/xyz_beta.jpg")
 
 
 class TestBuildThumbnails(unittest.TestCase):
@@ -129,11 +129,8 @@ class TestBuildThumbnails(unittest.TestCase):
 
         result = list(thumbnails.build_thumbnails(examples, extract, lambda a: Path(f"/c/{a}.jpg")))
 
-        self.assertEqual(
-            result,
-            [("Side Beta", Path("/c/Side Beta.jpg")), ("XYZ Alpha", Path("/c/XYZ Alpha.jpg"))],
-        )
-        self.assertEqual(calls[0], (Path("a.mp4"), Path("/c/Side Beta.jpg")))
+        assert result == [("Side Beta", Path("/c/Side Beta.jpg")), ("XYZ Alpha", Path("/c/XYZ Alpha.jpg"))]
+        assert calls[0] == (Path("a.mp4"), Path("/c/Side Beta.jpg"))
 
     def test_a_cached_thumbnail_is_reused_without_extracting(self):
         with workspace_temp_dir() as root:
@@ -149,8 +146,8 @@ class TestBuildThumbnails(unittest.TestCase):
                 )
             )
 
-            self.assertEqual(result, [("Side Beta", cached)])
-            self.assertEqual(extracted, [])  # a cache hit never shells out to ffmpeg
+            assert result == [("Side Beta", cached)]
+            assert extracted == []  # a cache hit never shells out to ffmpeg
 
     def test_an_extraction_failure_skips_that_action(self):
         examples = {"Good": Path("g.mp4"), "Bad": Path("b.mp4")}
@@ -161,7 +158,7 @@ class TestBuildThumbnails(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result, [("Good", Path("/c/Good.jpg"))])
+        assert result == [("Good", Path("/c/Good.jpg"))]
 
 
 class TestExtractFrame(unittest.TestCase):
@@ -181,10 +178,10 @@ class TestExtractFrame(unittest.TestCase):
                 # 0.9 with the suite green).
                 ok = thumbnails.extract_frame(Path("clip.mp4"), dest)
 
-            self.assertTrue(ok)
+            assert ok
             argv = run.call_args[0][0]
-            self.assertEqual(argv[argv.index("-ss") + 1], "4.000")
-            self.assertIn(str(dest), argv)
+            assert argv[argv.index("-ss") + 1] == "4.000"
+            assert str(dest) in argv
 
     def test_scales_to_the_one_thumbnail_height(self):
         """Like at_fraction, the height is the tuned value and no caller names
@@ -202,7 +199,7 @@ class TestExtractFrame(unittest.TestCase):
                 thumbnails.extract_frame(Path("clip.mp4"), dest)
 
             argv = run.call_args[0][0]
-            self.assertEqual(argv[argv.index("-vf") + 1], f"scale=-2:{thumbnails._THUMBNAIL_HEIGHT}")
+            assert argv[argv.index("-vf") + 1] == f"scale=-2:{thumbnails._THUMBNAIL_HEIGHT}"
 
     def test_seeks_to_zero_when_the_duration_is_unknown(self):
         with workspace_temp_dir() as root:
@@ -217,14 +214,14 @@ class TestExtractFrame(unittest.TestCase):
                 thumbnails.extract_frame(Path("clip.mp4"), dest)
 
             argv = run.call_args[0][0]
-            self.assertEqual(argv[argv.index("-ss") + 1], "0.000")
+            assert argv[argv.index("-ss") + 1] == "0.000"
 
     def test_a_frame_ffmpeg_could_not_write_is_reported_as_not_extracted(self):
         with workspace_temp_dir() as root:
             dest = root / "out.jpg"
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
                  patch("backfill.thumbnails.subprocess.run", return_value=SimpleNamespace(returncode=1)):
-                self.assertFalse(thumbnails.extract_frame(Path("clip.mp4"), dest))
+                assert not thumbnails.extract_frame(Path("clip.mp4"), dest)
 
     def test_a_missing_probe_leaves_the_tile_text_only_rather_than_crashing(self):
         """duration_seconds sat ABOVE the try that exists to survive a missing
@@ -237,7 +234,7 @@ class TestExtractFrame(unittest.TestCase):
 
             with patch("backfill.thumbnails.duration_seconds",
                        side_effect=FileNotFoundError("ffprobe")):
-                self.assertFalse(thumbnails.extract_frame(Path("clip.mp4"), dest))
+                assert not thumbnails.extract_frame(Path("clip.mp4"), dest)
 
     def test_a_missing_encoder_leaves_it_text_only_too(self):
         with workspace_temp_dir() as root:
@@ -246,7 +243,7 @@ class TestExtractFrame(unittest.TestCase):
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
                  patch("backfill.thumbnails.subprocess.run",
                        side_effect=FileNotFoundError("ffmpeg")):
-                self.assertFalse(thumbnails.extract_frame(Path("clip.mp4"), dest))
+                assert not thumbnails.extract_frame(Path("clip.mp4"), dest)
 
 
 if __name__ == "__main__":

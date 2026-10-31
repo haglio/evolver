@@ -29,16 +29,9 @@ class TestSceneScripts(SceneScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 1)
+        assert result.written == 1
         written = json.loads(self.scene_script().read_text(encoding="utf-8"))
-        self.assertEqual(
-            written["actions"],
-            [
-                {"at": 493_250, "pos": 60},
-                {"at": 494_750, "pos": 10},
-                {"at": 534_783, "pos": 48},
-            ],
-        )
+        assert written["actions"] == [{"at": 493250, "pos": 60}, {"at": 494750, "pos": 10}, {"at": 534783, "pos": 48}]
 
     def test_a_placed_script_says_in_itself_that_this_stage_placed_it(self):
         scene = self.make_scene()
@@ -48,8 +41,7 @@ class TestSceneScripts(SceneScriptsCase):
 
         written = json.loads(self.scene_script().read_text(encoding="utf-8"))
         stamp = written["metadata"][provenance.BLOCK][provenance.SCENE_SCRIPTS]
-        self.assertEqual((stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
-                         ("evolver", None, None))
+        assert (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("evolver", None, None)
 
     def test_the_rest_of_the_scene_is_left_unscripted(self):
         """A scene runs for an hour and the clip covers a minute of it. Nothing
@@ -61,7 +53,7 @@ class TestSceneScripts(SceneScriptsCase):
         self.run_stage(duration=3_600.0)
 
         written = json.loads(self.scene_script().read_text(encoding="utf-8"))
-        self.assertEqual([action["at"] for action in written["actions"]], [300_000, 300_900])
+        assert [action["at"] for action in written["actions"]] == [300000, 300900]
 
     def test_never_overwrites_a_script_the_scene_already_has(self):
         scene = self.make_scene(actions=[{"at": 7, "pos": 42}])
@@ -69,12 +61,9 @@ class TestSceneScripts(SceneScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.already_scripted, 1)
-        self.assertEqual(
-            json.loads(self.scene_script().read_text(encoding="utf-8"))["actions"],
-            [{"at": 7, "pos": 42}],
-        )
+        assert result.written == 0
+        assert result.already_scripted == 1
+        assert json.loads(self.scene_script().read_text(encoding="utf-8"))["actions"] == [{"at": 7, "pos": 42}]
 
     def test_leaves_a_scene_alone_when_its_clip_has_no_script(self):
         scene = self.make_scene()
@@ -82,9 +71,9 @@ class TestSceneScripts(SceneScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.no_clip_script, 1)
-        self.assertFalse(self.scene_script().exists())
+        assert result.written == 0
+        assert result.no_clip_script == 1
+        assert not self.scene_script().exists()
 
     def test_skips_a_clip_the_matcher_has_not_placed_yet(self):
         """Most clips have no ``full_video``: the scene they were cut from is
@@ -98,8 +87,8 @@ class TestSceneScripts(SceneScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.unmatched_clip, 1)
+        assert result.written == 0
+        assert result.unmatched_clip == 1
 
     def test_skips_a_scene_that_has_left_the_library(self):
         """A recorded match names a file that can since have been renamed,
@@ -109,8 +98,8 @@ class TestSceneScripts(SceneScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.scene_gone, 1)
+        assert result.written == 0
+        assert result.scene_gone == 1
 
     def test_a_whole_video_that_is_not_a_clip_is_not_a_source(self):
         """Only a carved clip carries the record; an ordinary video has no
@@ -121,8 +110,8 @@ class TestSceneScripts(SceneScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.unmatched_clip, 0)
+        assert result.written == 0
+        assert result.unmatched_clip == 0
 
 
 if __name__ == "__main__":

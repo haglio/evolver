@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from tasks import clip_scripts, scene_scripts, scripts_sync, stray_files
 from tests.temp_helpers import (
     CarvedClipLibraryCase,
@@ -41,15 +43,15 @@ class TestWalkingTheLibrary(unittest.TestCase):
             _flick_in(lib)
             _made_by_origenerator(lib)
 
-            self.assertEqual(set(media_files.library_videos(lib.library)), {own})
+            assert set(media_files.library_videos(lib.library)) == {own}
 
     def test_walking_one_of_them_itself_finds_what_is_in_it(self):
         with a_library() as lib:
             flick = _flick_in(lib)
             made = _made_by_origenerator(lib)
 
-            self.assertEqual(list(media_files.library_videos(lib.genau)), [flick])
-            self.assertEqual(list(media_files.library_videos(lib.origenerator)), [made])
+            assert list(media_files.library_videos(lib.genau)) == [flick]
+            assert list(media_files.library_videos(lib.origenerator)) == [made]
 
     def test_lists_every_file_of_the_library_but_theirs(self):
         with a_library() as lib:
@@ -58,7 +60,7 @@ class TestWalkingTheLibrary(unittest.TestCase):
                 (folder / "notes.txt").parent.mkdir(parents=True, exist_ok=True)
                 (folder / "notes.txt").write_text("notes", encoding="utf-8")
 
-            self.assertEqual(set(media_files.library_files(lib.library)), {notes})
+            assert set(media_files.library_files(lib.library)) == {notes}
 
 
 class TestStrayFiles(unittest.TestCase):
@@ -72,9 +74,9 @@ class TestStrayFiles(unittest.TestCase):
 
             result = stray_files.run()
 
-            self.assertEqual((result.renamed, result.rehomed_scripts, result.reported), (1, 0, []))
-            self.assertTrue(own.with_name("scene.mp4").is_file())
-            self.assertTrue(all(path.is_file() for path in kept))
+            assert (result.renamed, result.rehomed_scripts, result.reported) == (1, 0, [])
+            assert own.with_name("scene.mp4").is_file()
+            assert all(path.is_file() for path in kept)
 
 
 class TestScriptsSync(unittest.TestCase):
@@ -89,8 +91,9 @@ class TestScriptsSync(unittest.TestCase):
 
             result = scripts_sync.run()
 
-            self.assertEqual((result.unmatched, result.moved), (2, 0))
-            self.assertFalse((lib.scripts / "genau").exists() or (lib.scripts / "origenerator").exists())
+            assert (result.unmatched, result.moved) == (2, 0)
+            assert not (lib.scripts / "genau").exists()
+            assert not (lib.scripts / "origenerator").exists()
 
 
 class TestCarvedClipScripts(CarvedClipLibraryCase):
@@ -123,8 +126,8 @@ class TestCarvedClipScripts(CarvedClipLibraryCase):
                      patch.object(clip_scripts.ffprobe, "duration_seconds", return_value=2.0):
                     result = clip_scripts.run()
 
-                self.assertEqual(result.written, 0)
-                self.assertFalse((self.scripts / folder_name / "clips" / "clip.funscript").exists())
+                assert result.written == 0
+                assert not (self.scripts / folder_name / "clips" / "clip.funscript").exists()
 
     def test_a_scene_is_given_no_script_from_a_clip_in_either_folder(self):
         for folder_name in ("genau", "origenerator"):
@@ -134,8 +137,8 @@ class TestCarvedClipScripts(CarvedClipLibraryCase):
                      patch.object(scene_scripts.ffprobe, "duration_seconds", return_value=60.0):
                     result = scene_scripts.run()
 
-                self.assertEqual(result.written, 0)
-                self.assertFalse(self.scene_script(scene.stem).exists())
+                assert result.written == 0
+                assert not self.scene_script(scene.stem).exists()
 
 
 class TestFollowingVideosThatMoved(unittest.TestCase):
@@ -145,21 +148,20 @@ class TestFollowingVideosThatMoved(unittest.TestCase):
             _made_by_origenerator(lib)
             index = video_locator.build_index()
 
-            self.assertEqual(video_locator.relocate(Path("gone") / "loop_1.mp4", index), flick)
-            self.assertIsNone(video_locator.relocate(Path("gone") / "video_1.mp4", index))
+            assert video_locator.relocate(Path("gone") / "loop_1.mp4", index) == flick
+            assert video_locator.relocate(Path("gone") / "video_1.mp4", index) is None
 
 
 class TestTheMirrors(unittest.TestCase):
     def test_a_video_in_either_folder_has_no_script_in_the_library(self):
         with a_library() as lib:
             for video in (_flick_in(lib), _made_by_origenerator(lib)):
-                with self.subTest(video=video.name), self.assertRaises(ValueError):
+                with self.subTest(video=video.name), pytest.raises(ValueError, match="is not in the video library"):
                     script_library.script_path_for_video(video)
 
     def test_genau_s_sidecars_stay_under_genau_in_the_metadata_tree(self):
         with a_library() as lib:
-            self.assertEqual(sidecar.sidecar_path(_flick_in(lib)),
-                             lib.metadata / "genau" / "flicks" / "2D" / "AI" / "loop_1.json")
+            assert sidecar.sidecar_path(_flick_in(lib)) == lib.metadata / "genau" / "flicks" / "2D" / "AI" / "loop_1.json"
 
 
 if __name__ == "__main__":

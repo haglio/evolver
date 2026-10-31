@@ -73,8 +73,8 @@ class TestGenaumacherSessions(unittest.TestCase):
                 result = reference_sync.run()
 
             payload = json.loads(session.read_text(encoding="utf-8"))
-            self.assertEqual(payload["video_path"], str(moved_to))
-            self.assertEqual(result.relocated, 1)
+            assert payload["video_path"] == str(moved_to)
+            assert result.relocated == 1
 
     def test_follows_a_video_that_was_renamed_where_it_stood(self):
         """No name left to match on — but the session records the footage's shape."""
@@ -92,8 +92,8 @@ class TestGenaumacherSessions(unittest.TestCase):
             ):
                 result = reference_sync.run()
 
-            self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], str(renamed_to))
-            self.assertEqual(result.relocated, 1)
+            assert json.loads(session.read_text(encoding="utf-8"))["video_path"] == str(renamed_to)
+            assert result.relocated == 1
 
     def test_leaves_a_session_alone_while_the_only_video_of_its_name_is_one_origenerator_made(self):
         with workspace_temp_dir() as temp:
@@ -106,8 +106,8 @@ class TestGenaumacherSessions(unittest.TestCase):
                                ORIGENERATOR_VIDEOS_DIR=made):
                 result = reference_sync.run()
 
-            self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], was_at)
-            self.assertEqual(result.relocated, 0)
+            assert json.loads(session.read_text(encoding="utf-8"))["video_path"] == was_at
+            assert result.relocated == 0
 
     def test_leaves_a_session_alone_when_the_video_is_nowhere(self):
         with workspace_temp_dir() as temp:
@@ -119,11 +119,11 @@ class TestGenaumacherSessions(unittest.TestCase):
                 with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
                     result = reference_sync.run()
 
-            self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], gone)
-            self.assertEqual(result.unresolved, 1)
+            assert json.loads(session.read_text(encoding="utf-8"))["video_path"] == gone
+            assert result.unresolved == 1
             # The stage no longer carries the paths on its result, so the log is
             # the only place that says *which* reference could not be followed.
-            self.assertIn(gone, logged.records[0].getMessage())
+            assert gone in logged.records[0].getMessage()
 
     def test_leaves_a_session_whose_video_never_moved_untouched(self):
         with workspace_temp_dir() as temp:
@@ -134,8 +134,8 @@ class TestGenaumacherSessions(unittest.TestCase):
             with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
                 result = reference_sync.run()
 
-            self.assertEqual(session.stat().st_mtime_ns, written_at)
-            self.assertEqual((result.relocated, result.unresolved), (0, 0))
+            assert session.stat().st_mtime_ns == written_at
+            assert (result.relocated, result.unresolved) == (0, 0)
 
 
 class TestScriptureProjects(unittest.TestCase):
@@ -154,8 +154,8 @@ class TestScriptureProjects(unittest.TestCase):
                 reference_sync.run()
 
             payload = json.loads(project.read_text(encoding="utf-8"))
-            self.assertEqual(payload["video_path"], str(moved_to))
-            self.assertEqual(payload["splits"], [12, 340])
+            assert payload["video_path"] == str(moved_to)
+            assert payload["splits"] == [12, 340]
 
 
 class TestWatchStats(unittest.TestCase):
@@ -175,8 +175,8 @@ class TestWatchStats(unittest.TestCase):
                 reference_sync.run()
 
             payload = json.loads(stats.read_text(encoding="utf-8"))
-            self.assertEqual(payload[str(moved_to).lower()], {"completions": 9, "skips": 1, "locks": 2})
-            self.assertEqual(payload[str(stayed).lower()], {"completions": 1, "skips": 0, "locks": 0})
+            assert payload[str(moved_to).lower()] == {"completions": 9, "skips": 1, "locks": 2}
+            assert payload[str(stayed).lower()] == {"completions": 1, "skips": 0, "locks": 0}
 
 
 class TestAFolderThatCannotBeReached(unittest.TestCase):
@@ -191,7 +191,7 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
             with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, VR_VIDEO_DIR=vr_root):
                 result = reference_sync.run()
 
-            self.assertEqual((result.unresolved, result.not_checked), (0, 1))
+            assert (result.unresolved, result.not_checked) == (0, 1)
 
     def test_the_log_says_once_which_folder_could_not_be_reached(self):
         with workspace_temp_dir() as temp:
@@ -205,8 +205,7 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
                 with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
                     reference_sync.run()
 
-            self.assertEqual(logged.output, [
-                f"WARNING:tasks.reference_sync:2 reference(s) not checked: {vr_root} cannot be reached."])
+            assert logged.output == [f"WARNING:tasks.reference_sync:2 reference(s) not checked: {vr_root} cannot be reached."]
 
     def test_a_video_of_the_same_name_in_the_library_does_not_take_the_reference(self):
         with workspace_temp_dir() as temp:
@@ -219,8 +218,8 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
             with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, VR_VIDEO_DIR=vr_root):
                 result = reference_sync.run()
 
-            self.assertEqual(result.relocated, 0)
-            self.assertEqual(list(json.loads(stats.read_text(encoding="utf-8"))), [kept])
+            assert result.relocated == 0
+            assert list(json.loads(stats.read_text(encoding="utf-8"))) == [kept]
 
     def test_a_reference_into_the_archive_waits_while_the_archive_cannot_be_reached(self):
         with workspace_temp_dir() as temp:
@@ -233,7 +232,7 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
             with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, NONAI_RETIRED_ROOT=archive_root):
                 result = reference_sync.run()
 
-            self.assertEqual((result.unresolved, result.not_checked), (0, 1))
+            assert (result.unresolved, result.not_checked) == (0, 1)
 
 
 class TestClipPairings(unittest.TestCase):
@@ -256,12 +255,8 @@ class TestClipPairings(unittest.TestCase):
 
             result = reference_sync.run()
 
-            self.assertEqual(json.loads(card.read_text(encoding="utf-8")), {
-                "clip": {"performer": "Nora Quill", "full_video": str(upscale),
-                         "scene_offset": 781.125},
-                "video": {"type": "excerpt"},
-            })
-            self.assertEqual(result.relocated, 1)
+            assert json.loads(card.read_text(encoding="utf-8")) == {"clip": {"performer": "Nora Quill", "full_video": str(upscale), "scene_offset": 781.125}, "video": {"type": "excerpt"}}
+            assert result.relocated == 1
 
     def test_of_several_versions_the_pairing_takes_the_smallest_the_matcher_would_decode(self):
         with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
@@ -273,8 +268,7 @@ class TestClipPairings(unittest.TestCase):
 
             reference_sync.run()
 
-            self.assertEqual(json.loads(card.read_text(encoding="utf-8"))["clip"]["full_video"],
-                             str(smaller))
+            assert json.loads(card.read_text(encoding="utf-8"))["clip"]["full_video"] == str(smaller)
 
     def test_a_same_named_upscale_in_another_bucket_is_not_that_scene(self):
         with workspace_temp_dir() as temp, _paired_library(temp) as non_ai:
@@ -286,9 +280,8 @@ class TestClipPairings(unittest.TestCase):
 
             result = reference_sync.run()
 
-            self.assertEqual(json.loads(card.read_text(encoding="utf-8"))["clip"]["full_video"],
-                             str(gone))
-            self.assertEqual(result.unresolved, 1)
+            assert json.loads(card.read_text(encoding="utf-8"))["clip"]["full_video"] == str(gone)
+            assert result.unresolved == 1
 
 
 class TestUnwritableStore(unittest.TestCase):
@@ -323,17 +316,11 @@ class TestUnwritableStore(unittest.TestCase):
             with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"), patched:
                 result = reference_sync.run()
 
-            self.assertEqual(result.write_errors, 1)
-            self.assertFalse(result.ok)
-            self.assertEqual(result.relocated, 1)
-            self.assertEqual(
-                json.loads(writable.read_text(encoding="utf-8"))["video_path"],
-                str(moved_to),
-            )
-            self.assertEqual(
-                json.loads(locked.read_text(encoding="utf-8"))["video_path"],
-                str(was_at),
-            )
+            assert result.write_errors == 1
+            assert not result.ok
+            assert result.relocated == 1
+            assert json.loads(writable.read_text(encoding="utf-8"))["video_path"] == str(moved_to)
+            assert json.loads(locked.read_text(encoding="utf-8"))["video_path"] == str(was_at)
 
 
 class TestReferenceStoreSurface(unittest.TestCase):
@@ -358,18 +345,11 @@ class TestReferenceStoreSurface(unittest.TestCase):
         calls = []
         store = self._store(calls)
 
-        self.assertEqual(store.read(), ["a.mp4"])
+        assert store.read() == ["a.mp4"]
         store.rewrite({"a.mp4": "b.mp4"})
-        self.assertEqual(store.fingerprint(), (30.0, 100))
+        assert store.fingerprint() == (30.0, 100)
 
-        self.assertEqual(
-            calls,
-            [
-                ("read", store.path),
-                ("rewrite", store.path, {"a.mp4": "b.mp4"}),
-                ("fingerprint", store.path),
-            ],
-        )
+        assert calls == [("read", store.path), ("rewrite", store.path, {"a.mp4": "b.mp4"}), ("fingerprint", store.path)]
 
     def test_a_store_that_records_no_fingerprint_answers_none(self):
         """Most of them record only a path, so a renamed video is beyond their
@@ -379,7 +359,7 @@ class TestReferenceStoreSurface(unittest.TestCase):
             lambda path, moves: None,
         )
 
-        self.assertIsNone(store.fingerprint())
+        assert store.fingerprint() is None
 
 
 class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
@@ -401,11 +381,11 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
             with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
                 result = reference_sync.run()
 
-            self.assertEqual(json.loads(session.read_text(encoding="utf-8"))["video_path"], was_at)
-            self.assertEqual(result.refused, 1)
-            self.assertEqual(result.relocated, 0)
-            self.assertTrue(result.needs_an_eye)
-            self.assertTrue(result.ok)
+            assert json.loads(session.read_text(encoding="utf-8"))["video_path"] == was_at
+            assert result.refused == 1
+            assert result.relocated == 0
+            assert result.needs_an_eye
+            assert result.ok
 
     def test_a_session_written_before_the_stamp_existed_is_the_first_version(self):
         """Every session and project on disk today was written without one."""
@@ -420,9 +400,8 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
             with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
                 result = reference_sync.run()
 
-            self.assertEqual(
-                json.loads(session.read_text(encoding="utf-8"))["video_path"], str(moved_to))
-            self.assertEqual(result.refused, 0)
+            assert json.loads(session.read_text(encoding="utf-8"))["video_path"] == str(moved_to)
+            assert result.refused == 0
 
     def test_a_project_stamped_with_a_version_this_stage_does_not_know_is_left_alone(self):
         with workspace_temp_dir() as temp:
@@ -434,8 +413,8 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
             with _stores_under(temp, SCRIPTURE_SESSIONS_DIR=temp / "projects"):
                 result = reference_sync.run()
 
-            self.assertEqual(json.loads(project.read_text(encoding="utf-8"))["video_path"], was_at)
-            self.assertEqual(result.refused, 1)
+            assert json.loads(project.read_text(encoding="utf-8"))["video_path"] == was_at
+            assert result.refused == 1
 
     def test_watch_counts_that_are_not_counts_are_left_alone(self):
         """These carry no version and cannot: every key there is a video path.
@@ -448,17 +427,14 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
             with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats):
                 result = reference_sync.run()
 
-            self.assertEqual(json.loads(stats.read_text(encoding="utf-8")), {was_at: 9})
-            self.assertEqual(result.refused, 1)
+            assert json.loads(stats.read_text(encoding="utf-8")) == {was_at: 9}
+            assert result.refused == 1
 
 
 class TestReferenceSyncResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
         """Every field lands in a run record; one nothing reads is dead weight."""
-        self.assertEqual(
-            {f.name for f in dataclasses.fields(reference_sync.ReferenceSyncResult)},
-            {"checked", "relocated", "unresolved", "not_checked", "write_errors", "refused"},
-        )
+        assert {f.name for f in dataclasses.fields(reference_sync.ReferenceSyncResult)} == {"checked", "relocated", "unresolved", "not_checked", "write_errors", "refused"}
 
 
 if __name__ == "__main__":

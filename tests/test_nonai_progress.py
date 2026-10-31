@@ -46,9 +46,9 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
 
                 progress = nonai_progress.so_far([queued])
 
-            self.assertEqual(progress.done_seconds, 200.0)
-            self.assertEqual(progress.remaining_seconds, 600.0)
-            self.assertEqual(progress.unmeasured, 0)
+            assert progress.done_seconds == 200.0
+            assert progress.remaining_seconds == 600.0
+            assert progress.unmeasured == 0
 
     def test_the_percentage_is_of_running_time_not_of_clips(self):
         """Three of four clips done and a quarter of the project done are the
@@ -67,7 +67,7 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
 
                 progress = nonai_progress.so_far([queued])
 
-            self.assertEqual(progress.percent, 25)
+            assert progress.percent == 25
 
     def test_an_empty_project_has_no_percentage_rather_than_zero(self):
         """A library whose running times nothing has recorded yet has no
@@ -75,7 +75,7 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             with override_config(**overrides):
-                self.assertIsNone(nonai_progress.so_far([]).percent)
+                assert nonai_progress.so_far([]).percent is None
 
     def test_nothing_upscaled_yet_reads_as_zero_rather_than_as_no_answer(self):
         with workspace_temp_dir() as root:
@@ -87,7 +87,7 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
                     600.0,
                 )
 
-                self.assertEqual(nonai_progress.so_far([queued]).percent, 0)
+                assert nonai_progress.so_far([queued]).percent == 0
 
 
 class TestWhatItWillNotGuessAt(unittest.TestCase):
@@ -110,9 +110,9 @@ class TestWhatItWillNotGuessAt(unittest.TestCase):
 
                 progress = nonai_progress.so_far([queued, unmeasured])
 
-            self.assertEqual(progress.remaining_seconds, 300.0)
-            self.assertEqual(progress.done_seconds, 0.0)
-            self.assertEqual(progress.unmeasured, 2)
+            assert progress.remaining_seconds == 300.0
+            assert progress.done_seconds == 0.0
+            assert progress.unmeasured == 2
 
 
 class TestWhatCountsAsDone(unittest.TestCase):
@@ -129,7 +129,7 @@ class TestWhatCountsAsDone(unittest.TestCase):
 
                 progress = nonai_progress.so_far([])
 
-            self.assertEqual(progress.done_seconds, 400.0)
+            assert progress.done_seconds == 400.0
 
     def test_an_original_still_in_the_library_is_not_counted_twice(self):
         """The original of an upscale is retired, but not always at once, and a
@@ -145,7 +145,7 @@ class TestWhatCountsAsDone(unittest.TestCase):
 
                 progress = nonai_progress.so_far([])
 
-            self.assertEqual(progress.done_seconds, 400.0)
+            assert progress.done_seconds == 400.0
 
     def test_a_video_the_project_cannot_reach_is_in_neither_total(self):
         """A clip parked where a human still has to trim it is not queued and
@@ -162,10 +162,7 @@ class TestWhatCountsAsDone(unittest.TestCase):
 
                 progress = nonai_progress.so_far([])
 
-            self.assertEqual(
-                (progress.done_seconds, progress.remaining_seconds, progress.unmeasured),
-                (400.0, 0.0, 0),
-            )
+            assert (progress.done_seconds, progress.remaining_seconds, progress.unmeasured) == (400.0, 0.0, 0)
 
 if __name__ == "__main__":
     unittest.main()

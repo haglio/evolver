@@ -52,15 +52,15 @@ class TestGenauDeliver(unittest.TestCase):
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
-            self.assertEqual(result.delivered, 1)
+            assert result.delivered == 1
             delivered = flicks / "2D" / "AI" / "loop_1_topaz.mp4"
-            self.assertTrue(delivered.is_file())
-            self.assertEqual(delivered.read_text(encoding="utf-8"), "upscaled")
-            self.assertFalse(upscaled.exists())
+            assert delivered.is_file()
+            assert delivered.read_text(encoding="utf-8") == "upscaled"
+            assert not upscaled.exists()
             # The source goes with it: left in place, the upscale stage would remake
             # this flick every run and the correspondence check would call it a
             # mismatch (see the module docstring).
-            self.assertFalse(original.exists())
+            assert not original.exists()
 
     def test_the_flicks_metadata_travels_with_it_and_says_what_it_is(self):
         """A delivered loop keeps the generation record it was made with, and
@@ -79,12 +79,10 @@ class TestGenauDeliver(unittest.TestCase):
                 genau_deliver.run()
 
                 delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
-            self.assertEqual(delivered["video"]["prompt"], "a prompt")
-            self.assertEqual(video_type.type_of(delivered), video_type.GENAU_FLICK)
+            assert delivered["video"]["prompt"] == "a prompt"
+            assert video_type.type_of(delivered) == video_type.GENAU_FLICK
             # The outbox path it mirrored is gone, so the record must not stay there.
-            self.assertFalse(
-                (metadata / "landscape" / GENAU_SOURCE / "loop_1_topaz.json").exists()
-            )
+            assert not (metadata / "landscape" / GENAU_SOURCE / "loop_1_topaz.json").exists()
 
     def test_delivery_carries_what_made_the_flick_and_adds_nothing_to_it(self):
         """Delivering moves a file; it makes none. The stamps a loop was
@@ -105,7 +103,7 @@ class TestGenauDeliver(unittest.TestCase):
                 genau_deliver.run()
 
                 delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
-            self.assertEqual(delivered[provenance.BLOCK], stamps)
+            assert delivered[provenance.BLOCK] == stamps
 
     def test_a_flick_delivered_without_any_metadata_still_gets_a_record(self):
         with workspace_temp_dir() as root:
@@ -118,7 +116,7 @@ class TestGenauDeliver(unittest.TestCase):
                 genau_deliver.run()
 
                 delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
-            self.assertEqual(video_type.type_of(delivered), video_type.GENAU_FLICK)
+            assert video_type.type_of(delivered) == video_type.GENAU_FLICK
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
         """Fun Time's audio companion plays ``<audio folder>/<flick name>.mp3``
@@ -136,7 +134,7 @@ class TestGenauDeliver(unittest.TestCase):
                        side_effect=lambda video, mp3: saved.append((video, mp3))):
                 genau_deliver.run()
 
-            self.assertEqual(saved, [(flicks / "2D" / "AI" / "loop_1_topaz.mp4", audio / "loop_1_topaz.mp3")])
+            assert saved == [(flicks / "2D" / "AI" / "loop_1_topaz.mp4", audio / "loop_1_topaz.mp3")]
 
     def test_a_silent_loop_leaves_no_sound_behind(self):
         with workspace_temp_dir() as root:
@@ -149,7 +147,7 @@ class TestGenauDeliver(unittest.TestCase):
                  patch("tasks.genau_deliver.save_as_mp3") as save:
                 result = genau_deliver.run()
 
-            self.assertEqual(result.delivered, 1)
+            assert result.delivered == 1
             save.assert_not_called()
 
     def test_a_sound_that_cannot_be_saved_leaves_the_loop_delivered(self):
@@ -164,9 +162,9 @@ class TestGenauDeliver(unittest.TestCase):
                  self.assertLogs("tasks.genau_deliver", level="WARNING"):
                 result = genau_deliver.run()
 
-            self.assertEqual((result.delivered, result.failed), (1, 0))
-            self.assertTrue((flicks / "2D" / "AI" / "loop_1_topaz.mp4").is_file())
-            self.assertFalse(original.exists())
+            assert (result.delivered, result.failed) == (1, 0)
+            assert (flicks / "2D" / "AI" / "loop_1_topaz.mp4").is_file()
+            assert not original.exists()
 
     def test_only_the_genau_source_is_delivered(self):
         with workspace_temp_dir() as root:
@@ -180,9 +178,9 @@ class TestGenauDeliver(unittest.TestCase):
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
-            self.assertEqual(result.delivered, 1)
-            self.assertTrue(other.is_file())  # the ordinary lane stays in the outbox
-            self.assertFalse((flicks / "2D" / "AI" / "video_1_topaz.mp4").exists())
+            assert result.delivered == 1
+            assert other.is_file()  # the ordinary lane stays in the outbox
+            assert not (flicks / "2D" / "AI" / "video_1_topaz.mp4").exists()
 
     def test_flicks_are_found_under_every_orientation(self):
         with workspace_temp_dir() as root:
@@ -194,9 +192,9 @@ class TestGenauDeliver(unittest.TestCase):
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
-            self.assertEqual(result.delivered, 2)
-            self.assertTrue((flicks / "2D" / "AI" / "wide_topaz.mp4").is_file())
-            self.assertTrue((flicks / "2D" / "AI" / "tall_topaz.mp4").is_file())
+            assert result.delivered == 2
+            assert (flicks / "2D" / "AI" / "wide_topaz.mp4").is_file()
+            assert (flicks / "2D" / "AI" / "tall_topaz.mp4").is_file()
 
     def test_a_name_already_in_genaus_folder_is_not_overwritten(self):
         with workspace_temp_dir() as root:
@@ -210,9 +208,8 @@ class TestGenauDeliver(unittest.TestCase):
                                  METADATA_DIR=root / "metadata"):
                 genau_deliver.run()
 
-            self.assertEqual(existing.read_text(encoding="utf-8"),
-                             "a flick already being played")
-            self.assertTrue((flicks / "2D" / "AI" / "loop_1_topaz (2).mp4").is_file())
+            assert existing.read_text(encoding="utf-8") == "a flick already being played"
+            assert (flicks / "2D" / "AI" / "loop_1_topaz (2).mp4").is_file()
 
     def test_a_flick_origenerator_made_again_takes_the_place_of_the_one_genau_plays(self):
         with workspace_temp_dir() as root:
@@ -234,13 +231,12 @@ class TestGenauDeliver(unittest.TestCase):
                 result = genau_deliver.run()
 
                 record = sidecar.read(sidecar.sidecar_path(played))
-            self.assertEqual(result.delivered, 1)
-            self.assertEqual(sorted(path.name for path in played.parent.iterdir()), [played.name])
-            self.assertEqual(played.read_text(encoding="utf-8"), "upscaled")
-            self.assertEqual(played.stat().st_mtime, 1_700_000_001)
-            self.assertEqual((record["favorite"], record["genau"], record["video"]["seed"]),
-                             (True, {"flipped": True}, "2"))
-            self.assertFalse(original.exists())
+            assert result.delivered == 1
+            assert sorted(path.name for path in played.parent.iterdir()) == [played.name]
+            assert played.read_text(encoding="utf-8") == "upscaled"
+            assert played.stat().st_mtime == 1700000001
+            assert (record["favorite"], record["genau"], record["video"]["seed"]) == (True, {"flipped": True}, "2")
+            assert not original.exists()
 
     def test_a_flick_that_cannot_be_moved_is_left_whole_for_the_next_run(self):
         # Genau holds the file open on Windows while it plays. Leaving both halves
@@ -263,9 +259,9 @@ class TestGenauDeliver(unittest.TestCase):
                  patch.object(type(upscaled), "replace", _locked):
                 result = genau_deliver.run()
 
-            self.assertEqual((result.delivered, result.failed), (0, 1))
-            self.assertTrue(upscaled.is_file())
-            self.assertTrue(original.is_file())
+            assert (result.delivered, result.failed) == (0, 1)
+            assert upscaled.is_file()
+            assert original.is_file()
 
     def test_an_empty_lane_is_a_no_op(self):
         with workspace_temp_dir() as root:
@@ -275,8 +271,8 @@ class TestGenauDeliver(unittest.TestCase):
                                  METADATA_DIR=root / "metadata"):
                 result = genau_deliver.run()
 
-            self.assertEqual((result.delivered, result.failed), (0, 0))
-            self.assertFalse((flicks / "2D" / "AI").exists())  # nothing to deliver, nothing created
+            assert (result.delivered, result.failed) == (0, 0)
+            assert not (flicks / "2D" / "AI").exists()  # nothing to deliver, nothing created
 
     def test_the_lane_runs_between_the_four_places_it_is_given(self):
         """The lane spans four places, and all four are arguments now.
@@ -305,18 +301,15 @@ class TestGenauDeliver(unittest.TestCase):
                     delivery_dir=given_flicks / "2D" / "AI",
                 )
 
-            self.assertEqual(result.delivered, 1)
-            self.assertTrue((given_flicks / "2D" / "AI" / "loop_given_topaz.mp4").is_file())
-            self.assertFalse((ambient_flicks / "2D" / "AI").exists())
-            self.assertTrue((ambient_outbox / "landscape" / GENAU_SOURCE / "loop_ambient_topaz.mp4").is_file())
+            assert result.delivered == 1
+            assert (given_flicks / "2D" / "AI" / "loop_given_topaz.mp4").is_file()
+            assert not (ambient_flicks / "2D" / "AI").exists()
+            assert (ambient_outbox / "landscape" / GENAU_SOURCE / "loop_ambient_topaz.mp4").is_file()
 
 class TestGenauDeliverResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
         """Every field lands in a run record; one nothing reads is dead weight."""
-        self.assertEqual(
-            {f.name for f in dataclasses.fields(genau_deliver.GenauDeliverResult)},
-            {"delivered", "failed"},
-        )
+        assert {f.name for f in dataclasses.fields(genau_deliver.GenauDeliverResult)} == {"delivered", "failed"}
 
 
 if __name__ == "__main__":

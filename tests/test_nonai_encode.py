@@ -22,23 +22,22 @@ class TestParseTopazCommand(unittest.TestCase):
             '"C:/lib/3 done/scene one.partial.ab12.mp4"'
         )
 
-        self.assertEqual(source, Path("C:/lib/0 unsorted/scene one.mp4"))
-        self.assertEqual(out, Path("C:/lib/3 done/scene one.partial.ab12.mp4"))
+        assert source == Path("C:/lib/0 unsorted/scene one.mp4")
+        assert out == Path("C:/lib/3 done/scene one.partial.ab12.mp4")
 
     def test_reads_unquoted_ones_too(self):
         source, out = nonai_encode._parse_topaz_command(
             "ffmpeg.exe -i /lib/a.mp4 -vf x /lib/a.partial.ab12.mp4"
         )
 
-        self.assertEqual(source, Path("/lib/a.mp4"))
-        self.assertEqual(out, Path("/lib/a.partial.ab12.mp4"))
+        assert source == Path("/lib/a.mp4")
+        assert out == Path("/lib/a.partial.ab12.mp4")
 
     def test_a_command_line_with_no_input_names_neither(self):
-        self.assertEqual(nonai_encode._parse_topaz_command("ffmpeg.exe -version"),
-                         (None, None))
+        assert nonai_encode._parse_topaz_command("ffmpeg.exe -version") == (None, None)
 
     def test_an_empty_command_line_names_neither(self):
-        self.assertEqual(nonai_encode._parse_topaz_command(""), (None, None))
+        assert nonai_encode._parse_topaz_command("") == (None, None)
 
 
 class TestPercentEncoded(unittest.TestCase):
@@ -59,34 +58,34 @@ class TestPercentEncoded(unittest.TestCase):
             job = self._job(root, expected=200.0)
 
             with patch("util.ffprobe.duration_seconds", return_value=75.0):
-                self.assertEqual(nonai_encode.percent_encoded(job), 38)
+                assert nonai_encode.percent_encoded(job) == 38
 
     def test_an_output_that_has_overrun_its_source_still_reads_as_100(self):
         with workspace_temp_dir() as root:
             job = self._job(root, expected=100.0)
 
             with patch("util.ffprobe.duration_seconds", return_value=140.0):
-                self.assertEqual(nonai_encode.percent_encoded(job), 100)
+                assert nonai_encode.percent_encoded(job) == 100
 
     def test_an_unprobeable_partial_has_no_percentage(self):
         with workspace_temp_dir() as root:
             job = self._job(root, expected=100.0)
 
             with patch("util.ffprobe.duration_seconds", return_value=None):
-                self.assertIsNone(nonai_encode.percent_encoded(job))
+                assert nonai_encode.percent_encoded(job) is None
 
     def test_a_partial_not_written_yet_has_no_percentage(self):
         with workspace_temp_dir() as root:
             job = self._job(root, expected=100.0, written=False)
 
-            self.assertIsNone(nonai_encode.percent_encoded(job))
+            assert nonai_encode.percent_encoded(job) is None
 
     def test_a_source_of_unknown_length_has_no_percentage(self):
         with workspace_temp_dir() as root:
             job = self._job(root, expected=0.0)
 
             with patch("util.ffprobe.duration_seconds", return_value=50.0):
-                self.assertIsNone(nonai_encode.percent_encoded(job))
+                assert nonai_encode.percent_encoded(job) is None
 
 
 class TestActiveRuntime(unittest.TestCase):
@@ -100,32 +99,32 @@ class TestActiveRuntime(unittest.TestCase):
     def test_a_plain_run_is_the_time_since_it_started(self):
         job = {"started_at": 1_000.0}
 
-        self.assertEqual(nonai_encode.active_runtime(job, now=4_600.0), 3_600.0)
+        assert nonai_encode.active_runtime(job, now=4600.0) == 3600.0
 
     def test_time_already_banked_as_suspended_is_not_charged(self):
         job = {"started_at": 1_000.0, "suspended_seconds": 600.0}
 
-        self.assertEqual(nonai_encode.active_runtime(job, now=4_600.0), 3_000.0)
+        assert nonai_encode.active_runtime(job, now=4600.0) == 3000.0
 
     def test_a_freeze_still_in_progress_is_not_charged_either(self):
         """Otherwise a machine left in use overnight would look like a stuck
         encode and be killed for overrunning."""
         job = {"started_at": 1_000.0, "suspended": True, "suspended_at": 2_000.0}
 
-        self.assertEqual(nonai_encode.active_runtime(job, now=4_600.0), 1_000.0)
+        assert nonai_encode.active_runtime(job, now=4600.0) == 1000.0
 
     def test_a_banked_freeze_and_a_live_one_both_count(self):
         job = {"started_at": 1_000.0, "suspended_seconds": 600.0,
                "suspended": True, "suspended_at": 3_000.0}
 
-        self.assertEqual(nonai_encode.active_runtime(job, now=4_600.0), 1_400.0)
+        assert nonai_encode.active_runtime(job, now=4600.0) == 1400.0
 
     def test_a_record_with_no_start_time_reads_as_having_just_started(self):
         """Pinned rather than endorsed: a job whose `started_at` went missing
         can never overrun, which finding tasks/design/014 files as a defect of
         the untyped record. Changing it is a behaviour change and not this
         item's."""
-        self.assertEqual(nonai_encode.active_runtime({}, now=4_600.0), 0.0)
+        assert nonai_encode.active_runtime({}, now=4600.0) == 0.0
 
 
 class TestOverran(unittest.TestCase):
@@ -136,22 +135,19 @@ class TestOverran(unittest.TestCase):
         started = 1_000.0
         job = {"started_at": started}
 
-        self.assertFalse(nonai_encode.overran(
-            job, self.SETTINGS, now=started + self.CAP_SECONDS))
+        assert not nonai_encode.overran(job, self.SETTINGS, now=started + self.CAP_SECONDS)
 
     def test_past_the_cap_is(self):
         started = 1_000.0
         job = {"started_at": started}
 
-        self.assertTrue(nonai_encode.overran(
-            job, self.SETTINGS, now=started + self.CAP_SECONDS + 1))
+        assert nonai_encode.overran(job, self.SETTINGS, now=started + self.CAP_SECONDS + 1)
 
     def test_a_long_freeze_keeps_a_slow_encode_under_the_cap(self):
         started = 1_000.0
         job = {"started_at": started, "suspended_seconds": self.CAP_SECONDS}
 
-        self.assertFalse(nonai_encode.overran(
-            job, self.SETTINGS, now=started + 2 * self.CAP_SECONDS))
+        assert not nonai_encode.overran(job, self.SETTINGS, now=started + 2 * self.CAP_SECONDS)
 
 
 if __name__ == "__main__":

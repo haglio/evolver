@@ -280,20 +280,10 @@ class TestConfigSeam(unittest.TestCase):
             and (references := _config_references(tree)) > CONFIG_REFERENCE_CEILINGS.get(name, 0)
         }
 
-        self.assertEqual(
-            over,
-            {},
-            "a new ambient read: hand the module the value as a parameter from where it "
-            "is already read, rather than raising its ceiling. A ceiling only comes down, "
-            "in the commit that takes a module's reads out",
-        )
+        assert over == {}, "a new ambient read: hand the module the value as a parameter from where it is already read, rather than raising its ceiling. A ceiling only comes down, in the commit that takes a module's reads out"
 
     def test_every_ceiling_names_a_module_that_is_still_there(self):
-        self.assertEqual(
-            sorted(set(CONFIG_REFERENCE_CEILINGS) - set(_trees())),
-            [],
-            "a ceiling for a module the tree no longer has: take it out with the module",
-        )
+        assert sorted(set(CONFIG_REFERENCE_CEILINGS) - set(_trees())) == [], "a ceiling for a module the tree no longer has: take it out with the module"
 
     def test_config_is_reached_only_as_the_module(self):
         offenders = sorted(
@@ -302,11 +292,7 @@ class TestConfigSeam(unittest.TestCase):
             for line in _config_imports(tree)
         )
 
-        self.assertEqual(
-            offenders,
-            [],
-            "`import config` and `config.X`, so the ledger can see the read",
-        )
+        assert offenders == [], "`import config` and `config.X`, so the ledger can see the read"
 
     def test_no_signature_default_is_read_off_config(self):
         offenders = sorted(
@@ -315,12 +301,7 @@ class TestConfigSeam(unittest.TestCase):
             for line in _import_time_config_defaults(tree)
         )
 
-        self.assertEqual(
-            offenders,
-            [],
-            "a default is evaluated at import and freezes the value past "
-            "override_config; resolve it in the body instead",
-        )
+        assert offenders == [], "a default is evaluated at import and freezes the value past override_config; resolve it in the body instead"
 
     def test_the_overlay_keys_are_the_ones_the_contract_names(self):
         found: set[str] = set()
@@ -333,13 +314,8 @@ class TestConfigSeam(unittest.TestCase):
             found |= visitor.keys
             unreadable += [f"{name}:{line}" for line in visitor.unreadable]
 
-        self.assertEqual(
-            sorted(unreadable),
-            [],
-            "an overlay key spelled as anything but a literal is a key this "
-            "gate cannot record; spell it out",
-        )
-        self.assertEqual(found, OVERLAY_KEYS)
+        assert sorted(unreadable) == [], "an overlay key spelled as anything but a literal is a key this gate cannot record; spell it out"
+        assert found == OVERLAY_KEYS
 
     def test_the_committed_example_carries_every_required_key(self):
         """A public checkout loads the example, so a key missing from it is a
@@ -352,7 +328,7 @@ class TestConfigSeam(unittest.TestCase):
             with self.subTest(key=key):
                 value = example
                 for part in key.split("."):
-                    self.assertIn(part, value)
+                    assert part in value
                     value = value[part]
 
 

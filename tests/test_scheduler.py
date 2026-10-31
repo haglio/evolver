@@ -23,8 +23,8 @@ class TestPipelineScheduler(unittest.TestCase):
         fired = spy.wait(5000)
         scheduler.stop()
 
-        self.assertTrue(fired, "the scheduler's timer never fired")
-        self.assertEqual(spy[0][0], "scheduled")
+        assert fired, "the scheduler's timer never fired"
+        assert spy[0][0] == "scheduled"
 
     # The remaining tick behaviour is driven by calling tick() -- the slot the
     # timer fires -- directly, so each test asserts an exact signal count
@@ -40,7 +40,7 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.tick()
         scheduler.stop()
 
-        self.assertEqual(len(spy), 0)
+        assert len(spy) == 0
 
     def test_resumes_after_mark_idle(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -48,13 +48,13 @@ class TestPipelineScheduler(unittest.TestCase):
         spy = QSignalSpy(scheduler.run_requested)
         scheduler.mark_running()
         scheduler.tick()
-        self.assertEqual(len(spy), 0)
+        assert len(spy) == 0
 
         scheduler.mark_idle()  # reopens scheduling
         scheduler.tick()
         scheduler.stop()
 
-        self.assertEqual(len(spy), 1)
+        assert len(spy) == 1
 
     def test_toggling_pauses_a_running_schedule_and_resumes_a_paused_one(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -77,15 +77,15 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.pause()
         # Paused means no tick is scheduled at all -- the timer is stopped and
         # the next-run display goes blank.
-        self.assertIsNone(scheduler.next_run_at)
+        assert scheduler.next_run_at is None
 
         scheduler.resume()
-        self.assertIsNotNone(scheduler.next_run_at)
+        assert scheduler.next_run_at is not None
         scheduler.tick()
         scheduler.stop()
 
-        self.assertEqual(len(spy), 1)
-        self.assertEqual(spy[0][0], "scheduled")
+        assert len(spy) == 1
+        assert spy[0][0] == "scheduled"
 
     def test_run_now_emits_manual_trigger(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -93,8 +93,8 @@ class TestPipelineScheduler(unittest.TestCase):
 
         scheduler.run_now()
 
-        self.assertEqual(len(spy), 1)
-        self.assertEqual(spy[0][0], "manual")
+        assert len(spy) == 1
+        assert spy[0][0] == "manual"
 
     def test_run_now_suppressed_when_running(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -103,36 +103,36 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.mark_running()
         scheduler.run_now()
 
-        self.assertEqual(len(spy), 0)
+        assert len(spy) == 0
 
     def test_set_interval(self):
         scheduler = PipelineScheduler(interval_minutes=10)
-        self.assertEqual(scheduler.interval_minutes, 10)
+        assert scheduler.interval_minutes == 10
         scheduler.set_interval_minutes(5)
-        self.assertEqual(scheduler.interval_minutes, 5)
+        assert scheduler.interval_minutes == 5
 
     def test_next_run_at_is_clock_aligned(self):
         scheduler = PipelineScheduler(interval_minutes=10)
         scheduler.start()
 
         nra = scheduler.next_run_at
-        self.assertIsNotNone(nra)
-        self.assertEqual(nra.minute % 10, 0)
-        self.assertEqual(nra.second, 0)
-        self.assertEqual(nra.microsecond, 0)
+        assert nra is not None
+        assert nra.minute % 10 == 0
+        assert nra.second == 0
+        assert nra.microsecond == 0
         scheduler.stop()
 
     def test_next_run_at_is_none_when_paused(self):
         scheduler = PipelineScheduler(interval_minutes=10)
         scheduler.start()
         scheduler.pause()
-        self.assertIsNone(scheduler.next_run_at)
+        assert scheduler.next_run_at is None
 
     def test_status_changed_emitted_on_start(self):
         scheduler = PipelineScheduler(interval_minutes=10)
         spy = QSignalSpy(scheduler.status_changed)
         scheduler.start()
-        self.assertGreaterEqual(len(spy), 1)
+        assert len(spy) >= 1
         scheduler.stop()
 
     def test_status_changed_emitted_on_pause(self):
@@ -140,7 +140,7 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.start()
         spy = QSignalSpy(scheduler.status_changed)
         scheduler.pause()
-        self.assertGreaterEqual(len(spy), 1)
+        assert len(spy) >= 1
 
 
 if __name__ == "__main__":

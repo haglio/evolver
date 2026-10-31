@@ -144,19 +144,18 @@ class TestWhatTheWindowIsTold(unittest.TestCase):
     def test_a_settled_phrase_reaches_the_window(self):
         told = _listen([_said("side beta")], until_heard="side beta")
 
-        self.assertEqual(told.heard, ["side beta"])
+        assert told.heard == ["side beta"]
 
     def test_the_words_still_forming_are_shown_as_they_change_and_cleared_before_the_phrase(self):
         forming = ["side"] * PAUSES.min_speech_frames + ["side beta"]
         told = _listen([_said("side beta", forming=forming)], until_heard="side beta")
 
-        self.assertEqual(told.timeline, [("hearing", "side"), ("hearing", "side beta"),
-                                         ("hearing", ""), ("heard", "side beta")])
+        assert told.timeline == [("hearing", "side"), ("hearing", "side beta"), ("hearing", ""), ("heard", "side beta")]
 
     def test_what_is_said_outside_the_phrases_is_not_handed_to_the_window(self):
         told = _listen([_said("beta side undo"), _said("side beta")], until_heard="side beta")
 
-        self.assertEqual(told.heard, ["side beta"])
+        assert told.heard == ["side beta"]
 
 
 class TestWhenListeningCannotGoOn(unittest.TestCase):
@@ -167,10 +166,9 @@ class TestWhenListeningCannotGoOn(unittest.TestCase):
         with patch.dict(sys.modules, {"vosk": None}),                 self.assertLogs("backfill.voice", level="ERROR") as logged:
             told = _told_by(VoiceListener(PHRASES))
 
-        self.assertEqual([record.getMessage() for record in logged.records],
-                         ["Voice listener crashed"])
-        self.assertEqual(len(told.failures), 1)
-        self.assertTrue(told.failures[0])
+        assert [record.getMessage() for record in logged.records] == ["Voice listener crashed"]
+        assert len(told.failures) == 1
+        assert told.failures[0]
 
     def test_a_microphone_that_will_not_open_says_so_rather_than_crashed(self):
         engines = _engines([])
@@ -179,9 +177,8 @@ class TestWhenListeningCannotGoOn(unittest.TestCase):
         with self.assertLogs("backfill.voice", level="ERROR") as logged:
             told = _told_by(VoiceListener(PHRASES, engines=engines))
 
-        self.assertEqual([record.getMessage() for record in logged.records],
-                         ["Microphone could not be opened"])
-        self.assertEqual(told.failures, ["no input device"])
+        assert [record.getMessage() for record in logged.records] == ["Microphone could not be opened"]
+        assert told.failures == ["no input device"]
 
     def test_a_recognizer_that_breaks_partway_says_listening_stopped(self):
         engines = _engines([_said(forming=["side"])])
@@ -191,9 +188,8 @@ class TestWhenListeningCannotGoOn(unittest.TestCase):
         with self.assertLogs("backfill.voice", level="ERROR") as logged:
             told = _told_by(VoiceListener(PHRASES, engines=engines))
 
-        self.assertEqual([record.getMessage() for record in logged.records],
-                         ["Voice listener stopped listening"])
-        self.assertEqual(told.failures, ["the decoder gave up"])
+        assert [record.getMessage() for record in logged.records] == ["Voice listener stopped listening"]
+        assert told.failures == ["the decoder gave up"]
 
     def test_a_failure_with_nothing_to_say_for_itself_is_named_for_what_it_is(self):
         engines = _engines([_said(forming=["side"])])
@@ -203,7 +199,7 @@ class TestWhenListeningCannotGoOn(unittest.TestCase):
         with self.assertLogs("backfill.voice", level="ERROR"):
             told = _told_by(VoiceListener(PHRASES, engines=engines))
 
-        self.assertEqual(told.failures, ["RuntimeError"])
+        assert told.failures == ["RuntimeError"]
 
 
 class TestStoppingAndRestarting(unittest.TestCase):
@@ -213,7 +209,7 @@ class TestStoppingAndRestarting(unittest.TestCase):
         streams = []
         _listen([_said("side beta")], until_heard="side beta", streams=streams)
 
-        self.assertEqual(streams, ["opened", "closed"])
+        assert streams == ["opened", "closed"]
 
     def test_starting_twice_opens_one_microphone(self):
         streams = []
@@ -226,7 +222,7 @@ class TestStoppingAndRestarting(unittest.TestCase):
         told.wait()
         listener.stop()
 
-        self.assertEqual(streams, ["opened", "closed"])
+        assert streams == ["opened", "closed"]
 
     def test_a_stopped_listener_can_be_started_again_and_hears_again(self):
         listener = VoiceListener(PHRASES, engines=_engines([_said("side beta")]))
@@ -234,7 +230,7 @@ class TestStoppingAndRestarting(unittest.TestCase):
         _told_by(listener, until_heard="side beta")
         again = _told_by(listener, until_heard="side beta")
 
-        self.assertEqual(again.heard, ["side beta"])
+        assert again.heard == ["side beta"]
 
     def test_stopping_one_that_never_started_is_not_an_error(self):
         VoiceListener(PHRASES).stop()
@@ -244,7 +240,7 @@ class TestWhichReadingsAreTrusted(unittest.TestCase):
     def test_a_phrase_ranked_under_a_near_miss_is_still_taken(self):
         told = _listen([_said("side side beta", "side beta")], until_heard="side beta")
 
-        self.assertEqual(told.heard, ["side beta"])
+        assert told.heard == ["side beta"]
 
     def test_a_phrase_that_discards_the_clip_is_taken_only_as_the_first_reading(self):
         listener = VoiceListener(
@@ -253,13 +249,13 @@ class TestWhichReadingsAreTrusted(unittest.TestCase):
 
         told = _told_by(listener, until_heard="undo")
 
-        self.assertEqual(told.heard, ["undo"])
+        assert told.heard == ["undo"]
 
     def test_a_phrase_the_verifying_listener_reads_differently_does_not_act(self):
         told = _listen([_said("side beta"), _said("undo")], until_heard="undo",
                        verifying_listener=lambda audio, hint: "and then" if "beta" in hint else hint)
 
-        self.assertEqual(told.heard, ["undo"])
+        assert told.heard == ["undo"]
 
     def test_left_to_itself_it_has_whisper_read_each_command_and_ends_one_when_its_speaker_pauses(self):
         with patch("backfill.voice.CommandListener") as built:
@@ -268,8 +264,7 @@ class TestWhichReadingsAreTrusted(unittest.TestCase):
             listener.stop()
 
         engines = built.call_args.args[3]
-        self.assertEqual((type(engines.verifying_listener), type(engines.hears_speech)),
-                         (WhisperReader, HearsSpeech))
+        assert (type(engines.verifying_listener), type(engines.hears_speech)) == (WhisperReader, HearsSpeech)
 
 
 class TestWhatItListensWith(unittest.TestCase):
@@ -285,10 +280,9 @@ class TestWhatItListensWith(unittest.TestCase):
                 listener.stop()
 
         rules, settings = built.call_args.args[:2]
-        self.assertEqual((settings.model_name, settings.device_name, settings.sample_rate),
-                         ("a-model", "desk", 8000))
-        self.assertEqual(rules.confidence_threshold, 0.5)
-        self.assertEqual(rules.phrases, frozenset(PHRASES))
+        assert (settings.model_name, settings.device_name, settings.sample_rate) == ("a-model", "desk", 8000)
+        assert rules.confidence_threshold == 0.5
+        assert rules.phrases == frozenset(PHRASES)
 
 if __name__ == "__main__":
     unittest.main()

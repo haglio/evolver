@@ -6,6 +6,7 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
 from app_support.favorites import is_favorite, mark
 
 from tasks import watch_weights
@@ -97,8 +98,8 @@ class TestCounts(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertEqual(_watch(upscale), {"completions": 3, "skips": 0, "locks": 0, "weight": 2.0})
-        self.assertEqual(result.stamped, 1)
+            assert _watch(upscale) == {"completions": 3, "skips": 0, "locks": 0, "weight": 2.0}
+        assert result.stamped == 1
 
     def test_the_phone_s_viewing_is_added_to_fun_time_s(self):
         with _setting() as s:
@@ -112,7 +113,7 @@ class TestCounts(unittest.TestCase):
 
             watch_weights.run()
 
-            self.assertEqual(_watch(upscale), {"completions": 3, "skips": 0, "locks": 1, "weight": 4.0})
+            assert _watch(upscale) == {"completions": 3, "skips": 0, "locks": 1, "weight": 4.0}
 
     def test_a_delivered_loop_and_a_scene_are_stamped_by_their_own_lanes(self):
         with _setting() as s:
@@ -127,8 +128,8 @@ class TestCounts(unittest.TestCase):
 
             watch_weights.run()
 
-            self.assertEqual(_watch(loop)["weight"], 0.5)
-            self.assertAlmostEqual(_watch(scene)["weight"], 2 ** (1 / 3))
+            assert _watch(loop)["weight"] == 0.5
+            assert _watch(scene)["weight"] == pytest.approx(2 ** (1 / 3), abs=5e-8)
 
     def test_what_the_sidecar_already_records_is_kept(self):
         with _setting() as s:
@@ -139,7 +140,7 @@ class TestCounts(unittest.TestCase):
 
             watch_weights.run()
 
-            self.assertEqual(sidecar.read(path)["video"], {"type": "short", "action": "Alpha"})
+            assert sidecar.read(path)["video"] == {"type": "short", "action": "Alpha"}
 
     def test_a_sidecar_already_saying_so_is_left_alone(self):
         with _setting() as s:
@@ -150,8 +151,8 @@ class TestCounts(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertEqual(sidecar.sidecar_path(upscale).stat().st_mtime_ns, before)
-        self.assertEqual(result.stamped, 0)
+            assert sidecar.sidecar_path(upscale).stat().st_mtime_ns == before
+        assert result.stamped == 0
 
     def test_a_video_nobody_watches_any_more_loses_its_block(self):
         with _setting() as s:
@@ -162,7 +163,7 @@ class TestCounts(unittest.TestCase):
 
             watch_weights.run()
 
-            self.assertEqual(sidecar.read(path), {"video": {"type": "short"}})
+            assert sidecar.read(path) == {"video": {"type": "short"}}
 
     def test_a_journal_line_naming_no_video_here_is_counted_and_nothing_else_happens(self):
         with _setting() as s:
@@ -170,7 +171,7 @@ class TestCounts(unittest.TestCase):
 
             result = watch_weights.run()
 
-        self.assertEqual((result.unmapped, result.stamped), (1, 0))
+        assert (result.unmapped, result.stamped) == (1, 0)
 
 
 class TestThePhonesFolderCannotBeReached(unittest.TestCase):
@@ -183,8 +184,8 @@ class TestThePhonesFolderCannotBeReached(unittest.TestCase):
             with s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
                 result = watch_weights.run()
 
-            self.assertEqual(sidecar.read(path), stamped)
-        self.assertEqual(result.stamped, 0)
+            assert sidecar.read(path) == stamped
+        assert result.stamped == 0
 
     def test_no_favorite_is_carried_and_none_is_skipped_for_good(self):
         with _setting() as s:
@@ -194,9 +195,9 @@ class TestThePhonesFolderCannotBeReached(unittest.TestCase):
             with s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
                 result = watch_weights.run()
 
-            self.assertFalse(_favorite(upscale))
-            self.assertFalse(s.cursor.exists())
-        self.assertEqual(result.favorites_added, 0)
+            assert not _favorite(upscale)
+            assert not s.cursor.exists()
+        assert result.favorites_added == 0
 
     def test_a_folder_gone_from_a_drive_that_is_there_holds_nothing_back(self):
         with _setting() as s:
@@ -206,8 +207,8 @@ class TestThePhonesFolderCannotBeReached(unittest.TestCase):
             with s.config(WARM_GUN_OUTBOX=s.journal_dir.parent / "retired_outbox"):
                 result = watch_weights.run()
 
-            self.assertEqual(_watch(upscale)["locks"], 1)
-        self.assertEqual(result.stamped, 1)
+            assert _watch(upscale)["locks"] == 1
+        assert result.stamped == 1
 
     def test_the_log_says_which_folder_could_not_be_reached(self):
         with _setting() as s:
@@ -215,9 +216,7 @@ class TestThePhonesFolderCannotBeReached(unittest.TestCase):
                 with self.assertLogs("tasks.watch_weights", level="WARNING") as logged:
                     watch_weights.run()
 
-        self.assertEqual(logged.output, [
-            ("WARNING:tasks.watch_weights:Watch weights and the phone's favorites left as they "
-             f"were: {s.phones_own_folder} cannot be reached.")])
+        assert logged.output == [f"WARNING:tasks.watch_weights:Watch weights and the phone's favorites left as they were: {s.phones_own_folder} cannot be reached."]
 
 
 class TestFavorites(unittest.TestCase):
@@ -228,8 +227,8 @@ class TestFavorites(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertTrue(_favorite(upscale))
-        self.assertEqual(result.favorites_added, 1)
+            assert _favorite(upscale)
+        assert result.favorites_added == 1
 
     def test_an_unfavorite_on_the_phone_takes_the_mark_off(self):
         with _setting() as s:
@@ -239,8 +238,8 @@ class TestFavorites(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertNotIn("favorite", sidecar.read(sidecar.sidecar_path(upscale)))
-        self.assertEqual(result.favorites_removed, 1)
+            assert "favorite" not in sidecar.read(sidecar.sidecar_path(upscale))
+        assert result.favorites_removed == 1
 
     def test_a_second_journal_s_older_favorite_lands_after_the_first_s_newer_one(self):
         """Two machines upload two files into the one folder, and one of them
@@ -256,8 +255,9 @@ class TestFavorites(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertTrue(_favorite(upscale_a) and _favorite(upscale_b))
-        self.assertEqual(result.favorites_added, 1)
+            assert _favorite(upscale_a)
+            assert _favorite(upscale_b)
+        assert result.favorites_added == 1
 
     def test_the_cursor_a_single_journal_left_behind_speaks_for_the_phone_s_file_only(self):
         """Before the laptop there was one journal and one time; that time was
@@ -273,11 +273,9 @@ class TestFavorites(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertEqual((_favorite(upscale_a), _favorite(upscale_b)), (True, False))
-            self.assertEqual(json.loads(s.cursor.read_text(encoding="utf-8")), {
-                "applied_through": {"warm-gun-journal.jsonl": 20, "warm-gun-journal-mac.jsonl": 10},
-            })
-        self.assertEqual(result.favorites_added, 1)
+            assert (_favorite(upscale_a), _favorite(upscale_b)) == (True, False)
+            assert json.loads(s.cursor.read_text(encoding="utf-8")) == {"applied_through": {"warm-gun-journal.jsonl": 20, "warm-gun-journal-mac.jsonl": 10}}
+        assert result.favorites_added == 1
 
     def test_a_phone_favorite_is_applied_once_so_fun_time_can_undo_it(self):
         with _setting() as s:
@@ -288,8 +286,8 @@ class TestFavorites(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertFalse(_favorite(upscale))
-        self.assertEqual(result.favorites_added, 0)
+            assert not _favorite(upscale)
+        assert result.favorites_added == 0
 
     def test_a_phone_favorite_for_a_video_not_here_yet_is_left_for_a_later_run(self):
         with _setting() as s:
@@ -297,11 +295,11 @@ class TestFavorites(unittest.TestCase):
             s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
 
             watch_weights.run()
-            self.assertFalse(_favorite(s.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4"))
+            assert not _favorite(s.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4")
             _, upscale = s.sorted_clip("clip_a")
             watch_weights.run()
 
-            self.assertTrue(_favorite(upscale))
+            assert _favorite(upscale)
 
     def test_a_phone_favorite_for_a_video_that_is_gone_holds_nothing_back(self):
         with _setting() as s:
@@ -314,8 +312,8 @@ class TestFavorites(unittest.TestCase):
             first = watch_weights.run()
             again = watch_weights.run()
 
-            self.assertTrue(_favorite(upscale))
-        self.assertEqual((first.favorites_added, again.favorites_added), (1, 0))
+            assert _favorite(upscale)
+        assert (first.favorites_added, again.favorites_added) == (1, 0)
 
     def test_a_favorite_fun_time_marked_stays_marked_through_the_stamping(self):
         with _setting() as s:
@@ -327,10 +325,9 @@ class TestFavorites(unittest.TestCase):
             watch_weights.run()
 
             loved_record = sidecar.read(sidecar.sidecar_path(loved))
-            self.assertEqual((loved_record["favorite"], loved_record["web_url"]),
-                             (True, "https://example.com/gallery/101"))
-            self.assertIn("watch", loved_record)
-            self.assertFalse(_favorite(other))
+            assert (loved_record["favorite"], loved_record["web_url"]) == (True, "https://example.com/gallery/101")
+            assert "watch" in loved_record
+            assert not _favorite(other)
 
     def test_the_phone_s_favorites_are_marked_where_fun_time_is_not_installed(self):
         with _setting() as s:
@@ -340,8 +337,8 @@ class TestFavorites(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertTrue(_favorite(upscale))
-        self.assertEqual(result.favorites_added, 1)
+            assert _favorite(upscale)
+        assert result.favorites_added == 1
 
 
 class TestActsPickedInOrigenerator(unittest.TestCase):
@@ -352,8 +349,7 @@ class TestActsPickedInOrigenerator(unittest.TestCase):
 
             watch_weights.run()
 
-            self.assertEqual(sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))),
-                             "Act Beta")
+            assert sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))) == "Act Beta"
 
     def test_a_pick_is_written_once_so_fun_time_can_strike_it_out_after(self):
         with _setting() as s:
@@ -364,7 +360,7 @@ class TestActsPickedInOrigenerator(unittest.TestCase):
 
             watch_weights.run()
 
-            self.assertEqual(sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))), "")
+            assert sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))) == ""
 
     def test_the_last_of_two_picks_is_the_act_the_record_keeps(self):
         with _setting() as s:
@@ -374,6 +370,5 @@ class TestActsPickedInOrigenerator(unittest.TestCase):
 
             result = watch_weights.run()
 
-            self.assertEqual(sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))),
-                             "Act Gamma")
-        self.assertEqual(result.acts_named, 2)
+            assert sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))) == "Act Gamma"
+        assert result.acts_named == 2

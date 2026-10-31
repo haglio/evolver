@@ -73,7 +73,7 @@ class TestStageRegistry(unittest.TestCase):
         with _patched_stages(mocks):
             result = evolver.run_pipeline()
 
-        self.assertEqual([stage.name for stage in result.stages], ALL_STAGES)
+        assert [stage.name for stage in result.stages] == ALL_STAGES
 
     def test_the_pipeline_spells_the_registry_s_order_and_nothing_else(self):
         """The same two lists, compared without running anything.
@@ -104,14 +104,13 @@ class TestStageRegistry(unittest.TestCase):
         spelled = []
         for call in calls:
             first = call.args[0] if call.args else None
-            self.assertTrue(
-                isinstance(first, ast.Constant) and isinstance(first.value, str),
-                f"the stage name at evolver.py:{call.lineno} is not a literal, "
-                "so nothing can compare it to the registry",
-            )
+            unnamed = (f"the stage name at evolver.py:{call.lineno} is not a literal, "
+                       "so nothing can compare it to the registry")
+            assert isinstance(first, ast.Constant), unnamed
+            assert isinstance(first.value, str), unnamed
             spelled.append(first.value)
 
-        self.assertEqual([name for name, _ in itertools.groupby(spelled)], ALL_STAGES)
+        assert [name for name, _ in itertools.groupby(spelled)] == ALL_STAGES
 
     def test_a_stage_reaches_the_run_record_through_those_two_calls_and_no_other(self):
         """The gate above reads two call names, so it is only as good as the
@@ -143,7 +142,7 @@ class TestStageRegistry(unittest.TestCase):
 
         walk(tree)
 
-        self.assertEqual(emitters, {"_run_stage", "_skip_stage"})
+        assert emitters == {"_run_stage", "_skip_stage"}
 
     def test_every_stage_either_has_a_verdict_rule_or_is_declared_unable_to_fail(self):
         """The last copy of the stage names, and the one that fails silently.
@@ -158,12 +157,9 @@ class TestStageRegistry(unittest.TestCase):
         genuinely cannot fail are named here. Adding a stage then has to
         answer "how does this one fail?" instead of defaulting to "it can't".
         """
-        self.assertEqual(
-            sorted(set(evolver._STAGE_FAILED) | CANNOT_FAIL),
-            sorted(ALL_STAGES),
-        )
-        self.assertEqual(sorted(set(evolver._STAGE_FAILED) & CANNOT_FAIL), [])
-        self.assertEqual(sorted(set(evolver._STAGE_WARNED) - set(ALL_STAGES)), [])
+        assert sorted(set(evolver._STAGE_FAILED) | CANNOT_FAIL) == sorted(ALL_STAGES)
+        assert sorted(set(evolver._STAGE_FAILED) & CANNOT_FAIL) == []
+        assert sorted(set(evolver._STAGE_WARNED) - set(ALL_STAGES)) == []
 
     def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
         """Two more tables keyed by stage string, with the same silent shape.
@@ -183,7 +179,7 @@ class TestStageRegistry(unittest.TestCase):
             (main_window._SUMMARIZERS, "_SUMMARIZERS"),
         ):
             with self.subTest(table=name):
-                self.assertEqual(sorted(set(table) - set(ALL_STAGES)), [])
+                assert sorted(set(table) - set(ALL_STAGES)) == []
 
     def test_every_counter_a_summarized_stage_declares_reaches_the_detail_view(self):
         """A counter no summarizer names is invisible, and stays invisible.
@@ -212,43 +208,39 @@ class TestStageRegistry(unittest.TestCase):
         ):
             with self.subTest(result=result_type.__name__):
                 shown = _result_keys_read(functions) | table_keys
-                self.assertEqual(
-                    sorted(shown),
-                    sorted(field.name for field in dataclasses.fields(result_type)),
-                )
+                assert sorted(shown) == sorted(field.name for field in dataclasses.fields(result_type))
 
     def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
         """Delivery runs straight after the AI upscale, so a clip made this run
         reaches Genau this run, and before the correspondence check, which
         would otherwise see the delivered clip's source still in 1_sorted with
         nothing beside it in the outbox."""
-        self.assertIn("genau_deliver", ALL_STAGES)
-        self.assertIn("upscale_non_ai", ALL_STAGES)
-        self.assertEqual(ALL_STAGES.index("genau_deliver"), ALL_STAGES.index("upscale") + 1)
-        self.assertEqual(ALL_STAGES.index("upscale_non_ai"), ALL_STAGES.index("genau_deliver") + 1)
-        self.assertLess(ALL_STAGES.index("genau_deliver"), ALL_STAGES.index("verify"))
+        assert "genau_deliver" in ALL_STAGES
+        assert "upscale_non_ai" in ALL_STAGES
+        assert ALL_STAGES.index("genau_deliver") == ALL_STAGES.index("upscale") + 1
+        assert ALL_STAGES.index("upscale_non_ai") == ALL_STAGES.index("genau_deliver") + 1
+        assert ALL_STAGES.index("genau_deliver") < ALL_STAGES.index("verify")
 
     def test_the_stages_name_genaus_flicks_in_the_overlays_word(self):
         tips = {stage.key: stage.tooltip for stage in STAGES}
 
-        self.assertIn("down the Genau lane, the delivered flick --", tips["withdrawn"])
-        self.assertTrue(tips["genau_deliver"].startswith(
-            "Move each upscaled Genau-lane flick out of 2_outbox into the folder Genau plays from"))
-        self.assertIn("redoes the flick forever", tips["genau_deliver"])
-        self.assertIn("a generation, an excerpt, a Genau flick --", tips["video_types"])
+        assert "down the Genau lane, the delivered flick --" in tips["withdrawn"]
+        assert tips["genau_deliver"].startswith("Move each upscaled Genau-lane flick out of 2_outbox into the folder Genau plays from")
+        assert "redoes the flick forever" in tips["genau_deliver"]
+        assert "a generation, an excerpt, a Genau flick --" in tips["video_types"]
 
     def test_the_registry_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
-        self.assertIn("group_non_ai", ALL_STAGES)
-        self.assertEqual(ALL_STAGES.index("group_non_ai"), ALL_STAGES.index("scripts") + 1)
+        assert "group_non_ai" in ALL_STAGES
+        assert ALL_STAGES.index("group_non_ai") == ALL_STAGES.index("scripts") + 1
 
     def test_the_registry_lists_the_script_writing_stages_before_the_sync_that_aligns_them(self):
         """Both stages carry a funscript between a clip and its scene, and the
         sync is what settles a new one across a video's version family — so
         neither can come after it."""
-        self.assertIn("clip_scripts", ALL_STAGES)
-        self.assertIn("scene_scripts", ALL_STAGES)
-        self.assertEqual(ALL_STAGES.index("scene_scripts"), ALL_STAGES.index("clip_scripts") + 1)
-        self.assertEqual(ALL_STAGES.index("scene_scripts"), ALL_STAGES.index("scripts") - 1)
+        assert "clip_scripts" in ALL_STAGES
+        assert "scene_scripts" in ALL_STAGES
+        assert ALL_STAGES.index("scene_scripts") == ALL_STAGES.index("clip_scripts") + 1
+        assert ALL_STAGES.index("scene_scripts") == ALL_STAGES.index("scripts") - 1
 
     def test_the_readme_enumerates_the_stages_the_registry_declares(self):
         """The README walks a reader through the pipeline, which makes it a
@@ -264,7 +256,7 @@ class TestStageRegistry(unittest.TestCase):
         readme = Path(PROJECT_ROOT, "README.md").read_text(encoding="utf-8")
         listed = re.findall(r"^\d+\. \*\*(.+?)\*\*", readme, re.MULTILINE)
 
-        self.assertEqual(listed, [STAGE_LABELS[key] for key in ALL_STAGES])
+        assert listed == [STAGE_LABELS[key] for key in ALL_STAGES]
 
     @pytest.mark.repo_check
     def test_nothing_writes_a_stage_number_of_its_own(self):
@@ -286,7 +278,7 @@ class TestStageRegistry(unittest.TestCase):
             if re.search(r"\bStage \d", line)
         )
 
-        self.assertEqual(offenders, [])
+        assert offenders == []
 
     def test_every_declared_color_is_one_qt_can_paint(self):
         """The fourth column used to be a dict of `QColor`s, which rejected a
@@ -301,8 +293,8 @@ class TestStageRegistry(unittest.TestCase):
             with self.subTest(stage=stage.key):
                 # Three channels, not four: a fourth would be an alpha Qt
                 # accepts, and the band's alpha is the painter's to decide.
-                self.assertEqual(len(stage.color), 3)
-                self.assertTrue(QColor(*stage.color).isValid())
+                assert len(stage.color) == 3
+                assert QColor(*stage.color).isValid()
 
     def test_no_two_stage_bands_are_hard_to_tell_apart(self):
         """The chart stacks every stage as a band in one column, so a close
@@ -320,7 +312,7 @@ class TestStageRegistry(unittest.TestCase):
             for one, other in itertools.combinations(ALL_STAGES, 2)
         )
 
-        self.assertGreaterEqual(worst, 20.0, f"{pair[0]} and {pair[1]} differ by only {worst:.1f}")
+        assert worst >= 20.0, f"{pair[0]} and {pair[1]} differ by only {worst:.1f}"
 
 
 
