@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
+from itertools import pairwise
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -89,7 +90,7 @@ def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
     user could see.
     """
     expected = band_fill(STAGE_COLORS[stage_key])
-    return all(abs(p - e) <= 1 for p, e in zip(pixel, expected))
+    return all(abs(p - e) <= 1 for p, e in zip(pixel, expected, strict=True))
 
 
 class TestStackedAreaChartSeries:
@@ -478,7 +479,7 @@ class TestPickYTicks:
     def _assert_readable(self, ticks, y_max):
         assert 3 <= len(ticks) <= 7, f"{len(ticks)} ticks is not a readable axis"
         assert all(0 < t <= y_max for t in ticks)
-        steps = {b - a for a, b in zip(ticks, ticks[1:])}
+        steps = {b - a for a, b in pairwise(ticks)}
         assert len(steps) == 1, f"uneven tick spacing {sorted(steps)}"
         assert steps <= set(self._NICE_STEPS)
 

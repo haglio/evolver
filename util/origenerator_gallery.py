@@ -80,7 +80,7 @@ def rows(columns: Iterable[str], *, optional: Iterable[str] = (),
         present = {column[1] for column in conn.execute("PRAGMA table_info(generations)")}
         selected = [*columns, *(name for name in optional if name in present)]
         cursor = conn.execute(f"SELECT {', '.join(selected)} FROM generations")
-        return [dict(zip(selected, row)) for row in cursor.fetchall()]
+        return [dict(zip(selected, row, strict=True)) for row in cursor.fetchall()]
     finally:
         conn.close()
 

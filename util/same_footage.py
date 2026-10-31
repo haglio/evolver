@@ -60,7 +60,7 @@ def same_length(a: float, b: float) -> bool:
 
 
 def same_footage(a: Sequence[str], b: Sequence[str]) -> bool:
-    agreeing = sum((int(x, 16) ^ int(y, 16)).bit_count() <= TOLERANCE for x, y in zip(a, b))
+    agreeing = sum((int(x, 16) ^ int(y, 16)).bit_count() <= TOLERANCE for x, y in zip(a, b, strict=True))
     return agreeing >= AGREEING_MOMENTS
 
 

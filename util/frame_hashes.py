@@ -125,7 +125,7 @@ def _cropdetect(video: Path, at: float) -> str:
     ]
     try:
         return subprocess.run(
-            command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False,
             **hidden_subprocess_kwargs(),
         ).stderr.decode(errors="replace")
     except OSError as exc:
