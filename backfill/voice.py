@@ -54,9 +54,7 @@ class VoiceListener(QObject):
     def _listener(self) -> CommandListener:
         return CommandListener(
             self._rules,
-            ListenerSettings(model_name=config.VOICE_MODEL_NAME,
-                             device_name=config.VOICE_DEVICE_NAME,
-                             sample_rate=config.VOICE_SAMPLE_RATE),
+            ListenerSettings(sample_rate=config.VOICE_SAMPLE_RATE),
             self._events,
             self._engines)
 
