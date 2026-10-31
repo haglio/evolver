@@ -10,13 +10,13 @@ import unittest
 import uuid
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from app_support.flick_folder import flat_flicks_in
 
 import config
 from gui.run_record import RunRecord
-from util import provenance
+from util import nonai_job, provenance
 from util.media_files import partial_path
 
 # The system temp dir, not a directory inside the checkout: the suite must not
@@ -354,3 +354,62 @@ def make_run_record(**overrides):
     )
     fields.update(overrides)
     return RunRecord(**fields)
+
+
+def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**15,
+           popen=None, is_running=True, image="ffmpeg.exe", terminate=True,
+           topaz_pids=(), cmdline=None, available_ram=64.0, idle_seconds=10_000.0):
+    """An ExitStack patching every outside contact the stage makes.
+
+    Patched on the module that owns each function rather than through whichever
+    stage module imports it: ``patch("tasks.nonai_upscale.processes.suspend")``
+    resolves ``processes`` to ``util.processes`` and sets the attribute there
+    anyway, so the prefix never scoped anything -- it only recorded which file
+    happened to call it, and went stale the moment the call moved.
+
+    idle_seconds defaults to a long idle (the user is away), so the presence
+    throttle lets encodes start unless a test says otherwise.
+    """
+    stack = ExitStack()
+    mocks = {
+        "idle_seconds": stack.enter_context(
+            patch("tasks.nonai_encode.seconds_since_input",
+                  return_value=idle_seconds)),
+        "suspend": stack.enter_context(
+            patch("util.processes.suspend", return_value=True)),
+        "resume": stack.enter_context(
+            patch("util.processes.resume", return_value=True)),
+        "videoai": stack.enter_context(
+            patch("util.ffprobe.videoai_tag", return_value=videoai)),
+        "orientation": stack.enter_context(
+            patch("util.ffprobe.orientation_of", return_value=orientation)),
+        "duration": stack.enter_context(
+            patch("util.ffprobe.duration_seconds", return_value=duration)),
+        "free_bytes": stack.enter_context(
+            patch("util.system_resources.free_bytes", return_value=free_bytes)),
+        "available_ram": stack.enter_context(
+            patch("util.system_resources.available_ram_gb", return_value=available_ram)),
+        "popen": stack.enter_context(
+            patch("subprocess.Popen", popen or Mock(return_value=Mock(pid=4242)))),
+        "is_running": stack.enter_context(
+            patch("util.processes.is_running", return_value=is_running)),
+        "image_path": stack.enter_context(
+            patch("util.processes.image_path", return_value=image)),
+        "terminate": stack.enter_context(
+            patch("util.processes.terminate", return_value=terminate)),
+        "pids_of_image": stack.enter_context(
+            patch("util.processes.pids_of_image", return_value=list(topaz_pids))),
+        "command_line": stack.enter_context(
+            patch("util.processes.command_line", return_value=cmdline)),
+        "sign_in_expired": stack.enter_context(
+            patch("util.topaz.sign_in_expired", return_value=False)),
+    }
+    return stack, mocks
+
+
+def ask_for(overrides, video):
+    nonai_job.save_request(overrides["NONAI_REQUEST_FILE"], nonai_job.Request(video))
+
+
+def request_of(overrides):
+    return nonai_job.load_request(overrides["NONAI_REQUEST_FILE"])

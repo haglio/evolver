@@ -5,18 +5,19 @@ import subprocess
 import threading
 import time
 import unittest
-from contextlib import ExitStack
-from unittest.mock import Mock, patch
 
 from app_support import funscript
 
 import config
-from tasks import nonai_encode, nonai_files, nonai_queue, nonai_upscale
+from tasks import nonai_encode, nonai_files, nonai_upscale
 from tests.temp_helpers import (
     STARTED_UNDER,
     a_drive_that_is_not_there,
+    ask_for,
     make_video,
     override_config,
+    probes,
+    request_of,
     workspace_temp_dir,
     write_job,
     write_sidecar,
@@ -26,57 +27,6 @@ from tests.temp_helpers import (
 )
 from util import nonai_job, orientation, provenance, script_library, sidecar, topaz, video_type
 from util.media_files import partial_path
-
-
-def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**15,
-           popen=None, is_running=True, image="ffmpeg.exe", terminate=True,
-           topaz_pids=(), cmdline=None, available_ram=64.0, idle_seconds=10_000.0):
-    """An ExitStack patching every outside contact the stage makes.
-
-    Patched on the module that owns each function rather than through whichever
-    stage module imports it: ``patch("tasks.nonai_upscale.processes.suspend")``
-    resolves ``processes`` to ``util.processes`` and sets the attribute there
-    anyway, so the prefix never scoped anything -- it only recorded which file
-    happened to call it, and went stale the moment the call moved.
-
-    idle_seconds defaults to a long idle (the user is away), so the presence
-    throttle lets encodes start unless a test says otherwise.
-    """
-    stack = ExitStack()
-    mocks = {
-        "idle_seconds": stack.enter_context(
-            patch("tasks.nonai_encode.seconds_since_input",
-                  return_value=idle_seconds)),
-        "suspend": stack.enter_context(
-            patch("util.processes.suspend", return_value=True)),
-        "resume": stack.enter_context(
-            patch("util.processes.resume", return_value=True)),
-        "videoai": stack.enter_context(
-            patch("util.ffprobe.videoai_tag", return_value=videoai)),
-        "orientation": stack.enter_context(
-            patch("util.ffprobe.orientation_of", return_value=orientation)),
-        "duration": stack.enter_context(
-            patch("util.ffprobe.duration_seconds", return_value=duration)),
-        "free_bytes": stack.enter_context(
-            patch("util.system_resources.free_bytes", return_value=free_bytes)),
-        "available_ram": stack.enter_context(
-            patch("util.system_resources.available_ram_gb", return_value=available_ram)),
-        "popen": stack.enter_context(
-            patch("subprocess.Popen", popen or Mock(return_value=Mock(pid=4242)))),
-        "is_running": stack.enter_context(
-            patch("util.processes.is_running", return_value=is_running)),
-        "image_path": stack.enter_context(
-            patch("util.processes.image_path", return_value=image)),
-        "terminate": stack.enter_context(
-            patch("util.processes.terminate", return_value=terminate)),
-        "pids_of_image": stack.enter_context(
-            patch("util.processes.pids_of_image", return_value=list(topaz_pids))),
-        "command_line": stack.enter_context(
-            patch("util.processes.command_line", return_value=cmdline)),
-        "sign_in_expired": stack.enter_context(
-            patch("util.topaz.sign_in_expired", return_value=False)),
-    }
-    return stack, mocks
 
 
 class TestRunStartsAJob(unittest.TestCase):
@@ -311,14 +261,6 @@ class TestStartGuards(unittest.TestCase):
             self.assertEqual(result.start_deferred, "")
 
 
-def ask_for(overrides, video):
-    nonai_job.save_request(overrides["NONAI_REQUEST_FILE"], nonai_job.Request(video))
-
-
-def request_of(overrides):
-    return nonai_job.load_request(overrides["NONAI_REQUEST_FILE"])
-
-
 class TestRunStartsWhatYouAskedFor(unittest.TestCase):
     """A video asked for from the queue window starts on the next run, even
     while the user is at the computer -- that is what asking for it now means."""
@@ -432,150 +374,6 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
                              ("", "ai_clips_waiting"))
             mocks["popen"].assert_not_called()
             self.assertEqual(request_of(overrides).held_back, "ai_clips_waiting")
-
-
-class TestAskingForOneNow(unittest.TestCase):
-    """What the queue window's "upscale this now" does the moment it is asked,
-    before any run picks the request up."""
-
-    def test_it_leads_the_queue_and_is_recorded_as_asked_for(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
-
-            stack, _mocks = probes()
-            with override_config(**overrides), stack:
-                nonai_upscale.request_now("lagoon/0 unsorted/b.mp4")
-
-            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
-                             ["lagoon/0 unsorted/b.mp4"])
-            self.assertEqual(request_of(overrides), nonai_job.Request("lagoon/0 unsorted/b.mp4"))
-
-    def test_it_stops_the_encode_in_flight_and_queues_that_video_next(self):
-        """Stopping here rather than on the next run is what lets that run
-        upscale its AI clips first: they wait on any live Topaz process."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            _busy, tmp, _out = write_job(root, overrides)
-            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
-
-            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
-            with override_config(**overrides), stack:
-                nonai_upscale.request_now("lagoon/0 unsorted/b.mp4")
-
-            mocks["terminate"].assert_called_once_with(4242)
-            self.assertFalse(tmp.exists())
-            self.assertIsNone(nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]))
-            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
-                             ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/busy.mp4"])
-            self.assertEqual(request_of(overrides).video, "lagoon/0 unsorted/b.mp4")
-
-    def test_asking_for_the_one_already_encoding_lets_it_run_on(self):
-        """It is already the video wanted; killing it to start it again would
-        throw away the hours it has done."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            write_job(root, overrides, suspended=True, suspended_at=time.time() - 60)
-
-            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
-            with override_config(**overrides), stack:
-                nonai_upscale.request_now("lagoon/0 unsorted/busy.mp4")
-
-            mocks["terminate"].assert_not_called()
-            mocks["resume"].assert_called_once_with(4242)
-            job = nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"])
-            self.assertTrue(job["on_request"])
-            self.assertFalse(job["suspended"])
-            self.assertIsNone(request_of(overrides))
-
-
-class TestPuttingOneFirst(unittest.TestCase):
-    """A video dragged to the top of the queue window: it is next, and it waits
-    for the usual moment to start like any other."""
-
-    def test_it_leads_the_queue_without_being_asked_for(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
-
-            stack, _mocks = probes()
-            with override_config(**overrides), stack:
-                nonai_upscale.put_first("lagoon/0 unsorted/b.mp4")
-
-            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
-                             ["lagoon/0 unsorted/b.mp4"])
-            self.assertIsNone(request_of(overrides))
-
-    def test_it_takes_over_from_the_encode_in_flight_which_goes_next(self):
-        """Put first means first: the encode of another video stops, and that
-        video waits second in line to start over."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            _busy, tmp, _out = write_job(root, overrides, suspended=True)
-            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
-
-            stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
-            with override_config(**overrides), stack:
-                nonai_upscale.put_first("lagoon/0 unsorted/b.mp4")
-
-            mocks["terminate"].assert_called_once_with(4242)
-            self.assertFalse(tmp.exists())
-            self.assertIsNone(nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]))
-            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
-                             ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/busy.mp4"])
-            self.assertIsNone(request_of(overrides))
-
-    def test_a_video_asked_for_and_not_yet_started_goes_next_and_is_no_longer_asked_for(self):
-        """Only the first video can be asked for, and it is no longer first."""
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            for name in "ab":
-                make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / f"{name}.mp4")
-
-            stack, _mocks = probes()
-            with override_config(**overrides), stack:
-                nonai_upscale.request_now("lagoon/0 unsorted/a.mp4")
-                nonai_upscale.put_first("lagoon/0 unsorted/b.mp4")
-
-            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
-                             ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"])
-            self.assertIsNone(request_of(overrides))
-
-
-class TestWithdrawingTheAsk(unittest.TestCase):
-    """The queue window's hollow arrow: the first video stays first, and goes
-    back to waiting for nobody to be at the computer."""
-
-    def test_a_video_not_yet_started_is_no_longer_asked_for_and_keeps_its_place(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
-
-            stack, _mocks = probes()
-            with override_config(**overrides), stack:
-                nonai_upscale.request_now("lagoon/0 unsorted/b.mp4")
-                nonai_upscale.withdraw_request()
-
-            self.assertIsNone(request_of(overrides))
-            self.assertEqual(nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]),
-                             ["lagoon/0 unsorted/b.mp4"])
-
-    def test_an_encode_already_running_is_parked_again_while_you_are_here(self):
-        with workspace_temp_dir() as root:
-            overrides = library_overrides(root)
-            _source, tmp, _out = write_job(root, overrides, on_request=True)
-
-            stack, mocks = probes(is_running=True, image=str(config.FFMPEG),
-                                  idle_seconds=5.0)
-            with override_config(**overrides), stack:
-                nonai_upscale.withdraw_request()
-                changed = nonai_upscale.throttle_to_presence()
-
-            self.assertEqual(changed, "suspended")
-            mocks["suspend"].assert_called_once_with(4242)
-            mocks["terminate"].assert_not_called()
-            self.assertTrue(tmp.exists())
-            self.assertNotIn("on_request", nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]))
 
 
 class TestAnEncodeYouAskedForRunsOn(unittest.TestCase):
