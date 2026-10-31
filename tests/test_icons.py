@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QIcon, QImage
-from shared_ui.icons import glyph_pixmap
+from shared_ui.icons import icon_pixmap
 
 from gui.icons import pause_icon, quit_icon, restart_icon, run_now_icon
 
@@ -28,13 +28,13 @@ class TestRestartIcon:
         # Not Font Awesome's "redo": that is a plain circular arrow, which is
         # what an undo looks like everywhere else here. The family draws this
         # control as a power symbol whose ring runs on into an arrowhead.
-        assert _rendered(restart_icon("#ddd")) == glyph_pixmap("restart", 48, QColor("#ddd")).toImage()
+        assert _rendered(restart_icon("#ddd")) == icon_pixmap("restart", 48, QColor("#ddd")).toImage()
 
     def test_it_takes_the_ink_the_chrome_it_sits_on_needs(self):
         light = _rendered(restart_icon("#ddd"))
         dark = _rendered(restart_icon("#333"))
         assert light != dark
-        assert dark == glyph_pixmap("restart", 48, QColor("#333")).toImage()
+        assert dark == icon_pixmap("restart", 48, QColor("#333")).toImage()
 
 
 class TestQuitIcon:
@@ -42,13 +42,13 @@ class TestQuitIcon:
     def test_it_is_the_familys_power_mark(self):
         # Fun Time paints this same one on its bar, and the two apps are open
         # together -- so quit has to be one drawing, not two weights of one idea.
-        assert _rendered(quit_icon("#ddd")) == glyph_pixmap("power", 48, QColor("#ddd")).toImage()
+        assert _rendered(quit_icon("#ddd")) == icon_pixmap("power", 48, QColor("#ddd")).toImage()
 
 
 class TestRunNowIcon:
 
     def test_it_is_the_familys_play_triangle(self):
-        assert _rendered(run_now_icon("#ddd")) == glyph_pixmap("play", 48, QColor("#ddd")).toImage()
+        assert _rendered(run_now_icon("#ddd")) == icon_pixmap("play", 48, QColor("#ddd")).toImage()
 
 
 class TestPauseIcon:
@@ -56,4 +56,4 @@ class TestPauseIcon:
     def test_it_is_the_familys_pause_bars(self):
         # The Broker's tray menu pauses with this same mark, and its icon sits
         # beside this app's in the tray.
-        assert _rendered(pause_icon("#ddd")) == glyph_pixmap("pause", 48, QColor("#ddd")).toImage()
+        assert _rendered(pause_icon("#ddd")) == icon_pixmap("pause", 48, QColor("#ddd")).toImage()

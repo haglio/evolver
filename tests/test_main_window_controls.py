@@ -10,7 +10,7 @@ from PyQt6.QtCore import QPoint, QRect, Qt
 from PyQt6.QtGui import QIcon, QPalette, QTextDocument
 from PyQt6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToolButton
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
-from shared_ui.icons import glyph_pixmap, inline_mark
+from shared_ui.icons import icon_pixmap, inline_icon
 
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
 from gui.schedule_state import ScheduleStatus
@@ -141,12 +141,12 @@ class TestStageStatusColumn:
 
     def test_a_completed_stage_shows_a_green_check(self):
         cell = self._status_cell("completed")
-        assert _drawn(cell.icon()) == _drawn(QIcon(glyph_pixmap("check", 16, GREEN)))
+        assert _drawn(cell.icon()) == _drawn(QIcon(icon_pixmap("check", 16, GREEN)))
 
     def test_an_errored_stage_shows_a_red_cross(self):
         """The row a low-disk hold now produces, which no run record had before."""
         cell = self._status_cell("error")
-        assert _drawn(cell.icon()) == _drawn(QIcon(glyph_pixmap("cross", 16, RED)))
+        assert _drawn(cell.icon()) == _drawn(QIcon(icon_pixmap("cross", 16, RED)))
 
     def test_a_cell_that_is_its_mark_alone_wears_it_in_the_middle(self):
         cell = self._status_cell("completed")
@@ -179,11 +179,11 @@ class TestRunVerdictInDetailPane:
 
     def test_a_failed_run_is_marked_with_the_red_cross(self):
         text = self._info_text("error")
-        assert inline_mark("cross", color=RED, size=self._mark_side()) in text
+        assert inline_icon("cross", color=RED, size=self._mark_side()) in text
 
     def test_a_successful_run_is_marked_with_the_green_check(self):
         text = self._info_text("success")
-        assert inline_mark("check", color=GREEN, size=self._mark_side()) in text
+        assert inline_icon("check", color=GREEN, size=self._mark_side()) in text
 
     def _mark_side(self) -> int:
         return self.widget._info_label.fontMetrics().height()

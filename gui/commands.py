@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from PyQt6.QtGui import QAction, QIcon
 from shared_ui.colors import TEXT_SECONDARY
-from shared_ui.icons import glyph_icon
+from shared_ui.icons import qt_icon
 
 from gui.icons import pause_icon, quit_icon, restart_icon, review_weird_icon, run_now_icon
 
@@ -28,7 +28,7 @@ def set_label(action: QAction, label: str) -> None:
 
 
 def _mark(name: str) -> Callable[[str], QIcon]:
-    return lambda color: glyph_icon(name, color=color)
+    return lambda color: qt_icon(name, color=color)
 
 
 OPEN = Command("Open", _mark("external_link"))

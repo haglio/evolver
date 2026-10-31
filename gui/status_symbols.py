@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from PyQt6.QtGui import QColor, QIcon
 from shared_ui.colors import GREEN, RED, TEXT_MUTED
-from shared_ui.icons import glyph_pixmap
+from shared_ui.icons import icon_pixmap
 
 # No work happened here: the muted gray everything else inert wears.
 GRAY = TEXT_MUTED
@@ -61,4 +61,4 @@ def mark_icon(status: str) -> QIcon:
     mark, color = mark_for(status)
     if not mark:
         return QIcon()
-    return QIcon(glyph_pixmap(mark, _MARK_PX, color))
+    return QIcon(icon_pixmap(mark, _MARK_PX, color))

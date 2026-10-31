@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 )
 from shared_ui.chrome import toolbar_rules
 from shared_ui.fonts import SIZE_BODY
-from shared_ui.icons import inline_mark
+from shared_ui.icons import inline_icon
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
@@ -131,7 +131,7 @@ class RunDetailWidget(QWidget):
         mark, color = mark_for(record.status)
         # Rich text so the mark alone is colored; the rest of the line stays
         # the label's own color, matching the history list beside it.
-        status = inline_mark(mark, color=color, size=self._info_label.fontMetrics().height()) if mark else ""
+        status = inline_icon(mark, color=color, size=self._info_label.fontMetrics().height()) if mark else ""
         self._info_label.setText(
             f"Trigger: {record.trigger}  |  Duration: {record.duration_seconds:.1f}s"
             f"  |  Status: {status}"

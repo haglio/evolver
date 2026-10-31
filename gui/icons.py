@@ -17,29 +17,29 @@ mark for the same thing, and the apps sit open side by side:
 from __future__ import annotations
 
 from PyQt6.QtGui import QIcon
-from shared_ui.icons import glyph_icon
+from shared_ui.icons import qt_icon
 
 
 def restart_icon(color: str) -> QIcon:
     """The family's restart mark, tinted for the chrome it sits on."""
-    return glyph_icon("restart", color=color)
+    return qt_icon("restart", color=color)
 
 
 def quit_icon(color: str) -> QIcon:
     """The family's power mark -- and restart is built from its ring and bar,
     so the two read as relatives where they sit beside each other."""
-    return glyph_icon("power", color=color)
+    return qt_icon("power", color=color)
 
 
 def run_now_icon(color: str) -> QIcon:
     """The family's play triangle, corners rounded like the transport marks it
     replaces."""
-    return glyph_icon("play", color=color)
+    return qt_icon("play", color=color)
 
 
 def pause_icon(color: str) -> QIcon:
-    return glyph_icon("pause", color=color)
+    return qt_icon("pause", color=color)
 
 
 def review_weird_icon(color: str) -> QIcon:
-    return glyph_icon("trash", color=color)
+    return qt_icon("trash", color=color)

@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 from shared_ui.colors import BLUE, TEXT_MUTED
-from shared_ui.icons import glyph_icon
+from shared_ui.icons import qt_icon
 from shared_ui.spacing import MARGIN_STANDARD
 
 from util import upscale_lineup
@@ -322,8 +322,8 @@ class UpscaleQueueWindow(QDialog):
 def _arrow(head: Head | None):
     """The first row's arrow: filled it runs now, hollow it waits."""
     if head is None or head.state == upscale_lineup.FINISHING:
-        return glyph_icon("play", color=Qt.GlobalColor.transparent)
-    return glyph_icon("play", color=BLUE if head.runs_now else TEXT_MUTED)
+        return qt_icon("play", color=Qt.GlobalColor.transparent)
+    return qt_icon("play", color=BLUE if head.runs_now else TEXT_MUTED)
 
 
 def _arrow_tip(head: Head | None) -> str:
