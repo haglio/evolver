@@ -6,8 +6,7 @@ from pathlib import Path
 from PyQt6.QtCore import QUrl
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
-
-from util.player_readout import silence_the_ffmpeg_format_dump
+from shared_ui.qt_messages import silence_the_ffmpeg_format_dump
 
 
 class LoopingPreview:
