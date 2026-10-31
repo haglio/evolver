@@ -9,6 +9,7 @@ common case and must not be rewritten.
 
 from __future__ import annotations
 
+import calendar
 import datetime
 import re
 
@@ -49,12 +50,7 @@ def as_iso_date(value: str) -> str:
         while month < 1:
             month += 12
             year -= 1
-        day = min(now.day, _days_in_month(year, month))
+        day = min(now.day, calendar.monthrange(year, month)[1])
         return datetime.date(year, month, day).isoformat()
     return value
 
-
-def _days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)).day

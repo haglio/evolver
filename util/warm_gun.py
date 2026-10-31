@@ -74,15 +74,15 @@ def _event(line: str) -> Event | None:
 
 
 def library_video(journal_path: str) -> Path | None:
-    lane, *rest = journal_path.replace("\\", "/").split("/")
-    if lane == "1_sorted" and len(rest) == 3:
-        source, orient, name = rest
-        return upscaled_video_path(source, orient, Path(name).stem)
-    if lane == "non_AI" and rest:
-        return config.NON_AI_DIR.joinpath(*rest)
-    if lane == "genau" and len(rest) >= 2:
-        return _genau_flick(lanes.genau_flicks_dir(), rest[0], rest[1:])
-    named = config.LIBRARY_ROOT.joinpath(lane, *rest)
+    parts = journal_path.replace("\\", "/").split("/")
+    match parts:
+        case ["1_sorted", source, orient, name]:
+            return upscaled_video_path(source, orient, Path(name).stem)
+        case ["non_AI", *rest] if rest:
+            return config.NON_AI_DIR.joinpath(*rest)
+        case ["genau", folder_named, *inside] if inside:
+            return _genau_flick(lanes.genau_flicks_dir(), folder_named, inside)
+    named = config.LIBRARY_ROOT.joinpath(*parts)
     return named if named.is_relative_to(config.OUT_UPSCALED_DIR) else None
 
 
@@ -98,7 +98,7 @@ def _genau_flick(flicks_folder: Path | None, folder_named: str, inside: list[str
 
 
 def played_video(journal_path: str) -> Path | None:
-    lane, *rest = journal_path.replace("\\", "/").split("/")
-    if lane == "1_sorted" and len(rest) == 3:
-        return config.SORTED_DIR.joinpath(*rest)
+    match journal_path.replace("\\", "/").split("/"):
+        case ["1_sorted", source, orient, name]:
+            return config.SORTED_DIR.joinpath(source, orient, name)
     return library_video(journal_path)

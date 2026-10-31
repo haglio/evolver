@@ -35,6 +35,8 @@ from util.sidecar import sidecar_path, upscaled_video_path
 
 log = logging.getLogger(__name__)
 
+_SORTED_DEPTH = 3
+
 
 @dataclass
 class UpscaleResult:
@@ -239,7 +241,7 @@ def collect_candidates(
             rel = in_file.relative_to(sorted_dir)
         except ValueError:
             continue
-        if len(rel.parts) < 3:
+        if len(rel.parts) < _SORTED_DEPTH:
             continue
         source, orient = rel.parts[0], rel.parts[1]
         if orient not in orientation.SORTED:

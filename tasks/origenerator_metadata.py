@@ -52,6 +52,7 @@ _TYPE_ANNOTATIONS = ("[output]", "[input]", "[temp]")
 # Aspect ratios a raw WxH is snapped to for display when it lands close enough.
 _COMMON_RATIOS = ((16, 9), (9, 16), (1, 1), (4, 3), (3, 4), (3, 2), (2, 3),
                   (21, 9), (9, 21), (5, 4), (4, 5))
+_RATIO_TOLERANCE = 0.05
 
 
 def build_metadata(video_path, db_path=None) -> dict:
@@ -210,7 +211,7 @@ def _aspect_ratio(width: int, height: int) -> str:
         return ""
     target = width / height
     for a, b in _COMMON_RATIOS:
-        if abs(a / b - target) <= 0.05:
+        if abs(a / b - target) <= _RATIO_TOLERANCE:
             return f"{a}:{b}"
     divisor = math.gcd(width, height)
     return f"{width // divisor}:{height // divisor}"
