@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -24,7 +23,7 @@ from shared_ui.spacing import MARGIN_STANDARD
 
 import config
 from util import weird_piles
-from util.player_readout import silence_the_ffmpeg_format_dump
+from util.looping_preview import LoopingPreview
 from util.selection_highlight import SELECTION_HIGHLIGHT
 
 LOOK_AGAIN_SECONDS = 2.0
@@ -58,10 +57,7 @@ class ReviewWeirdWindow(QWidget):
         self.videos.itemSelectionChanged.connect(self._offer_what_can_be_done)
 
         screen = QVideoWidget()
-        silence_the_ffmpeg_format_dump()
-        self.player = QMediaPlayer()
-        self.player.setVideoOutput(screen)
-        self.player.setLoops(QMediaPlayer.Loops.Infinite)
+        self.preview = LoopingPreview(screen)
 
         self.restore_button = QPushButton(glyph_icon("undo_arrow", color=_ICON_COLOR), "Restore")
         self.restore_button.clicked.connect(self._restore)
@@ -104,10 +100,9 @@ class ReviewWeirdWindow(QWidget):
     def _play(self, item: QTreeWidgetItem | None) -> None:
         if item is None:
             return
-        source = QUrl.fromLocalFile(str(_marked(item).video))
-        if self.player.source() != source:
-            self.player.setSource(source)
-            self.player.play()
+        video = _marked(item).video
+        if not self.preview.is_showing(video):
+            self.preview.show(video)
 
     def _look_again(self) -> None:
         if weird_piles.videos_marked_weird() != [each.video for each in self._marked]:
@@ -144,8 +139,7 @@ class ReviewWeirdWindow(QWidget):
         self.delete_button.setEnabled(bool(chosen))
 
     def _let_go(self) -> None:
-        self.player.stop()
-        self.player.setSource(QUrl())
+        self.preview.let_go()
 
     def showEvent(self, event):
         super().showEvent(event)

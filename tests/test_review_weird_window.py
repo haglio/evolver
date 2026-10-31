@@ -73,7 +73,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         window.videos.setCurrentItem(window.videos.topLevelItem(1))
         touch_video(self.lib.genau_weird / "loop_19_topaz.mp4")
 
-        with patch.object(window.player, "setSource", wraps=window.player.setSource) as switched:
+        with patch.object(window.preview.player, "setSource", wraps=window.preview.player.setSource) as switched:
             window.watch.timeout.emit()
 
         switched.assert_not_called()
@@ -135,10 +135,10 @@ class TestWatchingOne(_ReviewingALibrary):
 
         window = self._window()
 
-        self.assertIsNone(window.player.audioOutput())
+        self.assertIsNone(window.preview.player.audioOutput())
 
     def test_what_the_player_reads_out_of_a_video_is_kept_out_of_every_log(self):
-        with patch("review_weird.window.silence_the_ffmpeg_format_dump") as silenced:
+        with patch("util.looping_preview.silence_the_ffmpeg_format_dump") as silenced:
             self._window()
 
         silenced.assert_called_once_with()
@@ -278,7 +278,7 @@ def _delete_key(window: ReviewWeirdWindow) -> QShortcut:
 
 
 def _playing(window: ReviewWeirdWindow) -> Path:
-    return Path(window.player.source().toLocalFile())
+    return Path(window.preview.player.source().toLocalFile())
 
 
 if __name__ == "__main__":

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt, QUrl
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon, QKeySequence, QPainter, QPixmap, QShortcut
-from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtWidgets import (
     QFrame,
@@ -19,7 +18,7 @@ from PyQt6.QtWidgets import (
 
 from backfill.session import BackfillSession
 from backfill.vocabulary import Command, Vocabulary
-from util.player_readout import silence_the_ffmpeg_format_dump
+from util.looping_preview import LoopingPreview
 
 _DONE = "Nothing left to label."
 _SCROLLBAR_ALLOWANCE = 28
@@ -105,10 +104,7 @@ class BackfillWindow(QWidget):
         for label, path in (thumbnails or {}).items():
             self.set_thumbnail(label, path)
 
-        silence_the_ffmpeg_format_dump()
-        self._player = QMediaPlayer()
-        self._player.setVideoOutput(self._video)
-        self._player.setLoops(QMediaPlayer.Loops.Infinite)
+        self._preview = LoopingPreview(self._video)
 
         QShortcut(QKeySequence(Qt.Key.Key_Escape), self, self.close)
 
@@ -245,8 +241,7 @@ class BackfillWindow(QWidget):
         else:
             # Pointing the player at the next clip is also what makes it let go of the
             # last one, which a background discard is racing to rename.
-            self._player.setSource(QUrl.fromLocalFile(str(clip)))
-            self._player.play()
+            self._preview.show(clip)
         self._refresh_status()
 
     def _refresh_status(self) -> None:
@@ -258,8 +253,7 @@ class BackfillWindow(QWidget):
 
     def _release(self) -> None:
         """Stop, and let go of the file the player has open."""
-        self._player.stop()
-        self._player.setSource(QUrl())
+        self._preview.let_go()
 
     def closeEvent(self, event):  # noqa: N802 — Qt override
         self._release()
