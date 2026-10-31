@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from app_support import funscript
 
 import config
-from tasks import nonai_encode, nonai_queue, nonai_upscale
+from tasks import nonai_encode, nonai_files, nonai_queue, nonai_upscale
 from tests.temp_helpers import (
     STARTED_UNDER,
     a_drive_that_is_not_there,
@@ -1022,13 +1022,13 @@ class TestThrottleToPresence(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, idle_seconds=5.0)
             with override_config(**overrides), stack:
-                nonai_upscale._throttle_lock.acquire()
+                nonai_files.stage_lock.acquire()
                 try:
                     poll.start()
                     poll.join(timeout=2)
                     passed_while_held = not poll.is_alive()
                 finally:
-                    nonai_upscale._throttle_lock.release()
+                    nonai_files.stage_lock.release()
                     poll.join(timeout=10)
 
             self.assertTrue(passed_while_held)

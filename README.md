@@ -52,6 +52,7 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `tasks/genau_deliver.py` - the Genau lane's last step: an upscaled flick leaves for Genau's flicks folder
   - `tasks/nonai_upscale.py` - the non-AI library's detached Topaz encodes, one at a time
   - `tasks/nonai_queue.py` - which non-AI clip is encoded next, and why it beat the others
+  - `tasks/nonai_files.py` - the seven files that stage touches, resolved once, and the lock over them
   - `tasks/nonai_progress.py` - how far through the non-AI upscale project the library is, by running time
   - `tasks/nonai_encode.py` - the detached encode itself: start, adopt, freeze, measure, kill
   - `tasks/nonai_lineup.py` - that queue as the queue window shows it: one list, with the video in flight on top

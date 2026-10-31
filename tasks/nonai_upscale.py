@@ -32,7 +32,6 @@ supervise, maybe start, report.
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -44,12 +43,8 @@ from app_support.win32 import seconds_since_input
 import config
 from tasks import nonai_encode, nonai_progress, nonai_queue
 from tasks.nonai_encode import EncodeSettings
-from tasks.nonai_queue import (
-    Candidate,
-    add_to_skip_list,
-    collect_candidates,
-    relpath,
-)
+from tasks.nonai_files import StageFiles, stage_lock
+from tasks.nonai_queue import Candidate, add_to_skip_list, relpath
 from util import (
     ffprobe,
     nonai_job,
@@ -65,11 +60,6 @@ from util.nonai_library import buckets, stage_dirs
 from util.nonai_retire import carry_funscript, carry_metadata, retire_original
 
 log = logging.getLogger(__name__)
-
-# The full pipeline tick (worker thread) and the fast presence poll (GUI
-# thread) both touch the one job file and its ffmpeg. This serializes them so a
-# suspend/resume never races a supervise.
-_throttle_lock = threading.Lock()
 
 LOW_DISK = "low_disk"
 
@@ -143,49 +133,6 @@ class Conclusion:
     unreachable_archive: str = ""
 
 
-@dataclass(frozen=True)
-class StageFiles:
-    """The seven files the stage touches, resolved once at its boundary.
-
-    Four it writes -- the job record, the attempt counter, the cooldown stamp,
-    the request from the queue window -- and three the queue reads: the skip
-    and pin lists, and Fun Time's watch stats. Held as one record rather
-    than threaded separately because every function below is handed the same
-    set, and seven separate resolutions put seven conditionals in front of the
-    code that supervises a live multi-hour encode -- the one function here that
-    most needs to read straight through.
-    """
-
-    job: Path
-    attempts: Path
-    cooldown: Path
-    skip_list: Path
-    pin_list: Path
-    watch_stats: Path
-    request: Path
-
-    @classmethod
-    def configured(cls, *, job: Path | None = None, attempts: Path | None = None,
-                   cooldown: Path | None = None, skip_list: Path | None = None,
-                   pin_list: Path | None = None, watch_stats: Path | None = None,
-                   request: Path | None = None) -> StageFiles:
-        """Each path given, or the configured one where none was.
-
-        Read from ``config`` here rather than as signature defaults: a default
-        is evaluated at import, which would put the value out of reach of
-        ``override_config``, the seam every stage test steers with.
-        """
-        return cls(
-            job=job or config.NONAI_JOB_STATE_FILE,
-            attempts=attempts or config.NONAI_ATTEMPTS_FILE,
-            cooldown=cooldown or config.NONAI_COOLDOWN_FILE,
-            skip_list=skip_list or config.NONAI_SKIP_LIST,
-            pin_list=pin_list or config.NONAI_PIN_LIST,
-            watch_stats=watch_stats or config.FUN_TIME_WATCH_STATS_FILE,
-            request=request or config.NONAI_REQUEST_FILE,
-        )
-
-
 def run(allow_start: bool = True, stop: bool = False,
         presence_managed: bool = False, *, take_requests: bool = False,
         ai_waiting: bool = False, job_file: Path | None = None,
@@ -218,7 +165,7 @@ def run(allow_start: bool = True, stop: bool = False,
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
-    with _throttle_lock:
+    with stage_lock:
         job = nonai_job.load_job(files.job)
         if job is None:
             job = nonai_encode.adopt_orphan(files.job)
@@ -254,7 +201,7 @@ def run(allow_start: bool = True, stop: bool = False,
     # the skip list, and the count reported is the queue as it stands after
     # that. The doubled walk is finding tasks/design/008's; merging the two
     # would change what `pending` means, so it stays and stays visible.
-    queued = _collect(files)
+    queued = files.candidates()
     result.pending = len(queued)
     # Handed the queue just collected: nonai_progress reads sidecars and walks
     # the buckets for what is upscaled, and need not redo this walk too.
@@ -291,12 +238,12 @@ def throttle_to_presence(*, job_file: Path | None = None,
     """
     job_file = StageFiles.configured(job=job_file).job
     settings = EncodeSettings() if settings is None else settings
-    if not _throttle_lock.acquire(blocking=False):
+    if not stage_lock.acquire(blocking=False):
         return ""
     try:
         return _match_presence(job_file, settings)
     finally:
-        _throttle_lock.release()
+        stage_lock.release()
 
 
 def _match_presence(job_file: Path, settings: EncodeSettings) -> str:
@@ -324,7 +271,7 @@ def foreign_topaz_running(*, job_file: Path | None = None) -> bool:
 @contextmanager
 def frozen_for_ai_clips(*, job_file: Path | None = None) -> Iterator[None]:
     job_file = StageFiles.configured(job=job_file).job
-    with _throttle_lock:
+    with stage_lock:
         job = nonai_job.load_job(job_file)
         was_running = (job is not None and not job.get("suspended")
                        and processes.is_running(job.get("pid", 0)))
@@ -335,12 +282,6 @@ def frozen_for_ai_clips(*, job_file: Path | None = None) -> Iterator[None]:
         finally:
             if was_running:
                 nonai_encode.resume_job(job, job_file, because="the AI clips are done")
-
-
-def _collect(files: StageFiles) -> list[Candidate]:
-    return collect_candidates(skip_list=files.skip_list,
-                              pin_list=files.pin_list,
-                              watch_stats_file=files.watch_stats)
 
 
 def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
@@ -430,7 +371,7 @@ def request_now(video: str) -> None:
     request is about to end anyway.
     """
     files = StageFiles.configured()
-    with _throttle_lock:
+    with stage_lock:
         own = _put_ahead(video, files, "you asked for another video now")
         if own is not None:
             _take_over(own, files)
@@ -446,7 +387,7 @@ def put_first(video: str) -> None:
     The queue window's door for a video dragged to the top of the list.
     """
     files = StageFiles.configured()
-    with _throttle_lock:
+    with stage_lock:
         _put_ahead(video, files, "you put another video first")
         log.info("Put %s first in the non-AI upscale queue.", video)
 
@@ -479,7 +420,7 @@ def withdraw_request() -> None:
     rule: upscaled while nobody is at the computer.
     """
     files = StageFiles.configured()
-    with _throttle_lock:
+    with stage_lock:
         nonai_job.clear_request(files.request)
         job = nonai_job.load_job(files.job)
         if job is not None and job.pop("on_request", None):
@@ -548,7 +489,7 @@ def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartA
         log.info("Deferring non-AI upscale start: %s.", busy)
         return StartAttempt(deferred=busy)
 
-    for candidate in _collect(files):
+    for candidate in files.candidates():
         if _launch(candidate, files):
             return StartAttempt(started=relpath(candidate.path))
     return StartAttempt()
@@ -563,7 +504,7 @@ def _start_requested(request: nonai_job.Request, files: StageFiles,
         log.info("Holding back the non-AI upscale asked for: %s.", busy)
         nonai_job.save_request(files.request, nonai_job.Request(request.video, held_back=busy))
         return StartAttempt(deferred="" if low_disk else busy, deferred_low_disk=low_disk)
-    candidate = next((candidate for candidate in _collect(files)
+    candidate = next((candidate for candidate in files.candidates()
                       if relpath(candidate.path) == request.video), None)
     nonai_job.clear_request(files.request)
     if candidate is None or not _launch(candidate, files, on_request=True):
