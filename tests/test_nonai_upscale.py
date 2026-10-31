@@ -45,7 +45,7 @@ def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**1
     stack = ExitStack()
     mocks = {
         "idle_seconds": stack.enter_context(
-            patch("tasks.nonai_upscale.seconds_since_input",
+            patch("tasks.nonai_encode.seconds_since_input",
                   return_value=idle_seconds)),
         "suspend": stack.enter_context(
             patch("util.processes.suspend", return_value=True)),

@@ -32,40 +32,31 @@ supervise, maybe start, report.
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from app_support.win32 import seconds_since_input
-
 import config
 from tasks import nonai_encode, nonai_progress, nonai_queue
-from tasks.nonai_encode import EncodeSettings
+from tasks.nonai_encode import EncodeSettings, StartAttempt
 from tasks.nonai_files import StageFiles, stage_lock
-from tasks.nonai_queue import Candidate, add_to_skip_list, relpath
+from tasks.nonai_queue import add_to_skip_list, relpath
 from util import (
     ffprobe,
     nonai_job,
-    orientation,
     processes,
     provenance,
     sidecar,
-    system_resources,
-    topaz,
 )
-from util.media_files import partial_path, reachable, remove_partial_files
+from util.media_files import reachable, remove_partial_files
 from util.nonai_library import buckets, stage_dirs
 from util.nonai_retire import carry_funscript, carry_metadata, retire_original
 
 log = logging.getLogger(__name__)
 
-LOW_DISK = "low_disk"
-
 _USER_IS_BACK = "the user is back at the machine"
 _MACHINE_IS_IDLE = "the machine is idle again"
-_ASKED_FOR = "it is the video asked for now"
 
 
 @dataclass
@@ -108,20 +99,6 @@ class Supervision:
     failed: str = ""
     deferred_low_disk: bool = False
     unreachable_archive: str = ""
-
-
-@dataclass(frozen=True)
-class StartAttempt:
-    """What trying to start the next encode came to, this tick.
-
-    Either a clip was started, or it was held back -- ``deferred`` naming which
-    of the machine's six reasons, and ``deferred_low_disk`` the one that is
-    about the library's drive rather than the machine's load.
-    """
-
-    started: str = ""
-    deferred: str = ""
-    deferred_low_disk: bool = False
 
 
 @dataclass(frozen=True)
@@ -253,7 +230,7 @@ def _match_presence(job_file: Path, settings: EncodeSettings) -> str:
     pid = job.get("pid", 0)
     if not pid or not processes.is_running(pid) or job.get("on_request"):
         return ""
-    present = _user_present(settings)
+    present = nonai_encode.user_present(settings)
     if present and not job.get("suspended"):
         nonai_encode.suspend_job(job, job_file, because=_USER_IS_BACK)
         return "suspended"
@@ -292,22 +269,22 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
         on_request = bool(job.get("on_request"))
         if stop and not on_request:
             return Supervision(
-                stopped=_stop_in_flight(job, "the non-AI upscale toggle is off", files))
-        if _is_low_disk(settings):
+                stopped=nonai_encode.stop_in_flight(job, "the non-AI upscale toggle is off", files))
+        if nonai_encode.is_low_disk(settings):
             # The floor was clear at start, but a 4K60 output plus whatever
             # else writes overnight can cross it mid-encode.
             return Supervision(
                 deferred_low_disk=True,
-                stopped=_stop_in_flight(
+                stopped=nonai_encode.stop_in_flight(
                     job, "free disk fell below the safety floor mid-encode", files),
             )
-        if presence_managed and not on_request and _user_present(settings):
+        if presence_managed and not on_request and nonai_encode.user_present(settings):
             nonai_encode.suspend_job(job, files.job, because=_USER_IS_BACK)
             return Supervision(in_flight=relpath(source), suspended=True,
                                in_flight_percent=nonai_encode.percent_encoded(job))
         if presence_managed or on_request:
             nonai_encode.resume_job(job, files.job,
-                                    because=_ASKED_FOR if on_request else _MACHINE_IS_IDLE)
+                                    because=nonai_encode.ASKED_FOR if on_request else _MACHINE_IS_IDLE)
         if not nonai_encode.overran(job, settings):
             return Supervision(in_flight=relpath(source),
                                in_flight_percent=nonai_encode.percent_encoded(job))
@@ -319,20 +296,6 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
                            unreachable_archive=conclusion.unreachable_archive)
     nonai_job.clear_job(files.job)
     return Supervision(promoted=conclusion.promoted, failed=conclusion.failed)
-
-
-def _stop_in_flight(job: dict, reason: str, files: StageFiles) -> str:
-    """End the encode through no fault of its video — no retry penalty.
-
-    Answers the clip that was stopped, which keeps its place in the queue.
-    """
-    source = Path(job.get("source", ""))
-    nonai_encode.terminate_ffmpeg(job.get("pid", 0), reason)
-    nonai_encode.delete_tmp(Path(job.get("tmp", "")))
-    nonai_job.clear_attempts(files.attempts, relpath(source))
-    nonai_job.clear_job(files.job)
-    log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
-    return relpath(source)
 
 
 def _make_way_for(video: str, job: dict, files: StageFiles) -> tuple[dict | None, str]:
@@ -347,12 +310,12 @@ def _make_way_for(video: str, job: dict, files: StageFiles) -> tuple[dict | None
         _take_over(job, files)
         nonai_job.clear_request(files.request)
         return job, ""
-    return None, _stop_in_flight(job, "you asked for another video now", files)
+    return None, nonai_encode.stop_in_flight(job, "you asked for another video now", files)
 
 
 def _take_over(job: dict, files: StageFiles) -> None:
     """Let the encode already running stand as the one that was asked for."""
-    nonai_encode.resume_job(job, files.job, because=_ASKED_FOR)
+    nonai_encode.resume_job(job, files.job, because=nonai_encode.ASKED_FOR)
     job["on_request"] = True
     nonai_job.save_job(files.job, job)
     log.info("The encode of %s runs on: it is the one asked for.", job.get("source"))
@@ -403,7 +366,7 @@ def _put_ahead(video: str, files: StageFiles, why: str) -> dict | None:
     running = bool(job and job.get("pid") and processes.is_running(job["pid"]))
     next_after = []
     if running and relpath(Path(job["source"])) != video:
-        next_after.append(_stop_in_flight(job, why, files))
+        next_after.append(nonai_encode.stop_in_flight(job, why, files))
         running = False
     waiting = nonai_job.load_request(files.request)
     if waiting is not None and waiting.video != video:
@@ -481,24 +444,24 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
 
 
 def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartAttempt:
-    if _is_low_disk(settings):
+    if nonai_encode.is_low_disk(settings):
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
         return StartAttempt(deferred_low_disk=True)
-    busy = _machine_busy_reason(files.cooldown, settings)
+    busy = nonai_encode.machine_busy_reason(files.cooldown, settings)
     if busy:
         log.info("Deferring non-AI upscale start: %s.", busy)
         return StartAttempt(deferred=busy)
 
     for candidate in files.candidates():
-        if _launch(candidate, files):
+        if nonai_encode.start(candidate, files):
             return StartAttempt(started=relpath(candidate.path))
     return StartAttempt()
 
 
 def _start_requested(request: nonai_job.Request, files: StageFiles,
                      settings: EncodeSettings, *, ai_waiting: bool) -> StartAttempt:
-    low_disk = _is_low_disk(settings)
-    busy = LOW_DISK if low_disk else _machine_busy_reason(
+    low_disk = nonai_encode.is_low_disk(settings)
+    busy = nonai_encode.LOW_DISK if low_disk else nonai_encode.machine_busy_reason(
         files.cooldown, settings, asked_for=True, ai_waiting=ai_waiting)
     if busy:
         log.info("Holding back the non-AI upscale asked for: %s.", busy)
@@ -507,100 +470,8 @@ def _start_requested(request: nonai_job.Request, files: StageFiles,
     candidate = next((candidate for candidate in files.candidates()
                       if relpath(candidate.path) == request.video), None)
     nonai_job.clear_request(files.request)
-    if candidate is None or not _launch(candidate, files, on_request=True):
+    if candidate is None or not nonai_encode.start(candidate, files, on_request=True):
         return StartAttempt()
     return StartAttempt(started=request.video)
 
 
-def _launch(candidate: Candidate, files: StageFiles, *, on_request: bool = False) -> bool:
-    """Start *candidate*'s encode, or retire it to the skip list unstarted."""
-    source = candidate.path
-    expected_duration = ffprobe.duration_seconds(source)
-    orient = ffprobe.orientation_of(source)
-    if ffprobe.videoai_tag(source):
-        add_to_skip_list(files.skip_list, source,
-                             "already carries a Topaz videoai tag")
-        return False
-    if expected_duration is None or orient == orientation.UNKNOWN:
-        add_to_skip_list(files.skip_list, source,
-                             "ffprobe could not read duration or orientation")
-        return False
-
-    out = _output_path(candidate)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    tmp = partial_path(out, source.stem)
-    nonai_job.bump_attempts(files.attempts, relpath(source))
-    pid = nonai_encode.launch(source, tmp, orient)
-    job = {
-        "pid": pid,
-        "source": str(source),
-        "tmp": str(tmp),
-        "out": str(out),
-        "expected_duration": expected_duration,
-        "started_at": time.time(),
-        "provenance": provenance.by_evolver(method=topaz.NON_AI_UPSCALE.name,
-                                            method_version=topaz.NON_AI_UPSCALE.version),
-    }
-    if on_request:
-        job["on_request"] = True
-    nonai_job.save_job(files.job, job)
-    log.info("Started detached non-AI upscale (pid %d%s): %s -> %s",
-             pid, ", asked for" if on_request else "", source, out)
-    return True
-
-
-def _output_path(candidate: Candidate) -> Path:
-    done_dirs = stage_dirs(candidate.bucket, digits=(3,))
-    done_dir = (
-        done_dirs[0][1] if done_dirs
-        else candidate.bucket / config.NONAI_FALLBACK_DONE_DIR_NAME
-    )
-    stem = candidate.path.stem
-    return done_dir / config.NONAI_PROCESSED_DIR_NAME / f"{stem}{config.NONAI_OUTPUT_SUFFIX}.mp4"
-
-
-def _is_low_disk(settings: EncodeSettings) -> bool:
-    return system_resources.free_gb(config.NON_AI_DIR) < settings.min_free_disk_gb
-
-
-def _machine_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
-                         asked_for: bool = False, ai_waiting: bool = False) -> str:
-    """Why the machine cannot take a new encode right now — "" when it can.
-
-    A present user comes first: an unattended multi-hour encode has no business
-    starting while someone is at the keyboard. Any live Topaz ffmpeg — an
-    orphaned encode or the user's own GUI export — already owns the GPU, and CPU
-    sampling never sees that. RAM and a post-encode cooldown keep an unattended
-    night from running the machine flat out end to end.
-
-    A video *asked_for* from the queue window is wanted now, so the user being
-    at the computer and the cooldown do not hold it back; the rest still do, and
-    so do new AI clips still *ai_waiting*, since none of them can run beside it.
-    """
-    if not asked_for and _user_present(settings):
-        return "user_present"
-    if nonai_encode.topaz_pids():
-        return "topaz_busy"
-    if system_resources.available_ram_gb() < settings.min_available_ram_gb:
-        return "low_ram"
-    if ai_waiting:
-        return "ai_clips_waiting"
-    if not asked_for and (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
-                          < settings.cooldown_minutes * 60):
-        return "cooldown"
-    if topaz.sign_in_expired():
-        return topaz.SIGN_IN_EXPIRED
-    return ""
-
-
-def _user_present(settings: EncodeSettings) -> bool:
-    """Whether the user has touched the machine recently.
-
-    On any failure to read the idle time, err toward present: holding back an
-    unattended encode is always safer than hogging a machine someone is using.
-    """
-    try:
-        idle = seconds_since_input()
-    except OSError:
-        return True
-    return idle < settings.user_idle_threshold_seconds
