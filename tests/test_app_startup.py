@@ -16,7 +16,7 @@ from gui.run_history import RunHistory
 from gui.run_record import RunRecord
 from gui.settings import EvolverSettings
 from gui.single_instance import Outcome
-from tests.gui_support import EMPTY_QUEUE, QAPP, DoneAtOnce, build_evolver_app
+from tests.gui_support import EMPTY_QUEUE, QAPP, DoneAtOnce, build_evolver_app, retire_evolver_app
 from tests.temp_helpers import make_run_record, override_config
 
 
@@ -28,6 +28,26 @@ class TestAppStartup:
         assert app._tray is not None
         assert app._window is not None
         assert app._scheduler is not None
+
+
+class TestRetiringAnApp:
+    """The harness's teardown leaves none of the app's windows alive.
+
+    A window only marked for deletion dies inside whichever later test next lets
+    the event loop run, and a window dying while that test has a menu popped up
+    closes the menu: in the merge queue's shuffled order, the tray's switch tests
+    read an unhighlighted row that way (haglio/evolver#194's queue run).
+    """
+
+    def test_its_windows_are_gone_when_the_teardown_returns(self):
+        app = build_evolver_app(SimpleNamespace(addfinalizer=lambda _finalizer: None))
+        with patch("gui.app.run_log.read_run", return_value=""):
+            app._show_run_log(make_run_record())
+        windows = {app._window, app._log_window}
+
+        retire_evolver_app(app)
+
+        assert windows.isdisjoint(QAPP.topLevelWidgets())
 
 
 class TestBuildingIsNotStarting:

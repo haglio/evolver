@@ -21,6 +21,7 @@ import os
 # developer override it to watch something on a real display.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import QEvent
 from PyQt6.QtWidgets import QApplication
 
 from gui.app import EvolverApp
@@ -94,3 +95,6 @@ def retire_evolver_app(app) -> None:
     app._tray.deleteLater()
     app._window.close()
     app._window.deleteLater()
+    # Deleted now, not inside whichever later test next lets the event loop run:
+    # a window dying there takes that test's popped-up menu down with it.
+    QAPP.sendPostedEvents(None, QEvent.Type.DeferredDelete)
