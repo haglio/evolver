@@ -56,6 +56,19 @@ class TestPipelineScheduler(unittest.TestCase):
 
         self.assertEqual(len(spy), 1)
 
+    def test_toggling_pauses_a_running_schedule_and_resumes_a_paused_one(self):
+        scheduler = PipelineScheduler(interval_minutes=10)
+        scheduler.start()
+
+        scheduler.toggle_pause()
+        self.assertTrue(scheduler.is_paused)
+        self.assertIsNone(scheduler.next_run_at)
+
+        scheduler.toggle_pause()
+        self.assertFalse(scheduler.is_paused)
+        self.assertIsNotNone(scheduler.next_run_at)
+        scheduler.stop()
+
     def test_pause_and_resume(self):
         scheduler = PipelineScheduler(interval_minutes=10)
 
