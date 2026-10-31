@@ -7,7 +7,7 @@ toolbar shows, off the one status the scheduler hands both.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from PyQt6.QtCore import QPoint
 from PyQt6.QtGui import QAction
@@ -140,7 +140,7 @@ class TestTrayScheduleDisplay:
 
     def test_a_scheduled_next_run_is_in_the_tooltip_and_the_menus_one_status_line(self):
         tray = EvolverTray()
-        tray.show_schedule(ScheduleStatus(next_run_at=datetime(2026, 3, 29, 14, 30)))
+        tray.show_schedule(ScheduleStatus(next_run_at=datetime(2026, 3, 29, 14, 30, tzinfo=UTC)))
         assert "Next run: 14:30" in tray.toolTip()
         assert _status_lines(tray) == ["Status: Scheduled for 14:30"]
 
@@ -160,7 +160,7 @@ class TestTrayScheduleDisplay:
     def test_a_running_pipeline_reads_running_and_disables_run_now(self):
         tray = EvolverTray()
         tray.show_schedule(ScheduleStatus(
-            is_running=True, next_run_at=datetime(2026, 3, 29, 14, 30)))
+            is_running=True, next_run_at=datetime(2026, 3, 29, 14, 30, tzinfo=UTC)))
         assert "Running..." in tray.toolTip()
         assert _status_lines(tray) == ["Status: Running"]
         assert not tray.run_now_action.isEnabled()

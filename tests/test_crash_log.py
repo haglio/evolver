@@ -15,7 +15,7 @@ from util import crash_log
 
 @pytest.fixture(autouse=True)
 def _the_crash_flag_is_put_back():
-    """Give `crash_log._crash_logged` back at the end of every test here.
+    """Give `crash_log._Logged.crash` back at the end of every test here.
 
     Six tests assign that module global directly, and none of them put it back --
     so whatever the last one left was what the rest of the session saw. The
@@ -23,9 +23,9 @@ def _the_crash_flag_is_put_back():
     before each write, because a neighbour might have left it True. The tests
     still say what they need; nothing now carries it to the next one.
     """
-    before = crash_log._crash_logged
+    before = crash_log._Logged.crash
     yield
-    crash_log._crash_logged = before
+    crash_log._Logged.crash = before
 
 
 class TestInstallExcepthook(unittest.TestCase):
@@ -78,7 +78,7 @@ class TestWriteCrash(unittest.TestCase):
         with workspace_temp_dir() as tmp_dir:
             tmp = tmp_dir / "tray_crash.log"
             with patch.object(crash_log, "CRASH_LOG", tmp):
-                crash_log._crash_logged = False
+                crash_log._Logged.crash = False
                 crash_log.write_crash("Test header:", "some detail")
 
             text = tmp.read_text(encoding="utf-8")
@@ -92,7 +92,7 @@ class TestWriteCrash(unittest.TestCase):
             tmp = tmp_dir / "tray_crash.log"
             tmp.write_text("[2026-03-31 10:00:00] Previous entry\n", encoding="utf-8")
             with patch.object(crash_log, "CRASH_LOG", tmp):
-                crash_log._crash_logged = False
+                crash_log._Logged.crash = False
                 crash_log.write_crash("New crash:", "details here")
 
             content = tmp.read_text(encoding="utf-8")
@@ -104,7 +104,7 @@ class TestAtexitHandler(unittest.TestCase):
     """on_exit logs clean exits, unless a crash already explained the ending."""
 
     def setUp(self):
-        crash_log._crash_logged = False
+        crash_log._Logged.crash = False
 
     def test_atexit_writes_when_no_crash(self):
         mock_path = MagicMock()
@@ -130,7 +130,7 @@ class TestAtexitHandler(unittest.TestCase):
             self.assertIn("on_exit", content)
 
     def test_atexit_skips_when_crash_already_logged(self):
-        crash_log._crash_logged = True
+        crash_log._Logged.crash = True
         mock_path = MagicMock()
         with patch.object(crash_log, "CRASH_LOG", mock_path):
             crash_log.on_exit()
@@ -138,24 +138,24 @@ class TestAtexitHandler(unittest.TestCase):
         mock_path.open.assert_not_called()
 
     def test_write_crash_sets_flag(self):
-        crash_log._crash_logged = False
+        crash_log._Logged.crash = False
         mock_path = MagicMock()
         with patch.object(crash_log, "CRASH_LOG", mock_path):
             crash_log.write_crash("test:", "detail")
-        self.assertTrue(crash_log._crash_logged)
+        self.assertTrue(crash_log._Logged.crash)
 
 
 class TestWriteInfo(unittest.TestCase):
     """write_info logs without suppressing the atexit handler."""
 
     def setUp(self):
-        crash_log._crash_logged = False
+        crash_log._Logged.crash = False
 
     def test_write_info_does_not_set_crash_flag(self):
         mock_path = MagicMock()
         with patch.object(crash_log, "CRASH_LOG", mock_path):
             crash_log.write_info("Session end:", "detail\n")
-        self.assertFalse(crash_log._crash_logged)
+        self.assertFalse(crash_log._Logged.crash)
 
     def test_write_info_writes_timestamped_entry(self):
         with workspace_temp_dir() as tmp_dir:

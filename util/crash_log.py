@@ -18,7 +18,9 @@ from pathlib import Path
 
 CRASH_LOG = Path(__file__).resolve().parent.parent / "tray_crash.log"
 
-_crash_logged = False
+
+class _Logged:
+    crash = False
 
 
 class _WarningsIntoTheCrashLog(logging.Handler):
@@ -45,8 +47,7 @@ def record_warnings() -> logging.Handler:
 
 def write_crash(header: str, detail: str) -> None:
     """Append a timestamped crash entry, and suppress the atexit 'Clean exit' line."""
-    global _crash_logged
-    _crash_logged = True
+    _Logged.crash = True
     _append(header, detail)
 
 
@@ -57,7 +58,7 @@ def write_info(header: str, detail: str) -> None:
 
 def on_exit() -> None:
     """Log clean exits so we can distinguish them from external kills."""
-    if not _crash_logged:
+    if not _Logged.crash:
         _append("Clean exit", "".join(traceback.format_stack()))
 
 
@@ -78,6 +79,6 @@ def install_excepthook() -> None:
 
 
 def _append(header: str, detail: str) -> None:
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
     with CRASH_LOG.open("a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {header}\n{detail}")

@@ -62,8 +62,8 @@ def _lookups(scan: list[ScannedClip]) -> tuple[dict[str, Path], dict[str, Path]]
     by_id: dict[str, Path] = {}
     for clip in scan:
         by_id.setdefault(clip.clip_id, clip.path)
-        for part in clip.action.split(","):
-            part = part.strip().lower()
+        for listed in clip.action.split(","):
+            part = listed.strip().lower()
             if part:
                 by_action.setdefault(part, clip.path)
     return by_action, by_id

@@ -19,7 +19,7 @@ _RELATIVE_DATE_RE = re.compile(r"^(\d+)(mo|[mhdw])\s+ago$", re.IGNORECASE)
 
 def today() -> datetime.date:
     """The day to count back from — a function so a test can fix it."""
-    return datetime.date.today()
+    return datetime.datetime.now().astimezone().date()
 
 
 def as_iso_date(value: str) -> str:
