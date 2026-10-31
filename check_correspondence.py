@@ -15,6 +15,8 @@ from util.variants import upscaled_stem
 
 log = logging.getLogger(__name__)
 
+_LISTED = 10
+
 
 @dataclass
 class CorrespondenceResult:
@@ -144,11 +146,8 @@ def _popup_message(result: CorrespondenceResult) -> str:
         ])
 
     if result.duplicates:
-        duplicate_lines = []
-        for outbox_name, paths in sorted(result.duplicates.items()):
-            duplicate_lines.append(f"{outbox_name} -> {', '.join(paths[:2])}")
-            if len(duplicate_lines) == 10:
-                break
+        duplicate_lines = [f"{outbox_name} -> {', '.join(paths[:2])}"
+                           for outbox_name, paths in sorted(result.duplicates.items())[:_LISTED]]
         lines.extend([
             "",
             f"Duplicate outbox basenames found: {len(result.duplicates)}",
@@ -158,10 +157,10 @@ def _popup_message(result: CorrespondenceResult) -> str:
     return "\n".join(lines)
 
 
-def _truncate(items: list[str], limit: int = 10) -> list[str]:
-    if len(items) <= limit:
+def _truncate(items: list[str]) -> list[str]:
+    if len(items) <= _LISTED:
         return items
-    return [*items[:limit], "..."]
+    return [*items[:_LISTED], "..."]
 
 
 def main() -> int:

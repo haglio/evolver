@@ -9,6 +9,9 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 from gui.schedule_state import ScheduleStatus
 
+_MINUTES_PER_HOUR = 60
+_HOURS_PER_DAY = 24
+
 
 class PipelineScheduler(QObject):
     """Fires run_requested at clock-aligned intervals (e.g. :00, :10, :20).
@@ -108,15 +111,16 @@ class PipelineScheduler(QObject):
         interval = self._interval_minutes
 
         # Align to clock: find next minute that's a multiple of interval
-        current_minute = now.hour * 60 + now.minute
+        current_minute = now.hour * _MINUTES_PER_HOUR + now.minute
         next_slot = ((current_minute // interval) + 1) * interval
-        next_hour, next_minute = divmod(next_slot, 60)
+        next_hour, next_minute = divmod(next_slot, _MINUTES_PER_HOUR)
 
         target = now.replace(second=0, microsecond=0)
-        if next_hour >= 24:
+        if next_hour >= _HOURS_PER_DAY:
             # Wraps to next day
             target = target.replace(hour=0, minute=0) + timedelta(days=1)
-            next_hour, next_minute = divmod(next_slot % (24 * 60), 60)
+            next_hour, next_minute = divmod(next_slot % (_HOURS_PER_DAY * _MINUTES_PER_HOUR),
+                                            _MINUTES_PER_HOUR)
             target = target.replace(hour=next_hour, minute=next_minute)
         else:
             target = target.replace(hour=next_hour, minute=next_minute)
