@@ -61,12 +61,12 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.start()
 
         scheduler.toggle_pause()
-        self.assertTrue(scheduler.is_paused)
-        self.assertIsNone(scheduler.next_run_at)
+        assert scheduler.is_paused
+        assert scheduler.next_run_at is None
 
         scheduler.toggle_pause()
-        self.assertFalse(scheduler.is_paused)
-        self.assertIsNotNone(scheduler.next_run_at)
+        assert not scheduler.is_paused
+        assert scheduler.next_run_at is not None
         scheduler.stop()
 
     def test_pause_and_resume(self):
