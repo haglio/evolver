@@ -29,14 +29,23 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
+from app_support.win32 import seconds_since_input
 
 import config
-from util import ffprobe, nonai_job, processes, provenance, topaz
-from util.media_files import is_partial_path, partial_stem
+from tasks.nonai_files import StageFiles
+from tasks.nonai_queue import Candidate, add_to_skip_list, relpath
+from util import ffprobe, nonai_job, orientation, processes, provenance, system_resources, topaz
+from util.media_files import is_partial_path, partial_path, partial_stem
+from util.nonai_library import stage_dirs
 
 log = logging.getLogger(__name__)
 
 _LOG_WARNINGS_AND_PROGRESS_ONLY = ("-loglevel", "warning", "-stats")
+
+#: Why a start was held back when the library's drive, rather than the machine, is the reason.
+LOW_DISK = "low_disk"
+#: Why an encode asked for from the queue window is resumed, or let run on.
+ASKED_FOR = "it is the video asked for now"
 
 
 @dataclass(frozen=True)
@@ -66,6 +75,20 @@ class EncodeSettings:
     # "away" and an encode may start or resume. Five minutes rides out ordinary
     # reading/watching pauses without treating them as the user leaving.
     user_idle_threshold_seconds: float = 300.0
+
+
+@dataclass(frozen=True)
+class StartAttempt:
+    """What trying to start an encode came to, this tick.
+
+    Either a clip was started, or it was held back -- ``deferred`` naming which
+    of the machine's six reasons, and ``deferred_low_disk`` the one that is
+    about the library's drive rather than the machine's load.
+    """
+
+    started: str = ""
+    deferred: str = ""
+    deferred_low_disk: bool = False
 
 
 def unrecorded_start() -> dict:
@@ -228,3 +251,111 @@ def launch(source: Path, tmp: Path, orient: str) -> int:
             **hidden_subprocess_kwargs(creationflags=subprocess.BELOW_NORMAL_PRIORITY_CLASS),
         )
     return proc.pid
+
+
+def start(candidate: Candidate, files: StageFiles, *, on_request: bool = False) -> bool:
+    """Start *candidate*'s encode, or retire it to the skip list unstarted."""
+    source = candidate.path
+    expected_duration = ffprobe.duration_seconds(source)
+    orient = ffprobe.orientation_of(source)
+    if ffprobe.videoai_tag(source):
+        add_to_skip_list(files.skip_list, source,
+                             "already carries a Topaz videoai tag")
+        return False
+    if expected_duration is None or orient == orientation.UNKNOWN:
+        add_to_skip_list(files.skip_list, source,
+                             "ffprobe could not read duration or orientation")
+        return False
+
+    out = _output_path(candidate)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = partial_path(out, source.stem)
+    nonai_job.bump_attempts(files.attempts, relpath(source))
+    pid = launch(source, tmp, orient)
+    job = {
+        "pid": pid,
+        "source": str(source),
+        "tmp": str(tmp),
+        "out": str(out),
+        "expected_duration": expected_duration,
+        "started_at": time.time(),
+        "provenance": provenance.by_evolver(method=topaz.NON_AI_UPSCALE.name,
+                                            method_version=topaz.NON_AI_UPSCALE.version),
+    }
+    if on_request:
+        job["on_request"] = True
+    nonai_job.save_job(files.job, job)
+    log.info("Started detached non-AI upscale (pid %d%s): %s -> %s",
+             pid, ", asked for" if on_request else "", source, out)
+    return True
+
+
+def _output_path(candidate: Candidate) -> Path:
+    done_dirs = stage_dirs(candidate.bucket, digits=(3,))
+    done_dir = (
+        done_dirs[0][1] if done_dirs
+        else candidate.bucket / config.NONAI_FALLBACK_DONE_DIR_NAME
+    )
+    stem = candidate.path.stem
+    return done_dir / config.NONAI_PROCESSED_DIR_NAME / f"{stem}{config.NONAI_OUTPUT_SUFFIX}.mp4"
+
+
+def stop_in_flight(job: dict, reason: str, files: StageFiles) -> str:
+    """End the encode through no fault of its video -- no retry penalty.
+
+    Answers the clip that was stopped, which keeps its place in the queue.
+    """
+    source = Path(job.get("source", ""))
+    terminate_ffmpeg(job.get("pid", 0), reason)
+    delete_tmp(Path(job.get("tmp", "")))
+    nonai_job.clear_attempts(files.attempts, relpath(source))
+    nonai_job.clear_job(files.job)
+    log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
+    return relpath(source)
+
+
+def is_low_disk(settings: EncodeSettings) -> bool:
+    return system_resources.free_gb(config.NON_AI_DIR) < settings.min_free_disk_gb
+
+
+def machine_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
+                        asked_for: bool = False, ai_waiting: bool = False) -> str:
+    """Why the machine cannot take a new encode right now -- "" when it can.
+
+    A present user comes first: an unattended multi-hour encode has no business
+    starting while someone is at the keyboard. Any live Topaz ffmpeg -- an
+    orphaned encode or the user's own GUI export -- already owns the GPU, and
+    CPU sampling never sees that. RAM and a post-encode cooldown keep an
+    unattended night from running the machine flat out end to end.
+
+    A video *asked_for* from the queue window is wanted now, so the user being
+    at the computer and the cooldown do not hold it back; the rest still do, and
+    so do new AI clips still *ai_waiting*, since none of them can run beside it.
+    """
+    if not asked_for and user_present(settings):
+        return "user_present"
+    if topaz_pids():
+        return "topaz_busy"
+    if system_resources.available_ram_gb() < settings.min_available_ram_gb:
+        return "low_ram"
+    if ai_waiting:
+        return "ai_clips_waiting"
+    if not asked_for and (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
+                          < settings.cooldown_minutes * 60):
+        return "cooldown"
+    if topaz.sign_in_expired():
+        return topaz.SIGN_IN_EXPIRED
+    return ""
+
+
+def user_present(settings: EncodeSettings) -> bool:
+    """Whether the user has touched the machine recently.
+
+    On any failure to read the idle time, err toward present: holding back an
+    unattended encode is always safer than hogging a machine someone is using.
+    """
+    try:
+        idle = seconds_since_input()
+    except OSError:
+        return True
+    return idle < settings.user_idle_threshold_seconds
