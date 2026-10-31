@@ -144,7 +144,7 @@ class TestBackfillWindow(unittest.TestCase):
         session = FakeSession([Path("a_topaz.mp4")], [("nothing to undo", None)])
         window = self._window(session)
 
-        with patch.object(window._player, "setSource") as set_source:
+        with patch.object(window._preview.player, "setSource") as set_source:
             window.on_phrase("undo")
 
         set_source.assert_not_called()
@@ -169,7 +169,7 @@ class TestBackfillWindow(unittest.TestCase):
         session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → weird", [])])
         window = self._window(session)
 
-        with patch.object(window._player, "setSource") as set_source:
+        with patch.object(window._preview.player, "setSource") as set_source:
             window.on_phrase("weird")
 
         set_source.assert_called_once()
@@ -179,7 +179,7 @@ class TestBackfillWindow(unittest.TestCase):
         session = FakeSession([], [("undid a_topaz.mp4 → Dancing", [Path("a_topaz.mp4")])])
         window = self._window(session)
 
-        with patch.object(window._player, "setSource") as set_source:
+        with patch.object(window._preview.player, "setSource") as set_source:
             window.on_phrase("undo")
 
         set_source.assert_called_once()
@@ -295,11 +295,11 @@ class TestBackfillWindow(unittest.TestCase):
         """The microphone is open the whole session; a clip's audio would be
         one more thing for the recognizer to mishear."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
-        self.assertIsNone(window._player.audioOutput())
+        self.assertIsNone(window._preview.player.audioOutput())
 
     def test_the_clip_loops_until_a_decision_lands(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
-        self.assertEqual(window._player.loops(), QMediaPlayer.Loops.Infinite)
+        self.assertEqual(window._preview.player.loops(), QMediaPlayer.Loops.Infinite)
 
     def test_releasing_the_last_clip_also_stops_the_player(self):
         """Dropping the source without stop() left playback tearing at a file
@@ -308,14 +308,14 @@ class TestBackfillWindow(unittest.TestCase):
         session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → weird", [])])
         window = self._window(session)
 
-        with patch.object(window._player, "stop") as stop, \
-             patch.object(window._player, "setSource"):
+        with patch.object(window._preview.player, "stop") as stop, \
+             patch.object(window._preview.player, "setSource"):
             window.on_phrase("weird")
 
         stop.assert_called_once()
 
     def test_what_the_player_reads_out_of_a_clip_is_kept_out_of_every_log(self):
-        with patch("backfill.window.silence_the_ffmpeg_format_dump") as silenced:
+        with patch("util.looping_preview.silence_the_ffmpeg_format_dump") as silenced:
             self._window(FakeSession([Path("a_topaz.mp4")]))
 
         silenced.assert_called_once_with()
@@ -374,7 +374,7 @@ class TestBackfillWindow(unittest.TestCase):
         # not callable" out of the Qt event loop, in five teardowns out of ten.
         window = self._window(session)
 
-        with patch.object(window._player, "setSource") as set_source:
+        with patch.object(window._preview.player, "setSource") as set_source:
             window.close()
 
         set_source.assert_called_once()
