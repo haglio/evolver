@@ -793,17 +793,17 @@ class TestTheWindowsDoorToTheQueue:
         pin_ahead.assert_called_once_with(Path("next.txt"), ["lagoon/0 unsorted/a.mp4"])
 
     def test_asking_for_one_now_reaches_the_stage(self):
-        with patch("tasks.nonai_upscale.request_now") as request_now:
+        with patch("tasks.nonai_request.request_now") as request_now:
             evolver.upscale_now("lagoon/0 unsorted/a.mp4")
         request_now.assert_called_once_with("lagoon/0 unsorted/a.mp4")
 
     def test_putting_one_first_reaches_the_stage(self):
-        with patch("tasks.nonai_upscale.put_first") as put_first:
+        with patch("tasks.nonai_request.put_first") as put_first:
             evolver.upscale_next("lagoon/0 unsorted/a.mp4")
         put_first.assert_called_once_with("lagoon/0 unsorted/a.mp4")
 
     def test_withdrawing_the_ask_reaches_the_stage(self):
-        with patch("tasks.nonai_upscale.withdraw_request") as withdraw_request:
+        with patch("tasks.nonai_request.withdraw_request") as withdraw_request:
             evolver.withdraw_upscale_now()
         withdraw_request.assert_called_once_with()
 

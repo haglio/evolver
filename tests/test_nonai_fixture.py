@@ -29,6 +29,7 @@ from tests.temp_helpers import nonai_library_overrides, workspace_temp_dir
 MODULES = (
     "tasks/nonai_upscale.py",
     "tasks/nonai_files.py",
+    "tasks/nonai_request.py",
     "tasks/nonai_encode.py",
     "tasks/nonai_progress.py",
     "tasks/nonai_queue.py",

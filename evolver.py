@@ -34,6 +34,7 @@ from tasks import (
     nonai_group,
     nonai_lineup,
     nonai_queue,
+    nonai_request,
     nonai_titles,
     nonai_upscale,
     origenerator_downtime,
@@ -208,17 +209,17 @@ def arrange_upscale_queue(videos: list[str]) -> None:
 
 def upscale_now(video: str) -> None:
     """Ask for *video* to be upscaled right away, stopping whatever is in flight."""
-    nonai_upscale.request_now(video)
+    nonai_request.request_now(video)
 
 
 def upscale_next(video: str) -> None:
     """Put *video* first in the queue: it takes over, and starts at the usual moment."""
-    nonai_upscale.put_first(video)
+    nonai_request.put_first(video)
 
 
 def withdraw_upscale_now() -> None:
     """Stop asking: the video asked for waits for nobody at the computer again."""
-    nonai_upscale.withdraw_request()
+    nonai_request.withdraw_request()
 
 
 def run_pipeline(
