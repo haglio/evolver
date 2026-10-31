@@ -201,7 +201,7 @@ class TestTheActTableIsReadWhenMainAsksForIt(unittest.TestCase):
         env["QT_QPA_PLATFORM"] = "offscreen"
         result = subprocess.run(
             [sys.executable, "-c", _OVERLAY_READS],
-            cwd=PROJECT_ROOT, env=env, capture_output=True, text=True,
+            cwd=PROJECT_ROOT, env=env, capture_output=True, text=True, check=False,
         )
 
         self.assertEqual(result.returncode, 0, result.stderr)

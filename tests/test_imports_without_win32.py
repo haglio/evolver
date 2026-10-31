@@ -68,6 +68,7 @@ def run_without_the_win32_ctypes_surface(body):
     return subprocess.run(
         [sys.executable, "-c", _STRIP_WIN32_FROM_CTYPES + body],
         cwd=str(REPO_DIR), env=env, capture_output=True, text=True, timeout=180,
+        check=False,
     )
 
 

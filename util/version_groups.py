@@ -132,7 +132,7 @@ def _families_by_name(stems: list[str]) -> dict[str, str]:
         toks = tokens[stem]
         joined: str | None = None
         if toks:
-            for anchor, atoks in zip(anchors, anchor_tokens):
+            for anchor, atoks in zip(anchors, anchor_tokens, strict=True):
                 if atoks and _is_variant_of(atoks, toks):
                     joined = anchor
                     break
