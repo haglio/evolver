@@ -18,6 +18,7 @@ from voice_core.listener import (
     MicrophoneUnavailable,
     RecognizerUnavailable,
     engines_for,
+    reason_for,
 )
 from voice_core.listening import Heard
 from voice_core.listening_thread import ListeningThread
@@ -64,7 +65,7 @@ class VoiceListener(QObject):
             MicrophoneUnavailable: "Microphone could not be opened",
         }.get(type(exc), "Voice listener stopped listening")
         log.error(what_happened, exc_info=exc)
-        self.failed.emit(str(exc) or type(exc).__name__)
+        self.failed.emit(reason_for(exc))
 
     def _on_heard(self, heard: Heard) -> None:
         if heard.recognition.phrase:
