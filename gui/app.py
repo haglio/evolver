@@ -147,7 +147,6 @@ class EvolverApp:
         self._peer_timer.timeout.connect(self._peer.tick)
 
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
-        self._scheduler.status_changed.connect(self._update_status_display)
 
         self._window = EvolverMainWindow()
         self._window.setWindowTitle(self._session.name)
@@ -156,13 +155,17 @@ class EvolverApp:
         # same on the tray. This one carries the run that was clicked.
         self._window.log_requested.connect(self._show_run_log)
 
+        self._tray = EvolverTray(self._session.name, shown_as=branch_session.shown_as())
+        self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
+        self._scheduler.status_changed.connect(self._tray.show_schedule)
+        self._scheduler.status_changed.connect(self._window.show_schedule)
+
         # The non-AI opt-in is read at every start rather than held from
         # construction: it can be switched between runs.
         self._runs = RunController(
             self._window, lambda: self._settings.nonai_upscale_enabled)
         self._scheduler.run_requested.connect(self._runs.start)
-        self._runs.run_started.connect(self._on_run_started)
-        self._runs.run_ended.connect(self._on_run_ended)
+        self._runs.run_started.connect(self._scheduler.mark_running)
         self._runs.run_finished.connect(self._on_finished)
         self._runs.run_failed.connect(self._on_error)
         self._runs.run_overran.connect(self._on_overrun)
@@ -170,21 +173,23 @@ class EvolverApp:
         self._queue = QueueController(self._window, self._background)
         self._queue.run_wanted.connect(self._runs.start_when_free)
         self._queue.presence_poll_wanted.connect(self._presence.poll)
+        # A run is what starts, promotes and fails encodes, so the queue on
+        # screen is a run old the moment one ends.
+        self._runs.run_ended.connect(self._scheduler.mark_idle)
+        self._runs.run_ended.connect(self._window.refresh_history)
+        self._runs.run_ended.connect(self._queue.refresh)
 
         shared_commands = {
             "run_now": self._scheduler.run_now,
-            "pause": self._toggle_pause,
+            "pause": self._scheduler.toggle_pause,
             "nonai": self._set_nonai_enabled,
             "settings": self._show_settings,
             "stats": self._show_stats,
             "queue": self._queue.show,
-            "backfill": self._launch_backfill,
-            "review_weird": self._launch_review_weird,
+            "backfill": partial(self._launch_tool, "backfill_app.py"),
+            "review_weird": partial(self._launch_tool, "review_weird_app.py"),
             "restart": self._restart,
         }
-
-        self._tray = EvolverTray(self._session.name, shown_as=branch_session.shown_as())
-        self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
         _wire(self._tray, {**shared_commands,
                            "open": self._show_window, "quit": self._session.quit})
         # Quit is the one command that means something different here: from the
@@ -263,12 +268,6 @@ class EvolverApp:
         self._window.raise_()
         self._window.activateWindow()
 
-    def _toggle_pause(self):
-        if self._scheduler.is_paused:
-            self._scheduler.resume()
-        else:
-            self._scheduler.pause()
-
     def _set_nonai_enabled(self, enabled: bool):
         """Persist the one-time opt-in; presence polling and the next tick act on it."""
         self._settings.nonai_upscale_enabled = enabled
@@ -316,12 +315,6 @@ class EvolverApp:
         self._log_window.raise_()
         self._log_window.activateWindow()
 
-    def _launch_backfill(self):
-        self._launch_tool("backfill_app.py")
-
-    def _launch_review_weird(self):
-        self._launch_tool("review_weird_app.py")
-
     def _launch_tool(self, script: str):
         # Its own process: a tool plays video, and a media backend that wedges
         # or crashes must not take the tray down with it.
@@ -329,21 +322,6 @@ class EvolverApp:
             [sys.executable, str(self._checkout / script)],
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
-
-    def _update_status_display(self, status):
-        """Push scheduling state to tray and window."""
-        self._tray.show_schedule(status)
-        self._window.show_schedule(status)
-
-    def _on_run_started(self):
-        self._scheduler.mark_running()
-
-    def _on_run_ended(self):
-        self._scheduler.mark_idle()
-        self._window.refresh_history()
-        # A run is what starts, promotes and fails encodes, so the queue on
-        # screen is a run old the moment one ends.
-        self._queue.refresh()
 
     def _notify(self, body: str, icon: QSystemTrayIcon.MessageIcon, msecs: int):
         """Say something in a tray balloon, if the user asked for balloons."""

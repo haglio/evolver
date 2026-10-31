@@ -56,6 +56,12 @@ class PipelineScheduler(QObject):
         self._paused = False
         self._schedule_next()
 
+    def toggle_pause(self):
+        if self._paused:
+            self.resume()
+        else:
+            self.pause()
+
     def run_now(self):
         if not self._running:
             self.run_requested.emit("manual")
