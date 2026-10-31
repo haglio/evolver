@@ -6,10 +6,12 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app_support.video_names import UPSCALE_SUFFIX
+
 import config
 from util.alert import show_error
 from util.media_files import library_videos
-from util.variants import UPSCALE_SUFFIX, upscaled_stem
+from util.variants import upscaled_stem
 
 log = logging.getLogger(__name__)
 

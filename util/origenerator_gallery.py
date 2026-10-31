@@ -27,9 +27,10 @@ from collections.abc import Callable, Iterable
 from fractions import Fraction
 from pathlib import Path
 
+from app_support.video_names import strip_processing_suffixes
+
 import config
 from util.media_files import strip_uniquifier
-from util.variants import strip_processing_suffixes
 
 log = logging.getLogger(__name__)
 

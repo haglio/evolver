@@ -21,11 +21,13 @@ from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
 
+from app_support.video_names import strip_processing_suffixes
+
 import config
 from util import same_footage, sidecar, weird_piles
 from util.media_files import file_size, is_finalized_video_file
 from util.nonai_library import buckets
-from util.variants import is_processed_stem, strip_processing_suffixes
+from util.variants import is_processed_stem
 from util.version_groups import group_ids
 from util.video_type import duration_of
 

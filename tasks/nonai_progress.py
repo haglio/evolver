@@ -28,10 +28,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.video_names import strip_processing_suffixes
+
 from util import sidecar, video_type
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
-from util.variants import is_processed_stem, strip_processing_suffixes
+from util.variants import is_processed_stem
 
 
 @dataclass(frozen=True)

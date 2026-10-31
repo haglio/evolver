@@ -26,11 +26,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from app_support.video_names import stable_title
 
 from util import lanes, sidecar
 from util.frame_hashes import SAMPLE_FPS, Match, align, frame_hashes, locate, sample_frames
 from util.media_files import file_size
-from util.version_groups import stable_title
 
 log = logging.getLogger(__name__)
 
@@ -188,7 +188,7 @@ def _scene_cuts(scenes: list[Path]) -> list[_SceneCut]:
     """*scenes* folded so that each cut of footage appears once.
 
     Versions of one cut agree on their whole reduced title
-    (:func:`util.version_groups.stable_title`), which is stricter than the
+    (``app_support.video_names.stable_title``), which is stricter than the
     prefix rule that families a bucket: a performer's second scene begins with
     her name too, and folding it into her first would decode one and leave the
     other unmatchable. A name that reduces to nothing is a version of nothing
