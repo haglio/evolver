@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 from shared_ui.loading_window import Loading, LoadingCanceled
 
 import config
-import evolver
 from gui import branch_session, peer_watch, process_identity, single_instance
 from gui.background import BackgroundQueue
 from gui.log_window import RunLogWindow
@@ -26,7 +25,7 @@ from gui.main_window import EvolverMainWindow
 from gui.one_window import OneWindow
 from gui.palette import apply_accent
 from gui.presence_throttle import PresenceThrottle
-from gui.queue_window import UpscaleQueueWindow
+from gui.queue_controller import QueueController
 from gui.run_controller import RunController
 from gui.run_history import RunHistory
 from gui.run_record import RunRecord, format_run_label
@@ -116,7 +115,6 @@ class EvolverApp:
         self._name = branch_session.app_name()
         self._settings = EvolverSettings.load()
         self._stats = OneWindow()
-        self._queue = OneWindow()
         # The queue window's reads and verbs reach into the non-AI stage, which
         # a run can hold for as long as starting an encode takes.
         self._background = BackgroundQueue()
@@ -149,31 +147,9 @@ class EvolverApp:
         self._hand_back.setInterval(branch_session.HAND_BACK_AFTER_MINUTES * 60_000)
         self._hand_back.timeout.connect(self._hand_back_when_free)
 
-        shared_commands = {
-            "run_now": self._scheduler.run_now,
-            "pause": self._toggle_pause,
-            "nonai": self._set_nonai_enabled,
-            "settings": self._show_settings,
-            "stats": self._show_stats,
-            "queue": self._show_queue,
-            "backfill": self._launch_backfill,
-            "review_weird": self._launch_review_weird,
-            "restart": self._restart,
-        }
-
-        self._tray = EvolverTray(self._name, shown_as=branch_session.shown_as())
-        self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
-        _wire(self._tray, {**shared_commands,
-                           "open": self._show_window, "quit": self._quit_by_request})
-
-        self._app.commitDataRequest.connect(self._on_session_end)
-
         self._window = EvolverMainWindow()
         self._window.setWindowTitle(self._name)
         self._window.set_nonai_enabled(self._settings.nonai_upscale_enabled)
-        # Quit is the one command that means something different here: from the
-        # window it asks first, because the window is where a stray click lands.
-        _wire(self._window, {**shared_commands, "quit": self._confirm_quit})
         # Not one of the window's commands: those are the toolbar's, named the
         # same on the tray. This one carries the run that was clicked.
         self._window.log_requested.connect(self._show_run_log)
@@ -188,6 +164,32 @@ class EvolverApp:
         self._runs.run_finished.connect(self._on_finished)
         self._runs.run_failed.connect(self._on_error)
         self._runs.run_overran.connect(self._on_overrun)
+
+        self._queue = QueueController(self._window, self._background)
+        self._queue.run_wanted.connect(self._runs.start_when_free)
+        self._queue.presence_poll_wanted.connect(self._presence.poll)
+
+        shared_commands = {
+            "run_now": self._scheduler.run_now,
+            "pause": self._toggle_pause,
+            "nonai": self._set_nonai_enabled,
+            "settings": self._show_settings,
+            "stats": self._show_stats,
+            "queue": self._queue.show,
+            "backfill": self._launch_backfill,
+            "review_weird": self._launch_review_weird,
+            "restart": self._restart,
+        }
+
+        self._tray = EvolverTray(self._name, shown_as=branch_session.shown_as())
+        self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
+        _wire(self._tray, {**shared_commands,
+                           "open": self._show_window, "quit": self._quit_by_request})
+        # Quit is the one command that means something different here: from the
+        # window it asks first, because the window is where a stray click lands.
+        _wire(self._window, {**shared_commands, "quit": self._confirm_quit})
+
+        self._app.commitDataRequest.connect(self._on_session_end)
 
         self._updates = production_update.UpdateWatch(
             self._checkout, a_good_moment=self._a_good_moment_for_an_update,
@@ -360,62 +362,6 @@ class EvolverApp:
         if window is self._stats.current:
             window.show_history(history)
 
-    def _show_queue(self):
-        self._queue.show(self._queue_window_wired_to_its_verbs)
-
-    def _queue_window_wired_to_its_verbs(self) -> UpscaleQueueWindow:
-        window = UpscaleQueueWindow(self._window)
-        window.arranged.connect(self._arrange_queue)
-        window.placed_first.connect(self._upscale_next)
-        window.now_requested.connect(self._upscale_now)
-        window.now_withdrawn.connect(self._withdraw_upscale_now)
-        window.refresh_wanted.connect(self._refresh_queue)
-        self._background.run(evolver.upscale_lineup, then=self._draw_queue)
-        return window
-
-    def _arrange_queue(self, videos: list):
-        """Keep the order the window was just put in — it leads the next run."""
-        self._background.run(partial(evolver.arrange_upscale_queue, videos))
-
-    def _upscale_next(self, video: str):
-        """Put *video* first; it starts at the usual moment, like any other."""
-        self._background.run(partial(evolver.upscale_next, video),
-                             then=lambda _: self._refresh_queue())
-
-    def _upscale_now(self, video: str):
-        """Ask for *video* now, and bring the run that starts it forward.
-
-        Encodes start on a pipeline run and nowhere else, so without this the
-        video asked for would wait out the rest of the ten-minute interval.
-        """
-        self._background.run(partial(evolver.upscale_now, video),
-                             then=self._start_what_was_asked_for)
-
-    def _start_what_was_asked_for(self, _):
-        self._refresh_queue()
-        self._runs.start_when_free("manual")
-
-    def _withdraw_upscale_now(self):
-        """Stop asking for the video on the first row, and park it if you're here.
-
-        The poll that parks an encode for the user's presence runs every twenty
-        seconds; polling as soon as the ask is gone is what makes the click take
-        effect while they are looking at it.
-        """
-        self._background.run(evolver.withdraw_upscale_now, then=self._park_if_present)
-
-    def _park_if_present(self, _):
-        self._presence.poll()
-        self._refresh_queue()
-
-    def _refresh_queue(self):
-        if self._queue.current is not None:
-            self._background.run(evolver.upscale_lineup, then=self._draw_queue)
-
-    def _draw_queue(self, lineup):
-        if self._queue.current is not None:
-            self._queue.current.show_lineup(lineup)
-
     def _show_run_log(self, record: RunRecord):
         """Open the log where this run wrote, rather than at its top.
 
@@ -467,7 +413,7 @@ class EvolverApp:
         self._window.refresh_history()
         # A run is what starts, promotes and fails encodes, so the queue on
         # screen is a run old the moment one ends.
-        self._refresh_queue()
+        self._queue.refresh()
 
     def _notify(self, body: str, icon: QSystemTrayIcon.MessageIcon, msecs: int):
         """Say something in a tray balloon, if the user asked for balloons."""
