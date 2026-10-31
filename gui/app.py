@@ -41,8 +41,6 @@ from util.alert import show_error
 
 log = logging.getLogger(__name__)
 
-# How long a preview whose time is up waits for the run in flight to end.
-_HAND_BACK_RETRY_MS = 60_000
 _UPDATE_CHECK_MS = 60_000
 
 _SHOW_WINDOW = "--show-window"
@@ -119,11 +117,7 @@ class EvolverApp:
         self._app.setApplicationName("Evolver")
         apply_accent(self._app)
 
-        # Read once: what this process is was settled by the launcher that
-        # started it, and every branch below has to give the same answer.
-        self._branch_session = branch_session.is_one()
         self._checkout = config.PROJECT_DIR
-        self._name = branch_session.app_name()
         self._settings = EvolverSettings.load()
         self._stats = OneWindow()
         # The queue window's reads and verbs reach into the non-AI stage, which
@@ -131,6 +125,9 @@ class EvolverApp:
         self._background = BackgroundQueue()
         self._log_window: RunLogWindow | None = None
         self._instance = InstanceGateway()
+        self._session = branch_session.BranchSession(
+            self._instance, a_run_is_going=lambda: self._runs.is_running)
+        self._session.leaving.connect(self._shutdown)
         self._sign_in_notice = SignInNotice()
 
         # Parks and thaws the in-flight non-AI encode between the slow pipeline
@@ -152,14 +149,8 @@ class EvolverApp:
         self._scheduler = PipelineScheduler(interval_minutes=self._settings.interval_minutes)
         self._scheduler.status_changed.connect(self._update_status_display)
 
-        # A preview's own end: see gui/branch_session.py.
-        self._hand_back = QTimer()
-        self._hand_back.setSingleShot(True)
-        self._hand_back.setInterval(branch_session.HAND_BACK_AFTER_MINUTES * 60_000)
-        self._hand_back.timeout.connect(self._hand_back_when_free)
-
         self._window = EvolverMainWindow()
-        self._window.setWindowTitle(self._name)
+        self._window.setWindowTitle(self._session.name)
         self._window.set_nonai_enabled(self._settings.nonai_upscale_enabled)
         # Not one of the window's commands: those are the toolbar's, named the
         # same on the tray. This one carries the run that was clicked.
@@ -192,10 +183,10 @@ class EvolverApp:
             "restart": self._restart,
         }
 
-        self._tray = EvolverTray(self._name, shown_as=branch_session.shown_as())
+        self._tray = EvolverTray(self._session.name, shown_as=branch_session.shown_as())
         self._tray.set_nonai_enabled(self._settings.nonai_upscale_enabled)
         _wire(self._tray, {**shared_commands,
-                           "open": self._show_window, "quit": self._quit_by_request})
+                           "open": self._show_window, "quit": self._session.quit})
         # Quit is the one command that means something different here: from the
         # window it asks first, because the window is where a stray click lands.
         _wire(self._window, {**shared_commands, "quit": self._confirm_quit})
@@ -212,7 +203,7 @@ class EvolverApp:
     def _a_good_moment_for_an_update(self) -> bool:
         on_screen = (self._window.isVisible(), self._stats.is_on_screen, self._queue.is_on_screen,
                      self._log_window is not None and self._log_window.isVisible())
-        return not self._branch_session and not self._runs.is_running and not any(on_screen)
+        return not self._session.is_preview and not self._runs.is_running and not any(on_screen)
 
     def start(self) -> None:
         """Everything the app does to the machine, in the order it must happen.
@@ -225,10 +216,8 @@ class EvolverApp:
         self._window.refresh_history()
         self._tray.show()
         self._keep_the_schedule()
-        if self._branch_session:
-            self._hand_back.start()
-            self._window.setWindowTitle(
-                f"{self._name}, until {branch_session.until(datetime.now())}")
+        self._session.take_the_work()
+        self._window.setWindowTitle(self._session.title(datetime.now()))
         if _SHOW_WINDOW in sys.argv:
             self._show_window()
 
@@ -245,32 +234,9 @@ class EvolverApp:
         self._update_timer.start()
         self._peer.tick()
 
-    def _hand_back_when_free(self):
-        """Hand the work back, unless a run is mid-stage; then try again later.
-
-        Handing back quits, and a quit gives the stage in flight five seconds.
-        """
-        if self._runs.is_running:
-            self._hand_back.start(_HAND_BACK_RETRY_MS)
-            return
-        self._hand_back_now()
-
-    def _hand_back_now(self):
-        """Give the usual Evolver its work back, and quit.
-
-        The claim goes first, so the Evolver started next can take it at once:
-        one from before launches spoke hands its launch to whoever holds the
-        claim, and would open this preview's window instead. Should it fail to
-        start, the broker's watch starts it, since a preview never stands
-        Evolver down.
-        """
-        self._instance.let_go()
-        branch_session.start_the_usual_evolver()
-        self._shutdown()
-
     def run(self) -> int:
         outcome = self._instance.become_evolver(
-            as_preview=self._branch_session,
+            as_preview=self._session.is_preview,
             only_if_not_running=single_instance.IF_NOT_RUNNING in sys.argv)
         if outcome is Outcome.UNANSWERED:
             _say_the_running_evolver_did_not_answer(self._app)
@@ -285,29 +251,12 @@ class EvolverApp:
         except LoadingCanceled:
             return 0
 
-        self._instance.serve_launches(steps_aside_for=self._steps_aside_for,
+        self._instance.serve_launches(steps_aside_for=self._session.steps_aside_for,
                                       on_show=self._show_window,
-                                      on_step_aside=self._step_aside)
+                                      on_step_aside=self._session.step_aside)
         self.start()
         loading.done()
         return self._app.exec()
-
-    def _steps_aside_for(self, launch: bytes) -> bool:
-        """Whether a launch that found this Evolver running takes the work from it.
-
-        A preview always does -- that is what it was launched for -- and a
-        preview makes way for the Evolver the user runs, which is how a preview
-        forgotten about ends. A launcher that says nothing predates the answers
-        and leaves on the connection, so for that one the window opens.
-        """
-        if launch == single_instance.PREVIEW:
-            return True
-        return self._branch_session and launch == single_instance.USUAL
-
-    def _step_aside(self):
-        """Quit for the Evolver taking the work over, without standing Evolver down."""
-        crash_log.write_info("Stepping aside:", "another Evolver is taking the work over\n")
-        self._shutdown()
 
     def _show_window(self):
         self._window.show()
@@ -450,36 +399,19 @@ class EvolverApp:
         result = QMessageBox.question(
             self._window,
             "Quit Evolver",
-            "Quit this preview? Your usual Evolver takes the work back."
-            if self._branch_session else "Are you sure?",
+            self._session.quit_question(),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if result == QMessageBox.StandardButton.Yes:
-            self._quit_by_request()
+            self._session.quit()
 
     def _restart(self):
         showing = self._window.isVisible()
-        launcher = ("launch_preview_branch.vbs" if self._branch_session
-                    else "launch_evolver_showing_its_window.vbs" if showing else "launch_evolver.vbs")
+        launcher = self._session.restart_launcher(showing=showing)
         production_update.start_again_after(os.getpid(), self._checkout / launcher)
         if showing:
             ctypes.windll.user32.AllowSetForegroundWindow(_ANY_PROCESS)
-        self._shutdown()
-
-    def _quit_by_request(self):
-        """Quit because the user asked for it — the one quit the broker honors.
-
-        Every other way Evolver goes down leaves no mark and is undone within the
-        quarter hour: a crash, a kill from the task list, the quit above that
-        Windows asks for when it announces a session end and then, sometimes,
-        cancels. This one leaves a mark, so closing Evolver on purpose is not
-        argued with. Starting it again clears the mark; see start().
-        """
-        if self._branch_session:
-            self._hand_back_now()
-            return
-        peer_watch.stand_evolver_down()
         self._shutdown()
 
     def _shutdown(self):

@@ -14,7 +14,6 @@ import json
 import os
 import subprocess
 import sys
-from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import Mock, call, patch
 
@@ -120,7 +119,16 @@ class TestWhatABranchSessionTakesOver:
 
         self._started(app)
 
-        assert not app._hand_back.isActive()
+        assert not app._session._hand_back.isActive()
+
+
+def _session(*, preview: bool, a_run_is_going: bool = False):
+    """A session over a stand-in gateway, with the steps of leaving recorded in order."""
+    steps = Mock()
+    with override_config(BRANCH_SESSION=preview):
+        session = branch_session.BranchSession(steps.gateway, lambda: a_run_is_going)
+    session.leaving.connect(steps.leaving)
+    return session, steps
 
 
 class TestHandingTheWorkBack:
@@ -136,58 +144,74 @@ class TestHandingTheWorkBack:
             app.start()
         return app
 
-    def _handing_back(self, app):
-        """The three steps of handing back, recorded in the order they ran."""
-        steps = Mock()
-        return steps, ExitStack(), [
-            patch.object(app._instance, "let_go", steps.let_go),
-            patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver),
-            patch.object(app, "_shutdown", steps.shutdown),
-        ]
-
-    def test_once_it_has_had_its_time_it_makes_way_for_the_usual_evolver(self, request):
+    def test_once_it_has_had_its_time_it_makes_way_for_the_usual_evolver(self):
         """The claim goes first, so the usual Evolver can take it at once: one
         from before launches spoke hands its launch to whoever holds the
         claim, which would open the preview's window instead."""
-        app = self._started_preview(request)
-        steps, stack, patches = self._handing_back(app)
+        session, steps = _session(preview=True)
+        session.take_the_work()
 
-        assert app._hand_back.isActive()
-        assert app._hand_back.interval() == branch_session.HAND_BACK_AFTER_MINUTES * 60_000
-        with stack:
-            for each in patches:
-                stack.enter_context(each)
-            app._hand_back.timeout.emit()
+        assert session._hand_back.isActive()
+        assert session._hand_back.interval() == branch_session.HAND_BACK_AFTER_MINUTES * 60_000
+        with patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver):
+            session._hand_back.timeout.emit()
 
-        assert steps.mock_calls == [call.let_go(), call.start_the_usual_evolver(),
-                                    call.shutdown()]
+        assert steps.mock_calls == [call.gateway.let_go(), call.start_the_usual_evolver(),
+                                    call.leaving()]
 
-    def test_a_run_in_flight_is_let_finish_first(self, request):
+    def test_a_run_in_flight_is_let_finish_first(self):
         """Quitting gives the stage in flight five seconds, and the run it
         belongs to is the branch's own work."""
-        app = self._started_preview(request)
-        steps, stack, patches = self._handing_back(app)
+        session, steps = _session(preview=True, a_run_is_going=True)
+        session.take_the_work()
 
-        with stack, patch.object(type(app._runs), "is_running", new=True):
-            for each in patches:
-                stack.enter_context(each)
-            app._hand_back.timeout.emit()
+        with patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver):
+            session._hand_back.timeout.emit()
 
         assert steps.mock_calls == []
-        assert app._hand_back.isActive()
+        assert session._hand_back.isActive()
+        assert session._hand_back.interval() == branch_session.HAND_BACK_RETRY_MS
 
-    def test_quitting_a_preview_hands_the_work_back_at_once(self, request):
-        app = self._started_preview(request)
-        steps, stack, patches = self._handing_back(app)
+    def test_the_usual_evolver_never_starts_the_hour(self):
+        session, _steps = _session(preview=False)
 
-        with stack, patch("gui.app.peer_watch.stand_evolver_down") as stood_down:
-            for each in patches:
-                stack.enter_context(each)
-            app._quit_by_request()
+        session.take_the_work()
 
-        assert steps.mock_calls == [call.let_go(), call.start_the_usual_evolver(),
-                                    call.shutdown()]
+        assert not session._hand_back.isActive()
+
+    def test_quitting_a_preview_hands_the_work_back_at_once(self):
+        session, steps = _session(preview=True)
+
+        with patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver), \
+             patch("gui.peer_watch.stand_evolver_down") as stood_down:
+            session.quit()
+
+        assert steps.mock_calls == [call.gateway.let_go(), call.start_the_usual_evolver(),
+                                    call.leaving()]
         stood_down.assert_not_called()
+
+    def test_quitting_the_usual_evolver_stands_it_down_and_leaves(self):
+        """The one quit the broker honors: every other way Evolver goes down is
+        undone within the quarter hour."""
+        session, steps = _session(preview=False)
+
+        with patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver), \
+             patch("gui.peer_watch.stand_evolver_down", steps.stand_evolver_down):
+            session.quit()
+
+        assert steps.mock_calls == [call.stand_evolver_down(), call.leaving()]
+
+    def test_stepping_aside_leaves_without_standing_evolver_down(self):
+        """Whoever asked is taking the work over; the broker must not be told
+        to leave Evolver down."""
+        session, steps = _session(preview=False)
+
+        with patch("gui.peer_watch.stand_evolver_down", steps.stand_evolver_down), \
+             patch("util.crash_log.write_info") as logged:
+            session.step_aside()
+
+        assert steps.mock_calls == [call.leaving()]
+        assert "stepping aside" in logged.call_args.args[0].lower()
 
     def test_the_windows_quit_says_the_work_goes_back_before_it_does(self, request):
         app = self._started_preview(request)
@@ -200,16 +224,13 @@ class TestHandingTheWorkBack:
         assert "Your usual Evolver takes the work back" in asked.call_args.args[2]
         started.assert_not_called()
 
-    def test_quitting_the_usual_evolver_still_stands_it_down(self, request):
+    def test_leaving_the_work_quits_the_app(self, request):
         app = build_evolver_app(request)
 
-        with patch("gui.branch_session.start_the_usual_evolver") as started, \
-             patch("gui.app.peer_watch.stand_evolver_down") as stood_down, \
-             patch.object(app, "_shutdown"):
-            app._quit_by_request()
+        with patch.object(app._app, "quit") as quit_the_application:
+            app._session.leaving.emit()
 
-        started.assert_not_called()
-        stood_down.assert_called_once_with()
+        quit_the_application.assert_called_once_with()
 
     def test_the_window_says_when_the_work_goes_back(self, request):
         with patch("util.preview.preview_of", return_value=Preview(feature="the new queue window")):

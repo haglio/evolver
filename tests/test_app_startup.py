@@ -511,7 +511,7 @@ class TestRestart:
 
     def _restarted(self, request, *, window_visible=False, branch_session=False):
         app = build_evolver_app(request)
-        app._branch_session = branch_session
+        app._session.is_preview = branch_session
         with patch("gui.app.production_update.start_again_after") as start_again, \
              patch.object(app, "_shutdown") as quit_this_copy, \
              patch.object(app._window, "isVisible", return_value=window_visible), \
@@ -572,7 +572,7 @@ class TestTakingAnUpdate:
                             lambda checkout: checkout == config.PROJECT_DIR)
         with patch("gui.app.BackgroundQueue", DoneAtOnce):
             app = build_evolver_app(request)
-        app._branch_session = branch_session
+        app._session.is_preview = branch_session
         if open_window is not None:
             open_window(app)
         with patch("gui.app.production_update.start_again_after") as start_again, \
@@ -771,11 +771,11 @@ class TestAnsweringLaunches:
         to leave Evolver down."""
         app, served = self._run_as_first_instance(request)
 
-        with patch.object(app, "_shutdown") as shutdown, \
-             patch("gui.app.peer_watch.stand_evolver_down") as stood_down:
+        with patch.object(app._app, "quit") as quit_the_application, \
+             patch("gui.peer_watch.stand_evolver_down") as stood_down:
             served["on_step_aside"]()
 
-        shutdown.assert_called_once_with()
+        quit_the_application.assert_called_once_with()
         stood_down.assert_not_called()
 
     def test_an_evolver_on_its_way_out_answers_no_more_launches(self, request):

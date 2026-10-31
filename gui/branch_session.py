@@ -24,16 +24,22 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from shared_ui.preview import taskbar_identity, window_title
 
 import config
+from gui import peer_watch, single_instance
+from util import crash_log
 from util.preview import shown_as
 
 #: How long a preview keeps the work if nobody quits it.
 HAND_BACK_AFTER_MINUTES = 60
+#: How long a preview whose time is up waits for the run in flight to end.
+HAND_BACK_RETRY_MS = 60_000
 
 
 def is_one() -> bool:
@@ -61,6 +67,84 @@ def relaunch_command() -> str:
     if is_one():
         return f'wscript.exe "{config.PROJECT_DIR / "launch_preview_branch.vbs"}"'
     return f'"{sys.executable}" "{config.PROJECT_DIR / "tray_app.py"}" --show-window'
+
+
+class BranchSession(QObject):
+    """This Evolver's turn at the work: how it answers another launch, and how it ends.
+
+    A preview's ends by handing the work back -- after its hour, or when it is
+    quit -- and the usual Evolver's when he quits it, standing it down so the
+    broker leaves it down.
+    """
+
+    #: This Evolver is done with the work: handed back, or taken over.
+    leaving = pyqtSignal()
+
+    def __init__(self, instance: single_instance.InstanceGateway,
+                 a_run_is_going: Callable[[], bool], parent=None):
+        super().__init__(parent)
+        # Read once: which Evolver this process is was settled by the launcher
+        # that started it, and every answer here has to agree.
+        self.is_preview = is_one()
+        self.name = app_name()
+        self._instance = instance
+        self._a_run_is_going = a_run_is_going
+        self._hand_back = QTimer(self)
+        self._hand_back.setSingleShot(True)
+        self._hand_back.setInterval(HAND_BACK_AFTER_MINUTES * 60_000)
+        self._hand_back.timeout.connect(self._hand_back_when_free)
+
+    def take_the_work(self) -> None:
+        if self.is_preview:
+            self._hand_back.start()
+
+    def title(self, now: datetime) -> str:
+        return f"{self.name}, until {until(now)}" if self.is_preview else self.name
+
+    def steps_aside_for(self, launch: bytes) -> bool:
+        """Whether a launch that found this Evolver running takes the work from it.
+
+        A preview always does, and a preview makes way for the Evolver the
+        user runs. A launcher that says nothing predates the answers and
+        leaves on the connection, so for that one the window opens.
+        """
+        if launch == single_instance.PREVIEW:
+            return True
+        return self.is_preview and launch == single_instance.USUAL
+
+    def step_aside(self) -> None:
+        crash_log.write_info("Stepping aside:", "another Evolver is taking the work over\n")
+        self.leaving.emit()
+
+    def quit(self) -> None:
+        """The quit he asked for: a preview hands the work back, the usual
+        Evolver leaves the mark that keeps the broker from starting it again."""
+        if self.is_preview:
+            self._hand_back_now()
+            return
+        peer_watch.stand_evolver_down()
+        self.leaving.emit()
+
+    def quit_question(self) -> str:
+        return ("Quit this preview? Your usual Evolver takes the work back."
+                if self.is_preview else "Are you sure?")
+
+    def restart_launcher(self, *, showing: bool) -> str:
+        if self.is_preview:
+            return "launch_preview_branch.vbs"
+        return "launch_evolver_showing_its_window.vbs" if showing else "launch_evolver.vbs"
+
+    def _hand_back_when_free(self) -> None:
+        if self._a_run_is_going():
+            self._hand_back.start(HAND_BACK_RETRY_MS)
+            return
+        self._hand_back_now()
+
+    def _hand_back_now(self) -> None:
+        """The claim goes first, so the Evolver started next can take it at once."""
+        self._instance.let_go()
+        start_the_usual_evolver()
+        self.leaving.emit()
 
 
 _WHAT_ONLY_A_PREVIEW_RUNS_WITH = (config.BRANCH_SESSION_FLAG, "PYTHONPATH")
