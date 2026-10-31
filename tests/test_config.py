@@ -39,9 +39,9 @@ class TestWhatEvolverWillNotOpenWithout(unittest.TestCase):
             short.write_text(json.dumps(lines), encoding="utf-8")
             started = self._import_config_on(short)
 
-        self.assertNotEqual(started.returncode, 0)
-        self.assertIn("MissingOverlayKey", started.stderr)
-        self.assertIn("excerpt_folders", started.stderr)
+        assert started.returncode != 0
+        assert "MissingOverlayKey" in started.stderr
+        assert "excerpt_folders" in started.stderr
 
     def test_the_pyproject_says_it_needs_every_key_of_the_example_in_the_local_overlay(self):
         root = content_overlay.PROJECT_DIR
@@ -51,13 +51,12 @@ class TestWhatEvolverWillNotOpenWithout(unittest.TestCase):
             [sys.executable, "-c", "import content_overlay as c; print(c.EXAMPLE_CONTENT); print(c.LOCAL_CONTENT)"],
             cwd=root, capture_output=True, text=True, check=True)
 
-        self.assertEqual([root / declared["every-key-of"], root / declared["in"]],
-                         [Path(line) for line in compared.stdout.splitlines()])
+        assert [root / declared["every-key-of"], root / declared["in"]] == [Path(line) for line in compared.stdout.splitlines()]
 
 
 class TestProjectRoots(unittest.TestCase):
     def test_are_the_ones_all_of_haglio_shares(self):
-        self.assertEqual(config.PROJECT_ROOTS, haglio_settings.project_roots())
+        assert haglio_settings.project_roots() == config.PROJECT_ROOTS
 
 
 class TestRetiredRoot(unittest.TestCase):
@@ -66,27 +65,24 @@ class TestRetiredRoot(unittest.TestCase):
     def test_unset_means_keep_it_in_the_library(self):
         """A public checkout gets the user's own convention: the bucket's "2*"
         folder, which is what None tells the upscale stage to use."""
-        self.assertIsNone(config.retired_root({}))
+        assert config.retired_root({}) is None
 
     def test_an_empty_value_counts_as_unset(self):
-        self.assertIsNone(config.retired_root({"retired_root": ""}))
+        assert config.retired_root({"retired_root": ""}) is None
 
     def test_reads_the_archive_from_the_overlay(self):
-        self.assertEqual(
-            config.retired_root({"retired_root": "A:/cold storage"}),
-            Path("A:/cold storage"),
-        )
+        assert config.retired_root({"retired_root": "A:/cold storage"}) == Path("A:/cold storage")
 
 
 class TestVrVideoDir(unittest.TestCase):
     def test_unset_means_the_vr_videos_sit_in_the_library(self):
-        self.assertIsNone(config.vr_video_dir({}))
+        assert config.vr_video_dir({}) is None
 
     def test_an_empty_value_counts_as_unset(self):
-        self.assertIsNone(config.vr_video_dir({"vr_videos": ""}))
+        assert config.vr_video_dir({"vr_videos": ""}) is None
 
     def test_reads_where_the_vr_videos_are_kept_from_the_overlay(self):
-        self.assertEqual(config.vr_video_dir({"vr_videos": "Q:/cloud/VR"}), Path("Q:/cloud/VR"))
+        assert config.vr_video_dir({"vr_videos": "Q:/cloud/VR"}) == Path("Q:/cloud/VR")
 
 
 class TestFoldersTheSharedSettingsPlace(unittest.TestCase):
@@ -114,8 +110,7 @@ class TestFoldersTheSharedSettingsPlace(unittest.TestCase):
                 env={**os.environ, haglio_settings.SETTINGS_ENV: str(settings)},
             )
 
-        self.assertEqual(json.loads(read.stdout),
-                         {key: str(Path(place)) for key, place in places.items()})
+        assert json.loads(read.stdout) == {key: str(Path(place)) for key, place in places.items()}
 
 
 class TestTopazPaths(unittest.TestCase):
@@ -125,16 +120,13 @@ class TestTopazPaths(unittest.TestCase):
     def test_an_overlay_that_says_nothing_gets_the_installer_s_own_paths(self):
         ffmpeg, models = config.topaz_paths({})
 
-        self.assertEqual(ffmpeg.name, "ffmpeg.exe")
-        self.assertEqual(models.name, "models")
-        self.assertTrue(ffmpeg.is_absolute())
-        self.assertTrue(models.is_absolute())
+        assert ffmpeg.name == "ffmpeg.exe"
+        assert models.name == "models"
+        assert ffmpeg.is_absolute()
+        assert models.is_absolute()
 
     def test_an_empty_value_counts_as_unset(self):
-        self.assertEqual(
-            config.topaz_paths({"topaz_ffmpeg": "", "topaz_models": ""}),
-            config.topaz_paths({}),
-        )
+        assert config.topaz_paths({"topaz_ffmpeg": "", "topaz_models": ""}) == config.topaz_paths({})
 
     def test_a_machine_that_installed_it_elsewhere_says_so_in_the_overlay(self):
         ffmpeg, models = config.topaz_paths({
@@ -142,16 +134,16 @@ class TestTopazPaths(unittest.TestCase):
             "topaz_models": "E:/topaz-models",
         })
 
-        self.assertEqual(ffmpeg, Path("D:/Apps/Topaz Video/ffmpeg.exe"))
-        self.assertEqual(models, Path("E:/topaz-models"))
+        assert ffmpeg == Path("D:/Apps/Topaz Video/ffmpeg.exe")
+        assert models == Path("E:/topaz-models")
 
     def test_either_one_can_move_without_the_other(self):
         """They sit in different trees on a stock install, so an overlay that
         moves one is not saying anything about the other."""
         ffmpeg, models = config.topaz_paths({"topaz_models": "E:/topaz-models"})
 
-        self.assertEqual(ffmpeg, config.topaz_paths({})[0])
-        self.assertEqual(models, Path("E:/topaz-models"))
+        assert ffmpeg == config.topaz_paths({})[0]
+        assert models == Path("E:/topaz-models")
 
 
 class TestProjectDir(unittest.TestCase):
@@ -162,7 +154,7 @@ class TestProjectDir(unittest.TestCase):
 
             found = config.project_dir("alpha_app", (temp / "suite",))
 
-            self.assertEqual(found, checkout)
+            assert found == checkout
 
     def test_prefers_the_earlier_root_when_both_hold_the_checkout(self):
         with workspace_temp_dir() as temp:
@@ -172,7 +164,7 @@ class TestProjectDir(unittest.TestCase):
 
             found = config.project_dir("alpha_app", (temp / "workspace", temp / "old"))
 
-            self.assertEqual(found, moved)
+            assert found == moved
 
     def test_falls_through_to_a_later_root_for_a_checkout_that_has_not_moved(self):
         """The half-migrated state: alpha moved, beta is still where it was."""
@@ -183,7 +175,7 @@ class TestProjectDir(unittest.TestCase):
 
             found = config.project_dir("beta_app", (temp / "workspace", temp / "old"))
 
-            self.assertEqual(found, stayed)
+            assert found == stayed
 
     def test_a_sibling_that_is_not_installed_still_resolves_to_a_path(self):
         """A missing sibling still resolves to a path, so callers can .is_dir() it.
@@ -194,7 +186,7 @@ class TestProjectDir(unittest.TestCase):
         with workspace_temp_dir() as temp:
             found = config.project_dir("gamma_app", (temp / "workspace", temp / "old"))
 
-            self.assertEqual(found, temp / "workspace" / "gamma_app")
+            assert found == temp / "workspace" / "gamma_app"
 
     def test_a_file_of_that_name_does_not_count_as_the_checkout(self):
         with workspace_temp_dir() as temp:
@@ -205,7 +197,7 @@ class TestProjectDir(unittest.TestCase):
 
             found = config.project_dir("alpha_app", (temp / "workspace", temp / "old"))
 
-            self.assertEqual(found, checkout)
+            assert found == checkout
 
 
 class TestLiveDir(unittest.TestCase):
@@ -222,7 +214,7 @@ class TestLiveDir(unittest.TestCase):
 
             found = config.live_dir({}, temp / "worktree", (temp / "workspace",))
 
-            self.assertEqual(found, temp / "worktree")
+            assert found == temp / "worktree"
 
     def test_a_branch_session_uses_the_checkout_the_live_app_runs_from(self):
         with workspace_temp_dir() as temp:
@@ -232,7 +224,7 @@ class TestLiveDir(unittest.TestCase):
             found = config.live_dir({config.BRANCH_SESSION_FLAG: "1"},
                                     temp / "worktree", (temp / "workspace",))
 
-            self.assertEqual(found, live)
+            assert found == live
 
     def test_only_the_flag_the_preview_launcher_sets_counts(self):
         with workspace_temp_dir() as temp:
@@ -241,7 +233,7 @@ class TestLiveDir(unittest.TestCase):
             found = config.live_dir({config.BRANCH_SESSION_FLAG: "yes"},
                                     temp / "worktree", (temp / "workspace",))
 
-            self.assertEqual(found, temp / "worktree")
+            assert found == temp / "worktree"
 
 
 class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
@@ -255,13 +247,10 @@ class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
             ("SCRIPTURE_SESSIONS_DIR", config.SCRIPTURE_SESSIONS_DIR),
         ):
             with self.subTest(name):
-                self.assertTrue(
-                    any(path.is_relative_to(root) for root in config.PROJECT_ROOTS),
-                    f"{name} ({path}) is under none of {config.PROJECT_ROOTS}",
-                )
+                assert any(path.is_relative_to(root) for root in config.PROJECT_ROOTS), f"{name} ({path}) is under none of {config.PROJECT_ROOTS}"
 
     def test_the_derived_sibling_files_stay_anchored_to_the_fun_time_checkout(self):
-        self.assertTrue(config.FUN_TIME_WATCH_STATS_FILE.is_relative_to(config.FUN_TIME_PROJECT_DIR))
+        assert config.FUN_TIME_WATCH_STATS_FILE.is_relative_to(config.FUN_TIME_PROJECT_DIR)
 
 
 if __name__ == "__main__":
@@ -270,26 +259,16 @@ if __name__ == "__main__":
 
 class TestWarmGunJournalDirs(unittest.TestCase):
     def test_the_library_holds_the_journal_when_the_overlay_says_nothing(self):
-        self.assertEqual(
-            config.warm_gun_journal_dirs({}, Path("L:/library/app_data/warm_gun")),
-            (Path("L:/library/app_data/warm_gun"),),
-        )
+        assert config.warm_gun_journal_dirs({}, Path("L:/library/app_data/warm_gun")) == (Path("L:/library/app_data/warm_gun"),)
 
     def test_the_folder_the_phone_still_writes_to_is_read_as_well(self):
-        self.assertEqual(
-            config.warm_gun_journal_dirs({"warm_gun_outbox": "S:/WarmGun"},
-                                         Path("L:/library/app_data/warm_gun")),
-            (Path("L:/library/app_data/warm_gun"), Path("S:/WarmGun")),
-        )
+        assert config.warm_gun_journal_dirs({"warm_gun_outbox": "S:/WarmGun"}, Path("L:/library/app_data/warm_gun")) == (Path("L:/library/app_data/warm_gun"), Path("S:/WarmGun"))
 
     def test_an_empty_value_counts_as_unset(self):
-        self.assertEqual(
-            len(config.warm_gun_journal_dirs({"warm_gun_outbox": ""},
-                                             Path("L:/library/app_data/warm_gun"))), 1
-        )
+        assert len(config.warm_gun_journal_dirs({"warm_gun_outbox": ""}, Path("L:/library/app_data/warm_gun"))) == 1
 
     def test_the_phone_s_own_folder_is_the_one_the_overlay_names(self):
-        self.assertEqual(config.warm_gun_outbox({"warm_gun_outbox": "S:/WarmGun"}), Path("S:/WarmGun"))
+        assert config.warm_gun_outbox({"warm_gun_outbox": "S:/WarmGun"}) == Path("S:/WarmGun")
 
     def test_with_none_named_the_phone_has_no_folder_of_its_own(self):
-        self.assertIsNone(config.warm_gun_outbox({"warm_gun_outbox": ""}))
+        assert config.warm_gun_outbox({"warm_gun_outbox": ""}) is None

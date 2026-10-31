@@ -31,6 +31,9 @@ STAGE_COLORS = {stage.key: QColor(*stage.color) for stage in STAGES}
 
 _Y_MAX = 700.0  # seconds — keeps the 600s line near the top
 _LIMIT_SECONDS = 600.0
+_FEWEST_TICKS = 3
+_MOST_TICKS = 7
+_SECONDS_PER_MINUTE = 60
 _MARGIN_LEFT = 70
 _MARGIN_TOP = 20
 _MARGIN_LOWER = 50
@@ -74,13 +77,12 @@ def chart_right_margin() -> int:
 def _pick_y_ticks(y_max: float) -> list[float]:
     """Choose ~5 nice round tick values spanning (0, y_max], skipping 0."""
     nice = [1, 2, 5, 10, 15, 30, 60, 120, 180, 300, 600]
-    # Pick the interval that gives closest to 5 ticks
     best_step = nice[-1]
     for step in nice:
         count = int(y_max // step)
-        if count >= 3:
+        if count >= _FEWEST_TICKS:
             best_step = step
-            if count <= 7:
+            if count <= _MOST_TICKS:
                 break
     ticks = []
     val = best_step
@@ -313,7 +315,7 @@ class StackedAreaChart(QWidget):
             y = int(plot.y_of(secs))
             painter.drawLine(plot.left - 4, y, plot.left, y)
             painter.drawText(plot.left - 35, y + 4,
-                             f"{secs / 60:.0f}m" if secs >= 60 else f"{secs:.0f}s")
+                             f"{secs / _SECONDS_PER_MINUTE:.0f}m" if secs >= _SECONDS_PER_MINUTE else f"{secs:.0f}s")
 
         painter.save()
         painter.setPen(colors.BG_KEYCAP)

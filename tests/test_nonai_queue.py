@@ -45,10 +45,7 @@ class TestCollectCandidates(unittest.TestCase):
 
             # Sort both sides: which bucket name sorts first is an accident of
             # the fixture's spelling, not something this test is about.
-            self.assertEqual(
-                sorted(c.path for c in candidates),
-                sorted([flagged_video, unsorted_video]),
-            )
+            assert sorted(c.path for c in candidates) == sorted([flagged_video, unsorted_video])
 
     def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
         """A triage dir's first sub-stage holds manual pre-work (e.g. lagoon's
@@ -67,7 +64,7 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
 
-            self.assertEqual([c.path for c in candidates], [ready])
+            assert [c.path for c in candidates] == [ready]
 
     def test_finds_videos_in_a_triage_dirs_upscale_ready_substages(self):
         """Past the manual-pre-work one, a triage dir's sub-stages say in their
@@ -88,7 +85,7 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
 
-            self.assertEqual(sorted(c.path for c in candidates), [good, trimmed])
+            assert sorted(c.path for c in candidates) == [good, trimmed]
 
     def test_pinned_videos_lead_the_queue_in_the_order_listed(self):
         """The pin list is how the user says "encode this one next", so it
@@ -109,7 +106,7 @@ class TestCollectCandidates(unittest.TestCase):
                 candidates = nonai_queue.collect_candidates(
                     **queue_files(root, overrides, pin_list=pins))
 
-            self.assertEqual([c.path for c in candidates][:2], [first, second])
+            assert [c.path for c in candidates][:2] == [first, second]
 
     def test_a_pin_re_queues_a_video_that_already_has_a_processed_variant(self):
         """An existing variant normally reads as "already done". When it came
@@ -129,7 +126,7 @@ class TestCollectCandidates(unittest.TestCase):
                 candidates = nonai_queue.collect_candidates(
                     **queue_files(root, overrides, pin_list=pins))
 
-            self.assertEqual([c.path for c in candidates], [original])
+            assert [c.path for c in candidates] == [original]
 
     def test_excludes_originals_that_already_have_a_processed_variant(self):
         with workspace_temp_dir() as root:
@@ -145,7 +142,7 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
 
-            self.assertEqual([c.path for c in candidates], [fresh])
+            assert [c.path for c in candidates] == [fresh]
 
     def test_excludes_what_the_skip_list_names(self):
         with workspace_temp_dir() as root:
@@ -161,7 +158,7 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
 
-            self.assertEqual([c.path for c in candidates], [fresh])
+            assert [c.path for c in candidates] == [fresh]
 
     def test_watched_videos_outrank_funscripted_ones(self):
         """Fun Time's watch stats (once its Main Funestra tracking records them) are the
@@ -186,9 +183,7 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
 
-            self.assertEqual(
-                [c.path for c in candidates], [watched, scripted, plain, disliked]
-            )
+            assert [c.path for c in candidates] == [watched, scripted, plain, disliked]
 
     def test_orders_flagged_then_funscripted_then_the_rest(self):
         with workspace_temp_dir() as root:
@@ -206,13 +201,13 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
 
-            self.assertEqual([c.path for c in candidates], [flagged, scripted, plain])
+            assert [c.path for c in candidates] == [flagged, scripted, plain]
 
 
 class TestManifestEntries(unittest.TestCase):
     def test_a_missing_list_is_empty_rather_than_an_error(self):
         with workspace_temp_dir() as root:
-            self.assertEqual(nonai_queue.listed_videos(root / "none.txt"), [])
+            assert nonai_queue.listed_videos(root / "none.txt") == []
 
     def test_a_note_past_a_tab_is_the_users_own_and_not_part_of_the_path(self):
         with workspace_temp_dir() as root:
@@ -222,10 +217,7 @@ class TestManifestEntries(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assertEqual(
-                nonai_queue.listed_videos(path),
-                ["lagoon/0 unsorted/a.mp4", "other/0 unsorted/b.mp4"],
-            )
+            assert nonai_queue.listed_videos(path) == ["lagoon/0 unsorted/a.mp4", "other/0 unsorted/b.mp4"]
 
 
 class TestPinAhead(unittest.TestCase):
@@ -239,8 +231,7 @@ class TestPinAhead(unittest.TestCase):
             with override_config(**overrides):
                 nonai_queue.pin_ahead(pins, ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"])
 
-            self.assertEqual(nonai_queue.listed_videos(pins),
-                             ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"])
+            assert nonai_queue.listed_videos(pins) == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"]
 
     def test_the_pins_already_there_follow_in_their_order_with_their_notes(self):
         """The list is hand-edited too, so a line's note is the user's and
@@ -256,11 +247,7 @@ class TestPinAhead(unittest.TestCase):
             with override_config(**overrides):
                 nonai_queue.pin_ahead(pins, ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/c.mp4"])
 
-            self.assertEqual(pins.read_text(encoding="utf-8").splitlines(), [
-                "lagoon/0 unsorted/b.mp4",
-                "lagoon/0 unsorted/c.mp4\tredo under v2",
-                "lagoon/0 unsorted/a.mp4\tfor the weekend",
-            ])
+            assert pins.read_text(encoding="utf-8").splitlines() == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/c.mp4\tredo under v2", "lagoon/0 unsorted/a.mp4\tfor the weekend"]
 
     def test_a_pin_whose_video_has_left_the_library_is_dropped(self):
         """An upscaled original is retired out of the folder it was pinned in,
@@ -275,7 +262,7 @@ class TestPinAhead(unittest.TestCase):
             with override_config(**overrides):
                 nonai_queue.pin_ahead(pins, ["lagoon/0 unsorted/a.mp4"])
 
-            self.assertEqual(nonai_queue.listed_videos(pins), ["lagoon/0 unsorted/a.mp4"])
+            assert nonai_queue.listed_videos(pins) == ["lagoon/0 unsorted/a.mp4"]
 
 
 class TestAddToSkipManifest(unittest.TestCase):
@@ -289,11 +276,7 @@ class TestAddToSkipManifest(unittest.TestCase):
             with override_config(**overrides):
                 nonai_queue.add_to_skip_list(skip_list, video, "already tagged")
 
-            self.assertEqual(
-                skip_list.read_text(encoding="utf-8").splitlines(),
-                ["other/0 unsorted/b.mp4\tearlier",
-                 "lagoon/0 unsorted/a.mp4\talready tagged"],
-            )
+            assert skip_list.read_text(encoding="utf-8").splitlines() == ["other/0 unsorted/b.mp4\tearlier", "lagoon/0 unsorted/a.mp4\talready tagged"]
 
 
 if __name__ == "__main__":

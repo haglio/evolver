@@ -112,12 +112,7 @@ class TestStageResults(unittest.TestCase):
             for function in _out_parameters(tree, result_types)
         )
 
-        self.assertEqual(
-            offenders,
-            [],
-            "return what the helper learned and let the caller that owns the "
-            "result add it up",
-        )
+        assert offenders == [], "return what the helper learned and let the caller that owns the result add it up"
 
 
 if __name__ == "__main__":

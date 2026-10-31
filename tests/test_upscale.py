@@ -45,23 +45,23 @@ class TestUpscaleHelpers(unittest.TestCase):
             weird.mkdir(parents=True)
 
             with override_config(OUT_UPSCALED_DIR=out, WEIRD_DIR=weird):
-                self.assertFalse(upscale._already_processed("provider", "a_topaz.mp4", out, weird))
+                assert not upscale._already_processed("provider", "a_topaz.mp4", out, weird)
 
                 p1 = out / "landscape" / "provider" / "a_topaz.mp4"
                 p1.write_bytes(b"1")
-                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4", out, weird))
+                assert upscale._already_processed("provider", "a_topaz.mp4", out, weird)
 
                 p1.unlink()
                 # The portrait arm on its own -- narrowing the loop to
                 # ('landscape',) used to leave this test green (audit probe P3).
                 p2 = out / "portrait" / "provider" / "a_topaz.mp4"
                 p2.write_bytes(b"1")
-                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4", out, weird))
+                assert upscale._already_processed("provider", "a_topaz.mp4", out, weird)
 
                 p2.unlink()
                 p3 = weird / "a_topaz.mp4"
                 p3.write_bytes(b"1")
-                self.assertTrue(upscale._already_processed("provider", "a_topaz.mp4", out, weird))
+                assert upscale._already_processed("provider", "a_topaz.mp4", out, weird)
 
     def test_run_processes_dynamic_source_and_creates_out_dir(self):
         with workspace_temp_dir() as root:
@@ -76,10 +76,10 @@ class TestUpscaleHelpers(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
 
-            self.assertEqual(result.processed, 1)
-            self.assertEqual(result.failed, 0)
-            self.assertTrue((out_dir / "landscape" / source).is_dir())
-            self.assertTrue((out_dir / "landscape" / source / "clip_topaz.mp4").exists())
+            assert result.processed == 1
+            assert result.failed == 0
+            assert (out_dir / "landscape" / source).is_dir()
+            assert (out_dir / "landscape" / source / "clip_topaz.mp4").exists()
 
     def test_run_upscales_between_the_three_trees_it_is_given(self):
         """The stage spans three trees and a disk floor, and says so now.
@@ -113,10 +113,10 @@ class TestUpscaleHelpers(unittest.TestCase):
                     low_disk_floor_gb=1,
                 )
 
-            self.assertEqual(result.processed, 1)
-            self.assertTrue((given_out / "landscape" / "examplesource" / "clip one_topaz.mp4").exists())
-            self.assertFalse(ambient_out.exists())
-            self.assertTrue(ambient_in.exists())
+            assert result.processed == 1
+            assert (given_out / "landscape" / "examplesource" / "clip one_topaz.mp4").exists()
+            assert not ambient_out.exists()
+            assert ambient_in.exists()
 
     def test_a_given_outbox_outside_the_library_still_upscales(self):
         """The scraped provider's own clips, upscaled into a folder of one's own.
@@ -143,8 +143,8 @@ class TestUpscaleHelpers(unittest.TestCase):
                     low_disk_floor_gb=1,
                 )
 
-            self.assertEqual(result.processed, 1)
-            self.assertEqual(result.failed, 0)
+            assert result.processed == 1
+            assert result.failed == 0
 
     def test_collect_candidates_prioritizes_newly_sorted_files(self):
         with workspace_temp_dir() as root:
@@ -160,8 +160,8 @@ class TestUpscaleHelpers(unittest.TestCase):
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
                 candidates = upscale.collect_candidates(priority_files=[priority])
 
-            self.assertEqual(candidates[0][0], priority)
-            self.assertEqual(candidates[1][0], backlog)
+            assert candidates[0][0] == priority
+            assert candidates[1][0] == backlog
 
     def test_run_removes_stale_partial_outputs_before_processing(self):
         with workspace_temp_dir() as root:
@@ -180,9 +180,9 @@ class TestUpscaleHelpers(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=1)
 
-            self.assertEqual(result.processed, 1)
-            self.assertFalse(stale_partial.exists())
-            self.assertTrue((out_dir / "landscape" / source / "clip_topaz.mp4").exists())
+            assert result.processed == 1
+            assert not stale_partial.exists()
+            assert (out_dir / "landscape" / source / "clip_topaz.mp4").exists()
 
     def test_the_file_an_encode_writes_until_promotion_carries_no_video_extension(self):
         with workspace_temp_dir() as root:
@@ -197,7 +197,7 @@ class TestUpscaleHelpers(unittest.TestCase):
                             weird_dir=weird_dir, low_disk_floor_gb=1)
 
             written_to = run_ffmpeg.call_args.args[1]
-            self.assertNotIn(written_to.suffix.lower(), config.VIDEO_EXTENSIONS)
+            assert written_to.suffix.lower() not in config.VIDEO_EXTENSIONS
 
     def test_an_encode_ffmpeg_refused_is_recorded_as_a_failure(self):
         with workspace_temp_dir() as root:
@@ -211,8 +211,8 @@ class TestUpscaleHelpers(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
 
-            self.assertEqual(result.processed, 0)
-            self.assertEqual(result.failed, 1)
+            assert result.processed == 0
+            assert result.failed == 1
 
     def test_run_stops_early_when_budget_exceeded(self):
         with workspace_temp_dir() as root:
@@ -231,8 +231,8 @@ class TestUpscaleHelpers(unittest.TestCase):
                 result = upscale.run(max_items=10)
 
             # With budget=0, it should process the first item but stop before the second
-            self.assertEqual(result.processed, 1)
-            self.assertGreater(result.pending_after_run, 0)
+            assert result.processed == 1
+            assert result.pending_after_run > 0
 
     def test_run_stops_early_on_low_disk(self):
         with workspace_temp_dir() as root:
@@ -247,8 +247,8 @@ class TestUpscaleHelpers(unittest.TestCase):
                      patch("tasks.upscale.show_error"):
                     result = upscale.run(max_items=5)
 
-            self.assertTrue(result.deferred_low_disk)
-            self.assertEqual(result.processed, 0)
+            assert result.deferred_low_disk
+            assert result.processed == 0
             ffmpeg_mock.assert_not_called()
 
     def test_run_records_failure_when_output_is_empty(self):
@@ -267,8 +267,8 @@ class TestUpscaleHelpers(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
 
-            self.assertEqual(result.processed, 0)
-            self.assertEqual(result.failed, 1)
+            assert result.processed == 0
+            assert result.failed == 1
 
 
 FULL_DRIVE = 1
@@ -298,7 +298,7 @@ class TestTheLowDiskWarning(unittest.TestCase):
     def test_the_low_disk_warning_offers_dismiss(self):
         show_error = self.runs(FULL_DRIVE)
 
-        self.assertIs(show_error.call_args.kwargs["dismissible"], True)
+        assert show_error.call_args.kwargs["dismissible"] is True
 
     def test_a_drive_with_30_gb_free_still_upscales_a_send(self):
         with workspace_temp_dir() as root:
@@ -312,37 +312,36 @@ class TestTheLowDiskWarning(unittest.TestCase):
                                      weird_dir=weird_dir,
                                      low_disk_dismissed_file=root / "state" / "dismissed")
 
-        self.assertEqual(result.processed, 1)
+        assert result.processed == 1
         show_error.assert_not_called()
 
     def test_no_test_can_reach_the_dismissal_on_the_machine_running_the_suite(self):
         """Every upscale test with room on its drive clears the dismissal it sees."""
-        self.assertFalse(
-            config.LOW_DISK_WARNING_DISMISSED_FILE.is_relative_to(config.LOCAL_STATE_DIR))
+        assert not config.LOW_DISK_WARNING_DISMISSED_FILE.is_relative_to(config.LOCAL_STATE_DIR)
 
     def test_ok_leaves_it_coming_back_every_run_the_drive_is_low(self):
         show_error = self.runs(FULL_DRIVE, FULL_DRIVE, FULL_DRIVE)
 
-        self.assertEqual(show_error.call_count, 3)
+        assert show_error.call_count == 3
 
     def test_after_dismiss_it_stays_away_while_the_drive_stays_low(self):
         show_error = self.runs(FULL_DRIVE, FULL_DRIVE, FULL_DRIVE, clicked_dismiss=True)
 
-        self.assertEqual(show_error.call_count, 1)
+        assert show_error.call_count == 1
 
     def test_once_a_run_finds_room_again_the_next_low_run_shows_it_once_more(self):
         show_error = self.runs(FULL_DRIVE, ROOMY_DRIVE, FULL_DRIVE, FULL_DRIVE, clicked_dismiss=True)
 
-        self.assertEqual(show_error.call_count, 2)
+        assert show_error.call_count == 2
 
     def test_the_log_says_when_it_was_dismissed_and_when_room_brought_it_back(self):
         with self.assertLogs("tasks.upscale", level="INFO") as logged:
             self.runs(FULL_DRIVE, ROOMY_DRIVE, ROOMY_DRIVE, clicked_dismiss=True)
 
         said = [line for line in logged.output if "low-disk warning" in line]
-        self.assertEqual(len(said), 2)
-        self.assertIn("dismissed", said[0])
-        self.assertIn("room again", said[1])
+        assert len(said) == 2
+        assert "dismissed" in said[0]
+        assert "room again" in said[1]
 
 
 class TestWhatMadeTheUpscale(unittest.TestCase):
@@ -359,10 +358,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
                 stamp = sidecar.read(sidecar.sidecar_path(upscaled))[provenance.BLOCK][provenance.UPSCALE]
 
-        self.assertEqual(
-            (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
-            ("evolver", "ai_upscale", topaz.AI_UPSCALE.version),
-        )
+        assert (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("evolver", "ai_upscale", topaz.AI_UPSCALE.version)
 
     def test_a_text_to_video_clip_records_the_settings_it_was_given_instead(self):
         with workspace_temp_dir() as root:
@@ -378,8 +374,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
                 stamp = sidecar.read(sidecar.sidecar_path(upscaled))[provenance.BLOCK][provenance.UPSCALE]
 
-        self.assertEqual((stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
-                         ("ai_upscale_t2v", topaz.AI_UPSCALE_T2V.version))
+        assert (stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("ai_upscale_t2v", topaz.AI_UPSCALE_T2V.version)
 
 
 class TestIsT2vProvider(unittest.TestCase):
@@ -391,7 +386,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertTrue(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                assert upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_for_provider_with_source_image(self):
         with workspace_temp_dir() as root:
@@ -401,7 +396,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text(json.dumps({"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}), encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_for_non_provider_source(self):
         # The sidecar is a valid t2v one, so only the source-name guard can
@@ -415,7 +410,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider("provider2", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                assert not upscale._is_t2v_provider("provider2", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_the_provider_is_whoever_the_overlay_names(self):
         # The source name comes from the git-ignored overlay, and the deployed
@@ -429,8 +424,8 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir, PROVIDER_SOURCE="examplesource"):
-                self.assertTrue(upscale._is_t2v_provider("examplesource", "landscape", "clip", config.OUT_UPSCALED_DIR))
-                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                assert upscale._is_t2v_provider("examplesource", "landscape", "clip", config.OUT_UPSCALED_DIR)
+                assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_when_the_sidecar_is_not_readable_as_json(self):
         """A half-written sidecar must take the default settings, not the t2v ones:
@@ -444,8 +439,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text('{"video": {"prompt"', encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider(
-                    "provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_when_the_sidecar_holds_something_other_than_a_record(self):
         """Valid JSON that is not an object: the containment test would raise
@@ -459,8 +453,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path.write_text("5", encoding="utf-8")
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider(
-                    "provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_when_the_sidecar_holds_only_the_video_kind(self):
         """A sidecar the kinds stage made for a clip nothing has scraped says
@@ -475,13 +468,13 @@ class TestIsT2vProvider(unittest.TestCase):
             )
 
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_when_metadata_missing(self):
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             with override_config(METADATA_DIR=meta_dir):
-                self.assertFalse(upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR))
+                assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
 
 class TestOnProgressCallback(unittest.TestCase):
@@ -500,10 +493,10 @@ class TestOnProgressCallback(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
 
-            self.assertEqual(len(progress_calls), 3)
-            self.assertEqual(progress_calls[0], (1, 3))
-            self.assertEqual(progress_calls[1], (2, 3))
-            self.assertEqual(progress_calls[2], (3, 3))
+            assert len(progress_calls) == 3
+            assert progress_calls[0] == (1, 3)
+            assert progress_calls[1] == (2, 3)
+            assert progress_calls[2] == (3, 3)
 
     def test_on_progress_counts_failures(self):
         with workspace_temp_dir() as root:
@@ -520,8 +513,8 @@ class TestOnProgressCallback(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
 
-            self.assertEqual(len(progress_calls), 2)
-            self.assertEqual(progress_calls[-1], (2, 2))
+            assert len(progress_calls) == 2
+            assert progress_calls[-1] == (2, 2)
 
     def test_on_progress_not_required(self):
         """Existing callers without on_progress still work."""
@@ -536,7 +529,7 @@ class TestOnProgressCallback(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
 
-            self.assertEqual(result.processed, 1)
+            assert result.processed == 1
 
 
 class TestSubprocessTimeout(unittest.TestCase):
@@ -552,9 +545,9 @@ class TestSubprocessTimeout(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
 
-            self.assertEqual(result.stopped_at_budget, 1)
-            self.assertEqual(result.failed, 0)
-            self.assertEqual(result.processed, 0)
+            assert result.stopped_at_budget == 1
+            assert result.failed == 0
+            assert result.processed == 0
 
 
     def test_run_breaks_loop_after_timeout(self):
@@ -571,9 +564,9 @@ class TestSubprocessTimeout(unittest.TestCase):
                     result = upscale.run(max_items=10)
 
             mock_ffmpeg.assert_called_once()
-            self.assertEqual(result.stopped_at_budget, 1)
-            self.assertEqual(result.failed, 0)
-            self.assertEqual(result.pending_after_run, 2)
+            assert result.stopped_at_budget == 1
+            assert result.failed == 0
+            assert result.pending_after_run == 2
 
     def test_the_video_the_budget_cut_off_is_still_pending(self):
         with workspace_temp_dir() as root:
@@ -595,9 +588,9 @@ class TestSubprocessTimeout(unittest.TestCase):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=encode_then_run_out_of_time),                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
 
-            self.assertEqual(result.processed, 1)
-            self.assertEqual(result.stopped_at_budget, 1)
-            self.assertEqual(result.pending_after_run, 1)
+            assert result.processed == 1
+            assert result.stopped_at_budget == 1
+            assert result.pending_after_run == 1
 
     def test_on_progress_reports_where_the_run_stopped(self):
         with workspace_temp_dir() as root:
@@ -613,8 +606,8 @@ class TestSubprocessTimeout(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     upscale.run(max_items=5, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
 
-            self.assertEqual(len(progress_calls), 1)
-            self.assertEqual(progress_calls[0], (0, 1))
+            assert len(progress_calls) == 1
+            assert progress_calls[0] == (0, 1)
 
 
 class TestFfmpegWindowSuppression(unittest.TestCase):
@@ -626,8 +619,8 @@ class TestFfmpegWindowSuppression(unittest.TestCase):
                 Path("in.mp4"), Path("out.mp4"), {}, topaz.AI_UPSCALE,
             )
             kwargs = mock_run.call_args.kwargs
-            self.assertIn("creationflags", kwargs)
-            self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
+            assert "creationflags" in kwargs
+            assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
 
 
 class TestSettingsSelection(unittest.TestCase):
@@ -672,7 +665,7 @@ class TestSettingsSelection(unittest.TestCase):
         with workspace_temp_dir() as root:
             encoded_with = self._run_capturing_the_settings(root, {"video": {"prompt": "test"}})
 
-            self.assertEqual(encoded_with, [topaz.AI_UPSCALE_T2V])
+            assert encoded_with == [topaz.AI_UPSCALE_T2V]
 
     def test_run_uses_the_default_settings_for_i2v_provider(self):
         with workspace_temp_dir() as root:
@@ -680,7 +673,7 @@ class TestSettingsSelection(unittest.TestCase):
                 root, {"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}
             )
 
-            self.assertEqual(encoded_with, [topaz.AI_UPSCALE])
+            assert encoded_with == [topaz.AI_UPSCALE]
 
 
 class TestOrigeneratorsVideos(unittest.TestCase):
@@ -711,18 +704,14 @@ class TestOrigeneratorsVideos(unittest.TestCase):
         with workspace_temp_dir() as root:
             video, encoded_with, probed = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
 
-        self.assertEqual(encoded_with, [topaz.framed(
-            topaz.AI_UPSCALE_ORIGENERATOR, "portrait",
-            video_fps=Fraction(112), generated_fps=Fraction(16))])
+        assert encoded_with == [topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, "portrait", video_fps=Fraction(112), generated_fps=Fraction(16))]
         probed.assert_called_once_with(video)
 
     def test_sent_down_the_genau_lane_take_the_same_settings(self):
         with workspace_temp_dir() as root:
             _, encoded_with, _ = self._upscale(root, "example-loop-clips")
 
-        self.assertEqual(encoded_with, [topaz.framed(
-            topaz.AI_UPSCALE_ORIGENERATOR, "portrait",
-            video_fps=Fraction(112), generated_fps=Fraction(16))])
+        assert encoded_with == [topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, "portrait", video_fps=Fraction(112), generated_fps=Fraction(16))]
 
     def _upscaled_before(self, lib: LaneLibrary, source: str, stem: str, settings: topaz.Settings) -> Path:
         upscaled = touch_video(upscaled_video_path(source, "portrait", stem, lib.outbox))
@@ -739,9 +728,8 @@ class TestOrigeneratorsVideos(unittest.TestCase):
                     lib, lanes.ORIGENERATOR_SOURCE, "scene one", topaz.AI_UPSCALE)
             _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
 
-            self.assertEqual([settings.name for settings in encoded_with],
-                             [topaz.AI_UPSCALE_ORIGENERATOR.name])
-            self.assertEqual(upscaled.read_bytes(), b"upscaled")
+            assert [settings.name for settings in encoded_with] == [topaz.AI_UPSCALE_ORIGENERATOR.name]
+            assert upscaled.read_bytes() == b"upscaled"
 
     def test_never_upscaled_come_before_those_upscaled_again(self):
         with workspace_temp_dir() as root:
@@ -751,8 +739,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
                 touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "a scene.mp4")
                 fresh = touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "b scene.mp4")
 
-                self.assertEqual(upscale.collect_candidates(limit=1),
-                                 [(fresh, lanes.ORIGENERATOR_SOURCE, "portrait")])
+                assert upscale.collect_candidates(limit=1) == [(fresh, lanes.ORIGENERATOR_SOURCE, "portrait")]
 
     def test_one_a_player_holds_keeps_its_old_upscale_until_a_later_run(self):
         with workspace_temp_dir() as root:
@@ -763,8 +750,8 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             with patch("tasks.upscale.retry_while_in_use", side_effect=PermissionError):
                 self._upscale(root, lanes.ORIGENERATOR_SOURCE)
 
-            self.assertEqual(upscaled.read_bytes(), b"video")
-            self.assertEqual(sorted(p.name for p in upscaled.parent.iterdir()), [upscaled.name])
+            assert upscaled.read_bytes() == b"video"
+            assert sorted(p.name for p in upscaled.parent.iterdir()) == [upscaled.name]
 
     def test_upscaled_again_keep_their_place_by_date_a_second_after_the_old_one(self):
         with workspace_temp_dir() as root:
@@ -775,8 +762,8 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             os.utime(upscaled, (1_700_000_000, 1_700_000_000))
             self._upscale(root, lanes.ORIGENERATOR_SOURCE)
 
-            self.assertEqual(upscaled.read_bytes(), b"upscaled")
-            self.assertEqual(upscaled.stat().st_mtime, 1_700_000_001)
+            assert upscaled.read_bytes() == b"upscaled"
+            assert upscaled.stat().st_mtime == 1700000001
 
     def test_upscaled_by_the_current_settings_are_left_alone(self):
         with workspace_temp_dir() as root:
@@ -786,22 +773,19 @@ class TestOrigeneratorsVideos(unittest.TestCase):
                     lib, lanes.ORIGENERATOR_SOURCE, "scene one", topaz.AI_UPSCALE_ORIGENERATOR)
             _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
 
-        self.assertEqual(encoded_with, [])
+        assert encoded_with == []
 
     def test_from_any_other_source_keep_the_settings_they_had(self):
         with workspace_temp_dir() as root:
             _, encoded_with, _ = self._upscale(root, "example-provider-two")
 
-        self.assertEqual(encoded_with, [topaz.AI_UPSCALE])
+        assert encoded_with == [topaz.AI_UPSCALE]
 
 
 class TestUpscaleResultSurface(unittest.TestCase):
     def test_the_result_carries_only_counters_something_raises(self):
         """A counter nothing increments reads as a tally and is always a lie."""
-        self.assertEqual(
-            {f.name for f in dataclasses.fields(upscale.UpscaleResult)},
-            {"processed", "failed", "stopped_at_budget", "deferred_low_disk", "pending_after_run"},
-        )
+        assert {f.name for f in dataclasses.fields(upscale.UpscaleResult)} == {"processed", "failed", "stopped_at_budget", "deferred_low_disk", "pending_after_run"}
 
 
 if __name__ == "__main__":

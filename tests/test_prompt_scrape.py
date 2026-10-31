@@ -7,6 +7,8 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import config
 from tasks import prompt_scrape
 from tests.temp_helpers import override_config, workspace_temp_dir
@@ -53,30 +55,11 @@ class TestPromptScrape(unittest.TestCase):
                         with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
                             result = prompt_scrape.run()
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.newly_scraped, 1)
+            assert result.ok
+            assert result.newly_scraped == 1
             output_path = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             payload = json.loads(output_path.read_text(encoding="utf-8"))
-            self.assertEqual(
-                payload,
-                {
-                    "video": {
-                        "prompt": "video prompt text",
-                        "model": "Video v3",
-                        "seed": "123",
-                        "created": "2026-03-21",
-                    },
-                    "source_image": {
-                        "positive_prompt": "positive prompt text",
-                        "negative_prompt": "negative prompt text",
-                        "model": "X Dream",
-                        "seed": "999",
-                        "created": "2026-03-26",
-                        "style": "Realistic",
-                        "creativity": "Balance",
-                    },
-                },
-            )
+            assert payload == {"video": {"prompt": "video prompt text", "model": "Video v3", "seed": "123", "created": "2026-03-21"}, "source_image": {"positive_prompt": "positive prompt text", "negative_prompt": "negative prompt text", "model": "X Dream", "seed": "999", "created": "2026-03-26", "style": "Realistic", "creativity": "Balance"}}
 
     def test_a_video_outside_an_orientation_folder_is_never_scraped(self):
         """The guard against a stray sub-folder: a video not under
@@ -94,10 +77,10 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.newly_scraped, 0)
+            assert result.ok
+            assert result.newly_scraped == 0
             fetch_dom.assert_not_called()
-            self.assertEqual(list(metadata_dir.rglob("*.json")), [])
+            assert list(metadata_dir.rglob("*.json")) == []
 
     def test_run_no_scrape_strat_for_unknown_source(self):
         with workspace_temp_dir() as root:
@@ -109,8 +92,8 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom") as fetch_dom:
                         result = prompt_scrape.run()
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.no_scrape_strat, 1)
+            assert result.ok
+            assert result.no_scrape_strat == 1
             fetch_dom.assert_not_called()
 
     def test_run_builds_origenerator_metadata_without_browser(self):
@@ -127,11 +110,11 @@ class TestPromptScrape(unittest.TestCase):
                                return_value=payload) as build:
                         result = prompt_scrape.run()
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.newly_scraped, 1)
+            assert result.ok
+            assert result.newly_scraped == 1
             build.assert_called_once()
             out = self._mirror_path(metadata_dir, "portrait", "origenerator", "wan22_i2v_00001_")
-            self.assertEqual(json.loads(out.read_text(encoding="utf-8")), payload)
+            assert json.loads(out.read_text(encoding="utf-8")) == payload
 
     def test_run_ignores_partial_video_files(self):
         with workspace_temp_dir() as root:
@@ -144,9 +127,9 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only):
                         result = prompt_scrape.run()
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.newly_scraped, 1)
-            self.assertFalse(self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "one.partial.deadbeef").exists())
+            assert result.ok
+            assert result.newly_scraped == 1
+            assert not self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "one.partial.deadbeef").exists()
 
     def test_run_counts_error_and_reports_not_ok(self):
         with workspace_temp_dir() as root:
@@ -158,9 +141,9 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom", side_effect=RuntimeError("network error")):
                         result = prompt_scrape.run()
 
-            self.assertFalse(result.ok)
-            self.assertEqual(result.errors, 1)
-            self.assertEqual(result.newly_scraped, 0)
+            assert not result.ok
+            assert result.errors == 1
+            assert result.newly_scraped == 0
 
     def test_failed_scrape_writes_failure_marker(self):
         with workspace_temp_dir() as root:
@@ -172,8 +155,8 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom", side_effect=RuntimeError("source gone")):
                         result = prompt_scrape.run()
 
-            self.assertEqual(result.errors, 1)
-            self.assertTrue(self._marker_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists())
+            assert result.errors == 1
+            assert self._marker_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists()
 
     def test_skips_video_that_already_has_json(self):
         with workspace_temp_dir() as root:
@@ -188,8 +171,8 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
 
-            self.assertEqual(result.already_scraped, 1)
-            self.assertEqual(result.newly_scraped, 0)
+            assert result.already_scraped == 1
+            assert result.newly_scraped == 0
             fetch_dom.assert_not_called()
 
     def test_a_sidecar_holding_only_the_video_kind_is_not_a_scrape(self):
@@ -211,10 +194,8 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only):
                         result = prompt_scrape.run()
 
-            self.assertEqual((result.newly_scraped, result.already_scraped), (1, 0))
-            self.assertEqual(
-                video_type.type_of(sidecar.read(existing)), video_type.SHORT,
-            )
+            assert (result.newly_scraped, result.already_scraped) == (1, 0)
+            assert video_type.type_of(sidecar.read(existing)) == video_type.SHORT
 
     def test_a_record_of_what_made_the_clip_that_landed_first_survives_the_scrape(self):
         """The scrape replaces the sidecar wholesale, and the upscale can have
@@ -237,8 +218,8 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only):
                         result = prompt_scrape.run()
 
-            self.assertEqual(result.newly_scraped, 1)
-            self.assertEqual(sidecar.read(existing)[provenance.BLOCK], {"upscale": upscaled})
+            assert result.newly_scraped == 1
+            assert sidecar.read(existing)[provenance.BLOCK] == {"upscale": upscaled}
 
     def test_the_stamp_a_scrape_brings_joins_the_ones_already_there(self):
         upscaled = provenance.reconstructed("evolver", method="ai_upscale")
@@ -260,8 +241,7 @@ class TestPromptScrape(unittest.TestCase):
                                return_value=payload):
                         prompt_scrape.run()
 
-            self.assertEqual(sidecar.read(existing)[provenance.BLOCK],
-                             {"upscale": upscaled, provenance.GENERATION: generated})
+            assert sidecar.read(existing)[provenance.BLOCK] == {"upscale": upscaled, provenance.GENERATION: generated}
 
     def test_skips_video_with_failure_marker(self):
         with workspace_temp_dir() as root:
@@ -276,8 +256,8 @@ class TestPromptScrape(unittest.TestCase):
                     with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
 
-            self.assertEqual(result.skipped_failed, 1)
-            self.assertEqual(result.newly_scraped, 0)
+            assert result.skipped_failed == 1
+            assert result.newly_scraped == 0
             fetch_dom.assert_not_called()
 
     def test_run_scans_sorted_and_writes_metadata_at_outbox_mirror_path(self):
@@ -292,15 +272,15 @@ class TestPromptScrape(unittest.TestCase):
                         with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
                             result = prompt_scrape.run()
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.newly_scraped, 1)
+            assert result.ok
+            assert result.newly_scraped == 1
 
             # JSON must land where _is_t2v_provider looks:
             # METADATA_DIR / "2_outbox" / "upscaled_by_orientation" / <orient> / <source> / <stem>_topaz.json
             expected_path = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
-            self.assertTrue(expected_path.exists(), f"Expected metadata at {expected_path}")
+            assert expected_path.exists(), f"Expected metadata at {expected_path}"
             payload = json.loads(expected_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload["video"]["prompt"], "text only video prompt")
+            assert payload["video"]["prompt"] == "text only video prompt"
 
     @staticmethod
     def _fetch_dom_with_source_image(url: str, browser: Path, *, profile_dir: Path) -> str:
@@ -445,9 +425,9 @@ class TestFieldsAccumulateAcrossCandidateUrls(unittest.TestCase):
                 Path("profile"),
             )
 
-        self.assertEqual(payload["video"]["prompt"], "embedded prompt")
-        self.assertEqual(payload["video"]["model"], "Panel Model")
-        self.assertEqual(payload["video"]["seed"], "111")
+        assert payload["video"]["prompt"] == "embedded prompt"
+        assert payload["video"]["model"] == "Panel Model"
+        assert payload["video"]["seed"] == "111"
 
     def test_with_no_panel_anywhere_the_embedded_record_supplies_the_metadata(self):
         with patch("tasks.prompt_scrape.fetch_dom",
@@ -460,8 +440,8 @@ class TestFieldsAccumulateAcrossCandidateUrls(unittest.TestCase):
                 Path("profile"),
             )
 
-        self.assertEqual(payload["video"]["model"], "Embedded Model")
-        self.assertEqual(payload["video"]["seed"], "222")
+        assert payload["video"]["model"] == "Embedded Model"
+        assert payload["video"]["seed"] == "222"
 
     def test_a_parent_image_from_the_embedded_record_is_followed(self):
         def fetch(url, browser, *, profile_dir):
@@ -488,14 +468,13 @@ class TestFieldsAccumulateAcrossCandidateUrls(unittest.TestCase):
                 Path("profile"),
             )
 
-        self.assertEqual(payload["source_image"]["positive_prompt"],
-                         "the source image prompt")
-        self.assertEqual(payload["source_image"]["negative_prompt"], "not this")
-        self.assertEqual(payload["source_image"]["model"], "Image Model")
+        assert payload["source_image"]["positive_prompt"] == "the source image prompt"
+        assert payload["source_image"]["negative_prompt"] == "not this"
+        assert payload["source_image"]["model"] == "Image Model"
 
     def test_no_prompt_at_any_of_the_four_urls_is_an_error_naming_the_video(self):
         with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>"):
-            with self.assertRaises(RuntimeError) as caught:
+            with pytest.raises(RuntimeError) as caught:
                 prompt_scrape._scrape_provider_video(
                     Path("abc_topaz.mp4"),
                     f"{config.PROVIDER_BASE_URL}/image/abc",
@@ -504,7 +483,7 @@ class TestFieldsAccumulateAcrossCandidateUrls(unittest.TestCase):
                     Path("profile"),
                 )
 
-        self.assertIn("abc_topaz.mp4", str(caught.exception))
+        assert "abc_topaz.mp4" in str(caught.value)
 
     def test_the_four_urls_are_tried_in_order_and_stop_at_the_first_prompt(self):
         seen = []
@@ -525,8 +504,7 @@ class TestFieldsAccumulateAcrossCandidateUrls(unittest.TestCase):
             )
 
         base = config.PROVIDER_BASE_URL
-        self.assertEqual(seen, [f"{base}/image/abc", f"{base}/video/abc",
-                                f"{base}/text-to-video/abc"])
+        assert seen == [f"{base}/image/abc", f"{base}/video/abc", f"{base}/text-to-video/abc"]
 
 
 class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
@@ -560,7 +538,7 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
 
             # The configured tree does not exist, so a stage still reading it
             # would find nothing at all and report zero of everything.
-            self.assertEqual(result.errors, 1)
+            assert result.errors == 1
 
     def test_the_browser_gets_the_scratch_profile_the_parameter_names(self):
         with workspace_temp_dir() as root:
@@ -578,7 +556,7 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
                         prompt_scrape.run(sorted_dir=elsewhere,
                                           browser_profile_dir=profile)
 
-            self.assertEqual(fetch.call_args.kwargs["profile_dir"], profile)
+            assert fetch.call_args.kwargs["profile_dir"] == profile
 
     def test_the_default_scratch_profile_is_not_inside_the_checkout(self):
         """Nothing passes one in where it matters: evolver.py runs this stage
@@ -598,30 +576,29 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
                                return_value="<html></html>") as fetch:
                         prompt_scrape.run(sorted_dir=elsewhere)
 
-            self.assertNotIn(config.PROJECT_DIR,
-                             fetch.call_args.kwargs["profile_dir"].parents)
+            assert config.PROJECT_DIR not in fetch.call_args.kwargs["profile_dir"].parents
 
 
 class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
     def test_extracts_prompt_from_embedded_json(self):
         html = '{"id":"abc123","prompt":"a beautiful scene","negative_prompt":"ugly","parent_image_id":"img456"}'
         result = prompt_scrape._extract_provider_embedded_metadata(html, "abc123")
-        self.assertEqual(result.prompt, "a beautiful scene")
-        self.assertEqual(result.negative_prompt, "ugly")
-        self.assertEqual(result.parent_image_id, "img456")
+        assert result.prompt == "a beautiful scene"
+        assert result.negative_prompt == "ugly"
+        assert result.parent_image_id == "img456"
 
     def test_a_page_carrying_no_metadata_for_that_id_yields_nothing(self):
         result = prompt_scrape._extract_provider_embedded_metadata("<html>nothing</html>", "missing")
-        self.assertEqual(result.prompt, "")
-        self.assertEqual(result.negative_prompt, "")
-        self.assertEqual(result.parent_image_id, "")
+        assert result.prompt == ""
+        assert result.negative_prompt == ""
+        assert result.parent_image_id == ""
 
     def test_handles_null_negative_prompt(self):
         html = '{"id":"abc","prompt":"scene","negative_prompt":null,"parent_image_id":null}'
         result = prompt_scrape._extract_provider_embedded_metadata(html, "abc")
-        self.assertEqual(result.prompt, "scene")
-        self.assertEqual(result.negative_prompt, "")
-        self.assertEqual(result.parent_image_id, "")
+        assert result.prompt == "scene"
+        assert result.negative_prompt == ""
+        assert result.parent_image_id == ""
 
     def test_extracts_extended_metadata_fields(self):
         html = (
@@ -632,16 +609,16 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
             '"createdAt":"Fri, 13 Mar 2026 09:45:26 GMT","creativity":7}'
         )
         result = prompt_scrape._extract_provider_embedded_metadata(html, "abc123")
-        self.assertEqual(result.model, "Realism")
-        self.assertEqual(result.version, "v3")
-        self.assertEqual(result.seed, "12345")
-        self.assertEqual(result.aspect_ratio, "16:9")
-        self.assertEqual(result.resolution, "1280x720")
-        self.assertEqual(result.quality, "720p")
-        self.assertEqual(result.created, "2026-03-13")
-        self.assertEqual(result.action, "XYZ Beta")
-        self.assertEqual(result.style, "")
-        self.assertEqual(result.creativity, "7")
+        assert result.model == "Realism"
+        assert result.version == "v3"
+        assert result.seed == "12345"
+        assert result.aspect_ratio == "16:9"
+        assert result.resolution == "1280x720"
+        assert result.quality == "720p"
+        assert result.created == "2026-03-13"
+        assert result.action == "XYZ Beta"
+        assert result.style == ""
+        assert result.creativity == "7"
 
 
 class TestTheEmbeddedFieldTable(unittest.TestCase):
@@ -649,11 +626,7 @@ class TestTheEmbeddedFieldTable(unittest.TestCase):
         """The thirteen readers were thirteen copies of the same three lines, so
         a fourteenth field arriving with no reader looked exactly like the other
         thirteen and read as absent forever. It has to answer here instead."""
-        self.assertEqual(
-            {name for name, _ in prompt_scrape._EMBEDDED_FIELDS},
-            {field.name for field in
-             dataclasses.fields(prompt_scrape._ProviderEmbeddedMetadata)},
-        )
+        assert {name for name, _ in prompt_scrape._EMBEDDED_FIELDS} == {field.name for field in dataclasses.fields(prompt_scrape._ProviderEmbeddedMetadata)}
 
     def test_a_reader_answers_the_empty_string_when_its_field_is_absent(self):
         """The one shape the loop depends on: absent is "", never None, so a
@@ -661,42 +634,33 @@ class TestTheEmbeddedFieldTable(unittest.TestCase):
         be special-cased."""
         for name, extract in prompt_scrape._EMBEDDED_FIELDS:
             with self.subTest(field=name):
-                self.assertEqual(extract("{}"), "")
+                assert extract("{}") == ""
 
 
 class TestParseProviderCreatedAt(unittest.TestCase):
     def test_an_rfc_date_becomes_an_iso_one(self):
-        self.assertEqual(
-            prompt_scrape._parse_provider_created_at("Fri, 13 Mar 2026 09:45:26 GMT"),
-            "2026-03-13",
-        )
+        assert prompt_scrape._parse_provider_created_at("Fri, 13 Mar 2026 09:45:26 GMT") == "2026-03-13"
 
     def test_something_that_is_not_a_date_comes_back_as_it_was(self):
-        self.assertEqual(prompt_scrape._parse_provider_created_at("3d ago"), "3d ago")
+        assert prompt_scrape._parse_provider_created_at("3d ago") == "3d ago"
 
     def test_a_date_that_parses_but_cannot_exist_comes_back_as_it_was(self):
         """The 32nd of March reads as a date and is not one, which is the case
         the narrowed except is for: date() raises ValueError on it."""
-        self.assertEqual(
-            prompt_scrape._parse_provider_created_at("Fri, 32 Mar 2026 09:45:26 GMT"),
-            "Fri, 32 Mar 2026 09:45:26 GMT",
-        )
+        assert prompt_scrape._parse_provider_created_at("Fri, 32 Mar 2026 09:45:26 GMT") == "Fri, 32 Mar 2026 09:45:26 GMT"
 
     def test_a_year_outside_the_calendar_comes_back_as_it_was(self):
-        self.assertEqual(
-            prompt_scrape._parse_provider_created_at("Fri, 13 Mar 99999 09:45:26 GMT"),
-            "Fri, 13 Mar 99999 09:45:26 GMT",
-        )
+        assert prompt_scrape._parse_provider_created_at("Fri, 13 Mar 99999 09:45:26 GMT") == "Fri, 13 Mar 99999 09:45:26 GMT"
 
 
 class TestTitlecaseAction(unittest.TestCase):
     def test_title_cases_each_word(self):
-        self.assertEqual(prompt_scrape._titlecase_action("two_words"), "Two Words")
+        assert prompt_scrape._titlecase_action("two_words") == "Two Words"
 
     def test_writes_a_camera_word_the_way_the_overlay_prefixes_it(self):
         with override_config(CAMERA_PREFIXES=("North", "QRS")):
-            self.assertEqual(prompt_scrape._titlecase_action("qrs_beta"), "QRS Beta")
-            self.assertEqual(prompt_scrape._titlecase_action("north_qrs_gamma"), "North QRS Gamma")
+            assert prompt_scrape._titlecase_action("qrs_beta") == "QRS Beta"
+            assert prompt_scrape._titlecase_action("north_qrs_gamma") == "North QRS Gamma"
 
 
 class TestCssSelector(unittest.TestCase):
@@ -705,13 +669,13 @@ class TestCssSelector(unittest.TestCase):
         html = '<body><div class="outer"><div class="inner">found</div></div></body>'
         doc = html_query.parse_document(html)
         node = html_query.query_selector(doc, "body > div.outer > div.inner")
-        self.assertIsNotNone(node)
-        self.assertEqual(html_query.text_content(node).strip(), "found")
+        assert node is not None
+        assert html_query.text_content(node).strip() == "found"
 
     def test_a_selector_nothing_matches_finds_no_element(self):
         html = '<body><div class="other">text</div></body>'
         doc = html_query.parse_document(html)
-        self.assertIsNone(html_query.query_selector(doc, "body > div.missing"))
+        assert html_query.query_selector(doc, "body > div.missing") is None
 
     def test_the_engine_answers_the_one_selector_production_asks_for(self):
         """Nothing builds a selector: there is one constant, of this shape."""
@@ -722,21 +686,18 @@ class TestCssSelector(unittest.TestCase):
         )
         doc = html_query.parse_document(html)
         node = html_query.query_selector(doc, prompt_scrape._CONTENT_PANEL_SELECTOR)
-        self.assertIsNotNone(node)
-        self.assertEqual(html_query.text_content(node).strip(), "panel")
+        assert node is not None
+        assert html_query.text_content(node).strip() == "panel"
 
     def test_image_page_url_from_src(self):
-        self.assertEqual(
-            prompt_scrape._image_page_url_from_src("https://cdn1.example.com/abc123", config.PROVIDER_BASE_URL),
-            f"{config.PROVIDER_BASE_URL}/image/abc123",
-        )
-        self.assertEqual(prompt_scrape._image_page_url_from_src("https://cdn1.example.com/", config.PROVIDER_BASE_URL), "")
+        assert prompt_scrape._image_page_url_from_src("https://cdn1.example.com/abc123", config.PROVIDER_BASE_URL) == f"{config.PROVIDER_BASE_URL}/image/abc123"
+        assert prompt_scrape._image_page_url_from_src("https://cdn1.example.com/", config.PROVIDER_BASE_URL) == ""
 
 
 class TestProviderImageUrl(unittest.TestCase):
     def test_generates_provider_url(self):
         video = Path("C:/videos/0_inbox/provider/abc.mp4")
-        self.assertEqual(prompt_scrape._provider_image_url(video, config.PROVIDER_BASE_URL), f"{config.PROVIDER_BASE_URL}/image/abc")
+        assert prompt_scrape._provider_image_url(video, config.PROVIDER_BASE_URL) == f"{config.PROVIDER_BASE_URL}/image/abc"
 
 
 class TestExtractMetadataFields(unittest.TestCase):
@@ -750,9 +711,9 @@ class TestExtractMetadataFields(unittest.TestCase):
         """
         doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
-        self.assertEqual(result["model"], "Video v3")
-        self.assertEqual(result["seed"], "12345")
-        self.assertEqual(result["style"], "Default")
+        assert result["model"] == "Video v3"
+        assert result["seed"] == "12345"
+        assert result["style"] == "Default"
 
     def test_extracts_creativity_from_hidden_section(self):
         html = """
@@ -765,28 +726,28 @@ class TestExtractMetadataFields(unittest.TestCase):
         """
         doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
-        self.assertEqual(result["model"], "X Dream")
-        self.assertEqual(result["creativity"], "Balance")
+        assert result["model"] == "X Dream"
+        assert result["creativity"] == "Balance"
 
     def test_converts_created_to_date(self):
         html = '<div><h2>Created</h2><h1>2w ago</h1></div>'
         doc = html_query.parse_document(html)
         with patch("util.relative_dates.today", return_value=date(2026, 3, 28)):
             result = prompt_scrape._extract_metadata_fields(doc)
-        self.assertEqual(result["created"], "2026-03-14")
+        assert result["created"] == "2026-03-14"
 
     def test_ignores_unknown_labels(self):
         html = '<div><h2>Inpainted</h2><h1>No</h1><h2>Model</h2><h1>v3</h1></div>'
         doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
-        self.assertNotIn("inpainted", result)
-        self.assertEqual(result["model"], "v3")
+        assert "inpainted" not in result
+        assert result["model"] == "v3"
 
     def test_a_panel_with_no_labelled_fields_yields_no_metadata(self):
         html = '<div><p>Hello world</p></div>'
         doc = html_query.parse_document(html)
         result = prompt_scrape._extract_metadata_fields(doc)
-        self.assertEqual(result, {})
+        assert result == {}
 
 
 class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
@@ -811,16 +772,16 @@ class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
                     Path("profile"),
                 )
 
-        self.assertEqual(payload["video"]["prompt"], "video prompt")
-        self.assertEqual(payload["video"]["model"], "Video v3")
-        self.assertEqual(payload["video"]["seed"], "99999")
-        self.assertEqual(payload["video"]["aspect_ratio"], "9:16")
-        self.assertEqual(payload["video"]["resolution"], "720x1280")
-        self.assertEqual(payload["video"]["quality"], "720p")
-        self.assertEqual(payload["video"]["created"], "2026-03-13")
-        self.assertEqual(payload["video"]["action"], "Alpha")
-        self.assertEqual(payload["video"]["style"], "Default")
-        self.assertNotIn("source_image", payload)
+        assert payload["video"]["prompt"] == "video prompt"
+        assert payload["video"]["model"] == "Video v3"
+        assert payload["video"]["seed"] == "99999"
+        assert payload["video"]["aspect_ratio"] == "9:16"
+        assert payload["video"]["resolution"] == "720x1280"
+        assert payload["video"]["quality"] == "720p"
+        assert payload["video"]["created"] == "2026-03-13"
+        assert payload["video"]["action"] == "Alpha"
+        assert payload["video"]["style"] == "Default"
+        assert "source_image" not in payload
 
 
 class TestProviderSettingsAreRedirectable(unittest.TestCase):
@@ -839,14 +800,14 @@ class TestProviderSettingsAreRedirectable(unittest.TestCase):
         ):
             strategies = prompt_scrape._build_strategies(
                 Path("browser.exe"), Path("profile"))
-            self.assertIn("examplesource", strategies)
+            assert "examplesource" in strategies
 
             with patch("tasks.prompt_scrape._scrape_provider_video") as scrape:
                 strategies["examplesource"](Path("abc_topaz.mp4"))
 
         _video, image_url, _browser, base_url, _profile = scrape.call_args.args
-        self.assertEqual(image_url, "https://example.invalid/image/abc")
-        self.assertEqual(base_url, "https://example.invalid")
+        assert image_url == "https://example.invalid/image/abc"
+        assert base_url == "https://example.invalid"
 
 
 if __name__ == "__main__":

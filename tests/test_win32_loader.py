@@ -12,12 +12,14 @@ import ctypes.wintypes
 import unittest
 from unittest.mock import patch
 
+import pytest
+
 from util import win32_loader
 
 
 class TestAvailability(unittest.TestCase):
     def test_the_flag_says_whether_this_ctypes_can_bind_a_dll(self):
-        self.assertEqual(win32_loader.WIN32_AVAILABLE, hasattr(ctypes, "windll"))
+        assert hasattr(ctypes, "windll") == win32_loader.WIN32_AVAILABLE
 
 
 class TestAStandInDll(unittest.TestCase):
@@ -30,18 +32,18 @@ class TestAStandInDll(unittest.TestCase):
         """The stand-in must never pass for a call that worked."""
         kernel32 = win32_loader.load_dll("kernel32")
 
-        with self.assertRaises(win32_loader.Win32Unavailable) as caught:
+        with pytest.raises(win32_loader.Win32Unavailable) as caught:
             kernel32.OpenProcess(0x1000, False, 1234)
 
-        self.assertIn("kernel32.OpenProcess", str(caught.exception))
+        assert "kernel32.OpenProcess" in str(caught.value)
 
     def test_an_error_saving_handle_stands_in_the_same_way(self):
         kernel32 = win32_loader.load_dll("kernel32", use_last_error=True)
 
-        with self.assertRaises(win32_loader.Win32Unavailable) as caught:
+        with pytest.raises(win32_loader.Win32Unavailable) as caught:
             kernel32.CreateMutexW(None, False, "a name")
 
-        self.assertIn("kernel32.CreateMutexW", str(caught.exception))
+        assert "kernel32.CreateMutexW" in str(caught.value)
 
     def test_an_unbound_entry_point_still_takes_the_argtypes_declared_on_it(self):
         """Modules declare argtypes at import; that has to survive too."""
@@ -50,14 +52,14 @@ class TestAStandInDll(unittest.TestCase):
         kernel32.OpenProcess.argtypes = [ctypes.wintypes.DWORD]
         kernel32.OpenProcess.restype = ctypes.wintypes.HANDLE
 
-        self.assertEqual(kernel32.OpenProcess.argtypes, [ctypes.wintypes.DWORD])
-        self.assertIs(kernel32.OpenProcess.restype, ctypes.wintypes.HANDLE)
+        assert kernel32.OpenProcess.argtypes == [ctypes.wintypes.DWORD]
+        assert kernel32.OpenProcess.restype is ctypes.wintypes.HANDLE
 
     def test_an_unbound_entry_point_is_the_same_object_every_time(self):
         """A test that patches one has to be patching what the code will call."""
         ntdll = win32_loader.load_dll("ntdll")
 
-        self.assertIs(ntdll.NtSuspendProcess, ntdll.NtSuspendProcess)
+        assert ntdll.NtSuspendProcess is ntdll.NtSuspendProcess
 
 
 if __name__ == "__main__":

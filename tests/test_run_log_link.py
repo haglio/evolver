@@ -49,7 +49,7 @@ class TestRunTitleIsALink(unittest.TestCase):
     def test_a_shown_run_puts_a_link_on_its_title(self):
         self.widget.show_record(make_run_record())
 
-        self.assertEqual(self._links(), ["log"])
+        assert self._links() == ["log"]
 
     def test_the_link_is_one_the_mouse_can_reach(self):
         """The markup alone is not a link. A QLabel emits linkActivated only
@@ -60,7 +60,7 @@ class TestRunTitleIsALink(unittest.TestCase):
         self.widget.show_record(make_run_record())
 
         flags = self.widget._header.textInteractionFlags()
-        self.assertTrue(flags & Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        assert flags & Qt.TextInteractionFlag.LinksAccessibleByMouse
 
     def test_the_title_still_reads_as_the_run_it_names(self):
         """The link is what the title does, not what it says."""
@@ -68,7 +68,7 @@ class TestRunTitleIsALink(unittest.TestCase):
 
         document = QTextDocument()
         document.setHtml(self.widget._header.text())
-        self.assertEqual(document.toPlainText(), "Run: 2026-07-25T15:20:02")
+        assert document.toPlainText() == "Run: 2026-07-25T15:20:02"
 
     def test_clicking_it_asks_for_that_run_and_no_other(self):
         record = make_run_record(id="2026-07-25T15-20-02")
@@ -78,7 +78,7 @@ class TestRunTitleIsALink(unittest.TestCase):
 
         self.widget._on_title_clicked("log")
 
-        self.assertEqual(asked, [record])
+        assert asked == [record]
 
     def test_with_no_run_shown_the_title_is_not_a_link(self):
         """The pane starts here, and a link to a run there is none of would
@@ -86,7 +86,7 @@ class TestRunTitleIsALink(unittest.TestCase):
         self.widget.show_record(make_run_record())
         self.widget.clear()
 
-        self.assertEqual(self._links(), [])
+        assert self._links() == []
 
     def test_a_click_with_no_run_shown_asks_for_nothing(self):
         asked = []
@@ -94,7 +94,7 @@ class TestRunTitleIsALink(unittest.TestCase):
 
         self.widget._on_title_clicked("log")
 
-        self.assertEqual(asked, [])
+        assert asked == []
 
     def test_the_window_passes_the_request_on(self):
         """The app owns the windows opened beside the main one, so the ask has
@@ -108,7 +108,7 @@ class TestRunTitleIsALink(unittest.TestCase):
         window._detail_widget.show_record(record)
         window._detail_widget._on_title_clicked("log")
 
-        self.assertEqual(asked, [record])
+        assert asked == [record]
 
 
 class TestLogWindowOpens(unittest.TestCase):
@@ -154,10 +154,10 @@ class TestLogWindowOpens(unittest.TestCase):
         with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
 
-        self.assertIn("=== Stage 1: strays ===", self._shown())
-        self.assertIn("Stage 8 done.", self._shown())
-        self.assertNotIn("2026-07-25T15-10-02", self._shown())
-        self.assertNotIn("2026-07-25T15-30-02", self._shown())
+        assert "=== Stage 1: strays ===" in self._shown()
+        assert "Stage 8 done." in self._shown()
+        assert "2026-07-25T15-10-02" not in self._shown()
+        assert "2026-07-25T15-30-02" not in self._shown()
 
     def test_the_title_says_which_run_is_on_screen(self):
         record = self._marked_record()
@@ -165,7 +165,7 @@ class TestLogWindowOpens(unittest.TestCase):
         with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
 
-        self.assertIn("(12s)", self.app._log_window.windowTitle())
+        assert "(12s)" in self.app._log_window.windowTitle()
 
     def test_a_second_click_replaces_the_window_rather_than_stacking_one(self):
         record = self._marked_record()
@@ -175,7 +175,7 @@ class TestLogWindowOpens(unittest.TestCase):
             first = self.app._log_window
             self.app._show_run_log(record)
 
-        self.assertIsNot(self.app._log_window, first)
+        assert self.app._log_window is not first
 
     def test_a_run_from_before_the_mark_says_that_is_why(self):
         """Every record written before runs marked themselves has no mark, and
@@ -186,8 +186,8 @@ class TestLogWindowOpens(unittest.TestCase):
         with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
 
-        self.assertEqual(self._shown(), "")
-        self.assertIn("predates", self.app._log_window._view.placeholderText())
+        assert self._shown() == ""
+        assert "predates" in self.app._log_window._view.placeholderText()
 
     def test_a_mark_the_log_no_longer_answers_to_says_that_instead(self):
         """The offsets are only as good as the file under them. A log deleted
@@ -200,8 +200,8 @@ class TestLogWindowOpens(unittest.TestCase):
         with override_config(LOG_FILE=self.log):
             self.app._show_run_log(record)
 
-        self.assertEqual(self._shown(), "")
-        self.assertIn("no longer holds", self.app._log_window._view.placeholderText())
+        assert self._shown() == ""
+        assert "no longer holds" in self.app._log_window._view.placeholderText()
 
     def test_it_reads_the_configured_log_and_not_a_path_of_its_own(self):
         record = self._marked_record()
@@ -210,7 +210,7 @@ class TestLogWindowOpens(unittest.TestCase):
                 patch("gui.app.run_log.read_run", return_value="") as read:
             self.app._show_run_log(record)
 
-        self.assertEqual(read.call_args.args[0], self.log)
+        assert read.call_args.args[0] == self.log
 
 
 class TestLogWindowWidget(unittest.TestCase):
@@ -220,9 +220,8 @@ class TestLogWindowWidget(unittest.TestCase):
         window = RunLogWindow("2026/07/25 08:20 (12s)", "a line")
         self.addCleanup(window.deleteLater)
 
-        self.assertEqual(window._view.lineWrapMode(),
-                         window._view.LineWrapMode.NoWrap)
-        self.assertTrue(window._view.isReadOnly())
+        assert window._view.lineWrapMode() == window._view.LineWrapMode.NoWrap
+        assert window._view.isReadOnly()
 
 
 if __name__ == "__main__":

@@ -42,10 +42,9 @@ class TestAFunscriptHandedOverWithItsClip(unittest.TestCase):
                     lanes.ORIGENERATOR_SOURCE, "portrait", "made_00001"))
                 scripts_sync.run()
 
-                self.assertTrue(_where_fun_time_looks(upscale, "scripts", ".funscript").is_file())
-                self.assertTrue(_where_fun_time_looks(upscale, "generated", ".generated").is_file())
-                self.assertTrue(script_library.is_marked_generated(
-                    script_library.script_path_for_video(upscale)))
+                assert _where_fun_time_looks(upscale, "scripts", ".funscript").is_file()
+                assert _where_fun_time_looks(upscale, "generated", ".generated").is_file()
+                assert script_library.is_marked_generated(script_library.script_path_for_video(upscale))
 
     def test_with_a_video_made_again_takes_the_old_scripts_place_beside_both_copies(self):
         with workspace_temp_dir() as root:
@@ -71,10 +70,9 @@ class TestAFunscriptHandedOverWithItsClip(unittest.TestCase):
                     sort.run()
                 synced = scripts_sync.run()
 
-                self.assertTrue(synced.ok)
+                assert synced.ok
                 for copy in (sorted_copy, upscale):
-                    self.assertEqual(script_library.script_path_for_video(copy).read_text(
-                        encoding="utf-8"), "again")
+                    assert script_library.script_path_for_video(copy).read_text(encoding="utf-8") == "again"
 
 
 if __name__ == "__main__":

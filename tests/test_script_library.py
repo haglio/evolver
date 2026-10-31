@@ -21,10 +21,7 @@ class TestTrim(unittest.TestCase):
 
         trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=2.0)
 
-        self.assertEqual(
-            trimmed["actions"],
-            [{"at": 0, "pos": 20}, {"at": 1_000, "pos": 80}, {"at": 2_000, "pos": 30}],
-        )
+        assert trimmed["actions"] == [{"at": 0, "pos": 20}, {"at": 1000, "pos": 80}, {"at": 2000, "pos": 30}]
 
     def test_carries_the_preceding_action_to_zero_so_t0_has_a_position(self):
         script = {
@@ -37,10 +34,7 @@ class TestTrim(unittest.TestCase):
 
         trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=2.0)
 
-        self.assertEqual(
-            trimmed["actions"],
-            [{"at": 0, "pos": 15}, {"at": 500, "pos": 80}, {"at": 1_000, "pos": 30}],
-        )
+        assert trimmed["actions"] == [{"at": 0, "pos": 15}, {"at": 500, "pos": 80}, {"at": 1000, "pos": 30}]
 
     def test_keeps_the_scene_fields_but_redates_the_duration_to_the_clip(self):
         script = {
@@ -53,13 +47,13 @@ class TestTrim(unittest.TestCase):
 
         trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=126.5)
 
-        self.assertFalse(trimmed["inverted"])
-        self.assertEqual(trimmed["range"], 90)
-        self.assertEqual(trimmed["version"], "1.0")
-        self.assertEqual(trimmed["metadata"]["creator"], "someone")
-        self.assertEqual(trimmed["metadata"]["type"], "basic")
-        self.assertEqual(trimmed["metadata"]["duration"], 126)
-        self.assertEqual(script["metadata"]["duration"], 1402, "must not mutate the scene's script")
+        assert not trimmed["inverted"]
+        assert trimmed["range"] == 90
+        assert trimmed["version"] == "1.0"
+        assert trimmed["metadata"]["creator"] == "someone"
+        assert trimmed["metadata"]["type"] == "basic"
+        assert trimmed["metadata"]["duration"] == 126
+        assert script["metadata"]["duration"] == 1402, "must not mutate the scene's script"
 
     def test_drops_annotations_whose_times_belong_to_the_scene(self):
         script = {
@@ -73,9 +67,9 @@ class TestTrim(unittest.TestCase):
 
         trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=2.0)
 
-        self.assertEqual(trimmed["metadata"]["bookmarks"], [])
-        self.assertEqual(trimmed["metadata"]["chapters"], [])
-        self.assertEqual(trimmed["metadata"]["title"], "kept")
+        assert trimmed["metadata"]["bookmarks"] == []
+        assert trimmed["metadata"]["chapters"] == []
+        assert trimmed["metadata"]["title"] == "kept"
 
 
 class TestScriptPathForVideo(unittest.TestCase):
@@ -86,7 +80,7 @@ class TestScriptPathForVideo(unittest.TestCase):
         with override_config(VIDEO_LIBRARY_DIR=videos, SCRIPT_LIBRARY_DIR=scripts):
             path = script_library.script_path_for_video(videos / "2D" / "non_AI" / "lagoon" / "clip.mkv")
 
-        self.assertEqual(path, scripts / "2D" / "non_AI" / "lagoon" / "clip.funscript")
+        assert path == scripts / "2D" / "non_AI" / "lagoon" / "clip.funscript"
 
 
 if __name__ == "__main__":

@@ -58,7 +58,7 @@ class TestBackfillSession(unittest.TestCase):
             note = session.apply("xyz kappa")
 
         record.assert_called_once_with(clip, "XYZ Kappa")
-        self.assertEqual(note, f"{clip.name} → XYZ Kappa")
+        assert note == f"{clip.name} → XYZ Kappa"
 
     def test_a_control_the_session_does_not_dispatch_moves_no_file(self):
         """The four controls are dispatched by name. A fifth added to the
@@ -71,8 +71,8 @@ class TestBackfillSession(unittest.TestCase):
 
         note = session.apply("reticulate")
 
-        self.assertIsNone(note)
-        self.assertEqual(session.current, clip)
+        assert note is None
+        assert session.current == clip
 
     def test_an_act_records_the_action_against_the_clip_on_screen(self):
         session = self._session()
@@ -83,7 +83,7 @@ class TestBackfillSession(unittest.TestCase):
             note = session.apply("side beta")
 
         record.assert_called_once_with(clip, "Side Beta")
-        self.assertEqual(note, f"{clip.name} → Side Beta")
+        assert note == f"{clip.name} → Side Beta"
 
     def test_an_act_retires_the_clip(self):
         session = self._session()
@@ -92,8 +92,8 @@ class TestBackfillSession(unittest.TestCase):
         with patch("backfill.session.record_action"), patch("backfill.session.sidecar_snapshot"):
             session.apply("side dance")
 
-        self.assertEqual(session.remaining, 2)
-        self.assertNotEqual(session.current, clip)
+        assert session.remaining == 2
+        assert session.current != clip
 
     def test_skip_defers_the_clip_without_touching_the_disk(self):
         session = self._session()
@@ -105,9 +105,9 @@ class TestBackfillSession(unittest.TestCase):
 
         record.assert_not_called()
         discard.assert_not_called()
-        self.assertEqual(note, f"{clip.name} → skipped")
-        self.assertEqual(session.remaining, 3)
-        self.assertNotEqual(session.current, clip)
+        assert note == f"{clip.name} → skipped"
+        assert session.remaining == 3
+        assert session.current != clip
 
     def test_weird_discards_the_clip_and_writes_no_metadata(self):
         session = self._session()
@@ -119,8 +119,8 @@ class TestBackfillSession(unittest.TestCase):
 
         discard.assert_called_once_with(clip)
         record.assert_not_called()
-        self.assertEqual(note, f"{clip.name} → weird")
-        self.assertEqual(session.remaining, 2)
+        assert note == f"{clip.name} → weird"
+        assert session.remaining == 2
 
     def test_an_unknown_phrase_leaves_the_clip_on_screen(self):
         session = self._session()
@@ -128,9 +128,9 @@ class TestBackfillSession(unittest.TestCase):
 
         note = session.apply("banana")
 
-        self.assertIsNone(note)
-        self.assertEqual(session.current, clip)
-        self.assertEqual(session.remaining, 3)
+        assert note is None
+        assert session.current == clip
+        assert session.remaining == 3
 
     def test_a_phrase_heard_after_the_last_clip_does_nothing(self):
         session = self._session(count=1)
@@ -139,8 +139,8 @@ class TestBackfillSession(unittest.TestCase):
             session.apply("side dance")
             note = session.apply("side dance")
 
-        self.assertIsNone(note)
-        self.assertIsNone(session.current)
+        assert note is None
+        assert session.current is None
 
     def test_the_clip_advances_before_the_file_work_runs(self):
         """The session's headline promise, observed at the dispatch itself.
@@ -175,9 +175,9 @@ class TestBackfillSession(unittest.TestCase):
             session.apply("side dance")
 
             record.assert_not_called()
-            self.assertNotEqual(session.current, clip)
+            assert session.current != clip
             # the clip had already left the screen when its work was dispatched
-            self.assertEqual(worker.on_screen_at_submit, [session.current])
+            assert worker.on_screen_at_submit == [session.current]
 
             worker.drain()
             record.assert_called_once_with(clip, "Side Dancing")
@@ -195,9 +195,9 @@ class TestUndo(unittest.TestCase):
 
         note = session.apply("undo")
 
-        self.assertEqual(note, "nothing to undo")
-        self.assertEqual(session.current, clip)
-        self.assertEqual(session.remaining, 3)
+        assert note == "nothing to undo"
+        assert session.current == clip
+        assert session.remaining == 3
 
     def test_undoing_an_act_puts_the_clip_back_and_removes_its_sidecar(self):
         session = self._session()
@@ -210,9 +210,9 @@ class TestUndo(unittest.TestCase):
             note = session.apply("undo")
 
         restore.assert_called_once_with(clip, None)
-        self.assertEqual(note, f"undid {clip.name} → Side Dancing")
-        self.assertEqual(session.current, clip)
-        self.assertEqual(session.remaining, 3)
+        assert note == f"undid {clip.name} → Side Dancing"
+        assert session.current == clip
+        assert session.remaining == 3
 
     def test_undoing_a_discard_reclaims_the_clip_from_the_weird_folder(self):
         session = self._session()
@@ -225,9 +225,9 @@ class TestUndo(unittest.TestCase):
             note = session.apply("undo")
 
         reclaim.assert_called_once_with(landed, clip)
-        self.assertEqual(note, f"undid {clip.name} → weird")
-        self.assertEqual(session.current, clip)
-        self.assertEqual(session.remaining, 3)
+        assert note == f"undid {clip.name} → weird"
+        assert session.current == clip
+        assert session.remaining == 3
 
     def test_undoing_a_discard_whose_move_failed_reclaims_nothing(self):
         """A discard can die on a clip the player never releases; its file work
@@ -254,8 +254,8 @@ class TestUndo(unittest.TestCase):
             note = session.apply("undo")
 
         reclaim.assert_not_called()
-        self.assertEqual(note, f"undid {clip.name} → weird")
-        self.assertEqual(session.current, clip)
+        assert note == f"undid {clip.name} → weird"
+        assert session.current == clip
 
     def test_undoing_a_skip_brings_the_deferred_clip_back(self):
         session = self._session()
@@ -264,9 +264,9 @@ class TestUndo(unittest.TestCase):
         session.apply("skip")
         note = session.apply("undo")
 
-        self.assertEqual(note, f"undid {clip.name} → skipped")
-        self.assertEqual(session.current, clip)
-        self.assertEqual(session.remaining, 3)
+        assert note == f"undid {clip.name} → skipped"
+        assert session.current == clip
+        assert session.remaining == 3
 
     def test_the_last_clip_labelled_can_still_be_undone(self):
         session = self._session(count=1)
@@ -276,11 +276,11 @@ class TestUndo(unittest.TestCase):
              patch("backfill.session.sidecar_snapshot", return_value=None), \
              patch("backfill.session.restore_sidecar"):
             session.apply("side dance")
-            self.assertIsNone(session.current)
+            assert session.current is None
             session.apply("undo")
 
-        self.assertEqual(session.current, clip)
-        self.assertEqual(session.remaining, 1)
+        assert session.current == clip
+        assert session.remaining == 1
 
     def test_undo_waits_for_the_decision_it_is_about_to_reverse(self):
         worker = DeferredWorker()
@@ -293,7 +293,7 @@ class TestUndo(unittest.TestCase):
             session.apply("side dance")
             session.apply("undo")
 
-        self.assertEqual(order, ["record", "restore"])
+        assert order == ["record", "restore"]
 
     def test_undo_steps_back_through_a_run_of_decisions(self):
         session = self._session(count=4)
@@ -309,15 +309,15 @@ class TestUndo(unittest.TestCase):
             third = session.current
             session.apply("skip")
 
-            self.assertEqual(session.apply("undo"), f"undid {third.name} → skipped")
-            self.assertEqual(session.current, third)
-            self.assertEqual(session.apply("undo"), f"undid {second.name} → weird")
-            self.assertEqual(session.current, second)
-            self.assertEqual(session.apply("undo"), f"undid {first.name} → Side Dancing")
-            self.assertEqual(session.current, first)
-            self.assertEqual(session.apply("undo"), "nothing to undo")
+            assert session.apply("undo") == f"undid {third.name} → skipped"
+            assert session.current == third
+            assert session.apply("undo") == f"undid {second.name} → weird"
+            assert session.current == second
+            assert session.apply("undo") == f"undid {first.name} → Side Dancing"
+            assert session.current == first
+            assert session.apply("undo") == "nothing to undo"
 
-        self.assertEqual(session.remaining, 4)
+        assert session.remaining == 4
 
     def test_undoing_everything_rewinds_the_queue_to_its_original_order(self):
         session = self._session(count=5)
@@ -337,7 +337,7 @@ class TestUndo(unittest.TestCase):
                 rewound.append(session.current)
                 session.apply("side dance")
 
-        self.assertEqual(rewound, original)
+        assert rewound == original
 
 
 class TestSame(unittest.TestCase):
@@ -369,9 +369,9 @@ class TestSame(unittest.TestCase):
             second = session.current
             note = session.apply("same")
 
-            self.assertEqual(self._recorded_action(second), "XYZ Zeta")
-            self.assertEqual(note, f"{second.name} → XYZ Zeta")
-            self.assertNotEqual(second, first)
+            assert self._recorded_action(second) == "XYZ Zeta"
+            assert note == f"{second.name} → XYZ Zeta"
+            assert second != first
 
     def test_same_repeats_the_most_recent_act_not_the_first(self):
         """No other test ever speaks two DIFFERENT acts before "same", so the
@@ -387,8 +387,8 @@ class TestSame(unittest.TestCase):
             third = session.current
             note = session.apply("same")
 
-            self.assertEqual(self._recorded_action(third), "XYZ Zeta")
-            self.assertEqual(note, f"{third.name} → XYZ Zeta")
+            assert self._recorded_action(third) == "XYZ Zeta"
+            assert note == f"{third.name} → XYZ Zeta"
 
     def test_same_before_any_action_repeats_nothing(self):
         with library_tree() as lib:
@@ -397,10 +397,10 @@ class TestSame(unittest.TestCase):
 
             note = session.apply("same")
 
-            self.assertIsNone(self._recorded_action(clip))
-            self.assertEqual(note, "nothing to repeat")
-            self.assertEqual(session.current, clip)
-            self.assertEqual(session.remaining, 3)
+            assert self._recorded_action(clip) is None
+            assert note == "nothing to repeat"
+            assert session.current == clip
+            assert session.remaining == 3
 
     def test_same_reaches_past_a_skip_to_the_last_action(self):
         with library_tree() as lib:
@@ -412,10 +412,10 @@ class TestSame(unittest.TestCase):
             after_skip = session.current
             note = session.apply("same")
 
-            self.assertEqual(self._recorded_action(after_skip), "Side Dancing")
-            self.assertEqual(note, f"{after_skip.name} → Side Dancing")
-            self.assertNotEqual(after_skip, skipped)
-            self.assertIsNone(self._recorded_action(skipped))
+            assert self._recorded_action(after_skip) == "Side Dancing"
+            assert note == f"{after_skip.name} → Side Dancing"
+            assert after_skip != skipped
+            assert self._recorded_action(skipped) is None
 
     def test_undoing_a_same_puts_the_clip_back(self):
         with library_tree() as lib:
@@ -426,10 +426,10 @@ class TestSame(unittest.TestCase):
             session.apply("same")
             note = session.apply("undo")
 
-            self.assertIsNone(self._recorded_action(same_clip))
-            self.assertEqual(note, f"undid {same_clip.name} → Side Dancing")
-            self.assertEqual(session.current, same_clip)
-            self.assertEqual(session.remaining, 2)
+            assert self._recorded_action(same_clip) is None
+            assert note == f"undid {same_clip.name} → Side Dancing"
+            assert session.current == same_clip
+            assert session.remaining == 2
 
     def test_same_after_undoing_the_only_action_repeats_nothing(self):
         with library_tree() as lib:
@@ -438,12 +438,12 @@ class TestSame(unittest.TestCase):
 
             session.apply("side dance")
             session.apply("undo")
-            self.assertEqual(session.current, clip)
+            assert session.current == clip
             note = session.apply("same")
 
-            self.assertIsNone(self._recorded_action(clip))
-            self.assertEqual(note, "nothing to repeat")
-            self.assertEqual(session.current, clip)
+            assert self._recorded_action(clip) is None
+            assert note == "nothing to repeat"
+            assert session.current == clip
 
     def test_consecutive_sames_keep_labelling_and_advancing(self):
         with library_tree() as lib:
@@ -457,8 +457,8 @@ class TestSame(unittest.TestCase):
             session.apply("same")
 
             for clip in clips:
-                self.assertEqual(self._recorded_action(clip), "Side Beta")
-            self.assertEqual(session.remaining, 1)
+                assert self._recorded_action(clip) == "Side Beta"
+            assert session.remaining == 1
 
     def test_same_after_the_last_clip_does_nothing(self):
         with library_tree() as lib:
@@ -467,8 +467,8 @@ class TestSame(unittest.TestCase):
             session.apply("side dance")
             note = session.apply("same")
 
-            self.assertIsNone(note)
-            self.assertIsNone(session.current)
+            assert note is None
+            assert session.current is None
 
 
 class TestUndoAgainstRealFiles(unittest.TestCase):
@@ -482,12 +482,12 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
             video = lib.video()
             session = self._session(video)
             session.apply("xyz zeta")
-            self.assertTrue(sidecar_path(video).is_file())
+            assert sidecar_path(video).is_file()
 
             session.apply("undo")
 
-            self.assertFalse(sidecar_path(video).exists())
-            self.assertEqual(session.current, video)
+            assert not sidecar_path(video).exists()
+            assert session.current == video
 
     def test_undoing_an_act_keeps_metadata_the_clip_already_had(self):
         with library_tree() as lib:
@@ -500,24 +500,22 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
             session.apply("side dance")
             session.apply("undo")
 
-            self.assertEqual(
-                json.loads(path.read_text(encoding="utf-8")), {"video": {"prompt": "a prompt"}}
-            )
+            assert json.loads(path.read_text(encoding="utf-8")) == {"video": {"prompt": "a prompt"}}
 
     def test_undoing_a_discard_brings_the_file_back(self):
         with library_tree() as lib:
             video = lib.video()
             session = self._session(video)
             session.apply("weird")
-            self.assertFalse(video.exists())
-            self.assertTrue((lib.weird / video.name).is_file())
+            assert not video.exists()
+            assert (lib.weird / video.name).is_file()
 
             session.apply("undo")
 
-            self.assertTrue(video.is_file())
-            self.assertEqual(video.read_bytes(), b"video")
-            self.assertEqual(list(lib.weird.iterdir()), [])
-            self.assertEqual(session.current, video)
+            assert video.is_file()
+            assert video.read_bytes() == b"video"
+            assert list(lib.weird.iterdir()) == []
+            assert session.current == video
 
 
 class TestTheStepContract(unittest.TestCase):
@@ -533,7 +531,7 @@ class TestTheStepContract(unittest.TestCase):
         for kind in (session._Labelled, session._Discarded, session._Deferred):
             with self.subTest(kind=kind.__name__):
                 for attribute in ("note", "take_effect", "put_back", "commit", "roll_back"):
-                    self.assertTrue(hasattr(kind, attribute), attribute)
+                    assert hasattr(kind, attribute), attribute
 
     def test_the_protocol_names_exactly_those_five(self):
         """So a sixth attribute added to one kind and not the others cannot quietly
@@ -542,9 +540,7 @@ class TestTheStepContract(unittest.TestCase):
             name for name in vars(session._Step)
             if not name.startswith("_")
         }
-        self.assertEqual(
-            declared, {"note", "take_effect", "put_back", "commit", "roll_back"}
-        )
+        assert declared == {"note", "take_effect", "put_back", "commit", "roll_back"}
 
 
 if __name__ == "__main__":

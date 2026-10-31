@@ -38,10 +38,8 @@ class TestRetireIntoTheBucket(unittest.TestCase):
             with override_config(**overrides):
                 nonai_retire.retire_original(source, archive_root=None)
 
-            self.assertTrue(
-                (non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4").exists()
-            )
-            self.assertFalse(source.exists())
+            assert (non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4").exists()
+            assert not source.exists()
 
     def test_carries_the_sidecar_to_the_retire_folder(self):
         """A clip's `clip` metadata must follow the file when it is retired, or
@@ -61,13 +59,10 @@ class TestRetireIntoTheBucket(unittest.TestCase):
                 nonai_retire.retire_original(source, archive_root=None)
 
                 dest = non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4"
-                self.assertTrue(dest.exists())
-                self.assertFalse(source.exists())
-                self.assertFalse(sidecar.sidecar_path(source).exists())
-                self.assertEqual(
-                    sidecar.read(sidecar.sidecar_path(dest))["clip"],
-                    {"compilation": "Vol6", "index": 1},
-                )
+                assert dest.exists()
+                assert not source.exists()
+                assert not sidecar.sidecar_path(source).exists()
+                assert sidecar.read(sidecar.sidecar_path(dest))["clip"] == {"compilation": "Vol6", "index": 1}
 
     def test_carries_the_funscript_to_the_retire_folder(self):
         """A script left in the old folder still matches the moved video, so the
@@ -87,11 +82,8 @@ class TestRetireIntoTheBucket(unittest.TestCase):
                 nonai_retire.retire_original(source, archive_root=None)
 
                 dest = non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4"
-                self.assertFalse(script.exists())
-                self.assertEqual(
-                    funscript.read(script_library.script_path_for_video(dest)),
-                    {"actions": [{"at": 0, "pos": 20}]},
-                )
+                assert not script.exists()
+                assert funscript.read(script_library.script_path_for_video(dest)) == {"actions": [{"at": 0, "pos": 20}]}
 
     def test_the_mark_saying_no_person_wrote_the_funscript_goes_with_it(self):
         with workspace_temp_dir() as root:
@@ -108,9 +100,8 @@ class TestRetireIntoTheBucket(unittest.TestCase):
                 nonai_retire.retire_original(source, archive_root=None)
 
                 dest = non_ai / "example" / "2 do not need work" / "scene one.mp4"
-                self.assertTrue(script_library.is_marked_generated(
-                    script_library.script_path_for_video(dest)))
-                self.assertFalse(script_library.is_marked_generated(script))
+                assert script_library.is_marked_generated(script_library.script_path_for_video(dest))
+                assert not script_library.is_marked_generated(script)
 
 
 class TestRetireToAnArchive(unittest.TestCase):
@@ -134,10 +125,8 @@ class TestRetireToAnArchive(unittest.TestCase):
             with override_config(**overrides):
                 nonai_retire.retire_original(source, archive_root=archive)
 
-            self.assertFalse(source.exists())
-            self.assertTrue(
-                (archive / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
-            )
+            assert not source.exists()
+            assert (archive / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
 
     def test_the_funscript_goes_with_it_rather_than_being_stranded(self):
         """A script left in the library still matches the archived video by name,
@@ -156,12 +145,9 @@ class TestRetireToAnArchive(unittest.TestCase):
 
                 nonai_retire.retire_original(source, archive_root=archive)
 
-                self.assertFalse(script.exists())
+                assert not script.exists()
             archived = archive / "lagoon" / "1 clips to upscale" / "Lee-Poe.funscript"
-            self.assertEqual(
-                json.loads(archived.read_text(encoding="utf-8")),
-                {"actions": [{"at": 0, "pos": 20}]},
-            )
+            assert json.loads(archived.read_text(encoding="utf-8")) == {"actions": [{"at": 0, "pos": 20}]}
 
     def test_no_mark_is_left_behind_for_a_funscript_that_left_the_library(self):
         with workspace_temp_dir() as root:
@@ -176,7 +162,7 @@ class TestRetireToAnArchive(unittest.TestCase):
 
                 nonai_retire.retire_original(source, archive_root=root / "archive")
 
-                self.assertFalse(script_library.is_marked_generated(script))
+                assert not script_library.is_marked_generated(script)
 
     def test_the_sidecar_goes_with_it_so_the_archive_describes_itself(self):
         """The metadata tree mirrors the library, and the grouping stage prunes
@@ -196,12 +182,9 @@ class TestRetireToAnArchive(unittest.TestCase):
 
                 nonai_retire.retire_original(source, archive_root=archive)
 
-                self.assertFalse(sidecar.sidecar_path(source).exists())
+                assert not sidecar.sidecar_path(source).exists()
             archived = archive / "lagoon" / "1 clips to upscale" / "Lee-Poe.json"
-            self.assertEqual(
-                json.loads(archived.read_text(encoding="utf-8"))["clip"],
-                {"compilation": "Volume One", "index": 1},
-            )
+            assert json.loads(archived.read_text(encoding="utf-8"))["clip"] == {"compilation": "Volume One", "index": 1}
 
 
 class TestCarryMetadata(unittest.TestCase):
@@ -225,12 +208,12 @@ class TestCarryMetadata(unittest.TestCase):
                     "clip": {"compilation": "Volume One", "index": 1},
                 })
 
-                self.assertTrue(nonai_retire.carry_metadata(source, out))
+                assert nonai_retire.carry_metadata(source, out)
                 carried = sidecar.read(sidecar.sidecar_path(out))
 
-            self.assertEqual(carried["video"], {"action": "alpha"})
-            self.assertEqual(carried["clip"], {"compilation": "Volume One", "index": 1})
-            self.assertNotIn("version", carried)
+            assert carried["video"] == {"action": "alpha"}
+            assert carried["clip"] == {"compilation": "Volume One", "index": 1}
+            assert "version" not in carried
 
     def test_carrying_the_same_record_twice_writes_nothing_the_second_time(self):
         """The repair pass runs on every tick forever, so a no-op has to say so
@@ -248,8 +231,8 @@ class TestCarryMetadata(unittest.TestCase):
                 write_sidecar(sidecar.sidecar_path(source),
                               {"clip": {"compilation": "Volume One", "index": 1}})
 
-                self.assertTrue(nonai_retire.carry_metadata(source, out))
-                self.assertFalse(nonai_retire.carry_metadata(source, out))
+                assert nonai_retire.carry_metadata(source, out)
+                assert not nonai_retire.carry_metadata(source, out)
 
     def test_an_original_with_nothing_to_say_carries_nothing(self):
         with workspace_temp_dir() as root:
@@ -259,8 +242,8 @@ class TestCarryMetadata(unittest.TestCase):
             out = make_video(non_ai / "lagoon" / "3_good_to_go" / "Lee-Poe_iris2.mp4")
 
             with override_config(**overrides):
-                self.assertFalse(nonai_retire.carry_metadata(source, out))
-                self.assertFalse(sidecar.sidecar_path(out).exists())
+                assert not nonai_retire.carry_metadata(source, out)
+                assert not sidecar.sidecar_path(out).exists()
 
 
 if __name__ == "__main__":

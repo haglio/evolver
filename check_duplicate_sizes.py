@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from itertools import islice
 from pathlib import Path
 
 import config
@@ -11,6 +12,8 @@ from util.alert import show_error
 from util.media_files import library_videos
 
 log = logging.getLogger(__name__)
+
+_LISTED = 10
 
 
 @dataclass
@@ -88,11 +91,8 @@ def _popup_message(result: DuplicateSizesResult) -> str:
         f"Duplicate-size groups found: {len(result.duplicate_groups)}",
     ]
 
-    preview_lines: list[str] = []
-    for size, paths in result.duplicate_groups.items():
-        preview_lines.append(f"{size} bytes -> {', '.join(paths[:2])}")
-        if len(preview_lines) == 10:
-            break
+    preview_lines = [f"{size} bytes -> {', '.join(paths[:2])}"
+                     for size, paths in islice(result.duplicate_groups.items(), _LISTED)]
 
     if preview_lines:
         lines.extend(["", *preview_lines])

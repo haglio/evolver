@@ -15,6 +15,8 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import ANY, Mock, call, patch
 
+import pytest
+
 import backfill_app
 from tests.product_sources import PROJECT_ROOT
 
@@ -55,9 +57,9 @@ class TestMain(unittest.TestCase):
              patches["window"] as window:
             exit_code = backfill_app.main()
 
-        self.assertEqual(exit_code, 0)
+        assert exit_code == 0
         alert.information.assert_called_once()
-        self.assertIn("already has an action", alert.information.call_args[0][2])
+        assert "already has an action" in alert.information.call_args[0][2]
         window.assert_not_called()
 
     def test_it_is_evolver_on_the_taskbar_before_it_shows_anything(self):
@@ -71,8 +73,8 @@ class TestMain(unittest.TestCase):
 
             backfill_app.main()
 
-        self.assertEqual(order.mock_calls[0], call.claim(_the_application_made(application)))
-        self.assertEqual([name for name, _args, _kwargs in order.mock_calls], ["claim", "alert"])
+        assert order.mock_calls[0] == call.claim(_the_application_made(application))
+        assert [name for name, _args, _kwargs in order.mock_calls] == ["claim", "alert"]
 
     def test_a_session_stops_the_listener_and_worker_on_the_way_out(self):
         patches = self._patched([Path("a_topaz.mp4")])
@@ -83,7 +85,7 @@ class TestMain(unittest.TestCase):
             _the_application_made(application).exec.return_value = 0
             exit_code = backfill_app.main()
 
-        self.assertEqual(exit_code, 0)
+        assert exit_code == 0
         window.return_value.showMaximized.assert_called_once()
         listener.return_value.start.assert_called_once()
         listener.return_value.heard.connect.assert_called_once_with(
@@ -106,7 +108,7 @@ class TestMain(unittest.TestCase):
              patches["window"], patches["listener"] as listener, \
              patches["worker"] as worker, patches["vocabulary"]:
             _the_application_made(application).exec.side_effect = RuntimeError("backend gone")
-            with self.assertRaises(RuntimeError):
+            with pytest.raises(RuntimeError):
                 backfill_app.main()
 
         listener.return_value.stop.assert_called_once()
@@ -138,9 +140,7 @@ class TestMain(unittest.TestCase):
     def test_a_phrase_that_discards_the_clip_is_never_repaired_from_a_near_miss(self):
         mocks = self._run_main()
 
-        self.assertIs(
-            mocks["listener"].call_args.kwargs["never_repaired"],
-            mocks["vocabulary"].return_value.discarding_phrases.return_value)
+        assert mocks["listener"].call_args.kwargs["never_repaired"] is mocks["vocabulary"].return_value.discarding_phrases.return_value
 
 
 class TestReadyThumbnails(unittest.TestCase):
@@ -151,10 +151,7 @@ class TestReadyThumbnails(unittest.TestCase):
              patch("backfill_app.example_clips", return_value={}) as examples:
             ready = backfill_app._ready_thumbnails(vocabulary, scan)
 
-        self.assertEqual(
-            ready,
-            {"Side Beta": str(Path("/c/side_beta.jpg")), "XYZ Alpha": str(Path("/c/xyz_alpha.jpg"))},
-        )
+        assert ready == {"Side Beta": str(Path("/c/side_beta.jpg")), "XYZ Alpha": str(Path("/c/xyz_alpha.jpg"))}
         build.assert_called_once()
         examples.assert_called_once_with(vocabulary, scan)
 
@@ -204,11 +201,8 @@ class TestTheActTableIsReadWhenMainAsksForIt(unittest.TestCase):
             cwd=PROJECT_ROOT, env=env, capture_output=True, text=True, check=False,
         )
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(
-            json.loads(result.stdout.splitlines()[-1]),
-            {"at_import": [], "when_asked": ["content.example.json"]},
-        )
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout.splitlines()[-1]) == {"at_import": [], "when_asked": ["content.example.json"]}
 
 
 if __name__ == "__main__":

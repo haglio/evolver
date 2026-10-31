@@ -20,8 +20,8 @@ class TestSerialWorker(unittest.TestCase):
         worker.submit(lambda: ran_on.append(threading.current_thread()))
         worker.drain()
 
-        self.assertEqual(len(ran_on), 1)
-        self.assertIsNot(ran_on[0], threading.current_thread())
+        assert len(ran_on) == 1
+        assert ran_on[0] is not threading.current_thread()
 
     def test_tasks_run_in_the_order_they_were_submitted(self):
         worker = self._worker()
@@ -31,7 +31,7 @@ class TestSerialWorker(unittest.TestCase):
             worker.submit(lambda index=index: order.append(index))
         worker.drain()
 
-        self.assertEqual(order, list(range(20)))
+        assert order == list(range(20))
 
     def test_draining_waits_for_every_submitted_task(self):
         worker = self._worker()
@@ -40,12 +40,12 @@ class TestSerialWorker(unittest.TestCase):
         worker.submit(lambda: done.append("slow"))
         worker.drain()
 
-        self.assertEqual(done, ["slow"])
+        assert done == ["slow"]
 
     def test_draining_a_worker_nothing_was_submitted_to_waits_on_nothing(self):
         worker = self._worker()
         worker.drain()
-        self.assertIsNone(worker._latest)  # nothing was ever waited on
+        assert worker._latest is None  # nothing was ever waited on
 
     def test_a_failing_task_is_logged_and_never_reaches_the_caller(self):
         worker = self._worker()
@@ -71,7 +71,7 @@ class TestSerialWorker(unittest.TestCase):
             worker.submit(lambda: done.append("after"))
             worker.drain()
 
-        self.assertEqual(done, ["after"])
+        assert done == ["after"]
 
 
 if __name__ == "__main__":

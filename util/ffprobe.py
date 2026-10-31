@@ -28,6 +28,7 @@ ANSWER_WITHIN_S = 60
 # -show_entries sections at once, and the tag is optional, so the CSV comes
 # back with two fields or three.
 _GEOMETRY_ENTRIES = "stream=width,height:stream_tags=rotate"
+_ROTATION_FIELD = 2
 
 
 def _stream_geometry(file: Path) -> tuple[int, int, int] | None:
@@ -49,9 +50,9 @@ def _stream_geometry(file: Path) -> tuple[int, int, int] | None:
     except ValueError:
         return None
     rotation = 0
-    if len(fields) == 3:
+    if len(fields) > _ROTATION_FIELD:
         try:
-            rotation = int(fields[2])
+            rotation = int(fields[_ROTATION_FIELD])
         except ValueError:
             rotation = 0
     return width, height, rotation
@@ -93,13 +94,12 @@ def frame_fingerprint(file: Path) -> tuple[float, int] | None:
     either number is a different video as far as anything holding frame indices
     is concerned.
     """
-    fields = _probe(file, "stream=r_frame_rate,nb_frames").split(",")
-    if len(fields) != 2:
-        return None
-    rate = _rate(fields[0])
-    if rate is None or not fields[1].isdigit():
-        return None
-    return float(rate), int(fields[1])
+    match _probe(file, "stream=r_frame_rate,nb_frames").split(","):
+        case [said_rate, frames]:
+            rate = _rate(said_rate)
+            if rate is not None and frames.isdigit():
+                return float(rate), int(frames)
+    return None
 
 
 def frame_rate(file: Path) -> Fraction | None:

@@ -430,9 +430,9 @@ def _filed_2d_kind(script_path: Path, trees: Trees) -> str | None:
 
 
 def _ai_or_non_ai(rel: Path) -> str | None:
-    parts = rel.parts
-    if len(parts) >= 2 and parts[0] == "2D" and parts[1] in {"AI", "non_AI"}:
-        return parts[1]
+    match rel.parts:
+        case ("2D", "AI" | "non_AI" as kind, *_):
+            return kind
     return None
 
 
@@ -466,7 +466,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
             groups[key].append(video_path)
 
     for (_, normalized_stem), videos in sorted(groups.items()):
-        if len(videos) < 2:
+        if len(videos) <= 1:
             continue
 
         missing_targets = [video for video in videos if not script_path_for_video(video).exists()]
@@ -527,23 +527,20 @@ def _variant_bucket(video_path: Path, trees: Trees) -> tuple[str, ...]:
     filing = _ai_filing(rel)
     if filing.source and filing.orientation:
         return ("2D", "AI", filing.source, filing.orientation)
-    parts = rel.parts
-    if len(parts) >= 3 and parts[0] == "2D" and parts[1] == "non_AI":
-        return tuple(parts[:3])
-    return tuple(parts[:2]) if len(parts) >= 2 else tuple(parts)
+    match rel.parts:
+        case ("2D", "non_AI", source, *_):
+            return ("2D", "non_AI", source)
+    return rel.parts[:2]
 
 
 def _variant_kind(video_path: Path, trees: Trees) -> str:
     rel = video_path.relative_to(trees.videos)
-    parts = rel.parts
-    if len(parts) >= 3 and parts[0] == "2D" and parts[1] == "AI":
-        if parts[2] == "1_sorted":
+    match rel.parts:
+        case ("2D", "AI", "1_sorted", *_):
             return "original"
-        if parts[2] == "2_outbox":
+        case ("2D", "AI", "2_outbox", *_):
             return "processed"
-    if "processed" in parts:
-        return "processed"
-    return "original"
+    return "processed" if "processed" in rel.parts else "original"
 
 
 def _popup_message(result: ScriptsSyncResult) -> str:

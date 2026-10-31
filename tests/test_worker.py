@@ -80,31 +80,31 @@ class TestPipelineWorker(unittest.TestCase):
             _, _, finished, errors, _ = self._run_worker(
                 pipeline_error=Busy("another Evolver (process 42) is running the pipeline"))
 
-        self.assertEqual(finished, [])
-        self.assertEqual(errors, ["another Evolver (process 42) is running the pipeline"])
-        self.assertNotIn("Traceback", "\n".join(logged.output))
+        assert finished == []
+        assert errors == ["another Evolver (process 42) is running the pipeline"]
+        assert "Traceback" not in "\n".join(logged.output)
 
     def test_emits_stage_started_for_each_stage(self):
         started, _, _, _, _ = self._run_worker()
-        self.assertEqual(started, ["sort", "upscale"])
+        assert started == ["sort", "upscale"]
 
     def test_emits_stage_completed_for_each_stage(self):
         """Only the name crosses: the popup marks a bar full and reads nothing
         else, and the stage's result, duration and status reach the run record
         by their own route."""
         _, completed, _, _, _ = self._run_worker()
-        self.assertEqual(completed, [("sort",), ("upscale",)])
+        assert completed == [("sort",), ("upscale",)]
 
     def test_emits_pipeline_finished_with_run_record(self):
         _, _, finished, _, _ = self._run_worker()
-        self.assertEqual(len(finished), 1)
-        self.assertEqual(finished[0].trigger, "manual")
-        self.assertEqual(finished[0].status, "success")
+        assert len(finished) == 1
+        assert finished[0].trigger == "manual"
+        assert finished[0].status == "success"
 
     def test_emits_pipeline_error_on_exception(self):
         _, _, _, errors, _ = self._run_worker(pipeline_error=RuntimeError("boom"))
-        self.assertEqual(len(errors), 1)
-        self.assertIn("boom", errors[0])
+        assert len(errors) == 1
+        assert "boom" in errors[0]
 
     def test_the_traceback_is_logged_before_the_message_is_flattened(self):
         """str(exc) is all the GUI ever sees. Without this the only record of
@@ -112,18 +112,18 @@ class TestPipelineWorker(unittest.TestCase):
         with self.assertLogs("gui.worker", level="ERROR") as caught:
             self._run_worker(pipeline_error=RuntimeError("boom"))
 
-        self.assertTrue(any(record.exc_info for record in caught.records))
+        assert any(record.exc_info for record in caught.records)
 
     def test_trigger_passed_to_run_record(self):
         _, _, finished, _, _ = self._run_worker(trigger="scheduled")
-        self.assertEqual(finished[0].trigger, "scheduled")
+        assert finished[0].trigger == "scheduled"
 
     def test_emits_stage_progress_signal(self):
         events = [("upscale", 1, 3), ("upscale", 2, 3), ("upscale", 3, 3)]
         _, _, _, _, progress = self._run_worker(progress_events=events)
-        self.assertEqual(len(progress), 3)
-        self.assertEqual(progress[0], ("upscale", 1, 3))
-        self.assertEqual(progress[2], ("upscale", 3, 3))
+        assert len(progress) == 3
+        assert progress[0] == ("upscale", 1, 3)
+        assert progress[2] == ("upscale", 3, 3)
 
     def test_forwards_the_nonai_toggle_to_the_pipeline(self):
         worker = PipelineWorker(trigger="scheduled", nonai_enabled=True)
@@ -134,7 +134,7 @@ class TestPipelineWorker(unittest.TestCase):
              patch("gui.worker.save_run"), \
              patch("gui.worker.config"):
             worker.run()
-        self.assertTrue(run_pipeline.call_args.kwargs["nonai_enabled"])
+        assert run_pipeline.call_args.kwargs["nonai_enabled"]
 
     def test_hands_its_own_interruption_state_to_the_pipeline(self):
         """The watchdog's requestInterruption() must reach run_pipeline's
@@ -148,8 +148,8 @@ class TestPipelineWorker(unittest.TestCase):
              patch("gui.worker.config"):
             worker.run()
         should_stop = run_pipeline.call_args.kwargs["should_stop"]
-        self.assertIs(should_stop.__self__, worker)
-        self.assertEqual(should_stop.__name__, "isInterruptionRequested")
+        assert should_stop.__self__ is worker
+        assert should_stop.__name__ == "isInterruptionRequested"
 
 
 if __name__ == "__main__":
