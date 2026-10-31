@@ -229,26 +229,26 @@ class TestStatsWindowLifetime:
         with patch("gui.run_history.RunHistory.read", return_value=RunHistory.of([])) as read:
             app._show_stats()
             read.assert_not_called()
-            assert app._stats_window.isVisible()
+            assert app._stats.current.isVisible()
             work, then = (app._background.run.call_args.args[0],
                           app._background.run.call_args.kwargs["then"])
             then(work())
 
         read.assert_called_once_with(config.RUNS_DIR)
-        assert app._stats_window._placeholder.text() == "No run data available."
+        assert app._stats.current._placeholder.text() == "No run data available."
 
     def test_a_history_read_for_a_window_since_closed_and_gone_is_let_go(self, request):
         app = build_evolver_app(request)
         app._background = MagicMock()
         app._show_stats()
         answer_for_the_first = app._background.run.call_args.kwargs["then"]
-        app._stats_window.close()
+        app._stats.current.close()
         app._show_stats()
         QAPP.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
         answer_for_the_first(RunHistory.of([make_run_record()]))
 
-        assert app._stats_window._chart is None
+        assert app._stats.current._chart is None
 
     def test_a_second_stats_window_takes_the_first_one_down(self, request):
         """The dialog is parented to the main window, so one replaced without
@@ -360,26 +360,26 @@ class TestUpscaleQueueWindow:
             then(work())
 
         lineup.assert_called_once_with()
-        assert app._queue_window._heading.text() == "Nothing is waiting to be upscaled"
+        assert app._queue.current._heading.text() == "Nothing is waiting to be upscaled"
 
     def test_opening_it_hands_it_the_queue_as_it_stands(self, request):
         app = build_evolver_app(request)
         lineup = self._open(app)
         lineup.assert_called_once_with()
-        assert app._queue_window.isVisible()
+        assert app._queue.current.isVisible()
 
     def test_a_second_open_raises_the_one_already_up(self, request):
         app = build_evolver_app(request)
         self._open(app)
-        first = app._queue_window
+        first = app._queue.current
         self._open(app)
-        assert app._queue_window is first
+        assert app._queue.current is first
 
     def test_rearranging_it_pins_the_order_through_the_pipeline_module(self, request):
         app = build_evolver_app(request)
         self._open(app)
         with patch("evolver.arrange_upscale_queue") as arranged:
-            app._queue_window.arranged.emit(["lagoon/0 unsorted/a.mp4"])
+            app._queue.current.arranged.emit(["lagoon/0 unsorted/a.mp4"])
         arranged.assert_called_once_with(["lagoon/0 unsorted/a.mp4"])
 
     def test_a_video_put_first_goes_first_and_starts_no_run(self, request):
@@ -391,7 +391,7 @@ class TestUpscaleQueueWindow:
              patch("evolver.upscale_now") as asked, \
              patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
              patch.object(app._runs, "start_when_free") as run:
-            app._queue_window.placed_first.emit("lagoon/0 unsorted/a.mp4")
+            app._queue.current.placed_first.emit("lagoon/0 unsorted/a.mp4")
         put_first.assert_called_once_with("lagoon/0 unsorted/a.mp4")
         asked.assert_not_called()
         run.assert_not_called()
@@ -405,7 +405,7 @@ class TestUpscaleQueueWindow:
         with patch("evolver.upscale_now") as asked, \
              patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE), \
              patch.object(app._runs, "start_when_free") as run:
-            app._queue_window.now_requested.emit("lagoon/0 unsorted/a.mp4")
+            app._queue.current.now_requested.emit("lagoon/0 unsorted/a.mp4")
         asked.assert_called_once_with("lagoon/0 unsorted/a.mp4")
         run.assert_called_once_with("manual")
 
@@ -417,7 +417,7 @@ class TestUpscaleQueueWindow:
         with patch("evolver.withdraw_upscale_now") as withdrawn, \
              patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
              patch.object(app._presence, "poll") as poll:
-            app._queue_window.now_withdrawn.emit()
+            app._queue.current.now_withdrawn.emit()
         withdrawn.assert_called_once_with()
         poll.assert_called_once_with()
         lineup.assert_called_once_with()
@@ -438,7 +438,7 @@ class TestUpscaleQueueWindow:
         app = build_evolver_app(request)
         self._open(app)
         with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup:
-            app._queue_window.refresh_wanted.emit()
+            app._queue.current.refresh_wanted.emit()
         lineup.assert_called_once_with()
 
 
@@ -618,22 +618,41 @@ class TestRestart:
         start_again.assert_called_once_with(os.getpid(), config.PROJECT_DIR / "launch_preview_branch.vbs")
 
 
+def _the_main_window(app):
+    app._show_window()
+
+
+def _the_stats_window(app):
+    app._background = MagicMock()
+    app._show_stats()
+
+
+def _the_queue_window(app):
+    app._background = DoneAtOnce()
+    with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE):
+        app._show_queue()
+
+
+def _the_log_window(app):
+    with patch("gui.app.run_log.read_run", return_value=""):
+        app._show_run_log(make_run_record())
+
+
 class TestTakingAnUpdate:
     """Evolver runs all day, so an update waits for it to close for good: it starts
     itself again for one once no run is going and nothing of it is on screen."""
 
-    def _ticked(self, request, monkeypatch, *, branch_session=False, running=False, showing=None):
+    def _ticked(self, request, monkeypatch, *, branch_session=False, running=False, open_window=None):
         monkeypatch.setattr(production_update, "UP_BEFORE_AN_UPDATE_S", 0.0)
         monkeypatch.setattr(production_update, "waits_for_programs_to_close",
                             lambda checkout: checkout == config.PROJECT_DIR)
         app = build_evolver_app(request)
         app._branch_session = branch_session
-        if showing not in (None, "_window"):
-            setattr(app, showing, SimpleNamespace(isVisible=lambda: True))
+        if open_window is not None:
+            open_window(app)
         with patch("gui.app.production_update.start_again_after") as start_again, \
              patch.object(app, "_shutdown") as quit_this_copy, \
-             patch.object(type(app._runs), "is_running", new=running), \
-             patch.object(app._window, "isVisible", return_value=showing == "_window"):
+             patch.object(type(app._runs), "is_running", new=running):
             app._updates.tick()
         return start_again, quit_this_copy
 
@@ -649,9 +668,10 @@ class TestTakingAnUpdate:
         start_again.assert_not_called()
         quit_this_copy.assert_not_called()
 
-    @pytest.mark.parametrize("on_screen", ["_window", "_stats_window", "_queue_window", "_log_window"])
-    def test_an_update_waits_while_a_window_of_evolver_is_on_screen(self, request, monkeypatch, on_screen):
-        start_again, quit_this_copy = self._ticked(request, monkeypatch, showing=on_screen)
+    @pytest.mark.parametrize("open_window", [_the_main_window, _the_stats_window,
+                                             _the_queue_window, _the_log_window])
+    def test_an_update_waits_while_a_window_of_evolver_is_on_screen(self, request, monkeypatch, open_window):
+        start_again, quit_this_copy = self._ticked(request, monkeypatch, open_window=open_window)
 
         start_again.assert_not_called()
         quit_this_copy.assert_not_called()

@@ -110,6 +110,7 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `gui/stats_window.py` - the stacked-area chart of stage durations across runs
   - `gui/run_history.py` - every run's start and how long each stage took in it, which is all the chart reads
   - `gui/queue_window.py` - the upscale queue: drag to reorder it, and the first video's arrow to upscale it now
+  - `gui/one_window.py` - one stats or queue window at a time: the one up is raised, one closed is built again
   - `gui/background.py` - what the queue and stats windows read or change, done off the window's thread
   - `gui/worker.py` - background QThread pipeline runner
   - `gui/scheduler.py` - timer-based scheduling with run-guard
