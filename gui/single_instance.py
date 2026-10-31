@@ -36,10 +36,10 @@ from dataclasses import dataclass
 from enum import Enum
 
 from app_support.win32 import try_acquire_mutex
+from app_support.win32_loader import load_dll
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 from util import crash_log, processes
-from util.win32_loader import load_dll
 
 log = logging.getLogger(__name__)
 

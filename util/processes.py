@@ -12,7 +12,7 @@ import ctypes
 import ctypes.wintypes
 from pathlib import Path
 
-from util.win32_loader import load_dll
+from app_support.win32_loader import load_dll
 
 _PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 _PROCESS_QUERY_INFORMATION = 0x0400
