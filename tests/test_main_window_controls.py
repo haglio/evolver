@@ -1,7 +1,7 @@
 """Tests for the main window toolbar controls (quit, settings, toggle, next run, run now)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
@@ -546,7 +546,7 @@ class TestToolbarSpacing:
 class TestTheWholeToolbarShows:
 
     @pytest.mark.parametrize("status", [
-        ScheduleStatus(next_run_at=datetime(2026, 10, 8, 19, 30)),
+        ScheduleStatus(next_run_at=datetime(2026, 10, 8, 19, 30, tzinfo=UTC)),
         ScheduleStatus(is_running=True),
         ScheduleStatus(is_paused=True),
     ], ids=["scheduled", "running", "paused"])
@@ -574,7 +574,7 @@ class TestToolbarStateUpdates:
     """show_schedule should keep toolbar widgets in sync."""
 
     def test_next_run_shown_when_scheduled(self, window):
-        next_run = datetime(2026, 3, 29, 14, 30)
+        next_run = datetime(2026, 3, 29, 14, 30, tzinfo=UTC)
         window.show_schedule(ScheduleStatus(next_run_at=next_run))
         assert "14:30" in window._next_run_label.text()
 
@@ -591,7 +591,7 @@ class TestToolbarStateUpdates:
         assert not window.run_now_action.isEnabled()
 
     def test_run_now_enabled_when_idle(self, window):
-        next_run = datetime(2026, 3, 29, 15, 0)
+        next_run = datetime(2026, 3, 29, 15, 0, tzinfo=UTC)
         window.show_schedule(ScheduleStatus(next_run_at=next_run))
         assert window.run_now_action.isEnabled()
 
@@ -607,7 +607,7 @@ class TestToolbarStateUpdates:
 
     def test_the_pause_button_reads_pause_scheduling_once_resumed(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
-        window.show_schedule(ScheduleStatus(next_run_at=datetime.now()))
+        window.show_schedule(ScheduleStatus(next_run_at=datetime.now(UTC)))
         assert window.pause_action.iconText() == "Pause Scheduling"
 
 

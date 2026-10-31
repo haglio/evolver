@@ -1,13 +1,13 @@
 """The one decision under every surface that shows the schedule."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
 from gui.schedule_state import IDLE, PAUSED, RUNNING, SCHEDULED, ScheduleStatus, schedule_state
 
-_AT = datetime(2026, 3, 29, 14, 30)
+_AT = datetime(2026, 3, 29, 14, 30, tzinfo=UTC)
 
 
 @pytest.mark.parametrize("status", [

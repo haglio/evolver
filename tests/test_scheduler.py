@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from PyQt6.QtTest import QSignalSpy
 
@@ -15,7 +15,7 @@ class TestPipelineScheduler(unittest.TestCase):
         deadline rather than a fixed sleep. The clock is parked a millisecond
         short of an aligned slot, so the real alignment arithmetic runs and
         still hands the timer a delay a test can wait on."""
-        almost = datetime(2026, 1, 1, 12, 10) - timedelta(milliseconds=1)
+        almost = datetime(2026, 1, 1, 12, 10, tzinfo=UTC) - timedelta(milliseconds=1)
         scheduler = PipelineScheduler(interval_minutes=10, now=lambda: almost)
 
         spy = QSignalSpy(scheduler.run_requested)

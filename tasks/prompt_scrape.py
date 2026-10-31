@@ -537,9 +537,7 @@ def _extract_metadata_fields(root: Node) -> dict[str, str]:
     fields: dict[str, str] = {}
     for label, value in extract_label_values(root, _METADATA_LABELS).items():
         key = label.replace(" ", "_")
-        if key == "created":
-            value = relative_dates.as_iso_date(value)
-        fields[key] = value
+        fields[key] = relative_dates.as_iso_date(value) if key == "created" else value
     return fields
 
 

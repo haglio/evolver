@@ -222,7 +222,7 @@ class EvolverApp:
         self._tray.show()
         self._keep_the_schedule()
         self._session.take_the_work()
-        self._window.setWindowTitle(self._session.title(datetime.now()))
+        self._window.setWindowTitle(self._session.title(datetime.now().astimezone()))
         if _SHOW_WINDOW in sys.argv:
             self._show_window()
 

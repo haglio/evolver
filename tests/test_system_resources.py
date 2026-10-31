@@ -68,7 +68,7 @@ class TestAvailableRamConversion:
             system_resources.ctypes.windll.kernel32, "GlobalMemoryStatusEx",
             lambda ref: 0,
         )
-        with pytest.raises(OSError):
+        with pytest.raises(OSError, match="GlobalMemoryStatusEx failed"):
             system_resources.available_ram_gb()
 
 
