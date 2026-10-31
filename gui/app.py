@@ -49,7 +49,6 @@ _SHOW_WINDOW = "--show-window"
 # AllowSetForegroundWindow's ASFW_ANY: the copy that will want the foreground is
 # the launcher's grandchild, whose pid nothing here can know.
 _ANY_PROCESS = -1
-_IF_NOT_RUNNING = "--if-not-running"
 STEPS = (("Loading Evolver...", 1.0),)
 
 
@@ -60,6 +59,18 @@ def open_the_loading_screen():
         caption="Evolver Loading", wordmark="Evolver", icon=process_identity.LETTER, preview=branch_session.shown_as(),
         steps=STEPS, cancel_hint="Press Esc to cancel opening Evolver",
         app_id=process_identity.identity(), taskbar=process_identity.taskbar_app())
+
+
+def _say_the_running_evolver_did_not_answer(app: QApplication) -> None:
+    """A wedged Evolver holds the claim while answering nothing, and exiting into
+    silence there looks exactly like a shortcut that does nothing."""
+    process_identity.claim(app)
+    show_error(
+        "Evolver",
+        "Evolver is already running but did not respond, so its window "
+        "could not be opened.\n\nQuit it from the tray icon, or end the "
+        "pythonw.exe process, then start Evolver again.",
+    )
 
 
 def _unmarked_note(record, log_path) -> str:
@@ -258,7 +269,12 @@ class EvolverApp:
         self._shutdown()
 
     def run(self) -> int:
-        if not self._become_evolver():
+        outcome = self._instance.become_evolver(
+            as_preview=self._branch_session,
+            only_if_not_running=single_instance.IF_NOT_RUNNING in sys.argv)
+        if outcome is Outcome.UNANSWERED:
+            _say_the_running_evolver_did_not_answer(self._app)
+        if outcome is not Outcome.CLAIMED:
             return 0
         if (next_launch := meeting_place(os.environ)) is not None:
             next_launch.say_where_the_app_comes_up(AppWindow(size=(self._window.width(), self._window.height())))
@@ -275,41 +291,6 @@ class EvolverApp:
         self.start()
         loading.done()
         return self._app.exec()
-
-    def _become_evolver(self) -> bool:
-        if _IF_NOT_RUNNING in sys.argv:
-            return self._claim_unless_running()
-        launch = single_instance.PREVIEW if self._branch_session else single_instance.USUAL
-        outcome = self._instance.take_over(launch, end_the_unanswering=self._branch_session)
-        if outcome is not Outcome.CLAIMED:
-            self._leave_this_launch(outcome)
-        return outcome is Outcome.CLAIMED
-
-    def _claim_unless_running(self) -> bool:
-        if self._instance.claim():
-            return True
-        crash_log.write_info(
-            "Already running:", f"a start with {_IF_NOT_RUNNING} left it as it was\n")
-        return False
-
-    def _leave_this_launch(self, outcome: Outcome):
-        """This launch went to the Evolver already running; say why if it could not.
-
-        A wedged instance holds the mutex while answering nothing, and exiting
-        into silence there looks exactly like a shortcut that does nothing.
-        """
-        crash_log.write_info(
-            "Already running:", "duplicate launch handed to the running instance\n",
-        )
-        if outcome is Outcome.HANDED_OFF:
-            return
-        process_identity.claim(self._app)
-        show_error(
-            "Evolver",
-            "Evolver is already running but did not respond, so its window "
-            "could not be opened.\n\nQuit it from the tray icon, or end the "
-            "pythonw.exe process, then start Evolver again.",
-        )
 
     def _steps_aside_for(self, launch: bytes) -> bool:
         """Whether a launch that found this Evolver running takes the work from it.

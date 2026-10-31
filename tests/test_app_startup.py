@@ -641,32 +641,30 @@ class TestALaunchThatFindsEvolverUp:
             app = build_evolver_app(request)
 
         launch = SimpleNamespace(order=Mock())
-        with patch.object(app._instance, "take_over", return_value=outcome) as launch.take_over, \
+        with patch.object(app._instance, "become_evolver", return_value=outcome) as launch.became, \
              patch.object(app._instance, "serve_launches"), \
              patch("gui.app.process_identity.claim") as claim, \
-             patch("gui.app.show_error") as launch.alert, \
-             patch("gui.app.crash_log.write_info") as launch.logged:
+             patch("gui.app.show_error") as launch.alert:
             launch.order.attach_mock(claim, "claim")
             launch.order.attach_mock(launch.alert, "alert")
             launch.exit_code = app.run()
 
         return launch
 
-    def test_the_usual_evolver_leaves_the_launch_with_the_running_one(self, request):
+    def test_the_usual_evolver_launches_as_the_usual_one(self, request):
         launch = self._launch(request, Outcome.HANDED_OFF)
 
-        launch.take_over.assert_called_once_with(single_instance.USUAL, end_the_unanswering=False)
-        assert launch.exit_code == 0
+        launch.became.assert_called_once_with(as_preview=False, only_if_not_running=False)
 
-    def test_a_preview_comes_to_take_the_work_and_ends_an_evolver_that_will_not_answer(
-            self, request):
+    def test_a_preview_launches_as_a_preview(self, request):
         launch = self._launch(request, Outcome.HANDED_OFF, preview=True)
 
-        launch.take_over.assert_called_once_with(single_instance.PREVIEW, end_the_unanswering=True)
+        launch.became.assert_called_once_with(as_preview=True, only_if_not_running=False)
 
-    def test_a_taken_handoff_needs_no_dialog(self, request):
+    def test_a_taken_handoff_exits_with_no_dialog(self, request):
         launch = self._launch(request, Outcome.HANDED_OFF)
 
+        assert launch.exit_code == 0
         launch.alert.assert_not_called()
 
     def test_a_handoff_the_running_instance_never_answered_is_visible(self, request):
@@ -684,14 +682,6 @@ class TestALaunchThatFindsEvolverUp:
 
         assert [name for name, _args, _kwargs in launch.order.mock_calls] == ["claim", "alert"]
 
-    def test_the_launch_is_logged_as_the_ordinary_event_it_is(self, request):
-        """A click on a running app is not a crash, and must not suppress the
-        atexit line that says how this process really ended."""
-        launch = self._launch(request, Outcome.HANDED_OFF)
-
-        launch.logged.assert_called_once()
-        assert "already running" in launch.logged.call_args[0][0].lower()
-
 
 class TestAStartForWhenEvolverIsNotRunning:
 
@@ -704,26 +694,19 @@ class TestAStartForWhenEvolverIsNotRunning:
              patch.object(app, "start") as start, \
              patch.object(app._app, "exec", return_value=0), \
              patch("gui.app.show_error"), \
-             patch("gui.app.crash_log.write_info") as logged, \
+             patch("util.crash_log.write_info"), \
              patch("gui.app.sys") as mock_sys:
             mock_sys.argv = ["tray_app.py", "--if-not-running"]
             exit_code = app.run()
 
-        return SimpleNamespace(exit_code=exit_code, take_over=take_over, serve=serve,
-                               start=start, logged=logged)
+        return SimpleNamespace(exit_code=exit_code, take_over=take_over, serve=serve, start=start)
 
-    def test_an_evolver_already_running_is_never_asked_to_open_its_window(self, request):
+    def test_an_evolver_already_running_is_left_as_it_was(self, request):
         started = self._start(request, already_running=True)
 
         started.take_over.assert_not_called()
+        started.start.assert_not_called()
         assert started.exit_code == 0
-
-    def test_the_log_says_which_start_found_it_running(self, request):
-        started = self._start(request, already_running=True)
-
-        header, detail = started.logged.call_args.args
-        assert "already running" in header.lower()
-        assert "--if-not-running" in detail
 
     def test_with_none_running_it_is_evolver_without_claiming_twice(self, request):
         started = self._start(request, already_running=False)
