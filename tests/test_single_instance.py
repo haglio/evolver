@@ -420,9 +420,9 @@ class TestBecomingEvolver(unittest.TestCase):
         came_to, _claim, take_over, logged = self._launch()
 
         take_over.assert_called_once_with(single_instance.USUAL, end_the_unanswering=False)
-        self.assertEqual(came_to, single_instance.Outcome.HANDED_OFF)
-        self.assertIn("already running", logged.call_args.args[0].lower())
-        self.assertIn("duplicate launch", logged.call_args.args[1])
+        assert came_to == single_instance.Outcome.HANDED_OFF
+        assert "already running" in logged.call_args.args[0].lower()
+        assert "duplicate launch" in logged.call_args.args[1]
 
     def test_a_preview_takes_the_work_over_and_ends_an_evolver_that_will_not_answer(self):
         _came_to, _claim, take_over, _logged = self._launch(as_preview=True)
@@ -433,24 +433,24 @@ class TestBecomingEvolver(unittest.TestCase):
         came_to, _claim, _take_over, logged = self._launch(
             outcome=single_instance.Outcome.CLAIMED)
 
-        self.assertEqual(came_to, single_instance.Outcome.CLAIMED)
+        assert came_to == single_instance.Outcome.CLAIMED
         logged.assert_not_called()
 
     def test_a_start_for_when_evolver_is_not_running_claims_without_asking_the_running_one(self):
         came_to, _claim, take_over, logged = self._launch(only_if_not_running=True, claimed=True)
 
-        self.assertEqual(came_to, single_instance.Outcome.CLAIMED)
+        assert came_to == single_instance.Outcome.CLAIMED
         take_over.assert_not_called()
         logged.assert_not_called()
 
     def test_a_start_for_when_evolver_is_not_running_leaves_a_running_one_as_it_was(self):
         came_to, _claim, take_over, logged = self._launch(only_if_not_running=True, claimed=False)
 
-        self.assertEqual(came_to, single_instance.Outcome.LEFT_AS_IT_WAS)
+        assert came_to == single_instance.Outcome.LEFT_AS_IT_WAS
         take_over.assert_not_called()
         header, detail = logged.call_args.args
-        self.assertIn("already running", header.lower())
-        self.assertIn(single_instance.IF_NOT_RUNNING, detail)
+        assert "already running" in header.lower()
+        assert single_instance.IF_NOT_RUNNING in detail
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
