@@ -38,7 +38,7 @@ from enum import Enum
 from app_support.win32 import try_acquire_mutex
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
-from util import processes
+from util import crash_log, processes
 from util.win32_loader import load_dll
 
 log = logging.getLogger(__name__)
@@ -67,6 +67,9 @@ PREVIEW = b"preview"
 SHOWING = b"showing"
 STEPPING_ASIDE = b"stepping-aside"
 
+#: What a start that is only for when Evolver is not running says on its command line.
+IF_NOT_RUNNING = "--if-not-running"
+
 
 class Outcome(Enum):
     """What a launch came to."""
@@ -77,6 +80,8 @@ class Outcome(Enum):
     HANDED_OFF = "handed_off"
     #: An Evolver holds the claim and could not be reached to answer.
     UNANSWERED = "unanswered"
+    #: An Evolver was already running, and this start was one that leaves it be.
+    LEFT_AS_IT_WAS = "left_as_it_was"
 
 
 @dataclass(frozen=True)
@@ -105,6 +110,25 @@ class InstanceGateway:
         """
         self._mutex_handle = try_acquire_mutex(_MUTEX_NAME)
         return self._mutex_handle is not None
+
+    def become_evolver(self, *, as_preview: bool, only_if_not_running: bool) -> Outcome:
+        """Be Evolver, or leave this launch with the one running and log which.
+
+        A preview comes to take the work over, so it ends an Evolver that will
+        not answer; the usual launch leaves such an Evolver be. A start that is
+        only for when none is running asks the running one nothing.
+        """
+        if only_if_not_running:
+            if self.claim():
+                return Outcome.CLAIMED
+            crash_log.write_info(
+                "Already running:", f"a start with {IF_NOT_RUNNING} left it as it was\n")
+            return Outcome.LEFT_AS_IT_WAS
+        outcome = self.take_over(PREVIEW if as_preview else USUAL, end_the_unanswering=as_preview)
+        if outcome is not Outcome.CLAIMED:
+            crash_log.write_info(
+                "Already running:", "duplicate launch handed to the running instance\n")
+        return outcome
 
     def take_over(self, launch: bytes, *, end_the_unanswering: bool) -> Outcome:
         """Become Evolver, or leave this launch with the one already running.

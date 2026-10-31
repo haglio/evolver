@@ -402,6 +402,57 @@ class TestTakingOver(unittest.TestCase):
         self.assertEqual(outcome, single_instance.Outcome.UNANSWERED)
 
 
+class TestBecomingEvolver(unittest.TestCase):
+    """The launch as the app asks for it: which launch this is, and what the
+    crash log says when it went to the Evolver already running."""
+
+    def _launch(self, *, as_preview=False, only_if_not_running=False, claimed=False,
+                outcome=single_instance.Outcome.HANDED_OFF):
+        gateway = single_instance.InstanceGateway()
+        with patch.object(gateway, "claim", return_value=claimed) as claim, \
+             patch.object(gateway, "take_over", return_value=outcome) as take_over, \
+             patch("util.crash_log.write_info") as logged:
+            came_to = gateway.become_evolver(as_preview=as_preview,
+                                             only_if_not_running=only_if_not_running)
+        return came_to, claim, take_over, logged
+
+    def test_the_usual_launch_hands_itself_to_the_running_evolver(self):
+        came_to, _claim, take_over, logged = self._launch()
+
+        take_over.assert_called_once_with(single_instance.USUAL, end_the_unanswering=False)
+        self.assertEqual(came_to, single_instance.Outcome.HANDED_OFF)
+        self.assertIn("already running", logged.call_args.args[0].lower())
+        self.assertIn("duplicate launch", logged.call_args.args[1])
+
+    def test_a_preview_takes_the_work_over_and_ends_an_evolver_that_will_not_answer(self):
+        _came_to, _claim, take_over, _logged = self._launch(as_preview=True)
+
+        take_over.assert_called_once_with(single_instance.PREVIEW, end_the_unanswering=True)
+
+    def test_a_launch_that_is_evolver_now_logs_nothing(self):
+        came_to, _claim, _take_over, logged = self._launch(
+            outcome=single_instance.Outcome.CLAIMED)
+
+        self.assertEqual(came_to, single_instance.Outcome.CLAIMED)
+        logged.assert_not_called()
+
+    def test_a_start_for_when_evolver_is_not_running_claims_without_asking_the_running_one(self):
+        came_to, _claim, take_over, logged = self._launch(only_if_not_running=True, claimed=True)
+
+        self.assertEqual(came_to, single_instance.Outcome.CLAIMED)
+        take_over.assert_not_called()
+        logged.assert_not_called()
+
+    def test_a_start_for_when_evolver_is_not_running_leaves_a_running_one_as_it_was(self):
+        came_to, _claim, take_over, logged = self._launch(only_if_not_running=True, claimed=False)
+
+        self.assertEqual(came_to, single_instance.Outcome.LEFT_AS_IT_WAS)
+        take_over.assert_not_called()
+        header, detail = logged.call_args.args
+        self.assertIn("already running", header.lower())
+        self.assertIn(single_instance.IF_NOT_RUNNING, detail)
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 _STARVED_SECONDS = 2.5
