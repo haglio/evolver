@@ -65,7 +65,7 @@ class TestEveryWindowOnTheTaskbar:
         assert taskbar_app.name == "Evolver"
         assert taskbar_app.icon == config.PROJECT_DIR / "icon.ico"
 
-    def test_a_preview_dresses_each_window_in_its_amber_letter(self, claimed, request, tmp_path: Path):
+    def test_a_preview_dresses_each_window_in_its_yellow_letter(self, claimed, request, tmp_path: Path):
         with override_config(BRANCH_SESSION=True, LOCAL_STATE_DIR=tmp_path), \
              patch("util.preview.preview_of", return_value=Preview(feature="a feature")):
             claims, worn = claimed()
