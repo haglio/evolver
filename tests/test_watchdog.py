@@ -41,7 +41,7 @@ class TestWatchdog(unittest.TestCase):
         app._runs._on_watchdog()
         app._runs.start("scheduled")
 
-        self.assertEqual(worker_cls.call_count, 1)
+        assert worker_cls.call_count == 1
 
     def test_the_watchdog_asks_the_pipeline_to_stop(self):
         """A hard kill could cut a stage mid-move, so the stop request is
@@ -61,8 +61,8 @@ class TestWatchdog(unittest.TestCase):
         with patch.object(app._tray, "show_schedule") as shown:
             app._runs._on_watchdog()
 
-        self.assertTrue(app._scheduler.is_running)
-        self.assertTrue(app._tray.toolTip().endswith("Running..."))
+        assert app._scheduler.is_running
+        assert app._tray.toolTip().endswith("Running...")
         shown.assert_not_called()
 
     def test_the_toast_says_the_run_is_still_going_not_killed(self):
@@ -73,8 +73,8 @@ class TestWatchdog(unittest.TestCase):
             app._runs._on_watchdog()
 
         message = toast.call_args[0][1]
-        self.assertIn("still running", message.lower())
-        self.assertNotIn("killed", message.lower())
+        assert "still running" in message.lower()
+        assert "killed" not in message.lower()
 
     def test_the_late_finish_still_reaches_its_teardown(self):
         """The overrun run does eventually end, and that ending is what
@@ -95,7 +95,7 @@ class TestWatchdog(unittest.TestCase):
         worker.isRunning.return_value = False
         app._runs.start("scheduled")
 
-        self.assertEqual(worker_cls.call_count, 2)
+        assert worker_cls.call_count == 2
 
     def test_a_run_that_finished_just_before_the_timer_is_left_alone(self):
         app, worker, _ = self._app_mid_overrun(enable_toasts=True)

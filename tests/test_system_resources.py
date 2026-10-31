@@ -75,5 +75,5 @@ class TestAvailableRamConversion:
 class TestAvailableRam(unittest.TestCase):
     def test_reports_a_plausible_available_amount(self):
         available = system_resources.available_ram_gb()
-        self.assertGreater(available, 0.0)
-        self.assertLess(available, 4096.0)
+        assert available > 0.0
+        assert available < 4096.0

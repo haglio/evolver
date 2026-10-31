@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import unittest
 
+import pytest
+
 from tests.temp_helpers import workspace_temp_dir
 from util import json_reads
 
@@ -14,25 +16,25 @@ class TestReadDict(unittest.TestCase):
             path = root / "a.json"
             path.write_text(json.dumps({"a": 1}), encoding="utf-8")
 
-            self.assertEqual(json_reads.read_dict(path), {"a": 1})
+            assert json_reads.read_dict(path) == {"a": 1}
 
     def test_a_missing_file_is_empty(self):
         with workspace_temp_dir() as root:
-            self.assertEqual(json_reads.read_dict(root / "none.json"), {})
+            assert json_reads.read_dict(root / "none.json") == {}
 
     def test_a_half_written_file_is_empty(self):
         with workspace_temp_dir() as root:
             path = root / "a.json"
             path.write_text('{"a":', encoding="utf-8")
 
-            self.assertEqual(json_reads.read_dict(path), {})
+            assert json_reads.read_dict(path) == {}
 
     def test_valid_json_that_is_not_a_mapping_is_empty(self):
         with workspace_temp_dir() as root:
             path = root / "a.json"
             path.write_text("[1, 2]", encoding="utf-8")
 
-            self.assertEqual(json_reads.read_dict(path), {})
+            assert json_reads.read_dict(path) == {}
 
 
 class TestReadDictStrict(unittest.TestCase):
@@ -44,10 +46,10 @@ class TestReadDictStrict(unittest.TestCase):
             path = root / "a.json"
             path.write_text(json.dumps({"a": 1}), encoding="utf-8")
 
-            self.assertEqual(json_reads.read_dict_strict(path), {"a": 1})
+            assert json_reads.read_dict_strict(path) == {"a": 1}
 
     def test_a_missing_file_raises(self):
-        with workspace_temp_dir() as root, self.assertRaises(OSError):
+        with workspace_temp_dir() as root, pytest.raises(FileNotFoundError):
             json_reads.read_dict_strict(root / "none.json")
 
     def test_a_half_written_file_raises(self):
@@ -55,7 +57,7 @@ class TestReadDictStrict(unittest.TestCase):
             path = root / "a.json"
             path.write_text('{"a":', encoding="utf-8")
 
-            with self.assertRaises(json.JSONDecodeError):
+            with pytest.raises(json.JSONDecodeError):
                 json_reads.read_dict_strict(path)
 
 

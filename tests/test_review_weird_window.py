@@ -40,20 +40,16 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
 
         window = self._window()
 
-        self.assertEqual(window.heading.text(), "2 videos marked weird")
-        self.assertEqual(self._rows(window), [
-            ("scene one_topaz.mp4",
-             r"videos\2D\AI\2_outbox\upscaled_by_orientation\portrait\example-source"),
-            ("loop_1_topaz.mp4", r"videos\genau\flicks\2D\AI"),
-        ])
+        assert window.heading.text() == "2 videos marked weird"
+        assert self._rows(window) == [("scene one_topaz.mp4", r"videos\2D\AI\2_outbox\upscaled_by_orientation\portrait\example-source"), ("loop_1_topaz.mp4", r"videos\genau\flicks\2D\AI")]
 
     def test_the_heading_counts_one_video_as_one(self):
         touch_video(self.lib.genau_weird / "loop_2_topaz.mp4")
 
-        self.assertEqual(self._window().heading.text(), "1 video marked weird")
+        assert self._window().heading.text() == "1 video marked weird"
 
     def test_with_nothing_marked_the_heading_says_so(self):
-        self.assertEqual(self._window().heading.text(), "Nothing is marked weird")
+        assert self._window().heading.text() == "Nothing is marked weird"
 
     def test_a_video_marked_weird_while_the_window_is_open_shows_up_in_it(self):
         touch_video(self.lib.genau_weird / "loop_15_topaz.mp4")
@@ -62,9 +58,8 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
 
         window.watch.timeout.emit()
 
-        self.assertEqual([row[0] for row in self._rows(window)],
-                         ["loop_15_topaz.mp4", "loop_16_topaz.mp4"])
-        self.assertEqual(window.heading.text(), "2 videos marked weird")
+        assert [row[0] for row in self._rows(window)] == ["loop_15_topaz.mp4", "loop_16_topaz.mp4"]
+        assert window.heading.text() == "2 videos marked weird"
 
     def test_the_video_playing_plays_on_while_another_arrives(self):
         touch_video(self.lib.genau_weird / "loop_17_topaz.mp4")
@@ -77,8 +72,8 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
             window.watch.timeout.emit()
 
         switched.assert_not_called()
-        self.assertEqual(_playing(window), playing)
-        self.assertEqual(window.videos.currentItem().text(0), "loop_18_topaz.mp4")
+        assert _playing(window) == playing
+        assert window.videos.currentItem().text(0) == "loop_18_topaz.mp4"
 
     def test_the_videos_picked_stay_picked_while_another_arrives(self):
         for number in (20, 21, 22):
@@ -89,8 +84,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
 
         window.watch.timeout.emit()
 
-        self.assertEqual(sorted(item.text(0) for item in window.videos.selectedItems()),
-                         ["loop_20_topaz.mp4", "loop_21_topaz.mp4", "loop_22_topaz.mp4"])
+        assert sorted(item.text(0) for item in window.videos.selectedItems()) == ["loop_20_topaz.mp4", "loop_21_topaz.mp4", "loop_22_topaz.mp4"]
 
     def test_the_folders_are_looked_at_again_every_couple_of_seconds_while_it_is_open(self):
         window = self._window()
@@ -99,24 +93,22 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         while_open = (window.watch.isActive(), window.watch.interval())
         window.hide()
 
-        self.assertEqual((while_open, window.watch.isActive()), ((True, 2000), False))
+        assert (while_open, window.watch.isActive()) == ((True, 2000), False)
 
     def test_a_video_nothing_says_the_place_of_reads_as_cant_tell_and_says_why(self):
         touch_video(self.lib.weird / "scene two.mp4")
 
         window = self._window()
 
-        self.assertEqual(self._rows(window), [("scene two.mp4", "can't tell")])
-        self.assertEqual(window.videos.topLevelItem(0).toolTip(1),
-                         "Nothing says which folder it was marked weird in, so it can't be restored")
+        assert self._rows(window) == [("scene two.mp4", "can't tell")]
+        assert window.videos.topLevelItem(0).toolTip(1) == "Nothing says which folder it was marked weird in, so it can't be restored"
 
     def test_each_row_says_in_full_where_the_video_is_and_where_it_goes(self):
         marked = touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_14_topaz.mp4")
 
         row = self._window().videos.topLevelItem(0)
 
-        self.assertEqual((row.toolTip(0), row.toolTip(1)),
-                         (str(marked), str(self.lib.genau_flicks / "2D" / "AI" / "loop_14_topaz.mp4")))
+        assert (row.toolTip(0), row.toolTip(1)) == (str(marked), str(self.lib.genau_flicks / "2D" / "AI" / "loop_14_topaz.mp4"))
 
 
 class TestWatchingOne(_ReviewingALibrary):
@@ -128,14 +120,14 @@ class TestWatchingOne(_ReviewingALibrary):
 
         window.videos.setCurrentItem(window.videos.topLevelItem(1))
 
-        self.assertEqual((playing_first, _playing(window)), (first, second))
+        assert (playing_first, _playing(window)) == (first, second)
 
     def test_a_video_plays_with_no_sound_output_at_all(self):
         touch_video(self.lib.genau_weird / "loop_5_topaz.mp4")
 
         window = self._window()
 
-        self.assertIsNone(window.preview.player.audioOutput())
+        assert window.preview.player.audioOutput() is None
 
     def test_what_the_player_reads_out_of_a_video_is_kept_out_of_every_log(self):
         with patch("util.looping_preview.silence_the_ffmpeg_format_dump") as silenced:
@@ -166,9 +158,9 @@ class TestPickedRows(_ReviewingALibrary):
 
         grounds = [row_ground(window.videos, row) for row in range(3)]
 
-        self.assertEqual(grounds[0], BLUE.name())
-        self.assertEqual(grounds[2], BLUE.name())
-        self.assertNotEqual(grounds[1], BLUE.name())
+        assert grounds[0] == BLUE.name()
+        assert grounds[2] == BLUE.name()
+        assert grounds[1] != BLUE.name()
 
     def test_the_row_the_keyboard_is_on_wears_no_frame_round_its_blue(self):
         touch_video(self.lib.genau_weird / "loop_27_topaz.mp4")
@@ -182,8 +174,8 @@ class TestPickedRows(_ReviewingALibrary):
             window.videos.topLevelItem(0).setText(column, "")
         QAPP.processEvents()
 
-        self.assertTrue(window.videos.hasFocus())
-        self.assertEqual(_row_colors(window.videos, 0), {BLUE.name()})
+        assert window.videos.hasFocus()
+        assert _row_colors(window.videos, 0) == {BLUE.name()}
 
 
 class TestRestoring(_ReviewingALibrary):
@@ -194,9 +186,9 @@ class TestRestoring(_ReviewingALibrary):
 
         window.restore_button.click()
 
-        self.assertTrue((self.lib.genau_flicks / "loop_5_topaz.mp4").is_file())
-        self.assertEqual(self._rows(window), [("loop_6_topaz.mp4", "videos\\genau\\flicks")])
-        self.assertEqual(_playing(window), after)
+        assert (self.lib.genau_flicks / "loop_5_topaz.mp4").is_file()
+        assert self._rows(window) == [("loop_6_topaz.mp4", "videos\\genau\\flicks")]
+        assert _playing(window) == after
 
     def test_one_that_cannot_be_restored_is_named_and_the_rest_still_are(self):
         touch_video(self.lib.genau_weird / "loop_11_topaz.mp4")
@@ -208,17 +200,16 @@ class TestRestoring(_ReviewingALibrary):
         with patch("review_weird.window.QMessageBox.warning") as warned:
             window.restore_button.click()
 
-        self.assertIn("loop_11_topaz.mp4", warned.call_args.args[2])
-        self.assertTrue((self.lib.genau_flicks / "loop_12_topaz.mp4").is_file())
-        self.assertEqual([row[0] for row in self._rows(window)], ["loop_11_topaz.mp4"])
+        assert "loop_11_topaz.mp4" in warned.call_args.args[2]
+        assert (self.lib.genau_flicks / "loop_12_topaz.mp4").is_file()
+        assert [row[0] for row in self._rows(window)] == ["loop_11_topaz.mp4"]
 
 
 class TestWhatCanBeDone(_ReviewingALibrary):
     def test_with_nothing_marked_neither_verdict_can_be_given(self):
         window = self._window()
 
-        self.assertEqual((window.restore_button.isEnabled(), window.delete_button.isEnabled()),
-                         (False, False))
+        assert (window.restore_button.isEnabled(), window.delete_button.isEnabled()) == (False, False)
 
     def test_a_video_nothing_says_the_place_of_can_be_deleted_but_not_restored(self):
         touch_video(self.lib.weird / "scene three.mp4")
@@ -226,8 +217,7 @@ class TestWhatCanBeDone(_ReviewingALibrary):
         window = self._window()
         window.videos.selectAll()
 
-        self.assertEqual((window.restore_button.isEnabled(), window.delete_button.isEnabled()),
-                         (False, True))
+        assert (window.restore_button.isEnabled(), window.delete_button.isEnabled()) == (False, True)
 
 
 class TestDeletingPermanently(_ReviewingALibrary):
@@ -239,8 +229,8 @@ class TestDeletingPermanently(_ReviewingALibrary):
             window.delete_button.click()
 
         asked.assert_not_called()
-        self.assertFalse(marked.exists())
-        self.assertEqual(window.heading.text(), "Nothing is marked weird")
+        assert not marked.exists()
+        assert window.heading.text() == "Nothing is marked weird"
 
     def test_several_selected_all_go_at_once(self):
         marked = [touch_video(self.lib.genau_weird / f"loop_{number}_topaz.mp4") for number in (8, 9)]
@@ -249,7 +239,7 @@ class TestDeletingPermanently(_ReviewingALibrary):
 
         window.delete_button.click()
 
-        self.assertEqual([video for video in marked if video.exists()], [])
+        assert [video for video in marked if video.exists()] == []
 
     def test_the_delete_key_deletes_too(self):
         marked = touch_video(self.lib.genau_weird / "loop_13_topaz.mp4")
@@ -257,14 +247,14 @@ class TestDeletingPermanently(_ReviewingALibrary):
 
         _delete_key(window).activated.emit()
 
-        self.assertFalse(marked.exists())
+        assert not marked.exists()
 
     def test_the_delete_key_with_nothing_marked_does_nothing(self):
         window = self._window()
 
         _delete_key(window).activated.emit()
 
-        self.assertEqual(window.heading.text(), "Nothing is marked weird")
+        assert window.heading.text() == "Nothing is marked weird"
 
 
 def _no_question_asked():

@@ -48,7 +48,7 @@ class TestNonAiTitles(unittest.TestCase):
 
                 nonai_titles.run()
 
-                self.assertEqual(_title_of(clip), "Jane Doe - Alpha Study: Part Two")
+                assert _title_of(clip) == "Jane Doe - Alpha Study: Part Two"
 
     def test_a_scene_takes_the_name_of_the_clip_matched_inside_it(self):
         """The scene was saved under whatever the download called it; the clip
@@ -69,7 +69,7 @@ class TestNonAiTitles(unittest.TestCase):
 
                 nonai_titles.run()
 
-                self.assertEqual(_title_of(scene), "Jane Doe - Alpha Study 3")
+                assert _title_of(scene) == "Jane Doe - Alpha Study 3"
 
     def test_the_scenes_name_reaches_the_rendition_that_was_not_matched(self):
         """The batch records its match against the one file it searched, while
@@ -93,7 +93,7 @@ class TestNonAiTitles(unittest.TestCase):
 
                 nonai_titles.run()
 
-                self.assertEqual(_title_of(upscale), "Jane Doe - Alpha Study 3")
+                assert _title_of(upscale) == "Jane Doe - Alpha Study 3"
 
     def test_a_video_nothing_names_is_left_without_one(self):
         """Its readers fall back to the filename, which is what they always did."""
@@ -107,8 +107,8 @@ class TestNonAiTitles(unittest.TestCase):
 
                 result = nonai_titles.run()
 
-                self.assertNotIn("title", sidecar.read(sidecar.sidecar_path(lone)))
-                self.assertEqual((result.titled, result.videos), (0, 1))
+                assert "title" not in sidecar.read(sidecar.sidecar_path(lone))
+                assert (result.titled, result.videos) == (0, 1)
 
     def test_a_name_that_no_longer_holds_is_taken_back_off(self):
         """A backfill that never ends has to be able to correct itself: strike
@@ -125,4 +125,4 @@ class TestNonAiTitles(unittest.TestCase):
 
                 nonai_titles.run()
 
-                self.assertNotIn("title", sidecar.read(sidecar.sidecar_path(video)))
+                assert "title" not in sidecar.read(sidecar.sidecar_path(video))

@@ -93,25 +93,20 @@ def _config_names_read() -> set[str]:
 
 class TestTheNonAiFixture(unittest.TestCase):
     def test_every_config_name_the_stage_reads_is_filed_one_way_or_the_other(self):
-        self.assertEqual(
-            _config_names_read(),
-            PLACES_ON_DISK | set(LEFT_AMBIENT),
-            "a new ambient read is either a place the fixture must redirect or "
-            "one it may leave alone -- say which, and why, above",
-        )
+        assert _config_names_read() == PLACES_ON_DISK | set(LEFT_AMBIENT), "a new ambient read is either a place the fixture must redirect or one it may leave alone -- say which, and why, above"
 
     def test_the_fixture_redirects_every_place_into_the_cases_own_tree(self):
         with workspace_temp_dir() as root:
             overrides = nonai_library_overrides(root)
 
-            self.assertEqual(PLACES_ON_DISK - set(overrides), set())
+            assert PLACES_ON_DISK - set(overrides) == set()
             for name in sorted(PLACES_ON_DISK):
                 with self.subTest(name=name):
                     value = overrides[name]
                     # None is the archive being unset, which is the public
                     # checkout's behaviour and keeps the original in-library.
                     if value is not None:
-                        self.assertTrue(Path(value).is_relative_to(root))
+                        assert Path(value).is_relative_to(root)
 
 
 if __name__ == "__main__":

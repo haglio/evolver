@@ -18,14 +18,13 @@ class TestAiClips(unittest.TestCase):
                 clips = list(lanes.ai_clips())
                 upscales = [clip.upscale for clip in clips]
 
-        self.assertEqual([(c.video, c.source, c.orientation) for c in clips],
-                         [(video, "provider2", "portrait")])
-        self.assertEqual(upscales, [lib.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4"])
+        assert [(c.video, c.source, c.orientation) for c in clips] == [(video, "provider2", "portrait")]
+        assert upscales == [lib.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4"]
 
     def test_no_sorted_folder_means_no_clips(self):
         with workspace_temp_dir() as root:
             with LaneLibrary(root).config():
-                self.assertEqual(list(lanes.ai_clips()), [])
+                assert list(lanes.ai_clips()) == []
 
 
 class TestGenauFlicks(unittest.TestCase):
@@ -37,7 +36,7 @@ class TestGenauFlicks(unittest.TestCase):
                 cut = touch_video(lib.genau_flicks / "2D" / "non_AI" / "scene one.mp4")
                 vr = touch_video(lib.genau_flicks / "VR" / "scene two_180.mp4")
 
-                self.assertEqual(list(lanes.genau_flicks()), [loop, cut, vr])
+                assert list(lanes.genau_flicks()) == [loop, cut, vr]
 
     def test_finds_genaus_flicks_by_the_shape_of_their_folder_whatever_it_is_called(self):
         with workspace_temp_dir() as root:
@@ -47,14 +46,14 @@ class TestGenauFlicks(unittest.TestCase):
                 lib.genau_flicks.rename(renamed)
                 flick = touch_video(renamed / "2D" / "AI" / "loop_2_topaz.mp4")
 
-                self.assertEqual(list(lanes.genau_flicks()), [flick])
-                self.assertEqual(lanes.genau_delivery_dir(), renamed / "2D" / "AI")
+                assert list(lanes.genau_flicks()) == [flick]
+                assert lanes.genau_delivery_dir() == renamed / "2D" / "AI"
 
     def test_finds_no_flicks_and_nowhere_to_deliver_where_no_folder_has_their_shape(self):
         with workspace_temp_dir() as root:
             with override_config(GENAU_DIR=root / "genau"):
-                self.assertEqual(list(lanes.genau_flicks()), [])
-                self.assertIsNone(lanes.genau_delivery_dir())
+                assert list(lanes.genau_flicks()) == []
+                assert lanes.genau_delivery_dir() is None
 
     def test_lists_the_delivered_loops_and_nothing_still_being_written(self):
         with workspace_temp_dir() as root:
@@ -64,7 +63,7 @@ class TestGenauFlicks(unittest.TestCase):
                 touch_video(lib.genau_flicks / "loop_3.partial.mp4")
                 (lib.genau_flicks / "notes.txt").write_text("x", encoding="utf-8")
 
-                self.assertEqual(list(lanes.genau_flicks()), [loop])
+                assert list(lanes.genau_flicks()) == [loop]
 
 
 class TestSentLanes(unittest.TestCase):
@@ -74,9 +73,7 @@ class TestSentLanes(unittest.TestCase):
             with lib.config(genau_source="example-loop-clips"):
                 sent = lanes.sent_lanes()
 
-                self.assertEqual([(lane.source, lane.unsent_column) for lane in sent],
-                                 [("origenerator", "evolver_unsent_at"),
-                                  ("example-loop-clips", "genau_unsent_at")])
+                assert [(lane.source, lane.unsent_column) for lane in sent] == [("origenerator", "evolver_unsent_at"), ("example-loop-clips", "genau_unsent_at")]
 
     def test_only_the_genau_lane_delivers_its_clips_out_of_the_library(self):
         # The other lane's clips rest in the outbox, so there is nowhere else to
@@ -88,8 +85,8 @@ class TestSentLanes(unittest.TestCase):
             with lib.config():
                 library_lane, genau_lane = lanes.sent_lanes()
 
-                self.assertIsNone(library_lane.delivered_dir)
-                self.assertEqual(genau_lane.delivered_dir, lib.genau_flicks / "2D" / "AI")
+                assert library_lane.delivered_dir is None
+                assert genau_lane.delivered_dir == lib.genau_flicks / "2D" / "AI"
 
 
 class TestNonAiVideos(unittest.TestCase):
@@ -100,9 +97,9 @@ class TestNonAiVideos(unittest.TestCase):
                 later = touch_video(lib.non_ai / "beta" / "scenes" / "scene.mp4")
                 first = touch_video(lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-1.mp4")
 
-                self.assertEqual(lanes.non_ai_videos(), [first, later])
+                assert lanes.non_ai_videos() == [first, later]
 
     def test_no_non_ai_folder_means_no_videos(self):
         with workspace_temp_dir() as root:
             with LaneLibrary(root).config():
-                self.assertEqual(lanes.non_ai_videos(), [])
+                assert lanes.non_ai_videos() == []

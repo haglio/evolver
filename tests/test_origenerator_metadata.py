@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from app_support import provenance
 
 from tasks import origenerator_metadata as om
@@ -75,11 +76,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
 
-        self.assertEqual(payload["provenance"], {"generation": {
-            "schema": provenance.SCHEMA, "app": "origenerator",
-            "app_commit": None, "app_dirty": None,
-            METHOD: "wan22_i2v", METHOD_VERSION: "v007", "stamped_at": None,
-        }})
+        assert payload["provenance"] == {"generation": {"schema": provenance.SCHEMA, "app": "origenerator", "app_commit": None, "app_dirty": None, METHOD: "wan22_i2v", METHOD_VERSION: "v007", "stamped_at": None}}
 
     def test_what_an_import_writes_in_place_of_a_workflow_is_recorded_as_unknown(self):
         """Origenerator fills both columns of a clip it imported rather than
@@ -93,7 +90,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
 
         generation = payload["provenance"]["generation"]
-        self.assertEqual((generation[METHOD], generation[METHOD_VERSION]), (None, None))
+        assert (generation[METHOD], generation[METHOD_VERSION]) == (None, None)
 
     def test_a_record_the_gallery_keeps_of_its_own_is_carried_as_it_stands(self):
         """Once Origenerator stamps its own rows it knows what nothing here can
@@ -112,7 +109,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
 
-        self.assertEqual(payload["provenance"]["generation"], its_own)
+        assert payload["provenance"]["generation"] == its_own
 
 
 class TestBuildMetadata(unittest.TestCase):
@@ -126,12 +123,7 @@ class TestBuildMetadata(unittest.TestCase):
             ])
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
-        self.assertEqual(payload["video"], {
-            "prompt": "a woman dancing",
-            "model": "wan2.2_i2v_high_noise",
-            "seed": "42",
-            "created": "2026-03-28",
-        })
+        assert payload["video"] == {"prompt": "a woman dancing", "model": "wan2.2_i2v_high_noise", "seed": "42", "created": "2026-03-28"}
 
     def test_resolves_source_image_block(self):
         with workspace_temp_dir() as root:
@@ -147,14 +139,8 @@ class TestBuildMetadata(unittest.TestCase):
             ])
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00009_.mp4"), db_path=db)
-        self.assertEqual(payload["video"]["prompt"], "she turns around")
-        self.assertEqual(payload["source_image"], {
-            "positive_prompt": "portrait of a woman",
-            "negative_prompt": "blurry",
-            "model": "reapony_v80",
-            "seed": "7",
-            "created": "2026-03-27",
-        })
+        assert payload["video"]["prompt"] == "she turns around"
+        assert payload["source_image"] == {"positive_prompt": "portrait of a woman", "negative_prompt": "blurry", "model": "reapony_v80", "seed": "7", "created": "2026-03-27"}
 
     def test_no_source_image_when_input_image_unmatched(self):
         with workspace_temp_dir() as root:
@@ -166,7 +152,7 @@ class TestBuildMetadata(unittest.TestCase):
             ])
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
-        self.assertNotIn("source_image", payload)
+        assert "source_image" not in payload
 
     def test_strips_export_uniquifier_when_matching(self):
         with workspace_temp_dir() as root:
@@ -176,17 +162,17 @@ class TestBuildMetadata(unittest.TestCase):
             ])
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_ (2).mp4"), db_path=db)
-        self.assertEqual(payload["video"]["prompt"], "a scene")
+        assert payload["video"]["prompt"] == "a scene"
 
     def test_raises_when_no_row_matches(self):
         with workspace_temp_dir() as root:
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", outputs=["other.mp4"])])
-            with _no_probe(), self.assertRaises(LookupError):
+            with _no_probe(), pytest.raises(LookupError):
                 om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
 
     def test_raises_when_db_missing(self):
-        with workspace_temp_dir() as root, self.assertRaises(FileNotFoundError):
+        with workspace_temp_dir() as root, pytest.raises(FileNotFoundError):
             om.build_metadata(Path("x.mp4"), db_path=root / "nope.db")
 
     def test_includes_resolution_and_aspect_from_probe(self):
@@ -195,8 +181,8 @@ class TestBuildMetadata(unittest.TestCase):
             _make_db(db, [_row("vid-1", pos="a scene", outputs=["wan22_i2v_00001_.mp4"])])
             with patch("tasks.origenerator_metadata.video_dimensions", return_value=(832, 480)):
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
-        self.assertEqual(payload["video"]["resolution"], "832x480")
-        self.assertEqual(payload["video"]["aspect_ratio"], "16:9")
+        assert payload["video"]["resolution"] == "832x480"
+        assert payload["video"]["aspect_ratio"] == "16:9"
 
     def test_omits_empty_fields(self):
         with workspace_temp_dir() as root:
@@ -205,50 +191,49 @@ class TestBuildMetadata(unittest.TestCase):
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
         # No prompt, no seed, no model, no created -> an empty video block, not keys with "".
-        self.assertEqual(payload["video"], {})
+        assert payload["video"] == {}
 
 
 class TestModelLabel(unittest.TestCase):
     def test_prefers_unet_high_and_strips_extension(self):
-        self.assertEqual(om._model_label({"unet_high": "wan_high.gguf", "unet_low": "wan_low.gguf"}),
-                         "wan_high")
+        assert om._model_label({"unet_high": "wan_high.gguf", "unet_low": "wan_low.gguf"}) == "wan_high"
 
     def test_flux_unet(self):
-        self.assertEqual(om._model_label({"unet": "flux1-dev.safetensors"}), "flux1-dev")
+        assert om._model_label({"unet": "flux1-dev.safetensors"}) == "flux1-dev"
 
     def test_sdxl_checkpoint_with_path(self):
-        self.assertEqual(om._model_label({"checkpoint": "sub\\reapony_v80.safetensors"}), "reapony_v80")
+        assert om._model_label({"checkpoint": "sub\\reapony_v80.safetensors"}) == "reapony_v80"
 
     def test_empty_when_no_model_key(self):
-        self.assertEqual(om._model_label({"steps": 8}), "")
+        assert om._model_label({"steps": 8}) == ""
 
 
 class TestAspectRatio(unittest.TestCase):
     def test_snaps_landscape(self):
-        self.assertEqual(om._aspect_ratio(832, 480), "16:9")
+        assert om._aspect_ratio(832, 480) == "16:9"
 
     def test_snaps_portrait(self):
-        self.assertEqual(om._aspect_ratio(480, 832), "9:16")
+        assert om._aspect_ratio(480, 832) == "9:16"
 
     def test_snaps_square(self):
-        self.assertEqual(om._aspect_ratio(624, 624), "1:1")
+        assert om._aspect_ratio(624, 624) == "1:1"
 
     def test_reduces_uncommon_ratio(self):
-        self.assertEqual(om._aspect_ratio(1000, 300), "10:3")
+        assert om._aspect_ratio(1000, 300) == "10:3"
 
     def test_empty_for_degenerate(self):
-        self.assertEqual(om._aspect_ratio(0, 480), "")
+        assert om._aspect_ratio(0, 480) == ""
 
 
 class TestFrameName(unittest.TestCase):
     def test_strips_output_annotation_and_lowercases(self):
-        self.assertEqual(om._frame_name("Sub/Wan22_T2I_00005_.PNG [output]"), "wan22_t2i_00005_.png")
+        assert om._frame_name("Sub/Wan22_T2I_00005_.PNG [output]") == "wan22_t2i_00005_.png"
 
     def test_bare_filename(self):
-        self.assertEqual(om._frame_name("a.mp4"), "a.mp4")
+        assert om._frame_name("a.mp4") == "a.mp4"
 
     def test_empty(self):
-        self.assertEqual(om._frame_name(None), "")
+        assert om._frame_name(None) == ""
 
 
 if __name__ == "__main__":

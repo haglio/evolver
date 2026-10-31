@@ -61,9 +61,9 @@ class TestBackfillWindow(unittest.TestCase):
 
         window = self._window(session)
 
-        self.assertIn("2 remaining", window.status_text())
-        self.assertIn("a_topaz.mp4", window.status_text())
-        self.assertEqual(window.last_text(), "")
+        assert "2 remaining" in window.status_text()
+        assert "a_topaz.mp4" in window.status_text()
+        assert window.last_text() == ""
 
     def test_a_heard_phrase_reaches_the_session_and_advances_the_clip(self):
         session = FakeSession(
@@ -74,16 +74,16 @@ class TestBackfillWindow(unittest.TestCase):
         window = self._window(session)
         window.on_phrase("dance")
 
-        self.assertEqual(session.applied, ["dance"])
-        self.assertIn("1 remaining", window.status_text())
-        self.assertIn("b_topaz.mp4", window.status_text())
+        assert session.applied == ["dance"]
+        assert "1 remaining" in window.status_text()
+        assert "b_topaz.mp4" in window.status_text()
 
     def test_the_live_hypothesis_shows_what_the_recognizer_is_hearing(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
         window.on_hearing("side eta")
 
-        self.assertIn("side eta", window.hearing_text())
+        assert "side eta" in window.hearing_text()
 
     def test_an_empty_hypothesis_clears_the_hearing_line(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
@@ -91,7 +91,7 @@ class TestBackfillWindow(unittest.TestCase):
 
         window.on_hearing("")
 
-        self.assertEqual(window.hearing_text(), "")
+        assert window.hearing_text() == ""
 
     def test_a_dead_recognizer_says_so_where_the_live_guess_was(self):
         """The tiles still work -- they are clickable -- so nothing closes or
@@ -102,8 +102,8 @@ class TestBackfillWindow(unittest.TestCase):
 
         window.on_voice_failed("no input device")
 
-        self.assertIn("stopped", window.hearing_text().lower())
-        self.assertIn("no input device", window.hearing_text())
+        assert "stopped" in window.hearing_text().lower()
+        assert "no input device" in window.hearing_text()
 
     def test_a_landed_phrase_clears_the_stale_hearing_line(self):
         session = FakeSession(
@@ -115,7 +115,7 @@ class TestBackfillWindow(unittest.TestCase):
 
         window.on_phrase("dance")
 
-        self.assertEqual(window.hearing_text(), "")
+        assert window.hearing_text() == ""
 
     def test_the_last_decision_names_its_own_clip_not_the_one_now_playing(self):
         session = FakeSession(
@@ -126,8 +126,8 @@ class TestBackfillWindow(unittest.TestCase):
         window = self._window(session)
         window.on_phrase("dance")
 
-        self.assertEqual(window.last_text(), "Last: a_topaz.mp4 → Dancing")
-        self.assertNotIn("Dancing", window.status_text())
+        assert window.last_text() == "Last: a_topaz.mp4 → Dancing"
+        assert "Dancing" not in window.status_text()
 
     def test_a_phrase_the_session_ignores_leaves_both_lines_alone(self):
         session = FakeSession([Path("a_topaz.mp4")], [(None, None)])
@@ -136,8 +136,8 @@ class TestBackfillWindow(unittest.TestCase):
         status, last = window.status_text(), window.last_text()
         window.on_phrase("banana")
 
-        self.assertEqual(window.status_text(), status)
-        self.assertEqual(window.last_text(), last)
+        assert window.status_text() == status
+        assert window.last_text() == last
 
     def test_a_decision_that_leaves_the_clip_on_screen_does_not_restart_it(self):
         """An undo with nothing to undo, or a skip with only one clip left."""
@@ -148,7 +148,7 @@ class TestBackfillWindow(unittest.TestCase):
             window.on_phrase("undo")
 
         set_source.assert_not_called()
-        self.assertEqual(window.last_text(), "Last: nothing to undo")
+        assert window.last_text() == "Last: nothing to undo"
 
     def test_the_last_clip_leaves_a_finished_message(self):
         session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → weird", [])])
@@ -156,13 +156,13 @@ class TestBackfillWindow(unittest.TestCase):
         window = self._window(session)
         window.on_phrase("weird")
 
-        self.assertEqual(window.status_text(), "Nothing left to label.")
-        self.assertEqual(window.last_text(), "Last: a_topaz.mp4 → weird")
+        assert window.status_text() == "Nothing left to label."
+        assert window.last_text() == "Last: a_topaz.mp4 → weird"
 
     def test_an_empty_queue_opens_straight_to_the_finished_message(self):
         window = self._window(FakeSession([]))
 
-        self.assertEqual(window.status_text(), "Nothing left to label.")
+        assert window.status_text() == "Nothing left to label."
 
     def test_emptying_the_queue_releases_the_last_clip(self):
         """Otherwise the player still holds the file the background move is renaming."""
@@ -173,7 +173,7 @@ class TestBackfillWindow(unittest.TestCase):
             window.on_phrase("weird")
 
         set_source.assert_called_once()
-        self.assertTrue(set_source.call_args[0][0].isEmpty())
+        assert set_source.call_args[0][0].isEmpty()
 
     def test_an_undo_after_the_last_clip_starts_playing_it_again(self):
         session = FakeSession([], [("undid a_topaz.mp4 → Dancing", [Path("a_topaz.mp4")])])
@@ -183,34 +183,24 @@ class TestBackfillWindow(unittest.TestCase):
             window.on_phrase("undo")
 
         set_source.assert_called_once()
-        self.assertIn("a_topaz.mp4", set_source.call_args[0][0].toLocalFile())
-        self.assertIn("1 remaining", window.status_text())
-        self.assertEqual(window.last_text(), "Last: undid a_topaz.mp4 → Dancing")
+        assert "a_topaz.mp4" in set_source.call_args[0][0].toLocalFile()
+        assert "1 remaining" in window.status_text()
+        assert window.last_text() == "Last: undid a_topaz.mp4 → Dancing"
 
     def test_the_window_is_built_from_a_session_its_vocabulary_and_its_thumbnails(self):
         """It is the top-level window of its own process — nothing owns it, so
         there is no parent to take."""
-        self.assertEqual(
-            list(inspect.signature(BackfillWindow.__init__).parameters)[1:],
-            ["session", "vocabulary", "thumbnails"],
-        )
+        assert list(inspect.signature(BackfillWindow.__init__).parameters)[1:] == ["session", "vocabulary", "thumbnails"]
 
     def test_the_tiles_are_the_commands_of_the_vocabulary_it_was_handed(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]), vocabulary_of(Act("kappa", "Kappa")))
 
-        self.assertEqual(
-            sorted(tile.text() for tile in window.findChildren(QToolButton)),
-            ["Same", "Side Kappa", "Skip", "Undo", "Weird", "XYZ Kappa"],
-        )
+        assert sorted(tile.text() for tile in window.findChildren(QToolButton)) == ["Same", "Side Kappa", "Skip", "Undo", "Weird", "XYZ Kappa"]
 
     def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        self.assertEqual(
-            {command.phrase: window.tile_for(command.phrase).text()
-             for command in _every_grid_command(VOCABULARY)},
-            {command.phrase: command.label for command in _every_grid_command(VOCABULARY)},
-        )
+        assert {command.phrase: window.tile_for(command.phrase).text() for command in _every_grid_command(VOCABULARY)} == {command.phrase: command.label for command in _every_grid_command(VOCABULARY)}
 
     def test_every_command_keeps_its_own_tile(self):
         """One command's phrase can equal another's label: the vocabulary is
@@ -222,13 +212,13 @@ class TestBackfillWindow(unittest.TestCase):
         window = self._window(FakeSession([Path("a_topaz.mp4")]), shadowing)
 
         for command in _every_grid_command(shadowing):
-            self.assertEqual(window.tile_for(command.phrase).text(), command.label)
-            self.assertEqual(window.tile_for(command.label).text(), command.label)
+            assert window.tile_for(command.phrase).text() == command.label
+            assert window.tile_for(command.label).text() == command.label
 
     def test_a_tile_is_labelled_with_the_action_it_records(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        self.assertEqual(window.tile_for("side beta").text(), "Side Beta")
+        assert window.tile_for("side beta").text() == "Side Beta"
 
     def test_clicking_a_tile_applies_its_phrase_through_the_session(self):
         session = FakeSession(
@@ -239,7 +229,7 @@ class TestBackfillWindow(unittest.TestCase):
 
         window.tile_for("skip").click()
 
-        self.assertEqual(session.applied, ["skip"])
+        assert session.applied == ["skip"]
 
     def _png(self, tmp):
         png = Path(tmp) / "frame.png"
@@ -253,7 +243,7 @@ class TestBackfillWindow(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             window.set_thumbnail("Side Beta", str(self._png(tmp)))
 
-            self.assertFalse(window.tile_for("side beta").icon().isNull())
+            assert not window.tile_for("side beta").icon().isNull()
 
     def test_an_example_stored_under_older_casing_still_lights_its_tile(self):
         """Library clips tagged "Xyz ..." must reach the "XYZ ..." tile."""
@@ -261,7 +251,7 @@ class TestBackfillWindow(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             window.set_thumbnail("Xyz Beta", str(self._png(tmp)))
 
-            self.assertFalse(window.tile_for("xyz beta").icon().isNull())
+            assert not window.tile_for("xyz beta").icon().isNull()
 
     def test_a_thumbnail_for_an_action_with_no_tile_is_ignored(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
@@ -269,16 +259,14 @@ class TestBackfillWindow(unittest.TestCase):
         window.set_thumbnail("Not An Act", "whatever.png")  # must not raise
 
         # ...and must not have decorated some other act's tile with it either
-        self.assertTrue(
-            all(tile.icon().isNull() for tile in window.findChildren(QToolButton))
-        )
+        assert all(tile.icon().isNull() for tile in window.findChildren(QToolButton))
 
     def test_an_empty_thumbnail_path_leaves_the_tile_iconless(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
         window.set_thumbnail("Side Beta", "")
 
-        self.assertTrue(window.tile_for("side beta").icon().isNull())
+        assert window.tile_for("side beta").icon().isNull()
 
     def test_thumbnails_passed_at_construction_land_on_their_tiles(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -289,17 +277,17 @@ class TestBackfillWindow(unittest.TestCase):
             self.addCleanup(window.close)
             self.addCleanup(window.deleteLater)
 
-            self.assertFalse(window.tile_for("side beta").icon().isNull())
+            assert not window.tile_for("side beta").icon().isNull()
 
     def test_the_clip_plays_with_no_sound_output_at_all(self):
         """The microphone is open the whole session; a clip's audio would be
         one more thing for the recognizer to mishear."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
-        self.assertIsNone(window._preview.player.audioOutput())
+        assert window._preview.player.audioOutput() is None
 
     def test_the_clip_loops_until_a_decision_lands(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
-        self.assertEqual(window._preview.player.loops(), QMediaPlayer.Loops.Infinite)
+        assert window._preview.player.loops() == QMediaPlayer.Loops.Infinite
 
     def test_releasing_the_last_clip_also_stops_the_player(self):
         """Dropping the source without stop() left playback tearing at a file
@@ -326,21 +314,21 @@ class TestBackfillWindow(unittest.TestCase):
             s for s in window.findChildren(QShortcut)
             if s.key() == QKeySequence(Qt.Key.Key_Escape)
         ]
-        self.assertEqual(len(escapes), 1)
+        assert len(escapes) == 1
 
         window.show()
-        self.assertTrue(window.isVisible())
+        assert window.isVisible()
         escapes[0].activated.emit()
-        self.assertFalse(window.isVisible())
+        assert not window.isVisible()
 
     def test_no_tile_ever_takes_keyboard_focus(self):
         """The space bar must not re-fire the last clicked tile, and Esc must
         keep closing the window rather than being swallowed by a button."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         tiles = window.findChildren(QToolButton)
-        self.assertTrue(tiles)
+        assert tiles
         for tile in tiles:
-            self.assertEqual(tile.focusPolicy(), Qt.FocusPolicy.NoFocus)
+            assert tile.focusPolicy() == Qt.FocusPolicy.NoFocus
 
     def test_a_portrait_frame_lands_unsquished_on_a_square_icon(self):
         """The fix for portrait/landscape frames coming out squished to square
@@ -356,13 +344,13 @@ class TestBackfillWindow(unittest.TestCase):
 
             icon = window.tile_for("side beta").icon()
             rendered = icon.pixmap(96, 96)
-            self.assertEqual((rendered.width(), rendered.height()), (96, 96))
+            assert (rendered.width(), rendered.height()) == (96, 96)
             image = rendered.toImage()
             # a 20x40 frame fits 96x96 as 48x96: opaque centre, transparent
             # margins on the short axis
-            self.assertEqual(image.pixelColor(48, 48).alpha(), 255)
-            self.assertEqual(image.pixelColor(5, 48).alpha(), 0)
-            self.assertEqual(image.pixelColor(90, 48).alpha(), 0)
+            assert image.pixelColor(48, 48).alpha() == 255
+            assert image.pixelColor(5, 48).alpha() == 0
+            assert image.pixelColor(90, 48).alpha() == 0
 
     def test_closing_releases_the_clip_the_player_holds(self):
         session = FakeSession([Path("a_topaz.mp4")])
@@ -378,7 +366,7 @@ class TestBackfillWindow(unittest.TestCase):
             window.close()
 
         set_source.assert_called_once()
-        self.assertTrue(set_source.call_args[0][0].isEmpty())
+        assert set_source.call_args[0][0].isEmpty()
 
 
 if __name__ == "__main__":

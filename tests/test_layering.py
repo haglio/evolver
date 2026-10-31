@@ -97,19 +97,14 @@ class TestLayering(unittest.TestCase):
     def test_no_package_imports_one_it_is_not_allowed_to(self):
         _used, unlisted = _edges()
 
-        self.assertEqual(
-            sorted(unlisted),
-            [],
-            "an import across a layer boundary that nothing declares -- either "
-            "it belongs in ALLOWED with a reason, or it is the wrong way round",
-        )
+        assert sorted(unlisted) == [], "an import across a layer boundary that nothing declares -- either it belongs in ALLOWED with a reason, or it is the wrong way round"
 
     def test_every_declared_edge_is_one_something_actually_uses(self):
         """A dependency that has gone is a smaller surface, and the list has to
         say so -- otherwise it drifts into describing a shape nothing has."""
         used, _unlisted = _edges()
 
-        self.assertEqual(used, ALLOWED)
+        assert used == ALLOWED
 
 
 if __name__ == "__main__":

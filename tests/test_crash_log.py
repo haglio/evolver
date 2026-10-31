@@ -1,6 +1,7 @@
 """Tests for the crash log, and for the entry point that has to surface one."""
 from __future__ import annotations
 
+import re
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
@@ -39,7 +40,7 @@ class TestInstallExcepthook(unittest.TestCase):
 
     def test_sets_sys_excepthook(self):
         crash_log.install_excepthook()
-        self.assertIsNot(sys.excepthook, self._original_hook)
+        assert sys.excepthook is not self._original_hook
 
     def test_hook_writes_crash_log(self):
         crash_log.install_excepthook()
@@ -49,13 +50,13 @@ class TestInstallExcepthook(unittest.TestCase):
             exc_type, exc_value, exc_tb = sys.exc_info()
 
         with patch.object(crash_log, "write_crash") as mock_write, \
-             self.assertRaises(SystemExit):
+             pytest.raises(SystemExit):
             sys.excepthook(exc_type, exc_value, exc_tb)
 
         mock_write.assert_called_once()
         header, detail = mock_write.call_args[0]
-        self.assertIn("Qt callback", header)
-        self.assertIn("slot went boom", detail)
+        assert "Qt callback" in header
+        assert "slot went boom" in detail
 
     def test_hook_exits_with_code_1(self):
         crash_log.install_excepthook()
@@ -65,10 +66,10 @@ class TestInstallExcepthook(unittest.TestCase):
             exc_type, exc_value, exc_tb = sys.exc_info()
 
         with patch.object(crash_log, "write_crash"), \
-             self.assertRaises(SystemExit) as cm:
+             pytest.raises(SystemExit) as cm:
             sys.excepthook(exc_type, exc_value, exc_tb)
 
-        self.assertEqual(cm.exception.code, 1)
+        assert cm.value.code == 1
 
 
 class TestWriteCrash(unittest.TestCase):
@@ -82,9 +83,9 @@ class TestWriteCrash(unittest.TestCase):
                 crash_log.write_crash("Test header:", "some detail")
 
             text = tmp.read_text(encoding="utf-8")
-            self.assertIn("Test header:", text)
-            self.assertIn("some detail", text)
-            self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
+            assert "Test header:" in text
+            assert "some detail" in text
+            assert re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]", text)
 
     def test_appends_to_existing_content(self):
         """Crash entries must append, not overwrite, so we don't lose evidence."""
@@ -96,8 +97,8 @@ class TestWriteCrash(unittest.TestCase):
                 crash_log.write_crash("New crash:", "details here")
 
             content = tmp.read_text(encoding="utf-8")
-            self.assertIn("Previous entry", content)
-            self.assertIn("New crash:", content)
+            assert "Previous entry" in content
+            assert "New crash:" in content
 
 
 class TestAtexitHandler(unittest.TestCase):
@@ -115,7 +116,7 @@ class TestAtexitHandler(unittest.TestCase):
         mock_path.open.assert_called_once()
         handle = mock_path.open()
         written = "".join(c.args[0] for c in handle.write.call_args_list)
-        self.assertIn("Clean exit", written)
+        assert "Clean exit" in written
 
     def test_atexit_includes_stack_trace(self):
         """Clean exit must log a stack trace so we can diagnose what triggered it."""
@@ -125,9 +126,9 @@ class TestAtexitHandler(unittest.TestCase):
                 crash_log.on_exit()
 
             content = tmp.read_text(encoding="utf-8")
-            self.assertIn("Clean exit", content)
+            assert "Clean exit" in content
             # Must contain stack frames showing the call chain
-            self.assertIn("on_exit", content)
+            assert "on_exit" in content
 
     def test_atexit_skips_when_crash_already_logged(self):
         crash_log._Logged.crash = True
@@ -142,7 +143,7 @@ class TestAtexitHandler(unittest.TestCase):
         mock_path = MagicMock()
         with patch.object(crash_log, "CRASH_LOG", mock_path):
             crash_log.write_crash("test:", "detail")
-        self.assertTrue(crash_log._Logged.crash)
+        assert crash_log._Logged.crash
 
 
 class TestWriteInfo(unittest.TestCase):
@@ -155,7 +156,7 @@ class TestWriteInfo(unittest.TestCase):
         mock_path = MagicMock()
         with patch.object(crash_log, "CRASH_LOG", mock_path):
             crash_log.write_info("Session end:", "detail\n")
-        self.assertFalse(crash_log._Logged.crash)
+        assert not crash_log._Logged.crash
 
     def test_write_info_writes_timestamped_entry(self):
         with workspace_temp_dir() as tmp_dir:
@@ -164,8 +165,8 @@ class TestWriteInfo(unittest.TestCase):
                 crash_log.write_info("Session end:", "detail\n")
 
             text = tmp.read_text(encoding="utf-8")
-            self.assertIn("Session end:", text)
-            self.assertRegex(text, r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]")
+            assert "Session end:" in text
+            assert re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]", text)
 
 
 class TestStartupCrashIsVisible(unittest.TestCase):
@@ -178,7 +179,7 @@ class TestStartupCrashIsVisible(unittest.TestCase):
             tray_app.report_startup_crash("Traceback...\nValueError: no module named x\n")
 
         mock_write.assert_called_once()
-        self.assertIn("startup crash", mock_write.call_args[0][0].lower())
+        assert "startup crash" in mock_write.call_args[0][0].lower()
 
     def test_startup_crash_opens_a_dialog_naming_the_error(self):
         with patch.object(crash_log, "write_crash"), \
@@ -189,15 +190,15 @@ class TestStartupCrashIsVisible(unittest.TestCase):
 
         mock_alert.assert_called_once()
         title, body = mock_alert.call_args[0]
-        self.assertIn("evolver", title.lower())
-        self.assertIn("example_dependency", body)
-        self.assertIn(str(crash_log.CRASH_LOG), body)
+        assert "evolver" in title.lower()
+        assert "example_dependency" in body
+        assert str(crash_log.CRASH_LOG) in body
 
 
 class TestTheSuiteLeavesTheCrashLogAlone(unittest.TestCase):
     def test_no_test_writes_into_the_crash_log_of_the_checkout_it_runs_in(self):
         """Every test that has Evolver step aside writes a line there."""
-        self.assertFalse(crash_log.CRASH_LOG.is_relative_to(PROJECT_ROOT))
+        assert not crash_log.CRASH_LOG.is_relative_to(PROJECT_ROOT)
 
 
 if __name__ == "__main__":
