@@ -113,11 +113,11 @@ class TestClipMatch(unittest.TestCase):
 
                 scene = non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4"
                 cut_from_it = non_ai / "clips" / "Nora Quill - Nights of Nonsense 8.mp4"
-                self.assertEqual(result.matched, 1)
-                self.assertEqual(_recorded(cut_from_it)["full_video"], str(scene))
-                self.assertEqual(_recorded(cut_from_it)["scene_offset"], 10.0)
+                assert result.matched == 1
+                assert _recorded(cut_from_it)["full_video"] == str(scene)
+                assert _recorded(cut_from_it)["scene_offset"] == 10.0
                 other = non_ai / "clips" / "Nora Quill - Scene Three 3.mp4"
-                self.assertNotIn("full_video", _recorded(other))
+                assert "full_video" not in _recorded(other)
 
     def test_the_clips_own_record_survives_the_answer(self):
         with workspace_temp_dir() as root:
@@ -135,8 +135,8 @@ class TestClipMatch(unittest.TestCase):
                 clip_match.run(fps=8.0, sampler=sampler)
 
                 cut_from_it = non_ai / "clips" / "Nora Quill - Nights of Nonsense 8.mp4"
-                self.assertEqual(_recorded(cut_from_it)["compilation"], "Vol1")
-                self.assertEqual(_recorded(cut_from_it)["index"], 9)
+                assert _recorded(cut_from_it)["compilation"] == "Vol1"
+                assert _recorded(cut_from_it)["index"] == 9
 
     def test_decodes_the_cheapest_version_of_a_scene(self):
         """Upscales cost minutes where the original costs seconds, and they hold
@@ -152,7 +152,7 @@ class TestClipMatch(unittest.TestCase):
             with settings:
                 clip_match.run(fps=8.0, sampler=sampler)
 
-            self.assertFalse([v for v in sampled if "apo8" in v.name])
+            assert not [v for v in sampled if "apo8" in v.name]
 
     def test_separates_two_scenes_whose_names_share_a_prefix(self):
         """Two scenes of one performer can share a name prefix without being the
@@ -171,7 +171,7 @@ class TestClipMatch(unittest.TestCase):
             with settings:
                 clip_match.run(fps=8.0, sampler=sampler)
 
-            self.assertEqual(len(scenes), 2)
+            assert len(scenes) == 2
 
     def test_the_better_alignment_takes_a_clip_two_scenes_both_hold(self):
         """The library keeps a 540p release and a 4k re-release of one scene, cut
@@ -195,9 +195,9 @@ class TestClipMatch(unittest.TestCase):
 
                 scene = non_ai / "scenes" / "Petra-Vance_540-paci21ck.mp4"
                 clip = non_ai / "clips" / "Petra Vance - Scene Three 8.mp4"
-                self.assertEqual(result.matched, 1)
-                self.assertEqual(_recorded(clip)["full_video"], str(scene))
-                self.assertEqual(_recorded(clip)["scene_offset"], 10.0)
+                assert result.matched == 1
+                assert _recorded(clip)["full_video"] == str(scene)
+                assert _recorded(clip)["scene_offset"] == 10.0
 
     def test_matches_a_scene_bucketed_under_a_shared_version_group(self):
         """A version group is not always one video -- it buckets by a title read
@@ -229,9 +229,9 @@ class TestClipMatch(unittest.TestCase):
 
                 scene = non_ai / "scenes" / "Jane-Doe-&-Ada-Roe-b4t7k1qz-old_iris2.mp4"
                 clip = non_ai / "clips" / "Jane Doe, Ada Roe - Load Bearing 2.mp4"
-                self.assertEqual(result.matched, 1)
-                self.assertEqual(_recorded(clip)["full_video"], str(scene))
-                self.assertEqual(_recorded(clip)["scene_offset"], 10.0)
+                assert result.matched == 1
+                assert _recorded(clip)["full_video"] == str(scene)
+                assert _recorded(clip)["scene_offset"] == 10.0
 
     def test_a_family_entry_is_measured_rather_than_told(self):
         """The winner's answer used to go to every entry of its family. Where a
@@ -245,12 +245,10 @@ class TestClipMatch(unittest.TestCase):
 
                 bigger = _recorded(non_ai / "clips" / "Nora Quill - Brink.mp4")
                 smaller = _recorded(non_ai / "clips" / "Nora Quill - Brink (2).mp4")
-                self.assertEqual(bigger["full_video"],
-                                 str(non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4"))
-                self.assertEqual(bigger["scene_offset"], 10.0)
-                self.assertEqual(smaller["full_video"],
-                                 str(non_ai / "scenes" / "Nora-Quill-2_720-qq7mnbet.mp4"))
-                self.assertEqual(smaller["scene_offset"], 25.0)
+                assert bigger["full_video"] == str(non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4")
+                assert bigger["scene_offset"] == 10.0
+                assert smaller["full_video"] == str(non_ai / "scenes" / "Nora-Quill-2_720-qq7mnbet.mp4")
+                assert smaller["scene_offset"] == 25.0
 
     def test_a_family_entry_that_is_another_encode_still_gets_the_answer(self):
         """The family is worth having: a genuine re-encode holds the same
@@ -274,7 +272,7 @@ class TestClipMatch(unittest.TestCase):
 
                 scene = non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4"
                 for name in ("Nora Quill - Brink.mp4", "Nora Quill - Brink_apo8_iris2.mp4"):
-                    self.assertEqual(_recorded(non_ai / "clips" / name)["full_video"], str(scene))
+                    assert _recorded(non_ai / "clips" / name)["full_video"] == str(scene)
 
     def test_a_wrong_match_an_earlier_run_wrote_is_dropped(self):
         """Self-healing: the sidecars already carry answers handed out on trust,
@@ -295,9 +293,8 @@ class TestClipMatch(unittest.TestCase):
                 clip_match.run(fps=8.0, sampler=_two_cuts_sampler())
 
                 recorded = _recorded(non_ai / "clips" / "Nora Quill - Brink (2).mp4")
-                self.assertEqual(recorded["full_video"],
-                                 str(non_ai / "scenes" / "Nora-Quill-2_720-qq7mnbet.mp4"))
-                self.assertEqual(recorded["compilation"], "Vol3")
+                assert recorded["full_video"] == str(non_ai / "scenes" / "Nora-Quill-2_720-qq7mnbet.mp4")
+                assert recorded["compilation"] == "Vol3"
 
     def test_a_family_entry_in_no_scene_at_all_is_left_with_nothing(self):
         """The other half of measuring rather than telling: an entry that aligns
@@ -329,9 +326,9 @@ class TestClipMatch(unittest.TestCase):
                 clip_match.run(fps=8.0, sampler=sampler)
 
                 recorded = _recorded(non_ai / "clips" / "Nora Quill - Brink (2).mp4")
-                self.assertNotIn("full_video", recorded)
-                self.assertNotIn("scene_offset", recorded)
-                self.assertEqual(recorded["compilation"], "Vol3")
+                assert "full_video" not in recorded
+                assert "scene_offset" not in recorded
+                assert recorded["compilation"] == "Vol3"
 
     def test_a_library_with_no_clips_records_nothing(self):
         with workspace_temp_dir() as root:
@@ -341,8 +338,8 @@ class TestClipMatch(unittest.TestCase):
             with settings:
                 result = clip_match.run(fps=8.0, sampler=lambda v, fps: sampled.append(v))
 
-            self.assertEqual((result.scenes, result.clips, result.matched), (1, 0, 0))
-            self.assertEqual(sampled, [])
+            assert (result.scenes, result.clips, result.matched) == (1, 0, 0)
+            assert sampled == []
 
 
 class TestCouldBeCutFrom(unittest.TestCase):
@@ -383,11 +380,8 @@ class TestRecordAndForget(unittest.TestCase):
                 clip_match.record(clip, scene, offset=808.25)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
-                self.assertEqual(payload["clip"], {
-                    "compilation": "Vol3", "index": 5, "performer": NORA,
-                    "full_video": str(scene), "scene_offset": 808.25,
-                })
-                self.assertEqual(payload["video"], {"action": "Alpha"})
+                assert payload["clip"] == {"compilation": "Vol3", "index": 5, "performer": NORA, "full_video": str(scene), "scene_offset": 808.25}
+                assert payload["video"] == {"action": "Alpha"}
 
     def test_forget_leaves_a_match_to_another_scene_alone(self):
         with workspace_temp_dir() as root:
@@ -402,7 +396,7 @@ class TestRecordAndForget(unittest.TestCase):
                 clip_match.record(clip, one, offset=4.0)
                 clip_match.forget(clip, another)
 
-                self.assertEqual(_recorded(clip)["full_video"], str(one))
+                assert _recorded(clip)["full_video"] == str(one)
 
     def test_neither_leaves_anything_beside_the_sidecar(self):
         with workspace_temp_dir() as root:
@@ -417,8 +411,7 @@ class TestRecordAndForget(unittest.TestCase):
                 clip_match.forget(clip, scene)
 
                 folder = sidecar.sidecar_path(clip).parent
-                self.assertEqual([p.name for p in sorted(folder.iterdir())],
-                                 ["Nora Quill - Brink.json"])
+                assert [p.name for p in sorted(folder.iterdir())] == ["Nora Quill - Brink.json"]
 
 
 if __name__ == "__main__":

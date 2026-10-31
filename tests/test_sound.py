@@ -26,11 +26,11 @@ class TestSaveAsMp3(unittest.TestCase):
             mp3 = root / "audio" / "loop one.mp3"
             save_as_mp3(root / "loop one.mp4", mp3)
 
-            self.assertEqual(sorted(p.name for p in mp3.parent.iterdir()), ["loop one.mp3"])
+            assert sorted(p.name for p in mp3.parent.iterdir()) == ["loop one.mp3"]
         argv, kwargs = calls[0]
-        self.assertEqual(argv[argv.index("-i") + 1], str(root / "loop one.mp4"))
-        self.assertIn(".partial.", argv[-1])
-        self.assertTrue(kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
+        assert argv[argv.index("-i") + 1] == str(root / "loop one.mp4")
+        assert ".partial." in argv[-1]
+        assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
 
     def test_the_sound_takes_no_tags_from_the_video(self):
         """ComfyUI writes the prompt into a video's tags; a copy of them in the
@@ -40,8 +40,8 @@ class TestSaveAsMp3(unittest.TestCase):
              patch("util.sound.subprocess.run", side_effect=_ffmpeg_writing_its_output(calls)):
             save_as_mp3(root / "loop.mp4", root / "loop.mp3")
         argv, _kwargs = calls[0]
-        self.assertEqual(argv[argv.index("-map_metadata") + 1], "-1")
-        self.assertIn("-vn", argv)
+        assert argv[argv.index("-map_metadata") + 1] == "-1"
+        assert "-vn" in argv
 
 
 if __name__ == "__main__":

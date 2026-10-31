@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from tests.temp_helpers import workspace_temp_dir
 from util import headless_browser
 
@@ -25,7 +27,7 @@ class TestFindBrowserExecutable(unittest.TestCase):
             with patch.object(headless_browser, "_BROWSER_CANDIDATES", candidates):
                 found = headless_browser.find_browser_executable()
 
-        self.assertEqual(found, second)
+        assert found == second
 
 
     def test_no_browser_installed_is_no_answer_rather_than_an_error(self):
@@ -34,7 +36,7 @@ class TestFindBrowserExecutable(unittest.TestCase):
         with workspace_temp_dir() as root:
             with patch.object(headless_browser, "_BROWSER_CANDIDATES",
                               (root / "chrome.exe",)):
-                self.assertIsNone(headless_browser.find_browser_executable())
+                assert headless_browser.find_browser_executable() is None
 
 
 class TestFetchDom(unittest.TestCase):
@@ -45,7 +47,7 @@ class TestFetchDom(unittest.TestCase):
                     "https://example.invalid/a", Path("chrome.exe"),
                     profile_dir=root / "profile")
 
-            self.assertEqual(dom, "<p>hi</p>")
+            assert dom == "<p>hi</p>"
 
     def test_the_profile_directory_it_is_given_is_the_one_the_browser_gets(self):
         """The browser writes into it, so a default under the checkout would be
@@ -57,8 +59,8 @@ class TestFetchDom(unittest.TestCase):
                 headless_browser.fetch_dom("https://example.invalid/a",
                                            Path("chrome.exe"), profile_dir=profile)
 
-            self.assertTrue(profile.is_dir())
-            self.assertIn(f"--user-data-dir={profile}", run.call_args.args[0])
+            assert profile.is_dir()
+            assert f"--user-data-dir={profile}" in run.call_args.args[0]
 
     def test_the_browser_it_is_given_is_the_one_launched(self):
         with workspace_temp_dir() as root:
@@ -67,28 +69,28 @@ class TestFetchDom(unittest.TestCase):
                                            Path("/opt/msedge"), profile_dir=root)
 
             argv = run.call_args.args[0]
-            self.assertEqual(argv[0], str(Path("/opt/msedge")))
-            self.assertEqual(argv[-1], "https://example.invalid/a")
+            assert argv[0] == str(Path("/opt/msedge"))
+            assert argv[-1] == "https://example.invalid/a"
 
     def test_a_nonzero_exit_names_the_url_and_what_the_browser_said(self):
         with workspace_temp_dir() as root:
             with patch("subprocess.run",
                        return_value=_completed(returncode=1, stderr="no display")), \
-                 self.assertRaises(RuntimeError) as caught:
+                 pytest.raises(RuntimeError) as caught:
                 headless_browser.fetch_dom("https://example.invalid/a",
                                            Path("chrome.exe"), profile_dir=root)
 
-            self.assertIn("https://example.invalid/a", str(caught.exception))
-            self.assertIn("no display", str(caught.exception))
+            assert "https://example.invalid/a" in str(caught.value)
+            assert "no display" in str(caught.value)
 
     def test_a_silent_nonzero_exit_still_says_what_the_code_was(self):
         with workspace_temp_dir() as root:
             with patch("subprocess.run", return_value=_completed(returncode=3)), \
-                 self.assertRaises(RuntimeError) as caught:
+                 pytest.raises(RuntimeError) as caught:
                 headless_browser.fetch_dom("https://example.invalid/a",
                                            Path("chrome.exe"), profile_dir=root)
 
-            self.assertIn("exit 3", str(caught.exception))
+            assert "exit 3" in str(caught.value)
 
 
 if __name__ == "__main__":

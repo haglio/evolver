@@ -36,10 +36,7 @@ class TestAnOrigeneratorClip(unittest.TestCase):
                 recorded = sidecar.read(sidecar.sidecar_path(
                     lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4"))
 
-        self.assertEqual(recorded[provenance.BLOCK], {
-            provenance.GENERATION: provenance.reconstructed(
-                "origenerator", method="wan22_i2v", method_version="v007"),
-        })
+        assert recorded[provenance.BLOCK] == {provenance.GENERATION: provenance.reconstructed("origenerator", method="wan22_i2v", method_version="v007")}
 
     def test_one_its_gallery_has_no_record_of_is_recorded_as_generated_there_and_no_more(self):
         """The row can have been deleted since. The clip came in through
@@ -57,8 +54,7 @@ class TestAnOrigeneratorClip(unittest.TestCase):
                 recorded = sidecar.read(sidecar.sidecar_path(
                     lib.outbox / "landscape" / "origenerator" / "wan22_i2v_00002__topaz.mp4"))
 
-        self.assertEqual(recorded[provenance.BLOCK],
-                         {provenance.GENERATION: provenance.reconstructed("origenerator")})
+        assert recorded[provenance.BLOCK] == {provenance.GENERATION: provenance.reconstructed("origenerator")}
 
     def test_a_gallery_it_cannot_read_leaves_the_generation_for_a_run_that_can(self):
         """What made the clip is still knowable -- the gallery has moved, or is
@@ -75,8 +71,8 @@ class TestAnOrigeneratorClip(unittest.TestCase):
 
                 recorded = sidecar.read(sidecar.sidecar_path(upscaled))
 
-        self.assertEqual(set(recorded[provenance.BLOCK]), {provenance.UPSCALE})
-        self.assertEqual(result.deferred, 1)
+        assert set(recorded[provenance.BLOCK]) == {provenance.UPSCALE}
+        assert result.deferred == 1
 
     def test_a_clip_already_recorded_never_opens_the_gallery(self):
         """The stage runs every tick and almost every clip is recorded already;
@@ -92,7 +88,7 @@ class TestAnOrigeneratorClip(unittest.TestCase):
 
                 result = provenance_sweep.run(read_note=_refuses_to_be_called)
 
-        self.assertEqual((result.deferred, result.already), (0, 1))
+        assert (result.deferred, result.already) == (0, 1)
 
 
 class TestAnAiUpscale(unittest.TestCase):
@@ -110,8 +106,7 @@ class TestAnAiUpscale(unittest.TestCase):
 
                 recorded = sidecar.read(sidecar.sidecar_path(upscaled))
 
-        self.assertEqual(recorded[provenance.BLOCK],
-                         {provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale")})
+        assert recorded[provenance.BLOCK] == {provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale")}
 
     def test_one_whose_note_names_no_settings_here_is_recorded_with_its_maker_unknown(self):
         """A hand export from the Topaz GUI can sit in the outbox under an
@@ -127,8 +122,7 @@ class TestAnAiUpscale(unittest.TestCase):
 
                 recorded = sidecar.read(sidecar.sidecar_path(upscaled))
 
-        self.assertEqual(recorded[provenance.BLOCK],
-                         {provenance.UPSCALE: provenance.reconstructed(None)})
+        assert recorded[provenance.BLOCK] == {provenance.UPSCALE: provenance.reconstructed(None)}
 
     def test_a_stamp_taken_when_the_upscale_was_made_is_left_as_it_stands(self):
         """The stage that made the file knew the settings, their version and the
@@ -150,7 +144,7 @@ class TestAnAiUpscale(unittest.TestCase):
 
                 recorded = sidecar.read(sidecar.sidecar_path(upscaled))
 
-        self.assertEqual(recorded[provenance.BLOCK], {provenance.UPSCALE: taken_at_the_time})
+        assert recorded[provenance.BLOCK] == {provenance.UPSCALE: taken_at_the_time}
 
 
 class TestAGenauFlick(unittest.TestCase):
@@ -167,8 +161,7 @@ class TestAGenauFlick(unittest.TestCase):
 
                 recorded = sidecar.read(sidecar.sidecar_path(clip))
 
-        self.assertEqual(recorded[provenance.BLOCK],
-                         {provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale")})
+        assert recorded[provenance.BLOCK] == {provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale")}
 
 
 class TestANonAiUpscale(unittest.TestCase):
@@ -186,9 +179,7 @@ class TestANonAiUpscale(unittest.TestCase):
 
                 recorded = sidecar.read(sidecar.sidecar_path(upscale))
 
-        self.assertEqual(recorded[provenance.BLOCK], {
-            provenance.UPSCALE_NON_AI: provenance.reconstructed("evolver", method="non_ai_upscale"),
-        })
+        assert recorded[provenance.BLOCK] == {provenance.UPSCALE_NON_AI: provenance.reconstructed("evolver", method="non_ai_upscale")}
 
 
 class TestWhatARunSays(unittest.TestCase):
@@ -206,7 +197,7 @@ class TestWhatARunSays(unittest.TestCase):
 
                 result = provenance_sweep.run(read_note=lambda video: notes[video.stem])
 
-        self.assertEqual((result.from_notes, result.unknown), (1, 1))
+        assert (result.from_notes, result.unknown) == (1, 1)
 
 
 class TestNotHoldingUpTheRun(unittest.TestCase):
@@ -228,9 +219,9 @@ class TestNotHoldingUpTheRun(unittest.TestCase):
                 first = provenance_sweep.run(read_note=reading, notes_per_run=2)
                 second = provenance_sweep.run(read_note=reading, notes_per_run=2)
 
-        self.assertEqual((first.from_notes, first.deferred), (2, 1))
-        self.assertEqual((second.from_notes, second.already), (1, 2))
-        self.assertEqual(len(read), 3)
+        assert (first.from_notes, first.deferred) == (2, 1)
+        assert (second.from_notes, second.already) == (1, 2)
+        assert len(read) == 3
 
 
 class TestRunningItAgain(unittest.TestCase):
@@ -246,7 +237,7 @@ class TestRunningItAgain(unittest.TestCase):
                 provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
                 again = provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
 
-        self.assertEqual((again.unknown, again.already), (0, 1))
+        assert (again.unknown, again.already) == (0, 1)
 
     def test_a_file_whose_record_is_complete_never_has_its_note_read_again(self):
         """Reading a note spawns a process per file, and a file does not change
@@ -260,7 +251,7 @@ class TestRunningItAgain(unittest.TestCase):
                 provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
                 again = provenance_sweep.run(read_note=_refuses_to_be_called)
 
-        self.assertEqual(again.already, 1)
+        assert again.already == 1
 
 
 if __name__ == "__main__":

@@ -27,9 +27,9 @@ class TestSortHelpers(unittest.TestCase):
 
             moved = sort_task._move_unique(src, dest)
 
-            self.assertTrue(moved)
-            self.assertFalse(src.exists())
-            self.assertTrue(dest.exists())
+            assert moved
+            assert not src.exists()
+            assert dest.exists()
 
     def test_move_unique_deletes_src_on_collision(self):
         with workspace_temp_dir() as td_path:
@@ -40,9 +40,9 @@ class TestSortHelpers(unittest.TestCase):
 
             moved = sort_task._move_unique(src, dest)
 
-            self.assertFalse(moved)
-            self.assertFalse(src.exists())
-            self.assertEqual(dest.read_text(encoding="utf-8"), "dest")
+            assert not moved
+            assert not src.exists()
+            assert dest.read_text(encoding="utf-8") == "dest"
 
     def test_run_processes_dynamic_source_directory(self):
         with workspace_temp_dir() as td_path:
@@ -58,9 +58,9 @@ class TestSortHelpers(unittest.TestCase):
                 with patch("tasks.sort.orientation_of", return_value="landscape"):
                     result = sort_task.run()
 
-            self.assertEqual(result.moved, 1)
-            self.assertTrue((sorted_dir / dynamic_source / "landscape" / "clip.mp4").exists())
-            self.assertFalse(src.exists())
+            assert result.moved == 1
+            assert (sorted_dir / dynamic_source / "landscape" / "clip.mp4").exists()
+            assert not src.exists()
 
     def test_run_clears_the_source_folder_it_emptied(self):
         """The inbox is swept after every run, not after a switch."""
@@ -75,7 +75,7 @@ class TestSortHelpers(unittest.TestCase):
                 with patch("tasks.sort.orientation_of", return_value="landscape"):
                     sort_task.run()
 
-            self.assertFalse(source_dir.exists())
+            assert not source_dir.exists()
 
     def test_run_sorts_between_the_folders_it_is_given(self):
         """The two folders the stage moves between are arguments to it.
@@ -98,9 +98,9 @@ class TestSortHelpers(unittest.TestCase):
                 with patch("tasks.sort.orientation_of", return_value="portrait"):
                     result = sort_task.run(inbox_dir=inbox, sorted_dir=sorted_dir)
 
-            self.assertEqual(result.moved, 1)
-            self.assertTrue((sorted_dir / "examplesource" / "portrait" / "clip one.mp4").exists())
-            self.assertFalse(ambient.exists())
+            assert result.moved == 1
+            assert (sorted_dir / "examplesource" / "portrait" / "clip one.mp4").exists()
+            assert not ambient.exists()
 
 
 class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
@@ -134,11 +134,10 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
 
                 handed_over = self._sent_again(lib, "made_00001.mp4", b"made again")
 
-                self.assertFalse(handed_over.exists())
-                self.assertEqual(sorted_copy.read_bytes(), b"made again")
-                self.assertEqual(upscale.collect_candidates(),
-                                 [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")])
-                self.assertTrue(sidecar.read(sidecar.sidecar_path(upscaled))["favorite"])
+                assert not handed_over.exists()
+                assert sorted_copy.read_bytes() == b"made again"
+                assert upscale.collect_candidates() == [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")]
+                assert sidecar.read(sidecar.sidecar_path(upscaled))["favorite"]
 
     def test_sent_again_as_it_already_is_leaves_its_upscale_alone(self):
         with workspace_temp_dir() as root:
@@ -149,9 +148,9 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
 
                 handed_over = self._sent_again(lib, "made_00001.mp4", b"first made")
 
-                self.assertFalse(handed_over.exists())
-                self.assertEqual(sorted_copy.read_bytes(), b"first made")
-                self.assertEqual(upscale.collect_candidates(), [])
+                assert not handed_over.exists()
+                assert sorted_copy.read_bytes() == b"first made"
+                assert upscale.collect_candidates() == []
 
 
 if __name__ == "__main__":

@@ -41,18 +41,15 @@ class TestNonAiGroup(unittest.TestCase):
                 result = nonai_group.run()
 
                 # The sidecar mirrors the clip's full path under metadata/.
-                self.assertEqual(
-                    sidecar.sidecar_path(original),
-                    metadata / "2D" / "non_AI" / "lagoon" / "2 done" / "Jane-Doe-lA0JUsAd.json",
-                )
+                assert sidecar.sidecar_path(original) == metadata / "2D" / "non_AI" / "lagoon" / "2 done" / "Jane-Doe-lA0JUsAd.json"
                 orig = sidecar.read(sidecar.sidecar_path(original))
                 var = sidecar.read(sidecar.sidecar_path(variant))
                 distinct = sidecar.read(sidecar.sidecar_path(other))
-                self.assertEqual(orig["version"]["group"], var["version"]["group"])
-                self.assertNotEqual(orig["version"]["group"], distinct["version"]["group"])
-                self.assertFalse(orig["version"]["processed"])
-                self.assertTrue(var["version"]["processed"])
-                self.assertEqual(result.written, 3)
+                assert orig["version"]["group"] == var["version"]["group"]
+                assert orig["version"]["group"] != distinct["version"]["group"]
+                assert not orig["version"]["processed"]
+                assert var["version"]["processed"]
+                assert result.written == 3
 
     def test_merges_version_into_an_existing_clip_sidecar(self):
         """A clip carved from a compilation carries a `clip` object; grouping must
@@ -72,9 +69,9 @@ class TestNonAiGroup(unittest.TestCase):
                 nonai_group.run()
 
                 got = sidecar.read(sidecar.sidecar_path(clip))
-                self.assertEqual(got["clip"], {"compilation": "Vol6", "index": 9})
-                self.assertEqual(got["video"], {"action": "Alpha"})
-                self.assertIn("group", got["version"])
+                assert got["clip"] == {"compilation": "Vol6", "index": 9}
+                assert got["video"] == {"action": "Alpha"}
+                assert "group" in got["version"]
 
     def test_propagates_clip_across_the_version_family(self):
         """The upscaled variant of a clip inherits the original's `clip` metadata,
@@ -97,7 +94,7 @@ class TestNonAiGroup(unittest.TestCase):
                 nonai_group.run()
 
                 var = sidecar.read(sidecar.sidecar_path(variant))
-                self.assertEqual(var["clip"], {"compilation": "Vol6", "index": 1})
+                assert var["clip"] == {"compilation": "Vol6", "index": 1}
 
     def test_does_not_tag_a_name_neighbour_as_a_clip(self):
         """A family is name-derived, so a full scene the user already owned can
@@ -121,8 +118,8 @@ class TestNonAiGroup(unittest.TestCase):
 
                 nonai_group.run()
 
-                self.assertIn("clip", sidecar.read(sidecar.sidecar_path(upscaled)))
-                self.assertNotIn("clip", sidecar.read(sidecar.sidecar_path(neighbour)))
+                assert "clip" in sidecar.read(sidecar.sidecar_path(upscaled))
+                assert "clip" not in sidecar.read(sidecar.sidecar_path(neighbour))
 
     def test_a_declared_pair_gets_one_group_the_names_never_would(self):
         """The stage rewrites `version.group` every run, so a hand edit to a
@@ -143,10 +140,7 @@ class TestNonAiGroup(unittest.TestCase):
 
                 nonai_group.run()
 
-                self.assertEqual(
-                    sidecar.read(sidecar.sidecar_path(upscale))["version"]["group"],
-                    sidecar.read(sidecar.sidecar_path(original))["version"]["group"],
-                )
+                assert sidecar.read(sidecar.sidecar_path(upscale))["version"]["group"] == sidecar.read(sidecar.sidecar_path(original))["version"]["group"]
 
     def test_is_idempotent_then_prunes_a_removed_clips_sidecar(self):
         with workspace_temp_dir() as root:
@@ -155,13 +149,13 @@ class TestNonAiGroup(unittest.TestCase):
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
                 clip = _touch(non_ai / "lagoon" / "0 unsorted" / "Scene-1.mp4")
-                self.assertEqual(nonai_group.run().written, 1)
-                self.assertEqual(nonai_group.run().written, 0)  # nothing changed
+                assert nonai_group.run().written == 1
+                assert nonai_group.run().written == 0  # nothing changed
 
                 clip.unlink()
                 result = nonai_group.run()
-                self.assertEqual(result.pruned, 1)
-                self.assertFalse(sidecar.sidecar_path(clip).exists())
+                assert result.pruned == 1
+                assert not sidecar.sidecar_path(clip).exists()
 
     def test_keeps_the_record_of_a_clip_marked_weird_until_it_is_reviewed(self):
         with workspace_temp_dir() as root:
@@ -174,8 +168,8 @@ class TestNonAiGroup(unittest.TestCase):
 
                 result = nonai_group.run()
 
-                self.assertEqual(result.pruned, 0)
-                self.assertTrue(sidecar.sidecar_path(clip).exists())
+                assert result.pruned == 0
+                assert sidecar.sidecar_path(clip).exists()
 
 
 ONE_FINGERPRINT = [f"{0x5A5A5A5A5A5A5A5A + moment:016x}" for moment in range(16)]
@@ -206,8 +200,8 @@ class TestOneVideoByItsFrames(unittest.TestCase):
 
                 result = nonai_group.run(fingerprint=lambda video, seconds: ONE_FINGERPRINT)
 
-                self.assertEqual(_group(old), _group(new))
-                self.assertEqual(result.joined, 1)
+                assert _group(old) == _group(new)
+                assert result.joined == 1
 
     def test_a_video_is_measured_once_and_its_frames_kept(self):
         with workspace_temp_dir() as root:
@@ -227,8 +221,8 @@ class TestOneVideoByItsFrames(unittest.TestCase):
                 nonai_group.run(fingerprint=fingerprint)
                 nonai_group.run(fingerprint=fingerprint)
 
-                self.assertEqual(sorted(measured), sorted([old.name, new.name]))
-                self.assertEqual(_group(old), _group(new))
+                assert sorted(measured) == sorted([old.name, new.name])
+                assert _group(old) == _group(new)
 
     def test_only_full_videos_of_the_same_length_are_ever_measured(self):
         with workspace_temp_dir() as root:
@@ -253,9 +247,9 @@ class TestOneVideoByItsFrames(unittest.TestCase):
 
                 nonai_group.run(fingerprint=fingerprint)
 
-                self.assertEqual(sorted(measured), sorted([old.name, new.name]))
-                self.assertNotEqual(_group(longer), _group(old))
-                self.assertNotEqual(_group(carved), _group(old))
+                assert sorted(measured) == sorted([old.name, new.name])
+                assert _group(longer) != _group(old)
+                assert _group(carved) != _group(old)
 
     def test_a_family_is_measured_through_its_smallest_file(self):
         with workspace_temp_dir() as root:
@@ -277,8 +271,8 @@ class TestOneVideoByItsFrames(unittest.TestCase):
 
                 nonai_group.run(fingerprint=fingerprint)
 
-                self.assertEqual(sorted(measured), sorted([old.name, new.name]))
-                self.assertEqual(_group(upscale), _group(new))
+                assert sorted(measured) == sorted([old.name, new.name])
+                assert _group(upscale) == _group(new)
 
     def test_frames_an_upscale_was_handed_are_not_measured_again(self):
         with workspace_temp_dir() as root:
@@ -302,8 +296,8 @@ class TestOneVideoByItsFrames(unittest.TestCase):
 
                 nonai_group.run(fingerprint=fingerprint)
 
-                self.assertEqual(measured, [new.name])
-                self.assertEqual(_group(upscale), _group(new))
+                assert measured == [new.name]
+                assert _group(upscale) == _group(new)
 
     def test_a_run_measures_no_more_videos_than_its_allowance(self):
         with workspace_temp_dir() as root:
@@ -323,8 +317,8 @@ class TestOneVideoByItsFrames(unittest.TestCase):
 
                 result = nonai_group.run(fingerprint=fingerprint)
 
-                self.assertEqual(len(measured), 3)
-                self.assertEqual(result.measured, 3)
+                assert len(measured) == 3
+                assert result.measured == 3
 
     def test_the_same_length_with_other_frames_is_another_video(self):
         with workspace_temp_dir() as root:
@@ -340,7 +334,7 @@ class TestOneVideoByItsFrames(unittest.TestCase):
                 nonai_group.run(fingerprint=lambda video, seconds:
                                 ONE_FINGERPRINT if video == first else other)
 
-                self.assertNotEqual(_group(first), _group(second))
+                assert _group(first) != _group(second)
 
 
 class TestGroupingCannotFail(unittest.TestCase):
@@ -348,8 +342,8 @@ class TestGroupingCannotFail(unittest.TestCase):
         """Grouping is bookkeeping over whatever files exist: absence from
         ``_STAGE_FAILED`` is what says it cannot fail, so a result that also
         advertises an ``ok`` invites a reader to look in the wrong place."""
-        self.assertNotIn("group_non_ai", evolver._STAGE_FAILED)
-        self.assertFalse(hasattr(nonai_group.NonAiGroupResult(), "ok"))
+        assert "group_non_ai" not in evolver._STAGE_FAILED
+        assert not hasattr(nonai_group.NonAiGroupResult(), "ok")
 
 
 if __name__ == "__main__":

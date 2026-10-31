@@ -52,7 +52,7 @@ class OrigeneratorGalleryContract(unittest.TestCase):
         promised = self.promise.get("downtime_command")
         read = origenerator_gallery.downtime_command(self.origenerator)
 
-        self.assertEqual(read, None if promised is None else tuple(promised))
+        assert read == (None if promised is None else tuple(promised))
 
     def test_every_column_read_here_is_one_origenerator_promises(self):
         """A column this repo selects and that repo does not promise is a
@@ -66,7 +66,7 @@ class OrigeneratorGalleryContract(unittest.TestCase):
             *(lane.unsent_column for lane in lanes.sent_lanes()),
         }
 
-        self.assertLessEqual(read, promised)
+        assert read <= promised
 
     def test_the_lane_stamps_read_here_are_the_ones_origenerator_writes(self):
         """A withdrawal is stamped there and answered here; the two names are
@@ -74,27 +74,24 @@ class OrigeneratorGalleryContract(unittest.TestCase):
         promised = {lane: stamps["unsent"]
                     for lane, stamps in self.promise["lanes"].items()}
 
-        self.assertEqual(
-            {lane.key: lane.unsent_column for lane in lanes.sent_lanes()}, promised)
+        assert {lane.key: lane.unsent_column for lane in lanes.sent_lanes()} == promised
 
     def test_the_soundless_copy_role_read_here_is_the_one_origenerator_writes(self):
-        self.assertEqual(withdrawn.SILENT_COPY_ROLE, self.promise["silent_copy_role"])
+        assert self.promise["silent_copy_role"] == withdrawn.SILENT_COPY_ROLE
 
     def test_the_model_keys_read_here_are_the_ones_origenerator_records(self):
         """A run's model is named under one of these inside ``params_json``."""
-        self.assertEqual(list(origenerator_metadata.MODEL_KEYS),
-                         self.promise["params_model_keys"])
+        assert list(origenerator_metadata.MODEL_KEYS) == self.promise["params_model_keys"]
 
     def test_the_rate_its_videos_are_generated_at_is_read_where_origenerator_publishes_it(self):
-        self.assertIsNotNone(origenerator_gallery.generated_fps(self.origenerator))
+        assert origenerator_gallery.generated_fps(self.origenerator) is not None
 
     def test_the_database_is_where_origenerator_says_it_keeps_it(self):
         """This repo resolves that checkout through its own overlay, so what has
         to agree is the path INSIDE it."""
         relative = Path(self.promise["database_path"])
 
-        self.assertEqual(config.ORIGENERATOR_DB_PATH,
-                         config.ORIGENERATOR_PROJECT_DIR / relative)
+        assert config.ORIGENERATOR_PROJECT_DIR / relative == config.ORIGENERATOR_DB_PATH
 
 
 if __name__ == "__main__":

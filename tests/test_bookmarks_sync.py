@@ -72,7 +72,7 @@ class TestBookmarkName(unittest.TestCase):
         ]
         for url, expected in cases:
             with self.subTest(url=url):
-                self.assertEqual(bookmarks_sync._bookmark_name(url), expected)
+                assert bookmarks_sync._bookmark_name(url) == expected
 
 
 class TestBookmarksSync(unittest.TestCase):
@@ -100,16 +100,13 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.synced, 2)
-            self.assertEqual(result.no_url, 1)
+            assert result.ok
+            assert result.synced == 2
+            assert result.no_url == 1
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
-            self.assertEqual(folder["name"], "Fun Time Favs")
-            self.assertEqual(
-                sorted(child["url"] for child in folder["children"]),
-                ["https://example.com/image/xyz", "https://example.net/image/abc"],
-            )
+            assert folder["name"] == "Fun Time Favs"
+            assert sorted(child["url"] for child in folder["children"]) == ["https://example.com/image/xyz", "https://example.net/image/abc"]
 
     def test_a_video_no_longer_a_favorite_leaves_the_folder(self):
         with workspace_temp_dir() as root:
@@ -125,8 +122,8 @@ class TestBookmarksSync(unittest.TestCase):
 
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
-            self.assertEqual(urls, ["https://example.com/keep"])
-            self.assertTrue(kept.exists())
+            assert urls == ["https://example.com/keep"]
+            assert kept.exists()
 
     def test_a_favorite_whose_video_is_gone_is_left_out(self):
         with workspace_temp_dir() as root:
@@ -137,10 +134,10 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            self.assertEqual(result.synced, 1)
+            assert result.synced == 1
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
-            self.assertEqual(urls, ["https://example.com/keep"])
+            assert urls == ["https://example.com/keep"]
 
     def test_the_folder_keeps_its_order_and_a_new_favorite_joins_the_end(self):
         with workspace_temp_dir() as root:
@@ -158,7 +155,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
-            self.assertEqual(urls, ["https://example.com/c", "https://example.com/b", "https://example.com/a"])
+            assert urls == ["https://example.com/c", "https://example.com/b", "https://example.com/a"]
 
     def test_run_deduplicates_identical_urls(self):
         with workspace_temp_dir() as root:
@@ -170,8 +167,8 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.synced, 2)
+            assert result.ok
+            assert result.synced == 2
 
     def test_a_page_that_is_no_web_address_is_counted_and_left_out(self):
         with workspace_temp_dir() as root:
@@ -181,7 +178,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            self.assertEqual((result.synced, result.bad_url), (0, 1))
+            assert (result.synced, result.bad_url) == (0, 1)
 
     def test_records_that_cannot_be_reached_leave_the_folder_as_it_was(self):
         with workspace_temp_dir() as root:
@@ -194,8 +191,8 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            self.assertEqual(result.synced, 0)
-            self.assertEqual(bookmarks_path.read_text(encoding="utf-8"), before)
+            assert result.synced == 0
+            assert bookmarks_path.read_text(encoding="utf-8") == before
 
     def test_run_reports_missing_profile(self):
         with workspace_temp_dir() as root:
@@ -210,8 +207,8 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            self.assertFalse(result.ok)
-            self.assertTrue(result.profile_missing)
+            assert not result.ok
+            assert result.profile_missing
 
     def test_run_uses_the_profile_it_is_given(self):
         """Three things reach outside this repo, and all three are arguments now.
@@ -238,12 +235,12 @@ class TestBookmarksSync(unittest.TestCase):
                     bookmarks_folder_name="Given Folder",
                 )
 
-            self.assertTrue(result.ok)
-            self.assertEqual(result.synced, 1)
+            assert result.ok
+            assert result.synced == 1
             written = json.loads(given_bookmarks.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
-            self.assertEqual(folder["name"], "Given Folder")
-            self.assertEqual([child["url"] for child in folder["children"]], ["https://example.com/given"])
+            assert folder["name"] == "Given Folder"
+            assert [child["url"] for child in folder["children"]] == ["https://example.com/given"]
 
 
 if __name__ == "__main__":

@@ -60,9 +60,9 @@ class TestTheEvolverLane(unittest.TestCase):
 
                 result = withdrawn.run()
 
-                self.assertFalse(upscale.exists())
-                self.assertFalse(sorted_copy.exists())
-        self.assertEqual(result.deleted, 2)
+                assert not upscale.exists()
+                assert not sorted_copy.exists()
+        assert result.deleted == 2
 
     def test_a_withdrawn_clip_takes_each_copys_funscript_and_its_mark_along(self):
         with workspace_temp_dir() as root:
@@ -80,9 +80,9 @@ class TestTheEvolverLane(unittest.TestCase):
                 result = withdrawn.run()
 
                 for script in scripts:
-                    self.assertFalse(script.exists())
-                    self.assertFalse(script_library.is_marked_generated(script))
-        self.assertEqual(result.deleted_scripts, 2)
+                    assert not script.exists()
+                    assert not script_library.is_marked_generated(script)
+        assert result.deleted_scripts == 2
 
     def test_the_funscript_still_where_a_condemned_upscale_was_filed_goes_too(self):
         with workspace_temp_dir() as root:
@@ -97,7 +97,7 @@ class TestTheEvolverLane(unittest.TestCase):
 
                 withdrawn.run()
 
-                self.assertFalse(left_behind.exists())
+                assert not left_behind.exists()
 
     def test_a_funscript_that_will_not_delete_is_left_for_the_next_run(self):
         with workspace_temp_dir() as root:
@@ -112,8 +112,8 @@ class TestTheEvolverLane(unittest.TestCase):
                            side_effect=PermissionError("in use")):
                     result = withdrawn.run()
 
-                self.assertTrue(script.exists())
-        self.assertEqual((result.deleted, result.deleted_scripts, result.failed), (1, 0, 1))
+                assert script.exists()
+        assert (result.deleted, result.deleted_scripts, result.failed) == (1, 0, 1)
 
     def test_a_clip_still_in_the_inbox_goes_before_it_is_ever_sorted(self):
         with workspace_temp_dir() as root:
@@ -125,7 +125,7 @@ class TestTheEvolverLane(unittest.TestCase):
 
                 withdrawn.run()
 
-                self.assertFalse(waiting.exists())
+                assert not waiting.exists()
 
     def test_a_send_that_still_stands_is_left_alone(self):
         with workspace_temp_dir() as root:
@@ -138,8 +138,8 @@ class TestTheEvolverLane(unittest.TestCase):
 
                 result = withdrawn.run()
 
-                self.assertTrue(kept.exists())
-        self.assertEqual(result.deleted, 0)
+                assert kept.exists()
+        assert result.deleted == 0
 
     def test_a_clip_this_library_never_took_is_no_error(self):
         # The withdrawal is a standing answer rather than a request that drains,
@@ -150,7 +150,7 @@ class TestTheEvolverLane(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 result = withdrawn.run()
 
-        self.assertEqual((result.deleted, result.failed), (0, 0))
+        assert (result.deleted, result.failed) == (0, 0)
 
     def test_the_copy_keeps_the_uniquifier_the_inbox_gave_it(self):
         # Two clips of one name reach the inbox and the second is filed as
@@ -166,7 +166,7 @@ class TestTheEvolverLane(unittest.TestCase):
 
                 withdrawn.run()
 
-                self.assertFalse(second.exists())
+                assert not second.exists()
 
     def test_the_clip_takes_its_metadata_with_it(self):
         with workspace_temp_dir() as root:
@@ -180,8 +180,8 @@ class TestTheEvolverLane(unittest.TestCase):
 
                 result = withdrawn.run()
 
-                self.assertFalse(record.exists())
-        self.assertEqual(result.deleted_metadata, 1)
+                assert not record.exists()
+        assert result.deleted_metadata == 1
 
     def test_an_outbox_copy_that_will_not_go_keeps_its_source_beside_it(self):
         # 1_sorted and the outbox are held in one-to-one correspondence, and a
@@ -199,8 +199,8 @@ class TestTheEvolverLane(unittest.TestCase):
                 with locked.open("a"):
                     result = withdrawn.run()
 
-                self.assertTrue(sorted_copy.exists())
-        self.assertEqual(result.failed, 1)
+                assert sorted_copy.exists()
+        assert result.failed == 1
 
 
 class TestTheGenauLane(unittest.TestCase):
@@ -213,7 +213,7 @@ class TestTheGenauLane(unittest.TestCase):
 
                 withdrawn.run()
 
-                self.assertFalse(delivered.exists())
+                assert not delivered.exists()
 
     def test_withdrawing_from_one_lane_leaves_the_other_lanes_copy(self):
         with workspace_temp_dir() as root:
@@ -227,8 +227,8 @@ class TestTheGenauLane(unittest.TestCase):
 
                 withdrawn.run()
 
-                self.assertTrue(kept.exists())
-                self.assertFalse(delivered.exists())
+                assert kept.exists()
+                assert not delivered.exists()
 
 
 
@@ -258,8 +258,8 @@ class TestASoundlessCopy(unittest.TestCase):
 
                 withdrawn.run()
 
-                self.assertTrue(sounded.exists())
-                self.assertFalse(soundless.exists())
+                assert sounded.exists()
+                assert not soundless.exists()
 
     def test_it_stays_where_it_is_the_only_copy_of_its_video(self):
         with workspace_temp_dir() as root:
@@ -270,7 +270,7 @@ class TestASoundlessCopy(unittest.TestCase):
 
                 withdrawn.run()
 
-                self.assertTrue(soundless.exists())
+                assert soundless.exists()
 
     def test_it_leaves_the_library_once_the_video_with_its_sound_has_its_upscale(self):
         with workspace_temp_dir() as root:
@@ -284,9 +284,9 @@ class TestASoundlessCopy(unittest.TestCase):
 
                 result = withdrawn.run()
 
-                self.assertTrue(sounded.exists())
-                self.assertFalse(any(copy.exists() for copy in soundless))
-        self.assertEqual(result.deleted, 2)
+                assert sounded.exists()
+                assert not any(copy.exists() for copy in soundless)
+        assert result.deleted == 2
 
 
 class TestAGalleryThisCannotRead(unittest.TestCase):
@@ -296,7 +296,7 @@ class TestAGalleryThisCannotRead(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=root / "absent.db"):
                 result = withdrawn.run()
 
-        self.assertEqual((result.deleted, result.failed), (0, 0))
+        assert (result.deleted, result.failed) == (0, 0)
 
     def test_a_gallery_from_before_the_columns_existed_withdraws_nothing(self):
         with workspace_temp_dir() as root:
@@ -313,5 +313,5 @@ class TestAGalleryThisCannotRead(unittest.TestCase):
 
                 result = withdrawn.run()
 
-                self.assertTrue(kept.exists())
-        self.assertEqual(result.deleted, 0)
+                assert kept.exists()
+        assert result.deleted == 0

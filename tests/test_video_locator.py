@@ -22,7 +22,7 @@ class TestRelocate(unittest.TestCase):
                 index = video_locator.build_index()
 
             was_at = temp / "videos" / "2D" / "other" / "clip.mp4"
-            self.assertEqual(video_locator.relocate(was_at, index), moved_to)
+            assert video_locator.relocate(was_at, index) == moved_to
 
     def test_declines_when_two_folders_hold_that_filename(self):
         with workspace_temp_dir() as temp:
@@ -31,7 +31,7 @@ class TestRelocate(unittest.TestCase):
             with override_config(VIDEO_SEARCH_ROOT=temp / "videos"):
                 index = video_locator.build_index()
 
-            self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
+            assert video_locator.relocate(temp / "gone" / "clip.mp4", index) is None
 
     def test_leaves_a_reference_where_its_video_was_while_the_video_waits_in_kinda_weird(self):
         with workspace_temp_dir() as temp:
@@ -40,7 +40,7 @@ class TestRelocate(unittest.TestCase):
             with override_config(VIDEO_SEARCH_ROOT=temp / "videos", WEIRD_DIR=weird_dir):
                 index = video_locator.build_index()
 
-            self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
+            assert video_locator.relocate(temp / "gone" / "clip.mp4", index) is None
 
     def test_leaves_a_reference_where_its_flick_was_while_the_flick_waits_in_genaus_weird_pile(self):
         with workspace_temp_dir() as temp:
@@ -51,7 +51,7 @@ class TestRelocate(unittest.TestCase):
                                  GENAU_WEIRD_DIR=genau_weird):
                 index = video_locator.build_index()
 
-            self.assertIsNone(video_locator.relocate(temp / "gone" / "loop.mp4", index))
+            assert video_locator.relocate(temp / "gone" / "loop.mp4", index) is None
 
 
     def test_leaves_a_reference_where_its_video_was_while_the_only_video_of_its_name_is_one_origenerator_made(self):
@@ -61,7 +61,7 @@ class TestRelocate(unittest.TestCase):
             with override_config(VIDEO_SEARCH_ROOT=temp / "videos", ORIGENERATOR_VIDEOS_DIR=made):
                 index = video_locator.build_index()
 
-            self.assertIsNone(video_locator.relocate(temp / "gone" / "clip.mp4", index))
+            assert video_locator.relocate(temp / "gone" / "clip.mp4", index) is None
 
 class TestRenamedInPlace(unittest.TestCase):
     def test_finds_the_renamed_file_by_its_frame_fingerprint(self):
@@ -74,7 +74,7 @@ class TestRenamedInPlace(unittest.TestCase):
             with patch("util.video_locator.ffprobe.frame_fingerprint", fingerprints.get):
                 found = video_locator.renamed_in_place(folder / "clip-1080p_60fps.mp4", (60.0, 70296))
 
-            self.assertEqual(found, renamed_to)
+            assert found == renamed_to
 
     def test_declines_when_no_neighbour_matches(self):
         with workspace_temp_dir() as temp:
@@ -84,7 +84,7 @@ class TestRenamedInPlace(unittest.TestCase):
             with patch("util.video_locator.ffprobe.frame_fingerprint", lambda _: (30.0, 2350)):
                 found = video_locator.renamed_in_place(folder / "gone.mp4", (60.0, 70296))
 
-            self.assertIsNone(found)
+            assert found is None
 
     def test_declines_when_two_neighbours_share_the_fingerprint(self):
         with workspace_temp_dir() as temp:
@@ -95,7 +95,7 @@ class TestRenamedInPlace(unittest.TestCase):
             with patch("util.video_locator.ffprobe.frame_fingerprint", lambda _: (60.0, 70296)):
                 found = video_locator.renamed_in_place(folder / "gone.mp4", (60.0, 70296))
 
-            self.assertIsNone(found)
+            assert found is None
 
 
 if __name__ == "__main__":

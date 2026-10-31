@@ -88,7 +88,7 @@ class TestTheWholeSuite(unittest.TestCase):
             "sys.exit(pytest.main(['--collect-only', '-q']))\n"
         )
 
-        self.assertEqual(result.returncode, 0, result.stdout[-4000:])
+        assert result.returncode == 0, result.stdout[-4000:]
 
 
 if __name__ == "__main__":

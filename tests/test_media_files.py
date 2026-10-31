@@ -11,6 +11,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import config
 from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
 from util.media_files import (
@@ -43,8 +45,8 @@ class TestLibraryVideos(unittest.TestCase):
             with override_config(VIDEO_EXTENSIONS={".mp4"}):
                 found = list(library_videos(root))
 
-        self.assertEqual(found, [good])
-        self.assertTrue(is_partial_path(partial))
+        assert found == [good]
+        assert is_partial_path(partial)
 
     def test_what_counts_as_a_video_is_read_when_it_is_asked_not_at_import(self):
         """Five stages threaded config.VIDEO_EXTENSIONS through one-line
@@ -57,11 +59,11 @@ class TestLibraryVideos(unittest.TestCase):
             mkv.write_bytes(b"video")
 
             with override_config(VIDEO_EXTENSIONS={".mkv"}):
-                self.assertEqual(list(library_videos(root)), [mkv])
+                assert list(library_videos(root)) == [mkv]
 
     def test_a_root_that_is_not_there_yields_nothing(self):
         with workspace_temp_dir() as root, override_config(VIDEO_EXTENSIONS={".mp4"}):
-            self.assertEqual(list(library_videos(root / "nope")), [])
+            assert list(library_videos(root / "nope")) == []
 
 
 class TestListedVideos(unittest.TestCase):
@@ -77,24 +79,24 @@ class TestListedVideos(unittest.TestCase):
                     patch("os.stat", side_effect=AssertionError("asked the disk about one file")):
                 found = list(listed_videos(root))
 
-        self.assertEqual(found, [good])
+        assert found == [good]
 
     def test_a_root_that_is_not_there_yields_nothing(self):
         with workspace_temp_dir() as root, override_config(VIDEO_EXTENSIONS={".mp4"}):
-            self.assertEqual(list(listed_videos(root / "nope")), [])
+            assert list(listed_videos(root / "nope")) == []
 
 
 class TestReachable(unittest.TestCase):
     def test_an_empty_folder_can_be_reached(self):
         with workspace_temp_dir() as root:
-            self.assertTrue(reachable(root))
+            assert reachable(root)
 
     def test_a_folder_not_made_yet_on_a_drive_that_is_there_can_be_reached(self):
         with workspace_temp_dir() as root:
-            self.assertTrue(reachable(root / "archive"))
+            assert reachable(root / "archive")
 
     def test_a_folder_on_a_drive_that_is_not_there_cannot_be_reached(self):
-        self.assertFalse(reachable(a_drive_that_is_not_there() / "cloud" / "VR"))
+        assert not reachable(a_drive_that_is_not_there() / "cloud" / "VR")
 
 
 class TestPartialPath(unittest.TestCase):
@@ -103,20 +105,20 @@ class TestPartialPath(unittest.TestCase):
 
         partial = partial_path(final, "scene one")
 
-        self.assertEqual(partial.parent, final.parent)
-        self.assertTrue(partial.name.startswith("scene one"))
-        self.assertTrue(is_partial_path(partial))
-        self.assertNotIn(partial.suffix.lower(), config.VIDEO_EXTENSIONS)
+        assert partial.parent == final.parent
+        assert partial.name.startswith("scene one")
+        assert is_partial_path(partial)
+        assert partial.suffix.lower() not in config.VIDEO_EXTENSIONS
 
     def test_a_retry_never_writes_over_a_partial_a_dead_encode_still_holds_open(self):
         final = Path("processed") / "scene one_apo8_iris2.mp4"
 
-        self.assertNotEqual(partial_path(final, "scene one"), partial_path(final, "scene one"))
+        assert partial_path(final, "scene one") != partial_path(final, "scene one")
 
     def test_the_stem_a_partial_was_named_for_reads_back_off_it(self):
         final = Path("processed") / "scene one_apo8_iris2.mp4"
 
-        self.assertEqual(partial_stem(partial_path(final, "scene one")), "scene one")
+        assert partial_stem(partial_path(final, "scene one")) == "scene one"
 
 
 class TestChildDirs(unittest.TestCase):
@@ -127,15 +129,13 @@ class TestChildDirs(unittest.TestCase):
             (root / "alpha" / "deeper").mkdir()
             (root / "a file.txt").write_text("x", encoding="utf-8")
 
-            self.assertEqual(
-                [d.name for d in child_dirs(root)], ["alpha", "middle", "zebra"]
-            )
+            assert [d.name for d in child_dirs(root)] == ["alpha", "middle", "zebra"]
 
     def test_a_root_that_is_not_there_yields_nothing(self):
         """The one copy of this that left the guard off raised on a root the
         pipeline had not created yet."""
         with workspace_temp_dir() as root:
-            self.assertEqual(list(child_dirs(root / "nope")), [])
+            assert list(child_dirs(root / "nope")) == []
 
 
 class TestTheUniquifier(unittest.TestCase):
@@ -149,22 +149,20 @@ class TestTheUniquifier(unittest.TestCase):
 
     def test_a_free_name_is_left_alone(self):
         with workspace_temp_dir() as root:
-            self.assertEqual(unique_path(root / "clip.mp4"), root / "clip.mp4")
+            assert unique_path(root / "clip.mp4") == root / "clip.mp4"
 
     def test_a_taken_name_gets_the_next_free_number(self):
         with workspace_temp_dir() as root:
             (root / "clip.mp4").write_bytes(b"one")
             (root / "clip (2).mp4").write_bytes(b"two")
 
-            self.assertEqual(unique_path(root / "clip.mp4"), root / "clip (3).mp4")
+            assert unique_path(root / "clip.mp4") == root / "clip (3).mp4"
 
     def test_the_suffix_survives_and_the_number_goes_before_it(self):
         with workspace_temp_dir() as root:
             (root / "clip one.mkv").write_bytes(b"one")
 
-            self.assertEqual(
-                unique_path(root / "clip one.mkv"), root / "clip one (2).mkv"
-            )
+            assert unique_path(root / "clip one.mkv") == root / "clip one (2).mkv"
 
     def test_stripping_is_the_inverse_of_appending(self):
         with workspace_temp_dir() as root:
@@ -172,15 +170,15 @@ class TestTheUniquifier(unittest.TestCase):
 
             taken = unique_path(root / "clip.mp4")
 
-            self.assertEqual(strip_uniquifier(taken.stem), "clip")
+            assert strip_uniquifier(taken.stem) == "clip"
 
     def test_a_stem_with_no_number_comes_back_whole(self):
-        self.assertEqual(strip_uniquifier("clip one"), "clip one")
+        assert strip_uniquifier("clip one") == "clip one"
 
     def test_only_a_trailing_number_in_parentheses_is_stripped(self):
         """A title is free to hold parentheses of its own."""
-        self.assertEqual(strip_uniquifier("clip (director's cut)"), "clip (director's cut)")
-        self.assertEqual(strip_uniquifier("clip (2) more"), "clip (2) more")
+        assert strip_uniquifier("clip (director's cut)") == "clip (director's cut)"
+        assert strip_uniquifier("clip (2) more") == "clip (2) more"
 
 
 class TestRemoveEmptyDirs(unittest.TestCase):
@@ -194,18 +192,15 @@ class TestRemoveEmptyDirs(unittest.TestCase):
 
             remove_empty_dirs(root)
 
-            self.assertFalse((root / "a").exists())
-            self.assertTrue(nonempty_sub.exists())
+            assert not (root / "a").exists()
+            assert nonempty_sub.exists()
 
 
 class TestRemovePartialFiles(unittest.TestCase):
     def test_takes_the_partials_and_leaves_the_rest(self):
         """Every caller hands it a logger, so it does not carry a branch for
         the case where it has none."""
-        self.assertIs(
-            inspect.signature(remove_partial_files).parameters["logger"].default,
-            inspect.Parameter.empty,
-        )
+        assert inspect.signature(remove_partial_files).parameters["logger"].default is inspect.Parameter.empty
         with workspace_temp_dir() as root:
             partial = partial_path(root / "clip_topaz.mp4", "clip")
             finished = root / "clip.mp4"
@@ -214,9 +209,9 @@ class TestRemovePartialFiles(unittest.TestCase):
 
             removed = remove_partial_files(root, logging.getLogger(__name__))
 
-            self.assertEqual(removed, 1)
-            self.assertFalse(partial.exists())
-            self.assertTrue(finished.exists())
+            assert removed == 1
+            assert not partial.exists()
+            assert finished.exists()
 
     def test_a_partial_that_will_not_delete_is_reported_and_not_counted(self):
         with workspace_temp_dir() as root:
@@ -227,7 +222,7 @@ class TestRemovePartialFiles(unittest.TestCase):
                  self.assertLogs(log, level="ERROR"):
                 removed = remove_partial_files(root, log)
 
-            self.assertEqual(removed, 0)
+            assert removed == 0
 
 
 class TestRetryWhileInUse(unittest.TestCase):
@@ -241,9 +236,9 @@ class TestRetryWhileInUse(unittest.TestCase):
             return "moved"
 
         with patch("app_support.file_channel.time.sleep") as sleep:
-            self.assertEqual(retry_while_in_use(held_open_once), "moved")
+            assert retry_while_in_use(held_open_once) == "moved"
 
-        self.assertEqual(len(tries), 2)
+        assert len(tries) == 2
         sleep.assert_called_once()
 
     def test_the_player_gets_ten_short_chances_to_let_go(self):
@@ -257,14 +252,14 @@ class TestRetryWhileInUse(unittest.TestCase):
         with patch("app_support.file_channel.time.sleep") as sleep:
             retry_while_in_use(held_open_until_the_last_chance)
 
-        self.assertEqual(len(tries), 10)
-        self.assertEqual([call.args[0] for call in sleep.call_args_list], [0.2] * 9)
+        assert len(tries) == 10
+        assert [call.args[0] for call in sleep.call_args_list] == [0.2] * 9
 
     def test_gives_up_on_a_file_that_is_never_let_go(self):
         def always_held_open():
             raise _IN_USE
 
-        with patch("app_support.file_channel.time.sleep"), self.assertRaises(PermissionError):
+        with patch("app_support.file_channel.time.sleep"), pytest.raises(PermissionError):
             retry_while_in_use(always_held_open)
 
 

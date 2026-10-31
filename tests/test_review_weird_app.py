@@ -18,7 +18,7 @@ class TestMain(unittest.TestCase):
 
         logging_set_up.assert_called_once_with()
         window.return_value.show.assert_called_once_with()
-        self.assertEqual(exit_code, 0)
+        assert exit_code == 0
 
     def test_it_is_evolver_on_the_taskbar_before_its_window_exists(self):
         order = Mock()
@@ -32,7 +32,7 @@ class TestMain(unittest.TestCase):
 
             review_weird_app.main()
 
-        self.assertEqual(order.mock_calls[:2], [call.claim(application.return_value.__enter__.return_value), call.window()])
+        assert order.mock_calls[:2] == [call.claim(application.return_value.__enter__.return_value), call.window()]
 
 
 if __name__ == "__main__":

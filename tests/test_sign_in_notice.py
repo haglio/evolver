@@ -37,10 +37,10 @@ class TestSignInNotice(unittest.TestCase):
         with patch("gui.sign_in_notice.show_error") as show_error:
             notice.after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=0.0)
             notice.after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=600.0)
-            self.assertEqual(show_error.call_count, 1)
+            assert show_error.call_count == 1
 
             notice.after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=24 * 3600.0)
-            self.assertEqual(show_error.call_count, 2)
+            assert show_error.call_count == 2
 
     def test_a_run_that_held_nothing_back_for_the_sign_in_says_nothing(self):
         nothing_to_do = {"name": "upscale", "status": "skipped", "duration_seconds": 0.0,

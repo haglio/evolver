@@ -4,6 +4,7 @@ import json
 import threading
 import unittest
 
+import pytest
 from app_support.json_store import locked_update
 
 from tests.temp_helpers import library_tree, override_config, workspace_temp_dir
@@ -17,10 +18,7 @@ class TestUpscaledVideoPath(unittest.TestCase):
             upscaled = root / "AI" / "2_outbox" / "upscaled_by_orientation"
 
             with override_config(OUT_UPSCALED_DIR=upscaled):
-                self.assertEqual(
-                    upscaled_video_path("provider2", "portrait", "clip"),
-                    upscaled / "portrait" / "provider2" / "clip_topaz.mp4",
-                )
+                assert upscaled_video_path("provider2", "portrait", "clip") == upscaled / "portrait" / "provider2" / "clip_topaz.mp4"
 
 
 class TestSidecarPath(unittest.TestCase):
@@ -34,11 +32,7 @@ class TestSidecarPath(unittest.TestCase):
             )
 
             with override_config(VIDEO_LIBRARY_DIR=video_lib, METADATA_DIR=metadata):
-                self.assertEqual(
-                    sidecar_path(video),
-                    metadata / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation"
-                    / "portrait" / "provider2" / "clip_topaz.json",
-                )
+                assert sidecar_path(video) == metadata / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider2" / "clip_topaz.json"
 
     def test_also_mirrors_a_non_ai_video_into_the_same_tree(self):
         with workspace_temp_dir() as root:
@@ -50,11 +44,7 @@ class TestSidecarPath(unittest.TestCase):
             )
 
             with override_config(VIDEO_LIBRARY_DIR=video_lib, METADATA_DIR=metadata):
-                self.assertEqual(
-                    sidecar_path(video),
-                    metadata / "2D" / "non_AI" / "lagoon" / "3_good_to_go" / "processed"
-                    / "clip_apo8_iris2.json",
-                )
+                assert sidecar_path(video) == metadata / "2D" / "non_AI" / "lagoon" / "3_good_to_go" / "processed" / "clip_apo8_iris2.json"
 
     def test_mirrors_a_genau_flick_from_beside_the_library(self):
         """Genau's flicks sit next to the video tree rather than inside it, so
@@ -67,16 +57,13 @@ class TestSidecarPath(unittest.TestCase):
                 VIDEO_LIBRARY_DIR=videos / "videos", VIDEO_SEARCH_ROOT=videos,
                 METADATA_DIR=metadata,
             ):
-                self.assertEqual(
-                    sidecar_path(videos / "genau" / "flicks" / "flick.mp4"),
-                    metadata / "genau" / "flicks" / "flick.json",
-                )
+                assert sidecar_path(videos / "genau" / "flicks" / "flick.mp4") == metadata / "genau" / "flicks" / "flick.json"
 
     def test_rejects_a_video_outside_the_library(self):
         with workspace_temp_dir() as root, override_config(
             VIDEO_LIBRARY_DIR=root / "videos" / "videos",
             VIDEO_SEARCH_ROOT=root / "videos", METADATA_DIR=root / "metadata",
-        ), self.assertRaises(ValueError):
+        ), pytest.raises(ValueError, match="is not in the video library"):
             sidecar_path(root / "elsewhere" / "clip.mp4")
 
 
@@ -87,14 +74,14 @@ class TestSidecarFolder(unittest.TestCase):
         ):
             folder = root / "videos" / "2D" / "non_AI" / "example.bucket" / "vol. 2"
 
-            self.assertEqual(sidecar.sidecar_folder(folder), sidecar_path(folder / "clip.mp4").parent)
+            assert sidecar.sidecar_folder(folder) == sidecar_path(folder / "clip.mp4").parent
 
     def test_a_folder_outside_the_library_has_no_records_folder(self):
         with workspace_temp_dir() as root, override_config(
             VIDEO_LIBRARY_DIR=root / "videos" / "videos",
             VIDEO_SEARCH_ROOT=root / "videos", METADATA_DIR=root / "metadata",
         ):
-            self.assertIsNone(sidecar.sidecar_folder(root / "elsewhere"))
+            assert sidecar.sidecar_folder(root / "elsewhere") is None
 
 
 class TestUpdate(unittest.TestCase):
@@ -122,7 +109,7 @@ class TestUpdate(unittest.TestCase):
 
             sidecar.update(path, look_for_a_way_in)
 
-            self.assertEqual(refused, [True])
+            assert refused == [True]
 
     def test_it_changes_the_document_the_other_writer_left(self):
         """The lost update itself: a pass whose turn comes after a rejection
@@ -141,7 +128,7 @@ class TestUpdate(unittest.TestCase):
             viewer = threading.Thread(
                 target=locked_update, args=(path, strike_the_act_out), daemon=True)
             viewer.start()
-            self.assertTrue(inside.wait(5))
+            assert inside.wait(5)
             stamped = []
             pipeline = threading.Thread(
                 target=lambda: stamped.append(
@@ -152,11 +139,8 @@ class TestUpdate(unittest.TestCase):
             viewer.join(5)
             pipeline.join(5)
 
-            self.assertEqual(
-                sidecar.read(path),
-                {"video": {WRONG_ACTION_FIELD: "alpha"}, "favorite": True},
-            )
-            self.assertEqual(stamped, [sidecar.read(path)])
+            assert sidecar.read(path) == {"video": {WRONG_ACTION_FIELD: "alpha"}, "favorite": True}
+            assert stamped == [sidecar.read(path)]
 
     def test_a_writer_with_nothing_to_change_leaves_the_file_alone(self):
         with workspace_temp_dir() as root:
@@ -164,8 +148,8 @@ class TestUpdate(unittest.TestCase):
             sidecar.update(path, lambda _: {"video": {"action": "alpha"}})
             written = path.read_text(encoding="utf-8")
 
-            self.assertIsNone(sidecar.update(path, lambda payload: None))
-            self.assertEqual(path.read_text(encoding="utf-8"), written)
+            assert sidecar.update(path, lambda payload: None) is None
+            assert path.read_text(encoding="utf-8") == written
 
 
 if __name__ == "__main__":
@@ -180,7 +164,7 @@ class TestRecordAction(unittest.TestCase):
             record_action(video, "Side Beta")
             payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
-            self.assertEqual(payload, {"video": {"action": "Side Beta"}})
+            assert payload == {"video": {"action": "Side Beta"}}
 
     def test_naming_the_act_answers_a_viewers_rejection_of_the_old_one(self):
         """``wrong_action`` is a standing question — "this clip is mislabeled,
@@ -197,7 +181,7 @@ class TestRecordAction(unittest.TestCase):
             record_action(video, "Side Beta")
             payload = json.loads(path.read_text(encoding="utf-8"))
 
-            self.assertEqual(payload, {"video": {"prompt": "p", "action": "Side Beta"}})
+            assert payload == {"video": {"prompt": "p", "action": "Side Beta"}}
 
     def test_keeps_the_metadata_an_existing_sidecar_already_holds(self):
         with library_tree() as lib:
@@ -212,10 +196,7 @@ class TestRecordAction(unittest.TestCase):
             record_action(video, "Dancing")
             payload = json.loads(path.read_text(encoding="utf-8"))
 
-            self.assertEqual(
-                payload,
-                {"video": {"prompt": "a prompt", "action": "Dancing"}, "source_image": {"seed": "7"}},
-            )
+            assert payload == {"video": {"prompt": "a prompt", "action": "Dancing"}, "source_image": {"seed": "7"}}
 
     def test_relabelling_replaces_the_previous_action(self):
         with library_tree() as lib:
@@ -225,4 +206,4 @@ class TestRecordAction(unittest.TestCase):
             record_action(video, "XYZ Gamma")
             payload = json.loads(sidecar_path(video).read_text(encoding="utf-8"))
 
-            self.assertEqual(payload, {"video": {"action": "XYZ Gamma"}})
+            assert payload == {"video": {"action": "XYZ Gamma"}}

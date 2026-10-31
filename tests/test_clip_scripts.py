@@ -30,12 +30,9 @@ class TestClipScripts(ClipScriptsCase):
 
         result = self.run_stage(duration=2.0)
 
-        self.assertEqual(result.written, 1)
+        assert result.written == 1
         written = json.loads(self.clip_script().read_text(encoding="utf-8"))
-        self.assertEqual(
-            written["actions"],
-            [{"at": 0, "pos": 0}, {"at": 500, "pos": 90}, {"at": 1_500, "pos": 10}],
-        )
+        assert written["actions"] == [{"at": 0, "pos": 0}, {"at": 500, "pos": 90}, {"at": 1500, "pos": 10}]
 
     def test_a_trimmed_script_says_in_itself_that_this_stage_cut_it(self):
         """In the script rather than on the clip's sidecar: a script is replaced
@@ -49,8 +46,7 @@ class TestClipScripts(ClipScriptsCase):
 
         written = json.loads(self.clip_script().read_text(encoding="utf-8"))
         stamp = written["metadata"][provenance.BLOCK][provenance.CLIP_SCRIPTS]
-        self.assertEqual((stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]),
-                         ("evolver", None, None))
+        assert (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("evolver", None, None)
 
     def test_what_made_the_scene_script_comes_along_into_the_clips(self):
         """A clip's script is only as current as the scene script it was cut
@@ -66,8 +62,8 @@ class TestClipScripts(ClipScriptsCase):
         self.run_stage(duration=2.0)
 
         stamps = json.loads(self.clip_script().read_text(encoding="utf-8"))["metadata"][provenance.BLOCK]
-        self.assertEqual(set(stamps), {provenance.SCENE_SCRIPTS, provenance.CLIP_SCRIPTS})
-        self.assertEqual(stamps[provenance.SCENE_SCRIPTS], placed)
+        assert set(stamps) == {provenance.SCENE_SCRIPTS, provenance.CLIP_SCRIPTS}
+        assert stamps[provenance.SCENE_SCRIPTS] == placed
 
     def test_leaves_a_clip_alone_when_its_scene_has_no_script(self):
         scene = self.make_scene()
@@ -75,9 +71,9 @@ class TestClipScripts(ClipScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.no_scene_script, 1)
-        self.assertFalse(self.clip_script().exists())
+        assert result.written == 0
+        assert result.no_scene_script == 1
+        assert not self.clip_script().exists()
 
     def test_never_overwrites_a_script_the_clip_already_has(self):
         scene = self.make_scene(actions=[{"at": 10_500, "pos": 90}])
@@ -88,12 +84,9 @@ class TestClipScripts(ClipScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.already_scripted, 1)
-        self.assertEqual(
-            json.loads(existing.read_text(encoding="utf-8"))["actions"],
-            [{"at": 7, "pos": 42}],
-        )
+        assert result.written == 0
+        assert result.already_scripted == 1
+        assert json.loads(existing.read_text(encoding="utf-8"))["actions"] == [{"at": 7, "pos": 42}]
 
     def test_writes_nothing_when_the_clip_outlasts_the_scripted_motion(self):
         scene = self.make_scene(actions=[{"at": 1_000, "pos": 0}, {"at": 2_000, "pos": 90}])
@@ -101,9 +94,9 @@ class TestClipScripts(ClipScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.no_motion_in_window, 1)
-        self.assertFalse(self.clip_script().exists())
+        assert result.written == 0
+        assert result.no_motion_in_window == 1
+        assert not self.clip_script().exists()
 
     def test_skips_a_clip_whose_duration_will_not_probe(self):
         scene = self.make_scene(actions=[{"at": 10_500, "pos": 90}, {"at": 11_000, "pos": 10}])
@@ -111,9 +104,9 @@ class TestClipScripts(ClipScriptsCase):
 
         result = self.run_stage(duration=None)
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.unprobeable, 1)
-        self.assertFalse(self.clip_script().exists())
+        assert result.written == 0
+        assert result.unprobeable == 1
+        assert not self.clip_script().exists()
 
     def test_passes_over_a_clip_not_yet_matched_to_its_scene(self):
         scene = self.make_scene(actions=[{"at": 10_500, "pos": 90}, {"at": 11_000, "pos": 10}])
@@ -121,17 +114,17 @@ class TestClipScripts(ClipScriptsCase):
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.unmatched_clip, 1)
-        self.assertFalse(self.clip_script().exists())
+        assert result.written == 0
+        assert result.unmatched_clip == 1
+        assert not self.clip_script().exists()
 
     def test_ignores_a_video_that_was_never_carved_from_anything(self):
         self.make_scene(actions=[{"at": 10_500, "pos": 90}, {"at": 11_000, "pos": 10}])
 
         result = self.run_stage()
 
-        self.assertEqual(result.written, 0)
-        self.assertEqual(result.unmatched_clip, 0)
+        assert result.written == 0
+        assert result.unmatched_clip == 0
 
 
 if __name__ == "__main__":

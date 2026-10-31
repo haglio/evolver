@@ -36,8 +36,7 @@ class TestApplyAccent(unittest.TestCase):
         return app._palette
 
     def test_a_link_wears_the_family_blue(self):
-        self.assertEqual(
-            self._applied().color(QPalette.ColorRole.Link).name(), BLUE.name())
+        assert self._applied().color(QPalette.ColorRole.Link).name() == BLUE.name()
 
     def test_a_visited_link_wears_the_same_blue(self):
         """These are not the web's links: a run title goes to that run's own
@@ -45,20 +44,15 @@ class TestApplyAccent(unittest.TestCase):
         titles had been clicked before."""
         applied = self._applied()
 
-        self.assertEqual(applied.color(QPalette.ColorRole.LinkVisited).name(),
-                         applied.color(QPalette.ColorRole.Link).name())
+        assert applied.color(QPalette.ColorRole.LinkVisited).name() == applied.color(QPalette.ColorRole.Link).name()
 
     def test_a_selection_wears_it_too(self):
-        self.assertEqual(
-            self._applied().color(QPalette.ColorRole.Highlight).name(),
-            BLUE.name())
+        assert self._applied().color(QPalette.ColorRole.Highlight).name() == BLUE.name()
 
     def test_selected_text_is_the_familys_own_brightest(self):
         """Windows paired its highlight with black text, which is legible on a
         pale orange and not on this blue."""
-        self.assertEqual(
-            self._applied().color(QPalette.ColorRole.HighlightedText).name(),
-            TEXT_PRIMARY.name())
+        assert self._applied().color(QPalette.ColorRole.HighlightedText).name() == TEXT_PRIMARY.name()
 
 
 if __name__ == "__main__":
