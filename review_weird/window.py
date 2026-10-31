@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from shared_ui.colors import TEXT_MUTED, TEXT_SECONDARY
-from shared_ui.icons import glyph_icon
+from shared_ui.icons import qt_icon
 from shared_ui.spacing import MARGIN_STANDARD
 
 import config
@@ -59,9 +59,9 @@ class ReviewWeirdWindow(QWidget):
         screen = QVideoWidget()
         self.preview = LoopingPreview(screen)
 
-        self.restore_button = QPushButton(glyph_icon("undo_arrow", color=_ICON_COLOR), "Restore")
+        self.restore_button = QPushButton(qt_icon("undo_arrow", color=_ICON_COLOR), "Restore")
         self.restore_button.clicked.connect(self._restore)
-        self.delete_button = QPushButton(glyph_icon("trash", color=_ICON_COLOR), "Delete Permanently")
+        self.delete_button = QPushButton(qt_icon("trash", color=_ICON_COLOR), "Delete Permanently")
         self.delete_button.clicked.connect(self._delete_permanently)
         QShortcut(QKeySequence(QKeySequence.StandardKey.Delete), self, self._delete_permanently)
 
