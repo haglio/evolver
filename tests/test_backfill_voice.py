@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import array
 import json
+import os
 import sys
+import tempfile
 import threading
 import unittest
 from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -270,19 +273,22 @@ class TestWhichReadingsAreTrusted(unittest.TestCase):
 
 
 class TestWhatItListensWith(unittest.TestCase):
-    def test_the_model_the_microphone_the_rate_and_the_bar_are_the_settings_own(self):
-        with patch("backfill.voice.CommandListener") as built,                 patch.multiple(config, VOICE_MODEL_NAME="a-model", VOICE_DEVICE_NAME="desk",
-                               VOICE_SAMPLE_RATE=8000, VOICE_CONFIDENCE_THRESHOLD=0.5):
-            listener = VoiceListener(PHRASES)
-            listener.start()
-            listener.stop()
+    def test_the_microphone_and_model_are_the_familys_and_the_rate_and_bar_evolvers(self):
+        with tempfile.TemporaryDirectory() as folder:
+            settings = Path(folder) / "settings.json"
+            settings.write_text(json.dumps({"microphone": "desk", "vosk_model": "a-model"}), encoding="utf-8")
+            with (patch("backfill.voice.CommandListener") as built,
+                  patch.dict(os.environ, {"HAGLIO_SETTINGS": str(settings)}),
+                  patch.multiple(config, VOICE_SAMPLE_RATE=8000, VOICE_CONFIDENCE_THRESHOLD=0.5)):
+                listener = VoiceListener(PHRASES)
+                listener.start()
+                listener.stop()
 
         rules, settings = built.call_args.args[:2]
         self.assertEqual((settings.model_name, settings.device_name, settings.sample_rate),
                          ("a-model", "desk", 8000))
         self.assertEqual(rules.confidence_threshold, 0.5)
         self.assertEqual(rules.phrases, frozenset(PHRASES))
-
 
 if __name__ == "__main__":
     unittest.main()
