@@ -637,7 +637,7 @@ class TestToolbarAppWiring:
     def test_the_quit_button_asks_first_and_a_yes_quits(self, app):
         patcher, mock_alert = self._quit_confirmation(QMessageBox.StandardButton.Yes)
         try:
-            with patch.object(app, "_shutdown") as mock_quit:
+            with patch.object(app._app, "quit") as mock_quit:
                 app._window.quit_action.trigger()
         finally:
             patcher.stop()
@@ -647,7 +647,7 @@ class TestToolbarAppWiring:
     def test_a_no_to_the_quit_confirmation_changes_nothing(self, app):
         patcher, _ = self._quit_confirmation(QMessageBox.StandardButton.No)
         try:
-            with patch.object(app, "_shutdown") as mock_quit:
+            with patch.object(app._app, "quit") as mock_quit:
                 app._window.quit_action.trigger()
         finally:
             patcher.stop()

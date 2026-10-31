@@ -160,9 +160,9 @@ class TestTheAppKeepsTheWatch:
     def test_quitting_from_the_tray_stands_evolver_down(self, request):
         app = build_evolver_app(request)
 
-        with patch("gui.app.peer_watch.stand_evolver_down") as stand_down, \
-             patch.object(app, "_shutdown"):
-            app._quit_by_request()
+        with patch("gui.peer_watch.stand_evolver_down") as stand_down, \
+             patch.object(app._app, "quit"):
+            app._tray.quit_action.trigger()
 
         stand_down.assert_called_once()
 
