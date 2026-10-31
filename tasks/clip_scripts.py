@@ -63,7 +63,7 @@ def run() -> ClipScriptsResult:
         # One action is a position the device holds, not a motion: a script of
         # it would drive nothing, and having one stops anybody scripting the
         # clip properly later.
-        if len(trimmed["actions"]) < 2:
+        if len(trimmed["actions"]) <= 1:
             result.no_motion_in_window += 1
             log.info("NO MOTION for clip window, leaving unscripted: %s", video)
             continue

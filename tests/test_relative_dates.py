@@ -37,8 +37,8 @@ class TestAsIsoDate(unittest.TestCase):
             assert relative_dates.as_iso_date("1mo ago") == "2026-02-28"
 
     def test_months_ago_across_a_december_boundary_clamps_too(self):
-        """December is the one month _days_in_month answers without arithmetic,
-        so it is the branch a rewrite would most easily get wrong."""
+        """Counting back from January lands in the December before, on its
+        last day."""
         with patch("util.relative_dates.today", return_value=datetime.date(2026, 1, 31)):
             assert relative_dates.as_iso_date("1mo ago") == "2025-12-31"
 
