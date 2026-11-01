@@ -60,9 +60,8 @@ class TestCommandLine:
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
         try:
-            cmdline = processes.command_line(proc.pid)
-            assert cmdline is not None
-            assert "time.sleep(60)" in cmdline
+            assert _wait_until(
+                lambda: "time.sleep(60)" in (processes.command_line(proc.pid) or ""))
         finally:
             proc.kill()
             proc.wait(timeout=10)
