@@ -213,7 +213,6 @@
     "tests/test_json_reads.py": 3,
     "tests/test_lanes.py": 5,
     "tests/test_launch_smoke.py": 50,
-    "tests/test_launcher_contract.py": 9,
     "tests/test_layering.py": 22,
     "tests/test_main_window_controls.py": 68,
     "tests/test_media_files.py": 18,
