@@ -101,7 +101,7 @@ def run(
         log.info("Removed %d stale partial output file(s) from %s", removed_partial_outputs, outbox_dir)
 
     env = topaz.environment()
-    candidates = collect_candidates(
+    candidates = collect_queued_videos(
         priority_files=priority_files,
         sorted_dir=sorted_dir, outbox_dir=outbox_dir, trash_dir=trash_dir,
     )
@@ -199,10 +199,10 @@ def run(
 
 
 def has_pending_work(priority_files: list[Path] | None = None) -> bool:
-    return bool(collect_candidates(priority_files=priority_files, limit=1))
+    return bool(collect_queued_videos(priority_files=priority_files, limit=1))
 
 
-def collect_candidates(
+def collect_queued_videos(
     priority_files: list[Path] | None = None,
     limit: int | None = None,
     *,

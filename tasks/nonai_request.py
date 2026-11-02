@@ -91,10 +91,10 @@ def start_requested(request: nonai_job.Request, files: StageFiles,
         log.info("Holding back the non-AI upscale asked for: %s.", busy)
         nonai_job.save_request(files.request, nonai_job.Request(request.video, held_back=busy))
         return StartAttempt(deferred="" if low_disk else busy, deferred_low_disk=low_disk)
-    candidate = next((candidate for candidate in files.candidates()
-                      if relpath(candidate.path) == request.video), None)
+    queued_video = next((queued_video for queued_video in files.queued_videos()
+                      if relpath(queued_video.path) == request.video), None)
     nonai_job.clear_request(files.request)
-    if candidate is None or not nonai_encode.start(candidate, files, on_request=True):
+    if queued_video is None or not nonai_encode.start(queued_video, files, on_request=True):
         return StartAttempt()
     return StartAttempt(started=request.video)
 

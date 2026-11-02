@@ -51,7 +51,7 @@ class StageFiles:
             request=request or config.NONAI_REQUEST_FILE,
         )
 
-    def candidates(self) -> list[nonai_queue.Candidate]:
+    def queued_videos(self) -> list[nonai_queue.QueuedVideo]:
         """The queue as it stands: every unprocessed video, most wanted first."""
-        return nonai_queue.collect_candidates(
+        return nonai_queue.collect_queued_videos(
             skip_list=self.skip_list, pin_list=self.pin_list, watch_stats_file=self.watch_stats)

@@ -29,8 +29,8 @@ def test_the_candidates_are_collected_from_its_three_lists():
         skip_list=Path("skip"), pin_list=Path("pin"), watch_stats=Path("watch"),
         request=Path("request"))
 
-    with patch("tasks.nonai_queue.collect_candidates", return_value=["a"]) as collect:
-        assert files.candidates() == ["a"]
+    with patch("tasks.nonai_queue.collect_queued_videos", return_value=["a"]) as collect:
+        assert files.queued_videos() == ["a"]
 
     collect.assert_called_once_with(skip_list=Path("skip"), pin_list=Path("pin"),
                                     watch_stats_file=Path("watch"))
