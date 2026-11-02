@@ -61,7 +61,7 @@ AI_UPSCALE_T2V = Settings(
                  "keeping the soundtrack (t2v provider)"),
     keep_audio=True,
 )
-# What the non-AI clips processed by hand in the Topaz GUI carry in their videoai
+# What the non-AI videos processed by hand in the Topaz GUI carry in their videoai
 # tags: apo-8 60 fps interpolation, then an iris-2 upscale in auto mode with
 # recover-original-detail at 100 (blend=1), aimed at a 4K frame, keeping the
 # soundtrack. vram=0.5 and instances=0 where the AI settings have 1 and 1: an

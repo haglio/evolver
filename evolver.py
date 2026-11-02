@@ -331,7 +331,7 @@ def _run_stages(
             upscale_skipped = True
             _skip_stage("upscale", "topaz_busy")
         else:
-            with nonai_upscale.frozen_for_ai_clips():
+            with nonai_upscale.frozen_for_ai_videos():
                 if _should_skip_upscale_due_to_cpu(log):
                     log.info("Skipping upscale because CPU usage is above the configured threshold.")
                     upscale_skipped = True

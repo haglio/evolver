@@ -36,7 +36,7 @@ class TestAskingForOneNow(unittest.TestCase):
 
     def test_it_stops_the_encode_in_flight_and_queues_that_video_next(self):
         """Stopping here rather than on the next run is what lets that run
-        upscale its AI clips first: they wait on any live Topaz process."""
+        upscale its AI videos first: they wait on any live Topaz process."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _busy, tmp, _out = write_job(root, overrides)

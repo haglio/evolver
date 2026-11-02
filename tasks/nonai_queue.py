@@ -1,4 +1,4 @@
-"""Which non-AI clip the upscale stage encodes next, and in what order.
+"""Which non-AI video the upscale stage encodes next, and in what order.
 
 Queued videos come from the buckets' triage folders (``0 unsorted``, ``1 could
 use work``), most-wanted first: a pin in the pin list beats everything and

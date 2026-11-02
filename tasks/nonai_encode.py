@@ -330,7 +330,7 @@ def computer_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
 
     A video *asked_for* from the queue window is wanted now, so the user being
     at the computer and the cooldown do not hold it back; the rest still do, and
-    so do new AI clips still *ai_waiting*, since none of them can run beside it.
+    so do new AI videos still *ai_waiting*, since none of them can run beside it.
     """
     if not asked_for and user_present(settings):
         return "user_present"

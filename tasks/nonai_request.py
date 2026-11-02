@@ -30,7 +30,7 @@ def request_now(video: str) -> None:
     """Ask for *video* to be upscaled right away, and clear the way for it.
 
     An encode of another video is stopped here rather than on the next run, so
-    the AI clips that run upscales first are not held back by a Topaz process
+    the AI videos that run upscales first are not held back by a Topaz process
     this request is about to end anyway. The encode itself starts on that run,
     the one place a Topaz process is ever launched.
     """

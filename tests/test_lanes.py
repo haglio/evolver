@@ -7,7 +7,7 @@ from tests.temp_helpers import LaneLibrary, override_config, touch_video, worksp
 from util import lanes
 
 
-class TestAiClips(unittest.TestCase):
+class TestAiVideos(unittest.TestCase):
     def test_each_sorted_clip_knows_its_source_orientation_and_upscale(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
@@ -15,7 +15,7 @@ class TestAiClips(unittest.TestCase):
                 video = touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_a.mp4")
                 touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_b.partial.mp4")
 
-                clips = list(lanes.ai_clips())
+                clips = list(lanes.ai_videos())
                 upscales = [clip.upscale for clip in clips]
 
         assert [(c.video, c.source, c.orientation) for c in clips] == [(video, "provider2", "portrait")]
@@ -24,7 +24,7 @@ class TestAiClips(unittest.TestCase):
     def test_no_sorted_folder_means_no_clips(self):
         with workspace_temp_dir() as root:
             with LaneLibrary(root).config():
-                assert list(lanes.ai_clips()) == []
+                assert list(lanes.ai_videos()) == []
 
 
 class TestGenauFlicks(unittest.TestCase):

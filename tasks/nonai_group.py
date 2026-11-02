@@ -1,4 +1,4 @@
-"""Stage: record each non-AI clip's version family in a metadata sidecar.
+"""Stage: record each non-AI video's version family in a metadata sidecar.
 
 Real-footage clips carry no generation metadata, but Fun Time's Main Funestra
 still wants to fold an original together with its Topaz-enhanced variants into
@@ -51,7 +51,7 @@ class NonAiGroupResult:
 
 
 def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupResult:
-    """Group every non-AI clip and record its family in a mirrored sidecar."""
+    """Group every non-AI video and record its family in a mirrored sidecar."""
     log.info("=== Stage: group non-AI versions ===")
     result = NonAiGroupResult()
     measure = _Allowance(fingerprint, MEASURED_PER_RUN)

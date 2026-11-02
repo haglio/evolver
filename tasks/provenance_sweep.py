@@ -110,7 +110,7 @@ def _what_each_video_went_through(
 ) -> Iterator[tuple[Path, dict[str, StampFor]]]:
     """Every library video that shows an act, with where its record is and a
     stamp for each act it shows."""
-    for clip in lanes.ai_clips():
+    for clip in lanes.ai_videos():
         acts: dict[str, StampFor] = {}
         if clip.source == lanes.ORIGENERATOR_SOURCE:
             acts[provenance.GENERATION] = lambda clip=clip: gallery.generation_of(clip.video)
