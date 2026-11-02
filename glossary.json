@@ -1,0 +1,295 @@
+{
+  "app": "Evolver",
+  "drafted": "2026-11-02",
+  "columns": {
+    "thing": "where it is on the screen and what it looks like",
+    "screen": "the words on the screen that name it (a label, a button, a tooltip), quoted; null when no label names it",
+    "his_word": "the word the user says for it, from his own messages and the spoken commands, with the date he said it; null when he has none yet",
+    "code_today": "the words the code says for it now; each has to be in the code, or the row is stale",
+    "code_word": "the one word the code is to say for it; null while unruled",
+    "status": "ruled: his word, given where `ruled` says | his_word: a word he has used, not yet the code's everywhere | agreed: screen, user and code already say one word | unruled: no word of his yet, the row waits for him | kept: a name from outside this app, or a thing he has no word for, so the code keeps its own",
+    "retired": "code words for it that are gone and stay gone; `keep` lists the tokens that may still carry the letters (another thing's name, or something stored on disk)"
+  },
+  "things": [
+    {
+      "id": "upscale_queue",
+      "thing": "the window listing the videos waiting for a non-AI upscale, the next one on top",
+      "screen": [
+        "Upscale Queue..."
+      ],
+      "his_word": "Upscale Queue (2026-10-09)",
+      "code_today": [
+        "upscale queue",
+        "queue"
+      ],
+      "code_word": "upscale queue",
+      "status": "ruled",
+      "ruled": "the window's own name; his word of 2026-10-09",
+      "retired": [
+        "lineup"
+      ]
+    },
+    {
+      "id": "queued_video",
+      "thing": "one row of the Upscale Queue",
+      "screen": [
+        "Video"
+      ],
+      "his_word": "video",
+      "code_today": [
+        "queued video",
+        "video"
+      ],
+      "code_word": "video",
+      "status": "agreed"
+    },
+    {
+      "id": "computer",
+      "thing": "the computer Evolver runs on, in 'Paused while you're at the computer'",
+      "screen": [
+        "Paused while you're at the computer",
+        "Next, once you're away from the computer"
+      ],
+      "his_word": "at the computer (2026-09-16)",
+      "code_today": [
+        "computer"
+      ],
+      "code_word": "computer",
+      "status": "ruled",
+      "ruled": "his word of 2026-09-16; two screens said machine and computer until 2026-11-02",
+      "retired": [
+        "machine"
+      ]
+    },
+    {
+      "id": "trash",
+      "thing": "where a video goes when it is sent away, to wait in Review Trash for Restore or Delete Permanently",
+      "screen": [
+        "Review Trash...",
+        "Trash"
+      ],
+      "his_word": "Trash (2026-11-02: 'we're getting rid of \"weird\" references across Haglio in favor of \"trash\"')",
+      "code_today": [
+        "trash",
+        "trash folders",
+        "trash dirs"
+      ],
+      "code_word": "trash",
+      "status": "ruled",
+      "ruled": "2026-11-01 and 2026-11-02, his words; the folders on disk keep their names",
+      "retired": [
+        "weird",
+        "pile"
+      ],
+      "keep": [
+        "kinda_weird",
+        "weird_pile_in",
+        "/ \"weird\"",
+        "pile up"
+      ]
+    },
+    {
+      "id": "backfill_button",
+      "thing": "in Backfill Metadata, a square with a picture and an action's name under it",
+      "screen": null,
+      "his_word": "buttons (2026-11-02: 'why not just call those \"buttons\" instead')",
+      "code_today": [
+        "button"
+      ],
+      "code_word": "button",
+      "status": "ruled",
+      "ruled": "2026-11-02, his words; tile is Origenerator's gallery's",
+      "retired": [
+        "tile",
+        "command panel"
+      ],
+      "keep": [
+        "tiles, the name"
+      ]
+    },
+    {
+      "id": "band",
+      "thing": "one colored layer of the Run Statistics chart, one per stage",
+      "screen": null,
+      "his_word": "band (2026-11-02: '\"band\" is fine')",
+      "code_today": [
+        "band"
+      ],
+      "code_word": "band",
+      "status": "ruled",
+      "ruled": "2026-11-02, his words"
+    },
+    {
+      "id": "video",
+      "thing": "a video in the library, an AI one included; what Backfill Metadata labels",
+      "screen": [
+        "Every video already has an action.",
+        "the newly downloaded AI videos"
+      ],
+      "his_word": "video",
+      "code_today": [
+        "video",
+        "ai video"
+      ],
+      "code_word": "video",
+      "status": "ruled",
+      "ruled": "2026-11-02, Fun Time's glossary: a Satellite's buttons say video",
+      "retired": [
+        "ai clip"
+      ],
+      "keep": [
+        "ai_clips_waiting"
+      ]
+    },
+    {
+      "id": "clip",
+      "thing": "a short piece cut from a full scene",
+      "screen": [
+        "Clip Scripts",
+        "Cut each carved clip's funscript out of its source scene's"
+      ],
+      "his_word": "clip (2026-11-02: clip stays for short vs full)",
+      "code_today": [
+        "clip"
+      ],
+      "code_word": "clip",
+      "status": "ruled",
+      "ruled": "2026-11-02, Fun Time's glossary"
+    },
+    {
+      "id": "version",
+      "thing": "another version of one video, such as its upscale",
+      "screen": [
+        "version family",
+        "copied to a version"
+      ],
+      "his_word": "versions (2026-10-29, the Funestras' button)",
+      "code_today": [
+        "version",
+        "versions"
+      ],
+      "code_word": "version",
+      "status": "ruled",
+      "ruled": "the Funestras' button; five fields a run stores on disk keep their names",
+      "retired": [
+        "variant"
+      ],
+      "keep": [
+        "copied_variants",
+        "rehomed_to_variants",
+        "variant_copy_errors",
+        "variant_copy_error_paths",
+        "ambiguous_variant_groups"
+      ]
+    },
+    {
+      "id": "taken_back",
+      "thing": "the stage that deletes every copy of a video Origenerator took back",
+      "screen": [
+        "Taken Back"
+      ],
+      "his_word": null,
+      "code_today": [
+        "taken back"
+      ],
+      "code_word": "taken back",
+      "status": "agreed"
+    },
+    {
+      "id": "video_kind",
+      "thing": "what kind a library video is, recorded by the Video Kinds stage",
+      "screen": [
+        "Video Kinds"
+      ],
+      "his_word": null,
+      "code_today": [
+        "video kind",
+        "video kinds"
+      ],
+      "code_word": "video kind",
+      "status": "agreed"
+    },
+    {
+      "id": "action",
+      "thing": "what a video shows, the name on a Backfill Metadata button",
+      "screen": [
+        "Every video already has an action."
+      ],
+      "his_word": "Action (2026-10-21)",
+      "code_today": [
+        "action",
+        "act"
+      ],
+      "code_word": "action",
+      "status": "his_word"
+    },
+    {
+      "id": "icon",
+      "thing": "the picture on a button of the main window or the tray menu",
+      "screen": null,
+      "his_word": "icon (2026-10-09, 2026-10-16)",
+      "code_today": [
+        "icon"
+      ],
+      "code_word": "icon",
+      "status": "ruled",
+      "ruled": "2026-10-16, his word",
+      "retired": [
+        "glyph"
+      ]
+    },
+    {
+      "id": "stage",
+      "thing": "one step of a run, a row of the run's table",
+      "screen": [
+        "Stage"
+      ],
+      "his_word": null,
+      "code_today": [
+        "stage"
+      ],
+      "code_word": "stage",
+      "status": "agreed"
+    },
+    {
+      "id": "tray",
+      "thing": "Evolver's icon in the Windows tray and its menu",
+      "screen": null,
+      "his_word": "tray",
+      "code_today": [
+        "tray"
+      ],
+      "code_word": "tray",
+      "status": "kept"
+    },
+    {
+      "id": "other_words",
+      "thing": "words the code uses for things no screen shows or names, each its own meaning",
+      "screen": null,
+      "his_word": null,
+      "code_today": [
+        "banner",
+        "card",
+        "cell",
+        "console",
+        "map",
+        "notice",
+        "pane",
+        "panel",
+        "pill",
+        "sheet",
+        "slot",
+        "strip",
+        "toast",
+        "toolbar",
+        "bookmark",
+        "swatch",
+        "gutter",
+        "bank",
+        "halo"
+      ],
+      "code_word": null,
+      "status": "kept"
+    }
+  ]
+}
