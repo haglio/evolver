@@ -187,7 +187,7 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
     result.collisions = len(result.collision_paths)
     result.variant_copy_errors = len(result.variant_copy_error_paths)
     log.info(
-        "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Version copies: %d, Ambiguous version groups: %d, Variant copy errors: %d, Rehomed to variants: %d, Followed to archive: %d, Discarded duplicates: %d",
+        "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Version copies: %d, Ambiguous version groups: %d, Version copy errors: %d, Rehomed to versions: %d, Followed to archive: %d, Discarded duplicates: %d",
         result.moved,
         result.already_aligned,
         result.unmatched,

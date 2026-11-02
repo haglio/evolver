@@ -139,7 +139,7 @@ def _copy_groups(lane: lanes.SentLane,
 
 def _reachable_copies(lane: lanes.SentLane, stems: set[str]) -> list[Path]:
     """Every copy a viewer could still reach: the upscale, the delivered loop,
-    and either pile a condemned one is waiting in."""
+    and either trash folder a condemned one is waiting in."""
     return _matches(_reachable_roots(lane), stems)
 
 
@@ -163,7 +163,7 @@ def _outbox_dirs(lane: lanes.SentLane) -> list[Path]:
 def _matches(roots, stems: set[str]) -> list[Path]:
     """Every video under *roots* whose original name is one of *stems*.
 
-    The piles and the delivered folder are flat and hold whatever was put in
+    The trash folders and the delivered folder are flat and hold whatever was put in
     them, so there the stem is all there is to go on -- and it is enough, being
     the name Origenerator gave the file.
     """

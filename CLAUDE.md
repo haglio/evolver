@@ -55,6 +55,16 @@ commit.
 fingerprint is added to `SHIPPED`. Never edit a fingerprint already there:
 files on disk already name that version.
 
+## One word per thing
+
+`glossary.json` lists the things on this app's screens and their words, and
+`tests/test_glossary.py` holds the code to it. A noun for something drawn is a row
+there before it is a word in the code, so a new name is a row he rules on. A rename
+moves the old word from the row's `code_today` to its `retired`, which the test holds
+at zero. What is stored on disk keeps its name (the folders `kinda_weird` and
+`genau/weird`, a stage's key in the run history, a field on a sidecar) unless every
+reader changes with it.
+
 ## Test fixtures must be fabricated, never copied from the real library
 
 Every fixture value that stands in for library data — a video title, a filename,
