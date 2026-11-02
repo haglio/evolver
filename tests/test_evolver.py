@@ -57,7 +57,7 @@ def _stage_mocks() -> dict:
         "has_pending_work": Mock(return_value=False),
         "should_skip_cpu": Mock(return_value=False),
         "foreign_topaz_running": Mock(return_value=False),
-        "frozen_for_ai_clips": Mock(side_effect=nullcontext),
+        "frozen_for_ai_videos": Mock(side_effect=nullcontext),
         "topaz_sign_in_expired": Mock(return_value=False),
     }
 
@@ -85,7 +85,7 @@ _STAGE_PATCHES = [
     ("evolver.upscale.has_pending_work", "has_pending_work"),
     ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
     ("evolver.nonai_upscale.foreign_topaz_running", "foreign_topaz_running"),
-    ("evolver.nonai_upscale.frozen_for_ai_clips", "frozen_for_ai_clips"),
+    ("evolver.nonai_upscale.frozen_for_ai_videos", "frozen_for_ai_videos"),
     ("util.topaz.sign_in_expired", "topaz_sign_in_expired"),
     ("evolver.prompt_scrape.run", "prompt_scrape_run"),
 ]
@@ -207,7 +207,7 @@ class TestEvolverMain:
         )
         assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_not_called()
-        mocks["frozen_for_ai_clips"].assert_not_called()
+        mocks["frozen_for_ai_videos"].assert_not_called()
         mocks["correspondence_run"].assert_not_called()
 
     def test_ai_upscale_waits_while_origenerator_trains_a_fix_on_the_graphics_card(self):
@@ -220,7 +220,7 @@ class TestEvolverMain:
         assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_not_called()
 
-    def test_ai_clips_upscale_with_the_library_encode_frozen_around_every_topaz_step(self):
+    def test_ai_videos_upscale_with_the_library_encode_frozen_around_every_topaz_step(self):
         steps = []
 
         @contextmanager
@@ -232,7 +232,7 @@ class TestEvolverMain:
         self._run_pipeline(
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
-            frozen_for_ai_clips=Mock(side_effect=frozen),
+            frozen_for_ai_videos=Mock(side_effect=frozen),
             should_skip_cpu=Mock(side_effect=lambda log: steps.append("cpu sampled") and False),
             topaz_sign_in_expired=Mock(side_effect=lambda: steps.append("sign-in asked") and False),
             upscale_run=Mock(side_effect=lambda **kwargs: steps.append("upscaled") or Mock(
@@ -485,7 +485,7 @@ class TestRunPipeline:
             allow_start=False, stop=False, presence_managed=True,
             take_requests=True, ai_waiting=True)
 
-    def test_ai_clips_held_back_by_a_topaz_encode_evolver_did_not_start_are_still_waiting(self):
+    def test_ai_videos_held_back_by_a_topaz_encode_evolver_did_not_start_are_still_waiting(self):
         stack, mocks = self._patch_all_stages(
             has_pending_work=Mock(return_value=True),
             foreign_topaz_running=Mock(return_value=True),

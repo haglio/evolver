@@ -241,7 +241,7 @@ def foreign_topaz_running(*, job_file: Path | None = None) -> bool:
 
 
 @contextmanager
-def frozen_for_ai_clips(*, job_file: Path | None = None) -> Iterator[None]:
+def frozen_for_ai_videos(*, job_file: Path | None = None) -> Iterator[None]:
     job_file = StageFiles.configured(job=job_file).job
     with stage_lock:
         job = nonai_job.load_job(job_file)

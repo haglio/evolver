@@ -187,7 +187,7 @@ def _orientation_measured(video: Path, orientation_probe) -> str:
 
 def _library_videos():
     yield from _genau_flicks()
-    yield from _ai_clips()
+    yield from _ai_videos()
     yield from _non_ai_videos()
     yield from _vr_videos()
 
@@ -198,11 +198,11 @@ def _genau_flicks():
         yield _Listed(video, path, sidecar.read(path), genau=True)
 
 
-def _ai_clips():
+def _ai_videos():
     """Read off ``1_sorted``, which holds the whole AI library while the outbox
     holds only what has been upscaled so far; the sidecar sits at the upscale's
     mirrored path either way."""
-    for clip in lanes.ai_clips():
+    for clip in lanes.ai_videos():
         path = sidecar.sidecar_path(clip.upscale)
         filed_under = clip.orientation if clip.orientation in orientation.SORTED else ""
         yield _Listed(clip.video, path, sidecar.read(path),

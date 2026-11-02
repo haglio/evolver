@@ -279,7 +279,7 @@ def _name_sample(names: list[str]) -> str:
 
 
 def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
-    """Say which non-AI clip is in hand and what just happened to it.
+    """Say which non-AI video is in hand and what just happened to it.
 
     This stage reports its outcomes as clip names — strings the generic numeric
     dump drops entirely, leaving a bare "suspended=True" and no way to tell

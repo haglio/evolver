@@ -1,4 +1,4 @@
-"""Which non-AI clip is next, and why it beat the others.
+"""Which non-AI video is next, and why it beat the others.
 
 These moved out of tests/test_nonai_upscale.py with the queue itself. They no
 longer construct the stage to ask it: the three files a queue is built from are

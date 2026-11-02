@@ -356,9 +356,9 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
             mocks["popen"].assert_not_called()
             assert request_of(overrides) is None
 
-    def test_new_ai_clips_still_waiting_go_first(self):
-        """An AI clip takes a minute and an asked-for encode takes hours, and
-        once it runs no AI clip can until it ends."""
+    def test_new_ai_videos_still_waiting_go_first(self):
+        """An AI video takes a minute and an asked-for encode takes hours, and
+        once it runs no AI video can until it ends."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
@@ -830,7 +830,7 @@ class TestThrottleToPresence(unittest.TestCase):
             mocks["suspend"].assert_not_called()
 
 
-class TestMakingWayForAiClips(unittest.TestCase):
+class TestMakingWayForAiVideos(unittest.TestCase):
     def test_a_running_encode_is_frozen_while_the_clips_upscale_and_thawed_after(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -838,7 +838,7 @@ class TestMakingWayForAiClips(unittest.TestCase):
 
             stack, mocks = probes(is_running=True)
             with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_clips():
+                with nonai_upscale.frozen_for_ai_videos():
                     frozen_during = [call.args for call in mocks["suspend"].call_args_list]
                     thawed_during = mocks["resume"].called
 
@@ -853,7 +853,7 @@ class TestMakingWayForAiClips(unittest.TestCase):
 
             stack, mocks = probes(is_running=True)
             with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_clips():
+                with nonai_upscale.frozen_for_ai_videos():
                     pass
 
             mocks["resume"].assert_not_called()
@@ -866,7 +866,7 @@ class TestMakingWayForAiClips(unittest.TestCase):
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_clips():
+                with nonai_upscale.frozen_for_ai_videos():
                     pass
 
             mocks["suspend"].assert_not_called()
@@ -880,7 +880,7 @@ class TestMakingWayForAiClips(unittest.TestCase):
 
             stack, mocks = probes(is_running=False)
             with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_clips():
+                with nonai_upscale.frozen_for_ai_videos():
                     pass
 
             mocks["suspend"].assert_not_called()
@@ -897,7 +897,7 @@ class TestMakingWayForAiClips(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, idle_seconds=10_000.0)
             with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_clips():
+                with nonai_upscale.frozen_for_ai_videos():
                     poll.start()
                     poll.join(timeout=10)
                     thawed_during = mocks["resume"].called
@@ -923,7 +923,7 @@ class TestMakingWayForAiClips(unittest.TestCase):
             with override_config(**overrides), stack:
                 assert nonai_upscale.foreign_topaz_running()
 
-    def test_the_log_gives_the_ai_clips_as_the_reason_for_the_pause(self):
+    def test_the_log_gives_the_ai_videos_as_the_reason_for_the_pause(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             write_job(root, overrides)
@@ -931,7 +931,7 @@ class TestMakingWayForAiClips(unittest.TestCase):
             stack, _ = probes(is_running=True)
             with override_config(**overrides), stack, \
                     self.assertLogs("tasks.nonai_encode", level="INFO") as logged:
-                with nonai_upscale.frozen_for_ai_clips():
+                with nonai_upscale.frozen_for_ai_videos():
                     pass
 
             said = "\n".join(logged.output)

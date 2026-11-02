@@ -64,7 +64,7 @@ def sent_by_origenerator(source: str) -> bool:
 
 
 @dataclass(frozen=True)
-class AiClip:
+class AiVideo:
     video: Path
     source: str
     orientation: str
@@ -74,13 +74,13 @@ class AiClip:
         return upscaled_video_path(self.source, self.orientation, self.video.stem)
 
 
-def ai_clips() -> Iterator[AiClip]:
+def ai_videos() -> Iterator[AiVideo]:
     if not config.SORTED_DIR.is_dir():
         return
     for source_dir in sorted(p for p in config.SORTED_DIR.iterdir() if p.is_dir()):
         for orient_dir in sorted(p for p in source_dir.iterdir() if p.is_dir()):
             for video in sorted(library_videos(orient_dir)):
-                yield AiClip(video, source_dir.name, orient_dir.name)
+                yield AiVideo(video, source_dir.name, orient_dir.name)
 
 
 def upscale_filed_for(video: Path) -> Path | None:
@@ -89,7 +89,7 @@ def upscale_filed_for(video: Path) -> Path | None:
         source, orientation, *inside = video.relative_to(config.SORTED_DIR).parts
     except ValueError:
         return None
-    return AiClip(video, source, orientation).upscale if inside else None
+    return AiVideo(video, source, orientation).upscale if inside else None
 
 
 def genau_flicks_dir() -> Path | None:
