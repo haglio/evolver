@@ -25,7 +25,7 @@ from PyQt6.QtCore import QEvent
 from PyQt6.QtWidgets import QApplication
 
 from gui.app import EvolverApp
-from util.upscale_lineup import Lineup
+from util.upscale_queue import UpscaleQueue
 
 # Built at import, not in a fixture: the GUI modules construct widgets at class
 # scope and a QApplication has to exist before the first of them is imported.
@@ -33,7 +33,7 @@ from util.upscale_lineup import Lineup
 # test module.
 QAPP = QApplication.instance() or QApplication([])
 
-EMPTY_QUEUE = Lineup(rows=(), head=None)
+EMPTY_QUEUE = UpscaleQueue(rows=(), head=None)
 
 
 class DoneAtOnce:

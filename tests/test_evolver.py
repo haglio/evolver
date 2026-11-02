@@ -782,9 +782,9 @@ class TestTheWindowsDoorToTheQueue:
     (tests/test_layering.py), so the queue window's verbs live here."""
 
     def test_the_lineup_is_the_queues_own(self):
-        with patch("tasks.nonai_lineup.current") as lineup:
-            assert evolver.upscale_lineup() is lineup.return_value
-        lineup.assert_called_once_with()
+        with patch("tasks.nonai_upscale_queue.current") as queue:
+            assert evolver.upscale_queue() is queue.return_value
+        queue.assert_called_once_with()
 
     def test_rearranging_pins_the_videos_in_the_configured_pin_list(self):
         with patch("tasks.nonai_queue.pin_ahead") as pin_ahead, \

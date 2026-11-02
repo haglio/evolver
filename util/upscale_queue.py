@@ -1,6 +1,6 @@
 """What the upscale queue window is handed: one list, and what its first row is doing.
 
-The shape only. :mod:`tasks.nonai_lineup` fills it in from the library and the
+The shape only. :mod:`tasks.nonai_queue` fills it in from the library and the
 stage's own records, and ``gui/queue_window.py`` draws it -- which is why the
 shape lives here rather than beside either: the window layer reaches the stages
 through ``evolver`` alone (tests/test_layering.py), and a vocabulary both ends
@@ -61,7 +61,7 @@ class Head:
 
 
 @dataclass(frozen=True)
-class Lineup:
+class UpscaleQueue:
     rows: tuple[Entry, ...]
     #: None only when there are no rows.
     head: Head | None

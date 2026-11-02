@@ -4,7 +4,7 @@ The stage's own view of the same queue is a count and a name in a log line.
 This is the rest of it — every video in the order the stage would take them,
 called what the library calls them, with whatever the machine is on (or was
 asked to start) lifted to the first row and what is happening to it said in a
-word (:mod:`util.upscale_lineup`).
+word (:mod:`util.upscale_queue`).
 
 Read on the GUI thread, without the lock the stage takes: every file it reads
 is written whole, so the worst a badly timed read sees is the state a moment
@@ -20,7 +20,7 @@ from tasks.nonai_files import StageFiles
 from tasks.nonai_queue import collect_candidates, listed_videos, relpath
 from tasks.nonai_titles import TITLE_FIELD
 from util import nonai_job, processes, sidecar, video_type
-from util.upscale_lineup import (
+from util.upscale_queue import (
     ASKED_FOR,
     FINISHING,
     NEXT,
@@ -29,11 +29,11 @@ from util.upscale_lineup import (
     UPSCALING,
     Entry,
     Head,
-    Lineup,
+    UpscaleQueue,
 )
 
 
-def current() -> Lineup:
+def current() -> UpscaleQueue:
     files = StageFiles.configured()
     pinned = set(listed_videos(files.pin_list))
     entries = [_entry(candidate.path, pinned) for candidate in collect_candidates(
@@ -41,9 +41,9 @@ def current() -> Lineup:
         watch_stats_file=files.watch_stats)]
     first, head = _first(files, entries, pinned)
     if first is None:
-        return Lineup(rows=tuple(entries), head=Head(NEXT) if entries else None)
+        return UpscaleQueue(rows=tuple(entries), head=Head(NEXT) if entries else None)
     rest = tuple(entry for entry in entries if entry.video != first.video)
-    return Lineup(rows=(first, *rest), head=head)
+    return UpscaleQueue(rows=(first, *rest), head=head)
 
 
 def _first(files: StageFiles, entries: list[Entry],
