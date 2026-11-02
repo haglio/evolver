@@ -345,7 +345,7 @@ class TestTheUpscaleQueueWindowsWiring:
     def _opened(self, request):
         with patch("gui.app.BackgroundQueue", DoneAtOnce):
             app = build_evolver_app(request)
-        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE):
+        with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE):
             app._tray.queue_action.trigger()
         return app
 
@@ -358,7 +358,7 @@ class TestTheUpscaleQueueWindowsWiring:
         app = self._opened(request)
 
         with patch("evolver.upscale_now"), \
-             patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE), \
+             patch("evolver.upscale_queue", return_value=EMPTY_QUEUE), \
              patch("gui.run_controller.PipelineWorker") as worker_cls:
             app._queue._window.current.now_requested.emit("lagoon/0 unsorted/a.mp4")
 
@@ -369,7 +369,7 @@ class TestTheUpscaleQueueWindowsWiring:
         app._settings.nonai_upscale_enabled = True
 
         with patch("evolver.withdraw_upscale_now"), \
-             patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE), \
+             patch("evolver.upscale_queue", return_value=EMPTY_QUEUE), \
              patch("evolver.throttle_nonai_to_presence") as parked:
             app._queue._window.current.now_withdrawn.emit()
 
@@ -380,11 +380,11 @@ class TestTheUpscaleQueueWindowsWiring:
         stale the moment one ends."""
         app = self._opened(request)
 
-        with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE) as lineup, \
+        with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE) as queue, \
              patch("gui.main_window.newest_runs", return_value=[]):
             app._runs.run_ended.emit()
 
-        lineup.assert_called_once_with()
+        queue.assert_called_once_with()
 
 
 class TestNonAiUpscaleToggle:
@@ -574,7 +574,7 @@ def _the_stats_window(app):
 
 
 def _the_queue_window(app):
-    with patch("evolver.upscale_lineup", return_value=EMPTY_QUEUE):
+    with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE):
         app._queue.show()
 
 

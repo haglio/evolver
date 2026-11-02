@@ -10,7 +10,7 @@ import unittest
 from contextlib import ExitStack, contextmanager
 from unittest.mock import patch
 
-from tasks import nonai_lineup
+from tasks import nonai_upscale_queue
 from tests.temp_helpers import (
     make_video,
     override_config,
@@ -19,7 +19,7 @@ from tests.temp_helpers import (
     write_sidecar,
 )
 from tests.temp_helpers import nonai_library_overrides as library_overrides
-from util import nonai_job, sidecar, upscale_lineup
+from util import nonai_job, sidecar, upscale_queue
 
 
 @contextmanager
@@ -36,8 +36,8 @@ def running_encode(*, alive=True, percent=50):
         yield
 
 
-def videos(lineup):
-    return [entry.video for entry in lineup.rows]
+def videos(queue):
+    return [entry.video for entry in queue.rows]
 
 
 class TestTheList(unittest.TestCase):
@@ -46,9 +46,9 @@ class TestTheList(unittest.TestCase):
             overrides = library_overrides(root)
 
             with override_config(**overrides):
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert lineup == upscale_lineup.Lineup(rows=(), head=None)
+            assert queue == upscale_queue.UpscaleQueue(rows=(), head=None)
 
     def test_the_rows_come_in_the_order_the_stage_would_take_them(self):
         with workspace_temp_dir() as root:
@@ -60,10 +60,10 @@ class TestTheList(unittest.TestCase):
                 "lagoon/0 unsorted/b.mp4\n", encoding="utf-8")
 
             with override_config(**overrides):
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert videos(lineup) == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"]
-            assert [entry.pinned for entry in lineup.rows] == [True, False]
+            assert videos(queue) == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"]
+            assert [entry.pinned for entry in queue.rows] == [True, False]
 
     def test_with_nothing_in_flight_row_one_is_simply_next(self):
         with workspace_temp_dir() as root:
@@ -71,10 +71,10 @@ class TestTheList(unittest.TestCase):
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
 
             with override_config(**overrides):
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert lineup.head == upscale_lineup.Head(upscale_lineup.NEXT)
-            assert not lineup.head.runs_now
+            assert queue.head == upscale_queue.Head(upscale_queue.NEXT)
+            assert not queue.head.runs_now
 
     def test_a_video_is_called_by_its_recorded_title_where_it_has_one(self):
         """The title the library records is what the other apps show; a video
@@ -89,9 +89,9 @@ class TestTheList(unittest.TestCase):
                               {"title": "Jane Doe - Alpha Study 3",
                                "video": {"duration_seconds": 754.0}})
 
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert [(entry.name, entry.seconds) for entry in lineup.rows] == [("Jane Doe - Alpha Study 3", 754.0), ("b", None)]
+            assert [(entry.name, entry.seconds) for entry in queue.rows] == [("Jane Doe - Alpha Study 3", 754.0), ("b", None)]
 
 
 class TestRowOne(unittest.TestCase):
@@ -104,11 +104,11 @@ class TestRowOne(unittest.TestCase):
             write_job(root, overrides)
 
             with override_config(**overrides), running_encode(percent=41):
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert videos(lineup) == ["lagoon/0 unsorted/busy.mp4", "lagoon/0 unsorted/a.mp4"]
-            assert lineup.head == upscale_lineup.Head(upscale_lineup.UPSCALING, percent=41)
-            assert not lineup.head.runs_now
+            assert videos(queue) == ["lagoon/0 unsorted/busy.mp4", "lagoon/0 unsorted/a.mp4"]
+            assert queue.head == upscale_queue.Head(upscale_queue.UPSCALING, percent=41)
+            assert not queue.head.runs_now
 
     def test_an_encode_frozen_by_your_presence_is_paused(self):
         with workspace_temp_dir() as root:
@@ -116,9 +116,9 @@ class TestRowOne(unittest.TestCase):
             write_job(root, overrides, suspended=True)
 
             with override_config(**overrides), running_encode():
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert lineup.head.state == upscale_lineup.PAUSED
+            assert queue.head.state == upscale_queue.PAUSED
 
     def test_an_encode_you_asked_for_runs_now(self):
         with workspace_temp_dir() as root:
@@ -126,10 +126,10 @@ class TestRowOne(unittest.TestCase):
             write_job(root, overrides, on_request=True)
 
             with override_config(**overrides), running_encode():
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert lineup.head.state == upscale_lineup.ASKED_FOR
-            assert lineup.head.runs_now
+            assert queue.head.state == upscale_queue.ASKED_FOR
+            assert queue.head.runs_now
 
     def test_an_encode_whose_process_has_ended_is_finishing(self):
         """Its output is promoted on the next run, which is when the video
@@ -139,10 +139,10 @@ class TestRowOne(unittest.TestCase):
             write_job(root, overrides)
 
             with override_config(**overrides), running_encode(alive=False):
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert lineup.head.state == upscale_lineup.FINISHING
-            assert not lineup.head.runs_now
+            assert queue.head.state == upscale_queue.FINISHING
+            assert not queue.head.runs_now
 
     def test_a_video_asked_for_that_has_not_started_is_row_one_and_runs_now(self):
         with workspace_temp_dir() as root:
@@ -154,11 +154,11 @@ class TestRowOne(unittest.TestCase):
                                                      held_back="low_ram"))
 
             with override_config(**overrides), running_encode():
-                lineup = nonai_lineup.current()
+                queue = nonai_upscale_queue.current()
 
-            assert videos(lineup) == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"]
-            assert lineup.head == upscale_lineup.Head(upscale_lineup.STARTING, held_back="low_ram")
-            assert lineup.head.runs_now
+            assert videos(queue) == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"]
+            assert queue.head == upscale_queue.Head(upscale_queue.STARTING, held_back="low_ram")
+            assert queue.head.runs_now
 
 
 if __name__ == "__main__":

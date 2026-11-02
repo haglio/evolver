@@ -32,11 +32,11 @@ from tasks import (
     clip_scripts,
     genau_deliver,
     nonai_group,
-    nonai_lineup,
     nonai_queue,
     nonai_request,
     nonai_titles,
     nonai_upscale,
+    nonai_upscale_queue,
     origenerator_downtime,
     prompt_scrape,
     provenance_sweep,
@@ -51,7 +51,7 @@ from tasks import (
     withdrawn,
 )
 from util import run_lock, run_log, system_resources, topaz
-from util import upscale_lineup as upscale_lineup_shape
+from util import upscale_queue as upscale_queue_shape
 
 
 @dataclass
@@ -191,7 +191,7 @@ def throttle_nonai_to_presence() -> str:
     return nonai_upscale.throttle_to_presence()
 
 
-def upscale_lineup() -> upscale_lineup_shape.Lineup:
+def upscale_queue() -> upscale_queue_shape.UpscaleQueue:
     """What the queue window shows: the video in flight, and what is next.
 
     The window layer's doors to the non-AI queue are here for the reason
@@ -199,7 +199,7 @@ def upscale_lineup() -> upscale_lineup_shape.Lineup:
     ``util <- tasks <- evolver <- gui``, so gui reaches the stages through this
     module and nothing else.
     """
-    return nonai_lineup.current()
+    return nonai_upscale_queue.current()
 
 
 def arrange_upscale_queue(videos: list[str]) -> None:

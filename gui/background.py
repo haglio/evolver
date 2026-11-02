@@ -1,6 +1,6 @@
 """Work a window asks for, done off the window's thread, in the order it was asked.
 
-The queue window's verbs and its lineup reach into the non-AI stage, which a
+The queue window's verbs and its queue reach into the non-AI stage, which a
 pipeline run may be holding for as long as it takes to start an encode or file
 a finished one. Waited for on the window's own thread, that hold is a window
 that stops answering the mouse.

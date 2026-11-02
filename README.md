@@ -56,8 +56,8 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `tasks/nonai_request.py` - the video asked for now from the queue window: asked for, put first, withdrawn, started
   - `tasks/nonai_progress.py` - how far through the non-AI upscale project the library is, by running time
   - `tasks/nonai_encode.py` - the detached encode itself: start, adopt, freeze, measure, kill
-  - `tasks/nonai_lineup.py` - that queue as the queue window shows it: one list, with the video in flight on top
-  - `util/upscale_lineup.py` - the shape that window is handed, and the five words for what the video in flight is doing
+  - `tasks/nonai_queue.py` - that queue as the queue window shows it: one list, with the video in flight on top
+  - `util/upscale_queue.py` - the shape that window is handed, and the five words for what the video in flight is doing
   - `util/nonai_job.py` - the four JSON files that encode keeps its state in
   - `util/nonai_retire.py` - moving a superseded original out of the library, record and all
   - `tasks/reference_sync.py` - repointing the suite's saved video paths at videos that moved

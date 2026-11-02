@@ -33,11 +33,11 @@ from shared_ui.colors import BLUE, TEXT_MUTED
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import MARGIN_STANDARD
 
-from util import upscale_lineup
+from util import upscale_queue
 from util.selection_highlight import SELECTION_HIGHLIGHT
 
 if TYPE_CHECKING:
-    from util.upscale_lineup import Head, Lineup
+    from util.upscale_queue import Head, UpscaleQueue
 
 # What a dragged row carries besides Qt's own payload: the video's path within
 # the library, so a drop knows what was dropped without reaching back into the
@@ -49,19 +49,19 @@ VIDEO_MIME = "application/x-evolver-video"
 # colors, and the same gray is what the run history marks its inert rows with.
 _MUTED = TEXT_MUTED.name()
 
-# How often an open window asks for the lineup again. The encode it is watching
+# How often an open window asks for the queue again. The encode it is watching
 # is parked and thawed by a poll of its own between the ten-minute runs, and its
 # percent climbs the whole time.
 REFRESH_SECONDS = 15.0
 
 # What each state of the first row reads as, in the window's own words.
 _STATE_WORDS = {
-    upscale_lineup.NEXT: "Next, once you're away from the computer",
-    upscale_lineup.UPSCALING: "Upscaling",
-    upscale_lineup.PAUSED: "Paused while you're at the computer",
-    upscale_lineup.ASKED_FOR: "Upscaling at your request",
-    upscale_lineup.STARTING: "Starting at your request",
-    upscale_lineup.FINISHING: "Done upscaling; Evolver's next run replaces the original with it",
+    upscale_queue.NEXT: "Next, once you're away from the computer",
+    upscale_queue.UPSCALING: "Upscaling",
+    upscale_queue.PAUSED: "Paused while you're at the computer",
+    upscale_queue.ASKED_FOR: "Upscaling at your request",
+    upscale_queue.STARTING: "Starting at your request",
+    upscale_queue.FINISHING: "Done upscaling; Evolver's next run replaces the original with it",
 }
 
 # Why a video asked for has not started yet. The stage's own words for these
@@ -192,7 +192,7 @@ class _QueueTree(QTreeWidget):
 
 
 class UpscaleQueueWindow(QDialog):
-    """The queue window: it shows a lineup, and says what the user did to it."""
+    """The queue window: it shows a queue, and says what the user did to it."""
 
     #: The videos now placed by hand, in the order they are to be taken.
     arranged = pyqtSignal(list)
@@ -202,7 +202,7 @@ class UpscaleQueueWindow(QDialog):
     now_requested = pyqtSignal(str)
     #: The video on the first row goes back to waiting until you are away.
     now_withdrawn = pyqtSignal()
-    #: Asking for the lineup again, while the window is open to show it.
+    #: Asking for the queue again, while the window is open to show it.
     refresh_wanted = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -236,24 +236,24 @@ class UpscaleQueueWindow(QDialog):
 
         self._pinned: set[str] = set()
         self._head: Head | None = None
-        self._held: Lineup | None = None
+        self._held: UpscaleQueue | None = None
 
         self._clock = QTimer(self)
         self._clock.setInterval(int(REFRESH_SECONDS * 1000))
         self._clock.timeout.connect(self.refresh_wanted)
 
-    def show_lineup(self, lineup: Lineup) -> None:
-        """Draw *lineup*, or hold it until the row in the air has landed."""
+    def show_queue(self, queue: UpscaleQueue) -> None:
+        """Draw *queue*, or hold it until the row in the air has landed."""
         if self._tree.is_dragging:
-            self._held = lineup
+            self._held = queue
             return
         self._held = None
-        self._head = lineup.head
-        self._heading.setText(_queue_heading(lineup.rows))
-        self._pinned = {entry.video for entry in lineup.rows if entry.pinned}
+        self._head = queue.head
+        self._heading.setText(_queue_heading(queue.rows))
+        self._pinned = {entry.video for entry in queue.rows if entry.pinned}
         scrolled = self._tree.verticalScrollBar().value()
         self._tree.clear()
-        for entry in lineup.rows:
+        for entry in queue.rows:
             item = QTreeWidgetItem(["", entry.name, "", running_time(entry.seconds)])
             item.setTextAlignment(3, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             item.setData(0, Qt.ItemDataRole.UserRole, entry.video)
@@ -271,30 +271,30 @@ class UpscaleQueueWindow(QDialog):
         self._clock.stop()
 
     def _draw_what_waited(self) -> None:
-        """Draw whatever lineup arrived while the row was in the air."""
+        """Draw whatever queue arrived while the row was in the air."""
         if self._held is not None:
-            self.show_lineup(self._held)
+            self.show_queue(self._held)
 
     def _on_clicked(self, item, column: int) -> None:
         """The arrow, which only the first row has and only column zero is."""
         if column != 0 or item is not self._tree.topLevelItem(0) or self._head is None:
             return
-        if self._head.state == upscale_lineup.FINISHING:
+        if self._head.state == upscale_queue.FINISHING:
             return
         if self._head.runs_now:
-            self._head = upscale_lineup.Head(
-                upscale_lineup.UPSCALING if self._head.state == upscale_lineup.ASKED_FOR
-                else upscale_lineup.NEXT, self._head.percent)
+            self._head = upscale_queue.Head(
+                upscale_queue.UPSCALING if self._head.state == upscale_queue.ASKED_FOR
+                else upscale_queue.NEXT, self._head.percent)
             self._mark_places()
             self.now_withdrawn.emit()
             return
-        self._head = upscale_lineup.Head(upscale_lineup.STARTING)
+        self._head = upscale_queue.Head(upscale_queue.STARTING)
         self._mark_places()
         self.now_requested.emit(self._tree.videos()[0])
 
     def _on_moved(self, video: str, row: int) -> None:
         if row == 0:
-            self._head = upscale_lineup.Head(upscale_lineup.NEXT)
+            self._head = upscale_queue.Head(upscale_queue.NEXT)
             self._mark_places()
             self.placed_first.emit(video)
             return
@@ -321,13 +321,13 @@ class UpscaleQueueWindow(QDialog):
 
 def _arrow(head: Head | None):
     """The first row's arrow: filled it runs now, hollow it waits."""
-    if head is None or head.state == upscale_lineup.FINISHING:
+    if head is None or head.state == upscale_queue.FINISHING:
         return qt_icon("play", color=Qt.GlobalColor.transparent)
     return qt_icon("play", color=BLUE if head.runs_now else TEXT_MUTED)
 
 
 def _arrow_tip(head: Head | None) -> str:
-    if head is None or head.state == upscale_lineup.FINISHING:
+    if head is None or head.state == upscale_queue.FINISHING:
         return ""
     return _RUNS_NOW_TIP if head.runs_now else _WAITS_TIP
 

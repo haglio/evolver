@@ -43,7 +43,7 @@ class QueueController(QObject):
 
     def refresh(self) -> None:
         if self._window.current is not None:
-            self._background.run(evolver.upscale_lineup, then=self._draw)
+            self._background.run(evolver.upscale_queue, then=self._draw)
 
     def _wired_window(self) -> UpscaleQueueWindow:
         window = UpscaleQueueWindow(self._parent_window)
@@ -54,9 +54,9 @@ class QueueController(QObject):
         window.refresh_wanted.connect(self.refresh)
         return window
 
-    def _draw(self, lineup) -> None:
+    def _draw(self, queue) -> None:
         if self._window.current is not None:
-            self._window.current.show_lineup(lineup)
+            self._window.current.show_queue(queue)
 
     def _arrange(self, videos: list) -> None:
         self._background.run(partial(evolver.arrange_upscale_queue, videos))
