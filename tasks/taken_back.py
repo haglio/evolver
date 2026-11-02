@@ -7,7 +7,7 @@ it can be asked for a long time afterwards -- the clip has been sorted, renamed
 by the upscale and, down the Genau lane, moved into a folder outside the
 library altogether.
 Origenerator knows none of that and must not learn it: it is a content source
-like any other, so it records the withdrawal on its own row and this stage
+like any other, so it records the taking back on its own row and this stage
 pulls it, the same read-only read ``tasks.origenerator_metadata`` does.
 
 The stamp is a standing answer rather than a request that drains. Nothing on the
@@ -16,7 +16,7 @@ clip should not be here and this stage goes on finding nothing -- which is also
 what makes it self-healing, a copy that somehow reappears being deleted again.
 Sending the clip again clears the stamp, and the fresh copy stays.
 
-One clip is several files by the time it is withdrawn -- the inbox copy, the
+One clip is several files by the time it is taken back -- the inbox copy, the
 ``1_sorted`` copy, the upscale, the delivered loop -- and the outbox side goes
 first: ``check_correspondence`` pops a dialog over a ``1_sorted`` video with no
 ``_topaz`` counterpart, so an upscale that will not delete (Genau playing it,
@@ -38,25 +38,25 @@ log = logging.getLogger(__name__)
 
 
 @dataclass
-class WithdrawnResult:
+class TakenBackResult:
     deleted: int = 0
     deleted_metadata: int = 0
     deleted_scripts: int = 0
     failed: int = 0
 
-    def __add__(self, other: WithdrawnResult) -> WithdrawnResult:
+    def __add__(self, other: TakenBackResult) -> TakenBackResult:
         """One result covering both, so each helper returns what it learned
         rather than writing through a result it was handed."""
-        return WithdrawnResult(
+        return TakenBackResult(
             deleted=self.deleted + other.deleted,
             deleted_metadata=self.deleted_metadata + other.deleted_metadata,
             deleted_scripts=self.deleted_scripts + other.deleted_scripts,
             failed=self.failed + other.failed)
 
 
-def run() -> WithdrawnResult:
-    """Delete every copy this library holds of a video Origenerator has withdrawn."""
-    result = WithdrawnResult()
+def run() -> TakenBackResult:
+    """Delete every copy this library holds of a video Origenerator has taken back."""
+    result = TakenBackResult()
     try:
         rows = _gallery_rows()
     except FileNotFoundError:
@@ -78,17 +78,17 @@ def run() -> WithdrawnResult:
 #: Origenerator's role for a video's copy without its sound, inside ``output_files``.
 SILENT_COPY_ROLE = "silent"
 
-#: The column this stage selects itself; the withdrawal stamps beside it are
+#: The column this stage selects itself; the taking back stamps beside it are
 #: each lane's (``util.lanes``). Public for the same reason the metadata
 #: stage's are: it is a name another repo keeps for this one.
 COLUMNS = ("output_files",)
 
 
 def _gallery_rows() -> list[dict]:
-    """Origenerator's rows, holding the output names and both withdrawal stamps.
+    """Origenerator's rows, holding the output names and both taking back stamps.
 
     The stamps are optional: a gallery from before they existed has no
-    withdrawal to report, which is one more row with nothing set.
+    taking back to report, which is one more row with nothing set.
     """
     return origenerator_gallery.rows(
         COLUMNS,
@@ -110,7 +110,7 @@ def _soundless_copies_beside_their_sound(rows: list[dict], lane: lanes.SentLane)
     return stems
 
 
-def _empty_lane(lane: lanes.SentLane, stems: set[str]) -> WithdrawnResult:
+def _empty_lane(lane: lanes.SentLane, stems: set[str]) -> TakenBackResult:
     """Delete *lane*'s copies of every clip in *stems*, outbox side first.
 
     The order is the whole of why the groups are kept apart: the outbox and the
@@ -175,10 +175,10 @@ def _videos_under(roots) -> list[Path]:
             for video in sorted(library_videos(Path(root)))]
 
 
-def _delete_all(videos: list[Path]) -> WithdrawnResult:
+def _delete_all(videos: list[Path]) -> TakenBackResult:
     """Delete each of *videos*, its sidecars and its funscripts, and say what
     that came to."""
-    result = WithdrawnResult()
+    result = TakenBackResult()
     for video in videos:
         try:
             video.unlink()
@@ -197,11 +197,11 @@ def _delete_all(videos: list[Path]) -> WithdrawnResult:
     return result
 
 
-def _delete_scripts(video: Path) -> WithdrawnResult:
+def _delete_scripts(video: Path) -> TakenBackResult:
     """Delete *video*'s funscript, mark and all -- and for a 1_sorted copy, the
     one filed with its upscale, which stays there after a viewer condemns the
     upscale until the scripts stage next runs."""
-    result = WithdrawnResult()
+    result = TakenBackResult()
     for script in script_library.scripts_held_for(video, lanes.upscale_filed_for(video)):
         try:
             script_library.delete_script(script)
