@@ -15,6 +15,7 @@ from app_support import production_update
 from app_support.loading_screen import AppWindow, meeting_place
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
+from shared_ui.colors import family_palette
 from shared_ui.loading_window import Loading, LoadingCanceled
 
 import config
@@ -23,7 +24,6 @@ from gui.background import BackgroundQueue
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.one_window import OneWindow
-from gui.palette import apply_accent
 from gui.presence_throttle import PresenceThrottle
 from gui.queue_controller import QueueController
 from gui.run_controller import RunController
@@ -115,7 +115,7 @@ class EvolverApp:
         self._app = app
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("Evolver")
-        apply_accent(self._app)
+        app.setPalette(family_palette(app.palette()))
 
         self._checkout = config.PROJECT_DIR
         self._settings = EvolverSettings.load()

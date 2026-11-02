@@ -3,7 +3,7 @@
   "class_attributes": {},
   "fan_out": {
     "evolver.py": 29,
-    "gui/app.py": 24
+    "gui/app.py": 23
   },
   "library_patches": {
     "tests/__init__.py": 2,
@@ -135,7 +135,6 @@
     "gui/log_window.py": 15,
     "gui/main_window.py": 78,
     "gui/one_window.py": 2,
-    "gui/palette.py": 6,
     "gui/peer_watch.py": 46,
     "gui/presence_throttle.py": 16,
     "gui/process_identity.py": 17,
@@ -246,7 +245,6 @@
     "tests/test_origenerator_gallery_contract.py": 26,
     "tests/test_origenerator_metadata.py": 8,
     "tests/test_other_apps_folders.py": 1,
-    "tests/test_palette.py": 11,
     "tests/test_peer_watch.py": 19,
     "tests/test_process_identity.py": 4,
     "tests/test_process_name.py": 16,
