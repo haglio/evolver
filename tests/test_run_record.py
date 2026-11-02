@@ -372,9 +372,9 @@ class TestFormatRunLabel:
         with self._in_pacific():
             assert format_run_label("2026-03-30T05:20:00", 83.7) == "2026/03/29 22:20 (84s)"
 
-    def test_an_unset_zone_reads_the_machine_s_own(self):
+    def test_an_unset_zone_reads_the_computer_s_own(self):
         """What a public checkout gets, and what the setting exists to override
-        on the machine whose clock is not the one its user reads times in."""
+        on the computer whose clock is not the one its user reads times in."""
         stamp = "2026-03-30T05:20:00"
         expected = (datetime.fromisoformat(stamp).replace(tzinfo=UTC)
                     .astimezone().strftime("%Y/%m/%d %H:%M"))

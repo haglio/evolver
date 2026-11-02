@@ -95,7 +95,7 @@ def _patched_stages(mocks: dict) -> ExitStack:
     stack = ExitStack()
     for target, key in _STAGE_PATCHES:
         stack.enter_context(patch(target, mocks[key]))
-    # Each run's own turn: the machine's is the one a running Evolver holds
+    # Each run's own turn: the computer's is the one a running Evolver holds
     # while the suite runs beside it, and a test holding it would refuse that.
     stack.enter_context(override_config(
         PIPELINE_LOCK_FILE=Path(tempfile.gettempdir()) / "evolver-tests"

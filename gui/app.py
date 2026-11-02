@@ -131,7 +131,7 @@ class EvolverApp:
         self._sign_in_notice = SignInNotice()
 
         # Parks and thaws the in-flight non-AI encode between the slow pipeline
-        # ticks, so returning to the machine suspends it in seconds. Reads the
+        # ticks, so returning to the computer suspends it in seconds. Reads the
         # opt-in at every poll, since it can be switched while it runs.
         self._presence = PresenceThrottle(
             lambda: self._settings.nonai_upscale_enabled)
@@ -211,7 +211,7 @@ class EvolverApp:
         return not self._session.is_preview and not self._runs.is_running and not any(on_screen)
 
     def start(self) -> None:
-        """Everything the app does to the machine, in the order it must happen.
+        """Everything the app does to the computer, in the order it must happen.
 
         The identity goes first: the taskbar reads it when a window of this
         process first appears, so claiming it after the tray is up is claiming

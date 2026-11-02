@@ -61,7 +61,7 @@ def run() -> WithdrawnResult:
         rows = _gallery_rows()
     except FileNotFoundError:
         # No Origenerator beside this library -- every public checkout, and the
-        # ordinary state of a machine that only maintains video.
+        # ordinary state of a computer that only maintains video.
         return result
 
     log.info("=== Stage: videos Origenerator has taken back ===")

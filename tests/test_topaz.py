@@ -107,7 +107,7 @@ SHIPPED = {
 
 def _fingerprint(settings: topaz.Settings) -> str:
     """Every command a set of settings runs -- one per orientation -- bar the two file
-    paths and the path to Topaz itself, which are the machine's, not the settings'."""
+    paths and the path to Topaz itself, which are the computer's, not the settings'."""
     argvs = [
         topaz.command(Path("in"), Path("out"), _turned_to_an_example_video(settings, orient))[1:]
         for orient in orientation.SORTED

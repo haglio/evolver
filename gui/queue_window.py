@@ -4,9 +4,9 @@ Two things this window is for. Seeing the order — the stage picks it by watch
 score and a few other signals, and until now the only way to read it was a
 count in a log line. And changing it: a video dragged up the list is kept where
 it was dropped, and one dragged to the top is the next one upscaled, ahead of
-whatever the machine was on.
+whatever the computer was on.
 
-The first row is the one the machine is on, and the arrow beside it says
+The first row is the one the computer is on, and the arrow beside it says
 whether it goes ahead while somebody is at the computer: filled it runs anyway,
 hollow it waits until nobody is. Clicking it switches between the two.
 

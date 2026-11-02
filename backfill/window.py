@@ -136,7 +136,7 @@ class BackfillWindow(QWidget):
         panel.setWidget(inner)
         panel.setWidgetResizable(True)
         panel.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Size to the grid's own width (the camera columns at this machine's
+        # Size to the grid's own width (the camera columns at this computer's
         # font) rather than a hardcoded guess, plus room for the vertical
         # scrollbar, so no column is ever clipped off the right edge.
         panel.setFixedWidth(inner.sizeHint().width() + _SCROLLBAR_ALLOWANCE)

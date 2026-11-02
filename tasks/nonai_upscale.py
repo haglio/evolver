@@ -9,13 +9,13 @@ folder.  This stage automates exactly that convention.
 One encode takes hours while the tray watchdog kills a pipeline run at eleven
 minutes, so nothing here ever waits on ffmpeg: at most one detached encode is
 in flight, and each scheduler tick either checks on it (promote / fail / kill
-a stuck one) or starts the next queued video when the machine is otherwise idle.
+a stuck one) or starts the next queued video when the computer is otherwise idle.
 
 Once the tray toggle is on, the stage auto-manages that encode by user
 presence: it starts or resumes only while the user is away and suspends the
 detached ffmpeg the moment they return (frozen, zero compute, resumed exactly
 where it left off). A fast GUI poll — ``throttle_to_presence`` — parks and
-thaws it between ticks so returning to the machine takes effect in seconds.
+thaws it between ticks so returning to the computer takes effect in seconds.
 
 Which clip is next, and why it beat the others, is
 :mod:`tasks.nonai_queue`'s; the video asked for from the queue window, which
@@ -51,7 +51,7 @@ from util.nonai_retire import carry_funscript, carry_metadata, retire_original
 log = logging.getLogger(__name__)
 
 _USER_IS_BACK = "the user is back at the computer"
-_MACHINE_IS_IDLE = "the computer is idle again"
+_COMPUTER_IS_IDLE = "the computer is idle again"
 
 
 @dataclass
@@ -112,20 +112,20 @@ def run(allow_start: bool = True, stop: bool = False,
         skip_list: Path | None = None, pin_list: Path | None = None,
         watch_stats_file: Path | None = None, request_file: Path | None = None,
         settings: EncodeSettings | None = None) -> NonAiUpscaleResult:
-    """Check on the in-flight encode, then start the next one if the machine is free.
+    """Check on the in-flight encode, then start the next one if the computer is free.
 
     With *stop* (the tray toggle is off), a still-running encode is killed and
     its video keeps its place in the queue; an already-finished one is still
     promoted, and nothing new starts.
 
     With *presence_managed* (the toggle is on), the in-flight encode tracks the
-    user: it is suspended the moment they touch the machine and resumed once
+    user: it is suspended the moment they touch the computer and resumed once
     they idle out again, so a day of intermittent use makes progress in the
     gaps instead of throwing partial work away. The headless CLI leaves it off
     and simply lets an in-flight encode run.
 
     Every file the stage touches is named at this boundary and resolved once;
-    see :class:`StageFiles`. So is what one encode may cost the machine, which
+    see :class:`StageFiles`. So is what one encode may cost the computer, which
     is :class:`tasks.nonai_encode.EncodeSettings` -- seven numbers this stage
     used to reach for off ``config`` one at a time.
     """
@@ -230,7 +230,7 @@ def _match_presence(job_file: Path, settings: EncodeSettings) -> str:
         nonai_encode.suspend_job(job, job_file, because=_USER_IS_BACK)
         return "suspended"
     if not present and job.get("suspended"):
-        nonai_encode.resume_job(job, job_file, because=_MACHINE_IS_IDLE)
+        nonai_encode.resume_job(job, job_file, because=_COMPUTER_IS_IDLE)
         return "resumed"
     return ""
 
@@ -279,7 +279,7 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
                                in_flight_percent=nonai_encode.percent_encoded(job))
         if presence_managed or on_request:
             nonai_encode.resume_job(job, files.job,
-                                    because=nonai_encode.ASKED_FOR if on_request else _MACHINE_IS_IDLE)
+                                    because=nonai_encode.ASKED_FOR if on_request else _COMPUTER_IS_IDLE)
         if not nonai_encode.overran(job, settings):
             return Supervision(in_flight=relpath(source),
                                in_flight_percent=nonai_encode.percent_encoded(job))
@@ -348,7 +348,7 @@ def _start_next_queued_video(files: StageFiles, settings: EncodeSettings) -> Sta
     if nonai_encode.is_low_disk(settings):
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
         return StartAttempt(deferred_low_disk=True)
-    busy = nonai_encode.machine_busy_reason(files.cooldown, settings)
+    busy = nonai_encode.computer_busy_reason(files.cooldown, settings)
     if busy:
         log.info("Deferring non-AI upscale start: %s.", busy)
         return StartAttempt(deferred=busy)

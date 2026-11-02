@@ -1,4 +1,4 @@
-"""Warm Gun's journals: one JSON line per event, one file per machine that
+"""Warm Gun's journals: one JSON line per event, one file per computer that
 plays (the phone's, and since 2026-10 the laptop's beside it), each naming its
 video by the lane it was played from — ``1_sorted/<source>/<orientation>/x.mp4``,
 ``non_AI/<bucket>/…`` or ``genau/clips/2D/AI/x.mp4``, whatever Genau's flicks
@@ -39,7 +39,7 @@ class Event:
 def read_journals(directories: Iterable[Path]) -> dict[str, list[Event]]:
     """Each journal's events by the journal's file name, each in time order.
 
-    A machine uploads its whole file every time, in its own order, so a file is
+    A computer uploads its whole file every time, in its own order, so a file is
     the unit that arrives in time order — and the one a cursor can be kept
     for. The same name reached through two folders is one journal; a line
     twice in it counts once.

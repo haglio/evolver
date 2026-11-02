@@ -2,7 +2,7 @@
 
 The stage's own view of the same queue is a count and a name in a log line.
 This is the rest of it — every video in the order the stage would take them,
-called what the library calls them, with whatever the machine is on (or was
+called what the library calls them, with whatever the computer is on (or was
 asked to start) lifted to the first row and what is happening to it said in a
 word (:mod:`util.upscale_queue`).
 
@@ -48,7 +48,7 @@ def current() -> UpscaleQueue:
 
 def _first(files: StageFiles, entries: list[Entry],
            pinned: set[str]) -> tuple[Entry | None, Head | None]:
-    """The video the machine is on or was asked to start, and what it is doing."""
+    """The video the computer is on or was asked to start, and what it is doing."""
     job = nonai_job.load_job(files.job)
     request = nonai_job.load_request(files.request)
     if job is not None and job.get("source"):

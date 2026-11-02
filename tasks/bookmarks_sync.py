@@ -55,7 +55,7 @@ def run(
     """Write the favorites' web URLs into one folder of a Chrome profile.
 
     The three things this stage reaches for in a browser profile on this
-    machine are arguments rather than names to grep the body for. They are
+    computer are arguments rather than names to grep the body for. They are
     resolved here rather than in the signature: a default is evaluated at
     import, which would freeze the value past ``override_config``.
     """

@@ -1,4 +1,4 @@
-"""One pipeline run on the machine at a time, whichever Evolver starts it."""
+"""One pipeline run on the computer at a time, whichever Evolver starts it."""
 from __future__ import annotations
 
 import os

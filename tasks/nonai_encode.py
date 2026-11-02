@@ -10,8 +10,8 @@ partial it is still writing, and killing it.
 Whether any of that should happen is :mod:`tasks.nonai_upscale`'s -- the
 tick's decision. What that decision is weighed against is :class:`EncodeSettings`,
 which lives here rather than in ``config``: how long an encode may run and how
-much of the machine it may take are this app's own policy, not anything the
-machine or the overlay says, and ``config`` is for the second kind.
+much of the computer it may take are this app's own policy, not anything the
+computer or the overlay says, and ``config`` is for the second kind.
 
 The encode's settings are :data:`util.topaz.NON_AI_UPSCALE`, named and versioned
 beside its settings so that every upscale made with it can say which; the
@@ -42,7 +42,7 @@ log = logging.getLogger(__name__)
 
 _LOG_WARNINGS_AND_PROGRESS_ONLY = ("-loglevel", "warning", "-stats")
 
-#: Why a start was held back when the library's drive, rather than the machine, is the reason.
+#: Why a start was held back when the library's drive, rather than the computer, is the reason.
 LOW_DISK = "low_disk"
 #: Why an encode asked for from the queue window is resumed, or let run on.
 ASKED_FOR = "it is the video asked for now"
@@ -50,14 +50,14 @@ ASKED_FOR = "it is the video asked for now"
 
 @dataclass(frozen=True)
 class EncodeSettings:
-    """What one unattended non-AI encode may cost the machine, and when.
+    """What one unattended non-AI encode may cost the computer, and when.
 
     Seven numbers the stage used to reach for off ``config`` one at a time, so
     its signature said nothing about what governed it and a test moving one
     patched a module attribute rather than passing a value. They are one record
     because they are one policy: how long an encode may run, how complete its
     output has to be to be believed, how many tries a clip gets, and the three
-    conditions the machine has to meet before the next one starts.
+    conditions the computer has to meet before the next one starts.
     """
 
     max_runtime_hours: float = 24
@@ -71,7 +71,7 @@ class EncodeSettings:
     # Presence throttle: once the toggle is on, Evolver auto-manages the encode
     # by how long the user has been away from the keyboard/mouse. Below this
     # idle threshold the user counts as present -- no new encode starts and any
-    # in-flight one is suspended (frozen, zero compute); past it the machine is
+    # in-flight one is suspended (frozen, zero compute); past it the computer is
     # "away" and an encode may start or resume. Five minutes rides out ordinary
     # reading/watching pauses without treating them as the user leaving.
     user_idle_threshold_seconds: float = 300.0
@@ -82,8 +82,8 @@ class StartAttempt:
     """What trying to start an encode came to, this tick.
 
     Either a clip was started, or it was held back -- ``deferred`` naming which
-    of the machine's six reasons, and ``deferred_low_disk`` the one that is
-    about the library's drive rather than the machine's load.
+    of the computer's six reasons, and ``deferred_low_disk`` the one that is
+    about the library's drive rather than the computer's load.
     """
 
     started: str = ""
@@ -192,7 +192,7 @@ def active_runtime(job: dict, *, now: float | None = None) -> float:
     """Wall-clock since the encode started, minus the time it spent suspended.
 
     The runtime cap exists to catch a *stuck* encode; hours parked frozen while
-    the user was at the machine are not the encode's fault and must not count.
+    the user was at the computer are not the encode's fault and must not count.
 
     *now* is the moment to measure against, defaulting to this one. It is an
     argument because this arithmetic is what decides that a live multi-hour
@@ -318,15 +318,15 @@ def is_low_disk(settings: EncodeSettings) -> bool:
     return system_resources.free_gb(config.NON_AI_DIR) < settings.min_free_disk_gb
 
 
-def machine_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
+def computer_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
                         asked_for: bool = False, ai_waiting: bool = False) -> str:
-    """Why the machine cannot take a new encode right now -- "" when it can.
+    """Why the computer cannot take a new encode right now -- "" when it can.
 
     A present user comes first: an unattended multi-hour encode has no business
     starting while someone is at the keyboard. Any live Topaz ffmpeg -- an
     orphaned encode or the user's own GUI export -- already owns the GPU, and
     CPU sampling never sees that. RAM and a post-encode cooldown keep an
-    unattended night from running the machine flat out end to end.
+    unattended night from running the computer flat out end to end.
 
     A video *asked_for* from the queue window is wanted now, so the user being
     at the computer and the cooldown do not hold it back; the rest still do, and
@@ -349,10 +349,10 @@ def machine_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
 
 
 def user_present(settings: EncodeSettings) -> bool:
-    """Whether the user has touched the machine recently.
+    """Whether the user has touched the computer recently.
 
     On any failure to read the idle time, err toward present: holding back an
-    unattended encode is always safer than hogging a machine someone is using.
+    unattended encode is always safer than hogging a computer someone is using.
     """
     try:
         idle = seconds_since_input()

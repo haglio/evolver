@@ -173,7 +173,7 @@ class TestRequest(unittest.TestCase):
 
                 assert nonai_job.load_request(path) is None
 
-    def test_a_request_the_machine_held_back_keeps_the_reason(self):
+    def test_a_request_the_computer_held_back_keeps_the_reason(self):
         with workspace_temp_dir() as root:
             path = root / "request.json"
             held = nonai_job.Request("lagoon/0 unsorted/scene one.mp4", held_back="low_ram")

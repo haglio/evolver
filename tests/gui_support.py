@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 
 # Before the QApplication below: agents run this suite on every commit, on the
-# machine Evolver itself runs on, and a tray icon or a window appearing there is
+# computer Evolver itself runs on, and a tray icon or a window appearing there is
 # the app the user is already using flickering at him. The merge gate sets this
 # in its own env, which does nothing for a run started by hand. setdefault lets a
 # developer override it to watch something on a real display.

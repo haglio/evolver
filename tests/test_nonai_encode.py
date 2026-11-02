@@ -92,7 +92,7 @@ class TestActiveRuntime(unittest.TestCase):
     """Wall clock since the encode started, minus the time it spent frozen.
 
     The runtime cap exists to catch a *stuck* encode; hours parked while the
-    user was at the machine are not the encode's fault. `now` is an argument so
+    user was at the computer are not the encode's fault. `now` is an argument so
     that arithmetic can be asked exactly rather than raced against the clock.
     """
 
@@ -107,7 +107,7 @@ class TestActiveRuntime(unittest.TestCase):
         assert nonai_encode.active_runtime(job, now=4600.0) == 3000.0
 
     def test_a_freeze_still_in_progress_is_not_charged_either(self):
-        """Otherwise a machine left in use overnight would look like a stuck
+        """Otherwise a computer left in use overnight would look like a stuck
         encode and be killed for overrunning."""
         job = {"started_at": 1_000.0, "suspended": True, "suspended_at": 2_000.0}
 

@@ -65,9 +65,9 @@ AI_UPSCALE_T2V = Settings(
 # tags: apo-8 60 fps interpolation, then an iris-2 upscale in auto mode with
 # recover-original-detail at 100 (blend=1), aimed at a 4K frame, keeping the
 # soundtrack. vram=0.5 and instances=0 where the AI settings have 1 and 1: an
-# unattended multi-hour encode shares the machine with whatever else is running,
+# unattended multi-hour encode shares the computer with whatever else is running,
 # so it gets half the VRAM budget and no extra model instance -- slower, but far
-# harder to push the machine into memory exhaustion.
+# harder to push the computer into memory exhaustion.
 NON_AI_UPSCALE = Settings(
     name="non_ai_upscale",
     version="v001",

@@ -1,9 +1,9 @@
-"""One pipeline run on the machine at a time, whichever Evolver starts it.
+"""One pipeline run on the computer at a time, whichever Evolver starts it.
 
 Only one tray Evolver is ever up (``gui/single_instance.py``), but a
 command-line run can start while the tray's runs go on.  Each would sort the
 same inbox; the upscale stages check for a live Topaz
-process before starting one, but between two sorts nothing stood.  The turn is a file in the machine-local
+process before starting one, but between two sorts nothing stood.  The turn is a file in the computer-local
 state folder, created exclusively and holding the runner's process number.
 """
 

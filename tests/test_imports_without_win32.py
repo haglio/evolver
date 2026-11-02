@@ -1,4 +1,4 @@
-"""What this suite does on a machine that has no Win32.
+"""What this suite does on a computer that has no Win32.
 
 Evolver binds Win32 while its modules are being imported, and the test package
 itself resolved a dotted name through ``ctypes.windll`` before any test module
@@ -28,7 +28,7 @@ _WIN32_CTYPES_NAMES = (
 )
 
 # Third-party packages that reach that surface while THEY are being imported,
-# on Windows.  Taking it away leaves a machine that cannot exist -- one whose
+# on Windows.  Taking it away leaves a computer that cannot exist -- one whose
 # sys.platform still says win32, so platform-branching code takes the Windows
 # branch with the Windows half gone.  That is the point for this repo's own
 # modules, which is what the question is about; it is only noise for a
@@ -62,7 +62,7 @@ def run_without_the_win32_ctypes_surface(body):
     """Run *body* in a child whose ``ctypes`` has had its Windows half removed.
 
     ``PYTHONPATH`` is dropped so the child cannot pick up a shim that fakes that
-    surface back in, the way a run on a developer's non-Windows machine does.
+    surface back in, the way a run on a developer's non-Windows computer does.
     """
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     return subprocess.run(

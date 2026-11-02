@@ -13,7 +13,7 @@ from app_support.overlay import overlay_value
 
 from content_overlay import LOCAL_CONTENT, load_content, refuse_an_incomplete_overlay
 
-# Machine-specific and private: every value below that names something outside
+# Computer-specific and private: every value below that names something outside
 # this repo comes from the git-ignored content overlay (content.example.json
 # shows the shape and documents each key), or, where other apps need it too,
 # from the settings all of Haglio shares.
@@ -213,7 +213,7 @@ EXCERPT_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
 
 # Where the Windows installer puts Topaz Video's own ffmpeg build and its
 # models. Not private -- an installer's default path names nothing of this
-# machine or this library -- so they sit in source as the fallback the overlay
+# computer or this library -- so they sit in source as the fallback the overlay
 # overrides.
 _INSTALLED_TOPAZ_FFMPEG = r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe"
 _INSTALLED_TOPAZ_MODELS = r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models"
@@ -225,7 +225,7 @@ def topaz_paths(content: dict[str, Any]) -> tuple[Path, Path]:
     Both upscale stages drive that build and no other -- the tvai_* filters
     exist in nothing else -- so where it is installed decides whether the
     pipeline can run at all, and the paths above were the only answer there
-    was: ``evolver.check_dependencies`` raised on any machine whose installer
+    was: ``evolver.check_dependencies`` raised on any computer whose installer
     had put it elsewhere. Two keys rather than one root, because the two sit in
     different trees.
     """
@@ -238,12 +238,12 @@ def topaz_paths(content: dict[str, Any]) -> tuple[Path, Path]:
 FFMPEG, TVAI_MODEL_DIR = topaz_paths(_CONTENT)
 
 def display_timezone(content: dict[str, Any]) -> tzinfo | None:
-    """The zone a run's timestamps are shown in — None for the machine's own.
+    """The zone a run's timestamps are shown in — None for the computer's own.
 
     A run record stores UTC; what a person reads is local time, and which local
     was one zone name written into ``gui/run_record`` at import. The setting
-    exists for the machine that is not in the zone its user reads times in;
-    unset, ``astimezone`` answers with whatever Windows says the machine is,
+    exists for the computer that is not in the zone its user reads times in;
+    unset, ``astimezone`` answers with whatever Windows says the computer is,
     which is the right answer everywhere else.
     """
     name = content.get("display_timezone")
@@ -292,7 +292,7 @@ NONAI_RETIRED_ROOT = retired_root(_CONTENT)
 # Rewrite-heavy runtime state lives OUTSIDE the synced project tree: the file
 # sync service covering the project dir kept renaming the in-flight job file to
 # "nonai_upscale_job [conflicted N].json" mid-run, which orphaned live encodes
-# (they piled up unsupervised and crashed the machine). LOCALAPPDATA is local-only.
+# (they piled up unsupervised and crashed the computer). LOCALAPPDATA is local-only.
 LOCAL_STATE_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver"
 NONAI_JOB_STATE_FILE = LOCAL_STATE_DIR / "nonai_upscale_job.json"
 NONAI_ATTEMPTS_FILE = LOCAL_STATE_DIR / "nonai_upscale_attempts.json"
@@ -314,9 +314,9 @@ NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays v
 # already holds an older processed variant of, which is the only way to ask for
 # a redo under newer settings.
 NONAI_PIN_LIST = LIVE_DIR / ".nonai-upscale-next.txt"
-# What one non-AI encode may cost the machine and when is
+# What one non-AI encode may cost the computer and when is
 # tasks.nonai_encode.EncodeSettings, not here: those numbers are this app's
-# own policy, and what belongs in this file is what the machine and the overlay
+# own policy, and what belongs in this file is what the computer and the overlay
 # say.
 # The GUI polls presence far more often than the 10-minute pipeline tick, so a
 # returning user parks the encode within seconds instead of minutes.

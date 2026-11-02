@@ -3,7 +3,7 @@
 One in-flight record (which encode is running, since when, and whether it is
 frozen), one attempt counter per clip (so a video that fails repeatedly stops
 being retried), one cooldown stamp (when the last encode ended, so an
-unattended night does not run the machine flat out end to end), and one
+unattended night does not run the computer flat out end to end), and one
 request (the video the user asked to have upscaled right away, until it starts).
 
 Every function takes the file it works on rather than reading ``config``: the

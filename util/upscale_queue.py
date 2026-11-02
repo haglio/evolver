@@ -56,7 +56,7 @@ class Head:
 
     @property
     def in_flight(self) -> bool:
-        """Whether the machine is on it, so nothing else can take its place by a drag."""
+        """Whether the computer is on it, so nothing else can take its place by a drag."""
         return self.state != NEXT
 
 

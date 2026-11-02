@@ -1,7 +1,7 @@
 """A fast poll that keeps the in-flight non-AI encode in step with the user.
 
 The pipeline tick is slow -- ten minutes by default -- and the encode it
-supervises runs for hours, so without this, returning to the machine would
+supervises runs for hours, so without this, returning to the computer would
 leave a multi-hour encode holding the GPU until the next tick noticed. This
 fires far more often and does one thing: park the encode when the user is back,
 thaw it when they idle out again.

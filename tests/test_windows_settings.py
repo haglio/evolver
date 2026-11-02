@@ -1,6 +1,6 @@
 """What Evolver relies on Windows to keep, as its pyproject lists it.
 
-``python -m app_support.windows_settings`` makes the machine match the list;
+``python -m app_support.windows_settings`` makes the computer match the list;
 what is Evolver's own about it is held here.
 """
 from __future__ import annotations

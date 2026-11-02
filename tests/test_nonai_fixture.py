@@ -1,6 +1,6 @@
 """Every place on disk the non-AI stage touches is redirected by its fixture.
 
-A test that does not redirect one reads or writes the real machine's. That is
+A test that does not redirect one reads or writes the real computer's. That is
 not hypothetical: ``NONAI_RETIRED_ROOT`` comes from the git-ignored overlay and
 ``NONAI_PIN_LIST`` is a path inside the checkout, so before both were
 pinned here, four tests that retire an original moved their fixture videos into
@@ -42,7 +42,7 @@ MODULES = (
 )
 
 # Names that say where something is, so a case that does not redirect one is
-# reading or writing the machine's own.
+# reading or writing the computer's own.
 PLACES_ON_DISK = {
     "FUN_TIME_WATCH_STATS_FILE",
     "GENERATED_SCRIPTS_DIR",

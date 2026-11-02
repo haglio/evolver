@@ -61,7 +61,7 @@ def legend_width() -> int:
     """The legend panel's width: enough for the longest stage label, measured.
 
     Not a fixed number, because the labels run half again the width of the
-    stage keys they replaced and by how much depends on the machine's font —
+    stage keys they replaced and by how much depends on the computer's font —
     a number picked here would clip the legend wherever that font is wider.
     """
     metrics = QFontMetrics(_legend_font())

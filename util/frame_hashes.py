@@ -187,7 +187,7 @@ def _content_filters(crop: tuple[int, int, int, int] | None) -> list[str]:
 
 
 def _decode(video: Path, arguments: list[str]) -> bytes:
-    # Below normal: whatever the user is doing on the machine comes first.
+    # Below normal: whatever the user is doing on the computer comes first.
     command = ["ffmpeg", "-v", "error", *arguments, "-pix_fmt", "gray", "-f", "rawvideo", "-"]
     try:
         return subprocess.run(
