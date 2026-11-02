@@ -119,7 +119,7 @@ class TestBackfillSession(unittest.TestCase):
 
         discard.assert_called_once_with(clip)
         record.assert_not_called()
-        assert note == f"{clip.name} → weird"
+        assert note == f"{clip.name} → Trash"
         assert session.remaining == 2
 
     def test_an_unknown_phrase_leaves_the_clip_on_screen(self):
@@ -221,11 +221,11 @@ class TestUndo(unittest.TestCase):
 
         with patch("backfill.session.discard_as_weird", return_value=landed), \
              patch("backfill.session.reclaim_from_weird") as reclaim:
-            session.apply("weird")
+            session.apply("trash")
             note = session.apply("undo")
 
         reclaim.assert_called_once_with(landed, clip)
-        assert note == f"undid {clip.name} → weird"
+        assert note == f"undid {clip.name} → Trash"
         assert session.current == clip
         assert session.remaining == 3
 
@@ -250,11 +250,11 @@ class TestUndo(unittest.TestCase):
         with patch("backfill.session.discard_as_weird",
                    side_effect=PermissionError(32, "still playing")), \
              patch("backfill.session.reclaim_from_weird") as reclaim:
-            session.apply("weird")
+            session.apply("trash")
             note = session.apply("undo")
 
         reclaim.assert_not_called()
-        assert note == f"undid {clip.name} → weird"
+        assert note == f"undid {clip.name} → Trash"
         assert session.current == clip
 
     def test_undoing_a_skip_brings_the_deferred_clip_back(self):
@@ -305,13 +305,13 @@ class TestUndo(unittest.TestCase):
             first, second = session.current, None
             session.apply("side dance")
             second = session.current
-            session.apply("weird")
+            session.apply("trash")
             third = session.current
             session.apply("skip")
 
             assert session.apply("undo") == f"undid {third.name} → skipped"
             assert session.current == third
-            assert session.apply("undo") == f"undid {second.name} → weird"
+            assert session.apply("undo") == f"undid {second.name} → Trash"
             assert session.current == second
             assert session.apply("undo") == f"undid {first.name} → Side Dancing"
             assert session.current == first
@@ -506,7 +506,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
         with library_tree() as lib:
             video = lib.video()
             session = self._session(video)
-            session.apply("weird")
+            session.apply("trash")
             assert not video.exists()
             assert (lib.weird / video.name).is_file()
 

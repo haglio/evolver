@@ -277,7 +277,7 @@ class TestScriptsSyncSummary:
             "1 match no video (alpha/scene one.funscript); "
             "1 match more than one video (beta/scene two.funscript); "
             "1 cannot move — a different script holds the destination (gamma/scene three.funscript); "
-            "1 failed to copy to a variant (delta/scene four.funscript)"
+            "1 failed to copy to a version (delta/scene four.funscript)"
         )
 
     def test_stands_in_a_count_for_the_names_it_cannot_fit(self):
@@ -290,7 +290,7 @@ class TestScriptsSyncSummary:
         """Six non-zero counters: the five-field truncation dropped the last."""
         summary = self._result(moved=3, already_aligned=53, collisions=1, copied_variants=2,
                                ambiguous_variant_groups=1, variant_copy_errors=1)
-        assert "1 failed to copy to a variant" in summary
+        assert "1 failed to copy to a version" in summary
         assert "1 cannot move" in summary
 
     def test_a_clean_run_reads_as_the_work_it_did(self):
@@ -348,7 +348,7 @@ class TestNonAiUpscaleSummary:
         summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4",
                                in_flight_percent=72, suspended=True)
         assert "paused" in summary
-        assert "you're at the machine" in summary
+        assert "you're at the computer" in summary
         assert "suspended=True" not in summary
 
     def test_a_finished_encode_names_what_it_promoted(self):

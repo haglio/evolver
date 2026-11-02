@@ -42,7 +42,7 @@ class TestActions(unittest.TestCase):
 class TestControls(unittest.TestCase):
     def test_skip_defers_and_both_weird_words_discard(self):
         assert VOCABULARY.controls["skip"] == SKIP
-        assert VOCABULARY.controls["weird"] == WEIRD
+        assert VOCABULARY.controls["trash"] == WEIRD
         assert VOCABULARY.controls["trash"] == WEIRD
 
     def test_undo_takes_the_last_decision_back(self):
@@ -52,7 +52,7 @@ class TestControls(unittest.TestCase):
         assert VOCABULARY.controls["same"] == SAME
 
     def test_the_phrases_that_discard_a_clip_are_every_way_of_saying_weird(self):
-        assert VOCABULARY.discarding_phrases() == {"weird", "trash"}
+        assert VOCABULARY.discarding_phrases() == {"trash"}
 
     def test_no_phrase_is_both_an_action_and_a_control(self):
         assert set(VOCABULARY.actions) & set(VOCABULARY.controls) == set()
@@ -83,7 +83,7 @@ class TestCommandGrid(unittest.TestCase):
         assert self._row("Other")[0] == Command("side other", "Side Other")
 
     def test_controls_cover_skip_weird_undo_and_same(self):
-        assert VOCABULARY.control_commands() == [Command("skip", "Skip"), Command("weird", "Weird"), Command("undo", "Undo"), Command("same", "Same")]
+        assert VOCABULARY.control_commands() == [Command("skip", "Skip"), Command("trash", "Trash"), Command("undo", "Undo"), Command("same", "Same")]
 
     def test_every_grid_command_is_a_phrase_the_session_understands(self):
         known = set(VOCABULARY.actions) | set(VOCABULARY.controls)

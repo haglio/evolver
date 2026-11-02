@@ -40,16 +40,16 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
 
         window = self._window()
 
-        assert window.heading.text() == "2 videos marked weird"
+        assert window.heading.text() == "2 videos in Trash"
         assert self._rows(window) == [("scene one_topaz.mp4", r"videos\2D\AI\2_outbox\upscaled_by_orientation\portrait\example-source"), ("loop_1_topaz.mp4", r"videos\genau\flicks\2D\AI")]
 
     def test_the_heading_counts_one_video_as_one(self):
         touch_video(self.lib.genau_weird / "loop_2_topaz.mp4")
 
-        assert self._window().heading.text() == "1 video marked weird"
+        assert self._window().heading.text() == "1 video in Trash"
 
     def test_with_nothing_marked_the_heading_says_so(self):
-        assert self._window().heading.text() == "Nothing is marked weird"
+        assert self._window().heading.text() == "Nothing is in Trash"
 
     def test_a_video_marked_weird_while_the_window_is_open_shows_up_in_it(self):
         touch_video(self.lib.genau_weird / "loop_15_topaz.mp4")
@@ -59,7 +59,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         window.watch.timeout.emit()
 
         assert [row[0] for row in self._rows(window)] == ["loop_15_topaz.mp4", "loop_16_topaz.mp4"]
-        assert window.heading.text() == "2 videos marked weird"
+        assert window.heading.text() == "2 videos in Trash"
 
     def test_the_video_playing_plays_on_while_another_arrives(self):
         touch_video(self.lib.genau_weird / "loop_17_topaz.mp4")
@@ -101,7 +101,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         window = self._window()
 
         assert self._rows(window) == [("scene two.mp4", "can't tell")]
-        assert window.videos.topLevelItem(0).toolTip(1) == "Nothing says which folder it was marked weird in, so it can't be restored"
+        assert window.videos.topLevelItem(0).toolTip(1) == "Nothing says which folder it was sent to Trash from, so it can't be restored"
 
     def test_each_row_says_in_full_where_the_video_is_and_where_it_goes(self):
         marked = touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_14_topaz.mp4")
@@ -230,7 +230,7 @@ class TestDeletingPermanently(_ReviewingALibrary):
 
         asked.assert_not_called()
         assert not marked.exists()
-        assert window.heading.text() == "Nothing is marked weird"
+        assert window.heading.text() == "Nothing is in Trash"
 
     def test_several_selected_all_go_at_once(self):
         marked = [touch_video(self.lib.genau_weird / f"loop_{number}_topaz.mp4") for number in (8, 9)]
@@ -254,7 +254,7 @@ class TestDeletingPermanently(_ReviewingALibrary):
 
         _delete_key(window).activated.emit()
 
-        assert window.heading.text() == "Nothing is marked weird"
+        assert window.heading.text() == "Nothing is in Trash"
 
 
 def _no_question_asked():

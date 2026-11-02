@@ -95,7 +95,7 @@ def _recorded_spots(video: Path) -> list[Path]:
 
 def restore(marked: MarkedWeird) -> None:
     if marked.restores_to is None:
-        raise ValueError(f"Nothing says where {marked.video.name} was marked weird from")
+        raise ValueError(f"Nothing says where {marked.video.name} was sent to Trash from")
     if marked.restores_to.exists():
         raise FileExistsError(f"Something else is at {marked.restores_to} now")
     marked.restores_to.parent.mkdir(parents=True, exist_ok=True)

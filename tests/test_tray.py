@@ -38,7 +38,7 @@ class TestTrayMenu:
         first = entries.index("Upscale Queue...")
 
         assert entries[first - 1:first + 4] == [
-            "---", "Upscale Queue...", "Backfill Metadata...", "Review Weird...", "---"]
+            "---", "Upscale Queue...", "Backfill Metadata...", "Review Trash...", "---"]
         assert tray.commands()["review_weird"] == tray.review_weird_action.triggered
 
 

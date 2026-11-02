@@ -93,7 +93,7 @@ class _Discarded:
 
     @property
     def note(self) -> str:
-        return f"{self.clip.name} → weird"
+        return f"{self.clip.name} → Trash"
 
     def take_effect(self, queue: BackfillQueue) -> None:
         queue.resolve()
