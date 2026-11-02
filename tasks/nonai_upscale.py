@@ -50,8 +50,8 @@ from util.nonai_retire import carry_funscript, carry_metadata, retire_original
 
 log = logging.getLogger(__name__)
 
-_USER_IS_BACK = "the user is back at the machine"
-_MACHINE_IS_IDLE = "the machine is idle again"
+_USER_IS_BACK = "the user is back at the computer"
+_MACHINE_IS_IDLE = "the computer is idle again"
 
 
 @dataclass
@@ -248,12 +248,12 @@ def frozen_for_ai_clips(*, job_file: Path | None = None) -> Iterator[None]:
         was_running = (job is not None and not job.get("suspended")
                        and processes.is_running(job.get("pid", 0)))
         if was_running:
-            nonai_encode.suspend_job(job, job_file, because="AI clips are upscaling first")
+            nonai_encode.suspend_job(job, job_file, because="AI videos are upscaling first")
         try:
             yield
         finally:
             if was_running:
-                nonai_encode.resume_job(job, job_file, because="the AI clips are done")
+                nonai_encode.resume_job(job, job_file, because="the AI videos are done")
 
 
 def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,

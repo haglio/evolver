@@ -231,13 +231,13 @@ _SCRIPTS_PROBLEMS = (
     ("unmatched", "match no video", "unmatched_paths"),
     ("ambiguous", "match more than one video", "ambiguous_paths"),
     ("collisions", "cannot move — a different script holds the destination", "collision_paths"),
-    ("ambiguous_variant_groups", "variant groups whose scripts differ — none copied", None),
-    ("variant_copy_errors", "failed to copy to a variant", "variant_copy_error_paths"),
+    ("ambiguous_variant_groups", "version groups whose scripts differ — none copied", None),
+    ("variant_copy_errors", "failed to copy to a version", "variant_copy_error_paths"),
 )
 _SCRIPTS_ROUTINE = (
     ("moved", "moved into place"),
-    ("copied_variants", "copied to a variant"),
-    ("rehomed_to_variants", "rehomed to a variant still in the library"),
+    ("copied_variants", "copied to a version"),
+    ("rehomed_to_variants", "rehomed to a version still in the library"),
     ("followed_to_archive", "followed a retired video out of the library"),
     ("discarded_duplicates", "duplicate discarded"),
     ("already_aligned", "already aligned"),
@@ -338,7 +338,7 @@ def _encode_state(result: dict[str, Any]) -> str:
     percent = result.get("in_flight_percent")
     state = "progress unknown" if percent is None else f"{percent}%"
     if result.get("suspended"):
-        state += ", paused: you're at the machine"
+        state += ", paused: you're at the computer"
     if result.get("on_request"):
         state += ", at your request"
     return state

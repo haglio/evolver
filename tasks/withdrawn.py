@@ -55,7 +55,7 @@ class WithdrawnResult:
 
 
 def run() -> WithdrawnResult:
-    """Delete every copy this library holds of a clip Origenerator has withdrawn."""
+    """Delete every copy this library holds of a video Origenerator has withdrawn."""
     result = WithdrawnResult()
     try:
         rows = _gallery_rows()
@@ -64,7 +64,7 @@ def run() -> WithdrawnResult:
         # ordinary state of a machine that only maintains video.
         return result
 
-    log.info("=== Stage: clips Origenerator has taken back ===")
+    log.info("=== Stage: videos Origenerator has taken back ===")
     for lane in lanes.sent_lanes():
         result = result + _empty_lane(lane, origenerator_gallery.video_stems(
             rows, lambda row, lane=lane: row.get(lane.unsent_column)))

@@ -70,7 +70,7 @@ _STATE_WORDS = {
 _HELD_BACK_WORDS = {
     "topaz_busy": "waiting for another Topaz upscale to finish",
     "low_ram": "waiting for memory to free up",
-    "ai_clips_waiting": "waiting for the newly downloaded AI clips, which go first",
+    "ai_clips_waiting": "waiting for the newly downloaded AI videos, which go first",
     "low_disk": "waiting for room on the drive",
     "topaz_sign_in_expired": "waiting for you to sign in to the Topaz Video app",
 }
