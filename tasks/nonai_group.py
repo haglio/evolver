@@ -29,7 +29,7 @@ from util.media_files import file_size, is_finalized_video_file
 from util.nonai_library import buckets
 from util.variants import is_processed_stem
 from util.version_groups import group_ids
-from util.video_type import duration_of
+from util.video_kind import duration_of
 
 log = logging.getLogger(__name__)
 

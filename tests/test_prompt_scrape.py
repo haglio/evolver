@@ -12,7 +12,7 @@ import pytest
 import config
 from tasks import prompt_scrape
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util import html_query, provenance, sidecar, video_type
+from util import html_query, provenance, sidecar, video_kind
 
 
 class TestPromptScrape(unittest.TestCase):
@@ -176,7 +176,7 @@ class TestPromptScrape(unittest.TestCase):
             fetch_dom.assert_not_called()
 
     def test_a_sidecar_holding_only_the_video_kind_is_not_a_scrape(self):
-        """``tasks.video_types`` writes a kind onto every library video,
+        """``tasks.video_kinds`` writes a kind onto every library video,
         including the ones nothing has scraped yet.  Reading that as "already
         scraped" would lose those prompts for good — the stage never looks at
         the video again."""
@@ -186,7 +186,7 @@ class TestPromptScrape(unittest.TestCase):
             existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             existing.parent.mkdir(parents=True, exist_ok=True)
             existing.write_text(
-                json.dumps({"video": {"type": video_type.SHORT}}), encoding="utf-8",
+                json.dumps({"video": {"type": video_kind.SHORT}}), encoding="utf-8",
             )
 
             with self._override(root):
@@ -195,7 +195,7 @@ class TestPromptScrape(unittest.TestCase):
                         result = prompt_scrape.run()
 
             assert (result.newly_scraped, result.already_scraped) == (1, 0)
-            assert video_type.type_of(sidecar.read(existing)) == video_type.SHORT
+            assert video_kind.kind_of(sidecar.read(existing)) == video_kind.SHORT
 
     def test_a_record_of_what_made_the_clip_that_landed_first_survives_the_scrape(self):
         """The scrape replaces the sidecar wholesale, and the upscale can have
@@ -209,7 +209,7 @@ class TestPromptScrape(unittest.TestCase):
             existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             existing.parent.mkdir(parents=True, exist_ok=True)
             existing.write_text(json.dumps({
-                "video": {"type": video_type.SHORT},
+                "video": {"type": video_kind.SHORT},
                 provenance.BLOCK: {"upscale": upscaled},
             }), encoding="utf-8")
 

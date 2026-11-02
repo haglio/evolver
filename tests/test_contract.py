@@ -21,7 +21,7 @@ from shared_ui.orientation import ORIENTATIONS, PORTRAIT
 
 import config
 from tests.temp_helpers import workspace_temp_dir
-from util import contract, media_files, sidecar, video_type, warm_gun, watch
+from util import contract, media_files, sidecar, video_kind, warm_gun, watch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -77,7 +77,7 @@ class TheLibraryRecord(unittest.TestCase):
 
     def test_every_kind_it_names_is_one_this_repo_records(self):
         """A reader branching on the kind has to know the whole set."""
-        assert self.record["video_kinds"] == list(video_type.TYPES)
+        assert self.record["video_kinds"] == list(video_kind.TYPES)
 
     def test_the_orientations_it_names_are_the_familys_two_words(self):
         assert self.record["video_orientations"] == list(ORIENTATIONS)
@@ -85,7 +85,7 @@ class TheLibraryRecord(unittest.TestCase):
     def test_the_field_the_reader_writes_is_the_one_this_repo_clears(self):
         """Fun Time strikes an act out and leaves this in its place; only the
         backfill tool clears it, once a viewer has finally named the act."""
-        video = self.record["blocks"][video_type.BLOCK]
+        video = self.record["blocks"][video_kind.BLOCK]
 
         assert video["written_by_the_reader"] == [sidecar.WRONG_ACTION_FIELD]
         assert sidecar.WRONG_ACTION_FIELD in video["fields"]
@@ -107,12 +107,12 @@ class TheLibraryRecord(unittest.TestCase):
 
     def test_the_kind_the_running_time_and_the_orientation_sit_where_it_says(self):
         """All three go in the video block, which is where a reader looks for them."""
-        stamped = video_type.oriented(
-            video_type.timed(video_type.stamped({}, video_type.SHORT), 12.5), PORTRAIT)
-        own = {video_type.FIELD, video_type.DURATION_FIELD, video_type.ORIENTATION_FIELD}
+        stamped = video_kind.oriented(
+            video_kind.timed(video_kind.stamped({}, video_kind.SHORT), 12.5), PORTRAIT)
+        own = {video_kind.FIELD, video_kind.DURATION_FIELD, video_kind.ORIENTATION_FIELD}
 
-        assert set(stamped[video_type.BLOCK]) == own
-        declared = self.record["blocks"][video_type.BLOCK]["fields"]
+        assert set(stamped[video_kind.BLOCK]) == own
+        declared = self.record["blocks"][video_kind.BLOCK]["fields"]
         assert own <= set(declared)
 
 

@@ -15,7 +15,7 @@ whatever the download called it, and the clip is the only thing that knows what
 is in it.  A video neither names keeps no ``title`` at all, and its readers fall
 back to the filename as they always did.
 
-Like :mod:`tasks.video_types` this is a backfill that never ends: it walks the
+Like :mod:`tasks.video_kinds` this is a backfill that never ends: it walks the
 whole non-AI library every run and rewrites what it finds, so a clip matched to
 its scene tomorrow is titled on the next run with no one-off script to remember.
 """

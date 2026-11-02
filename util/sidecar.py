@@ -52,7 +52,7 @@ def sidecar_path(video: Path) -> Path:
     folder holding both.  Genau's delivered flicks land at
     ``metadata/genau/flicks/2D/AI/y.json`` either way, whether the shared
     settings place its folder inside the library or beside it.  Their kind
-    (:mod:`util.video_type`) has to be recorded somewhere, and a delivered flick
+    (:mod:`util.video_kind`) has to be recorded somewhere, and a delivered flick
     keeps the generation metadata it was made with rather than losing it at the
     door.
 

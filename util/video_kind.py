@@ -2,7 +2,7 @@
 landscape — the ``video`` block.
 
 Facts about the file itself, recorded together on its metadata sidecar and
-owned here so that the block has a single author: :mod:`tasks.video_types`
+owned here so that the block has a single author: :mod:`tasks.video_kinds`
 writes them, and everything else reads.
 
 Four kinds, and every video in the library is exactly one of them.  The answer
@@ -113,7 +113,7 @@ def classify(*, genau: bool, excerpt: bool, duration_seconds: float | None) -> s
     return FULL_LENGTH
 
 
-def type_of(payload: dict) -> str:
+def kind_of(payload: dict) -> str:
     """The kind *payload* records, or ``""`` when it records none.
 
     Empty is the ordinary answer for a sidecar written before this field
@@ -136,7 +136,7 @@ def duration_of(payload: dict) -> float | None:
 
     ``None`` for a sidecar written before the field existed, and for one whose
     video could not be measured — both mean "ask ffprobe", which is what
-    :mod:`tasks.video_types` does with the one measurement it is allowed.
+    :mod:`tasks.video_kinds` does with the one measurement it is allowed.
     """
     seconds = _block(payload).get(DURATION_FIELD)
     return float(seconds) if isinstance(seconds, (int, float)) else None
@@ -150,7 +150,7 @@ def _block(payload: dict) -> dict:
 def only_the_video_itself(payload: dict) -> bool:
     """Whether *payload* holds what this module records and nothing else.
 
-    A sidecar :mod:`tasks.video_types` created for a video nothing else has
+    A sidecar :mod:`tasks.video_kinds` created for a video nothing else has
     recorded anything about.  It exists, and that is all it says — so the two
     stages that used to read a sidecar's mere existence as evidence of
     something else ("this clip has been scraped", "this clip is
@@ -174,14 +174,14 @@ def only_the_video_itself(payload: dict) -> bool:
     return isinstance(block, dict) and set(block) <= _OWN_FIELDS
 
 
-def stamped(payload: dict, video_type: str) -> dict:
+def stamped(payload: dict, video_kind: str) -> dict:
     """*payload* with *video_type* recorded on it — a copy, leaving the original.
 
     Creates the ``video`` block for the sidecars that have none: a non-AI scene
     carries no generation parameters, so its sidecar holds nothing but a version
     family until the kind arrives to join it.
     """
-    return _recorded(payload, FIELD, _one_of(TYPES, video_type, "a video type"))
+    return _recorded(payload, FIELD, _one_of(TYPES, video_kind, "a video type"))
 
 
 def timed(payload: dict, duration_seconds: float) -> dict:

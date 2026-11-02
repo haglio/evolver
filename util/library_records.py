@@ -22,25 +22,25 @@ from __future__ import annotations
 from app_support import favorites
 from shared_ui.orientation import ORIENTATIONS
 
-from util import video_type, watch
+from util import video_kind, watch
 from util.sidecar import WRONG_ACTION_FIELD
 
 #: The block holding what a video is and what it was made from.
-VIDEO_BLOCK = video_type.BLOCK
+VIDEO_BLOCK = video_kind.BLOCK
 
 #: Inside it: the kind of video (:data:`VIDEO_KINDS`), its running time, whether
 #: it is portrait or landscape, the act it depicts, and -- written by Fun Time
 #: rather than here -- the act a viewer struck out as wrong, which is what tells
 #: the backfill tool this clip was REJECTED rather than never labeled.
-VIDEO_TYPE_FIELD = video_type.FIELD
-VIDEO_DURATION_FIELD = video_type.DURATION_FIELD
-VIDEO_ORIENTATION_FIELD = video_type.ORIENTATION_FIELD
+VIDEO_TYPE_FIELD = video_kind.FIELD
+VIDEO_DURATION_FIELD = video_kind.DURATION_FIELD
+VIDEO_ORIENTATION_FIELD = video_kind.ORIENTATION_FIELD
 VIDEO_ACTION_FIELD = "action"
 VIDEO_WRONG_ACTION_FIELD = WRONG_ACTION_FIELD
 
 #: Every kind a video is recorded as, which a reader branching on one has to
 #: know the whole of.
-VIDEO_KINDS = video_type.TYPES
+VIDEO_KINDS = video_kind.TYPES
 
 #: The rest of the video block: what a generation was made from, as this repo
 #: reads it out of a gallery row or scrapes it off a provider's page.  A record

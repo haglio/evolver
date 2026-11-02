@@ -29,7 +29,7 @@ from functools import cache
 from pathlib import Path
 
 import config
-from util import lanes, origenerator_gallery, provenance, sidecar, video_type
+from util import lanes, origenerator_gallery, provenance, sidecar, video_kind
 from util.ffprobe import has_sound
 from util.media_files import (
     child_dirs,
@@ -99,7 +99,7 @@ def _move_sidecar(upscaled: Path, destination: Path) -> None:
 
     The record travels with the flick rather than dying at the door: what a loop
     was generated from is worth as much in Genau's folder as it was in the
-    outbox, and the kind Genau's flicks *are* (:mod:`util.video_type`) has to be
+    outbox, and the kind Genau's flicks *are* (:mod:`util.video_kind`) has to be
     written down somewhere for the apps that ask.  A flick delivered with no
     record at all still gets one, holding that one answer.
 
@@ -107,14 +107,14 @@ def _move_sidecar(upscaled: Path, destination: Path) -> None:
     ``sidecar_path`` raises for a video under neither library root, and a flick
     that somehow sits outside them simply has nowhere to keep a record, while a
     metadata tree that cannot be written costs the generation record but not the
-    kind — ``tasks.video_types`` finds the delivered flick with none and writes
+    kind — ``tasks.video_kinds`` finds the delivered flick with none and writes
     one on its next run.
     """
     try:
         was, now = sidecar.sidecar_path(upscaled), sidecar.sidecar_path(destination)
-        sidecar.update(now, lambda delivered: video_type.stamped(
+        sidecar.update(now, lambda delivered: video_kind.stamped(
             provenance.carried_forward(delivered, {**delivered, **sidecar.read(was)}),
-            video_type.GENAU_FLICK))
+            video_kind.GENAU_FLICK))
         was.unlink(missing_ok=True)
     except (ValueError, OSError):
         log.warning("Could not re-file the metadata for %s", upscaled.name, exc_info=True)

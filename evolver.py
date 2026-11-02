@@ -47,7 +47,7 @@ from tasks import (
     stray_files,
     taken_back,
     upscale,
-    video_types,
+    video_kinds,
     watch_weights,
 )
 from util import run_lock, run_log, system_resources, topaz
@@ -406,7 +406,7 @@ def _run_stages(
         # After the grouping, which is what creates a new non-AI video's sidecar:
         # the kind then joins a record that is already there rather than making a
         # second one for the same video in the same run.
-        _run_stage("video_types", video_types.run)
+        _run_stage("video_types", video_kinds.run)
         # After every stage that makes or moves a video, so it only ever fills in
         # what they left unrecorded, and after the kinds, so a video it records
         # already has the sidecar the kinds stage made for it.
