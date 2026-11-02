@@ -54,7 +54,7 @@ def run(
     on_progress: Callable[[int, int], None] | None = None,
     sorted_dir: Path | None = None,
     outbox_dir: Path | None = None,
-    weird_dir: Path | None = None,
+    trash_dir: Path | None = None,
     low_disk_floor_gb: float | None = None,
     low_disk_dismissed_file: Path | None = None,
     origenerator_dir: Path | None = None,
@@ -69,7 +69,7 @@ def run(
     """
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
-    weird_dir = config.WEIRD_DIR if weird_dir is None else weird_dir
+    trash_dir = config.TRASH_DIR if trash_dir is None else trash_dir
     low_disk_floor_gb = (
         config.LOW_DISK_WARNING_GB if low_disk_floor_gb is None else low_disk_floor_gb
     )
@@ -89,21 +89,21 @@ def run(
 
     for orient in orientation.SORTED:
         (outbox_dir / orient).mkdir(parents=True, exist_ok=True)
-    weird_dir.mkdir(parents=True, exist_ok=True)
+    trash_dir.mkdir(parents=True, exist_ok=True)
     removed_partial_outputs = remove_partial_files(outbox_dir, logger=log)
     if system_resources.free_gb(outbox_dir) >= low_disk_floor_gb:
         _bring_back_the_low_disk_warning(low_disk_dismissed_file)
 
     log.info("=== Stage: upscale from 1_sorted ===")
     log.info("OUT: %s/{landscape,portrait}/<source>/", outbox_dir)
-    log.info("Also skip if exists in: %s", weird_dir)
+    log.info("Also skip if exists in: %s", trash_dir)
     if removed_partial_outputs:
         log.info("Removed %d stale partial output file(s) from %s", removed_partial_outputs, outbox_dir)
 
     env = topaz.environment()
     candidates = collect_candidates(
         priority_files=priority_files,
-        sorted_dir=sorted_dir, outbox_dir=outbox_dir, weird_dir=weird_dir,
+        sorted_dir=sorted_dir, outbox_dir=outbox_dir, trash_dir=trash_dir,
     )
     total_pending = len(candidates)
     if max_items is not None:
@@ -208,7 +208,7 @@ def collect_candidates(
     *,
     sorted_dir: Path | None = None,
     outbox_dir: Path | None = None,
-    weird_dir: Path | None = None,
+    trash_dir: Path | None = None,
 ) -> list[tuple[Path, str, str]]:
     """The pending videos, newly sorted ones first, as (file, source, orient).
 
@@ -218,7 +218,7 @@ def collect_candidates(
     """
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
-    weird_dir = config.WEIRD_DIR if weird_dir is None else weird_dir
+    trash_dir = config.TRASH_DIR if trash_dir is None else trash_dir
 
     candidates: list[tuple[Path, str, str]] = []
     remakes: list[tuple[Path, str, str]] = []
@@ -229,7 +229,7 @@ def collect_candidates(
             return False
         seen.add(in_file)
         out = upscaled_video_path(source, orient, in_file.stem, outbox_dir)
-        if _already_processed(source, out.name, outbox_dir, weird_dir):
+        if _already_processed(source, out.name, outbox_dir, trash_dir):
             if out.is_file() and _made_by_superseded_settings(source, out):
                 remakes.append((in_file, source, orient))
             return False
@@ -336,8 +336,8 @@ def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> b
     return "source_image" not in payload
 
 
-def _already_processed(source: str, fname: str, outbox_dir: Path, weird_dir: Path) -> bool:
-    """Whether this output already exists, in either orientation or in weird.
+def _already_processed(source: str, fname: str, outbox_dir: Path, trash_dir: Path) -> bool:
+    """Whether this output already exists, in either orientation or in trash.
 
     The roots are required rather than defaulted: a sentinel here would read
     config again and leave the caller's roots decorative.
@@ -346,8 +346,8 @@ def _already_processed(source: str, fname: str, outbox_dir: Path, weird_dir: Pat
         p = outbox_dir / orient / source / fname
         if p.exists() and p.stat().st_size > 0:
             return True
-    weird = weird_dir / fname
-    return weird.exists() and weird.stat().st_size > 0
+    trash = trash_dir / fname
+    return trash.exists() and trash.stat().st_size > 0
 
 
 def _show_low_disk_warning(outbox_dir: Path, floor_gb: float, dismissed: Path) -> None:

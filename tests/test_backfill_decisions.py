@@ -7,9 +7,9 @@ from unittest.mock import patch
 from app_support.testing import no_wait_for_a_held_file
 
 from backfill.decisions import (
-    discard_as_weird,
-    reclaim_from_weird,
+    reclaim_from_trash,
     restore_sidecar,
+    send_to_trash,
     sidecar_snapshot,
 )
 from tests.temp_helpers import library_tree, override_config, workspace_temp_dir
@@ -57,59 +57,59 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
             assert not sidecar_path(video).exists()
 
 
-class TestReclaimFromWeird(unittest.TestCase):
+class TestReclaimFromTrash(unittest.TestCase):
     def test_a_discarded_clip_goes_back_where_it_came_from(self):
         with workspace_temp_dir() as root:
-            weird_dir = root / "kinda_weird"
+            trash_dir = root / "kinda_weird"
             video = root / "upscaled" / "portrait" / "provider2" / "a_topaz.mp4"
             video.parent.mkdir(parents=True)
             video.write_bytes(b"video")
 
-            with override_config(WEIRD_DIR=weird_dir):
-                destination = discard_as_weird(video)
-                reclaim_from_weird(destination, video)
+            with override_config(TRASH_DIR=trash_dir):
+                destination = send_to_trash(video)
+                reclaim_from_trash(destination, video)
 
             assert video.is_file()
             assert video.read_bytes() == b"video"
             assert not destination.exists()
 
 
-class TestDiscardAsWeird(unittest.TestCase):
+class TestDiscardAsTrash(unittest.TestCase):
     def _make_video(self, root, name="a_topaz.mp4"):
         video = root / "upscaled" / "portrait" / "provider2" / name
         video.parent.mkdir(parents=True, exist_ok=True)
         video.write_bytes(b"video")
         return video
 
-    def test_moves_the_video_into_the_weird_folder(self):
+    def test_moves_the_video_into_the_trash_folder(self):
         with workspace_temp_dir() as root:
-            weird_dir = root / "kinda_weird"
+            trash_dir = root / "kinda_weird"
             video = self._make_video(root)
 
-            with override_config(WEIRD_DIR=weird_dir):
-                destination = discard_as_weird(video)
+            with override_config(TRASH_DIR=trash_dir):
+                destination = send_to_trash(video)
 
-            assert destination == weird_dir / "a_topaz.mp4"
+            assert destination == trash_dir / "a_topaz.mp4"
             assert destination.is_file()
             assert not video.exists()
 
     def test_a_name_collision_never_overwrites_an_earlier_discard(self):
         with workspace_temp_dir() as root:
-            weird_dir = root / "kinda_weird"
-            weird_dir.mkdir()
-            (weird_dir / "a_topaz.mp4").write_bytes(b"earlier")
+            trash_dir = root / "kinda_weird"
+            trash_dir.mkdir()
+            (trash_dir / "a_topaz.mp4").write_bytes(b"earlier")
             video = self._make_video(root)
 
-            with override_config(WEIRD_DIR=weird_dir):
-                destination = discard_as_weird(video)
+            with override_config(TRASH_DIR=trash_dir):
+                destination = send_to_trash(video)
 
             assert destination.name == "a_topaz__dup1.mp4"
-            assert (weird_dir / "a_topaz.mp4").read_bytes() == b"earlier"
+            assert (trash_dir / "a_topaz.mp4").read_bytes() == b"earlier"
             assert destination.read_bytes() == b"video"
 
     def test_waits_out_a_player_that_still_holds_the_clip_open(self):
         with workspace_temp_dir() as root:
-            weird_dir = root / "kinda_weird"
+            trash_dir = root / "kinda_weird"
             video = self._make_video(root)
             real_replace = type(video).replace
             attempts = []
@@ -120,10 +120,10 @@ class TestDiscardAsWeird(unittest.TestCase):
                     raise PermissionError(32, "The process cannot access the file")
                 return real_replace(self, target)
 
-            with override_config(WEIRD_DIR=weird_dir):
+            with override_config(TRASH_DIR=trash_dir):
                 with patch.object(type(video), "replace", replace_locked_once), \
                      no_wait_for_a_held_file() as sleep:
-                    destination = discard_as_weird(video)
+                    destination = send_to_trash(video)
 
             assert len(attempts) == 2
             sleep.assert_called_once()

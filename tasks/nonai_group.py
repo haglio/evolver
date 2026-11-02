@@ -24,7 +24,7 @@ from pathlib import Path
 from app_support.video_names import strip_processing_suffixes
 
 import config
-from util import same_footage, sidecar, weird_piles
+from util import same_footage, sidecar, trash_folders
 from util.media_files import file_size, is_finalized_video_file
 from util.nonai_library import buckets
 from util.variants import is_processed_stem
@@ -172,7 +172,7 @@ def _family_fingerprint(
 
 def _prune_orphans(expected: set[Path]) -> int:
     pruned = 0
-    awaiting_review = weird_piles.stems_marked_weird()
+    awaiting_review = trash_folders.stems_in_trash()
     for bucket in buckets():
         bucket_metadata = sidecar.sidecar_folder(bucket)
         if bucket_metadata is None or not bucket_metadata.is_dir():

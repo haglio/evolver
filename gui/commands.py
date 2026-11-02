@@ -7,7 +7,7 @@ from PyQt6.QtGui import QAction, QIcon
 from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.icons import qt_icon
 
-from gui.icons import pause_icon, quit_icon, restart_icon, review_weird_icon, run_now_icon
+from gui.icons import pause_icon, quit_icon, restart_icon, review_trash_icon, run_now_icon
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ SETTINGS = Command("Settings...", _mark("settings"))
 STATS = Command("Stats...", _mark("chart"))
 QUEUE = Command("Upscale Queue...", _mark("enlarge"))
 BACKFILL = Command("Backfill Metadata...", _mark("tag"))
-REVIEW_WEIRD = Command("Review Trash...", review_weird_icon)
+REVIEW_TRASH = Command("Review Trash...", review_trash_icon)
 RESTART = Command("Restart", restart_icon)
 QUIT = Command("Quit", quit_icon)
 

@@ -19,15 +19,15 @@ _DUPLICATE = "__dup"
 _DUPLICATE_NUMBER = re.compile(rf"{_DUPLICATE}\d+$")
 
 
-def weird_pile_dirs() -> tuple[Path, Path]:
-    return config.WEIRD_DIR, config.GENAU_WEIRD_DIR
+def trash_dirs() -> tuple[Path, Path]:
+    return config.TRASH_DIR, config.GENAU_TRASH_DIR
 
 
-def free_spot_in(pile: Path, name: str) -> Path:
-    spot = pile / name
+def free_spot_in(folder: Path, name: str) -> Path:
+    spot = folder / name
     number = 1
     while spot.exists():
-        spot = pile / f"{Path(name).stem}{_DUPLICATE}{number}{Path(name).suffix}"
+        spot = folder / f"{Path(name).stem}{_DUPLICATE}{number}{Path(name).suffix}"
         number += 1
     return spot
 
@@ -36,28 +36,28 @@ def name_it_had(video: Path) -> str:
     return f"{_DUPLICATE_NUMBER.sub('', video.stem)}{video.suffix}"
 
 
-def videos_marked_weird() -> list[Path]:
-    return [video for pile in weird_pile_dirs()
-            for video in sorted(library_videos(pile), key=lambda video: (video.name.lower(), video))]
+def videos_in_trash() -> list[Path]:
+    return [video for folder in trash_dirs()
+            for video in sorted(library_videos(folder), key=lambda video: (video.name.lower(), video))]
 
 
-def stems_marked_weird() -> set[str]:
-    return {Path(name_it_had(video)).stem for video in videos_marked_weird()}
+def stems_in_trash() -> set[str]:
+    return {Path(name_it_had(video)).stem for video in videos_in_trash()}
 
 
 @dataclass(frozen=True)
-class MarkedWeird:
+class InTrash:
     video: Path
     restores_to: Path | None
     upscaled_from: Path | None = None
 
 
-def marked_weird() -> list[MarkedWeird]:
-    _, genau_pile = weird_pile_dirs()
+def in_trash() -> list[InTrash]:
+    _, genau_trash = trash_dirs()
     sorted_copies = _sorted_copies_by_stem()
-    return [_out_of_genau(video, genau_pile, sorted_copies) if video.is_relative_to(genau_pile)
+    return [_out_of_genau(video, genau_trash, sorted_copies) if video.is_relative_to(genau_trash)
             else _out_of_the_outbox(video, sorted_copies)
-            for video in videos_marked_weird()]
+            for video in videos_in_trash()]
 
 
 def _sorted_copies_by_stem() -> dict[str, list[Path]]:
@@ -67,21 +67,21 @@ def _sorted_copies_by_stem() -> dict[str, list[Path]]:
     return by_stem
 
 
-def _out_of_the_outbox(video: Path, sorted_copies: dict[str, list[Path]]) -> MarkedWeird:
+def _out_of_the_outbox(video: Path, sorted_copies: dict[str, list[Path]]) -> InTrash:
     upscales = {spot: copy
                 for copy in sorted_copies.get(sorted_stem_of(Path(name_it_had(video)).stem), [])
                 if (spot := lanes.upscale_filed_for(copy)) is not None}
     restores_to = _the_one_vacant(list(upscales)) or _the_one_vacant(_recorded_spots(video))
-    return MarkedWeird(video, restores_to, upscales.get(restores_to))
+    return InTrash(video, restores_to, upscales.get(restores_to))
 
 
-def _out_of_genau(video: Path, pile: Path, sorted_copies: dict[str, list[Path]]) -> MarkedWeird:
+def _out_of_genau(video: Path, folder: Path, sorted_copies: dict[str, list[Path]]) -> InTrash:
     lane = config.SORTED_DIR / config.GENAU_SOURCE
     left_in_the_lane = [copy
                         for copy in sorted_copies.get(sorted_stem_of(strip_uniquifier(video.stem)), [])
                         if copy.is_relative_to(lane)]
     flicks = lanes.genau_flicks_dir()
-    return MarkedWeird(video, _the_one_vacant([flicks / video.relative_to(pile)] if flicks else []),
+    return InTrash(video, _the_one_vacant([flicks / video.relative_to(folder)] if flicks else []),
                        left_in_the_lane[0] if len(left_in_the_lane) == 1 else None)
 
 
@@ -93,7 +93,7 @@ def _recorded_spots(video: Path) -> list[Path]:
             for record in records.rglob(glob.escape(f"{Path(name).stem}.json"))]
 
 
-def restore(marked: MarkedWeird) -> None:
+def restore(marked: InTrash) -> None:
     if marked.restores_to is None:
         raise ValueError(f"Nothing says where {marked.video.name} was sent to Trash from")
     if marked.restores_to.exists():
@@ -109,7 +109,7 @@ def restore(marked: MarkedWeird) -> None:
             script_library.carry_mark(script, home)
 
 
-def delete_permanently(marked: MarkedWeird) -> None:
+def delete_permanently(marked: InTrash) -> None:
     own_record = sidecar_path(marked.restores_to) if marked.restores_to is not None else None
     for gone in (marked.upscaled_from, marked.video, own_record, _sound_only_it_plays(marked)):
         if gone is not None and gone.exists():
@@ -120,9 +120,9 @@ def delete_permanently(marked: MarkedWeird) -> None:
         log.info("Deleted permanently: %s", script)
 
 
-def _sound_only_it_plays(marked: MarkedWeird) -> Path | None:
-    _, genau_pile = weird_pile_dirs()
-    if not marked.video.is_relative_to(genau_pile):
+def _sound_only_it_plays(marked: InTrash) -> Path | None:
+    _, genau_trash = trash_dirs()
+    if not marked.video.is_relative_to(genau_trash):
         return None
     if any(video.stem == marked.video.stem and video != marked.video
            for video in library_videos(config.GENAU_DIR)):

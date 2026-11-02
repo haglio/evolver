@@ -39,7 +39,7 @@ CONFIG_REFERENCE_CEILINGS = {
     "gui/startup.py": 1,
     "gui/tray.py": 1,
     "gui/worker.py": 1,
-    "review_weird/window.py": 1,
+    "review_trash/window.py": 1,
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 5,
@@ -74,7 +74,7 @@ CONFIG_REFERENCE_CEILINGS = {
     "util/topaz.py": 3,
     "util/video_locator.py": 2,
     "util/warm_gun.py": 4,
-    "util/weird_piles.py": 9,
+    "util/trash_folders.py": 9,
 }
 
 # Every key the app reads out of the content overlay, as ``key`` or

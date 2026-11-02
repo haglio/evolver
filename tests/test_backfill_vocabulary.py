@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from backfill.vocabulary import SAME, SKIP, UNDO, WEIRD, Act, Command, load_vocabulary
+from backfill.vocabulary import SAME, SKIP, TRASH, UNDO, Act, Command, load_vocabulary
 from content_overlay import EXAMPLE_CONTENT
 from tests.vocabulary_support import vocabulary_of
 
@@ -40,10 +40,10 @@ class TestActions(unittest.TestCase):
 
 
 class TestControls(unittest.TestCase):
-    def test_skip_defers_and_both_weird_words_discard(self):
+    def test_skip_defers_and_both_trash_words_discard(self):
         assert VOCABULARY.controls["skip"] == SKIP
-        assert VOCABULARY.controls["trash"] == WEIRD
-        assert VOCABULARY.controls["trash"] == WEIRD
+        assert VOCABULARY.controls["trash"] == TRASH
+        assert VOCABULARY.controls["trash"] == TRASH
 
     def test_undo_takes_the_last_decision_back(self):
         assert VOCABULARY.controls["undo"] == UNDO
@@ -51,7 +51,7 @@ class TestControls(unittest.TestCase):
     def test_same_repeats_the_last_action(self):
         assert VOCABULARY.controls["same"] == SAME
 
-    def test_the_phrases_that_discard_a_clip_are_every_way_of_saying_weird(self):
+    def test_the_phrases_that_discard_a_clip_are_every_way_of_saying_trash(self):
         assert VOCABULARY.discarding_phrases() == {"trash"}
 
     def test_no_phrase_is_both_an_action_and_a_control(self):
@@ -82,7 +82,7 @@ class TestCommandGrid(unittest.TestCase):
         assert self._row("Dancing")[1] == Command("xyz dance", "XYZ Dancing")
         assert self._row("Other")[0] == Command("side other", "Side Other")
 
-    def test_controls_cover_skip_weird_undo_and_same(self):
+    def test_controls_cover_skip_trash_undo_and_same(self):
         assert VOCABULARY.control_commands() == [Command("skip", "Skip"), Command("trash", "Trash"), Command("undo", "Undo"), Command("same", "Same")]
 
     def test_every_grid_command_is_a_phrase_the_session_understands(self):

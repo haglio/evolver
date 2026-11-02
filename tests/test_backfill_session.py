@@ -63,7 +63,7 @@ class TestBackfillSession(unittest.TestCase):
     def test_a_control_the_session_does_not_dispatch_moves_no_file(self):
         """The four controls are dispatched by name. A fifth added to the
         vocabulary and not here has to do nothing: the fallback used to be the
-        discard path, which moves the clip on screen into the weird folder."""
+        discard path, which moves the clip on screen into the trash folder."""
         vocabulary = vocabulary_of(Act("beta", "Beta"))
         vocabulary.controls["reticulate"] = "reticulate"
         session = self._session(vocabulary=vocabulary)
@@ -100,7 +100,7 @@ class TestBackfillSession(unittest.TestCase):
         clip = session.current
 
         with patch("backfill.session.record_action") as record, \
-             patch("backfill.session.discard_as_weird") as discard:
+             patch("backfill.session.send_to_trash") as discard:
             note = session.apply("skip")
 
         record.assert_not_called()
@@ -109,12 +109,12 @@ class TestBackfillSession(unittest.TestCase):
         assert session.remaining == 3
         assert session.current != clip
 
-    def test_weird_discards_the_clip_and_writes_no_metadata(self):
+    def test_trash_discards_the_clip_and_writes_no_metadata(self):
         session = self._session()
         clip = session.current
 
         with patch("backfill.session.record_action") as record, \
-             patch("backfill.session.discard_as_weird") as discard:
+             patch("backfill.session.send_to_trash") as discard:
             note = session.apply("trash")
 
         discard.assert_called_once_with(clip)
@@ -214,13 +214,13 @@ class TestUndo(unittest.TestCase):
         assert session.current == clip
         assert session.remaining == 3
 
-    def test_undoing_a_discard_reclaims_the_clip_from_the_weird_folder(self):
+    def test_undoing_a_discard_reclaims_the_clip_from_the_trash_folder(self):
         session = self._session()
         clip = session.current
         landed = Path("kinda_weird") / clip.name
 
-        with patch("backfill.session.discard_as_weird", return_value=landed), \
-             patch("backfill.session.reclaim_from_weird") as reclaim:
+        with patch("backfill.session.send_to_trash", return_value=landed), \
+             patch("backfill.session.reclaim_from_trash") as reclaim:
             session.apply("trash")
             note = session.apply("undo")
 
@@ -231,7 +231,7 @@ class TestUndo(unittest.TestCase):
 
     def test_undoing_a_discard_whose_move_failed_reclaims_nothing(self):
         """A discard can die on a clip the player never releases; its file work
-        raised and nothing landed in the weird folder. Undo must not then try
+        raised and nothing landed in the trash folder. Undo must not then try
         to reclaim from where nothing is -- the None-guard in roll_back was
         deletable with the suite green (audit probe 18)."""
         class SwallowingWorker(ImmediateWorker):
@@ -247,9 +247,9 @@ class TestUndo(unittest.TestCase):
         session = self._session(worker=SwallowingWorker())
         clip = session.current
 
-        with patch("backfill.session.discard_as_weird",
+        with patch("backfill.session.send_to_trash",
                    side_effect=PermissionError(32, "still playing")), \
-             patch("backfill.session.reclaim_from_weird") as reclaim:
+             patch("backfill.session.reclaim_from_trash") as reclaim:
             session.apply("trash")
             note = session.apply("undo")
 
@@ -300,8 +300,8 @@ class TestUndo(unittest.TestCase):
         with patch("backfill.session.record_action"), \
              patch("backfill.session.sidecar_snapshot", return_value=None), \
              patch("backfill.session.restore_sidecar"), \
-             patch("backfill.session.discard_as_weird", return_value=Path("w.mp4")), \
-             patch("backfill.session.reclaim_from_weird"):
+             patch("backfill.session.send_to_trash", return_value=Path("w.mp4")), \
+             patch("backfill.session.reclaim_from_trash"):
             first, second = session.current, None
             session.apply("side dance")
             second = session.current
@@ -508,13 +508,13 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
             session = self._session(video)
             session.apply("trash")
             assert not video.exists()
-            assert (lib.weird / video.name).is_file()
+            assert (lib.trash / video.name).is_file()
 
             session.apply("undo")
 
             assert video.is_file()
             assert video.read_bytes() == b"video"
-            assert list(lib.weird.iterdir()) == []
+            assert list(lib.trash.iterdir()) == []
             assert session.current == video
 
 

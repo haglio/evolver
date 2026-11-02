@@ -30,7 +30,7 @@ from tests.product_sources import strings_outside_docstrings
 pytestmark = pytest.mark.repo_check
 
 _ROOT = Path(__file__).resolve().parent.parent
-_TREES = (_ROOT / "gui", _ROOT / "evolver", _ROOT / "backfill", _ROOT / "review_weird", _ROOT / "tasks",
+_TREES = (_ROOT / "gui", _ROOT / "evolver", _ROOT / "backfill", _ROOT / "review_trash", _ROOT / "tasks",
           _ROOT / "util", _ROOT / "tools", _ROOT / "tests")
 
 # "#abc" and "#aabbcc" -- how a color reaches a Qt stylesheet or an HTML label

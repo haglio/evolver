@@ -155,7 +155,7 @@ SORTED_DIR   = AI_DIR / "1_sorted"
 OUTBOX_DIR   = AI_DIR / "2_outbox"
 
 OUT_UPSCALED_DIR = OUTBOX_DIR / "upscaled_by_orientation"
-WEIRD_DIR        = OUTBOX_DIR / "kinda_weird"
+TRASH_DIR        = OUTBOX_DIR / "kinda_weird"
 
 # The Genau lane: Origenerator drops a looping video it made for Genau under the
 # genau_source inbox folder, and the lane delivers its upscale into Genau's flicks
@@ -166,7 +166,7 @@ GENAU_SOURCE    = haglio_settings.value("genau_source")
 GENAU_FLICK_WORD = haglio_settings.value("genau_flick_words", "one")
 GENAU_DIR = Path(haglio_settings.value("genau_dir"))
 GENAU_AUDIO_DIR = Path(haglio_settings.value("genau_audio_dir"))
-GENAU_WEIRD_DIR = weird_pile_in(GENAU_DIR)
+GENAU_TRASH_DIR = weird_pile_in(GENAU_DIR)
 
 
 def kept_by_other_apps() -> tuple[Path, Path]:

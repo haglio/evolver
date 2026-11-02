@@ -7,14 +7,14 @@ from shared_ui.application import application
 
 import evolver
 from gui import process_identity
-from review_weird.window import ReviewWeirdWindow
+from review_trash.window import ReviewTrashWindow
 
 
 def main() -> int:
     evolver.setup_logging()
     with application(sys.argv) as app:
         process_identity.claim(app)
-        window = ReviewWeirdWindow()
+        window = ReviewTrashWindow()
         window.show()
         return app.exec()
 

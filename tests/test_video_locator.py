@@ -33,22 +33,22 @@ class TestRelocate(unittest.TestCase):
 
             assert video_locator.relocate(temp / "gone" / "clip.mp4", index) is None
 
-    def test_leaves_a_reference_where_its_video_was_while_the_video_waits_in_kinda_weird(self):
+    def test_leaves_a_reference_where_its_video_was_while_the_video_waits_in_kinda_trash(self):
         with workspace_temp_dir() as temp:
-            weird_dir = temp / "videos" / "2_outbox" / "kinda_weird"
-            _write_video(weird_dir / "clip.mp4")
-            with override_config(VIDEO_SEARCH_ROOT=temp / "videos", WEIRD_DIR=weird_dir):
+            trash_dir = temp / "videos" / "2_outbox" / "kinda_weird"
+            _write_video(trash_dir / "clip.mp4")
+            with override_config(VIDEO_SEARCH_ROOT=temp / "videos", TRASH_DIR=trash_dir):
                 index = video_locator.build_index()
 
             assert video_locator.relocate(temp / "gone" / "clip.mp4", index) is None
 
-    def test_leaves_a_reference_where_its_flick_was_while_the_flick_waits_in_genaus_weird_pile(self):
+    def test_leaves_a_reference_where_its_flick_was_while_the_flick_waits_in_genaus_trash_pile(self):
         with workspace_temp_dir() as temp:
-            genau_weird = temp / "videos" / "genau" / "weird"
-            _write_video(genau_weird / "loop.mp4")
+            genau_trash = temp / "videos" / "genau" / "weird"
+            _write_video(genau_trash / "loop.mp4")
             with override_config(VIDEO_SEARCH_ROOT=temp / "videos",
-                                 WEIRD_DIR=temp / "videos" / "2_outbox" / "kinda_weird",
-                                 GENAU_WEIRD_DIR=genau_weird):
+                                 TRASH_DIR=temp / "videos" / "2_outbox" / "kinda_weird",
+                                 GENAU_TRASH_DIR=genau_trash):
                 index = video_locator.build_index()
 
             assert video_locator.relocate(temp / "gone" / "loop.mp4", index) is None

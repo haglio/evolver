@@ -44,7 +44,7 @@ _SAMPLE_FRACTION = 0.4
 def _tile_labels(vocabulary: Vocabulary) -> list[str]:
     """Every tile's face, in grid order — the labels a thumbnail fills.
 
-    Labels, not actions: the grid holds control tiles ("Skip", "Weird") that
+    Labels, not actions: the grid holds control tiles ("Skip", "Trash") that
     are no act at all, and an act tile's label is what the library's
     ``video.action`` is matched against rather than what it is.
     """

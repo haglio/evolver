@@ -144,9 +144,9 @@ def _reachable_copies(lane: lanes.SentLane, stems: set[str]) -> list[Path]:
 
 
 def _reachable_roots(lane: lanes.SentLane) -> list[Path]:
-    roots = [*_outbox_dirs(lane), config.WEIRD_DIR]
+    roots = [*_outbox_dirs(lane), config.TRASH_DIR]
     if lane.delivered_dir is not None:
-        roots += [lane.delivered_dir, config.GENAU_WEIRD_DIR]
+        roots += [lane.delivered_dir, config.GENAU_TRASH_DIR]
     return roots
 
 

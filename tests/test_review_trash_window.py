@@ -7,7 +7,7 @@ from unittest.mock import patch
 from PyQt6.QtGui import QKeySequence, QShortcut
 from shared_ui.colors import BLUE
 
-from review_weird.window import ReviewWeirdWindow
+from review_trash.window import ReviewTrashWindow
 from tests.gui_support import QAPP, row_ground
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
 
@@ -21,22 +21,22 @@ class _ReviewingALibrary(unittest.TestCase):
         configured.__enter__()
         self.addCleanup(configured.__exit__, None, None, None)
 
-    def _window(self) -> ReviewWeirdWindow:
-        window = ReviewWeirdWindow()
+    def _window(self) -> ReviewTrashWindow:
+        window = ReviewTrashWindow()
         self.addCleanup(window.deleteLater)
         self.addCleanup(window.close)
         return window
 
-    def _rows(self, window: ReviewWeirdWindow) -> list[tuple[str, str]]:
+    def _rows(self, window: ReviewTrashWindow) -> list[tuple[str, str]]:
         return [(window.videos.topLevelItem(row).text(0), window.videos.topLevelItem(row).text(1))
                 for row in range(window.videos.topLevelItemCount())]
 
 
 class TestWhatTheWindowLists(_ReviewingALibrary):
-    def test_every_video_marked_weird_is_listed_with_the_folder_it_restores_to(self):
+    def test_every_video_marked_trash_is_listed_with_the_folder_it_restores_to(self):
         touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene one.mp4")
-        touch_video(self.lib.weird / "scene one_topaz.mp4")
-        touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_1_topaz.mp4")
+        touch_video(self.lib.trash / "scene one_topaz.mp4")
+        touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_1_topaz.mp4")
 
         window = self._window()
 
@@ -44,17 +44,17 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         assert self._rows(window) == [("scene one_topaz.mp4", r"videos\2D\AI\2_outbox\upscaled_by_orientation\portrait\example-source"), ("loop_1_topaz.mp4", r"videos\genau\flicks\2D\AI")]
 
     def test_the_heading_counts_one_video_as_one(self):
-        touch_video(self.lib.genau_weird / "loop_2_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_2_topaz.mp4")
 
         assert self._window().heading.text() == "1 video in Trash"
 
     def test_with_nothing_marked_the_heading_says_so(self):
         assert self._window().heading.text() == "Nothing is in Trash"
 
-    def test_a_video_marked_weird_while_the_window_is_open_shows_up_in_it(self):
-        touch_video(self.lib.genau_weird / "loop_15_topaz.mp4")
+    def test_a_video_marked_trash_while_the_window_is_open_shows_up_in_it(self):
+        touch_video(self.lib.genau_trash / "loop_15_topaz.mp4")
         window = self._window()
-        touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_16_topaz.mp4")
+        touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_16_topaz.mp4")
 
         window.watch.timeout.emit()
 
@@ -62,11 +62,11 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         assert window.heading.text() == "2 videos in Trash"
 
     def test_the_video_playing_plays_on_while_another_arrives(self):
-        touch_video(self.lib.genau_weird / "loop_17_topaz.mp4")
-        playing = touch_video(self.lib.genau_weird / "loop_18_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_17_topaz.mp4")
+        playing = touch_video(self.lib.genau_trash / "loop_18_topaz.mp4")
         window = self._window()
         window.videos.setCurrentItem(window.videos.topLevelItem(1))
-        touch_video(self.lib.genau_weird / "loop_19_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_19_topaz.mp4")
 
         with patch.object(window.preview.player, "setSource", wraps=window.preview.player.setSource) as switched:
             window.watch.timeout.emit()
@@ -77,10 +77,10 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
 
     def test_the_videos_picked_stay_picked_while_another_arrives(self):
         for number in (20, 21, 22):
-            touch_video(self.lib.genau_weird / f"loop_{number}_topaz.mp4")
+            touch_video(self.lib.genau_trash / f"loop_{number}_topaz.mp4")
         window = self._window()
         window.videos.selectAll()
-        touch_video(self.lib.genau_weird / "loop_23_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_23_topaz.mp4")
 
         window.watch.timeout.emit()
 
@@ -96,7 +96,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         assert (while_open, window.watch.isActive()) == ((True, 2000), False)
 
     def test_a_video_nothing_says_the_place_of_reads_as_cant_tell_and_says_why(self):
-        touch_video(self.lib.weird / "scene two.mp4")
+        touch_video(self.lib.trash / "scene two.mp4")
 
         window = self._window()
 
@@ -104,7 +104,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         assert window.videos.topLevelItem(0).toolTip(1) == "Nothing says which folder it was sent to Trash from, so it can't be restored"
 
     def test_each_row_says_in_full_where_the_video_is_and_where_it_goes(self):
-        marked = touch_video(self.lib.genau_weird / "2D" / "AI" / "loop_14_topaz.mp4")
+        marked = touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_14_topaz.mp4")
 
         row = self._window().videos.topLevelItem(0)
 
@@ -113,8 +113,8 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
 
 class TestWatchingOne(_ReviewingALibrary):
     def test_the_first_video_plays_and_clicking_another_plays_that_one(self):
-        first = touch_video(self.lib.genau_weird / "loop_3_topaz.mp4")
-        second = touch_video(self.lib.genau_weird / "loop_4_topaz.mp4")
+        first = touch_video(self.lib.genau_trash / "loop_3_topaz.mp4")
+        second = touch_video(self.lib.genau_trash / "loop_4_topaz.mp4")
         window = self._window()
         playing_first = _playing(window)
 
@@ -123,7 +123,7 @@ class TestWatchingOne(_ReviewingALibrary):
         assert (playing_first, _playing(window)) == (first, second)
 
     def test_a_video_plays_with_no_sound_output_at_all(self):
-        touch_video(self.lib.genau_weird / "loop_5_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_5_topaz.mp4")
 
         window = self._window()
 
@@ -150,7 +150,7 @@ def _row_colors(view, row: int) -> set[str]:
 class TestPickedRows(_ReviewingALibrary):
     def test_every_picked_row_wears_the_familys_blue(self):
         for number in (24, 25, 26):
-            touch_video(self.lib.genau_weird / f"loop_{number}_topaz.mp4")
+            touch_video(self.lib.genau_trash / f"loop_{number}_topaz.mp4")
         window = self._window()
         window.show()
         window.videos.topLevelItem(0).setSelected(True)
@@ -163,7 +163,7 @@ class TestPickedRows(_ReviewingALibrary):
         assert grounds[1] != BLUE.name()
 
     def test_the_row_the_keyboard_is_on_wears_no_frame_round_its_blue(self):
-        touch_video(self.lib.genau_weird / "loop_27_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_27_topaz.mp4")
         window = self._window()
         window.show()
         window.activateWindow()
@@ -180,8 +180,8 @@ class TestPickedRows(_ReviewingALibrary):
 
 class TestRestoring(_ReviewingALibrary):
     def test_the_selected_video_is_restored_and_the_next_one_plays(self):
-        touch_video(self.lib.genau_weird / "loop_5_topaz.mp4")
-        after = touch_video(self.lib.genau_weird / "loop_6_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_5_topaz.mp4")
+        after = touch_video(self.lib.genau_trash / "loop_6_topaz.mp4")
         window = self._window()
 
         window.restore_button.click()
@@ -191,13 +191,13 @@ class TestRestoring(_ReviewingALibrary):
         assert _playing(window) == after
 
     def test_one_that_cannot_be_restored_is_named_and_the_rest_still_are(self):
-        touch_video(self.lib.genau_weird / "loop_11_topaz.mp4")
-        touch_video(self.lib.genau_weird / "loop_12_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_11_topaz.mp4")
+        touch_video(self.lib.genau_trash / "loop_12_topaz.mp4")
         window = self._window()
         window.videos.selectAll()
         touch_video(self.lib.genau_flicks / "loop_11_topaz.mp4")
 
-        with patch("review_weird.window.QMessageBox.warning") as warned:
+        with patch("review_trash.window.QMessageBox.warning") as warned:
             window.restore_button.click()
 
         assert "loop_11_topaz.mp4" in warned.call_args.args[2]
@@ -212,8 +212,8 @@ class TestWhatCanBeDone(_ReviewingALibrary):
         assert (window.restore_button.isEnabled(), window.delete_button.isEnabled()) == (False, False)
 
     def test_a_video_nothing_says_the_place_of_can_be_deleted_but_not_restored(self):
-        touch_video(self.lib.weird / "scene three.mp4")
-        touch_video(self.lib.genau_weird / "loop_10_topaz.mp4")
+        touch_video(self.lib.trash / "scene three.mp4")
+        touch_video(self.lib.genau_trash / "loop_10_topaz.mp4")
         window = self._window()
         window.videos.selectAll()
 
@@ -222,7 +222,7 @@ class TestWhatCanBeDone(_ReviewingALibrary):
 
 class TestDeletingPermanently(_ReviewingALibrary):
     def test_it_deletes_at_once_without_asking(self):
-        marked = touch_video(self.lib.genau_weird / "loop_7_topaz.mp4")
+        marked = touch_video(self.lib.genau_trash / "loop_7_topaz.mp4")
         window = self._window()
 
         with _no_question_asked() as asked:
@@ -233,7 +233,7 @@ class TestDeletingPermanently(_ReviewingALibrary):
         assert window.heading.text() == "Nothing is in Trash"
 
     def test_several_selected_all_go_at_once(self):
-        marked = [touch_video(self.lib.genau_weird / f"loop_{number}_topaz.mp4") for number in (8, 9)]
+        marked = [touch_video(self.lib.genau_trash / f"loop_{number}_topaz.mp4") for number in (8, 9)]
         window = self._window()
         window.videos.selectAll()
 
@@ -242,7 +242,7 @@ class TestDeletingPermanently(_ReviewingALibrary):
         assert [video for video in marked if video.exists()] == []
 
     def test_the_delete_key_deletes_too(self):
-        marked = touch_video(self.lib.genau_weird / "loop_13_topaz.mp4")
+        marked = touch_video(self.lib.genau_trash / "loop_13_topaz.mp4")
         window = self._window()
 
         _delete_key(window).activated.emit()
@@ -258,16 +258,16 @@ class TestDeletingPermanently(_ReviewingALibrary):
 
 
 def _no_question_asked():
-    return patch("review_weird.window.QMessageBox.question")
+    return patch("review_trash.window.QMessageBox.question")
 
 
-def _delete_key(window: ReviewWeirdWindow) -> QShortcut:
+def _delete_key(window: ReviewTrashWindow) -> QShortcut:
     [key] = [shortcut for shortcut in window.findChildren(QShortcut)
              if shortcut.key() == QKeySequence(QKeySequence.StandardKey.Delete)]
     return key
 
 
-def _playing(window: ReviewWeirdWindow) -> Path:
+def _playing(window: ReviewTrashWindow) -> Path:
     return Path(window.preview.player.source().toLocalFile())
 
 

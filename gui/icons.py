@@ -11,7 +11,7 @@ mark for the same thing, and the apps sit open side by side:
 * run now, the play triangle, whose corners are rounded the way an icon font's
   transport controls are,
 * pause, the two bars the Broker's tray menu pauses with,
-* review weird, the trash can Fun Time's button marks a video weird with.
+* review trash, the trash can Fun Time's button sends a video to Trash with.
 """
 
 from __future__ import annotations
@@ -41,5 +41,5 @@ def pause_icon(color: str) -> QIcon:
     return qt_icon("pause", color=color)
 
 
-def review_weird_icon(color: str) -> QIcon:
+def review_trash_icon(color: str) -> QIcon:
     return qt_icon("trash", color=color)
