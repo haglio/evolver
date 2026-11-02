@@ -31,7 +31,7 @@ _MARKS = {
     # Held back and skipped draw the same circle deliberately: both say no work
     # happened and no one has to act. Which of the two it was is already in the
     # row's own words ("held back: low disk") and in its tooltip, where a second
-    # gray glyph would only ask the eye to tell two grays apart.
+    # gray symbol would only ask the eye to tell two grays apart.
     "warning": (CIRCLE, GRAY),
     "skipped": (CIRCLE, GRAY),
     "error": (CROSS, RED),
@@ -40,7 +40,7 @@ _MARKS = {
 _NO_MARK = ("", GRAY)
 
 
-def mark_for(status: str) -> tuple[str, QColor]:
+def symbol_for(status: str) -> tuple[str, QColor]:
     """The family's mark and the color that stand for *status*.
 
     A status this build does not draw — run records on disk go back months —
@@ -50,15 +50,15 @@ def mark_for(status: str) -> tuple[str, QColor]:
     return _MARKS.get(status, _NO_MARK)
 
 
-def mark_icon(status: str) -> QIcon:
+def status_icon(status: str) -> QIcon:
     """*status*'s mark as an icon, for a view that cannot color part of a row.
 
     A list item's text takes one color for the whole string, so the run history
     could only redden the ✘ by reddening the timestamp beside it. Carrying the
     mark as the item's icon puts the color back on the symbol, and drawing that
-    icon from the same glyph keeps it the same symbol the stage table shows.
+    icon from the same symbol keeps it the same symbol the stage table shows.
     """
-    mark, color = mark_for(status)
+    mark, color = symbol_for(status)
     if not mark:
         return QIcon()
     return QIcon(icon_pixmap(mark, _MARK_PX, color))

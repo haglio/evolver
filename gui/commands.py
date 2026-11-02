@@ -27,18 +27,18 @@ def set_label(action: QAction, label: str) -> None:
     action.setToolTip(label)
 
 
-def _mark(name: str) -> Callable[[str], QIcon]:
+def _icon(name: str) -> Callable[[str], QIcon]:
     return lambda color: qt_icon(name, color=color)
 
 
-OPEN = Command("Open", _mark("external_link"))
+OPEN = Command("Open", _icon("external_link"))
 RUN_NOW = Command("Run Now", run_now_icon)
 PAUSE = Command("Pause Scheduling", pause_icon)
-NONAI = Command("Upscale Non-AI When Idle", _mark("moon"))
-SETTINGS = Command("Settings...", _mark("settings"))
-STATS = Command("Stats...", _mark("chart"))
-QUEUE = Command("Upscale Queue...", _mark("enlarge"))
-BACKFILL = Command("Backfill Metadata...", _mark("tag"))
+NONAI = Command("Upscale Non-AI When Idle", _icon("moon"))
+SETTINGS = Command("Settings...", _icon("settings"))
+STATS = Command("Stats...", _icon("chart"))
+QUEUE = Command("Upscale Queue...", _icon("enlarge"))
+BACKFILL = Command("Backfill Metadata...", _icon("tag"))
 REVIEW_TRASH = Command("Review Trash...", review_trash_icon)
 RESTART = Command("Restart", restart_icon)
 QUIT = Command("Quit", quit_icon)
