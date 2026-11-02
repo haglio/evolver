@@ -1408,7 +1408,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
 
     def test_the_carried_sidecar_leaves_the_version_block_alone(self):
         """`version` describes the file, not the footage — the original is not a
-        processed variant and the upscale is, and the grouping stage is the one
+        processed version and the upscale is, and the grouping stage is the one
         thing that gets to say so."""
         with workspace_temp_dir() as root:
             archive = root / "archive"

@@ -25,14 +25,14 @@ def _library(root: Path) -> tuple[Path, Path, Path]:
 
 
 class TestNonAiGroup(unittest.TestCase):
-    def test_writes_a_sidecar_per_clip_folding_variants(self):
+    def test_writes_a_sidecar_per_clip_folding_versions(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
                 original = _touch(non_ai / "lagoon" / "2 done" / "Jane-Doe-lA0JUsAd.mp4")
-                variant = _touch(
+                version = _touch(
                     non_ai / "lagoon" / "3_good_to_go" / "processed"
                     / "Jane-Doe-lA0JUsAd_3_apf2_iris2.mp4"
                 )
@@ -43,7 +43,7 @@ class TestNonAiGroup(unittest.TestCase):
                 # The sidecar mirrors the clip's full path under metadata/.
                 assert sidecar.sidecar_path(original) == metadata / "2D" / "non_AI" / "lagoon" / "2 done" / "Jane-Doe-lA0JUsAd.json"
                 orig = sidecar.read(sidecar.sidecar_path(original))
-                var = sidecar.read(sidecar.sidecar_path(variant))
+                var = sidecar.read(sidecar.sidecar_path(version))
                 distinct = sidecar.read(sidecar.sidecar_path(other))
                 assert orig["version"]["group"] == var["version"]["group"]
                 assert orig["version"]["group"] != distinct["version"]["group"]
@@ -74,7 +74,7 @@ class TestNonAiGroup(unittest.TestCase):
                 assert "group" in got["version"]
 
     def test_propagates_clip_across_the_version_family(self):
-        """The upscaled variant of a clip inherits the original's `clip` metadata,
+        """The upscaled version of a clip inherits the original's `clip` metadata,
         so the Main Funestra still treats the enhanced file as a navigable short."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
@@ -82,7 +82,7 @@ class TestNonAiGroup(unittest.TestCase):
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
             ):
                 original = _touch(non_ai / "lagoon" / "2 done" / "Lee-Poe.mp4")
-                variant = _touch(
+                version = _touch(
                     non_ai / "lagoon" / "3_good_to_go" / "processed"
                     / "Lee-Poe_apo8_iris2.mp4"
                 )
@@ -93,7 +93,7 @@ class TestNonAiGroup(unittest.TestCase):
 
                 nonai_group.run()
 
-                var = sidecar.read(sidecar.sidecar_path(variant))
+                var = sidecar.read(sidecar.sidecar_path(version))
                 assert var["clip"] == {"compilation": "Vol6", "index": 1}
 
     def test_does_not_tag_a_name_neighbour_as_a_clip(self):

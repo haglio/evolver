@@ -190,7 +190,7 @@ class TestRetireToAnArchive(unittest.TestCase):
 class TestCarryMetadata(unittest.TestCase):
     def test_the_footage_keys_cross_and_the_file_scoped_one_does_not(self):
         """``version`` describes the file, not the footage — the original is not
-        a processed variant and the upscale is, and the grouping stage is the one
+        a processed version and the upscale is, and the grouping stage is the one
         thing that gets to say so."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)

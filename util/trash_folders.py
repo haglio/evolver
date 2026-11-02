@@ -11,7 +11,7 @@ import config
 from util import lanes, script_library
 from util.media_files import library_videos, retry_while_in_use, strip_uniquifier
 from util.sidecar import sidecar_folder, sidecar_path
-from util.variants import sorted_stem_of
+from util.versions import sorted_stem_of
 
 log = logging.getLogger(__name__)
 

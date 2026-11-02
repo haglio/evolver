@@ -11,7 +11,7 @@ import config
 from util import lanes, orientation, sidecar
 from util.media_files import library_videos
 from util.sidecar import action_of, sidecar_path, wrong_action_of
-from util.variants import sorted_stem_of
+from util.versions import sorted_stem_of
 
 # Portrait first, and that is not cosmetic: it is the order the tool asks a
 # human about, and most of the unlabeled queue is portrait.

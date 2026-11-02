@@ -7,7 +7,7 @@ what went first was the short stuff.  Hours left is the number a person wants,
 and a percentage of hours is the one that moves at a rate they can believe.
 
 The project is what the queue holds plus what the library has already been
-given: every bucket video with a processed variant counts as done, whoever made
+given: every bucket video with a processed version counts as done, whoever made
 it — a good part of the library was upscaled by hand in the Topaz GUI before
 this stage existed, and those are as finished as anything it promoted.  What is
 in neither set is in neither total, because the project cannot reach it: a clip
@@ -33,7 +33,7 @@ from app_support.video_names import strip_processing_suffixes
 from util import sidecar, video_kind
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
-from util.variants import is_processed_stem
+from util.versions import is_processed_stem
 
 
 @dataclass(frozen=True)
@@ -84,10 +84,10 @@ def _total(durations: Iterable[float | None]) -> tuple[float, int]:
 def _upscaled() -> dict[str, float | None]:
     """Each original the library already holds an upscale of, and how long it ran.
 
-    Keyed by the *original's* stem rather than the variant's, because one
-    original can have several variants — other settings, or a version saved
+    Keyed by the *original's* stem rather than the version's, because one
+    original can have several versions — other settings, or a version saved
     under a name of its own (``config.NONAI_VERSION_OVERRIDES``) — and it is one
-    video's worth of the project either way.  The variant's own running time
+    video's worth of the project either way.  The version's own running time
     answers for the original's: the settings interpolate frames rather than
     changing the length, which is the same equality the stage checks an encode's
     completeness against.

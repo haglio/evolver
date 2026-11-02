@@ -22,7 +22,7 @@ from app_support.mirrored_tree import mirrored_path
 
 import config
 from util.json_reads import read_dict
-from util.variants import upscaled_stem
+from util.versions import upscaled_stem
 
 
 def upscaled_video_path(

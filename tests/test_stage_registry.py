@@ -189,7 +189,7 @@ class TestStageRegistry(unittest.TestCase):
         build reading it -- so a field added on the stage's side reaches the
         window as a key nothing asks for, and the run reports doing nothing
         where it did something. It had already happened twice: a run that
-        rehomed seven scripts to their library variants and left two variant
+        rehomed seven scripts to their library versions and left two version
         groups too ambiguous to copy from said "no funscripts".
 
         Held by reading the keys out of the window's own source rather than by

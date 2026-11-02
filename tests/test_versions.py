@@ -7,7 +7,7 @@ import pytest
 from app_support.video_names import UPSCALE_SUFFIX, strip_processing_suffixes
 
 from tests.product_sources import PROJECT_ROOT, product_sources, strings_outside_docstrings
-from util.variants import (
+from util.versions import (
     is_processed_stem,
     is_upscaled_stem,
     sorted_stem_of,
@@ -72,7 +72,7 @@ class TestOnlyOneModuleSpellsIt:
     def test_the_suffix_is_a_literal_in_exactly_one_place(self):
         offenders = []
         for name in product_sources(PROJECT_ROOT):
-            if name == "util/variants.py":
+            if name == "util/versions.py":
                 continue
             tree = ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
             offenders += [
@@ -81,6 +81,6 @@ class TestOnlyOneModuleSpellsIt:
             ]
 
         assert offenders == [], (
-            "the upscale naming rule belongs to util.variants -- use "
+            "the upscale naming rule belongs to util.versions -- use "
             "upscaled_stem, sorted_stem_of or is_upscaled_stem"
         )

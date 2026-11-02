@@ -525,7 +525,7 @@ class TestScriptsSync(unittest.TestCase):
             _title, message = show_error.call_args.args
             assert message == "These funscripts match no video:\nscene one.funscript\nscene two.funscript"
 
-    def test_copies_ai_script_from_sorted_to_outbox_variant(self):
+    def test_copies_ai_script_from_sorted_to_outbox_version(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
@@ -547,7 +547,7 @@ class TestScriptsSync(unittest.TestCase):
             assert outbox_script.exists()
             assert outbox_script.read_text(encoding="utf-8") == sorted_script.read_text(encoding="utf-8")
 
-    def test_copies_ai_script_from_outbox_to_sorted_variant(self):
+    def test_copies_ai_script_from_outbox_to_sorted_version(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
@@ -569,7 +569,7 @@ class TestScriptsSync(unittest.TestCase):
             assert sorted_script.exists()
             assert sorted_script.read_text(encoding="utf-8") == outbox_script.read_text(encoding="utf-8")
 
-    def test_copies_processed_script_to_unprocessed_variant_within_source_bucket(self):
+    def test_copies_processed_script_to_unprocessed_version_within_source_bucket(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
@@ -591,8 +591,8 @@ class TestScriptsSync(unittest.TestCase):
             assert original_script.exists()
             assert original_script.read_text(encoding="utf-8") == processed_script.read_text(encoding="utf-8")
 
-    def test_two_differing_sibling_scripts_leave_the_variant_unscripted(self):
-        """The guard against copying one clip's funscript onto another variant:
+    def test_two_differing_sibling_scripts_leave_the_version_unscripted(self):
+        """The guard against copying one clip's funscript onto another version:
         when two siblings hold DIFFERING scripts there is no right source, so
         the stage must refuse and count the group -- dropping the filecmp
         comparison entirely used to change nothing (audit probe P19), and the
@@ -617,7 +617,7 @@ class TestScriptsSync(unittest.TestCase):
             assert result.copied_variants == 0
             assert not (scripts / "clip_topaz.funscript").exists()
 
-    def test_reports_variant_copy_error_without_crashing(self):
+    def test_reports_version_copy_error_without_crashing(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
@@ -729,16 +729,16 @@ class TestFollowRetiredVideos(unittest.TestCase):
             path.mkdir(parents=True, exist_ok=True)
         return video_root, script_root, archive_root
 
-    def test_orphan_script_rehomes_to_surviving_upscaled_variant(self):
+    def test_orphan_script_rehomes_to_surviving_upscaled_version(self):
         """An upscaled sibling still in the library inherits the retired
-        original's script — one funscript serves every variant of a video, so
+        original's script — one funscript serves every version of a video, so
         upscaling must never strand the surviving copy scriptless."""
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
-            variant = video_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.mp4"
+            version = video_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.mp4"
             archived = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"
             orphan = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
-            for path in (variant, archived):
+            for path in (version, archived):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"video")
             orphan.parent.mkdir(parents=True, exist_ok=True)
@@ -756,18 +756,18 @@ class TestFollowRetiredVideos(unittest.TestCase):
             assert rehomed.read_text(encoding="utf-8") == '{"actions":[1]}'
             assert archived.with_suffix(".funscript").read_text(encoding="utf-8") == '{"actions":[1]}'
 
-    def test_orphan_follows_archive_when_variant_already_scripted(self):
+    def test_orphan_follows_archive_when_version_already_scripted(self):
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
-            variant = video_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.mp4"
-            variant_script = script_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.funscript"
+            version = video_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.mp4"
+            version_script = script_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.funscript"
             archived = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"
             orphan = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
-            for path in (variant, archived):
+            for path in (version, archived):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"video")
-            variant_script.parent.mkdir(parents=True, exist_ok=True)
-            variant_script.write_text('{"actions":[7]}', encoding="utf-8")
+            version_script.parent.mkdir(parents=True, exist_ok=True)
+            version_script.write_text('{"actions":[7]}', encoding="utf-8")
             orphan.parent.mkdir(parents=True, exist_ok=True)
             orphan.write_text('{"actions":[1]}', encoding="utf-8")
 
@@ -777,7 +777,7 @@ class TestFollowRetiredVideos(unittest.TestCase):
 
             assert result.rehomed_to_variants == 0
             assert result.followed_to_archive == 1
-            assert variant_script.read_text(encoding="utf-8") == '{"actions":[7]}'
+            assert version_script.read_text(encoding="utf-8") == '{"actions":[7]}'
             assert not orphan.exists()
 
     def test_moves_script_beside_its_archived_video(self):

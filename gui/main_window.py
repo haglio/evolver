@@ -225,7 +225,7 @@ def _summarize_result(
 # What each scripts-sync counter means, in words. The first group is what a
 # person has to deal with, the second the work the stage got done.
 #
-# Ambiguous variant groups are the one problem here that does not also make the
+# Ambiguous version groups are the one problem here that does not also make the
 # stage red -- whether they should is the stage's call, not the view's.
 _SCRIPTS_PROBLEMS = (
     ("unmatched", "match no video", "unmatched_paths"),
