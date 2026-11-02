@@ -14,21 +14,21 @@ from tests.vocabulary_support import vocabulary_of
 
 VOCABULARY = vocabulary_of(Act("alpha", "Alpha"), Act("beta", "Beta"), Act("gamma", "Gamma"))
 
-# Fabricated: a real pin names a clip inside the library, which is why the pins
+# Fabricated: a real pin names a video inside the library, which is why the pins
 # moved to the git-ignored overlay in the first place. The button label is one the
 # act table above produces.
 PINNED_BUTTON = "Side Gamma"
 PINNED_ID = "11111111-2222-3333-4444-555555555555"
 
 
-class TestExampleClips(unittest.TestCase):
+class TestExampleVideos(unittest.TestCase):
     def _tag(self, lib, orient, source, stem, action):
         lib.sidecar(orient, source, stem, {"video": {"action": action}})
 
     def _examples(self, vocabulary=VOCABULARY):
-        return thumbnails.example_clips(vocabulary, library_scan())
+        return thumbnails.example_videos(vocabulary, library_scan())
 
-    def test_collects_one_labeled_clip_per_action(self):
+    def test_collects_one_labeled_video_per_action(self):
         with library_tree() as lib:
             video = lib.video("portrait", "provider2", "a_topaz.mp4")
             self._tag(lib, "portrait", "provider2", "a_topaz", "Side Beta")
@@ -43,21 +43,21 @@ class TestExampleClips(unittest.TestCase):
             assert self._examples(vocabulary_of(Act("kappa", "Kappa"))) == {"Side Kappa": video}
             assert self._examples(VOCABULARY) == {}
 
-    def test_an_unlabeled_clip_contributes_no_example(self):
+    def test_an_unlabeled_video_contributes_no_example(self):
         with library_tree() as lib:
             lib.video("portrait", "provider2", "a_topaz.mp4")  # no sidecar
 
             assert self._examples() == {}
 
     def test_a_scraped_source_is_a_valid_example(self):
-        """Unlike the work queue, the gallery welcomes already-labeled scraped clips."""
+        """Unlike the work queue, the gallery welcomes already-labeled scraped videos."""
         with library_tree() as lib:
             video = lib.video("landscape", "provider", "b_topaz.mp4")
             self._tag(lib, "landscape", "provider", "b_topaz", "XYZ Gamma")
 
             assert self._examples() == {"XYZ Gamma": video}
 
-    def test_the_first_clip_found_wins_for_an_action(self):
+    def test_the_first_video_found_wins_for_an_action(self):
         with library_tree() as lib:
             first = lib.video("portrait", "provider2", "a_topaz.mp4")
             lib.video("portrait", "provider2", "z_topaz.mp4")
@@ -92,7 +92,7 @@ class TestExampleClips(unittest.TestCase):
             with override_config(CURATED_EXAMPLES={PINNED_BUTTON: PINNED_ID}):
                 assert self._examples()[PINNED_BUTTON] == pinned
 
-    def test_a_pin_naming_a_clip_the_library_does_not_hold_falls_through(self):
+    def test_a_pin_naming_a_video_the_library_does_not_hold_falls_through(self):
         """Which is every pin on every computer but the one whose library the
         overlay describes -- so it has to be the ordinary case, not an error."""
         with library_tree() as lib:
@@ -123,8 +123,8 @@ class TestBuildThumbnails(unittest.TestCase):
         examples = {"Side Beta": Path("a.mp4"), "XYZ Alpha": Path("b.mp4")}
         calls = []
 
-        def extract(clip, dest):
-            calls.append((clip, dest))
+        def extract(video, dest):
+            calls.append((video, dest))
             return True
 
         result = list(thumbnails.build_thumbnails(examples, extract, lambda a: Path(f"/c/{a}.jpg")))
@@ -141,7 +141,7 @@ class TestBuildThumbnails(unittest.TestCase):
             result = list(
                 thumbnails.build_thumbnails(
                     {"Side Beta": Path("a.mp4")},
-                    lambda clip, dest: extracted.append(dest) or True,
+                    lambda video, dest: extracted.append(dest) or True,
                     lambda action: cached,
                 )
             )
@@ -154,7 +154,7 @@ class TestBuildThumbnails(unittest.TestCase):
 
         result = list(
             thumbnails.build_thumbnails(
-                examples, lambda clip, dest: clip == Path("g.mp4"), lambda a: Path(f"/c/{a}.jpg")
+                examples, lambda video, dest: video == Path("g.mp4"), lambda a: Path(f"/c/{a}.jpg")
             )
         )
 
@@ -173,10 +173,10 @@ class TestExtractFrame(unittest.TestCase):
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
                  patch("backfill.thumbnails.subprocess.run", side_effect=fake_run) as run:
                 # No at_fraction: the default IS the tuned value, chosen to
-                # sample past a clip's title card, and passing it explicitly
+                # sample past a video's title card, and passing it explicitly
                 # left the constant free to drift (audit probe 28 moved it to
                 # 0.9 with the suite green).
-                ok = thumbnails.extract_frame(Path("clip.mp4"), dest)
+                ok = thumbnails.extract_frame(Path("video.mp4"), dest)
 
             assert ok
             argv = run.call_args[0][0]
@@ -196,7 +196,7 @@ class TestExtractFrame(unittest.TestCase):
 
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
                  patch("backfill.thumbnails.subprocess.run", side_effect=fake_run) as run:
-                thumbnails.extract_frame(Path("clip.mp4"), dest)
+                thumbnails.extract_frame(Path("video.mp4"), dest)
 
             argv = run.call_args[0][0]
             assert argv[argv.index("-vf") + 1] == f"scale=-2:{thumbnails._THUMBNAIL_HEIGHT}"
@@ -211,7 +211,7 @@ class TestExtractFrame(unittest.TestCase):
 
             with patch("backfill.thumbnails.duration_seconds", return_value=None), \
                  patch("backfill.thumbnails.subprocess.run", side_effect=fake_run) as run:
-                thumbnails.extract_frame(Path("clip.mp4"), dest)
+                thumbnails.extract_frame(Path("video.mp4"), dest)
 
             argv = run.call_args[0][0]
             assert argv[argv.index("-ss") + 1] == "0.000"
@@ -221,7 +221,7 @@ class TestExtractFrame(unittest.TestCase):
             dest = root / "out.jpg"
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
                  patch("backfill.thumbnails.subprocess.run", return_value=SimpleNamespace(returncode=1)):
-                assert not thumbnails.extract_frame(Path("clip.mp4"), dest)
+                assert not thumbnails.extract_frame(Path("video.mp4"), dest)
 
     def test_a_missing_probe_leaves_the_button_text_only_rather_than_crashing(self):
         """duration_seconds sat ABOVE the try that exists to survive a missing
@@ -234,7 +234,7 @@ class TestExtractFrame(unittest.TestCase):
 
             with patch("backfill.thumbnails.duration_seconds",
                        side_effect=FileNotFoundError("ffprobe")):
-                assert not thumbnails.extract_frame(Path("clip.mp4"), dest)
+                assert not thumbnails.extract_frame(Path("video.mp4"), dest)
 
     def test_a_missing_encoder_leaves_it_text_only_too(self):
         with workspace_temp_dir() as root:
@@ -243,7 +243,7 @@ class TestExtractFrame(unittest.TestCase):
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
                  patch("backfill.thumbnails.subprocess.run",
                        side_effect=FileNotFoundError("ffmpeg")):
-                assert not thumbnails.extract_frame(Path("clip.mp4"), dest)
+                assert not thumbnails.extract_frame(Path("video.mp4"), dest)
 
 
 if __name__ == "__main__":

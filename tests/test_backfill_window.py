@@ -28,24 +28,24 @@ class FakeSession:
     """Stands in for BackfillSession: each scripted outcome is the note a phrase
     returns, plus the queue it leaves in place (None when the queue is untouched)."""
 
-    def __init__(self, clips, outcomes=()):
-        self._clips = list(clips)
+    def __init__(self, videos, outcomes=()):
+        self._videos = list(videos)
         self._outcomes = list(outcomes)
         self.applied = []
 
     @property
     def remaining(self):
-        return len(self._clips)
+        return len(self._videos)
 
     @property
     def current(self):
-        return self._clips[0] if self._clips else None
+        return self._videos[0] if self._videos else None
 
     def apply(self, phrase):
         self.applied.append(phrase)
-        note, clips_after = self._outcomes.pop(0)
-        if clips_after is not None:
-            self._clips = list(clips_after)
+        note, videos_after = self._outcomes.pop(0)
+        if videos_after is not None:
+            self._videos = list(videos_after)
         return note
 
 
@@ -56,7 +56,7 @@ class TestBackfillWindow(unittest.TestCase):
         self.addCleanup(window.deleteLater)
         return window
 
-    def test_the_status_line_counts_what_is_left_and_names_the_clip_on_screen(self):
+    def test_the_status_line_counts_what_is_left_and_names_the_video_on_screen(self):
         session = FakeSession([Path("a_topaz.mp4"), Path("b_topaz.mp4")])
 
         window = self._window(session)
@@ -65,7 +65,7 @@ class TestBackfillWindow(unittest.TestCase):
         assert "a_topaz.mp4" in window.status_text()
         assert window.last_text() == ""
 
-    def test_a_heard_phrase_reaches_the_session_and_advances_the_clip(self):
+    def test_a_heard_phrase_reaches_the_session_and_advances_the_video(self):
         session = FakeSession(
             [Path("a_topaz.mp4"), Path("b_topaz.mp4")],
             [("a_topaz.mp4 → Dancing", [Path("b_topaz.mp4")])],
@@ -117,7 +117,7 @@ class TestBackfillWindow(unittest.TestCase):
 
         assert window.hearing_text() == ""
 
-    def test_the_last_decision_names_its_own_clip_not_the_one_now_playing(self):
+    def test_the_last_decision_names_its_own_video_not_the_one_now_playing(self):
         session = FakeSession(
             [Path("a_topaz.mp4"), Path("b_topaz.mp4")],
             [("a_topaz.mp4 → Dancing", [Path("b_topaz.mp4")])],
@@ -139,8 +139,8 @@ class TestBackfillWindow(unittest.TestCase):
         assert window.status_text() == status
         assert window.last_text() == last
 
-    def test_a_decision_that_leaves_the_clip_on_screen_does_not_restart_it(self):
-        """An undo with nothing to undo, or a skip with only one clip left."""
+    def test_a_decision_that_leaves_the_video_on_screen_does_not_restart_it(self):
+        """An undo with nothing to undo, or a skip with only one video left."""
         session = FakeSession([Path("a_topaz.mp4")], [("nothing to undo", None)])
         window = self._window(session)
 
@@ -150,7 +150,7 @@ class TestBackfillWindow(unittest.TestCase):
         set_source.assert_not_called()
         assert window.last_text() == "Last: nothing to undo"
 
-    def test_the_last_clip_leaves_a_finished_message(self):
+    def test_the_last_video_leaves_a_finished_message(self):
         session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → Trash", [])])
 
         window = self._window(session)
@@ -164,7 +164,7 @@ class TestBackfillWindow(unittest.TestCase):
 
         assert window.status_text() == "Nothing left to label."
 
-    def test_emptying_the_queue_releases_the_last_clip(self):
+    def test_emptying_the_queue_releases_the_last_video(self):
         """Otherwise the player still holds the file the background move is renaming."""
         session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → Trash", [])])
         window = self._window(session)
@@ -175,7 +175,7 @@ class TestBackfillWindow(unittest.TestCase):
         set_source.assert_called_once()
         assert set_source.call_args[0][0].isEmpty()
 
-    def test_an_undo_after_the_last_clip_starts_playing_it_again(self):
+    def test_an_undo_after_the_last_video_starts_playing_it_again(self):
         session = FakeSession([], [("undid a_topaz.mp4 → Dancing", [Path("a_topaz.mp4")])])
         window = self._window(session)
 
@@ -246,7 +246,7 @@ class TestBackfillWindow(unittest.TestCase):
             assert not window.button_for("side beta").icon().isNull()
 
     def test_an_example_stored_under_older_casing_still_lights_its_button(self):
-        """Library clips tagged "Xyz ..." must reach the "XYZ ..." button."""
+        """Library videos tagged "Xyz ..." must reach the "XYZ ..." button."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         with tempfile.TemporaryDirectory() as tmp:
             window.set_thumbnail("Xyz Beta", str(self._png(tmp)))
@@ -279,17 +279,17 @@ class TestBackfillWindow(unittest.TestCase):
 
             assert not window.button_for("side beta").icon().isNull()
 
-    def test_the_clip_plays_with_no_sound_output_at_all(self):
-        """The microphone is open the whole session; a clip's audio would be
+    def test_the_video_plays_with_no_sound_output_at_all(self):
+        """The microphone is open the whole session; a video's audio would be
         one more thing for the recognizer to mishear."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         assert window._preview.player.audioOutput() is None
 
-    def test_the_clip_loops_until_a_decision_lands(self):
+    def test_the_video_loops_until_a_decision_lands(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         assert window._preview.player.loops() == QMediaPlayer.Loops.Infinite
 
-    def test_releasing_the_last_clip_also_stops_the_player(self):
+    def test_releasing_the_last_video_also_stops_the_player(self):
         """Dropping the source without stop() left playback tearing at a file
         the background discard is renaming (audit probe 25 deleted the stop
         with the suite green)."""
@@ -302,7 +302,7 @@ class TestBackfillWindow(unittest.TestCase):
 
         stop.assert_called_once()
 
-    def test_what_the_player_reads_out_of_a_clip_is_kept_out_of_every_log(self):
+    def test_what_the_player_reads_out_of_a_video_is_kept_out_of_every_log(self):
         with patch("util.looping_preview.silence_the_ffmpeg_format_dump") as silenced:
             self._window(FakeSession([Path("a_topaz.mp4")]))
 
@@ -352,7 +352,7 @@ class TestBackfillWindow(unittest.TestCase):
             assert image.pixelColor(5, 48).alpha() == 0
             assert image.pixelColor(90, 48).alpha() == 0
 
-    def test_closing_releases_the_clip_the_player_holds(self):
+    def test_closing_releases_the_video_the_player_holds(self):
         session = FakeSession([Path("a_topaz.mp4")])
         # Through the helper, for its cleanups: closing the window inside the
         # patch below is what this test is about, but the window itself still has

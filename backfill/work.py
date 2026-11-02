@@ -16,9 +16,9 @@ class SerialWorker:
     :meth:`drain` lets an undo wait for the decision it is about to reverse — a
     single worker means waiting on the last task waits on every task before it.
 
-    A task that raises is logged and dropped: the clip it belonged to has already
+    A task that raises is logged and dropped: the video it belonged to has already
     left the queue, so an exception escaping into a discarded Future would look
-    exactly like a clip that was labelled successfully.
+    exactly like a video that was labelled successfully.
     """
 
     def __init__(self) -> None:

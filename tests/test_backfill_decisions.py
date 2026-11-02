@@ -17,7 +17,7 @@ from util.sidecar import record_action, sidecar_path
 
 
 class TestSidecarSnapshotAndRestore(unittest.TestCase):
-    def test_a_clip_with_no_sidecar_snapshots_as_nothing(self):
+    def test_a_video_with_no_sidecar_snapshots_as_nothing(self):
         with library_tree() as lib:
             assert sidecar_snapshot(lib.video()) is None
 
@@ -58,7 +58,7 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
 
 
 class TestReclaimFromTrash(unittest.TestCase):
-    def test_a_discarded_clip_goes_back_where_it_came_from(self):
+    def test_a_discarded_video_goes_back_where_it_came_from(self):
         with workspace_temp_dir() as root:
             trash_dir = root / "kinda_weird"
             video = root / "upscaled" / "portrait" / "provider2" / "a_topaz.mp4"
@@ -107,7 +107,7 @@ class TestDiscardAsTrash(unittest.TestCase):
             assert (trash_dir / "a_topaz.mp4").read_bytes() == b"earlier"
             assert destination.read_bytes() == b"video"
 
-    def test_waits_out_a_player_that_still_holds_the_clip_open(self):
+    def test_waits_out_a_player_that_still_holds_the_video_open(self):
         with workspace_temp_dir() as root:
             trash_dir = root / "kinda_weird"
             video = self._make_video(root)

@@ -1,6 +1,6 @@
 """The spoken vocabulary of the metadata backfill tool.
 
-A recognized phrase labels the clip on screen with a ``video.action`` — the field
+A recognized phrase labels the video on screen with a ``video.action`` — the field
 Fun Time's metadata filter matches against.  Kept free of the vosk runtime so the
 tests import it without an audio backend, the same split Fun Time draws between
 its voice_commands and voice_control.
@@ -19,7 +19,7 @@ A :class:`Vocabulary` is the single source of truth for two consumers: the
 recognizer grammar and the window's clickable reference grid.  An act voiced
 more than one way is one ``spoken`` form plus its ``aliases``, so the grammar
 hears every form while the grid shows one button.  Every act is scoped by a
-camera word: a clip is always tagged with one of them, never bare.
+camera word: a video is always tagged with one of them, never bare.
 """
 
 from __future__ import annotations
@@ -76,10 +76,10 @@ TRASH = "trash"
 UNDO = "undo"
 SAME = "same"
 
-# "skip" defers the clip to the back of the queue; "trash"/"trash" moves it to the
+# "skip" defers the video to the back of the queue; "trash"/"trash" moves it to the
 # trash folder, as Fun Time's "send to Trash" does; "undo" takes back the last
 # decision, and keeps stepping back through them; "same" repeats the last act you
-# spoke, for a run of clips that share one.
+# spoke, for a run of videos that share one.
 _CONTROLS: tuple[_Control, ...] = (
     _Control("skip", "Skip", SKIP),
     _Control("trash", "Trash", TRASH),
