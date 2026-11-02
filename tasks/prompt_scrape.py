@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 import config
 from tasks import origenerator_metadata
-from util import lanes, orientation, provenance, relative_dates, sidecar, video_type
+from util import lanes, orientation, provenance, relative_dates, sidecar, video_kind
 from util.headless_browser import fetch_dom, find_browser_executable
 from util.html_query import (
     Node,
@@ -105,8 +105,8 @@ def run(*, sorted_dir: Path | None = None,
             # to learn again, and a stamp saying what made the upscale, which
             # nothing could learn again at all.
             def keep_what_landed_first(current: dict, payload=payload) -> dict:
-                recorded = video_type.type_of(current)
-                kept = video_type.stamped(payload, recorded) if recorded else payload
+                recorded = video_kind.kind_of(current)
+                kept = video_kind.stamped(payload, recorded) if recorded else payload
                 return provenance.carried_forward(current, kept)
 
             sidecar.update(output_path, keep_what_landed_first)
@@ -127,13 +127,13 @@ def run(*, sorted_dir: Path | None = None,
 def _already_scraped(output_path: Path) -> bool:
     """Whether the sidecar at *output_path* already holds what this stage writes.
 
-    Existence is not the same question: ``tasks.video_types`` records a kind
+    Existence is not the same question: ``tasks.video_kinds`` records a kind
     and a running time on every library video, including the ones nothing has
     scraped yet. A sidecar holding nothing but those is not a scrape, and
     reading it as one loses the prompts for good — a video this stage has
     skipped once is never looked at again.
     """
-    return output_path.exists() and not video_type.only_the_video_itself(
+    return output_path.exists() and not video_kind.only_the_video_itself(
         sidecar.read(output_path))
 
 

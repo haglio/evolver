@@ -202,7 +202,7 @@ PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-brows
 CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 # Non-AI folders holding scenes carved out of longer videos and nothing else,
 # as paths relative to the video library ("2D/non_AI/<bucket>/<folder>").
-# ``tasks.video_types`` reads them as excerpts whether or not each one carries
+# ``tasks.video_kinds`` reads them as excerpts whether or not each one carries
 # the ``clip`` record that normally says so: the batches that were split before
 # anything wrote that record are excerpts all the same, and the folder they were
 # filed into is the only thing left that knows it. From the overlay, not from
@@ -259,11 +259,11 @@ UPSCALE_BATCH_LIMIT = 5
 # How many ffprobes one run of the video-kinds stage will spend. Only a running
 # time or an orientation not yet recorded costs one, so this bounds the first runs
 # over a library that has never been asked and is never reached again after.
-VIDEO_TYPE_BATCH_LIMIT = 400
+VIDEO_KIND_BATCH_LIMIT = 400
 # And how many of those it spends on the VR videos kept on the cloud drive, where
 # each one fetches part of a file that is not on this computer, perhaps while the
 # headset is playing another from the same drive.
-CLOUD_VIDEO_TYPE_BATCH_LIMIT = 10
+CLOUD_VIDEO_KIND_BATCH_LIMIT = 10
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
 PIPELINE_WALL_TIMEOUT_SECONDS = UPSCALE_RUN_BUDGET_SECONDS + 3 * 60  # 11 min

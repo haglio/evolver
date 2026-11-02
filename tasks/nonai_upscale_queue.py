@@ -19,7 +19,7 @@ from tasks import nonai_encode
 from tasks.nonai_files import StageFiles
 from tasks.nonai_queue import collect_queued_videos, listed_videos, relpath
 from tasks.nonai_titles import TITLE_FIELD
-from util import nonai_job, processes, sidecar, video_type
+from util import nonai_job, processes, sidecar, video_kind
 from util.upscale_queue import (
     ASKED_FOR,
     FINISHING,
@@ -80,6 +80,6 @@ def _entry(video: Path, pinned: set[str]) -> Entry:
     return Entry(
         video=relpath(video),
         name=str(payload.get(TITLE_FIELD) or video.stem),
-        seconds=video_type.duration_of(payload),
+        seconds=video_kind.duration_of(payload),
         pinned=relpath(video) in pinned,
     )

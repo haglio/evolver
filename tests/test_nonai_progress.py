@@ -18,13 +18,13 @@ from tests.temp_helpers import (
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
-from util import sidecar, video_type
+from util import sidecar, video_kind
 
 
 def lasting(video, seconds):
     """*video*, with *seconds* recorded on its sidecar as the kinds stage would."""
     path = sidecar.sidecar_path(video)
-    write_sidecar(path, video_type.timed(sidecar.read(path), seconds))
+    write_sidecar(path, video_kind.timed(sidecar.read(path), seconds))
     return video
 
 

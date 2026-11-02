@@ -15,7 +15,7 @@ in a sub-stage that still wants a human with a trimmer, one the skip list
 retired, one sitting in a bucket's "good to go" that nobody asked to re-encode.
 
 Nothing here measures anything.  A running time comes off the video's sidecar,
-where :mod:`tasks.video_types` writes it once (:mod:`util.video_type`), so this
+where :mod:`tasks.video_kinds` writes it once (:mod:`util.video_kind`), so this
 costs a walk and a JSON read per video instead of four hundred ffprobe spawns
 every ten minutes.  A video nothing has measured yet is counted apart rather
 than guessed at, so over the first runs against a library that has never been
@@ -30,7 +30,7 @@ from pathlib import Path
 
 from app_support.video_names import strip_processing_suffixes
 
-from util import sidecar, video_type
+from util import sidecar, video_kind
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
 from util.variants import is_processed_stem
@@ -106,4 +106,4 @@ def _upscaled() -> dict[str, float | None]:
 
 
 def _recorded_duration(video: Path) -> float | None:
-    return video_type.duration_of(sidecar.read(sidecar.sidecar_path(video)))
+    return video_kind.duration_of(sidecar.read(sidecar.sidecar_path(video)))

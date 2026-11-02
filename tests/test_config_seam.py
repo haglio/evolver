@@ -58,7 +58,7 @@ CONFIG_REFERENCE_CEILINGS = {
     "tasks/stages.py": 1,
     "tasks/stray_files.py": 9,
     "tasks/upscale.py": 14,
-    "tasks/video_types.py": 6,
+    "tasks/video_kinds.py": 6,
     "tasks/watch_weights.py": 5,
     "tasks/taken_back.py": 7,
     "util/lanes.py": 9,

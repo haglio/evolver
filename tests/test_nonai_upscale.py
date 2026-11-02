@@ -25,7 +25,7 @@ from tests.temp_helpers import (
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
-from util import nonai_job, orientation, provenance, script_library, sidecar, topaz, video_type
+from util import nonai_job, orientation, provenance, script_library, sidecar, topaz, video_kind
 from util.media_files import partial_path
 
 
@@ -1487,7 +1487,7 @@ class TestReportingHowFarAlongItIs(unittest.TestCase):
 
     def _lasting(self, video, seconds):
         path = sidecar.sidecar_path(video)
-        write_sidecar(path, video_type.timed(sidecar.read(path), seconds))
+        write_sidecar(path, video_kind.timed(sidecar.read(path), seconds))
         return video
 
     def test_reports_the_percentage_and_the_hours_left_beside_the_count(self):

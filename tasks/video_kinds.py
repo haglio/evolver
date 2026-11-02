@@ -2,7 +2,7 @@
 it is portrait or landscape.
 
 Three fields, ``video.type``, ``video.duration_seconds`` and
-``video.orientation`` (:mod:`util.video_type`), written once per video and read
+``video.orientation`` (:mod:`util.video_kind`), written once per video and read
 by every app in the family in place of the tests they each used to run.  This
 stage is the only thing that writes them, so the vocabulary has one author.
 
@@ -28,7 +28,7 @@ measured wherever they are needed costs one per reader forever.
 
 Which means the first run over a library that has never been asked is the
 expensive one, and it runs inside a pipeline with a wall clock.  So a run
-measures at most ``config.VIDEO_TYPE_BATCH_LIMIT`` videos and leaves the rest
+measures at most ``config.VIDEO_KIND_BATCH_LIMIT`` videos and leaves the rest
 to the next one: a library arrives at a complete answer over a few runs rather
 than holding one run up until it has the whole thing.
 
@@ -47,7 +47,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import lanes, orientation, sidecar, video_type
+from util import lanes, orientation, sidecar, video_kind
 from util.ffprobe import duration_seconds, orientation_of
 
 log = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class _Measurements:
 
 
 @dataclass
-class VideoTypesResult:
+class VideoKindsResult:
     """What one run reached, counting each video once.
 
     ``recorded`` wrote a sidecar, ``already`` found nothing left to ask,
@@ -105,7 +105,7 @@ class VideoTypesResult:
     deferred: int = 0
 
 
-def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoTypesResult:
+def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsResult:
     """Record what kind every library video is, how long it runs, and whether it
     is portrait or landscape.
 
@@ -119,12 +119,12 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoTypesR
     signals, so a folder declared an excerpt after the fact corrects itself.
     """
     log.info("=== Stage: record video kinds ===")
-    result = VideoTypesResult()
-    measurements = _Measurements(config.VIDEO_TYPE_BATCH_LIMIT,
-                                 config.CLOUD_VIDEO_TYPE_BATCH_LIMIT)
+    result = VideoKindsResult()
+    measurements = _Measurements(config.VIDEO_KIND_BATCH_LIMIT,
+                                 config.CLOUD_VIDEO_KIND_BATCH_LIMIT)
     for listed in _library_videos():
-        free = video_type.free_kind(genau=listed.genau, excerpt=listed.excerpt)
-        seconds = video_type.duration_of(listed.payload)
+        free = video_kind.free_kind(genau=listed.genau, excerpt=listed.excerpt)
+        seconds = video_kind.duration_of(listed.payload)
         unmeasurable = False
         if seconds is None and measurements.spent_on(listed):
             seconds = probe(listed.video)
@@ -144,7 +144,7 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoTypesR
             continue
 
         oriented = listed.orientation is not _NEITHER_PORTRAIT_NOR_LANDSCAPE
-        orient = (listed.orientation or video_type.orientation_of(listed.payload)) if oriented else ""
+        orient = (listed.orientation or video_kind.orientation_of(listed.payload)) if oriented else ""
         if oriented and not orient and measurements.spent_on(listed):
             orient = _orientation_measured(listed.video, orientation_probe)
 
@@ -152,13 +152,13 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoTypesR
             current: dict, genau=listed.genau, excerpt=listed.excerpt, seconds=seconds,
             orient=orient,
         ) -> dict | None:
-            written = video_type.stamped(
-                current, video_type.classify(genau=genau, excerpt=excerpt,
+            written = video_kind.stamped(
+                current, video_kind.classify(genau=genau, excerpt=excerpt,
                                              duration_seconds=seconds))
             if seconds is not None:
-                written = video_type.timed(written, seconds)
+                written = video_kind.timed(written, seconds)
             if orient:
-                written = video_type.oriented(written, orient)
+                written = video_kind.oriented(written, orient)
             return written if written != current else None
 
         if sidecar.update(listed.sidecar, record_what_is_known) is not None:

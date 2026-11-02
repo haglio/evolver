@@ -15,7 +15,7 @@ from tests.temp_helpers import (
     workspace_temp_dir,
     write_sidecar,
 )
-from util import provenance, sidecar, video_type
+from util import provenance, sidecar, video_kind
 
 # Fabricated: the real folder name is library vocabulary and lives in the
 # overlay, so a test names its own and overrides the config with it.
@@ -80,7 +80,7 @@ class TestGenauDeliver(unittest.TestCase):
 
                 delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
             assert delivered["video"]["prompt"] == "a prompt"
-            assert video_type.type_of(delivered) == video_type.GENAU_FLICK
+            assert video_kind.kind_of(delivered) == video_kind.GENAU_FLICK
             # The outbox path it mirrored is gone, so the record must not stay there.
             assert not (metadata / "landscape" / GENAU_SOURCE / "loop_1_topaz.json").exists()
 
@@ -116,7 +116,7 @@ class TestGenauDeliver(unittest.TestCase):
                 genau_deliver.run()
 
                 delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
-            assert video_type.type_of(delivered) == video_type.GENAU_FLICK
+            assert video_kind.kind_of(delivered) == video_kind.GENAU_FLICK
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
         """Fun Time's audio companion plays ``<audio folder>/<flick name>.mp3``
