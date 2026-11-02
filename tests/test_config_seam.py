@@ -60,7 +60,7 @@ CONFIG_REFERENCE_CEILINGS = {
     "tasks/upscale.py": 14,
     "tasks/video_types.py": 6,
     "tasks/watch_weights.py": 5,
-    "tasks/withdrawn.py": 7,
+    "tasks/taken_back.py": 7,
     "util/lanes.py": 9,
     "util/origenerator_gallery.py": 2,
     "util/preview.py": 2,

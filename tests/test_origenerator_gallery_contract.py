@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 import config
-from tasks import origenerator_metadata, withdrawn
+from tasks import origenerator_metadata, taken_back
 from util import lanes, origenerator_gallery
 
 CONTRACT = Path("origenerator") / origenerator_gallery.PUBLISHED
@@ -61,7 +61,7 @@ class OrigeneratorGalleryContract(unittest.TestCase):
         read = {
             *origenerator_metadata.COLUMNS,
             origenerator_metadata.OWN_PROVENANCE,
-            *withdrawn.COLUMNS,
+            *taken_back.COLUMNS,
             origenerator_gallery.REMADE_AT,
             *(lane.unsent_column for lane in lanes.sent_lanes()),
         }
@@ -77,7 +77,7 @@ class OrigeneratorGalleryContract(unittest.TestCase):
         assert {lane.key: lane.unsent_column for lane in lanes.sent_lanes()} == promised
 
     def test_the_soundless_copy_role_read_here_is_the_one_origenerator_writes(self):
-        assert self.promise["silent_copy_role"] == withdrawn.SILENT_COPY_ROLE
+        assert self.promise["silent_copy_role"] == taken_back.SILENT_COPY_ROLE
 
     def test_the_model_keys_read_here_are_the_ones_origenerator_records(self):
         """A run's model is named under one of these inside ``params_json``."""

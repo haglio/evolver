@@ -8,7 +8,7 @@ read-only, so a running Origenerator (which owns the file) is never at risk of a
 write from here.
 
 Two stages pull from it, and each reads its own columns: the metadata strategy
-builds a clip's sidecar from the row that made it, and ``tasks.withdrawn``
+builds a clip's sidecar from the row that made it, and ``tasks.taken_back``
 deletes the clips whose send that gallery has taken back. The connection and the
 read are here rather than in either of them, because there was one of each and
 the second stage would have been a copy.

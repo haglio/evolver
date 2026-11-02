@@ -45,10 +45,10 @@ from tasks import (
     scripts_sync,
     sort,
     stray_files,
+    taken_back,
     upscale,
     video_types,
     watch_weights,
-    withdrawn,
 )
 from util import run_lock, run_log, system_resources, topaz
 from util import upscale_queue as upscale_queue_shape
@@ -80,7 +80,7 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     # A copy that would not delete is, like the one above, almost always a clip
     # an app has open right now, and the next run gets it -- but it stays visible
     # for the same reason: a folder that cannot be written at all looks identical
-    # from here, and a withdrawal that silently never happens leaves the clip in
+    # from here, and a taking back that silently never happens leaves the clip in
     # the library after the user was told it was going.
     "withdrawn": lambda r: bool(r.failed),
     # Origenerator could not be asked: the work it leaves for while it is closed
@@ -311,7 +311,7 @@ def _run_stages(
         # Before the scrape and the sort: a clip whose send has been taken back
         # should not be given a sidecar on its way out, nor filed into 1_sorted
         # from an inbox it is about to be deleted from.
-        _run_stage("withdrawn", withdrawn.run)
+        _run_stage("withdrawn", taken_back.run)
         _run_stage("metadata", prompt_scrape.run)
         sort_result = _run_stage("sort", sort.run)
         downtime_result = _run_stage("origenerator_downtime", origenerator_downtime.run)

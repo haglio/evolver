@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tasks import withdrawn
+from tasks import taken_back
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
 from util import lanes, script_library
 
@@ -58,7 +58,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 upscale = touch_video(
                     lib.outbox / "portrait" / source / "made_00001_topaz.mp4")
 
-                result = withdrawn.run()
+                result = taken_back.run()
 
                 assert not upscale.exists()
                 assert not sorted_copy.exists()
@@ -77,7 +77,7 @@ class TestTheEvolverLane(unittest.TestCase):
                     touch_video(script)
                     script_library.mark_generated(script)
 
-                result = withdrawn.run()
+                result = taken_back.run()
 
                 for script in scripts:
                     assert not script.exists()
@@ -95,7 +95,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 left_behind = touch_video(script_library.script_path_for_video(
                     lib.outbox / "portrait" / source / "made_00007_topaz.mp4"))
 
-                withdrawn.run()
+                taken_back.run()
 
                 assert not left_behind.exists()
 
@@ -108,9 +108,9 @@ class TestTheEvolverLane(unittest.TestCase):
                 sorted_copy = touch_video(lib.sorted_dir / source / "portrait" / "made_00008.mp4")
                 script = touch_video(script_library.script_path_for_video(sorted_copy))
 
-                with patch("tasks.withdrawn.script_library.delete_script",
+                with patch("tasks.taken_back.script_library.delete_script",
                            side_effect=PermissionError("in use")):
-                    result = withdrawn.run()
+                    result = taken_back.run()
 
                 assert script.exists()
         assert (result.deleted, result.deleted_scripts, result.failed) == (1, 0, 1)
@@ -123,7 +123,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 waiting = touch_video(
                     lib.inbox / lanes.ORIGENERATOR_SOURCE / "made_00002.mp4")
 
-                withdrawn.run()
+                taken_back.run()
 
                 assert not waiting.exists()
 
@@ -136,25 +136,25 @@ class TestTheEvolverLane(unittest.TestCase):
                     lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE
                     / "made_00003_topaz.mp4")
 
-                result = withdrawn.run()
+                result = taken_back.run()
 
                 assert kept.exists()
         assert result.deleted == 0
 
     def test_a_clip_this_library_never_took_is_no_error(self):
-        # The withdrawal is a standing answer rather than a request that drains,
+        # The taking back is a standing answer rather than a request that drains,
         # so it is read again on every run long after the copies have gone.
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             db = _gallery(root / "gallery.db", [("p1", "made_00004.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                result = withdrawn.run()
+                result = taken_back.run()
 
         assert (result.deleted, result.failed) == (0, 0)
 
     def test_the_copy_keeps_the_uniquifier_the_inbox_gave_it(self):
         # Two clips of one name reach the inbox and the second is filed as
-        # "name (2)"; the upscale carries that through, and a withdrawal has to
+        # "name (2)"; the upscale carries that through, and a taking back has to
         # follow it or the clip it names is never found.
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
@@ -164,7 +164,7 @@ class TestTheEvolverLane(unittest.TestCase):
                     lib.outbox / "landscape" / lanes.ORIGENERATOR_SOURCE
                     / "made_00005 (2)_topaz.mp4")
 
-                withdrawn.run()
+                taken_back.run()
 
                 assert not second.exists()
 
@@ -178,7 +178,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 record = _sidecar(lib, "2D", "AI", "2_outbox", "upscaled_by_orientation",
                                   "portrait", source, "made_00006_topaz.json")
 
-                result = withdrawn.run()
+                result = taken_back.run()
 
                 assert not record.exists()
         assert result.deleted_metadata == 1
@@ -197,7 +197,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 locked = touch_video(
                     lib.outbox / "portrait" / source / "made_00007_topaz.mp4")
                 with locked.open("a"):
-                    result = withdrawn.run()
+                    result = taken_back.run()
 
                 assert sorted_copy.exists()
         assert result.failed == 1
@@ -211,7 +211,7 @@ class TestTheGenauLane(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 delivered = touch_video(lib.genau_flicks / "2D" / "AI" / "loop_00001_topaz.mp4")
 
-                withdrawn.run()
+                taken_back.run()
 
                 assert not delivered.exists()
 
@@ -225,7 +225,7 @@ class TestTheGenauLane(unittest.TestCase):
                     / "both_00001_topaz.mp4")
                 delivered = touch_video(lib.genau_flicks / "2D" / "AI" / "both_00001_topaz.mp4")
 
-                withdrawn.run()
+                taken_back.run()
 
                 assert kept.exists()
                 assert not delivered.exists()
@@ -239,7 +239,7 @@ def _gallery_of_videos_with_sound(path: Path, stems) -> Path:
     for n, stem in enumerate(stems):
         outputs = json.dumps([{"filename": f"{stem}-audio.mp4", "subfolder": "video"},
                               {"filename": f"{stem}.mp4", "subfolder": "video",
-                               "role": withdrawn.SILENT_COPY_ROLE}])
+                               "role": taken_back.SILENT_COPY_ROLE}])
         conn.execute("INSERT INTO generations (prompt_id, output_files) VALUES (?, ?)",
                      (f"p{n}", outputs))
     conn.commit()
@@ -256,7 +256,7 @@ class TestASoundlessCopy(unittest.TestCase):
                 sounded = touch_video(lib.genau_flicks / "2D" / "AI" / "loop_00009-audio_topaz.mp4")
                 soundless = touch_video(lib.genau_flicks / "2D" / "AI" / "loop_00009_topaz.mp4")
 
-                withdrawn.run()
+                taken_back.run()
 
                 assert sounded.exists()
                 assert not soundless.exists()
@@ -268,7 +268,7 @@ class TestASoundlessCopy(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 soundless = touch_video(lib.genau_flicks / "2D" / "AI" / "loop_00010_topaz.mp4")
 
-                withdrawn.run()
+                taken_back.run()
 
                 assert soundless.exists()
 
@@ -282,7 +282,7 @@ class TestASoundlessCopy(unittest.TestCase):
                 soundless = (touch_video(lib.outbox / "landscape" / source / "made_00011_topaz.mp4"),
                              touch_video(lib.sorted_dir / source / "landscape" / "made_00011.mp4"))
 
-                result = withdrawn.run()
+                result = taken_back.run()
 
                 assert sounded.exists()
                 assert not any(copy.exists() for copy in soundless)
@@ -294,7 +294,7 @@ class TestAGalleryThisCannotRead(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "absent.db"):
-                result = withdrawn.run()
+                result = taken_back.run()
 
         assert (result.deleted, result.failed) == (0, 0)
 
@@ -311,7 +311,7 @@ class TestAGalleryThisCannotRead(unittest.TestCase):
                 kept = touch_video(
                     lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE / "old_topaz.mp4")
 
-                result = withdrawn.run()
+                result = taken_back.run()
 
                 assert kept.exists()
         assert result.deleted == 0

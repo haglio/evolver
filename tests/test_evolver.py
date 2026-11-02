@@ -68,7 +68,7 @@ _STAGE_PATCHES = [
     ("evolver.origenerator_downtime.run", "origenerator_downtime_run"),
     ("evolver.video_types.run", "video_types_run"),
     ("evolver.provenance_sweep.run", "provenance_sweep_run"),
-    ("evolver.withdrawn.run", "withdrawn_run"),
+    ("evolver.taken_back.run", "withdrawn_run"),
     ("evolver.clip_scripts.run", "clip_scripts_run"),
     ("evolver.scene_scripts.run", "scene_scripts_run"),
     ("evolver.scripts_sync.run", "scripts_sync_run"),
