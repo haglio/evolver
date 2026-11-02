@@ -171,7 +171,7 @@ class TestWhichReadingsAreTrusted(unittest.TestCase):
 
         assert told.heard == ["side beta"]
 
-    def test_a_phrase_that_discards_the_clip_is_taken_only_as_the_first_reading(self):
+    def test_a_phrase_that_discards_the_video_is_taken_only_as_the_first_reading(self):
         listener = VoiceListener(
             ["trash", "same", "undo"], never_repaired={"trash"},
             engines=scripted_engines([said("trash same", "trash"), said("undo")]))

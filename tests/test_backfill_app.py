@@ -32,7 +32,7 @@ class TestMain(unittest.TestCase):
             application=patch("backfill_app.application"),
             claim=patch("backfill_app.process_identity.claim"),
             alert=patch("backfill_app.QMessageBox"),
-            unlabeled=patch("backfill_app.unlabeled_clips", return_value=videos),
+            unlabeled=patch("backfill_app.unlabeled_videos", return_value=videos),
             thumbnails=patch("backfill_app._ready_thumbnails", return_value={}),
             window=patch("backfill_app.BackfillWindow"),
             listener=patch("backfill_app.VoiceListener"),
@@ -125,7 +125,7 @@ class TestMain(unittest.TestCase):
         mocks["window"].assert_called_once_with(
             mocks["session"].return_value, mocks["vocabulary"].return_value, thumbnails=ANY)
 
-    def test_the_example_clips_are_picked_for_the_vocabulary_main_loads(self):
+    def test_the_example_videos_are_picked_for_the_vocabulary_main_loads(self):
         mocks = self._run_main()
 
         mocks["thumbnails"].assert_called_once_with(mocks["vocabulary"].return_value, ANY)
@@ -137,7 +137,7 @@ class TestMain(unittest.TestCase):
             mocks["vocabulary"].return_value.grammar_phrases.return_value, parent=ANY,
             never_repaired=ANY)
 
-    def test_a_phrase_that_discards_the_clip_is_never_repaired_from_a_near_miss(self):
+    def test_a_phrase_that_discards_the_video_is_never_repaired_from_a_near_miss(self):
         mocks = self._run_main()
 
         assert mocks["listener"].call_args.kwargs["never_repaired"] is mocks["vocabulary"].return_value.discarding_phrases.return_value
@@ -148,7 +148,7 @@ class TestReadyThumbnails(unittest.TestCase):
         built = [("Side Beta", Path("/c/side_beta.jpg")), ("XYZ Alpha", Path("/c/xyz_alpha.jpg"))]
         vocabulary, scan = object(), []
         with patch("backfill_app.build_thumbnails", return_value=built) as build, \
-             patch("backfill_app.example_clips", return_value={}) as examples:
+             patch("backfill_app.example_videos", return_value={}) as examples:
             ready = backfill_app._ready_thumbnails(vocabulary, scan)
 
         assert ready == {"Side Beta": str(Path("/c/side_beta.jpg")), "XYZ Alpha": str(Path("/c/xyz_alpha.jpg"))}
@@ -156,11 +156,11 @@ class TestReadyThumbnails(unittest.TestCase):
         examples.assert_called_once_with(vocabulary, scan)
 
     def test_the_library_is_walked_once_for_both_of_startup_s_questions(self):
-        """The work queue and the example clips are two projections of one
+        """The work queue and the example videos are two projections of one
         scan. Two walks and two sidecar parses is a tray-launched tool sitting
         with no window on screen for twice as long as it needs to."""
         with patch("backfill_app.library_scan", return_value=[]) as scan, \
-                patch("backfill_app.unlabeled_clips", return_value=[]), \
+                patch("backfill_app.unlabeled_videos", return_value=[]), \
                 patch("backfill_app.application"), \
                 patch("backfill_app.process_identity.claim"), \
                 patch("backfill_app.QMessageBox"), \

@@ -1,4 +1,4 @@
-"""Which clips still need an action, and the order the backfill tool asks about them."""
+"""Which videos still need an action, and the order the backfill tool asks about them."""
 
 from __future__ import annotations
 
@@ -31,10 +31,10 @@ def scraped_sources() -> frozenset[str]:
 
 
 def iter_library_videos() -> Iterator[tuple[str, Path]]:
-    """Every finalized upscaled clip as ``(source name, path)``, both orientations.
+    """Every finalized upscaled video as ``(source name, path)``, both orientations.
 
     Walked in a stable order — orientation, then source, then filename — so both
-    the work queue and the example-clip scan see clips the same way each run.
+    the work queue and the example-video scan see videos the same way each run.
     """
     for orient in _ORIENTATIONS:
         orient_dir = config.OUT_UPSCALED_DIR / orient
@@ -46,21 +46,21 @@ def iter_library_videos() -> Iterator[tuple[str, Path]]:
 
 
 @dataclass(frozen=True)
-class ScannedClip:
-    """One library clip, as the tool's two startup passes read it."""
+class ScannedVideo:
+    """One library video, as the tool's two startup passes read it."""
 
     source: str
     path: Path
     action: str
     wrong_action: str
-    clip_id: str
+    video_id: str
 
 
-def library_scan() -> list[ScannedClip]:
-    """Every upscaled clip, walked once and its sidecar parsed once.
+def library_scan() -> list[ScannedVideo]:
+    """Every upscaled video, walked once and its sidecar parsed once.
 
-    Startup wants two different projections of the same data -- the clips with
-    no action, and the first clip per action plus an index by clip id -- and
+    Startup wants two different projections of the same data -- the videos with
+    no action, and the first video per action plus an index by video id -- and
     used to take a full walk and a full sidecar read for each. On a library of
     thousands, that is a tray-launched tool sitting with no window on screen
     for twice as long as it needs to.
@@ -69,27 +69,27 @@ def library_scan() -> list[ScannedClip]:
     resume where it left off: it is not re-sorted here, and must not be.
     """
     return [
-        ScannedClip(
+        ScannedVideo(
             source=source,
             path=video,
             action=action_of(payload),
             wrong_action=wrong_action_of(payload),
-            clip_id=sorted_stem_of(video.stem),
+            video_id=sorted_stem_of(video.stem),
         )
         for source, video in iter_library_videos()
         if (payload := sidecar.read(sidecar_path(video))) is not None
     ]
 
 
-def unlabeled_clips(scan: list[ScannedClip] | None = None) -> list[Path]:
-    """Every upscaled clip whose sidecar records no ``video.action``.
+def unlabeled_videos(scan: list[ScannedVideo] | None = None) -> list[Path]:
+    """Every upscaled video whose sidecar records no ``video.action``.
 
     The ones a viewer *rejected* come first.  Fun Time's "wrong action" empties
     ``video.action`` and leaves ``video.wrong_action`` in its place, which says a
-    person just looked at that clip and told us its label was wrong: they are
-    owed an answer now, not at whatever depth of the library walk the clip
+    person just looked at that video and told us its label was wrong: they are
+    owed an answer now, not at whatever depth of the library walk the video
     happens to sit at.  For the same reason a rejection overrides the
-    scraped-source skip below — the scrape's claim about the clip is the very
+    scraped-source skip below — the scrape's claim about the video is the very
     thing being contradicted, and re-running the scrape would only assert it
     again.
     """
@@ -97,24 +97,24 @@ def unlabeled_clips(scan: list[ScannedClip] | None = None) -> list[Path]:
     scraped = scraped_sources()
     rejected: list[Path] = []
     never_labeled: list[Path] = []
-    for clip in scan:
-        if clip.action:
+    for video in scan:
+        if video.action:
             continue
-        if clip.wrong_action:
-            rejected.append(clip.path)
-        elif clip.source not in scraped:
-            never_labeled.append(clip.path)
+        if video.wrong_action:
+            rejected.append(video.path)
+        elif video.source not in scraped:
+            never_labeled.append(video.path)
     return rejected + never_labeled
 
 
 class BackfillQueue:
-    """The clips awaiting an action, kept in the order they were found.
+    """The videos awaiting an action, kept in the order they were found.
 
     A stable order is what lets a reopened session pick up where the last left
-    off: labelled clips drop out, so the next open resumes at the first clip still
+    off: labelled videos drop out, so the next open resumes at the first video still
     unlabelled rather than jumping to a fresh random one.
 
-    The clip at the front is the one on screen.  :meth:`resolve` retires it —
+    The video at the front is the one on screen.  :meth:`resolve` retires it —
     it has been labelled or discarded — while :meth:`defer` sends it to the
     back, unanswered, to come round again later.
 
@@ -122,34 +122,34 @@ class BackfillQueue:
     run of decisions back to front rewinds the queue to the order it had.
     """
 
-    def __init__(self, clips: list[Path]) -> None:
-        self._pending = deque(clips)
+    def __init__(self, videos: list[Path]) -> None:
+        self._pending = deque(videos)
 
     @property
     def remaining(self) -> int:
-        """How many clips still need an action, deferred ones included."""
+        """How many videos still need an action, deferred ones included."""
         return len(self._pending)
 
     @property
     def current(self) -> Path | None:
-        """The clip on screen, or None once every clip has been resolved."""
+        """The video on screen, or None once every video has been resolved."""
         return self._pending[0] if self._pending else None
 
     def resolve(self) -> None:
-        """Retire the current clip — it has been labelled or discarded."""
+        """Retire the current video — it has been labelled or discarded."""
         if self._pending:
             self._pending.popleft()
 
     def defer(self) -> None:
-        """Send the current clip to the back, still needing an action."""
+        """Send the current video to the back, still needing an action."""
         if self._pending:
             self._pending.rotate(-1)
 
-    def restore(self, clip: Path) -> None:
-        """Put a resolved *clip* back on screen — the inverse of :meth:`resolve`."""
-        self._pending.appendleft(clip)
+    def restore(self, video: Path) -> None:
+        """Put a resolved *video* back on screen — the inverse of :meth:`resolve`."""
+        self._pending.appendleft(video)
 
     def undefer(self) -> None:
-        """Bring the deferred clip back to the front — the inverse of :meth:`defer`."""
+        """Bring the deferred video back to the front — the inverse of :meth:`defer`."""
         if self._pending:
             self._pending.rotate(1)

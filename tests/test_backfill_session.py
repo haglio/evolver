@@ -51,53 +51,53 @@ class TestBackfillSession(unittest.TestCase):
 
     def test_a_phrase_means_what_the_vocabulary_the_session_was_handed_says(self):
         session = self._session(vocabulary=vocabulary_of(Act("kappa", "Kappa")))
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
             note = session.apply("xyz kappa")
 
-        record.assert_called_once_with(clip, "XYZ Kappa")
-        assert note == f"{clip.name} → XYZ Kappa"
+        record.assert_called_once_with(video, "XYZ Kappa")
+        assert note == f"{video.name} → XYZ Kappa"
 
     def test_a_control_the_session_does_not_dispatch_moves_no_file(self):
         """The four controls are dispatched by name. A fifth added to the
         vocabulary and not here has to do nothing: the fallback used to be the
-        discard path, which moves the clip on screen into the trash folder."""
+        discard path, which moves the video on screen into the trash folder."""
         vocabulary = vocabulary_of(Act("beta", "Beta"))
         vocabulary.controls["reticulate"] = "reticulate"
         session = self._session(vocabulary=vocabulary)
-        clip = session.current
+        video = session.current
 
         note = session.apply("reticulate")
 
         assert note is None
-        assert session.current == clip
+        assert session.current == video
 
-    def test_an_act_records_the_action_against_the_clip_on_screen(self):
+    def test_an_act_records_the_action_against_the_video_on_screen(self):
         session = self._session()
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
             note = session.apply("side beta")
 
-        record.assert_called_once_with(clip, "Side Beta")
-        assert note == f"{clip.name} → Side Beta"
+        record.assert_called_once_with(video, "Side Beta")
+        assert note == f"{video.name} → Side Beta"
 
-    def test_an_act_retires_the_clip(self):
+    def test_an_act_retires_the_video(self):
         session = self._session()
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.record_action"), patch("backfill.session.sidecar_snapshot"):
             session.apply("side dance")
 
         assert session.remaining == 2
-        assert session.current != clip
+        assert session.current != video
 
-    def test_skip_defers_the_clip_without_touching_the_disk(self):
+    def test_skip_defers_the_video_without_touching_the_disk(self):
         session = self._session()
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.send_to_trash") as discard:
@@ -105,34 +105,34 @@ class TestBackfillSession(unittest.TestCase):
 
         record.assert_not_called()
         discard.assert_not_called()
-        assert note == f"{clip.name} → skipped"
+        assert note == f"{video.name} → skipped"
         assert session.remaining == 3
-        assert session.current != clip
+        assert session.current != video
 
-    def test_trash_discards_the_clip_and_writes_no_metadata(self):
+    def test_trash_discards_the_video_and_writes_no_metadata(self):
         session = self._session()
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.send_to_trash") as discard:
             note = session.apply("trash")
 
-        discard.assert_called_once_with(clip)
+        discard.assert_called_once_with(video)
         record.assert_not_called()
-        assert note == f"{clip.name} → Trash"
+        assert note == f"{video.name} → Trash"
         assert session.remaining == 2
 
-    def test_an_unknown_phrase_leaves_the_clip_on_screen(self):
+    def test_an_unknown_phrase_leaves_the_video_on_screen(self):
         session = self._session()
-        clip = session.current
+        video = session.current
 
         note = session.apply("banana")
 
         assert note is None
-        assert session.current == clip
+        assert session.current == video
         assert session.remaining == 3
 
-    def test_a_phrase_heard_after_the_last_clip_does_nothing(self):
+    def test_a_phrase_heard_after_the_last_video_does_nothing(self):
         session = self._session(count=1)
 
         with patch("backfill.session.record_action"), patch("backfill.session.sidecar_snapshot"):
@@ -142,7 +142,7 @@ class TestBackfillSession(unittest.TestCase):
         assert note is None
         assert session.current is None
 
-    def test_the_clip_advances_before_the_file_work_runs(self):
+    def test_the_video_advances_before_the_file_work_runs(self):
         """The session's headline promise, observed at the dispatch itself.
 
         A worker that merely held every task could not see the ordering:
@@ -168,19 +168,19 @@ class TestBackfillSession(unittest.TestCase):
         worker = QueueWatchingWorker()
         session = self._session(worker=worker)
         worker.session = session
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.record_action") as record, \
              patch("backfill.session.sidecar_snapshot"):
             session.apply("side dance")
 
             record.assert_not_called()
-            assert session.current != clip
-            # the clip had already left the screen when its work was dispatched
+            assert session.current != video
+            # the video had already left the screen when its work was dispatched
             assert worker.on_screen_at_submit == [session.current]
 
             worker.drain()
-            record.assert_called_once_with(clip, "Side Dancing")
+            record.assert_called_once_with(video, "Side Dancing")
 
 
 class TestUndo(unittest.TestCase):
@@ -191,17 +191,17 @@ class TestUndo(unittest.TestCase):
 
     def test_undo_with_nothing_decided_says_so_and_changes_nothing(self):
         session = self._session()
-        clip = session.current
+        video = session.current
 
         note = session.apply("undo")
 
         assert note == "nothing to undo"
-        assert session.current == clip
+        assert session.current == video
         assert session.remaining == 3
 
-    def test_undoing_an_act_puts_the_clip_back_and_removes_its_sidecar(self):
+    def test_undoing_an_act_puts_the_video_back_and_removes_its_sidecar(self):
         session = self._session()
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.record_action"), \
              patch("backfill.session.sidecar_snapshot", return_value=None), \
@@ -209,28 +209,28 @@ class TestUndo(unittest.TestCase):
             session.apply("side dance")
             note = session.apply("undo")
 
-        restore.assert_called_once_with(clip, None)
-        assert note == f"undid {clip.name} → Side Dancing"
-        assert session.current == clip
+        restore.assert_called_once_with(video, None)
+        assert note == f"undid {video.name} → Side Dancing"
+        assert session.current == video
         assert session.remaining == 3
 
-    def test_undoing_a_discard_reclaims_the_clip_from_the_trash_folder(self):
+    def test_undoing_a_discard_reclaims_the_video_from_the_trash_folder(self):
         session = self._session()
-        clip = session.current
-        landed = Path("kinda_weird") / clip.name
+        video = session.current
+        landed = Path("kinda_weird") / video.name
 
         with patch("backfill.session.send_to_trash", return_value=landed), \
              patch("backfill.session.reclaim_from_trash") as reclaim:
             session.apply("trash")
             note = session.apply("undo")
 
-        reclaim.assert_called_once_with(landed, clip)
-        assert note == f"undid {clip.name} → Trash"
-        assert session.current == clip
+        reclaim.assert_called_once_with(landed, video)
+        assert note == f"undid {video.name} → Trash"
+        assert session.current == video
         assert session.remaining == 3
 
     def test_undoing_a_discard_whose_move_failed_reclaims_nothing(self):
-        """A discard can die on a clip the player never releases; its file work
+        """A discard can die on a video the player never releases; its file work
         raised and nothing landed in the trash folder. Undo must not then try
         to reclaim from where nothing is -- the None-guard in roll_back was
         deletable with the suite green (audit probe 18)."""
@@ -245,7 +245,7 @@ class TestUndo(unittest.TestCase):
                     pass
 
         session = self._session(worker=SwallowingWorker())
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.send_to_trash",
                    side_effect=PermissionError(32, "still playing")), \
@@ -254,23 +254,23 @@ class TestUndo(unittest.TestCase):
             note = session.apply("undo")
 
         reclaim.assert_not_called()
-        assert note == f"undid {clip.name} → Trash"
-        assert session.current == clip
+        assert note == f"undid {video.name} → Trash"
+        assert session.current == video
 
-    def test_undoing_a_skip_brings_the_deferred_clip_back(self):
+    def test_undoing_a_skip_brings_the_deferred_video_back(self):
         session = self._session()
-        clip = session.current
+        video = session.current
 
         session.apply("skip")
         note = session.apply("undo")
 
-        assert note == f"undid {clip.name} → skipped"
-        assert session.current == clip
+        assert note == f"undid {video.name} → skipped"
+        assert session.current == video
         assert session.remaining == 3
 
-    def test_the_last_clip_labelled_can_still_be_undone(self):
+    def test_the_last_video_labelled_can_still_be_undone(self):
         session = self._session(count=1)
-        clip = session.current
+        video = session.current
 
         with patch("backfill.session.record_action"), \
              patch("backfill.session.sidecar_snapshot", return_value=None), \
@@ -279,7 +279,7 @@ class TestUndo(unittest.TestCase):
             assert session.current is None
             session.apply("undo")
 
-        assert session.current == clip
+        assert session.current == video
         assert session.remaining == 1
 
     def test_undo_waits_for_the_decision_it_is_about_to_reverse(self):
@@ -354,13 +354,13 @@ class TestSame(unittest.TestCase):
         videos = [lib.video(name=f"clip{i}_topaz.mp4") for i in range(count)]
         return BackfillSession(BackfillQueue(videos), ImmediateWorker(), VOCABULARY)
 
-    def _recorded_action(self, clip):
-        path = sidecar_path(clip)
+    def _recorded_action(self, video):
+        path = sidecar_path(video)
         if not path.is_file():
             return None
         return json.loads(path.read_text(encoding="utf-8"))["video"].get("action")
 
-    def test_same_records_the_last_action_against_the_clip_on_screen(self):
+    def test_same_records_the_last_action_against_the_video_on_screen(self):
         with library_tree() as lib:
             session = self._session(lib)
             first = session.current
@@ -377,7 +377,7 @@ class TestSame(unittest.TestCase):
         """No other test ever speaks two DIFFERENT acts before "same", so the
         direction of _last_action's walk was invisible: reversing it -- making
         "same" repeat the session's first act -- left all 149 tests green
-        (audit probe 9). In use that writes the wrong action into every clip
+        (audit probe 9). In use that writes the wrong action into every video
         of a run, and fun_time and genau read the sidecar it lands in."""
         with library_tree() as lib:
             session = self._session(lib, count=4)
@@ -393,13 +393,13 @@ class TestSame(unittest.TestCase):
     def test_same_before_any_action_repeats_nothing(self):
         with library_tree() as lib:
             session = self._session(lib)
-            clip = session.current
+            video = session.current
 
             note = session.apply("same")
 
-            assert self._recorded_action(clip) is None
+            assert self._recorded_action(video) is None
             assert note == "nothing to repeat"
-            assert session.current == clip
+            assert session.current == video
             assert session.remaining == 3
 
     def test_same_reaches_past_a_skip_to_the_last_action(self):
@@ -417,50 +417,50 @@ class TestSame(unittest.TestCase):
             assert after_skip != skipped
             assert self._recorded_action(skipped) is None
 
-    def test_undoing_a_same_puts_the_clip_back(self):
+    def test_undoing_a_same_puts_the_video_back(self):
         with library_tree() as lib:
             session = self._session(lib)
 
             session.apply("side dance")
-            same_clip = session.current
+            same_video = session.current
             session.apply("same")
             note = session.apply("undo")
 
-            assert self._recorded_action(same_clip) is None
-            assert note == f"undid {same_clip.name} → Side Dancing"
-            assert session.current == same_clip
+            assert self._recorded_action(same_video) is None
+            assert note == f"undid {same_video.name} → Side Dancing"
+            assert session.current == same_video
             assert session.remaining == 2
 
     def test_same_after_undoing_the_only_action_repeats_nothing(self):
         with library_tree() as lib:
             session = self._session(lib)
-            clip = session.current
+            video = session.current
 
             session.apply("side dance")
             session.apply("undo")
-            assert session.current == clip
+            assert session.current == video
             note = session.apply("same")
 
-            assert self._recorded_action(clip) is None
+            assert self._recorded_action(video) is None
             assert note == "nothing to repeat"
-            assert session.current == clip
+            assert session.current == video
 
     def test_consecutive_sames_keep_labelling_and_advancing(self):
         with library_tree() as lib:
             session = self._session(lib, count=4)
-            clips = [session.current]
+            videos = [session.current]
 
             session.apply("side beta")
-            clips.append(session.current)
+            videos.append(session.current)
             session.apply("same")
-            clips.append(session.current)
+            videos.append(session.current)
             session.apply("same")
 
-            for clip in clips:
-                assert self._recorded_action(clip) == "Side Beta"
+            for video in videos:
+                assert self._recorded_action(video) == "Side Beta"
             assert session.remaining == 1
 
-    def test_same_after_the_last_clip_does_nothing(self):
+    def test_same_after_the_last_video_does_nothing(self):
         with library_tree() as lib:
             session = self._session(lib, count=1)
 
@@ -489,7 +489,7 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
             assert not sidecar_path(video).exists()
             assert session.current == video
 
-    def test_undoing_an_act_keeps_metadata_the_clip_already_had(self):
+    def test_undoing_an_act_keeps_metadata_the_video_already_had(self):
         with library_tree() as lib:
             video = lib.video()
             path = sidecar_path(video)

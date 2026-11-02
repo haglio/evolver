@@ -51,7 +51,7 @@ class TestControls(unittest.TestCase):
     def test_same_repeats_the_last_action(self):
         assert VOCABULARY.controls["same"] == SAME
 
-    def test_the_phrases_that_discard_a_clip_are_every_way_of_saying_trash(self):
+    def test_the_phrases_that_discard_a_video_are_every_way_of_saying_trash(self):
         assert VOCABULARY.discarding_phrases() == {"trash"}
 
     def test_no_phrase_is_both_an_action_and_a_control(self):

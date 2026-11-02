@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from backfill.queue import BackfillQueue, unlabeled_clips
+from backfill.queue import BackfillQueue, unlabeled_videos
 from tests.temp_helpers import library_tree, override_config
 
 
@@ -12,63 +12,63 @@ class TestUnlabeledVideos(unittest.TestCase):
         with library_tree() as lib:
             video = lib.video("portrait", "provider2", "a_topaz.mp4")
 
-            assert unlabeled_clips() == [video]
+            assert unlabeled_videos() == [video]
 
     def test_a_sidecar_without_an_action_leaves_the_video_unlabeled(self):
         with library_tree() as lib:
             video = lib.video("portrait", "provider2", "a_topaz.mp4")
             lib.sidecar("portrait", "provider2", "a_topaz", {"video": {"prompt": "p"}})
 
-            assert unlabeled_clips() == [video]
+            assert unlabeled_videos() == [video]
 
     def test_a_sidecar_with_an_action_labels_the_video(self):
         with library_tree() as lib:
             lib.video("portrait", "provider2", "a_topaz.mp4")
             lib.sidecar("portrait", "provider2", "a_topaz", {"video": {"action": "Alpha"}})
 
-            assert unlabeled_clips() == []
+            assert unlabeled_videos() == []
 
     def test_the_scraped_sources_are_never_offered(self):
         with library_tree() as lib:
             lib.video("portrait", "provider", "a_topaz.mp4")
             lib.video("landscape", "origenerator", "b_topaz.mp4")
 
-            assert unlabeled_clips() == []
+            assert unlabeled_videos() == []
 
     def test_the_scraped_provider_is_whoever_the_overlay_names(self):
         # The provider's source name is the overlay's, and the deployed one is
         # not the committed placeholder: compared against a literal, every one
-        # of the real provider's unlabeled clips was queued for dictation --
+        # of the real provider's unlabeled videos was queued for dictation --
         # exactly what the skip exists to prevent (bug 12).
         with library_tree() as lib, override_config(PROVIDER_SOURCE="examplesource"):
             lib.video("portrait", "examplesource", "a_topaz.mp4")
             placeholder = lib.video("portrait", "provider", "b_topaz.mp4")
 
-            assert unlabeled_clips() == [placeholder]
+            assert unlabeled_videos() == [placeholder]
 
     def test_a_half_written_upscale_is_never_offered(self):
         with library_tree() as lib:
             lib.video("portrait", "provider2", "a.partial.deadbeef.mp4")
 
-            assert unlabeled_clips() == []
+            assert unlabeled_videos() == []
 
-    def test_a_clip_whose_act_was_called_wrong_is_asked_about_first(self):
+    def test_a_video_whose_act_was_called_wrong_is_asked_about_first(self):
         """Fun Time strikes a mislabeled act out of the sidecar and leaves
-        ``wrong_action`` in its place.  Someone said that clip is wrong *just now*, so
+        ``wrong_action`` in its place.  Someone said that video is wrong *just now*, so
         it goes to the head of the queue rather than the back of a library walk
         they may never reach."""
         with library_tree() as lib:
-            # The rejected clip sits last in the library walk (portrait sweeps
+            # The rejected video sits last in the library walk (portrait sweeps
             # before landscape), so only a reordering can bring it to the front.
             plain = lib.video("portrait", "provider2", "a_topaz.mp4")
             rejected = lib.video("landscape", "provider2", "b_topaz.mp4")
             lib.sidecar("landscape", "provider2", "b_topaz",
                                {"video": {"prompt": "p", "wrong_action": "Alpha"}})
 
-            assert unlabeled_clips() == [rejected, plain]
+            assert unlabeled_videos() == [rejected, plain]
 
-    def test_a_scraped_clip_whose_act_was_called_wrong_is_offered_anyway(self):
-        """A scraped act is skipped because the scrape stage knows what the clip
+    def test_a_scraped_video_whose_act_was_called_wrong_is_offered_anyway(self):
+        """A scraped act is skipped because the scrape stage knows what the video
         shows — which is exactly the claim a viewer has just contradicted, and
         the stage cannot correct itself."""
         with library_tree() as lib:
@@ -76,14 +76,14 @@ class TestUnlabeledVideos(unittest.TestCase):
             lib.sidecar("portrait", "origenerator", "a_topaz",
                                {"video": {"wrong_action": "Alpha"}})
 
-            assert unlabeled_clips() == [rejected]
+            assert unlabeled_videos() == [rejected]
 
     def test_both_orientations_are_swept(self):
         with library_tree() as lib:
             portrait = lib.video("portrait", "provider2", "a_topaz.mp4")
             landscape = lib.video("landscape", "provider3", "b_topaz.mp4")
 
-            assert sorted(unlabeled_clips()) == sorted([portrait, landscape])
+            assert sorted(unlabeled_videos()) == sorted([portrait, landscape])
 
 
 class TestBackfillQueue(unittest.TestCase):
@@ -160,8 +160,8 @@ class TestBackfillQueue(unittest.TestCase):
             original.append(queue.current)
             queue.resolve()
 
-        for clip in reversed(original):
-            queue.restore(clip)
+        for video in reversed(original):
+            queue.restore(video)
 
         rewound = []
         while queue.current is not None:

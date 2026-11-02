@@ -1,4 +1,4 @@
-"""The backfill tool's window: one looping clip, a live transcript, a clickable grid."""
+"""The backfill tool's window: one looping video, a live transcript, a clickable grid."""
 
 from __future__ import annotations
 
@@ -52,11 +52,11 @@ def _aspect_locked_icon(path: str, side: int) -> QIcon:
 
 
 class BackfillWindow(QWidget):
-    """Loops the clip awaiting an action, and moves on the moment one is chosen.
+    """Loops the video awaiting an action, and moves on the moment one is chosen.
 
-    The clip plays on the left under three lines: what is on screen now, what the
+    The video plays on the left under three lines: what is on screen now, what the
     recognizer is hearing this moment, and what the last thing you said did — the
-    last naming its own clip, which by then is not the one you are watching.
+    last naming its own video, which by then is not the one you are watching.
 
     The live "hearing" line is the answer to "is it even listening?": it fills in
     as on-script words are recognized and stays blank when what you said is not a
@@ -70,8 +70,8 @@ class BackfillWindow(QWidget):
     frame — passed in ready at construction, already cached — so the panel opens
     as a gallery with nothing to load.
 
-    The clip plays with no sound output: the microphone is open the whole time,
-    and a clip's own soundtrack would be one more thing for the recognizer to mishear.
+    The video plays with no sound output: the microphone is open the whole time,
+    and a video's own soundtrack would be one more thing for the recognizer to mishear.
     """
 
     def __init__(
@@ -138,7 +138,7 @@ class BackfillWindow(QWidget):
         panel.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         # Size to the grid's own width (the camera columns at this computer's
         # font) rather than a hardcoded guess, plus room for the vertical
-        # scrollbar, so no column is ever clipped off the right edge.
+        # scrollbar, so no column is ever videoped off the right edge.
         panel.setFixedWidth(inner.sizeHint().width() + _SCROLLBAR_ALLOWANCE)
         return panel
 
@@ -226,8 +226,8 @@ class BackfillWindow(QWidget):
         note = self._session.apply(phrase)
         if note is None:
             return
-        # A skip with one clip left, and an undo with nothing to undo, both leave the
-        # same clip on screen — reloading it would restart it from the top for nothing.
+        # A skip with one video left, and an undo with nothing to undo, both leave the
+        # same video on screen — reloading it would restart it from the top for nothing.
         if self._session.current != was_playing:
             self._play_current()
         else:
@@ -235,21 +235,21 @@ class BackfillWindow(QWidget):
         self._last.setText(f"Last: {note}")
 
     def _play_current(self) -> None:
-        clip = self._session.current
-        if clip is None:
+        video = self._session.current
+        if video is None:
             self._release()
         else:
-            # Pointing the player at the next clip is also what makes it let go of the
+            # Pointing the player at the next video is also what makes it let go of the
             # last one, which a background discard is racing to rename.
-            self._preview.show(clip)
+            self._preview.show(video)
         self._refresh_status()
 
     def _refresh_status(self) -> None:
-        clip = self._session.current
-        if clip is None:
+        video = self._session.current
+        if video is None:
             self._status.setText(_DONE)
         else:
-            self._status.setText(f"{self._session.remaining} remaining   ·   {clip.name}")
+            self._status.setText(f"{self._session.remaining} remaining   ·   {video.name}")
 
     def _release(self) -> None:
         """Stop, and let go of the file the player has open."""

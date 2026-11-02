@@ -1,17 +1,17 @@
 """Example thumbnails for the backfill window's clickable buttons.
 
-Each act button shows a still from a clip that illustrates that act, so the grid reads
+Each act button shows a still from a video that illustrates that act, so the grid reads
 as a gallery you recognize at a glance rather than a wall of words. A thumbnail is one
 extracted frame, cached under ``config.BACKFILL_THUMBNAIL_DIR`` and reused on every
 later open, so the window only ever loads ready files — it never extracts on open.
 
 A button's example comes from one of two places, curated first:
 
-* ``config.CURATED_EXAMPLES`` pins a specific clip to a button by id. This is how the acts
+* ``config.CURATED_EXAMPLES`` pins a specific video to a button by id. This is how the acts
   the library never tags in a camera-scoped form get a thumbnail — a side gamma, say
-  — and how a clip mistagged (or tagged for a different act than it best shows)
+  — and how a video mistagged (or tagged for a different act than it best shows)
   is still put to use.
-* otherwise the first library clip whose ``video.action`` matches the button, taken from
+* otherwise the first library video whose ``video.action`` matches the button, taken from
   a single scan. A compound tag like ``Side Epsilon, Alpha`` counts as each of its
   comma-separated parts, so it can illustrate either button.
 
@@ -30,14 +30,14 @@ from pathlib import Path
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 import config
-from backfill.queue import ScannedClip
+from backfill.queue import ScannedVideo
 from backfill.vocabulary import Vocabulary
 from util.ffprobe import duration_seconds
 
 log = logging.getLogger(__name__)
 
 _THUMBNAIL_HEIGHT = 96
-# Sample the frame a little under halfway in: past a clip's title card or fade-in, and
+# Sample the frame a little under halfway in: past a video's title card or fade-in, and
 # far enough that the act — and the anchor — is actually in frame, not just beginning.
 _SAMPLE_FRACTION = 0.4
 
@@ -51,28 +51,28 @@ def _button_labels(vocabulary: Vocabulary) -> list[str]:
     return [command.label for row in vocabulary.scoped_grid() for command in row]
 
 
-def _lookups(scan: list[ScannedClip]) -> tuple[dict[str, Path], dict[str, Path]]:
+def _lookups(scan: list[ScannedVideo]) -> tuple[dict[str, Path], dict[str, Path]]:
     """The two lookups the examples are resolved through.
 
     ``by_action`` maps each action (and each part of a compound tag), lower-cased, to
-    the first clip that carries it; ``by_id`` maps each clip's id — its stem without
-    the ``_topaz`` suffix — to the clip, for the curated pins.
+    the first video that carries it; ``by_id`` maps each video's id — its stem without
+    the ``_topaz`` suffix — to the video, for the curated pins.
     """
     by_action: dict[str, Path] = {}
     by_id: dict[str, Path] = {}
-    for clip in scan:
-        by_id.setdefault(clip.clip_id, clip.path)
-        for listed in clip.action.split(","):
+    for video in scan:
+        by_id.setdefault(video.video_id, video.path)
+        for listed in video.action.split(","):
             part = listed.strip().lower()
             if part:
-                by_action.setdefault(part, clip.path)
+                by_action.setdefault(part, video.path)
     return by_action, by_id
 
 
-def example_clips(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, Path]:
-    """One example clip per button of *vocabulary* that has one, as ``button label -> clip``.
+def example_videos(vocabulary: Vocabulary, scan: list[ScannedVideo]) -> dict[str, Path]:
+    """One example video per button of *vocabulary* that has one, as ``button label -> video``.
 
-    A curated pin wins; otherwise the button takes the first library clip whose
+    A curated pin wins; otherwise the button takes the first library video whose
     action matches its label. Buttons with neither are simply absent, and stay
     text-only.
 
@@ -82,10 +82,10 @@ def example_clips(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, 
     by_action, by_id = _lookups(scan)
     examples: dict[str, Path] = {}
     for label in _button_labels(vocabulary):
-        clip = (by_id.get(config.CURATED_EXAMPLES.get(label, ""))
+        video = (by_id.get(config.CURATED_EXAMPLES.get(label, ""))
                 or by_action.get(label.lower()))
-        if clip is not None:
-            examples[label] = clip
+        if video is not None:
+            examples[label] = video
     return examples
 
 
@@ -95,10 +95,10 @@ def thumbnail_cache_path(label: str) -> Path:
     return config.BACKFILL_THUMBNAIL_DIR / f"{slug}.jpg"
 
 
-def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTION) -> bool:
-    """Write one downscaled frame of *clip* to *dest*; True when it lands.
+def extract_frame(video: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTION) -> bool:
+    """Write one downscaled frame of *video* to *dest*; True when it lands.
 
-    Seeks to *at_fraction* of the clip's duration (0 when the duration is unknown)
+    Seeks to *at_fraction* of the video's duration (0 when the duration is unknown)
     and scales to ``_THUMBNAIL_HEIGHT``, keeping the aspect ratio. Uses the same
     Topaz ffmpeg and console-suppressed invocation the rest of the pipeline does.
     """
@@ -108,14 +108,14 @@ def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTI
         # try a missing one escapes here, escapes build_thumbnails and takes
         # the whole tool's startup down -- silently, since pythonw.exe has no
         # console for the traceback.
-        duration = duration_seconds(clip)
+        duration = duration_seconds(video)
         timestamp = duration * at_fraction if duration else 0.0
         result = subprocess.run(
             [
                 str(config.FFMPEG),
                 "-nostdin",
                 "-ss", f"{timestamp:.3f}",
-                "-i", str(clip),
+                "-i", str(video),
                 "-frames:v", "1",
                 "-vf", f"scale=-2:{_THUMBNAIL_HEIGHT}",
                 "-y", str(dest),
@@ -125,7 +125,7 @@ def extract_frame(clip: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTI
             **hidden_subprocess_kwargs(),
         )
     except OSError:
-        log.exception("Could not build a thumbnail for %s", clip)
+        log.exception("Could not build a thumbnail for %s", video)
         return False
     return result.returncode == 0 and dest.is_file()
 
@@ -140,7 +140,7 @@ def build_thumbnails(
     A cached frame is reused; otherwise one is extracted and cached. An act whose
     extraction fails is skipped, so its button simply stays text-only.
     """
-    for label, clip in examples.items():
+    for label, video in examples.items():
         dest = cache_path_for(label)
-        if dest.is_file() or extract(clip, dest):
+        if dest.is_file() or extract(video, dest):
             yield label, dest

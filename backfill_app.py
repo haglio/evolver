@@ -1,7 +1,7 @@
 #!/usr/bin/env pythonw
 """Metadata backfill tool entry point, launched from Evolver's tray menu or toolbar.
 
-Plays every clip that still lacks a ``video.action``, looping in a stable order,
+Plays every video that still lacks a ``video.action``, looping in a stable order,
 and records the act the viewer speaks.  Runs as its own process so an open
 microphone or a wedged media backend can never take the tray down with it.
 """
@@ -13,9 +13,14 @@ from PyQt6.QtWidgets import QMessageBox
 from shared_ui.application import application
 
 import evolver
-from backfill.queue import BackfillQueue, ScannedClip, library_scan, unlabeled_clips
+from backfill.queue import BackfillQueue, ScannedVideo, library_scan, unlabeled_videos
 from backfill.session import BackfillSession
-from backfill.thumbnails import build_thumbnails, example_clips, extract_frame, thumbnail_cache_path
+from backfill.thumbnails import (
+    build_thumbnails,
+    example_videos,
+    extract_frame,
+    thumbnail_cache_path,
+)
 from backfill.vocabulary import Vocabulary, load_vocabulary
 from backfill.voice import VoiceListener
 from backfill.window import BackfillWindow
@@ -25,7 +30,7 @@ from gui import process_identity
 _TITLE = "Backfill Metadata"
 
 
-def _ready_thumbnails(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, str]:
+def _ready_thumbnails(vocabulary: Vocabulary, scan: list[ScannedVideo]) -> dict[str, str]:
     """Every button's cached thumbnail, ready to hand the window at construction.
 
     Cached frames are read straight back; only an act whose frame was never made
@@ -34,7 +39,7 @@ def _ready_thumbnails(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[s
     return {
         action: str(path)
         for action, path in build_thumbnails(
-            example_clips(vocabulary, scan), extract_frame, thumbnail_cache_path)
+            example_videos(vocabulary, scan), extract_frame, thumbnail_cache_path)
     }
 
 
@@ -48,16 +53,16 @@ def _label_the_unlabeled(app) -> int:
     process_identity.claim(app)
 
     # One walk of the library, one parse of each sidecar: the work queue and
-    # the example clips are two projections of it (util_backfill/design/005).
+    # the example videos are two projections of it (util_backfill/design/005).
     scan = library_scan()
-    clips = unlabeled_clips(scan)
-    if not clips:
+    videos = unlabeled_videos(scan)
+    if not videos:
         QMessageBox.information(None, _TITLE, "Every video already has an action.")
         return 0
 
     worker = SerialWorker()
     vocabulary = load_vocabulary()
-    session = BackfillSession(BackfillQueue(clips), worker, vocabulary)
+    session = BackfillSession(BackfillQueue(videos), worker, vocabulary)
 
     window = BackfillWindow(session, vocabulary, thumbnails=_ready_thumbnails(vocabulary, scan))
 

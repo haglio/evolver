@@ -1,7 +1,7 @@
 """What a heard phrase does to the queue — the backfill tool's whole semantics.
 
 Separated from the window so it can be exercised without a media backend, and so
-the window is left with only what a window should do: show a clip, show a count.
+the window is left with only what a window should do: show a video, show a count.
 
 Every decision is a :class:`_Step` — the contract below, which
 :class:`_Labelled`, :class:`_Discarded` and :class:`_Deferred` each satisfy by
@@ -46,10 +46,10 @@ class _Step(Protocol):
         """What to show the viewer about what just happened."""
 
     def take_effect(self, queue: BackfillQueue) -> None:
-        """Move the clip out of the way in the queue."""
+        """Move the video out of the way in the queue."""
 
     def put_back(self, queue: BackfillQueue) -> None:
-        """Undo that: the clip is on screen again."""
+        """Undo that: the video is on screen again."""
 
     def commit(self) -> None:
         """Do the disk work, off the GUI thread."""
@@ -60,64 +60,64 @@ class _Step(Protocol):
 
 @dataclass
 class _Labelled:
-    """The viewer named the act; the clip keeps whatever else its sidecar held."""
+    """The viewer named the act; the video keeps whatever else its sidecar held."""
 
-    clip: Path
+    video: Path
     action: str
     _snapshot: dict | None = field(default=None, init=False, repr=False)
 
     @property
     def note(self) -> str:
-        return f"{self.clip.name} → {self.action}"
+        return f"{self.video.name} → {self.action}"
 
     def take_effect(self, queue: BackfillQueue) -> None:
         queue.resolve()
 
     def put_back(self, queue: BackfillQueue) -> None:
-        queue.restore(self.clip)
+        queue.restore(self.video)
 
     def commit(self) -> None:
-        self._snapshot = sidecar_snapshot(self.clip)
-        record_action(self.clip, self.action)
+        self._snapshot = sidecar_snapshot(self.video)
+        record_action(self.video, self.action)
 
     def roll_back(self) -> None:
-        restore_sidecar(self.clip, self._snapshot)
+        restore_sidecar(self.video, self._snapshot)
 
 
 @dataclass
 class _Discarded:
-    """The clip was trash; it now sits in the trash folder."""
+    """The video was trash; it now sits in the trash folder."""
 
-    clip: Path
+    video: Path
     _landed_at: Path | None = field(default=None, init=False, repr=False)
 
     @property
     def note(self) -> str:
-        return f"{self.clip.name} → Trash"
+        return f"{self.video.name} → Trash"
 
     def take_effect(self, queue: BackfillQueue) -> None:
         queue.resolve()
 
     def put_back(self, queue: BackfillQueue) -> None:
-        queue.restore(self.clip)
+        queue.restore(self.video)
 
     def commit(self) -> None:
-        self._landed_at = send_to_trash(self.clip)
+        self._landed_at = send_to_trash(self.video)
 
     def roll_back(self) -> None:
         if self._landed_at is not None:  # the move failed; there is nothing to reclaim
-            reclaim_from_trash(self._landed_at, self.clip)
+            reclaim_from_trash(self._landed_at, self.video)
 
 
 @dataclass
 class _Deferred:
-    """Not now — the clip goes to the back of the queue, untouched on disk."""
+    """Not now — the video goes to the back of the queue, untouched on disk."""
 
-    clip: Path
+    video: Path
 
     @property
     def note(self) -> str:
-        return f"{self.clip.name} → skipped"
+        return f"{self.video.name} → skipped"
 
     def take_effect(self, queue: BackfillQueue) -> None:
         queue.defer()
@@ -135,9 +135,9 @@ class _Deferred:
 class BackfillSession:
     """Applies heard phrases to the queue, dispatching the file work off-thread.
 
-    A clip leaves the screen the instant a phrase lands: the disk work — writing
-    the sidecar, or moving the clip to the trash folder — goes to *worker* and the
-    next clip starts playing without waiting for it.
+    A video leaves the screen the instant a phrase lands: the disk work — writing
+    the sidecar, or moving the video to the trash folder — goes to *worker* and the
+    next video starts playing without waiting for it.
     """
 
     def __init__(self, queue: BackfillQueue, worker: SerialWorker, vocabulary: Vocabulary) -> None:
@@ -148,12 +148,12 @@ class BackfillSession:
 
     @property
     def remaining(self) -> int:
-        """How many clips still need an action, deferred ones included."""
+        """How many videos still need an action, deferred ones included."""
         return self._queue.remaining
 
     @property
     def current(self) -> Path | None:
-        """The clip that should be on screen, or None once the queue is empty."""
+        """The video that should be on screen, or None once the queue is empty."""
         return self._queue.current
 
     def apply(self, phrase: str) -> str | None:
@@ -164,26 +164,26 @@ class BackfillSession:
         if control == SAME:
             return self._repeat()
 
-        clip = self._queue.current
-        if clip is None:
+        video = self._queue.current
+        if video is None:
             return None
-        step = self._step_for(phrase, clip)
+        step = self._step_for(phrase, video)
         if step is None:
             return None
         return self._commit(step)
 
     def _repeat(self) -> str | None:
-        """Apply the most recent action again, to the clip now on screen."""
-        clip = self._queue.current
-        if clip is None:
+        """Apply the most recent action again, to the video now on screen."""
+        video = self._queue.current
+        if video is None:
             return None
         action = self._last_action()
         if action is None:
             return NOTHING_TO_REPEAT
-        return self._commit(_Labelled(clip, action))
+        return self._commit(_Labelled(video, action))
 
     def _commit(self, step: _Step) -> str:
-        """Land a decision: retire its clip, dispatch its file work, remember it."""
+        """Land a decision: retire its video, dispatch its file work, remember it."""
         step.take_effect(self._queue)
         self._worker.submit(step.commit)
         self._history.append(step)
@@ -196,15 +196,15 @@ class BackfillSession:
                 return step.action
         return None
 
-    def _step_for(self, phrase: str, clip: Path) -> _Step | None:
+    def _step_for(self, phrase: str, video: Path) -> _Step | None:
         action = self._vocabulary.actions.get(phrase)
         if action is not None:
-            return _Labelled(clip, action)
+            return _Labelled(video, action)
         control = self._vocabulary.controls.get(phrase)
         if control == SKIP:
-            return _Deferred(clip)
+            return _Deferred(video)
         if control == TRASH:
-            return _Discarded(clip)
+            return _Discarded(video)
         # UNDO and SAME are answered in apply() before a step is asked for, and
         # anything else is a control this dispatch does not know: do nothing
         # rather than fall through to the branch that moves a file.
@@ -217,9 +217,9 @@ class BackfillSession:
         step = self._history.pop()
 
         # The decision's own file work may still be in flight, and reversing a write
-        # that has not happened would leave the clip labelled. Wait for it, then
+        # that has not happened would leave the video labelled. Wait for it, then
         # reverse it here rather than on the worker: the window reloads the restored
-        # clip the moment this returns, and a discarded clip has to be back in place
+        # video the moment this returns, and a discarded video has to be back in place
         # by then for the player to find it.
         self._worker.drain()
         step.roll_back()
