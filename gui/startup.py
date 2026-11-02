@@ -6,7 +6,6 @@ would otherwise leave Windows starting a branch at every sign-in.
 
 from __future__ import annotations
 
-import dataclasses
 from pathlib import Path
 
 from app_support import win32, windows_settings
@@ -34,7 +33,7 @@ def register_startup() -> None:
     (listed,) = [spec for spec in windows_settings.declared(checkout).shortcuts
                  if spec.name == _NAME and _PLACE in spec.places]
     shortcut = windows_settings.shortcut_for(checkout, listed)
-    win32.write_shortcut(str(_shortcut_path()), **dataclasses.asdict(shortcut))
+    win32.write_shortcut(str(_shortcut_path()), shortcut)
 
 
 def unregister_startup() -> None:
