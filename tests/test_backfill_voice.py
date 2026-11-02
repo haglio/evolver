@@ -89,7 +89,7 @@ class TestWhatTheWindowIsTold(unittest.TestCase):
 
 
 class TestWhenListeningCannotGoOn(unittest.TestCase):
-    """The tiles still work, so the window stays open; what it must not do is go on
+    """The buttons still work, so the window stays open; what it must not do is go on
     looking like it is listening."""
 
     def test_an_audio_stack_that_is_not_installed_is_a_crash_with_its_reason(self):

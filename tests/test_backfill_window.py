@@ -94,7 +94,7 @@ class TestBackfillWindow(unittest.TestCase):
         assert window.hearing_text() == ""
 
     def test_a_dead_recognizer_says_so_where_the_live_guess_was(self):
-        """The tiles still work -- they are clickable -- so nothing closes or
+        """The buttons still work -- they are clickable -- so nothing closes or
         disables. What the window must not do is go on looking like it is
         listening while the microphone path has gone."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
@@ -192,42 +192,42 @@ class TestBackfillWindow(unittest.TestCase):
         there is no parent to take."""
         assert list(inspect.signature(BackfillWindow.__init__).parameters)[1:] == ["session", "vocabulary", "thumbnails"]
 
-    def test_the_tiles_are_the_commands_of_the_vocabulary_it_was_handed(self):
+    def test_the_buttons_are_the_commands_of_the_vocabulary_it_was_handed(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]), vocabulary_of(Act("kappa", "Kappa")))
 
-        assert sorted(tile.text() for tile in window.findChildren(QToolButton)) == ["Same", "Side Kappa", "Skip", "Trash", "Undo", "XYZ Kappa"]
+        assert sorted(button.text() for button in window.findChildren(QToolButton)) == ["Same", "Side Kappa", "Skip", "Trash", "Undo", "XYZ Kappa"]
 
-    def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
+    def test_a_clickable_button_exists_for_every_command_in_the_grid(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        assert {command.phrase: window.tile_for(command.phrase).text() for command in _every_grid_command(VOCABULARY)} == {command.phrase: command.label for command in _every_grid_command(VOCABULARY)}
+        assert {command.phrase: window.button_for(command.phrase).text() for command in _every_grid_command(VOCABULARY)} == {command.phrase: command.label for command in _every_grid_command(VOCABULARY)}
 
-    def test_every_command_keeps_its_own_tile(self):
+    def test_every_command_keeps_its_own_button(self):
         """One command's phrase can equal another's label: the vocabulary is
         private and its acts are named by the user, so a spoken "dancing" and
         an act labeled "Dancing" can coexist. Neither may take the other's
-        tile — the phrase would click the wrong act, and the example frame
+        button — the phrase would click the wrong act, and the example frame
         would land on the wrong face."""
         shadowing = vocabulary_of(Act("dancing", "Dance Move"), Act("dance", "Dancing"))
         window = self._window(FakeSession([Path("a_topaz.mp4")]), shadowing)
 
         for command in _every_grid_command(shadowing):
-            assert window.tile_for(command.phrase).text() == command.label
-            assert window.tile_for(command.label).text() == command.label
+            assert window.button_for(command.phrase).text() == command.label
+            assert window.button_for(command.label).text() == command.label
 
-    def test_a_tile_is_labelled_with_the_action_it_records(self):
+    def test_a_button_is_labelled_with_the_action_it_records(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        assert window.tile_for("side beta").text() == "Side Beta"
+        assert window.button_for("side beta").text() == "Side Beta"
 
-    def test_clicking_a_tile_applies_its_phrase_through_the_session(self):
+    def test_clicking_a_button_applies_its_phrase_through_the_session(self):
         session = FakeSession(
             [Path("a_topaz.mp4"), Path("b_topaz.mp4")],
             [("a_topaz.mp4 → skipped", None)],
         )
         window = self._window(session)
 
-        window.tile_for("skip").click()
+        window.button_for("skip").click()
 
         assert session.applied == ["skip"]
 
@@ -238,37 +238,37 @@ class TestBackfillWindow(unittest.TestCase):
         pixmap.save(str(png))
         return png
 
-    def test_a_ready_thumbnail_appears_on_the_tile_for_its_action(self):
+    def test_a_ready_thumbnail_appears_on_the_button_for_its_action(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         with tempfile.TemporaryDirectory() as tmp:
             window.set_thumbnail("Side Beta", str(self._png(tmp)))
 
-            assert not window.tile_for("side beta").icon().isNull()
+            assert not window.button_for("side beta").icon().isNull()
 
-    def test_an_example_stored_under_older_casing_still_lights_its_tile(self):
-        """Library clips tagged "Xyz ..." must reach the "XYZ ..." tile."""
+    def test_an_example_stored_under_older_casing_still_lights_its_button(self):
+        """Library clips tagged "Xyz ..." must reach the "XYZ ..." button."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         with tempfile.TemporaryDirectory() as tmp:
             window.set_thumbnail("Xyz Beta", str(self._png(tmp)))
 
-            assert not window.tile_for("xyz beta").icon().isNull()
+            assert not window.button_for("xyz beta").icon().isNull()
 
-    def test_a_thumbnail_for_an_action_with_no_tile_is_ignored(self):
+    def test_a_thumbnail_for_an_action_with_no_button_is_ignored(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
         window.set_thumbnail("Not An Act", "whatever.png")  # must not raise
 
-        # ...and must not have decorated some other act's tile with it either
-        assert all(tile.icon().isNull() for tile in window.findChildren(QToolButton))
+        # ...and must not have decorated some other act's button with it either
+        assert all(button.icon().isNull() for button in window.findChildren(QToolButton))
 
-    def test_an_empty_thumbnail_path_leaves_the_tile_iconless(self):
+    def test_an_empty_thumbnail_path_leaves_the_button_iconless(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
         window.set_thumbnail("Side Beta", "")
 
-        assert window.tile_for("side beta").icon().isNull()
+        assert window.button_for("side beta").icon().isNull()
 
-    def test_thumbnails_passed_at_construction_land_on_their_tiles(self):
+    def test_thumbnails_passed_at_construction_land_on_their_buttons(self):
         with tempfile.TemporaryDirectory() as tmp:
             window = BackfillWindow(
                 FakeSession([Path("a_topaz.mp4")]), VOCABULARY,
@@ -277,7 +277,7 @@ class TestBackfillWindow(unittest.TestCase):
             self.addCleanup(window.close)
             self.addCleanup(window.deleteLater)
 
-            assert not window.tile_for("side beta").icon().isNull()
+            assert not window.button_for("side beta").icon().isNull()
 
     def test_the_clip_plays_with_no_sound_output_at_all(self):
         """The microphone is open the whole session; a clip's audio would be
@@ -321,14 +321,14 @@ class TestBackfillWindow(unittest.TestCase):
         escapes[0].activated.emit()
         assert not window.isVisible()
 
-    def test_no_tile_ever_takes_keyboard_focus(self):
-        """The space bar must not re-fire the last clicked tile, and Esc must
+    def test_no_button_ever_takes_keyboard_focus(self):
+        """The space bar must not re-fire the last clicked button, and Esc must
         keep closing the window rather than being swallowed by a button."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
-        tiles = window.findChildren(QToolButton)
-        assert tiles
-        for tile in tiles:
-            assert tile.focusPolicy() == Qt.FocusPolicy.NoFocus
+        buttons = window.findChildren(QToolButton)
+        assert buttons
+        for button in buttons:
+            assert button.focusPolicy() == Qt.FocusPolicy.NoFocus
 
     def test_a_portrait_frame_lands_unsquished_on_a_square_icon(self):
         """The fix for portrait/landscape frames coming out squished to square
@@ -342,7 +342,7 @@ class TestBackfillWindow(unittest.TestCase):
             pixmap.save(str(png))
             window.set_thumbnail("Side Beta", str(png))
 
-            icon = window.tile_for("side beta").icon()
+            icon = window.button_for("side beta").icon()
             rendered = icon.pixmap(96, 96)
             assert (rendered.width(), rendered.height()) == (96, 96)
             image = rendered.toImage()

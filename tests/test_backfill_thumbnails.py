@@ -15,9 +15,9 @@ from tests.vocabulary_support import vocabulary_of
 VOCABULARY = vocabulary_of(Act("alpha", "Alpha"), Act("beta", "Beta"), Act("gamma", "Gamma"))
 
 # Fabricated: a real pin names a clip inside the library, which is why the pins
-# moved to the git-ignored overlay in the first place. The tile label is one the
+# moved to the git-ignored overlay in the first place. The button label is one the
 # act table above produces.
-PINNED_TILE = "Side Gamma"
+PINNED_BUTTON = "Side Gamma"
 PINNED_ID = "11111111-2222-3333-4444-555555555555"
 
 
@@ -35,7 +35,7 @@ class TestExampleClips(unittest.TestCase):
 
             assert self._examples() == {"Side Beta": video}
 
-    def test_the_examples_are_for_the_tiles_of_the_vocabulary_handed_in(self):
+    def test_the_examples_are_for_the_buttons_of_the_vocabulary_handed_in(self):
         with library_tree() as lib:
             video = lib.video("portrait", "provider2", "k_topaz.mp4")
             self._tag(lib, "portrait", "provider2", "k_topaz", "Side Kappa")
@@ -76,40 +76,40 @@ class TestExampleClips(unittest.TestCase):
             assert examples["XYZ Gamma"] == video
             assert examples["Side Alpha"] == video
 
-    def test_a_curated_pin_supplies_a_tile_the_library_never_tags(self):
+    def test_a_curated_pin_supplies_a_button_the_library_never_tags(self):
         with library_tree() as lib:
             pinned = lib.video("portrait", "provider", f"{PINNED_ID}_topaz.mp4")
 
-            with override_config(CURATED_EXAMPLES={PINNED_TILE: PINNED_ID}):
-                assert self._examples() == {PINNED_TILE: pinned}
+            with override_config(CURATED_EXAMPLES={PINNED_BUTTON: PINNED_ID}):
+                assert self._examples() == {PINNED_BUTTON: pinned}
 
     def test_a_curated_pin_wins_over_an_auto_match(self):
         with library_tree() as lib:
             pinned = lib.video("portrait", "provider", f"{PINNED_ID}_topaz.mp4")
             lib.video("portrait", "provider2", "auto_topaz.mp4")
-            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
+            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_BUTTON)
 
-            with override_config(CURATED_EXAMPLES={PINNED_TILE: PINNED_ID}):
-                assert self._examples()[PINNED_TILE] == pinned
+            with override_config(CURATED_EXAMPLES={PINNED_BUTTON: PINNED_ID}):
+                assert self._examples()[PINNED_BUTTON] == pinned
 
     def test_a_pin_naming_a_clip_the_library_does_not_hold_falls_through(self):
         """Which is every pin on every machine but the one whose library the
         overlay describes -- so it has to be the ordinary case, not an error."""
         with library_tree() as lib:
             auto = lib.video("portrait", "provider2", "auto_topaz.mp4")
-            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
+            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_BUTTON)
 
-            with override_config(CURATED_EXAMPLES={PINNED_TILE: "not-in-this-library"}):
-                assert self._examples()[PINNED_TILE] == auto
+            with override_config(CURATED_EXAMPLES={PINNED_BUTTON: "not-in-this-library"}):
+                assert self._examples()[PINNED_BUTTON] == auto
 
-    def test_no_pins_at_all_leaves_every_tile_to_the_automatic_match(self):
+    def test_no_pins_at_all_leaves_every_button_to_the_automatic_match(self):
         """A public checkout's overlay carries an empty curated_examples."""
         with library_tree() as lib:
             auto = lib.video("portrait", "provider2", "auto_topaz.mp4")
-            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_TILE)
+            self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_BUTTON)
 
             with override_config(CURATED_EXAMPLES={}):
-                assert self._examples() == {PINNED_TILE: auto}
+                assert self._examples() == {PINNED_BUTTON: auto}
 
 
 class TestThumbnailCachePath(unittest.TestCase):
@@ -185,7 +185,7 @@ class TestExtractFrame(unittest.TestCase):
 
     def test_scales_to_the_one_thumbnail_height(self):
         """Like at_fraction, the height is the tuned value and no caller names
-        it — the grid draws every tile at one size."""
+        it — the grid draws every button at one size."""
         assert "height" not in inspect.signature(thumbnails.extract_frame).parameters
         with workspace_temp_dir() as root:
             dest = root / "out.jpg"
@@ -223,7 +223,7 @@ class TestExtractFrame(unittest.TestCase):
                  patch("backfill.thumbnails.subprocess.run", return_value=SimpleNamespace(returncode=1)):
                 assert not thumbnails.extract_frame(Path("clip.mp4"), dest)
 
-    def test_a_missing_probe_leaves_the_tile_text_only_rather_than_crashing(self):
+    def test_a_missing_probe_leaves_the_button_text_only_rather_than_crashing(self):
         """duration_seconds sat ABOVE the try that exists to survive a missing
         binary, so a FileNotFoundError from it escaped extract_frame, escaped
         the build_thumbnails generator and took backfill_app.main() down -- and

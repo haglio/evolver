@@ -1,19 +1,19 @@
-"""Example thumbnails for the backfill window's clickable tiles.
+"""Example thumbnails for the backfill window's clickable buttons.
 
-Each act tile shows a still from a clip that illustrates that act, so the grid reads
+Each act button shows a still from a clip that illustrates that act, so the grid reads
 as a gallery you recognize at a glance rather than a wall of words. A thumbnail is one
 extracted frame, cached under ``config.BACKFILL_THUMBNAIL_DIR`` and reused on every
 later open, so the window only ever loads ready files — it never extracts on open.
 
-A tile's example comes from one of two places, curated first:
+A button's example comes from one of two places, curated first:
 
-* ``config.CURATED_EXAMPLES`` pins a specific clip to a tile by id. This is how the acts
+* ``config.CURATED_EXAMPLES`` pins a specific clip to a button by id. This is how the acts
   the library never tags in a camera-scoped form get a thumbnail — a side gamma, say
   — and how a clip mistagged (or tagged for a different act than it best shows)
   is still put to use.
-* otherwise the first library clip whose ``video.action`` matches the tile, taken from
+* otherwise the first library clip whose ``video.action`` matches the button, taken from
   a single scan. A compound tag like ``Side Epsilon, Alpha`` counts as each of its
-  comma-separated parts, so it can illustrate either tile.
+  comma-separated parts, so it can illustrate either button.
 
 The pure pieces take their effects as arguments or touch only the filesystem, so they
 are tested without ffmpeg or Qt.
@@ -41,11 +41,11 @@ _THUMBNAIL_HEIGHT = 96
 # far enough that the act — and the anchor — is actually in frame, not just beginning.
 _SAMPLE_FRACTION = 0.4
 
-def _tile_labels(vocabulary: Vocabulary) -> list[str]:
-    """Every tile's face, in grid order — the labels a thumbnail fills.
+def _button_labels(vocabulary: Vocabulary) -> list[str]:
+    """Every button's face, in grid order — the labels a thumbnail fills.
 
-    Labels, not actions: the grid holds control tiles ("Skip", "Trash") that
-    are no act at all, and an act tile's label is what the library's
+    Labels, not actions: the grid holds control buttons ("Skip", "Trash") that
+    are no act at all, and an act button's label is what the library's
     ``video.action`` is matched against rather than what it is.
     """
     return [command.label for row in vocabulary.scoped_grid() for command in row]
@@ -70,10 +70,10 @@ def _lookups(scan: list[ScannedClip]) -> tuple[dict[str, Path], dict[str, Path]]
 
 
 def example_clips(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, Path]:
-    """One example clip per tile of *vocabulary* that has one, as ``tile label -> clip``.
+    """One example clip per button of *vocabulary* that has one, as ``button label -> clip``.
 
-    A curated pin wins; otherwise the tile takes the first library clip whose
-    action matches its label. Tiles with neither are simply absent, and stay
+    A curated pin wins; otherwise the button takes the first library clip whose
+    action matches its label. Buttons with neither are simply absent, and stay
     text-only.
 
     Takes the scan startup already made, so the library is walked and its
@@ -81,7 +81,7 @@ def example_clips(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, 
     """
     by_action, by_id = _lookups(scan)
     examples: dict[str, Path] = {}
-    for label in _tile_labels(vocabulary):
+    for label in _button_labels(vocabulary):
         clip = (by_id.get(config.CURATED_EXAMPLES.get(label, ""))
                 or by_action.get(label.lower()))
         if clip is not None:
@@ -90,7 +90,7 @@ def example_clips(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, 
 
 
 def thumbnail_cache_path(label: str) -> Path:
-    """Where *label*'s cached thumbnail lives — one stable file name per tile."""
+    """Where *label*'s cached thumbnail lives — one stable file name per button."""
     slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "unnamed"
     return config.BACKFILL_THUMBNAIL_DIR / f"{slug}.jpg"
 
@@ -135,10 +135,10 @@ def build_thumbnails(
     extract: Callable[[Path, Path], bool],
     cache_path_for: Callable[[str], Path],
 ):
-    """Yield ``(tile label, thumbnail path)`` for each example that has, or gets, one.
+    """Yield ``(button label, thumbnail path)`` for each example that has, or gets, one.
 
     A cached frame is reused; otherwise one is extracted and cached. An act whose
-    extraction fails is skipped, so its tile simply stays text-only.
+    extraction fails is skipped, so its button simply stays text-only.
     """
     for label, clip in examples.items():
         dest = cache_path_for(label)

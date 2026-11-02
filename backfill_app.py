@@ -26,7 +26,7 @@ _TITLE = "Backfill Metadata"
 
 
 def _ready_thumbnails(vocabulary: Vocabulary, scan: list[ScannedClip]) -> dict[str, str]:
-    """Every tile's cached thumbnail, ready to hand the window at construction.
+    """Every button's cached thumbnail, ready to hand the window at construction.
 
     Cached frames are read straight back; only an act whose frame was never made
     (a new curated example) is extracted here, so a warmed cache opens instantly.

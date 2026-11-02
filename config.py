@@ -193,12 +193,12 @@ CAMERA_PREFIXES = tuple(
 # live browser profile every ten minutes.
 PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-browser-profile"
 
-# Tile label -> the id of the clip that best illustrates it, for the acts the
+# Button label -> the id of the clip that best illustrates it, for the acts the
 # library has no clip tagged with. From the overlay for the same reason
 # GENAU_SOURCE is: these name clips inside the library, and a clip id in source
 # is library vocabulary. Optional, and empty in the committed example: without
-# it every tile simply takes the first library clip whose action matches, which
-# is what it does for any tile with no pin anyway.
+# it every button simply takes the first library clip whose action matches, which
+# is what it does for any button with no pin anyway.
 CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 # Non-AI folders holding scenes carved out of longer videos and nothing else,
 # as paths relative to the video library ("2D/non_AI/<bucket>/<folder>").
@@ -335,6 +335,6 @@ GUI_SETTINGS_FILE = LIVE_DIR / "gui_settings.json"
 VOICE_SAMPLE_RATE = 16000
 VOICE_CONFIDENCE_THRESHOLD = 0.7
 
-# One example frame per act, cached for the backfill window's clickable tiles. Local
+# One example frame per act, cached for the backfill window's clickable buttons. Local
 # only (like the non-AI state above) and disposable — delete the folder to rebuild.
 BACKFILL_THUMBNAIL_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver" / "backfill_thumbnails"
