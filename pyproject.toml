@@ -88,6 +88,9 @@ in = "content.local.json"
 # `python -m app_support.launcher --write`. The broker's tray names
 # launch_evolver_if_not_running.vbs in its own config, and runs it when it finds
 # Evolver gone.
+[tool.haglio.launcher-gate]
+without-a-log = ["launch_evolver.vbs", "launch_evolver_if_not_running.vbs", "launch_evolver_showing_its_window.vbs"]
+
 [tool.haglio.launchers."launch_evolver.vbs"]
 app = "Evolver"
 interpreter = "pythonw.exe"
