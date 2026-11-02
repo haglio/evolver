@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from app_support.process_identity_check import assert_the_app_names_its_process
+from app_support.process_identity_check import ProcessName, assert_the_process_is_named
 
 import tray_app
 from util import crash_log
@@ -30,9 +30,16 @@ def test_the_app_prepares_the_copy_for_next_time(tmp_path: Path):
     described as the app's name alone -- one app with one window, so the row is
     its name, not its name twice; carrying the app's own mark; and never taking
     a launch down when there is nothing to copy from."""
-    assert_the_app_names_its_process(
-        tray_app._name_this_process, tmp_path, app_name=APP_NAME, role=ROLE,
-        interpreter="pythonw.exe", row=APP_NAME, icon=PROJECT_DIR / "icon.ico")
+    assert_the_process_is_named(
+        tray_app._name_this_process, tmp_path,
+        ProcessName(
+            app_name=APP_NAME,
+            role=ROLE,
+            interpreter="pythonw.exe",
+            row=APP_NAME,
+            icon=PROJECT_DIR / "icon.ico",
+        ),
+    )
 
 
 def test_a_failure_to_name_leaves_a_trace(monkeypatch: pytest.MonkeyPatch):
