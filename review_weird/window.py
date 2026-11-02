@@ -28,16 +28,16 @@ from util.selection_highlight import SELECTION_HIGHLIGHT
 
 LOOK_AGAIN_SECONDS = 2.0
 _ICON_COLOR = TEXT_SECONDARY.name()
-_HINT = ("Restore puts a video back in the folder it was marked weird in. Delete Permanently deletes it, "
+_HINT = ("Restore puts a video back in the folder it was sent to Trash from. Delete Permanently deletes it, "
          "along with the copy it was upscaled from, its metadata and its funscript. "
          "Ctrl or Shift picks several.")
-_NOWHERE = "Nothing says which folder it was marked weird in, so it can't be restored"
+_NOWHERE = "Nothing says which folder it was sent to Trash from, so it can't be restored"
 
 
 class ReviewWeirdWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Evolver - Review Weird")
+        self.setWindowTitle("Evolver - Review Trash")
         self.resize(1200, 720)
 
         self.heading = QLabel()
@@ -126,7 +126,7 @@ class ReviewWeirdWindow(QWidget):
             try:
                 verdict(marked)
             except (OSError, ValueError) as error:
-                QMessageBox.warning(self, "Review Weird", f"{marked.video.name}: {error}")
+                QMessageBox.warning(self, "Review Trash", f"{marked.video.name}: {error}")
         self._show(weird_piles.marked_weird(), row)
 
     def _chosen(self) -> list[weird_piles.MarkedWeird]:
@@ -176,8 +176,8 @@ def _marked(item: QTreeWidgetItem) -> weird_piles.MarkedWeird:
 
 def _counted(videos: int) -> str:
     if not videos:
-        return "Nothing is marked weird"
-    return f"{videos} video{'' if videos == 1 else 's'} marked weird"
+        return "Nothing is in Trash"
+    return f"{videos} video{'' if videos == 1 else 's'} in Trash"
 
 
 def _folder(restores_to: Path | None) -> str:

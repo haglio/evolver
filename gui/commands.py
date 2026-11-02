@@ -39,7 +39,7 @@ SETTINGS = Command("Settings...", _mark("settings"))
 STATS = Command("Stats...", _mark("chart"))
 QUEUE = Command("Upscale Queue...", _mark("enlarge"))
 BACKFILL = Command("Backfill Metadata...", _mark("tag"))
-REVIEW_WEIRD = Command("Review Weird...", review_weird_icon)
+REVIEW_WEIRD = Command("Review Trash...", review_weird_icon)
 RESTART = Command("Restart", restart_icon)
 QUIT = Command("Quit", quit_icon)
 

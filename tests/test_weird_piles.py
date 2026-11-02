@@ -155,7 +155,7 @@ class TestRestoring(_InALibrary):
         marked = touch_video(self.lib.weird / "scene seven.mp4")
         [found] = weird_piles.marked_weird()
 
-        with pytest.raises(ValueError, match="was marked weird from"):
+        with pytest.raises(ValueError, match="was sent to Trash from"):
             weird_piles.restore(found)
 
         assert marked.is_file()

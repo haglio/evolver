@@ -82,7 +82,7 @@ SAME = "same"
 # spoke, for a run of clips that share one.
 _CONTROLS: tuple[_Control, ...] = (
     _Control("skip", "Skip", SKIP),
-    _Control("weird", "Weird", WEIRD, aliases=("trash",)),
+    _Control("trash", "Trash", WEIRD),
     _Control("undo", "Undo", UNDO),
     _Control("same", "Same", SAME),
 )

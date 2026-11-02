@@ -151,13 +151,13 @@ class TestBackfillWindow(unittest.TestCase):
         assert window.last_text() == "Last: nothing to undo"
 
     def test_the_last_clip_leaves_a_finished_message(self):
-        session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → weird", [])])
+        session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → Trash", [])])
 
         window = self._window(session)
-        window.on_phrase("weird")
+        window.on_phrase("trash")
 
         assert window.status_text() == "Nothing left to label."
-        assert window.last_text() == "Last: a_topaz.mp4 → weird"
+        assert window.last_text() == "Last: a_topaz.mp4 → Trash"
 
     def test_an_empty_queue_opens_straight_to_the_finished_message(self):
         window = self._window(FakeSession([]))
@@ -166,11 +166,11 @@ class TestBackfillWindow(unittest.TestCase):
 
     def test_emptying_the_queue_releases_the_last_clip(self):
         """Otherwise the player still holds the file the background move is renaming."""
-        session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → weird", [])])
+        session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → Trash", [])])
         window = self._window(session)
 
         with patch.object(window._preview.player, "setSource") as set_source:
-            window.on_phrase("weird")
+            window.on_phrase("trash")
 
         set_source.assert_called_once()
         assert set_source.call_args[0][0].isEmpty()
@@ -195,7 +195,7 @@ class TestBackfillWindow(unittest.TestCase):
     def test_the_tiles_are_the_commands_of_the_vocabulary_it_was_handed(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]), vocabulary_of(Act("kappa", "Kappa")))
 
-        assert sorted(tile.text() for tile in window.findChildren(QToolButton)) == ["Same", "Side Kappa", "Skip", "Undo", "Weird", "XYZ Kappa"]
+        assert sorted(tile.text() for tile in window.findChildren(QToolButton)) == ["Same", "Side Kappa", "Skip", "Trash", "Undo", "XYZ Kappa"]
 
     def test_a_clickable_tile_exists_for_every_command_in_the_grid(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
@@ -293,12 +293,12 @@ class TestBackfillWindow(unittest.TestCase):
         """Dropping the source without stop() left playback tearing at a file
         the background discard is renaming (audit probe 25 deleted the stop
         with the suite green)."""
-        session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → weird", [])])
+        session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → Trash", [])])
         window = self._window(session)
 
         with patch.object(window._preview.player, "stop") as stop, \
              patch.object(window._preview.player, "setSource"):
-            window.on_phrase("weird")
+            window.on_phrase("trash")
 
         stop.assert_called_once()
 
