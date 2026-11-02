@@ -24,7 +24,7 @@ from util.sidecar import upscaled_video_path
 
 
 def library_dirs(root):
-    """The three trees every upscale test builds: 1_sorted, the outbox, weird."""
+    """The three trees every upscale test builds: 1_sorted, the outbox, trash."""
     return root / "sorted", root / "out", root / "weird"
 
 
@@ -39,39 +39,39 @@ class TestUpscaleHelpers(unittest.TestCase):
     def test_already_processed_checks_all_locations(self):
         with workspace_temp_dir() as root:
             out = root / "out"
-            weird = root / "weird"
+            trash = root / "weird"
             (out / "landscape" / "provider").mkdir(parents=True)
             (out / "portrait" / "provider").mkdir(parents=True)
-            weird.mkdir(parents=True)
+            trash.mkdir(parents=True)
 
-            with override_config(OUT_UPSCALED_DIR=out, WEIRD_DIR=weird):
-                assert not upscale._already_processed("provider", "a_topaz.mp4", out, weird)
+            with override_config(OUT_UPSCALED_DIR=out, TRASH_DIR=trash):
+                assert not upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
                 p1 = out / "landscape" / "provider" / "a_topaz.mp4"
                 p1.write_bytes(b"1")
-                assert upscale._already_processed("provider", "a_topaz.mp4", out, weird)
+                assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
                 p1.unlink()
                 # The portrait arm on its own -- narrowing the loop to
                 # ('landscape',) used to leave this test green (audit probe P3).
                 p2 = out / "portrait" / "provider" / "a_topaz.mp4"
                 p2.write_bytes(b"1")
-                assert upscale._already_processed("provider", "a_topaz.mp4", out, weird)
+                assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
                 p2.unlink()
-                p3 = weird / "a_topaz.mp4"
+                p3 = trash / "a_topaz.mp4"
                 p3.write_bytes(b"1")
-                assert upscale._already_processed("provider", "a_topaz.mp4", out, weird)
+                assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
     def test_run_processes_dynamic_source_and_creates_out_dir(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             source = "brandnew"
             in_file = sorted_dir / source / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
@@ -90,18 +90,18 @@ class TestUpscaleHelpers(unittest.TestCase):
         reading them would upscale that one instead.
         """
         with workspace_temp_dir() as root:
-            given_sorted, given_out, given_weird = library_dirs(root / "given")
+            given_sorted, given_out, given_trash = library_dirs(root / "given")
             given_in = given_sorted / "examplesource" / "landscape" / "clip one.mp4"
             given_in.parent.mkdir(parents=True)
             given_in.write_bytes(b"video")
 
-            ambient_sorted, ambient_out, ambient_weird = library_dirs(root / "ambient")
+            ambient_sorted, ambient_out, ambient_trash = library_dirs(root / "ambient")
             ambient_in = ambient_sorted / "examplesource" / "landscape" / "clip two.mp4"
             ambient_in.parent.mkdir(parents=True)
             ambient_in.write_bytes(b"video")
 
             with override_config(
-                SORTED_DIR=ambient_sorted, OUT_UPSCALED_DIR=ambient_out, WEIRD_DIR=ambient_weird,
+                SORTED_DIR=ambient_sorted, OUT_UPSCALED_DIR=ambient_out, TRASH_DIR=ambient_trash,
                 LOW_DISK_WARNING_GB=10 ** 9,
             ), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
@@ -109,7 +109,7 @@ class TestUpscaleHelpers(unittest.TestCase):
                     max_items=5,
                     sorted_dir=given_sorted,
                     outbox_dir=given_out,
-                    weird_dir=given_weird,
+                    trash_dir=given_trash,
                     low_disk_floor_gb=1,
                 )
 
@@ -130,7 +130,7 @@ class TestUpscaleHelpers(unittest.TestCase):
         # The guard is reached only for a clip under the provider's own source
         # name, which is the overlay's to say.
         with workspace_temp_dir() as root, override_config(PROVIDER_SOURCE="provider"):
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / config.PROVIDER_SOURCE / "landscape" / "clip one.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -139,7 +139,7 @@ class TestUpscaleHelpers(unittest.TestCase):
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                 result = upscale.run(
                     max_items=5,
-                    sorted_dir=sorted_dir, outbox_dir=out_dir, weird_dir=weird_dir,
+                    sorted_dir=sorted_dir, outbox_dir=out_dir, trash_dir=trash_dir,
                     low_disk_floor_gb=1,
                 )
 
@@ -148,7 +148,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_collect_candidates_prioritizes_newly_sorted_files(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
 
             priority = sorted_dir / "sourceB" / "portrait" / "priority.mp4"
             backlog = sorted_dir / "sourceA" / "landscape" / "backlog.mp4"
@@ -157,7 +157,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             priority.write_bytes(b"video")
             backlog.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 candidates = upscale.collect_candidates(priority_files=[priority])
 
             assert candidates[0][0] == priority
@@ -165,7 +165,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_removes_stale_partial_outputs_before_processing(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             source = "provider2"
             in_file = sorted_dir / source / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
@@ -175,7 +175,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             stale_partial.parent.mkdir(parents=True)
             stale_partial.write_bytes(b"partial")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=1)
@@ -186,7 +186,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_the_file_an_encode_writes_until_promotion_carries_no_video_extension(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / "examplesource" / "landscape" / "clip one.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -194,19 +194,19 @@ class TestUpscaleHelpers(unittest.TestCase):
             with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg) as run_ffmpeg, \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                 upscale.run(max_items=1, sorted_dir=sorted_dir, outbox_dir=out_dir,
-                            weird_dir=weird_dir, low_disk_floor_gb=1)
+                            trash_dir=trash_dir, low_disk_floor_gb=1)
 
             written_to = run_ffmpeg.call_args.args[1]
             assert written_to.suffix.lower() not in config.VIDEO_EXTENSIONS
 
     def test_an_encode_ffmpeg_refused_is_recorded_as_a_failure(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", return_value=False), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
@@ -216,7 +216,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_stops_early_when_budget_exceeded(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -224,7 +224,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             # Set a tiny budget so after the first item, remaining < min_start
             with override_config(
-                SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir,
+                SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir,
                 UPSCALE_RUN_BUDGET_SECONDS=1, UPSCALE_MIN_START_REMAINING_SECONDS=9999,
             ), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
@@ -236,12 +236,12 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_stops_early_on_low_disk(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg") as ffmpeg_mock, \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=1), \
                      patch("tasks.upscale.show_error"):
@@ -253,7 +253,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_records_failure_when_output_is_empty(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -262,7 +262,7 @@ class TestUpscaleHelpers(unittest.TestCase):
                 tmp.write_bytes(b"")
                 return True
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg_empty), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
@@ -282,7 +282,7 @@ class TestTheLowDiskWarning(unittest.TestCase):
         The encode fails, so the video is still waiting for the next run.
         """
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             touch_video(sorted_dir / "src" / "landscape" / "clip.mp4")
 
             with patch("tasks.upscale._run_ffmpeg", return_value=False), \
@@ -291,7 +291,7 @@ class TestTheLowDiskWarning(unittest.TestCase):
                 for free in free_bytes_each_run:
                     free_bytes.return_value = free
                     upscale.run(max_items=5, sorted_dir=sorted_dir, outbox_dir=out_dir,
-                                weird_dir=weird_dir, low_disk_floor_gb=1,
+                                trash_dir=trash_dir, low_disk_floor_gb=1,
                                 low_disk_dismissed_file=root / "state" / "dismissed")
         return show_error
 
@@ -302,14 +302,14 @@ class TestTheLowDiskWarning(unittest.TestCase):
 
     def test_a_drive_with_30_gb_free_still_upscales_a_send(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             touch_video(sorted_dir / "src" / "landscape" / "clip.mp4")
 
             with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=30 * 1024 ** 3), \
                  patch("tasks.upscale.show_error") as show_error:
                 result = upscale.run(max_items=5, sorted_dir=sorted_dir, outbox_dir=out_dir,
-                                     weird_dir=weird_dir,
+                                     trash_dir=trash_dir,
                                      low_disk_dismissed_file=root / "state" / "dismissed")
 
         assert result.processed == 1
@@ -480,7 +480,7 @@ class TestIsT2vProvider(unittest.TestCase):
 class TestOnProgressCallback(unittest.TestCase):
     def test_on_progress_called_per_item(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             for name in ("a", "b", "c"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -488,7 +488,7 @@ class TestOnProgressCallback(unittest.TestCase):
 
             progress_calls = []
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
@@ -500,7 +500,7 @@ class TestOnProgressCallback(unittest.TestCase):
 
     def test_on_progress_counts_failures(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -508,7 +508,7 @@ class TestOnProgressCallback(unittest.TestCase):
 
             progress_calls = []
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", return_value=False), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
@@ -519,12 +519,12 @@ class TestOnProgressCallback(unittest.TestCase):
     def test_on_progress_not_required(self):
         """Existing callers without on_progress still work."""
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             f = sorted_dir / "src" / "landscape" / "clip.mp4"
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
@@ -535,12 +535,12 @@ class TestOnProgressCallback(unittest.TestCase):
 class TestSubprocessTimeout(unittest.TestCase):
     def test_an_encode_the_budget_stopped_is_not_counted_a_failure(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
@@ -552,13 +552,13 @@ class TestSubprocessTimeout(unittest.TestCase):
 
     def test_run_breaks_loop_after_timeout(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)) as mock_ffmpeg, \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=10)
@@ -570,7 +570,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
     def test_the_video_the_budget_cut_off_is_still_pending(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -584,7 +584,7 @@ class TestSubprocessTimeout(unittest.TestCase):
                     return fake_run_ffmpeg(in_file, tmp, *args, **kwargs)
                 raise subprocess.TimeoutExpired("ffmpeg", 5)
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=encode_then_run_out_of_time),                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     result = upscale.run(max_items=5)
 
@@ -594,14 +594,14 @@ class TestSubprocessTimeout(unittest.TestCase):
 
     def test_on_progress_reports_where_the_run_stopped(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, weird_dir = library_dirs(root)
+            sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
             progress_calls = []
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir):
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
                 with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                     upscale.run(max_items=5, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
@@ -633,7 +633,7 @@ class TestSettingsSelection(unittest.TestCase):
         ai_dir = video_lib / "2D" / "AI"
         sorted_dir = ai_dir / "1_sorted"
         out_dir = ai_dir / "2_outbox" / "upscaled_by_orientation"
-        weird_dir = root / "weird"
+        trash_dir = root / "weird"
         meta_dir = root / "meta"
 
         in_file = sorted_dir / "provider" / "landscape" / "clip.mp4"
@@ -655,7 +655,7 @@ class TestSettingsSelection(unittest.TestCase):
             return True
 
         with override_config(VIDEO_LIBRARY_DIR=video_lib, AI_DIR=ai_dir, SORTED_DIR=sorted_dir,
-                             OUT_UPSCALED_DIR=out_dir, WEIRD_DIR=weird_dir, METADATA_DIR=meta_dir):
+                             OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir, METADATA_DIR=meta_dir):
             with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                 upscale.run(max_items=1)

@@ -29,7 +29,7 @@ The order above is the order they run in, and it is not maintained here: `tasks/
 
 `<source>` is discovered dynamically from directory names. Any new subdirectory under `0_inbox` is treated as a source automatically, and matching output directories are created on demand.
 
-The video library, `videos/videos`, also holds two folders that are not Evolver's library: Genau's (`genau_dir` in the settings all of Haglio shares) and the one Origenerator keeps its videos in (`origenerator_videos_dir`). Every stage walks the library as though neither were there. Only the stages that work with Genau's flicks — delivery, video kinds, the weird piles and the search for videos that moved — go into Genau's folder, and no stage touches Origenerator's.
+The video library, `videos/videos`, also holds two folders that are not Evolver's library: Genau's (`genau_dir` in the settings all of Haglio shares) and the one Origenerator keeps its videos in (`origenerator_videos_dir`). Every stage walks the library as though neither were there. Only the stages that work with Genau's flicks — delivery, video kinds, the trash folders and the search for videos that moved — go into Genau's folder, and no stage touches Origenerator's.
 
 ## Current architecture
 
@@ -66,7 +66,7 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `util/warm_gun.py` - the phone's journal, and which library video each line means
   - `util/lanes.py` - every video the library holds, lane by lane
   - `util/frame_hashes.py` - a video read down to comparable frames, and one run of them found inside another
-  - `util/weird_piles.py` - the two folders a video marked weird waits in, where each one goes back to, and restoring it or deleting it permanently
+  - `util/trash_folders.py` - the two folders a video sent to Trash waits in, where each one goes back to, and restoring it or deleting it permanently
   - `util/reference_stores.py` - which files across the suite record a video path, and how to rewrite one
   - `util/video_locator.py` - where a video a reference has lost track of now lives
   - `check_duplicate_sizes.py` - duplicate-size scan for likely source duplicates
@@ -87,13 +87,13 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `backfill_app.py` - voice-driven metadata backfill tool (see below), launched from the tray
   - `backfill/vocabulary.py` - the spoken phrases, and the `video.action` each one records
   - `backfill/queue.py` - the clips still missing an action, shuffled
-  - `backfill/decisions.py` - writing a clip's action or discarding it as weird, and taking either back
+  - `backfill/decisions.py` - writing a clip's action or discarding it as trash, and taking either back
   - `backfill/session.py` - what a heard phrase does to the queue, and the history "undo" walks back through
   - `backfill/work.py` - the single thread the file work runs on, in the order it was spoken
   - `backfill/voice.py` - hands the window what `voice_core`, the family's listener, hears
   - `backfill/window.py` - the looping player, the remaining count, and the last decision
-  - `review_weird_app.py` - the tool that reviews what is marked weird (see below), launched from the tray
-  - `review_weird/window.py` - every video marked weird, the one picked playing, and Restore and Delete Permanently
+  - `review_trash_app.py` - the tool that reviews what is sent to Trash (see below), launched from the tray
+  - `review_trash/window.py` - every video sent to Trash, the one picked playing, and Restore and Delete Permanently
   - `util/player_readout.py` - keeping what the two tools' players read out of a video, its tags among it, out of every log
   - `util/selection_highlight.py` - the family's blue for a picked row, in the lists that would otherwise wear Windows 11's faint gray
   - `gui/app.py` - tray application wiring: builds the parts, then starts them
@@ -189,7 +189,7 @@ Four more phrases:
 
 - `same` — record the last act again on the clip now on screen, for a run that all share one act. It reaches past any intervening `skip` to the last act actually spoken, and says "nothing to repeat" if you have not named one yet
 - `skip` — not now; the clip goes to the back of the queue and comes round again
-- `weird` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "mark as weird" does. No metadata is written, and nothing deletes it: it waits there, with its `1_sorted` source, until you review it (see "Reviewing what is in Trash" below)
+- `trash` / `trash` — move the clip to `kinda_weird/`, exactly as Fun Time's "send to Trash" does. No metadata is written, and nothing deletes it: it waits there, with its `1_sorted` source, until you review it (see "Reviewing what is in Trash" below)
 - `undo` — take the last decision back, and keep saying it to walk back through the whole run
 
 Undo restores the clip to the screen and reverses what the decision did on disk: a sidecar it wrote is deleted (or, if the clip arrived carrying prompts, only the act is removed), and a clip sent to `kinda_weird/` is reclaimed from where it landed. Undoing every decision rewinds the queue to the order it had. It works after the last clip too, so a mislabelled final clip is still recoverable.
@@ -203,11 +203,11 @@ match. Frames are sampled a little way into the clip (past the intro, with the a
 
 Acts are voiced in plain-English words because the vosk lexicon lacks most of the compounds — the same trick Fun Time uses. A spoken command acts once a second recognizer (Whisper) has read the same audio and agrees, about half a second later; a phrase the two read differently is dropped, so say it again or click its tile. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. The `microphone` in `~/.haglio/settings.json`, which every app that listens reads, is a substring of the mic's name (from `python -m sounddevice`) and pins that one.
 
-## Reviewing what is marked weird
+## Reviewing what is sent to Trash
 
-A video marked weird — by Fun Time's Funestras, by the backfill tool's `weird`, or by Genau — waits in `2_outbox/kinda_weird/` or in the `weird` folder beside Genau's flicks folder, and nothing Evolver runs deletes it. **Review Trash...**, in the tray menu or on the main window's toolbar, opens a window that lists every one of them with the folder it restores to, and plays the one you pick, looping and muted. A video marked weird while the window is open joins the list within a couple of seconds.
+A video sent to Trash — by Fun Time's Funestras, by the backfill tool's `trash`, or by Genau — waits in `2_outbox/kinda_weird/` or in the `trash` folder beside Genau's flicks folder, and nothing Evolver runs deletes it. **Review Trash...**, in the tray menu or on the main window's toolbar, opens a window that lists every one of them with the folder it restores to, and plays the one you pick, looping and muted. A video sent to Trash while the window is open joins the list within a couple of seconds.
 
-- **Restore** puts the picked videos back in the folders they were marked weird in, under the names they had there, each with the funscript that followed it into the pile. An upscale goes back where the upscale stage filed it, a Genau flick to its own place in Genau's flicks folder, and any other video to the folder its metadata is still filed under. A video nothing says the place of reads "can't tell", and can only be deleted.
+- **Restore** puts the picked videos back in the folders they were sent to Trash in, under the names they had there, each with the funscript that followed it into the pile. An upscale goes back where the upscale stage filed it, a Genau flick to its own place in Genau's flicks folder, and any other video to the folder its metadata is still filed under. A video nothing says the place of reads "can't tell", and can only be deleted.
 - **Delete Permanently** deletes the picked videos at once, without asking, and what is theirs: the `1_sorted` copy each was upscaled from, its own metadata — never the metadata of another video that shares its name — its funscripts, and a Genau flick's sound, unless another flick of that name still plays it. The `Delete` key does the same.
 
 Both say in `evolver.log` what they moved or deleted. The window runs as its own process, as the backfill tool's does.
@@ -271,7 +271,7 @@ A reference whose file is missing is matched against the library by **exact file
 
 A clip's pairing also follows its scene to another version of it: when the non-AI upscale replaces a scene with `<stem>_apo8_iris2` and moves the original out of the library, no file carries the old name any more, so the pairing is matched to the smallest file in the same bucket whose name, processing suffixes taken off, is the one it names. That is safe for a pairing and for nothing else here, because its offset is in seconds, which an upscale keeps, where a Genaumacher session's frame numbers are not.
 
-Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`. Videos sitting in either weird pile — `kinda_weird/` and Genau's — are excluded from the search, so a reference goes on naming the place its video was, which is where the video goes back to if you put it back. So are the videos Origenerator keeps in its own folder (`origenerator_videos_dir` in the settings all of Haglio shares): they are not Evolver's to follow.
+Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`. Videos sitting in either trash folder — `kinda_weird/` and Genau's — are excluded from the search, so a reference goes on naming the place its video was, which is where the video goes back to if you put it back. So are the videos Origenerator keeps in its own folder (`origenerator_videos_dir` in the settings all of Haglio shares): they are not Evolver's to follow.
 
 A reference into a folder whose videos are kept off the library's drive, `vr_videos` or `retired_root`, is not looked for at all while the drive that folder is on is not there: its video is not missing, its drive is down, and matching the name against the library could repoint it at a different video. The stage counts it as not checked and says once in the log which folder could not be reached.
 
@@ -281,7 +281,7 @@ A reference into a folder whose videos are kept off the library's drive, `vr_vid
 
 ## What both apps watched
 
-Fun Time counts what its Funestras complete, skip and lock in `fun_time/state/watch_stats.json`. Warm Gun, on the phone, writes the same events — and `favorite`, `unfavorite`, `weird` — one JSON line each into `*.jsonl` files in Warm Gun's journal folder (`warm_gun_journal_dir` in the settings all of Haglio shares), a folder inside the library so the file sync that carries the videos carries the journal here too. While the app still writes to a folder of its own outside the library, name that folder as `warm_gun_outbox` in the content overlay and it is read as well — a line reached through both folders counts once, so the app can be changed and the folder retired without a day where the two sides disagree. While the drive that folder is on is not there, the stage leaves every weight and the phone's favorites as they were, rather than weigh every video without the viewing the folder holds, and says so in the log. A line is `{"t": <unix seconds>, "event": "...", "path": "..."}`, the path relative to the lane the phone played it from: `1_sorted/<source>/<orientation>/<file>`, `non_AI/<bucket>/...`, or `genau/<Genau's flicks folder>/<file>`, which lines written before that folder was renamed spell `genau/clips/<file>`. Every journal in the folder is read and a line that appears in two of them counts once.
+Fun Time counts what its Funestras complete, skip and lock in `fun_time/state/watch_stats.json`. Warm Gun, on the phone, writes the same events — and `favorite`, `unfavorite`, `trash` — one JSON line each into `*.jsonl` files in Warm Gun's journal folder (`warm_gun_journal_dir` in the settings all of Haglio shares), a folder inside the library so the file sync that carries the videos carries the journal here too. While the app still writes to a folder of its own outside the library, name that folder as `warm_gun_outbox` in the content overlay and it is read as well — a line reached through both folders counts once, so the app can be changed and the folder retired without a day where the two sides disagree. While the drive that folder is on is not there, the stage leaves every weight and the phone's favorites as they were, rather than weigh every video without the viewing the folder holds, and says so in the log. A line is `{"t": <unix seconds>, "event": "...", "path": "..."}`, the path relative to the lane the phone played it from: `1_sorted/<source>/<orientation>/<file>`, `non_AI/<bucket>/...`, or `genau/<Genau's flicks folder>/<file>`, which lines written before that folder was renamed spell `genau/clips/<file>`. Every journal in the folder is read and a line that appears in two of them counts once.
 
 The **Watch Weights** stage sums the two on every library video's sidecar — for a generated clip, the sidecar of its upscale, which is the file Fun Time plays:
 
@@ -390,7 +390,7 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 
 ## Notes
 
-- Nothing Evolver runs deletes a video marked weird: one in `2_outbox/kinda_weird/` or in the `weird` folder inside Genau's own stays there, with its `1_sorted` source, its metadata and its funscripts, until you review it with **Review Trash...** in the tray menu.
+- Nothing Evolver runs deletes a video sent to Trash: one in `2_outbox/kinda_weird/` or in the `trash` folder inside Genau's own stays there, with its `1_sorted` source, its metadata and its funscripts, until you review it with **Review Trash...** in the tray menu.
 - Scripts Sync always runs. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` tree within `videos/videos` (or exactly one in the script's own source folder), then fills in missing counterpart funscripts for matching processed/original video variants when it can do so unambiguously.
 - Bookmarks Sync resolves the Chrome profile from Chrome's `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the `web_url` of every favorite whose video is still there, skipping the run when the library's records cannot be reached.
 - Metadata Scrape writes prompt JSON files under `videos/metadata/2_outbox/.../<video-name>_topaz.json`, skipping any video that already has a JSON. A video whose scrape fails (for example, its source page was deleted) gets a sibling `<video-name>_topaz.json.failed` marker so it is not retried every run; delete the marker to force a retry. The current scraper only extracts Provider prompts.

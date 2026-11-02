@@ -59,7 +59,7 @@ class _LibraryTree:
         self.ai = root / "AI"
         self.upscaled = self.ai / "2_outbox" / "upscaled_by_orientation"
         self.metadata = root / "metadata"
-        self.weird = root / "kinda_weird"
+        self.trash = root / "kinda_weird"
 
     def video(self, orient="portrait", source="provider2", name="a_topaz.mp4") -> Path:
         video = self.upscaled / orient / source / name
@@ -99,7 +99,7 @@ def library_tree(**config_extra):
     The layout is a real contract (config.py mirrors it, and genau and
     fun_time read the same shape); it used to be re-implemented by hand in
     four test files with 26 copies of the same four-key override_config line.
-    Extra config keys (e.g. WEIRD_DIR) ride along per test.
+    Extra config keys (e.g. TRASH_DIR) ride along per test.
     """
     with workspace_temp_dir() as root:
         tree = _LibraryTree(root)
@@ -108,7 +108,7 @@ def library_tree(**config_extra):
             AI_DIR=tree.ai,
             OUT_UPSCALED_DIR=tree.upscaled,
             METADATA_DIR=tree.metadata,
-            WEIRD_DIR=tree.weird,
+            TRASH_DIR=tree.trash,
         )
         overrides.update(config_extra)
         with override_config(**overrides):
@@ -126,10 +126,10 @@ class LaneLibrary:
         self.sorted_dir = self.ai / "1_sorted"
         self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
         self.non_ai = self.library / "2D" / "non_AI"
-        self.weird = self.ai / "2_outbox" / "kinda_weird"
+        self.trash = self.ai / "2_outbox" / "kinda_weird"
         self.genau = self.library / "genau"
         self.genau_flicks = self.genau / "flicks"
-        self.genau_weird = self.genau / "weird"
+        self.genau_trash = self.genau / "weird"
         self.genau_audio = videos / "audio" / "genau"
         self.origenerator = self.library / "origenerator"
         self.metadata = videos / "metadata"
@@ -146,10 +146,10 @@ class LaneLibrary:
             "GENERATED_SCRIPTS_DIR": self.generated,
             "SORTED_DIR": self.sorted_dir,
             "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
-            "WEIRD_DIR": self.weird,
+            "TRASH_DIR": self.trash,
             "GENAU_DIR": self.genau, "GENAU_SOURCE": genau_source,
             "ORIGENERATOR_VIDEOS_DIR": self.origenerator,
-            "GENAU_WEIRD_DIR": self.genau_weird, "GENAU_AUDIO_DIR": self.genau_audio,
+            "GENAU_TRASH_DIR": self.genau_trash, "GENAU_AUDIO_DIR": self.genau_audio,
             "EXCERPT_FOLDERS": (), "VR_VIDEO_DIR": None,
         }
         settings.update(extra)

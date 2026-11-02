@@ -820,12 +820,12 @@ def _a_run(lib: LaneLibrary) -> None:
         evolver.run_pipeline()
 
 
-class TestWhatIsMarkedWeird:
-    def test_a_run_leaves_a_flick_genau_marked_weird_where_it_is_with_its_record(self):
+class TestWhatIsMarkedTrash:
+    def test_a_run_leaves_a_flick_genau_marked_trash_where_it_is_with_its_record(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():
-                marked = touch_video(lib.genau_weird / "loop_7_topaz.mp4")
+                marked = touch_video(lib.genau_trash / "loop_7_topaz.mp4")
                 record = _a_record_for(lib.genau_flicks / marked.name)
 
             _a_run(lib)
@@ -837,8 +837,8 @@ class TestWhatIsMarkedWeird:
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():
-                touch_video(lib.genau_weird / "scene one.mp4")
-                touch_video(lib.genau_weird / "loop_8_topaz.mp4")
+                touch_video(lib.genau_trash / "scene one.mp4")
+                touch_video(lib.genau_trash / "loop_8_topaz.mp4")
                 full_scene = _a_record_for(
                     touch_video(lib.non_ai / "example-bucket" / "full" / "scene one.mp4"))
                 landscape_copy = _a_record_for(

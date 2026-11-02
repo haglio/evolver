@@ -47,7 +47,7 @@ class SentLane:
 def sent_lanes() -> tuple[SentLane, ...]:
     """Both lanes Origenerator sends down, resolved against config as it is now.
 
-    A function rather than a table, for the reason ``weird_piles`` is one: the
+    A function rather than a table, for the reason ``trash_folders`` is one: the
     Genau lane's folder is found on disk each time, and a tuple built at import
     freezes whatever was there then.
     """

@@ -157,14 +157,14 @@ class TestNonAiGroup(unittest.TestCase):
                 assert result.pruned == 1
                 assert not sidecar.sidecar_path(clip).exists()
 
-    def test_keeps_the_record_of_a_clip_marked_weird_until_it_is_reviewed(self):
+    def test_keeps_the_record_of_a_clip_marked_trash_until_it_is_reviewed(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():
                 clip = _touch(lib.non_ai / "example-bucket" / "0 unsorted" / "Scene-2.mp4")
                 nonai_group.run()
-                lib.weird.mkdir(parents=True)
-                clip.replace(lib.weird / f"{clip.stem}__dup1{clip.suffix}")
+                lib.trash.mkdir(parents=True)
+                clip.replace(lib.trash / f"{clip.stem}__dup1{clip.suffix}")
 
                 result = nonai_group.run()
 

@@ -18,7 +18,7 @@ from gui.commands import (
     QUEUE,
     QUIT,
     RESTART,
-    REVIEW_WEIRD,
+    REVIEW_TRASH,
     RUN_NOW,
     SETTINGS,
     STATS,
@@ -83,8 +83,8 @@ class EvolverTray(QSystemTrayIcon):
         self.backfill_action = BACKFILL.action(self._menu)
         self._menu.addAction(self.backfill_action)
 
-        self.review_weird_action = REVIEW_WEIRD.action(self._menu)
-        self._menu.addAction(self.review_weird_action)
+        self.review_trash_action = REVIEW_TRASH.action(self._menu)
+        self._menu.addAction(self.review_trash_action)
 
         self._menu.addSeparator()
 
@@ -120,7 +120,7 @@ class EvolverTray(QSystemTrayIcon):
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
             "backfill": self.backfill_action.triggered,
-            "review_weird": self.review_weird_action.triggered,
+            "review_trash": self.review_trash_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,
         }

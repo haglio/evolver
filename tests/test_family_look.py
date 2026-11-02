@@ -9,7 +9,7 @@ from shared_ui.look_guard import assert_the_look_is_shared_uis
 pytestmark = pytest.mark.repo_check
 
 _CHECKOUT = Path(__file__).resolve().parents[1]
-_PACKAGES = ("gui", "backfill", "review_weird", "tasks", "util", "tools")
+_PACKAGES = ("gui", "backfill", "review_trash", "tasks", "util", "tools")
 # The Stats chart tells its 19 stages apart by colors of their own, which its owner chose to keep (2026-10-24).
 _WHERE_THE_STAGES_COLORS_ARE = _CHECKOUT / "tasks" / "stages.py"
 

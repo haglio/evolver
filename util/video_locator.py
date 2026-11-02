@@ -13,7 +13,7 @@ import config
 from util import ffprobe
 from util.media_files import file_size, is_finalized_video_file, library_videos
 from util.nonai_library import bucket_of
-from util.weird_piles import weird_pile_dirs
+from util.trash_folders import trash_dirs
 
 
 def build_index() -> dict[str, list[Path]]:
@@ -22,7 +22,7 @@ def build_index() -> dict[str, list[Path]]:
     root = config.VIDEO_SEARCH_ROOT
     if not root.is_dir():
         return index
-    left_out = weird_pile_dirs()
+    left_out = trash_dirs()
     for video_path in chain(library_videos(root), library_videos(config.GENAU_DIR)):
         if any(video_path.is_relative_to(folder) for folder in left_out):
             continue

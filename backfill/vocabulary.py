@@ -54,8 +54,8 @@ class Camera(_Voiced):
 class _Control(_Voiced):
     """A non-labeling command — skip, discard, undo, repeat."""
 
-    label: str  # the grid tile text, e.g. "Weird"
-    kind: str  # the control constant it maps to (SKIP / WEIRD / UNDO / SAME)
+    label: str  # the grid tile text, e.g. "Trash"
+    kind: str  # the control constant it maps to (SKIP / TRASH / UNDO / SAME)
 
 
 @dataclass(frozen=True)
@@ -72,17 +72,17 @@ class Command:
 
 
 SKIP = "skip"
-WEIRD = "weird"
+TRASH = "trash"
 UNDO = "undo"
 SAME = "same"
 
-# "skip" defers the clip to the back of the queue; "weird"/"trash" moves it to the
-# weird folder, as Fun Time's "mark as weird" does; "undo" takes back the last
+# "skip" defers the clip to the back of the queue; "trash"/"trash" moves it to the
+# trash folder, as Fun Time's "send to Trash" does; "undo" takes back the last
 # decision, and keeps stepping back through them; "same" repeats the last act you
 # spoke, for a run of clips that share one.
 _CONTROLS: tuple[_Control, ...] = (
     _Control("skip", "Skip", SKIP),
-    _Control("trash", "Trash", WEIRD),
+    _Control("trash", "Trash", TRASH),
     _Control("undo", "Undo", UNDO),
     _Control("same", "Same", SAME),
 )
@@ -120,7 +120,7 @@ class Vocabulary:
         return sorted({*self.actions, *self.controls})
 
     def discarding_phrases(self) -> set[str]:
-        return {phrase for phrase, kind in self.controls.items() if kind == WEIRD}
+        return {phrase for phrase, kind in self.controls.items() if kind == TRASH}
 
 
 def _aliases(entry: Mapping[str, Any]) -> tuple[str, ...]:

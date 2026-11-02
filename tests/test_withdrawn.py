@@ -90,7 +90,7 @@ class TestTheEvolverLane(unittest.TestCase):
             source = lanes.ORIGENERATOR_SOURCE
             db = _gallery(root / "gallery.db", [("p1", "made_00007.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                touch_video(lib.weird / "made_00007_topaz.mp4")
+                touch_video(lib.trash / "made_00007_topaz.mp4")
                 touch_video(lib.sorted_dir / source / "portrait" / "made_00007.mp4")
                 left_behind = touch_video(script_library.script_path_for_video(
                     lib.outbox / "portrait" / source / "made_00007_topaz.mp4"))

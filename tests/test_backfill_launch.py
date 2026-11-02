@@ -50,14 +50,14 @@ class TestLaunch(unittest.TestCase):
         expected = [sys.executable, str(config.PROJECT_DIR / "backfill_app.py")]
         assert [call.args[0] for call in popen.call_args_list] == [expected, expected]
 
-    def test_review_weird_starts_its_own_process_from_the_tray_and_the_window_alike(self):
+    def test_review_trash_starts_its_own_process_from_the_tray_and_the_window_alike(self):
         app = self._app()
 
         with patch("gui.app.subprocess.Popen") as popen:
-            app._tray.review_weird_action.trigger()
-            app._window.review_weird_action.trigger()
+            app._tray.review_trash_action.trigger()
+            app._window.review_trash_action.trigger()
 
-        expected = [sys.executable, str(config.PROJECT_DIR / "review_weird_app.py")]
+        expected = [sys.executable, str(config.PROJECT_DIR / "review_trash_app.py")]
         assert [call.args[0] for call in popen.call_args_list] == [expected, expected]
         assert popen.call_args.kwargs["creationflags"] & subprocess.DETACHED_PROCESS
 

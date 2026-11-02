@@ -17,13 +17,13 @@ from pathlib import Path
 from typing import Protocol
 
 from backfill.decisions import (
-    discard_as_weird,
-    reclaim_from_weird,
+    reclaim_from_trash,
     restore_sidecar,
+    send_to_trash,
     sidecar_snapshot,
 )
 from backfill.queue import BackfillQueue
-from backfill.vocabulary import SAME, SKIP, UNDO, WEIRD, Vocabulary
+from backfill.vocabulary import SAME, SKIP, TRASH, UNDO, Vocabulary
 from backfill.work import SerialWorker
 from util.sidecar import record_action
 
@@ -86,7 +86,7 @@ class _Labelled:
 
 @dataclass
 class _Discarded:
-    """The clip was weird; it now sits in the weird folder."""
+    """The clip was trash; it now sits in the trash folder."""
 
     clip: Path
     _landed_at: Path | None = field(default=None, init=False, repr=False)
@@ -102,11 +102,11 @@ class _Discarded:
         queue.restore(self.clip)
 
     def commit(self) -> None:
-        self._landed_at = discard_as_weird(self.clip)
+        self._landed_at = send_to_trash(self.clip)
 
     def roll_back(self) -> None:
         if self._landed_at is not None:  # the move failed; there is nothing to reclaim
-            reclaim_from_weird(self._landed_at, self.clip)
+            reclaim_from_trash(self._landed_at, self.clip)
 
 
 @dataclass
@@ -136,7 +136,7 @@ class BackfillSession:
     """Applies heard phrases to the queue, dispatching the file work off-thread.
 
     A clip leaves the screen the instant a phrase lands: the disk work — writing
-    the sidecar, or moving the clip to the weird folder — goes to *worker* and the
+    the sidecar, or moving the clip to the trash folder — goes to *worker* and the
     next clip starts playing without waiting for it.
     """
 
@@ -203,7 +203,7 @@ class BackfillSession:
         control = self._vocabulary.controls.get(phrase)
         if control == SKIP:
             return _Deferred(clip)
-        if control == WEIRD:
+        if control == TRASH:
             return _Discarded(clip)
         # UNDO and SAME are answered in apply() before a step is asked for, and
         # anything else is a control this dispatch does not know: do nothing

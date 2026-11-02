@@ -22,7 +22,7 @@ from shared_ui.icons import qt_icon
 from shared_ui.spacing import MARGIN_STANDARD
 
 import config
-from util import weird_piles
+from util import trash_folders
 from util.looping_preview import LoopingPreview
 from util.selection_highlight import SELECTION_HIGHLIGHT
 
@@ -34,7 +34,7 @@ _HINT = ("Restore puts a video back in the folder it was sent to Trash from. Del
 _NOWHERE = "Nothing says which folder it was sent to Trash from, so it can't be restored"
 
 
-class ReviewWeirdWindow(QWidget):
+class ReviewTrashWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Evolver - Review Trash")
@@ -76,9 +76,9 @@ class ReviewWeirdWindow(QWidget):
         layout.addWidget(_side_by_side(self.videos, _above(screen, self.restore_button,
                                                            self.delete_button)), stretch=1)
 
-        self._show(weird_piles.marked_weird(), row=0)
+        self._show(trash_folders.in_trash(), row=0)
 
-    def _show(self, marked: list[weird_piles.MarkedWeird], row: int,
+    def _show(self, marked: list[trash_folders.InTrash], row: int,
               current: Path | None = None, picked: frozenset[Path] = frozenset()) -> None:
         self._marked = marked
         self.heading.setText(_counted(len(marked)))
@@ -105,18 +105,18 @@ class ReviewWeirdWindow(QWidget):
             self.preview.show(video)
 
     def _look_again(self) -> None:
-        if weird_piles.videos_marked_weird() != [each.video for each in self._marked]:
+        if trash_folders.videos_in_trash() != [each.video for each in self._marked]:
             current = self.videos.currentItem()
-            self._show(weird_piles.marked_weird(), self.videos.indexOfTopLevelItem(current),
+            self._show(trash_folders.in_trash(), self.videos.indexOfTopLevelItem(current),
                        current=_marked(current).video if current is not None else None,
                        picked=frozenset(each.video for each in self._chosen()))
 
     def _restore(self) -> None:
-        self._settle(weird_piles.restore)
+        self._settle(trash_folders.restore)
 
     def _delete_permanently(self) -> None:
         if self._chosen():
-            self._settle(weird_piles.delete_permanently)
+            self._settle(trash_folders.delete_permanently)
 
     def _settle(self, verdict) -> None:
         row = self.videos.indexOfTopLevelItem(self.videos.currentItem())
@@ -127,9 +127,9 @@ class ReviewWeirdWindow(QWidget):
                 verdict(marked)
             except (OSError, ValueError) as error:
                 QMessageBox.warning(self, "Review Trash", f"{marked.video.name}: {error}")
-        self._show(weird_piles.marked_weird(), row)
+        self._show(trash_folders.in_trash(), row)
 
-    def _chosen(self) -> list[weird_piles.MarkedWeird]:
+    def _chosen(self) -> list[trash_folders.InTrash]:
         return [_marked(item) for item in self.videos.selectedItems()]
 
     def _offer_what_can_be_done(self) -> None:
@@ -170,7 +170,7 @@ def _above(screen: QWidget, *buttons: QPushButton) -> QWidget:
     return stack
 
 
-def _marked(item: QTreeWidgetItem) -> weird_piles.MarkedWeird:
+def _marked(item: QTreeWidgetItem) -> trash_folders.InTrash:
     return item.data(0, Qt.ItemDataRole.UserRole)
 
 

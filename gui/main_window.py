@@ -38,7 +38,7 @@ from gui.commands import (
     QUEUE,
     QUIT,
     RESTART,
-    REVIEW_WEIRD,
+    REVIEW_TRASH,
     RUN_NOW,
     SETTINGS,
     STATS,
@@ -440,8 +440,8 @@ class EvolverMainWindow(QMainWindow):
         self.backfill_action = BACKFILL.action(self)
         toolbar.addAction(self.backfill_action)
 
-        self.review_weird_action = REVIEW_WEIRD.action(self)
-        toolbar.addAction(self.review_weird_action)
+        self.review_trash_action = REVIEW_TRASH.action(self)
+        toolbar.addAction(self.review_trash_action)
 
         toolbar.addSeparator()
 
@@ -471,7 +471,7 @@ class EvolverMainWindow(QMainWindow):
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
             "backfill": self.backfill_action.triggered,
-            "review_weird": self.review_weird_action.triggered,
+            "review_trash": self.review_trash_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,
         }
