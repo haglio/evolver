@@ -1,11 +1,11 @@
 """Quit, restart, Run Now and pause wear the family's marks, in the window and
 the tray.
 
-What evolver owns here is which glyph each function asks shared_ui for, and
+What evolver owns here is which symbol each function asks shared_ui for, and
 that the caller's ink color reaches the drawing. How the glyphs are drawn --
 their geometry, their disabled rendering, their relative ink weights -- is
 shared_ui's contract, pinned in shared_ui's own suite; re-asserting it here
-turned a legitimate glyph redesign into a red evolver suite.
+turned a legitimate symbol redesign into a red evolver suite.
 """
 from __future__ import annotations
 

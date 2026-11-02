@@ -47,7 +47,7 @@ from gui.commands import (
 )
 from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
-from gui.status_symbols import GRAY, mark_for, mark_icon
+from gui.status_symbols import GRAY, status_icon, symbol_for
 from gui.switches import SwitchButton
 from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
@@ -128,7 +128,7 @@ class RunDetailWidget(QWidget):
         # link in whichever theme Qt has given the rest of the window.
         self._header.setText(f'<a href="log">Run: {record.started_at}</a>')
         self._header.setToolTip("Show what this run wrote to the log")
-        mark, color = mark_for(record.status)
+        mark, color = symbol_for(record.status)
         # Rich text so the mark alone is colored; the rest of the line stays
         # the label's own color, matching the history list beside it.
         status = inline_icon(mark, color=color, size=self._info_label.fontMetrics().height()) if mark else ""
@@ -164,7 +164,7 @@ class RunDetailWidget(QWidget):
             # color lands on a mark rather than on a block of text.
             status = stage.get("status", "")
             status_item = QTableWidgetItem()
-            status_item.setIcon(mark_icon(status))
+            status_item.setIcon(status_icon(status))
             status_item.setToolTip(status)
             status_item.setFlags(no_edit)
             self._table.setItem(i, 2, status_item)
@@ -485,7 +485,7 @@ class EvolverMainWindow(QMainWindow):
         self._history_list.clear()
         for record in self._records:
             item = QListWidgetItem(
-                mark_icon(record.status),
+                status_icon(record.status),
                 format_run_label(record.started_at, record.duration_seconds),
             )
             item.setToolTip(record.status)
