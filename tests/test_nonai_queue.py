@@ -21,7 +21,7 @@ from tests.temp_helpers import (
 
 
 def queue_files(root, overrides, *, pin_list=None):
-    """The three files collect_candidates reads, defaulted to absent ones."""
+    """The three files collect_queued videos reads, defaulted to absent ones."""
     return {
         "skip_list": overrides["NONAI_SKIP_LIST"],
         "pin_list": pin_list or root / "next.txt",
@@ -41,11 +41,11 @@ class TestCollectCandidates(unittest.TestCase):
             make_video(non_ai / "lagoon" / "3_good_to_go" / "processed" / "done_iris2.mp4")
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
+                queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
             # Sort both sides: which bucket name sorts first is an accident of
             # the fixture's spelling, not something this test is about.
-            assert sorted(c.path for c in candidates) == sorted([flagged_video, unsorted_video])
+            assert sorted(c.path for c in queued_videos) == sorted([flagged_video, unsorted_video])
 
     def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
         """A triage dir's first sub-stage holds manual pre-work (e.g. lagoon's
@@ -62,9 +62,9 @@ class TestCollectCandidates(unittest.TestCase):
             )
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
+                queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            assert [c.path for c in candidates] == [ready]
+            assert [c.path for c in queued_videos] == [ready]
 
     def test_finds_videos_in_a_triage_dirs_upscale_ready_substages(self):
         """Past the manual-pre-work one, a triage dir's sub-stages say in their
@@ -83,9 +83,9 @@ class TestCollectCandidates(unittest.TestCase):
             make_video(work / "1_originals_needing_trimming" / "not yet.mp4")
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
+                queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            assert sorted(c.path for c in candidates) == [good, trimmed]
+            assert sorted(c.path for c in queued_videos) == [good, trimmed]
 
     def test_pinned_videos_lead_the_queue_in_the_order_listed(self):
         """The pin list is how the user says "encode this one next", so it
@@ -103,10 +103,10 @@ class TestCollectCandidates(unittest.TestCase):
             )
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(
+                queued_videos = nonai_queue.collect_queued_videos(
                     **queue_files(root, overrides, pin_list=pins))
 
-            assert [c.path for c in candidates][:2] == [first, second]
+            assert [c.path for c in queued_videos][:2] == [first, second]
 
     def test_a_pin_re_queues_a_video_that_already_has_a_processed_variant(self):
         """An existing variant normally reads as "already done". When it came
@@ -123,10 +123,10 @@ class TestCollectCandidates(unittest.TestCase):
             pins.write_text("lagoon/1 could use work/scene.mp4\n", encoding="utf-8")
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(
+                queued_videos = nonai_queue.collect_queued_videos(
                     **queue_files(root, overrides, pin_list=pins))
 
-            assert [c.path for c in candidates] == [original]
+            assert [c.path for c in queued_videos] == [original]
 
     def test_excludes_originals_that_already_have_a_processed_variant(self):
         with workspace_temp_dir() as root:
@@ -140,9 +140,9 @@ class TestCollectCandidates(unittest.TestCase):
             fresh = make_video(non_ai / "other" / "0 unsorted" / "fresh.mp4")
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
+                queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            assert [c.path for c in candidates] == [fresh]
+            assert [c.path for c in queued_videos] == [fresh]
 
     def test_excludes_what_the_skip_list_names(self):
         with workspace_temp_dir() as root:
@@ -156,9 +156,9 @@ class TestCollectCandidates(unittest.TestCase):
             )
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
+                queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            assert [c.path for c in candidates] == [fresh]
+            assert [c.path for c in queued_videos] == [fresh]
 
     def test_watched_videos_outrank_funscripted_ones(self):
         """Fun Time's watch stats (once its Main Funestra tracking records them) are the
@@ -181,9 +181,9 @@ class TestCollectCandidates(unittest.TestCase):
             }), encoding="utf-8")
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
+                queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            assert [c.path for c in candidates] == [watched, scripted, plain, disliked]
+            assert [c.path for c in queued_videos] == [watched, scripted, plain, disliked]
 
     def test_orders_flagged_then_funscripted_then_the_rest(self):
         with workspace_temp_dir() as root:
@@ -199,9 +199,9 @@ class TestCollectCandidates(unittest.TestCase):
             script.write_text("{}", encoding="utf-8")
 
             with override_config(**overrides):
-                candidates = nonai_queue.collect_candidates(**queue_files(root, overrides))
+                queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            assert [c.path for c in candidates] == [flagged, scripted, plain]
+            assert [c.path for c in queued_videos] == [flagged, scripted, plain]
 
 
 class TestManifestEntries(unittest.TestCase):

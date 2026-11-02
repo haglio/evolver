@@ -33,7 +33,7 @@ from app_support.win32 import seconds_since_input
 
 import config
 from tasks.nonai_files import StageFiles
-from tasks.nonai_queue import Candidate, add_to_skip_list, relpath
+from tasks.nonai_queue import QueuedVideo, add_to_skip_list, relpath
 from util import ffprobe, nonai_job, orientation, processes, provenance, system_resources, topaz
 from util.media_files import is_partial_path, partial_path, partial_stem
 from util.nonai_library import stage_dirs
@@ -253,9 +253,9 @@ def launch(source: Path, tmp: Path, orient: str) -> int:
     return proc.pid
 
 
-def start(candidate: Candidate, files: StageFiles, *, on_request: bool = False) -> bool:
-    """Start *candidate*'s encode, or retire it to the skip list unstarted."""
-    source = candidate.path
+def start(queued_video: QueuedVideo, files: StageFiles, *, on_request: bool = False) -> bool:
+    """Start *queued_video*'s encode, or retire it to the skip list unstarted."""
+    source = queued_video.path
     expected_duration = ffprobe.duration_seconds(source)
     orient = ffprobe.orientation_of(source)
     if ffprobe.videoai_tag(source):
@@ -267,7 +267,7 @@ def start(candidate: Candidate, files: StageFiles, *, on_request: bool = False) 
                              "ffprobe could not read duration or orientation")
         return False
 
-    out = _output_path(candidate)
+    out = _output_path(queued_video)
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = partial_path(out, source.stem)
     nonai_job.bump_attempts(files.attempts, relpath(source))
@@ -290,13 +290,13 @@ def start(candidate: Candidate, files: StageFiles, *, on_request: bool = False) 
     return True
 
 
-def _output_path(candidate: Candidate) -> Path:
-    done_dirs = stage_dirs(candidate.bucket, digits=(3,))
+def _output_path(queued_video: QueuedVideo) -> Path:
+    done_dirs = stage_dirs(queued_video.bucket, digits=(3,))
     done_dir = (
         done_dirs[0][1] if done_dirs
-        else candidate.bucket / config.NONAI_FALLBACK_DONE_DIR_NAME
+        else queued_video.bucket / config.NONAI_FALLBACK_DONE_DIR_NAME
     )
-    stem = candidate.path.stem
+    stem = queued_video.path.stem
     return done_dir / config.NONAI_PROCESSED_DIR_NAME / f"{stem}{config.NONAI_OUTPUT_SUFFIX}.mp4"
 
 

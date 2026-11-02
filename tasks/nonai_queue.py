@@ -1,6 +1,6 @@
 """Which non-AI clip the upscale stage encodes next, and in what order.
 
-Candidates come from the buckets' triage folders (``0 unsorted``, ``1 could
+Queued videos come from the buckets' triage folders (``0 unsorted``, ``1 could
 use work``), most-wanted first: a pin in the pin list beats everything and
 also re-queues a video whose only processed variant came from older
 settings, then an explicit ``1`` flag, then Fun Time's watch score, then clips
@@ -10,7 +10,7 @@ of its own.
 The three files this reads are arguments rather than ambient config: the two
 lists are the user's -- edited by hand, and the pin one also rewritten when
 the queue window is rearranged -- the watch stats are a sibling app's, and
-naming them at the call makes it visible that listing candidates opens three
+naming them at the call makes it visible that listing queued videos opens three
 files besides walking the tree. What stays ambient is the library itself —
 where the non-AI root is, and what counts as a video — which is one repo-wide
 answer that no caller varies.
@@ -36,7 +36,7 @@ log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class Candidate:
+class QueuedVideo:
     path: Path
     bucket: Path
     triage_digit: int
@@ -44,10 +44,10 @@ class Candidate:
     watch_score: float
 
 
-def collect_candidates(*, skip_list: Path, pin_list: Path,
-                       watch_stats_file: Path) -> list[Candidate]:
+def collect_queued_videos(*, skip_list: Path, pin_list: Path,
+                       watch_stats_file: Path) -> list[QueuedVideo]:
     """Unprocessed triage-folder videos, most-wanted first."""
-    candidates: list[Candidate] = []
+    queued_videos: list[QueuedVideo] = []
     skipped = set(listed_videos(skip_list))
     pinned = listed_videos(pin_list)
     watch_scores = _watch_scores(watch_stats_file)
@@ -68,15 +68,15 @@ def collect_candidates(*, skip_list: Path, pin_list: Path,
                         continue
                     if rel in skipped:
                         continue
-                    candidates.append(Candidate(
+                    queued_videos.append(QueuedVideo(
                         video, bucket, triage_digit, _has_funscript(video),
                         watch_scores.get(str(video).strip().lower(), 0.0),
                     ))
-    candidates.sort(key=lambda c: (
+    queued_videos.sort(key=lambda c: (
         _pin_rank(pinned, c.path),
         c.triage_digit != 1, -c.watch_score, not c.has_funscript, str(c.path).lower(),
     ))
-    return candidates
+    return queued_videos
 
 
 def relpath(video: Path) -> str:
@@ -147,7 +147,7 @@ def _watch_scores(path: Path) -> dict[str, float]:
     Mirrors the breeding score its playlist weighting uses: completions plus
     three per lock, minus skips. Empty until Fun Time starts tracking primary
     (the Main Funestra) plays; satellite entries all point at the AI outbox and simply never
-    match a non-AI candidate.
+    match a non-AI queued video.
     """
     return {
         key: entry.get("completions", 0) + 3 * entry.get("locks", 0) - entry.get("skips", 0)

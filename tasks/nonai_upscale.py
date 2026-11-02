@@ -9,7 +9,7 @@ folder.  This stage automates exactly that convention.
 One encode takes hours while the tray watchdog kills a pipeline run at eleven
 minutes, so nothing here ever waits on ffmpeg: at most one detached encode is
 in flight, and each scheduler tick either checks on it (promote / fail / kill
-a stuck one) or starts the next candidate when the machine is otherwise idle.
+a stuck one) or starts the next queued video when the machine is otherwise idle.
 
 Once the tray toggle is on, the stage auto-manages that encode by user
 presence: it starts or resumes only while the user is away and suspends the
@@ -163,7 +163,7 @@ def run(allow_start: bool = True, stop: bool = False,
             attempt = nonai_request.start_requested(request, files, settings, ai_waiting=ai_waiting)
             result.on_request = bool(attempt.started)
         elif not result.in_flight and allow_start and not stop:
-            attempt = _start_next_candidate(files, settings)
+            attempt = _start_next_queued_video(files, settings)
         if attempt is not None:
             result.started = attempt.started
             result.start_deferred = attempt.deferred
@@ -173,11 +173,11 @@ def run(allow_start: bool = True, stop: bool = False,
     # the skip list, and the count reported is the queue as it stands after
     # that. The doubled walk is finding tasks/design/008's; merging the two
     # would change what `pending` means, so it stays and stays visible.
-    queued = files.candidates()
+    queued = files.queued_videos()
     result.pending = len(queued)
     # Handed the queue just collected: nonai_progress reads sidecars and walks
     # the buckets for what is upscaled, and need not redo this walk too.
-    progress = nonai_progress.so_far(candidate.path for candidate in queued)
+    progress = nonai_progress.so_far(queued_video.path for queued_video in queued)
     result.percent_complete = progress.percent
     result.remaining_seconds = progress.remaining_seconds
     result.unmeasured_videos = progress.unmeasured
@@ -204,9 +204,9 @@ def throttle_to_presence(*, job_file: Path | None = None,
     user: suspend it the moment they return, resume it once they idle out.
 
     Cheap enough for a short GUI timer — it touches only the one live job, with
-    no candidate scan or disk work. Returns "suspended", "resumed", or "" when
+    no queued video scan or disk work. Returns "suspended", "resumed", or "" when
     nothing changed. Starting a new encode stays with the pipeline tick, which
-    has the candidate scan and resource checks; this only parks and thaws.
+    has the queued video scan and resource checks; this only parks and thaws.
     """
     job_file = StageFiles.configured(job=job_file).job
     settings = EncodeSettings() if settings is None else settings
@@ -344,7 +344,7 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
                 log.info("Removed %d stale partial output file(s) from %s", removed, done_dir)
 
 
-def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartAttempt:
+def _start_next_queued_video(files: StageFiles, settings: EncodeSettings) -> StartAttempt:
     if nonai_encode.is_low_disk(settings):
         log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
         return StartAttempt(deferred_low_disk=True)
@@ -353,7 +353,7 @@ def _start_next_candidate(files: StageFiles, settings: EncodeSettings) -> StartA
         log.info("Deferring non-AI upscale start: %s.", busy)
         return StartAttempt(deferred=busy)
 
-    for candidate in files.candidates():
-        if nonai_encode.start(candidate, files):
-            return StartAttempt(started=relpath(candidate.path))
+    for queued_video in files.queued_videos():
+        if nonai_encode.start(queued_video, files):
+            return StartAttempt(started=relpath(queued_video.path))
     return StartAttempt()

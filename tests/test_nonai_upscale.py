@@ -735,7 +735,7 @@ class TestPresenceThrottle(unittest.TestCase):
 
 class TestThrottleToPresence(unittest.TestCase):
     """The fast between-ticks responder: suspend/resume the live encode alone,
-    with no candidate scan or disk work, so a GUI timer can call it often."""
+    with no queued video scan or disk work, so a GUI timer can call it often."""
 
     def test_suspends_a_running_encode_when_the_user_returns(self):
         with workspace_temp_dir() as root:

@@ -146,7 +146,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             assert result.processed == 1
             assert result.failed == 0
 
-    def test_collect_candidates_prioritizes_newly_sorted_files(self):
+    def test_collect_queued_videos_prioritizes_newly_sorted_files(self):
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, trash_dir = library_dirs(root)
 
@@ -158,7 +158,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             backlog.write_bytes(b"video")
 
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                candidates = upscale.collect_candidates(priority_files=[priority])
+                candidates = upscale.collect_queued_videos(priority_files=[priority])
 
             assert candidates[0][0] == priority
             assert candidates[1][0] == backlog
@@ -739,7 +739,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
                 touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "a scene.mp4")
                 fresh = touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "b scene.mp4")
 
-                assert upscale.collect_candidates(limit=1) == [(fresh, lanes.ORIGENERATOR_SOURCE, "portrait")]
+                assert upscale.collect_queued_videos(limit=1) == [(fresh, lanes.ORIGENERATOR_SOURCE, "portrait")]
 
     def test_one_a_player_holds_keeps_its_old_upscale_until_a_later_run(self):
         with workspace_temp_dir() as root:

@@ -136,7 +136,7 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
 
                 assert not handed_over.exists()
                 assert sorted_copy.read_bytes() == b"made again"
-                assert upscale.collect_candidates() == [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")]
+                assert upscale.collect_queued_videos() == [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")]
                 assert sidecar.read(sidecar.sidecar_path(upscaled))["favorite"]
 
     def test_sent_again_as_it_already_is_leaves_its_upscale_alone(self):
@@ -150,7 +150,7 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
 
                 assert not handed_over.exists()
                 assert sorted_copy.read_bytes() == b"first made"
-                assert upscale.collect_candidates() == []
+                assert upscale.collect_queued_videos() == []
 
 
 if __name__ == "__main__":

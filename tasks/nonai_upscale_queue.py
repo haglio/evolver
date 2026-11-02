@@ -17,7 +17,7 @@ from pathlib import Path
 
 from tasks import nonai_encode
 from tasks.nonai_files import StageFiles
-from tasks.nonai_queue import collect_candidates, listed_videos, relpath
+from tasks.nonai_queue import collect_queued_videos, listed_videos, relpath
 from tasks.nonai_titles import TITLE_FIELD
 from util import nonai_job, processes, sidecar, video_type
 from util.upscale_queue import (
@@ -36,7 +36,7 @@ from util.upscale_queue import (
 def current() -> UpscaleQueue:
     files = StageFiles.configured()
     pinned = set(listed_videos(files.pin_list))
-    entries = [_entry(candidate.path, pinned) for candidate in collect_candidates(
+    entries = [_entry(queued_video.path, pinned) for queued_video in collect_queued_videos(
         skip_list=files.skip_list, pin_list=files.pin_list,
         watch_stats_file=files.watch_stats)]
     first, head = _first(files, entries, pinned)
