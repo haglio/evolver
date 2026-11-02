@@ -23,7 +23,7 @@ them is the earlier one):
 
 ``excerpt``
     A scene carved out of a longer video — the ``clip`` record on its sidecar
-    names the video it came out of and where in it.  An excerpt is an excerpt
+    names the video it came out of and where in it.  A clip is a clip
     however long it runs, which is why it settles before the running time does.
 
 ``short``
@@ -51,12 +51,12 @@ from shared_ui.orientation import ORIENTATIONS
 from util import provenance, watch
 
 GENAU_FLICK = "genau_flick"
-EXCERPT = "excerpt"
+CLIP = "excerpt"
 SHORT = "short"
 FULL_LENGTH = "full_length"
 
 #: Every kind, in the order :func:`classify` settles them.
-TYPES = (GENAU_FLICK, EXCERPT, SHORT, FULL_LENGTH)
+TYPES = (GENAU_FLICK, CLIP, SHORT, FULL_LENGTH)
 
 #: A video runs short when it is no longer than this.  One number for the whole
 #: family: the Main Funestra split its library at 60 seconds and Warm Gun at 10, so a clip
@@ -82,30 +82,30 @@ _OWN_FIELDS = frozenset({FIELD, DURATION_FIELD, ORIENTATION_FIELD})
 _STAMPS = frozenset({watch.BLOCK, provenance.BLOCK, favorites.FAVORITE_KEY, favorites.PAGE_KEY})
 
 
-def free_kind(*, genau: bool, excerpt: bool) -> str:
+def free_kind(*, genau: bool, clip: bool) -> str:
     """The kind the signals that cost nothing already settle, or ``""``.
 
     Where a video *sits* and what its sidecar already says are both free to
     read, and both outrank a running time — so the two kinds they name can be
     re-derived on every run, and an answer recorded before something was known
-    (a folder of excerpts the overlay had not been told about yet, a ``clip``
+    (a folder of clips the overlay had not been told about yet, a ``clip``
     record written after the split) corrects itself rather than standing.
     """
     if genau:
         return GENAU_FLICK
-    if excerpt:
-        return EXCERPT
+    if clip:
+        return CLIP
     return ""
 
 
-def classify(*, genau: bool, excerpt: bool, duration_seconds: float | None) -> str:
+def classify(*, genau: bool, clip: bool, duration_seconds: float | None) -> str:
     """Which kind a video is, from the three signals that can identify one.
 
-    *genau* is whether it sits in Genau's flicks folder, *excerpt* whether
+    *genau* is whether it sits in Genau's flicks folder, *clip* whether
     something carved it out of a longer video, and *duration_seconds* its
     running time — ``None`` when it could not be measured.
     """
-    free = free_kind(genau=genau, excerpt=excerpt)
+    free = free_kind(genau=genau, clip=clip)
     if free:
         return free
     if duration_seconds is not None and duration_seconds <= SHORT_MAX_SECONDS:
