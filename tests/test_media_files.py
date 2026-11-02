@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from app_support.testing import no_wait_for_a_held_file
 
 import config
 from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
@@ -235,7 +236,7 @@ class TestRetryWhileInUse(unittest.TestCase):
                 raise _IN_USE
             return "moved"
 
-        with patch("app_support.file_channel.time.sleep") as sleep:
+        with no_wait_for_a_held_file() as sleep:
             assert retry_while_in_use(held_open_once) == "moved"
 
         assert len(tries) == 2
@@ -249,7 +250,7 @@ class TestRetryWhileInUse(unittest.TestCase):
             if len(tries) < 10:
                 raise _IN_USE
 
-        with patch("app_support.file_channel.time.sleep") as sleep:
+        with no_wait_for_a_held_file() as sleep:
             retry_while_in_use(held_open_until_the_last_chance)
 
         assert len(tries) == 10
@@ -259,7 +260,7 @@ class TestRetryWhileInUse(unittest.TestCase):
         def always_held_open():
             raise _IN_USE
 
-        with patch("app_support.file_channel.time.sleep"), pytest.raises(PermissionError):
+        with no_wait_for_a_held_file(), pytest.raises(PermissionError):
             retry_while_in_use(always_held_open)
 
 

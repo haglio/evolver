@@ -14,6 +14,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app_support import haglio_settings
+from app_support.testing import error_popup
+from shared_ui.testing import alert_shown
 
 import content_overlay
 
@@ -36,8 +38,8 @@ RUN_STATE = Path(_run_state.name)
 # runs before any test module is read, and both are importable on an interpreter
 # with no Windows, so the gag never becomes the thing that decides whether the
 # suite collects at all.
-patch("shared_ui.alert.show_alert", return_value=False).start()
-patch("app_support.win32.show_error_popup").start()
+alert_shown(return_value=False).start()
+error_popup().start()
 
 # No test may write or delete the stand-down marker. It lives under LOCALAPPDATA,
 # outside every checkout, and it is the file that tells the broker whether the
