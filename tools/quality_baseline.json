@@ -135,7 +135,7 @@
     "gui/log_window.py": 15,
     "gui/main_window.py": 78,
     "gui/one_window.py": 2,
-    "gui/palette.py": 14,
+    "gui/palette.py": 6,
     "gui/peer_watch.py": 46,
     "gui/presence_throttle.py": 16,
     "gui/process_identity.py": 17,
