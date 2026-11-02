@@ -18,7 +18,7 @@ whichever is loaded.
 A :class:`Vocabulary` is the single source of truth for two consumers: the
 recognizer grammar and the window's clickable reference grid.  An act voiced
 more than one way is one ``spoken`` form plus its ``aliases``, so the grammar
-hears every form while the grid shows one tile.  Every act is scoped by a
+hears every form while the grid shows one button.  Every act is scoped by a
 camera word: a clip is always tagged with one of them, never bare.
 """
 
@@ -33,7 +33,7 @@ from content_overlay import load_content
 
 @dataclass(frozen=True)
 class _Voiced:
-    spoken: str  # the canonical phrase: what a click re-emits and a tile is built from
+    spoken: str  # the canonical phrase: what a click re-emits and a button is built from
     aliases: tuple[str, ...] = field(default=(), kw_only=True)  # other phrases heard as it
 
     def forms(self) -> tuple[str, ...]:
@@ -54,15 +54,15 @@ class Camera(_Voiced):
 class _Control(_Voiced):
     """A non-labeling command — skip, discard, undo, repeat."""
 
-    label: str  # the grid tile text, e.g. "Trash"
+    label: str  # the grid button text, e.g. "Trash"
     kind: str  # the control constant it maps to (SKIP / TRASH / UNDO / SAME)
 
 
 @dataclass(frozen=True)
 class Command:
-    """One thing the viewer can invoke: speak its ``phrase`` or click its tile.
+    """One thing the viewer can invoke: speak its ``phrase`` or click its button.
 
-    ``label`` is the outcome shown on the tile — the action recorded, or the
+    ``label`` is the outcome shown on the button — the action recorded, or the
     control's name; ``phrase`` is what the recognizer listens for and what a click
     hands to the session, so the mouse and the microphone drive one code path.
     """

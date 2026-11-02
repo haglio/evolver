@@ -23,9 +23,9 @@ from util.looping_preview import LoopingPreview
 _DONE = "Nothing left to label."
 _SCROLLBAR_ALLOWANCE = 28
 _THUMBNAIL_SIZE = 96
-# Reserve the thumbnail's height on every tile up front so every row is the same
+# Reserve the thumbnail's height on every button up front so every row is the same
 # height whether or not its act has an example.
-_TILE_HEIGHT = _THUMBNAIL_SIZE + 30
+_BUTTON_HEIGHT = _THUMBNAIL_SIZE + 30
 
 
 def _aspect_locked_icon(path: str, side: int) -> QIcon:
@@ -62,11 +62,11 @@ class BackfillWindow(QWidget):
     as on-script words are recognized and stays blank when what you said is not a
     command, so a phrase that never lands is visible rather than a silent nothing.
 
-    A panel of every command sits on the right, one tile per possibility grouped
+    A panel of every command sits on the right, one button per possibility grouped
     the way the vocabulary is — every act as a row with a column per camera
-    word, then the controls. A tile is both the reference (what can I say?) and a fallback:
+    word, then the controls. A button is both the reference (what can I say?) and a fallback:
     clicking it drives the exact path a spoken phrase would, so a wedged
-    microphone never leaves the tool unusable. Each act tile carries an example
+    microphone never leaves the tool unusable. Each act button carries an example
     frame — passed in ready at construction, already cached — so the panel opens
     as a gallery with nothing to load.
 
@@ -79,7 +79,7 @@ class BackfillWindow(QWidget):
     ) -> None:
         super().__init__()
         self._session = session
-        self._tiles: dict[str, QToolButton] = {}
+        self._buttons: dict[str, QToolButton] = {}
         self.setWindowTitle("Evolver - Backfill Metadata")
 
         self._video = QVideoWidget()
@@ -99,7 +99,7 @@ class BackfillWindow(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(stage, stretch=1)
-        layout.addWidget(self._build_command_panel(vocabulary))
+        layout.addWidget(self._build_button_grid(vocabulary))
 
         for label, path in (thumbnails or {}).items():
             self.set_thumbnail(label, path)
@@ -110,14 +110,14 @@ class BackfillWindow(QWidget):
 
         self._play_current()
 
-    def _build_command_panel(self, vocabulary: Vocabulary) -> QWidget:
-        """The scrollable right-hand reference: every command as a clickable tile."""
+    def _build_button_grid(self, vocabulary: Vocabulary) -> QWidget:
+        """The scrollable right-hand reference: every command as a clickable button."""
         contents = QVBoxLayout()
 
         acts = QGridLayout()
         for row, commands in enumerate(vocabulary.scoped_grid()):
             for column, command in enumerate(commands):
-                acts.addWidget(self._command_tile(command), row, column)
+                acts.addWidget(self._command_button(command), row, column)
         contents.addLayout(acts)
 
         divider = QFrame()
@@ -126,7 +126,7 @@ class BackfillWindow(QWidget):
 
         controls = QHBoxLayout()
         for command in vocabulary.control_commands():
-            controls.addWidget(self._command_tile(command))
+            controls.addWidget(self._command_button(command))
         contents.addLayout(controls)
         contents.addStretch(1)
 
@@ -142,31 +142,31 @@ class BackfillWindow(QWidget):
         panel.setFixedWidth(inner.sizeHint().width() + _SCROLLBAR_ALLOWANCE)
         return panel
 
-    def _command_tile(self, command: Command) -> QToolButton:
+    def _command_button(self, command: Command) -> QToolButton:
         """A button that hands *command*'s phrase to the same slot the mic feeds.
 
         Text-under-icon with the icon space reserved from the start, so an example
         thumbnail arriving later fills that space instead of reflowing the grid.
         """
-        tile = QToolButton()
-        tile.setText(command.label)
-        tile.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-        tile.setIconSize(QSize(_THUMBNAIL_SIZE, _THUMBNAIL_SIZE))
-        tile.setMinimumHeight(_TILE_HEIGHT)
-        tile.setToolTip(f'Say "{command.phrase}"')
-        # Never take keyboard focus: the space bar must not re-fire the last tile,
+        button = QToolButton()
+        button.setText(command.label)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        button.setIconSize(QSize(_THUMBNAIL_SIZE, _THUMBNAIL_SIZE))
+        button.setMinimumHeight(_BUTTON_HEIGHT)
+        button.setToolTip(f'Say "{command.phrase}"')
+        # Never take keyboard focus: the space bar must not re-fire the last button,
         # and Esc must keep closing the window rather than being swallowed here.
-        tile.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        tile.clicked.connect(lambda _checked=False, phrase=command.phrase: self.on_phrase(phrase))
+        button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        button.clicked.connect(lambda _checked=False, phrase=command.phrase: self.on_phrase(phrase))
         # Keyed by the spoken phrase and nothing else. A label is not a second
         # key here: one command's phrase can equal another's label, and a dict
-        # holding both would hand the second tile the first one's name.
-        self._tiles[command.phrase] = tile
-        return tile
+        # holding both would hand the second button the first one's name.
+        self._buttons[command.phrase] = button
+        return button
 
-    # The window's read surface: what the three lines say and which tile a
+    # The window's read surface: what the three lines say and which button a
     # phrase or an action owns. One-liners over the same widgets, so the
-    # internals -- label fields, the media backend, how tiles are keyed -- can
+    # internals -- label fields, the media backend, how buttons are keyed -- can
     # move without breaking every assertion made about the window (31 reads of
     # six private attributes before these existed).
 
@@ -179,31 +179,31 @@ class BackfillWindow(QWidget):
     def last_text(self) -> str:
         return self._last.text()
 
-    def tile_for(self, key: str) -> QToolButton | None:
-        """The tile for a spoken *key* -- a command phrase, or an act label in
+    def button_for(self, key: str) -> QToolButton | None:
+        """The button for a spoken *key* -- a command phrase, or an act label in
         any casing."""
-        tile = self._tiles.get(key)
-        return tile if tile is not None else self._tile_labelled(key)
+        button = self._buttons.get(key)
+        return button if button is not None else self._button_labelled(key)
 
-    def _tile_labelled(self, label: str) -> QToolButton | None:
-        """The tile whose face reads *label*, in any casing.
+    def _button_labelled(self, label: str) -> QToolButton | None:
+        """The button whose face reads *label*, in any casing.
 
         Read off the buttons themselves rather than a second index: the label
-        is already the tile's text, and case-folding bridges the library's
+        is already the button's text, and case-folding bridges the library's
         older action casing (an initialism title-cased, "Xyz Alpha", against
         the "XYZ Alpha" the vocabulary writes today).
         """
         wanted = label.lower()
-        return next((tile for tile in self._tiles.values() if tile.text().lower() == wanted), None)
+        return next((button for button in self._buttons.values() if button.text().lower() == wanted), None)
 
     def set_thumbnail(self, label: str, path: str) -> None:
-        """Put *label*'s example frame on its tile, aspect-locked so it never stretches."""
-        tile = self._tile_labelled(label)
-        if tile is None or not path:
+        """Put *label*'s example frame on its button, aspect-locked so it never stretches."""
+        button = self._button_labelled(label)
+        if button is None or not path:
             return
         icon = _aspect_locked_icon(path, _THUMBNAIL_SIZE)
         if not icon.isNull():
-            tile.setIcon(icon)
+            button.setIcon(icon)
 
     def on_hearing(self, text: str) -> None:
         """Show the recognizer's live guess, or clear the line once it settles."""
@@ -212,7 +212,7 @@ class BackfillWindow(QWidget):
     def on_voice_failed(self, detail: str) -> None:
         """Say the microphone path has gone, where the live guess used to be.
 
-        The tiles still work -- they are clickable -- so the window does not
+        The buttons still work -- they are clickable -- so the window does not
         close or disable anything. What it must not do is go on looking like it
         is listening.
         """

@@ -73,7 +73,7 @@ class TestCommandGrid(unittest.TestCase):
         assert second == Command("xyz beta", "XYZ Beta")
 
     def test_an_act_with_alias_forms_shows_a_single_canonical_row(self):
-        """Alpha is heard two ways ("alpha"/"alpha form") but is one tile."""
+        """Alpha is heard two ways ("alpha"/"alpha form") but is one button."""
         alpha_rows = [row for row in VOCABULARY.scoped_grid() if row[0].label == "Side Alpha"]
         assert len(alpha_rows) == 1
         assert alpha_rows[0][0] == Command("side alpha", "Side Alpha")

@@ -38,4 +38,4 @@ _.stopped_at_budget
 _.status_text
 _.hearing_text
 _.last_text
-_.tile_for
+_.button_for
