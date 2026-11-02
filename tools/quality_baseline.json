@@ -15,7 +15,9 @@
     "tests/test_peer_watch.py": 3,
     "tests/test_tray_app.py": 1
   },
-  "methods": {},
+  "methods": {
+    "gui/app.py::EvolverApp": 20
+  },
   "mocks": {
     "tests/temp_helpers.py": 2,
     "tests/test_app_startup.py": 16,
@@ -376,5 +378,51 @@
   "statements": {
     "gui/stats_window.py": 303,
     "tasks/scripts_sync.py": 341
+  },
+  "uncovered_lines": {
+    "backfill/window.py": 1,
+    "check_correspondence.py": 10,
+    "content_overlay.py": 1,
+    "evolver.py": 4,
+    "gui/app.py": 2,
+    "gui/main_window.py": 3,
+    "gui/peer_watch.py": 2,
+    "gui/process_identity.py": 2,
+    "gui/progress_popup.py": 2,
+    "gui/queue_window.py": 12,
+    "gui/run_controller.py": 6,
+    "gui/scheduler.py": 3,
+    "gui/settings_dialog.py": 1,
+    "gui/single_instance.py": 2,
+    "gui/stats_window.py": 3,
+    "gui/status_symbols.py": 1,
+    "gui/worker.py": 2,
+    "tasks/bookmarks_sync.py": 11,
+    "tasks/genau_deliver.py": 4,
+    "tasks/nonai_encode.py": 8,
+    "tasks/nonai_group.py": 3,
+    "tasks/nonai_request.py": 4,
+    "tasks/nonai_titles.py": 1,
+    "tasks/origenerator_metadata.py": 2,
+    "tasks/prompt_scrape.py": 3,
+    "tasks/scene_scripts.py": 3,
+    "tasks/scripts_sync.py": 7,
+    "tasks/sort.py": 6,
+    "tasks/stray_files.py": 2,
+    "tasks/upscale.py": 11,
+    "tasks/watch_weights.py": 4,
+    "util/frame_hashes.py": 13,
+    "util/html_query.py": 4,
+    "util/media_files.py": 3,
+    "util/nonai_library.py": 5,
+    "util/nonai_retire.py": 2,
+    "util/origenerator_gallery.py": 6,
+    "util/processes.py": 12,
+    "util/reference_stores.py": 1,
+    "util/relative_dates.py": 1,
+    "util/run_lock.py": 5,
+    "util/script_library.py": 1,
+    "util/system_resources.py": 19,
+    "util/video_locator.py": 3
   }
 }
