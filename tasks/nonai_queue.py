@@ -2,7 +2,7 @@
 
 Queued videos come from the buckets' triage folders (``0 unsorted``, ``1 could
 use work``), most-wanted first: a pin in the pin list beats everything and
-also re-queues a video whose only processed variant came from older
+also re-queues a video whose only processed version came from older
 settings, then an explicit ``1`` flag, then Fun Time's watch score, then clips
 with a funscript — the only per-video engagement signal the non_AI library has
 of its own.
@@ -30,7 +30,7 @@ from util import script_library
 from util.json_reads import read_dict
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets, stage_dirs
-from util.variants import is_processed_stem
+from util.versions import is_processed_stem
 
 log = logging.getLogger(__name__)
 
@@ -61,8 +61,8 @@ def collect_queued_videos(*, skip_list: Path, pin_list: Path,
                     rel = relpath(video)
                     if is_processed_stem(video.stem):
                         continue
-                    # A variant of this video already existing normally means
-                    # there is nothing to do. A pin overrides that: the variant
+                    # A version of this video already existing normally means
+                    # there is nothing to do. A pin overrides that: the version
                     # is from older settings, and the redo is the whole point.
                     if video.stem in processed_stems and rel not in pinned:
                         continue
@@ -133,7 +133,7 @@ def _upscale_ready_dirs(triage_dir: Path) -> list[Path]:
 
 
 def _processed_stems(bucket: Path) -> set[str]:
-    """Original stems that already have a processed variant somewhere in *bucket*."""
+    """Original stems that already have a processed version somewhere in *bucket*."""
     stems = set()
     for video in bucket.rglob("*"):
         if is_finalized_video_file(video) and is_processed_stem(video.stem):

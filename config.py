@@ -275,7 +275,7 @@ CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
 # encodes run for hours, so the stage launches one detached ffmpeg at a time and
 # checks on it each scheduler tick.
 # Version families the naming rule cannot see. It reunites an original with a
-# variant whose stem is the original's plus a Topaz suffix; a version saved
+# version whose stem is the original's plus a Topaz suffix; a version saved
 # under a name of its own keeps no such thread back, so it is declared instead.
 # Maps that stem to the stem of the video it is a version of — both must sit in
 # the same bucket, and with three versions point them all at the same one.
@@ -311,7 +311,7 @@ PICKED_ACTS_CURSOR_FILE = LOCAL_STATE_DIR / "picked_acts.json"
 NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
 # The counterpart to the skip list: videos to encode next, in the order listed.
 # A pin outranks every ordering heuristic and re-queues a video the bucket
-# already holds an older processed variant of, which is the only way to ask for
+# already holds an older processed version of, which is the only way to ask for
 # a redo under newer settings.
 NONAI_PIN_LIST = LIVE_DIR / ".nonai-upscale-next.txt"
 # What one non-AI encode may cost the computer and when is

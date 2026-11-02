@@ -16,12 +16,12 @@ class TestGroupKeyTokens:
 
 
 class TestGroupIds:
-    def test_clean_topaz_variant_shares_the_originals_id(self):
+    def test_clean_topaz_version_shares_the_originals_id(self):
         ids = group_ids(["scene", "scene_apo8_iris2"])
         assert ids["scene_apo8_iris2"] == ids["scene"]
         assert ids["scene"] == "scene"
 
-    def test_hand_made_variant_with_extra_tag_still_folds(self):
+    def test_hand_made_version_with_extra_tag_still_folds(self):
         ids = group_ids(["Jane-Doe-lA0JUsAd", "Jane-Doe-lA0JUsAd_3_apf2_iris2"])
         assert ids["Jane-Doe-lA0JUsAd_3_apf2_iris2"] == ids["Jane-Doe-lA0JUsAd"]
         assert ids["Jane-Doe-lA0JUsAd"] == "Jane-Doe-lA0JUsAd"
@@ -60,7 +60,7 @@ class TestGroupIds:
         """Every scene of a performer starts with her name, so a stem that is
         only her name would anchor all of them — and did: three unrelated scenes
         went into one family, which is then one rotation slot and one answer to
-        "what was this clip cut from". A variant appends a marker to its
+        "what was this clip cut from". A version appends a marker to its
         original's name, never more of a title."""
         stems = ["Jane Doe", "Jane Doe - Cut to Length", "Jane-Doe-&-Ada-Roe-b4t7k1qz"]
 
@@ -89,7 +89,7 @@ class TestGroupIds:
 
         assert len(set(ids.values())) == 1
 
-    def test_three_scenes_each_with_a_variant_form_three_families(self):
+    def test_three_scenes_each_with_a_version_form_three_families(self):
         stems = []
         for n in (1, 2, 3):
             stems += [f"clip-{n}", f"clip-{n}_apo8_iris2"]

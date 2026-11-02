@@ -39,7 +39,7 @@ from util.media_files import (
     unique_path,
 )
 from util.sound import save_as_mp3
-from util.variants import is_upscaled_stem, sorted_stem_of
+from util.versions import is_upscaled_stem, sorted_stem_of
 
 log = logging.getLogger(__name__)
 

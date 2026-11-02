@@ -11,7 +11,7 @@ from app_support.video_names import UPSCALE_SUFFIX
 import config
 from util.alert import show_error
 from util.media_files import library_videos
-from util.variants import upscaled_stem
+from util.versions import upscaled_stem
 
 log = logging.getLogger(__name__)
 

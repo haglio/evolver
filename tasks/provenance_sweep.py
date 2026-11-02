@@ -10,7 +10,7 @@ from pathlib import Path
 import config
 from tasks import origenerator_metadata
 from util import ffprobe, lanes, provenance, sidecar, topaz
-from util.variants import is_upscaled_stem
+from util.versions import is_upscaled_stem
 
 log = logging.getLogger(__name__)
 

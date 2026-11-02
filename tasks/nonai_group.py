@@ -1,13 +1,13 @@
 """Stage: record each non-AI video's version family in a metadata sidecar.
 
 Real-footage clips carry no generation metadata, but Fun Time's Main Funestra
-still wants to fold an original together with its Topaz-enhanced variants into
+still wants to fold an original together with its Topaz-enhanced versions into
 one rotation slot. This stage is the source of truth for that grouping: it
 scans every non_AI bucket, families the clips by name (:mod:`util.version_groups`)
 plus the pairs ``config.NONAI_VERSION_OVERRIDES`` declares, folds together the
 differently named copies whose frames show them to be one video
 (:mod:`util.same_footage`), and writes each a sidecar — mirrored under ``METADATA_DIR`` exactly like the AI tree — recording
-its family id and whether it is a processed variant.
+its family id and whether it is a processed version.
 
 Being the source of truth means it rewrites ``version.group`` on every run, so
 editing a sidecar by hand does not hold: an override is the way to correct one.
@@ -27,8 +27,8 @@ import config
 from util import same_footage, sidecar, trash_folders
 from util.media_files import file_size, is_finalized_video_file
 from util.nonai_library import buckets
-from util.variants import is_processed_stem
 from util.version_groups import group_ids
+from util.versions import is_processed_stem
 from util.video_kind import duration_of
 
 log = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupRes
         existing_by_video = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
         ids = _joined_by_frames(videos, existing_by_video, named, measure)
         # A `clip` object (compilation, source, performer) describes one carved
-        # scene, and its re-encodes are the same scene — so an upscaled variant
+        # scene, and its re-encodes are the same scene — so an upscaled version
         # inherits it and stays a navigable short. Keying that on the *family*
         # would be too broad: a family is name-derived, so a full scene the user
         # already owned can share it with a clip carved from the same movie, and

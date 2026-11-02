@@ -64,11 +64,11 @@ class _Duplicate(Enum):
 
 
 @dataclass(frozen=True)
-class _VariantRehome:
-    """What sending an orphan script to a library variant came to.
+class _VersionRehome:
+    """What sending an orphan script to a library version came to.
 
     The two are independent: the archived original can get its self-describing
-    copy and the move to the variant still fail.
+    copy and the move to the version still fail.
     """
 
     moved: bool = False
@@ -96,8 +96,8 @@ class Trees:
 
 
 @dataclass(frozen=True)
-class _VariantCopies:
-    """What giving every scriptless variant its sibling's funscript came to."""
+class _VersionCopies:
+    """What giving every scriptless version its sibling's funscript came to."""
 
     copied: int = 0
     ambiguous_groups: int = 0
@@ -178,10 +178,10 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         result.discarded_duplicates += followed.discarded_duplicates
     remove_empty_dirs(trees.scripts)
     remove_empty_mark_folders()
-    variants = _copy_missing_variant_scripts(video_index, trees)
-    result.copied_variants += variants.copied
-    result.ambiguous_variant_groups += variants.ambiguous_groups
-    result.variant_copy_error_paths += variants.copy_error_paths
+    versions = _copy_missing_version_scripts(video_index, trees)
+    result.copied_variants += versions.copied
+    result.ambiguous_variant_groups += versions.ambiguous_groups
+    result.variant_copy_error_paths += versions.copy_error_paths
     result.unmatched = len(result.unmatched_paths)
     result.ambiguous = len(result.ambiguous_paths)
     result.collisions = len(result.collision_paths)
@@ -219,7 +219,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
 
     With one exception, checked first: when an upscaled sibling of the retired
     video is still IN the library with no script of its own, the script's real
-    home is that sibling — one funscript serves every variant of a video. The
+    home is that sibling — one funscript serves every version of a video. The
     library copy moves to the sibling's mirror path, and the archived original
     merely keeps a duplicate beside it for self-description.
 
@@ -243,8 +243,8 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
     discarded_duplicates = 0
     archived = _index_archived_videos(trees.archive) if orphans else {}
     for script_path in orphans:
-        rehome = (_VariantRehome() if _waiting(script_path, trees)
-                  else _rehome_to_library_variant(script_path, video_index, archived, trees))
+        rehome = (_VersionRehome() if _waiting(script_path, trees)
+                  else _rehome_to_library_version(script_path, video_index, archived, trees))
         if rehome.archived_copy:
             followed_to_archive += 1
         if rehome.moved:
@@ -304,17 +304,17 @@ def _park(script_path: Path, trees: Trees) -> str:
     return dest.name
 
 
-def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Path]],
+def _rehome_to_library_version(script_path: Path, video_index: dict[str, list[Path]],
                                archived: dict[str, list[Path]],
-                               trees: Trees) -> _VariantRehome:
-    """Move an orphan script to a still-in-library variant of its video.
+                               trees: Trees) -> _VersionRehome:
+    """Move an orphan script to a still-in-library version of its video.
 
     The scriptless sibling is found by the same normalized-stem-within-bucket
-    rule the variant-copy pass uses; the archived original, when it is
+    rule the version-copy pass uses; the archived original, when it is
     unambiguous and bare, gets a copy before the move so it can still describe
     itself.
     """
-    script_bucket = _variant_bucket(
+    script_bucket = _version_bucket(
         trees.videos / script_path.relative_to(trees.scripts), trees)
     normalized = strip_processing_suffixes(script_path.stem)
     siblings = [
@@ -322,11 +322,11 @@ def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Pa
         for matches in video_index.values()
         for video_path in matches
         if strip_processing_suffixes(video_path.stem) == normalized
-        and _variant_bucket(video_path, trees) == script_bucket
+        and _version_bucket(video_path, trees) == script_bucket
         and not script_path_for_video(video_path).exists()
     ]
     if not siblings:
-        return _VariantRehome()
+        return _VersionRehome()
 
     archived_copy = False
     archived_videos = archived.get(script_path.stem, [])
@@ -346,10 +346,10 @@ def _rehome_to_library_variant(script_path: Path, video_index: dict[str, list[Pa
         shutil.move(str(script_path), str(dest))
     except OSError:
         log.exception("FAILED TO REHOME SCRIPT TO VERSION  %s  ->  %s", script_path, dest)
-        return _VariantRehome(archived_copy=archived_copy)
+        return _VersionRehome(archived_copy=archived_copy)
     carry_mark(script_path, dest)
     log.info("REHOME SCRIPT TO LIBRARY VERSION  %s  ->  %s", script_path, dest)
-    return _VariantRehome(moved=True, archived_copy=archived_copy)
+    return _VersionRehome(moved=True, archived_copy=archived_copy)
 
 
 def _discard_or_keep_duplicate(script_path: Path, dest: Path) -> _Duplicate:
@@ -454,15 +454,15 @@ def _ai_filing(rel: Path) -> _AiFiling:
     return _AiFiling()
 
 
-def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
-                                  trees: Trees) -> _VariantCopies:
+def _copy_missing_version_scripts(video_index: dict[str, list[Path]],
+                                  trees: Trees) -> _VersionCopies:
     copied = 0
     ambiguous_groups = 0
     copy_error_paths: list[str] = []
     groups: dict[tuple[tuple[str, ...], str], list[Path]] = defaultdict(list)
     for matches in video_index.values():
         for video_path in matches:
-            key = (_variant_bucket(video_path, trees),
+            key = (_version_bucket(video_path, trees),
                    strip_processing_suffixes(video_path.stem))
             groups[key].append(video_path)
 
@@ -479,7 +479,7 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
             continue
 
         for target_video in sorted(missing_targets):
-            source_video = _pick_variant_source(target_video, existing_sources, trees)
+            source_video = _pick_version_source(target_video, existing_sources, trees)
             if source_video is None:
                 log.warning(
                     "AMBIGUOUS VERSION SCRIPT GROUP for stem %s: %s",
@@ -501,15 +501,15 @@ def _copy_missing_variant_scripts(video_index: dict[str, list[Path]],
             existing_sources.append(target_video)
             log.info("COPY VERSION SCRIPT  %s  ->  %s", source_script, dest_script)
 
-    return _VariantCopies(copied, ambiguous_groups, copy_error_paths)
+    return _VersionCopies(copied, ambiguous_groups, copy_error_paths)
 
 
-def _pick_variant_source(target_video: Path, existing_sources: list[Path],
+def _pick_version_source(target_video: Path, existing_sources: list[Path],
                          trees: Trees) -> Path | None:
     ordered = sorted(
         existing_sources,
         key=lambda path: (
-            _variant_kind(path, trees) == _variant_kind(target_video, trees),
+            _version_kind(path, trees) == _version_kind(target_video, trees),
             str(path),
         ),
     )
@@ -523,7 +523,7 @@ def _pick_variant_source(target_video: Path, existing_sources: list[Path],
     return ordered[0]
 
 
-def _variant_bucket(video_path: Path, trees: Trees) -> tuple[str, ...]:
+def _version_bucket(video_path: Path, trees: Trees) -> tuple[str, ...]:
     rel = video_path.relative_to(trees.videos)
     filing = _ai_filing(rel)
     if filing.source and filing.orientation:
@@ -534,7 +534,7 @@ def _variant_bucket(video_path: Path, trees: Trees) -> tuple[str, ...]:
     return rel.parts[:2]
 
 
-def _variant_kind(video_path: Path, trees: Trees) -> str:
+def _version_kind(video_path: Path, trees: Trees) -> str:
     rel = video_path.relative_to(trees.videos)
     match rel.parts:
         case ("2D", "AI", "1_sorted", *_):

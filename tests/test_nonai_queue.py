@@ -108,8 +108,8 @@ class TestCollectCandidates(unittest.TestCase):
 
             assert [c.path for c in queued_videos][:2] == [first, second]
 
-    def test_a_pin_re_queues_a_video_that_already_has_a_processed_variant(self):
-        """An existing variant normally reads as "already done". When it came
+    def test_a_pin_re_queues_a_video_that_already_has_a_processed_version(self):
+        """An existing version normally reads as "already done". When it came
         from older settings, pinning is how the user asks for the redo."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -128,7 +128,7 @@ class TestCollectCandidates(unittest.TestCase):
 
             assert [c.path for c in queued_videos] == [original]
 
-    def test_excludes_originals_that_already_have_a_processed_variant(self):
+    def test_excludes_originals_that_already_have_a_processed_version(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]

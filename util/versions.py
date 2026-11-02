@@ -1,9 +1,9 @@
-"""What a processed video variant's name says about its original.
+"""What a processed video version's name says about its original.
 
 The library names an upscaled/enhanced clip by appending the Topaz models that
 made it: ``foo_apo8_iris2.mp4`` is ``foo.mp4`` after apo-8 interpolation and an
 iris-2 upscale.  Stripping those suffixes recovers the original's stem, which
-is how originals and their processed variants are matched across the tree.
+is how originals and their processed versions are matched across the tree.
 """
 from __future__ import annotations
 
@@ -43,19 +43,19 @@ def source_stem(stem: str) -> str:
 # the first — the pipeline never writes these, so they arrive as ordinary
 # trailing tokens rather than as suffixes to strip. Kept short on purpose: each
 # word here is one a real title can no longer be told apart by.
-_MANUAL_VARIANT_TAGS = frozenset({"trimmed"})
+_MANUAL_VERSION_TAGS = frozenset({"trimmed"})
 
 
-def is_variant_marker(token: str) -> bool:
+def is_version_marker(token: str) -> bool:
     """Whether *token* marks another copy of a video rather than naming one.
 
     A copy counter — bare or parenthesized, as Windows writes it saving a file
     that is already there — or one of the tags above.
     """
-    return token.strip("()").isdigit() or token in _MANUAL_VARIANT_TAGS
+    return token.strip("()").isdigit() or token in _MANUAL_VERSION_TAGS
 
 
 def is_processed_stem(stem: str) -> bool:
-    """Whether *stem* names a processed variant rather than an original."""
+    """Whether *stem* names a processed version rather than an original."""
     return strip_processing_suffixes(stem) != stem
 

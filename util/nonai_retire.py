@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 _MIRRORS = (sidecar.sidecar_path, script_library.script_path_for_video)
 
 # The one part of a sidecar that describes the FILE rather than the footage in
-# it: which family it belongs to and whether it is a processed variant.  An
+# it: which family it belongs to and whether it is a processed version.  An
 # upscale's is its own, and the grouping stage stamps it on the same pass.
 _FILE_SCOPED_SIDECAR_KEYS = frozenset({"version"})
 
