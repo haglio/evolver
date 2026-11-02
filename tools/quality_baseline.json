@@ -5,16 +5,7 @@
     "evolver.py": 29,
     "gui/app.py": 23
   },
-  "library_patches": {
-    "tests/__init__.py": 2,
-    "tests/test_alert.py": 12,
-    "tests/test_app_startup.py": 2,
-    "tests/test_backfill_decisions.py": 1,
-    "tests/test_loading.py": 2,
-    "tests/test_media_files.py": 3,
-    "tests/test_peer_watch.py": 3,
-    "tests/test_tray_app.py": 1
-  },
+  "library_patches": {},
   "methods": {
     "gui/app.py::EvolverApp": 20
   },
@@ -38,7 +29,6 @@
   },
   "monkeypatches": {
     "tests/conftest.py": 1,
-    "tests/test_app_startup.py": 2,
     "tests/test_process_name.py": 1,
     "tests/test_system_resources.py": 3
   },
@@ -48,12 +38,12 @@
     "util/warm_gun.py": 1
   },
   "patches": {
-    "tests/__init__.py": 6,
+    "tests/__init__.py": 4,
     "tests/temp_helpers.py": 16,
-    "tests/test_alert.py": 13,
-    "tests/test_app_startup.py": 101,
+    "tests/test_alert.py": 1,
+    "tests/test_app_startup.py": 99,
     "tests/test_backfill_app.py": 20,
-    "tests/test_backfill_decisions.py": 2,
+    "tests/test_backfill_decisions.py": 1,
     "tests/test_backfill_launch.py": 4,
     "tests/test_backfill_session.py": 35,
     "tests/test_backfill_thumbnails.py": 11,
@@ -72,16 +62,16 @@
     "tests/test_genau_deliver.py": 7,
     "tests/test_handed_over_funscripts.py": 2,
     "tests/test_headless_browser.py": 7,
-    "tests/test_loading.py": 8,
+    "tests/test_loading.py": 6,
     "tests/test_main_window_controls.py": 17,
-    "tests/test_media_files.py": 5,
+    "tests/test_media_files.py": 2,
     "tests/test_nonai_encode.py": 4,
     "tests/test_nonai_files.py": 1,
     "tests/test_nonai_group.py": 1,
     "tests/test_nonai_lineup.py": 2,
     "tests/test_origenerator_metadata.py": 2,
     "tests/test_other_apps_folders.py": 2,
-    "tests/test_peer_watch.py": 33,
+    "tests/test_peer_watch.py": 30,
     "tests/test_process_identity.py": 5,
     "tests/test_process_name.py": 1,
     "tests/test_progress_popup.py": 1,
@@ -104,7 +94,7 @@
     "tests/test_startup.py": 1,
     "tests/test_stats_window.py": 1,
     "tests/test_topaz.py": 2,
-    "tests/test_tray_app.py": 5,
+    "tests/test_tray_app.py": 4,
     "tests/test_upscale.py": 50,
     "tests/test_video_locator.py": 3,
     "tests/test_watchdog.py": 5,
