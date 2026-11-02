@@ -32,12 +32,13 @@ import ctypes
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from enum import Enum
 
 from app_support.win32 import try_acquire_mutex
 from app_support.win32_loader import load_dll
-from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+from PyQt6.QtNetwork import QLocalServer
+from shared_ui import running_copy
+from shared_ui.running_copy import Answer
 
 from util import crash_log, processes
 
@@ -56,7 +57,6 @@ _PIPE_NAME = "EvolverTrayApp_ShowWindow"
 # on end -- starved of it, one took fifteen to answer.
 _PATIENCE_SECONDS = 30.0
 _RETRY_SECONDS = 0.2
-_SEND_TIMEOUT_MS = 2000
 
 #: What a launch says when it finds an Evolver already running: the Evolver
 #: the user runs every day, or a branch's, come to take the work over.
@@ -82,14 +82,6 @@ class Outcome(Enum):
     UNANSWERED = "unanswered"
     #: An Evolver was already running, and this start was one that leaves it be.
     LEFT_AS_IT_WAS = "left_as_it_was"
-
-
-@dataclass(frozen=True)
-class Answer:
-    """What the running Evolver said to a launch, and which process said it."""
-
-    reply: bytes
-    pid: int
 
 
 class InstanceGateway:
@@ -164,29 +156,21 @@ class InstanceGateway:
         listening first, so no later launch is answered by an Evolver on its
         way out.
         """
-        server = QLocalServer()
-        QLocalServer.removeServer(_PIPE_NAME)  # only ours to take: we hold the mutex
-        if not server.listen(_PIPE_NAME):
+        def _answer(launch: bytes, reply: Callable[[bytes], None]) -> None:
+            if steps_aside_for(launch):
+                self.stop_serving()
+                reply(STEPPING_ASIDE)
+                on_step_aside()
+            else:
+                reply(SHOWING)
+                on_show()
+
+        server = running_copy.listen(_PIPE_NAME, _answer)
+        if not server.isListening():
             # Not fatal — this instance still works. But nothing can hand a
             # launch to it, so say why here rather than in a dialog the user
             # cannot act on.
             log.error("Cannot listen on %s: %s", _PIPE_NAME, server.errorString())
-
-        def _answer(connection: QLocalSocket, launch: bytes) -> None:
-            if steps_aside_for(launch):
-                self.stop_serving()
-                _reply(connection, launch, STEPPING_ASIDE)
-                on_step_aside()
-            else:
-                _reply(connection, launch, SHOWING)
-                on_show()
-
-        def _accept():
-            connection = server.nextPendingConnection()
-            if connection is not None:
-                _hear(connection, _answer)
-
-        server.newConnection.connect(_accept)
         self._launches = server
 
     def stop_serving(self) -> None:
@@ -211,51 +195,9 @@ class InstanceGateway:
         None when nothing is listening -- an Evolver still starting, or one on
         its way out.
         """
-        socket = QLocalSocket()
-        socket.connectToServer(_PIPE_NAME)
-        if not socket.waitForConnected(_milliseconds_until(until)):
-            return None
-        pid = processes.pipe_server(int(socket.socketDescriptor()))
-        socket.write(launch)
-        socket.waitForBytesWritten(_milliseconds_until(until))
-        if not socket.bytesAvailable():
-            socket.waitForReadyRead(_milliseconds_until(until))
-        reply = bytes(socket.readAll())
-        socket.disconnectFromServer()
-        return Answer(reply, pid)
+        return running_copy.ask(_PIPE_NAME, launch, until=until)
 
 
 def _end(pid: int) -> bool:
     log.warning("Evolver (process %s) did not answer; ending it", pid)
     return processes.terminate(pid)
-
-
-def _milliseconds_until(moment: float) -> int:
-    return max(0, round((moment - time.monotonic()) * 1000))
-
-
-def _reply(connection: QLocalSocket, launch: bytes, reply: bytes) -> None:
-    if launch:
-        connection.write(reply)
-        connection.waitForBytesWritten(_SEND_TIMEOUT_MS)
-    connection.disconnectFromServer()
-    connection.deleteLater()
-
-
-def _hear(connection: QLocalSocket, answer: Callable[[QLocalSocket, bytes], None]) -> None:
-    """Hand *answer* what the launch on *connection* said, once it has said it.
-
-    A launch says its piece and waits; one from before launches spoke hangs up
-    having said nothing, and that hang-up is its whole message.
-    """
-    answered = []
-
-    def _once(launch: bytes) -> None:
-        if not answered:
-            answered.append(True)
-            answer(connection, launch)
-
-    connection.readyRead.connect(lambda: _once(bytes(connection.readAll())))
-    connection.disconnected.connect(lambda: _once(b""))
-    if connection.bytesAvailable():
-        _once(bytes(connection.readAll()))

@@ -14,6 +14,7 @@ from unittest.mock import patch
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 from gui import single_instance
+from gui.single_instance import Answer
 from tests.gui_support import QAPP
 
 
@@ -84,7 +85,7 @@ def _unique(label: str) -> str:
     return f"EvolverTest_{label}_{os.getpid()}_{time.monotonic_ns()}"
 
 
-def _ask(launch: bytes) -> single_instance.Answer | None:
+def _ask(launch: bytes) -> Answer | None:
     return single_instance.InstanceGateway().ask(launch, until=time.monotonic() + 10.0)
 
 
@@ -205,7 +206,7 @@ class TestAskingTheRunningOne(unittest.TestCase):
             finally:
                 running.close()
 
-        assert answer == single_instance.Answer(single_instance.STEPPING_ASIDE, os.getpid())
+        assert answer == Answer(single_instance.STEPPING_ASIDE, os.getpid())
         assert (running.stepped_aside, running.shown) == ([True], [])
 
     def test_a_launch_it_does_not_step_aside_for_opens_its_window(self):
@@ -461,6 +462,7 @@ import sys, time
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from gui import single_instance
+from gui.single_instance import Answer
 single_instance._MUTEX_NAME, single_instance._PIPE_NAME, manner, starved = sys.argv[1:5]
 app = QCoreApplication([])
 gateway = single_instance.InstanceGateway()
