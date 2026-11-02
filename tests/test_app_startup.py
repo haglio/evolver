@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from app_support import production_update
+from app_support.testing import start_again_stand_in, update_waiting_for
 from PyQt6.QtCore import QEvent
 
 import config
@@ -532,7 +532,8 @@ class TestRestart:
     def _restarted(self, request, *, window_visible=False, branch_session=False):
         app = build_evolver_app(request)
         app._session.is_preview = branch_session
-        with patch("gui.app.production_update.start_again_after") as start_again, \
+        with update_waiting_for(config.PROJECT_DIR), \
+             start_again_stand_in() as start_again, \
              patch.object(app, "_shutdown") as quit_this_copy, \
              patch.object(app._window, "isVisible", return_value=window_visible), \
              patch("gui.app.ctypes.windll.user32.AllowSetForegroundWindow") as allow:
@@ -586,29 +587,27 @@ class TestTakingAnUpdate:
     """Evolver runs all day, so an update waits for it to close for good: it starts
     itself again for one once no run is going and nothing of it is on screen."""
 
-    def _ticked(self, request, monkeypatch, *, branch_session=False, running=False, open_window=None):
-        monkeypatch.setattr(production_update, "UP_BEFORE_AN_UPDATE_S", 0.0)
-        monkeypatch.setattr(production_update, "waits_for_programs_to_close",
-                            lambda checkout: checkout == config.PROJECT_DIR)
+    def _ticked(self, request, *, branch_session=False, running=False, open_window=None):
         with patch("gui.app.BackgroundQueue", DoneAtOnce):
             app = build_evolver_app(request)
         app._session.is_preview = branch_session
         if open_window is not None:
             open_window(app)
-        with patch("gui.app.production_update.start_again_after") as start_again, \
+        with update_waiting_for(config.PROJECT_DIR), \
+             start_again_stand_in() as start_again, \
              patch.object(app, "_shutdown") as quit_this_copy, \
              patch.object(type(app._runs), "is_running", new=running):
             app._updates.tick()
         return start_again, quit_this_copy
 
     def test_an_update_waiting_for_evolver_starts_it_again_through_its_launcher(self, request, monkeypatch):
-        start_again, quit_this_copy = self._ticked(request, monkeypatch)
+        start_again, quit_this_copy = self._ticked(request)
 
         start_again.assert_called_once_with(os.getpid(), config.PROJECT_DIR / "launch_evolver.vbs")
         quit_this_copy.assert_called_once()
 
     def test_an_update_waits_for_the_run_going_to_end(self, request, monkeypatch):
-        start_again, quit_this_copy = self._ticked(request, monkeypatch, running=True)
+        start_again, quit_this_copy = self._ticked(request, running=True)
 
         start_again.assert_not_called()
         quit_this_copy.assert_not_called()
@@ -616,14 +615,14 @@ class TestTakingAnUpdate:
     @pytest.mark.parametrize("open_window", [_the_main_window, _the_stats_window,
                                              _the_queue_window, _the_log_window])
     def test_an_update_waits_while_a_window_of_evolver_is_on_screen(self, request, monkeypatch, open_window):
-        start_again, quit_this_copy = self._ticked(request, monkeypatch, open_window=open_window)
+        start_again, quit_this_copy = self._ticked(request, open_window=open_window)
 
         start_again.assert_not_called()
         quit_this_copy.assert_not_called()
 
     def test_a_preview_never_starts_again_for_an_update(self, request, monkeypatch):
         """It runs out of the everyday checkout's venv, and hands the work back within the hour."""
-        start_again, quit_this_copy = self._ticked(request, monkeypatch, branch_session=True)
+        start_again, quit_this_copy = self._ticked(request, branch_session=True)
 
         start_again.assert_not_called()
         quit_this_copy.assert_not_called()

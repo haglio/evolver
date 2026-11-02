@@ -10,6 +10,8 @@ from __future__ import annotations
 import subprocess
 from unittest.mock import MagicMock, patch
 
+from app_support.testing import stood_down, stood_down_asking
+
 import config
 from gui import peer_watch
 from tests.gui_support import build_evolver_app
@@ -102,7 +104,7 @@ class TestTheWatch:
     def test_a_broker_that_is_gone_is_started(self):
         with patch("gui.peer_watch.broker_tray_is_up", return_value=False), \
              patch("gui.peer_watch.launch_broker_tray") as launch, \
-             patch("app_support.peer_watch.is_stood_down", return_value=False):
+             stood_down(False):
             peer_watch.watch_the_broker().tick()
 
         launch.assert_called_once()
@@ -110,7 +112,7 @@ class TestTheWatch:
     def test_a_broker_the_user_closed_is_left_closed(self):
         with patch("gui.peer_watch.broker_tray_is_up", return_value=False), \
              patch("gui.peer_watch.launch_broker_tray") as launch, \
-             patch("app_support.peer_watch.is_stood_down", return_value=True):
+             stood_down(True):
             peer_watch.watch_the_broker().tick()
 
         launch.assert_not_called()
@@ -120,8 +122,7 @@ class TestTheWatch:
 
         with patch("gui.peer_watch.broker_tray_is_up", return_value=False), \
              patch("gui.peer_watch.launch_broker_tray"), \
-             patch("app_support.peer_watch.is_stood_down",
-                   side_effect=lambda key, **kw: asked.append(key) or False):
+             stood_down_asking(side_effect=lambda key, **kw: asked.append(key) or False):
             peer_watch.watch_the_broker().tick()
 
         assert asked == ["broker"]

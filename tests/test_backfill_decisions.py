@@ -4,6 +4,8 @@ import json
 import unittest
 from unittest.mock import patch
 
+from app_support.testing import no_wait_for_a_held_file
+
 from backfill.decisions import (
     discard_as_weird,
     reclaim_from_weird,
@@ -120,7 +122,7 @@ class TestDiscardAsWeird(unittest.TestCase):
 
             with override_config(WEIRD_DIR=weird_dir):
                 with patch.object(type(video), "replace", replace_locked_once), \
-                     patch("app_support.file_channel.time.sleep") as sleep:
+                     no_wait_for_a_held_file() as sleep:
                     destination = discard_as_weird(video)
 
             assert len(attempts) == 2

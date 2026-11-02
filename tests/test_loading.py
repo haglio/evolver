@@ -3,8 +3,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from app_support import loading_screen
-from shared_ui import loading_process
-from shared_ui.loading_window import Loading, LoadingCanceled
+from shared_ui.loading_window import LoadingCanceled
+from shared_ui.testing import loading_at_the_click, loading_process_opened
 
 import config
 from gui import app as evolver_app
@@ -31,7 +31,7 @@ class _Loading:
 def _launch(request, outcome: Outcome, *, canceled: bool = False, app=None) -> tuple[int, list[str], int]:
     app = app or build_evolver_app(request)
     happened: list[str] = []
-    with patch.object(Loading, "at_the_click", return_value=_Loading(happened, canceled=canceled)) as opened, \
+    with loading_at_the_click(_Loading(happened, canceled=canceled)) as opened, \
          patch.object(app._instance, "take_over", return_value=outcome), \
          patch.object(app._instance, "serve_launches", side_effect=lambda **_: happened.append("listening")), \
          patch.object(app, "start", side_effect=lambda: happened.append("tray up")), \
@@ -63,7 +63,7 @@ def test_esc_on_the_loading_screen_starts_nothing(request):
 
 
 def test_the_loading_screen_runs_in_a_process_of_its_own_wearing_evolvers_taskbar_button():
-    with patch.object(loading_process.LoadingProcess, "open") as opened:
+    with loading_process_opened() as opened:
         evolver_app.open_the_loading_screen()
 
     opened.assert_called_once_with(
