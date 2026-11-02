@@ -13,16 +13,16 @@ answered by the same code and there is no one-off script to remember to run.
 What it asks each time depends on what the answer costs.  Where a video sits,
 and whether its sidecar (or the company it keeps) says something carved it out
 of a longer one, are free to read, so those two kinds are re-derived every run — which is what makes the
-record self-correcting: declare a folder of excerpts in the overlay, or split a
+record self-correcting: declare a folder of clips in the overlay, or split a
 video and write it a ``clip`` record, and the next run fixes what it wrote
 before it knew.  A running time costs an ffprobe, so that answer is remembered
 once and never asked again; a video does not change length.
 
 Every video is measured, not only the ones a running time has to settle.  A
-free kind — an excerpt, a Genau flick — is named without asking how long the
+free kind — a clip, a Genau flick — is named without asking how long the
 video is, but the answer is worth having for its own sake: it is what
 :mod:`tasks.nonai_progress` weighs the non-AI upscale queue by, and two thirds
-of the videos that stage accounts for are excerpts.  Measuring them here costs
+of the videos that stage accounts for are clips.  Measuring them here costs
 one ffprobe apiece, once, against the same batch limit; leaving them to be
 measured wherever they are needed costs one per reader forever.
 
@@ -66,7 +66,7 @@ class _Listed:
     sidecar: Path
     payload: dict
     genau: bool = False
-    excerpt: bool = False
+    clip: bool = False
     orientation: str | None = ""
     on_the_cloud_drive: bool = False
 
@@ -116,14 +116,14 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsR
     A video is measured once — the first run that reaches it and has a
     measurement left to spend — and thereafter its sidecar answers.  The kind
     is then re-derived every run from that recorded time and from the two free
-    signals, so a folder declared an excerpt after the fact corrects itself.
+    signals, so a folder declared a clip after the fact corrects itself.
     """
     log.info("=== Stage: record video kinds ===")
     result = VideoKindsResult()
     measurements = _Measurements(config.VIDEO_KIND_BATCH_LIMIT,
                                  config.CLOUD_VIDEO_KIND_BATCH_LIMIT)
     for listed in _library_videos():
-        free = video_kind.free_kind(genau=listed.genau, excerpt=listed.excerpt)
+        free = video_kind.free_kind(genau=listed.genau, clip=listed.clip)
         seconds = video_kind.duration_of(listed.payload)
         unmeasurable = False
         if seconds is None and measurements.spent_on(listed):
@@ -149,11 +149,11 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsR
             orient = _orientation_measured(listed.video, orientation_probe)
 
         def record_what_is_known(
-            current: dict, genau=listed.genau, excerpt=listed.excerpt, seconds=seconds,
+            current: dict, genau=listed.genau, clip=listed.clip, seconds=seconds,
             orient=orient,
         ) -> dict | None:
             written = video_kind.stamped(
-                current, video_kind.classify(genau=genau, excerpt=excerpt,
+                current, video_kind.classify(genau=genau, clip=clip,
                                              duration_seconds=seconds))
             if seconds is not None:
                 written = video_kind.timed(written, seconds)
@@ -212,7 +212,7 @@ def _ai_clips():
 def _non_ai_videos():
     """The real-footage library, where a carved scene is what stands out.
 
-    An excerpt is known by the ``clip`` record something wrote when it carved
+    A clip is known by the ``clip`` record something wrote when it carved
     it.  For the batches split before anything wrote one, it is known by the
     company it keeps: a folder its librarian filed the batch's cuts into and
     nothing else (:func:`_cut_folders`), or one the overlay declares outright.
@@ -229,8 +229,8 @@ def _non_ai_videos():
         [_below_the_library(video) for video in videos if video not in carved],
     )
     for video in videos:
-        excerpt = video in carved or _in_a_cut_folder(_below_the_library(video), cuts)
-        yield _Listed(video, sidecar.sidecar_path(video), payloads[video], excerpt=excerpt)
+        clip = video in carved or _in_a_cut_folder(_below_the_library(video), cuts)
+        yield _Listed(video, sidecar.sidecar_path(video), payloads[video], clip=clip)
 
 
 def _vr_videos():
@@ -242,7 +242,7 @@ def _vr_videos():
 
 def _was_carved(video: Path, payload: dict) -> bool:
     """Whether something says outright that *video* came out of a longer one."""
-    return isinstance(payload.get("clip"), dict) or _in_an_excerpt_folder(video)
+    return isinstance(payload.get("clip"), dict) or _in_a_clip_folder(video)
 
 
 def _below_the_library(video: Path) -> tuple[str, ...]:
@@ -250,9 +250,9 @@ def _below_the_library(video: Path) -> tuple[str, ...]:
     return video.relative_to(config.NON_AI_DIR).parts[:-1]
 
 
-def _in_an_excerpt_folder(video: Path) -> bool:
+def _in_a_clip_folder(video: Path) -> bool:
     relative = video.relative_to(config.VIDEO_LIBRARY_DIR).as_posix()
-    return any(relative.startswith(folder) for folder in config.EXCERPT_FOLDERS)
+    return any(relative.startswith(folder) for folder in config.CLIP_FOLDERS)
 
 
 def _in_a_cut_folder(folders: tuple[str, ...], cuts: dict[str, str]) -> bool:

@@ -150,7 +150,7 @@ class LaneLibrary:
             "GENAU_DIR": self.genau, "GENAU_SOURCE": genau_source,
             "ORIGENERATOR_VIDEOS_DIR": self.origenerator,
             "GENAU_TRASH_DIR": self.genau_trash, "GENAU_AUDIO_DIR": self.genau_audio,
-            "EXCERPT_FOLDERS": (), "VR_VIDEO_DIR": None,
+            "CLIP_FOLDERS": (), "VR_VIDEO_DIR": None,
         }
         settings.update(extra)
         flat_flicks_in(self.genau_flicks).mkdir(parents=True, exist_ok=True)

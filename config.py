@@ -202,14 +202,14 @@ PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-brows
 CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 # Non-AI folders holding scenes carved out of longer videos and nothing else,
 # as paths relative to the video library ("2D/non_AI/<bucket>/<folder>").
-# ``tasks.video_kinds`` reads them as excerpts whether or not each one carries
+# ``tasks.video_kinds`` reads them as clips whether or not each one carries
 # the ``clip`` record that normally says so: the batches that were split before
-# anything wrote that record are excerpts all the same, and the folder they were
+# anything wrote that record are clips all the same, and the folder they were
 # filed into is the only thing left that knows it. From the overlay, not from
 # source, for the same reason ``GENAU_SOURCE`` is — these are folder names, and
 # folder names are library vocabulary. Optional; absent means the ``clip``
 # record is the only test.
-EXCERPT_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
+CLIP_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
 
 # Where the Windows installer puts Topaz Video's own ffmpeg build and its
 # models. Not private -- an installer's default path names nothing of this

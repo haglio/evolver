@@ -139,18 +139,18 @@ class TestNonAiLane(unittest.TestCase):
 
                 video_kinds.run(probe=_unmeasurable, orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(path)) == video_kind.EXCERPT
+                assert video_kind.kind_of(sidecar.read(path)) == video_kind.CLIP
 
     def test_a_folder_the_overlay_declares_holds_excerpts_needs_no_record(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
+            with lib.config(GENAU_SOURCE, CLIP_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 video = touch_video(self._bucket(lib) / "excerpts" / "0 unsorted" / "Ada-Roe-7.mp4")
 
                 video_kinds.run(probe=_probe({video.stem: 900.0}),
                                 orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.EXCERPT
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.CLIP
 
     def test_an_ordinary_scene_is_full_length(self):
         with workspace_temp_dir() as root:
@@ -244,7 +244,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
 
     def test_an_excerpt_is_measured_even_though_its_kind_was_free(self):
         """Two thirds of the videos the non-AI upscale project accounts for are
-        excerpts, and it weighs the queue by running time."""
+        clips, and it weighs the queue by running time."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
@@ -256,7 +256,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
-            assert video_kind.kind_of(payload) == video_kind.EXCERPT
+            assert video_kind.kind_of(payload) == video_kind.CLIP
             assert video_kind.duration_of(payload) == 240.0
 
     def test_measuring_a_free_kind_still_counts_against_the_batch_limit(self):
@@ -552,7 +552,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
 class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
     """The two kinds a folder settles are re-derived every run.
 
-    They cost nothing to reach, so a library recorded before its excerpt
+    They cost nothing to reach, so a library recorded before its clip
     folders were declared corrects itself on the next run rather than keeping
     an answer nobody can see is wrong.
     """
@@ -567,11 +567,11 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
                 assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.FULL_LENGTH
 
-            with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
+            with lib.config(GENAU_SOURCE, CLIP_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 result = video_kinds.run(probe=_refuses_to_be_called,
                                          orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.EXCERPT
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.CLIP
             assert (result.recorded, result.already) == (1, 0)
 
     def test_a_scene_carved_after_it_was_recorded_is_corrected_too(self):
@@ -589,7 +589,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 write_sidecar(path, dict(sidecar.read(path), clip={"index": 3}))
                 video_kinds.run(probe=_refuses_to_be_called, orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(path)) == video_kind.EXCERPT
+                assert video_kind.kind_of(sidecar.read(path)) == video_kind.CLIP
 
     def test_a_scene_that_is_no_longer_an_excerpt_is_reclassified(self):
         """Undeclaring the folder puts the running time back in charge, and the
@@ -597,7 +597,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             video = lib.non_ai / "alpha" / "excerpts" / "0 unsorted" / "Ada-Roe-8.mp4"
-            with lib.config(GENAU_SOURCE, EXCERPT_FOLDERS=("2D/non_AI/alpha/excerpts",)):
+            with lib.config(GENAU_SOURCE, CLIP_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 touch_video(video)
                 video_kinds.run(probe=_probe({video.stem: 900.0}),
                                 orientation_probe=_orientation_unknown)
@@ -651,7 +651,7 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                     v.name: video_kind.kind_of(sidecar.read(sidecar.sidecar_path(v)))
                     for v in [*carved, unrecorded, *wholes]
                 }
-            assert kinds["carved-3.mp4"] == video_kind.EXCERPT
+            assert kinds["carved-3.mp4"] == video_kind.CLIP
             assert kinds["whole-0.mp4"] == video_kind.FULL_LENGTH
 
     def test_a_batch_that_never_separated_its_cuts_keeps_every_whole_video(self):
@@ -671,7 +671,7 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                     v.name: video_kind.kind_of(sidecar.read(sidecar.sidecar_path(v)))
                     for v in [carved, *wholes]
                 }
-            assert kinds["carved-1.mp4"] == video_kind.EXCERPT
+            assert kinds["carved-1.mp4"] == video_kind.CLIP
             assert [kinds[f"whole-{i}.mp4"] for i in range(3)] == [video_kind.FULL_LENGTH] * 3
 
     def test_a_scene_carved_and_filed_beside_its_source_leaves_the_source_whole(self):

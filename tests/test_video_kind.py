@@ -9,28 +9,28 @@ from util import orientation, provenance, video_kind
 
 class TestClassify(unittest.TestCase):
     def test_a_short_running_clip_is_a_short(self):
-        assert video_kind.classify(genau=False, excerpt=False, duration_seconds=4.0) == video_kind.SHORT
+        assert video_kind.classify(genau=False, clip=False, duration_seconds=4.0) == video_kind.SHORT
 
     def test_a_long_running_clip_is_full_length(self):
-        assert video_kind.classify(genau=False, excerpt=False, duration_seconds=900.0) == video_kind.FULL_LENGTH
+        assert video_kind.classify(genau=False, clip=False, duration_seconds=900.0) == video_kind.FULL_LENGTH
 
     def test_an_unknown_running_time_reads_as_full_length(self):
-        assert video_kind.classify(genau=False, excerpt=False, duration_seconds=None) == video_kind.FULL_LENGTH
+        assert video_kind.classify(genau=False, clip=False, duration_seconds=None) == video_kind.FULL_LENGTH
 
     def test_a_carved_excerpt_outranks_its_running_time(self):
-        assert video_kind.classify(genau=False, excerpt=True, duration_seconds=4.0) == video_kind.EXCERPT
+        assert video_kind.classify(genau=False, clip=True, duration_seconds=4.0) == video_kind.CLIP
 
     def test_a_genau_flick_outranks_everything_else(self):
-        assert video_kind.classify(genau=True, excerpt=True, duration_seconds=900.0) == video_kind.GENAU_FLICK
+        assert video_kind.classify(genau=True, clip=True, duration_seconds=900.0) == video_kind.GENAU_FLICK
 
     def test_the_boundary_second_still_counts_as_short(self):
-        assert video_kind.classify(genau=False, excerpt=False, duration_seconds=video_kind.SHORT_MAX_SECONDS) == video_kind.SHORT
+        assert video_kind.classify(genau=False, clip=False, duration_seconds=video_kind.SHORT_MAX_SECONDS) == video_kind.SHORT
 
 
 class TestRecording(unittest.TestCase):
     def test_reads_the_kind_off_the_video_block(self):
-        payload = {"video": {"action": "Alpha", "type": video_kind.EXCERPT}}
-        assert video_kind.kind_of(payload) == video_kind.EXCERPT
+        payload = {"video": {"action": "Alpha", "type": video_kind.CLIP}}
+        assert video_kind.kind_of(payload) == video_kind.CLIP
 
     def test_a_sidecar_written_before_the_field_existed_reads_as_nothing(self):
         assert video_kind.kind_of({"video": {"action": "Alpha"}}) == ""
