@@ -12,12 +12,12 @@
 #   BLOCK  git reset --hard|--soft main        (resetting your branch onto main/origin)
 #   ALLOW  git merge --ff-only ...             (the landing step)
 #   ALLOW  git merge --abort|--continue|--quit (resolving an in-progress merge/rebase)
-#   ALLOW  git reset --soft $(git merge-base main HEAD)   (the documented own-commits squash)
+#   BLOCK  git reset --soft $(git merge-base main HEAD)   (collapsing a branch's commits into one)
 #   ALLOW  git reset --hard          / --hard HEAD[~n]    (discard local edits / own commits)
 #   ALLOW  git rebase main           (the encouraged sync)
 exit_block() {
   echo "BLOCKED by git-rebase-guard: $1" >&2
-  echo "Rule: when a teammate landed overlapping work, rebase onto main and resolve the conflict in place (git checkout --theirs <file> && git add; git rebase --continue / --skip past an emptied commit). Never reset-and-reapply, and never merge to sync. To squash your OWN commits use: git reset --soft \$(git merge-base main HEAD). See CLAUDE.md 'Git: rebase onto main, then ff-merge'." >&2
+  echo "Rule: when a teammate landed overlapping work, rebase onto main and resolve the conflict in place (git checkout --theirs <file> && git add; git rebase --continue / --skip past an emptied commit). Never reset-and-reapply, and never merge to sync. Never collapse a branch's commits into one: their messages are the history. See CLAUDE.md 'Git: rebase onto main, then ff-merge'." >&2
   exit 2
 }
 
@@ -38,8 +38,12 @@ if printf '%s' "$norm" | grep -Eq '\bgit\b[^|;&]*\bmerge\b' \
   exit_block "non-fast-forward 'git merge' (merging to sync). Rebase onto main instead."
 fi
 
+# --- collapsing a branch's commits into one --------------------------------------------------
+if printf '%s' "$norm" | grep -Eq '\bgit(\s+-[cC]\s+\S+)*\s+reset\b[^|;&]*--soft\b[^|;&]*merge-base'; then
+  exit_block "'git reset --soft' to the merge base collapses the branch's commits into one. Rebase, resolving each conflict in its commit."
+fi
+
 # --- reset --hard/--soft onto a branch (the reset-to-dig-out / reset-to-main move) -----------
-# Exclude the documented squash form, which mentions main only inside merge-base.
 if printf '%s' "$norm" | grep -Eq '\bgit\b[^|;&]*\breset\b[^|;&]*--(hard|soft)\b[^|;&]*\b(main|origin/main|origin/HEAD)\b' \
    && ! printf '%s' "$norm" | grep -Eq 'merge-base'; then
   exit_block "'git reset --hard/--soft main' reverts teammates' commits and is the reset-to-dig-out move. Rebase instead."
