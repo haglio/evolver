@@ -20,9 +20,9 @@ requires-python = ">=3.14"
 # one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
     "app-support @ git+https://github.com/haglio/app_support@v0.1.346",
-    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.297",
+    "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.299",
     # The family's listener, for the backfill tool: it brings vosk and sounddevice.
-    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.104",
+    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.105",
     # What voice_core reads each command with a second time; it imports it, this repo
     # installs it.
     "faster-whisper>=1,<2",
