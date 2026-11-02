@@ -128,7 +128,7 @@ class TestTopazPaths(unittest.TestCase):
     def test_an_empty_value_counts_as_unset(self):
         assert config.topaz_paths({"topaz_ffmpeg": "", "topaz_models": ""}) == config.topaz_paths({})
 
-    def test_a_machine_that_installed_it_elsewhere_says_so_in_the_overlay(self):
+    def test_a_computer_that_installed_it_elsewhere_says_so_in_the_overlay(self):
         ffmpeg, models = config.topaz_paths({
             "topaz_ffmpeg": "D:/Apps/Topaz Video/ffmpeg.exe",
             "topaz_models": "E:/topaz-models",

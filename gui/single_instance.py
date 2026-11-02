@@ -4,7 +4,7 @@ Two mechanisms, answering two different questions — keep both:
 
 * the **mutex** answers *may I run?*  Never two Evolvers, because two schedulers
   mean two pipelines and stacked Topaz encodes, which is what used to exhaust
-  memory and crash the machine.
+  memory and crash the computer.
 * the **pipe** answers *what should the one already running do about me?*  A
   tray app's window is hidden, so clicking Evolver — a shortcut, the Start
   menu, or the taskbar pin, whose relaunch command Windows re-runs verbatim —
@@ -53,7 +53,7 @@ _PIPE_NAME = "EvolverTrayApp_ShowWindow"
 
 # How long a launch waits for the Evolver already running to answer, and again
 # for it to go: stepping aside, it gives the stage it is in five seconds to
-# finish, and a machine under load can keep it from the processor for seconds
+# finish, and a computer under load can keep it from the processor for seconds
 # on end -- starved of it, one took fifteen to answer.
 _PATIENCE_SECONDS = 30.0
 _RETRY_SECONDS = 0.2

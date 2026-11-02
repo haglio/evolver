@@ -315,7 +315,7 @@ class TestTheLowDiskWarning(unittest.TestCase):
         assert result.processed == 1
         show_error.assert_not_called()
 
-    def test_no_test_can_reach_the_dismissal_on_the_machine_running_the_suite(self):
+    def test_no_test_can_reach_the_dismissal_on_the_computer_running_the_suite(self):
         """Every upscale test with room on its drive clears the dismissal it sees."""
         assert not config.LOW_DISK_WARNING_DISMISSED_FILE.is_relative_to(config.LOCAL_STATE_DIR)
 

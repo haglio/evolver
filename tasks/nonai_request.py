@@ -67,7 +67,7 @@ def withdraw_request() -> None:
 
 
 def make_way_for(video: str, job: dict, files: StageFiles) -> tuple[dict | None, str]:
-    """The job left in flight once *video* has the machine, and what was stopped.
+    """The job left in flight once *video* has the computer, and what was stopped.
 
     An encode that has already ended is left alone for supervision to conclude:
     it may be a finished upscale.
@@ -85,7 +85,7 @@ def start_requested(request: nonai_job.Request, files: StageFiles,
                     settings: EncodeSettings, *, ai_waiting: bool) -> StartAttempt:
     """Start the video asked for, or record what is holding it back."""
     low_disk = nonai_encode.is_low_disk(settings)
-    busy = nonai_encode.LOW_DISK if low_disk else nonai_encode.machine_busy_reason(
+    busy = nonai_encode.LOW_DISK if low_disk else nonai_encode.computer_busy_reason(
         files.cooldown, settings, asked_for=True, ai_waiting=ai_waiting)
     if busy:
         log.info("Holding back the non-AI upscale asked for: %s.", busy)

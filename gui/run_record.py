@@ -99,7 +99,7 @@ def in_display_zone(moment: datetime) -> datetime:
 def format_run_label(started_at: str, duration_seconds: float) -> str:
     """When a run started and how long it took, e.g. "2026/03/30 22:20 (5s)".
 
-    Shown in the zone the overlay names, or the machine's own when it names
+    Shown in the zone the overlay names, or the computer's own when it names
     none -- read at the call, so a test can point it somewhere. The verdict is
     deliberately not in here: it rides beside this text as a colored mark (see
     :mod:`gui.status_symbols`), so coloring the verdict cannot color the

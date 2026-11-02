@@ -242,7 +242,7 @@ class TestFavorites(unittest.TestCase):
         assert result.favorites_removed == 1
 
     def test_a_second_journal_s_older_favorite_lands_after_the_first_s_newer_one(self):
-        """Two machines upload two files into the one folder, and one of them
+        """Two computers upload two files into the one folder, and one of them
         can arrive late: a laptop is quit from the front as often as not, so
         its favorite made at ten can reach the folder after the phone's made
         at twenty has already been applied."""

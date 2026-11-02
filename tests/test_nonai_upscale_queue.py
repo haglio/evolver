@@ -95,7 +95,7 @@ class TestTheList(unittest.TestCase):
 
 
 class TestRowOne(unittest.TestCase):
-    """Row 1 is whatever the machine is on, ahead of the order the stage keeps."""
+    """Row 1 is whatever the computer is on, ahead of the order the stage keeps."""
 
     def test_the_video_in_flight_is_row_one_whatever_the_order_says(self):
         with workspace_temp_dir() as root:

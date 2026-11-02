@@ -59,7 +59,7 @@ def database(db_path=None) -> Path:
     """The gallery to read — *db_path*, else the configured one — which must exist.
 
     Raises ``FileNotFoundError`` when it is absent, which is the ordinary state
-    of a machine with no Origenerator installed beside this one.
+    of a computer with no Origenerator installed beside this one.
     """
     db_path = Path(db_path) if db_path is not None else config.ORIGENERATOR_DB_PATH
     if not db_path.exists():

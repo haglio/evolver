@@ -5,7 +5,7 @@ concerned, pythonw: its taskbar buttons belong to Python, carry Python's icon,
 and a pin made from one relaunches Python with no arguments. The tray and each
 tool it starts are such processes, and two things fix it -- naming the process,
 and dressing each window it shows -- both of them things the app *does* to the
-machine it is running on, which is why they are here and not in a constructor.
+computer it is running on, which is why they are here and not in a constructor.
 """
 
 from __future__ import annotations

@@ -231,14 +231,14 @@ def nonai_library_overrides(root: Path, **extra):
     METADATA_DIR belongs here with the rest: a sidecar's path is the metadata
     root joined to the video's path *within the library*, so pointing only the
     library at the temp tree sends every sidecar a test writes to whatever
-    metadata root the checkout is configured with — the real one, on a machine
+    metadata root the checkout is configured with — the real one, on a computer
     that has a real one. Tests then also share that tree with each other, and
     two of them naming a clip the same way read back one another's fixtures.
 
     NONAI_RETIRED_ROOT and NONAI_PIN_LIST are here for the same
-    reason, and both default to a machine's own answer rather than to nothing:
+    reason, and both default to a computer's own answer rather than to nothing:
     the archive comes from the overlay's ``retired_root``, and the pin list
-    is a path *inside the checkout*. So on a machine that has configured an
+    is a path *inside the checkout*. So on a computer that has configured an
     archive, retiring an original in a test moved the fixture into the real one
     and then failed the assertion that it had gone to the bucket's ``2*``
     folder — four tests, green here and on CI only because neither has an

@@ -2,7 +2,7 @@
 and the phone's favorites marked there.
 
 Fun Time's counts come from its own stats file, the phone's from Warm Gun's
-journal, which reaches this machine inside the synced library.  The sum and
+journal, which reaches this computer inside the synced library.  The sum and
 its weight go on the sidecar (``util.watch``), where Fun Time and Warm Gun
 read one number instead of each keeping a formula.  A favorite made or taken
 back on the phone goes onto the same sidecar, which is where Fun Time keeps
@@ -162,7 +162,7 @@ def _applied_once(
     """Hand *apply* each journal's events of *kinds* past that journal's own
     cursor, in time order, so each is applied once and another app may undo it.
 
-    One time per file, not one across them: each machine uploads its whole
+    One time per file, not one across them: each computer uploads its whole
     file in its own time order, but the laptop's can reach the folder after
     the phone's later lines have been applied, and one time across both would
     skip its events for good.  *apply* answers False to hold the rest of its

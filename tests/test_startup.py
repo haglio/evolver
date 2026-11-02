@@ -34,7 +34,7 @@ def startup_dir():
 class TestRegisterStartup:
 
     def test_the_shortcut_is_the_one_evolvers_list_keeps_in_the_startup_folder(self, startup_dir):
-        """So "Start with Windows" and the command that keeps the machine in step
+        """So "Start with Windows" and the command that keeps the computer in step
         with every app's list never write two different shortcuts."""
         with override_config(LIVE_DIR=REPO_ROOT):
             startup.register_startup()

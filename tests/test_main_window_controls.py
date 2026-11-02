@@ -91,7 +91,7 @@ class TestRunHistoryMarks:
 
     def test_the_label_itself_is_just_the_time_and_duration(self):
         """In the zone the overlay names -- pinned here, because a record
-        stores UTC and an unset zone reads the machine's own, which is not the
+        stores UTC and an unset zone reads the computer's own, which is not the
         gate's."""
         with override_config(DISPLAY_TIMEZONE=ZoneInfo("America/Los_Angeles")):
             assert self._item("success").text() == "2026/07/25 08:20 (12s)"

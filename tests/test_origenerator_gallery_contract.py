@@ -7,7 +7,7 @@ reading as never sent, and both suites stayed green.
 
 Origenerator publishes ``origenerator_gallery_contract.json`` at its checkout
 root now.  These hold this repo's reads to it.  Neither gate clones the other,
-so on a machine with no Origenerator beside this one there is nothing to
+so on a computer with no Origenerator beside this one there is nothing to
 compare and the check says so.
 """
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Content overlay — the copy that must not be published, loaded at runtime.
 
-Everything here describes the machine and the library rather than the app: the
+Everything here describes the computer and the library rather than the app: the
 browser profile, Genau's flicks folder, the scraped provider, and the spoken act
 and camera vocabulary; what other apps need too is in the settings all of Haglio
 shares (``app_support.haglio_settings``). All of it

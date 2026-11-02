@@ -93,7 +93,7 @@ class TestExampleClips(unittest.TestCase):
                 assert self._examples()[PINNED_BUTTON] == pinned
 
     def test_a_pin_naming_a_clip_the_library_does_not_hold_falls_through(self):
-        """Which is every pin on every machine but the one whose library the
+        """Which is every pin on every computer but the one whose library the
         overlay describes -- so it has to be the ordinary case, not an error."""
         with library_tree() as lib:
             auto = lib.video("portrait", "provider2", "auto_topaz.mp4")

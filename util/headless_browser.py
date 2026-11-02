@@ -1,7 +1,7 @@
 """Dumping a page's rendered DOM by driving an installed Chrome or Edge headless.
 
 The pages this exists for build their content in JavaScript, so fetching the
-HTML gets an empty shell; the only thing on these machines that will run the
+HTML gets an empty shell; the only thing on these computers that will run the
 scripts and hand back what a reader would see is a browser already installed
 for browsing. It is driven as a one-shot subprocess -- launch, dump, exit --
 rather than kept alive, because the caller is a pipeline stage that a watchdog

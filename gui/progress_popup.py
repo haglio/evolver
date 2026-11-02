@@ -25,7 +25,7 @@ def _caption_width(font) -> int:
 
     Measured rather than guessed: the widest label is a third wider than the
     widest stage key it replaced, and the gap between them is font-dependent,
-    so a number picked on one machine would clip on another.
+    so a number picked on one computer would clip on another.
     """
     metrics = QFontMetrics(font)
     return max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values()) + _CAPTION_GUTTER

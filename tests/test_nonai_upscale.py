@@ -141,7 +141,7 @@ class TestRunStartsAJob(unittest.TestCase):
 
 
 class TestStartGuards(unittest.TestCase):
-    """A new multi-hour encode only starts on a machine with headroom."""
+    """A new multi-hour encode only starts on a computer with headroom."""
 
     def _one_candidate(self, overrides):
         return make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
@@ -175,7 +175,7 @@ class TestStartGuards(unittest.TestCase):
             mocks["popen"].assert_not_called()
 
     def test_a_present_user_defers_the_start(self):
-        """Recent keyboard/mouse input means the user is at the machine; a
+        """Recent keyboard/mouse input means the user is at the computer; a
         multi-hour encode waits until they step away."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -300,7 +300,7 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
             assert result.started == "lagoon/0 unsorted/b.mp4"
             assert result.on_request
 
-    def test_a_machine_short_of_memory_holds_it_back_and_says_so(self):
+    def test_a_computer_short_of_memory_holds_it_back_and_says_so(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
@@ -591,7 +591,7 @@ class TestOrphanAdoption(unittest.TestCase):
     The file sync service covering the project tree renamed the in-flight job
     file to '... [conflicted N].json' mid-run; the stage then saw no job, the
     running ffmpeg went unsupervised, and fresh starts stacked encodes until
-    the machine crashed. With the state file gone, a lone Topaz process is
+    the computer crashed. With the state file gone, a lone Topaz process is
     re-identified from its own command line and adopted back under supervision.
     """
 

@@ -361,7 +361,7 @@ def _run_stages(
 
         # The non-AI stage always runs (it may have a detached encode to check on),
         # but only starts a new multi-hour encode when the tray toggle is on, the
-        # AI pipeline is drained, and the machine is otherwise quiet.
+        # AI pipeline is drained, and the computer is otherwise quiet.
         ai_drained = not upscale_skipped and (
             upscale_result is None or upscale_result.pending_after_run == 0
         )
@@ -372,7 +372,7 @@ def _run_stages(
             "upscale_non_ai", nonai_upscale.run,
             allow_start=nonai_allow_start, stop=nonai_enabled is False,
             # Toggle on -> Evolver manages the encode by user presence: suspend it
-            # when someone's at the machine, resume it when they idle out.
+            # when someone's at the computer, resume it when they idle out.
             presence_managed=nonai_enabled is True,
             # A video asked for from the queue window starts whatever the
             # toggle says; only the tray answers that ask, never the CLI.

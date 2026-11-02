@@ -31,8 +31,8 @@ class TestPopupConstruction(unittest.TestCase):
 
     def test_a_caption_is_never_clipped_by_the_column_it_sits_in(self):
         """The column is sized from the labels, not from a guess: the widest
-        one is 137 px in this machine's default font and was 91 as a key, and
-        the font is whatever the machine running it has."""
+        one is 137 px in this computer's default font and was 91 as a key, and
+        the font is whatever the computer running it has."""
         for label in self.popup.findChildren(QLabel):
             if label.text() in set(STAGE_LABELS.values()):
                 with self.subTest(caption=label.text()):

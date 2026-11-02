@@ -100,7 +100,7 @@ OVERLAY_KEYS = {
 # The ones the overlay may leave out; each is documented as optional and each
 # has a fallback, so the committed example does not carry them. The two Topaz
 # paths are absent for a second reason: the fallback is where the installer
-# puts them, and an example naming one machine's install would read as the
+# puts them, and an example naming one computer's install would read as the
 # answer rather than as the override it is.
 OPTIONAL_OVERLAY_KEYS = {
     "display_timezone", "retired_root", "topaz_ffmpeg",
