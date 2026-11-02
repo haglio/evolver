@@ -52,7 +52,7 @@ def _label_the_unlabeled(app) -> int:
     scan = library_scan()
     clips = unlabeled_clips(scan)
     if not clips:
-        QMessageBox.information(None, _TITLE, "Every clip already has an action.")
+        QMessageBox.information(None, _TITLE, "Every video already has an action.")
         return 0
 
     worker = SerialWorker()

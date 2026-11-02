@@ -107,7 +107,7 @@ def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupRes
     result.pruned = _prune_orphans(expected)
     result.measured = measure.taken
     log.info(
-        "Non-AI grouping: %d clip(s) in %d family(ies), %d of them joined by their "
+        "Non-AI grouping: %d video(s) in %d family(ies), %d of them joined by their "
         "frames (%d measured); wrote %d, pruned %d sidecar(s).",
         result.grouped, result.families, result.joined, result.measured,
         result.written, result.pruned,

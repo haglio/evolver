@@ -227,7 +227,7 @@ class TestStageRegistry(unittest.TestCase):
         assert "down the Genau lane, the delivered flick --" in tips["withdrawn"]
         assert tips["genau_deliver"].startswith("Move each upscaled Genau-lane flick out of 2_outbox into the folder Genau plays from")
         assert "redoes the flick forever" in tips["genau_deliver"]
-        assert "a generation, an excerpt, a Genau flick --" in tips["video_types"]
+        assert "a generation, a clip, a Genau flick --" in tips["video_types"]
 
     def test_the_registry_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
         assert "group_non_ai" in ALL_STAGES

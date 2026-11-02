@@ -935,7 +935,7 @@ class TestMakingWayForAiClips(unittest.TestCase):
                     pass
 
             said = "\n".join(logged.output)
-            assert "AI clips" in said
+            assert "AI videos" in said
             assert "the user is back" not in said
             assert "the machine is idle" not in said
 
