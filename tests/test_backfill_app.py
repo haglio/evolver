@@ -21,19 +21,19 @@ def _the_application_made(application):
 
 class TestMain(unittest.TestCase):
     def _patched(self, videos, **extra):
-        patches = dict(
-            setup_logging=patch("backfill_app.evolver.setup_logging"),
-            application=patch("backfill_app.application"),
-            claim=patch("backfill_app.process_identity.claim"),
-            alert=patch("backfill_app.QMessageBox"),
-            unlabeled=patch("backfill_app.unlabeled_videos", return_value=videos),
-            thumbnails=patch("backfill_app._ready_thumbnails", return_value={}),
-            window=patch("backfill_app.BackfillWindow"),
-            listener=patch("backfill_app.VoiceListener"),
-            worker=patch("backfill_app.SerialWorker"),
-            vocabulary=patch("backfill_app.load_vocabulary"),
-            session=patch("backfill_app.BackfillSession"),
-        )
+        patches = {
+            "setup_logging": patch("backfill_app.evolver.setup_logging"),
+            "application": patch("backfill_app.application"),
+            "claim": patch("backfill_app.process_identity.claim"),
+            "alert": patch("backfill_app.QMessageBox"),
+            "unlabeled": patch("backfill_app.unlabeled_videos", return_value=videos),
+            "thumbnails": patch("backfill_app._ready_thumbnails", return_value={}),
+            "window": patch("backfill_app.BackfillWindow"),
+            "listener": patch("backfill_app.VoiceListener"),
+            "worker": patch("backfill_app.SerialWorker"),
+            "vocabulary": patch("backfill_app.load_vocabulary"),
+            "session": patch("backfill_app.BackfillSession"),
+        }
         patches.update(extra)
         return patches
 

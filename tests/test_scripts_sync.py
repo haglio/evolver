@@ -10,10 +10,10 @@ from tests.temp_helpers import a_drive_that_is_not_there, override_config, works
 
 
 def library_overrides(video_root, script_root, **extra):
-    overrides = dict(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
-                     NONAI_RETIRED_ROOT=None, VR_VIDEO_DIR=None,
-                     UNMATCHED_SCRIPTS_DIR=script_root.parent / "unmatched_scripts",
-                     GENERATED_SCRIPTS_DIR=script_root.parent / "generated")
+    overrides = {"VIDEO_LIBRARY_DIR": video_root, "SCRIPT_LIBRARY_DIR": script_root,
+                     "NONAI_RETIRED_ROOT": None, "VR_VIDEO_DIR": None,
+                     "UNMATCHED_SCRIPTS_DIR": script_root.parent / "unmatched_scripts",
+                     "GENERATED_SCRIPTS_DIR": script_root.parent / "generated"}
     overrides.update(extra)
     return override_config(**overrides)
 

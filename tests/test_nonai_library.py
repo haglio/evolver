@@ -14,10 +14,10 @@ def make_video(path):
 
 
 def library(root):
-    return dict(
-        VIDEO_LIBRARY_DIR=root / "videos",
-        NON_AI_DIR=root / "videos" / "2D" / "non_AI",
-    )
+    return {
+        "VIDEO_LIBRARY_DIR": root / "videos",
+        "NON_AI_DIR": root / "videos" / "2D" / "non_AI",
+    }
 
 
 class TestBuckets(unittest.TestCase):

@@ -233,9 +233,9 @@ def _run_stages(
                     upscale_skipped = True
                     _skip_stage("upscale", topaz.SIGN_IN_EXPIRED)
                 else:
-                    upscale_kwargs: dict = dict(
-                        priority_files=priority_files, max_items=config.UPSCALE_BATCH_LIMIT,
-                    )
+                    upscale_kwargs: dict = {
+                        "priority_files": priority_files, "max_items": config.UPSCALE_BATCH_LIMIT,
+                    }
                     if on_stage_progress is not None:
                         upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
                     upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)

@@ -214,27 +214,27 @@ class TestEvolverMain:
     @pytest.mark.parametrize(
         "failing_overrides",
         [
-            pytest.param(lambda: dict(
-                withdrawn_run=Mock(return_value=Mock(failed=1))), id="withdrawn"),
-            pytest.param(lambda: dict(
-                nonai_run=Mock(return_value=Mock(failed=1, deferred_low_disk=False))), id="upscale_non_ai"),
-            pytest.param(lambda: dict(
-                sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
-                has_pending_work=Mock(return_value=True),
-                correspondence_run=Mock(return_value=Mock(ok=False))), id="verify"),
-            pytest.param(lambda: dict(
-                duplicate_sizes_run=Mock(return_value=Mock(ok=False))), id="dupes"),
-            pytest.param(lambda: dict(
-                scripts_sync_run=Mock(return_value=Mock(ok=False))), id="scripts"),
-            pytest.param(lambda: dict(
-                bookmarks_sync_run=Mock(return_value=Mock(ok=False))), id="bookmarks"),
-            pytest.param(lambda: dict(
-                sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
-                has_pending_work=Mock(return_value=True),
-                upscale_run=Mock(return_value=Mock(
-                    failed=2, deferred_low_disk=False, pending_after_run=0))), id="upscale"),
-            pytest.param(lambda: dict(
-                prompt_scrape_run=Mock(return_value=Mock(ok=False))), id="metadata"),
+            pytest.param(lambda: {
+                "withdrawn_run": Mock(return_value=Mock(failed=1))}, id="withdrawn"),
+            pytest.param(lambda: {
+                "nonai_run": Mock(return_value=Mock(failed=1, deferred_low_disk=False))}, id="upscale_non_ai"),
+            pytest.param(lambda: {
+                "sort_run": Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
+                "has_pending_work": Mock(return_value=True),
+                "correspondence_run": Mock(return_value=Mock(ok=False))}, id="verify"),
+            pytest.param(lambda: {
+                "duplicate_sizes_run": Mock(return_value=Mock(ok=False))}, id="dupes"),
+            pytest.param(lambda: {
+                "scripts_sync_run": Mock(return_value=Mock(ok=False))}, id="scripts"),
+            pytest.param(lambda: {
+                "bookmarks_sync_run": Mock(return_value=Mock(ok=False))}, id="bookmarks"),
+            pytest.param(lambda: {
+                "sort_run": Mock(return_value=Mock(moved=1, moved_files=["f"])),
+                "has_pending_work": Mock(return_value=True),
+                "upscale_run": Mock(return_value=Mock(
+                    failed=2, deferred_low_disk=False, pending_after_run=0))}, id="upscale"),
+            pytest.param(lambda: {
+                "prompt_scrape_run": Mock(return_value=Mock(ok=False))}, id="metadata"),
         ],
     )
     def test_a_failing_stage_exits_nonzero(self, failing_overrides):
@@ -361,9 +361,9 @@ class TestRunPipeline:
 
     def test_topaz_is_asked_about_its_sign_in_only_when_an_upscale_could_start(self):
         for overrides in (
-            dict(has_pending_work=Mock(return_value=False)),
-            dict(has_pending_work=Mock(return_value=True),
-                 foreign_topaz_running=Mock(return_value=True)),
+            {"has_pending_work": Mock(return_value=False)},
+            {"has_pending_work": Mock(return_value=True),
+                 "foreign_topaz_running": Mock(return_value=True)},
         ):
             stack, mocks = self._patch_all_stages(**overrides)
             with stack:
