@@ -20,9 +20,6 @@ from util import crash_log  # noqa: E402
 _run_state = tempfile.TemporaryDirectory(prefix="evolver-tests-", ignore_cleanup_errors=True)
 RUN_STATE = Path(_run_state.name)
 
-# No test may open a real modal dialog. Both of these block until a human clicks,
-# so one unguarded call hangs an unattended suite forever instead of failing it.
-# Modal dialogs block until a human clicks, so one unguarded call hangs an unattended suite.
 alert_shown(return_value=False).start()
 error_popup().start()
 

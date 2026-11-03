@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-# offscreen: no window or tray icon appears on the computer the suite runs on.
+# Qt's offscreen platform: no window or tray icon appears on the computer the suite runs on.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import QEvent
