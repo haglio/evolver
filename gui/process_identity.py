@@ -1,12 +1,3 @@
-"""What an Evolver process tells Windows it is, so each window it shows says Evolver.
-
-A PyQt app launched through ``pythonw.exe`` is, as far as the shell is
-concerned, pythonw: its taskbar buttons belong to Python, carry Python's icon,
-and a pin made from one relaunches Python with no arguments. The tray and each
-tool it starts are such processes, and two things fix it -- naming the process,
-and dressing each window it shows -- both of them things the app *does* to the
-computer it is running on, which is why they are here and not in a constructor.
-"""
 
 from __future__ import annotations
 
@@ -23,8 +14,7 @@ from util.preview import shown_as
 
 log = logging.getLogger(__name__)
 
-# The Windows identity contract. A pinned shortcut belongs to whatever this
-# says, so it is the one string that must not drift.
+# The Windows AppUserModelID: a pinned shortcut belongs to this string.
 APP_MODEL_ID = "Evolver.TrayApp"
 LETTER = config.PROJECT_DIR / "icon.ico"
 
@@ -51,8 +41,6 @@ def claim(app: QApplication) -> QObject:
 
 
 class _WindowDresser(QObject):
-    """Dresses a window at its Show event, which Qt sends before mapping the
-    window -- so before Windows makes its taskbar button out of what it wears."""
 
     def __init__(self, app: QApplication, identity: str, taskbar_app: TaskbarApp):
         super().__init__(app)

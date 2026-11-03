@@ -22,14 +22,8 @@ from util.selection_highlight import SELECTION_HIGHLIGHT
 if TYPE_CHECKING:
     from util.upscale_queue import Head, UpscaleQueue
 
-# What a dragged row carries besides Qt's own payload: the video's path within
-# the library, so a drop knows what was dropped without reaching back into the
-# list's selection.
 VIDEO_MIME = "application/x-evolver-video"
 
-# The family's muted gray rather than its secondary text, which is a near-white
-# for the dark chrome this app draws none of: these sit on a window Windows
-# colors, and the same gray is what the run history marks its inert rows with.
 _MUTED = TEXT_MUTED.name()
 
 REFRESH_SECONDS = 15.0
@@ -93,11 +87,6 @@ class _QueueTree(QTreeWidget):
 
     @property
     def is_dragging(self) -> bool:
-        """Whether a drag is in flight, which a rebuild would pull apart.
-
-        ``QDrag.exec`` runs an event loop of its own, so the refresh timer goes
-        on firing while a row is held in the air.
-        """
         return self._dragging
 
     def videos(self) -> list[str]:
@@ -120,15 +109,7 @@ class _QueueTree(QTreeWidget):
         return carried
 
     def startDrag(self, actions):
-        """Carry the row, and leave the list alone -- the drop moves it.
-
-        Not ``super()``: what QAbstractItemView does after a move is to remove
-        the rows the drag started from, and here the drop has already put that
-        row where it belongs, so the removal takes the row the user just placed
-        back off the list. It reappeared a refresh later, at the place it had
-        been dropped, which is what the user saw as a row vanishing for a
-        minute.
-        """
+        # Not super(): QAbstractItemView removes the dragged row after a move, taking the one just dropped.
         item = self.currentItem()
         if item is None or not item.flags() & Qt.ItemFlag.ItemIsDragEnabled:
             return

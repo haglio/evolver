@@ -1,4 +1,3 @@
-"""Background thread that runs the evolver pipeline and emits Qt signals."""
 
 from __future__ import annotations
 
@@ -15,11 +14,6 @@ log = logging.getLogger(__name__)
 
 
 class PipelineWorker(QThread):
-    """Runs evolver.run_pipeline() in a background thread.
-
-    Signals are auto-queued across the thread boundary by Qt,
-    so GUI slots receiving these signals run safely on the main thread.
-    """
 
     stage_started = pyqtSignal(str)
     stage_completed = pyqtSignal(str)

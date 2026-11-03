@@ -144,9 +144,7 @@ class TestPopupPositioning(unittest.TestCase):
         popup = ProgressPopup()
         popup.show_over(anchor)
 
-        # Popup frame center should be near anchor frame center.
-        # Y tolerance is larger because Tool windows have a smaller title
-        # bar than QMainWindow on Windows (~18px difference).
+        # Tool windows have a smaller title bar than QMainWindow on Windows.
         anchor_center = anchor.frameGeometry().center()
         popup_center = popup.frameGeometry().center()
         assert popup_center.x() == pytest.approx(anchor_center.x(), abs=5)

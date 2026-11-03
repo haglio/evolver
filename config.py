@@ -13,10 +13,6 @@ from app_support.overlay import overlay_value
 
 from content_overlay import LOCAL_CONTENT, load_content, refuse_an_incomplete_overlay
 
-# Computer-specific and private: every value below that names something outside
-# this repo comes from the git-ignored content overlay (content.example.json
-# shows the shape and documents each key), or, where other apps need it too,
-# from the settings all of Haglio shares.
 refuse_an_incomplete_overlay()
 _CONTENT = load_content()
 
@@ -115,34 +111,16 @@ PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
 PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]
 CAMERA_PREFIXES = tuple(
     camera["prefix"] for camera in overlay_value(_CONTENT, "cameras", path=LOCAL_CONTENT))
-# The scratch profile the metadata stage hands its headless browser: a whole
-# Chrome user-data tree, written from nothing on each scrape and worth keeping
-# for none of it. In the system temp dir because it defaulted to one under
-# PROJECT_DIR, which had the running app filling its own git working tree with a
-# live browser profile every ten minutes.
 PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-browser-profile"
 
 CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 CLIP_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
 
-# Where the Windows installer puts Topaz Video's own ffmpeg build and its
-# models. Not private -- an installer's default path names nothing of this
-# computer or this library -- so they sit in source as the fallback the overlay
-# overrides.
 _INSTALLED_TOPAZ_FFMPEG = r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe"
 _INSTALLED_TOPAZ_MODELS = r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models"
 
 
 def topaz_paths(content: dict[str, Any]) -> tuple[Path, Path]:
-    """Topaz Video's own ffmpeg build, and the models it reads.
-
-    Both upscale stages drive that build and no other -- the tvai_* filters
-    exist in nothing else -- so where it is installed decides whether the
-    pipeline can run at all, and the paths above were the only answer there
-    was: ``evolver.check_dependencies`` raised on any computer whose installer
-    had put it elsewhere. Two keys rather than one root, because the two sit in
-    different trees.
-    """
     return (
         Path(content.get("topaz_ffmpeg") or _INSTALLED_TOPAZ_FFMPEG),
         Path(content.get("topaz_models") or _INSTALLED_TOPAZ_MODELS),
@@ -152,14 +130,6 @@ def topaz_paths(content: dict[str, Any]) -> tuple[Path, Path]:
 FFMPEG, TVAI_MODEL_DIR = topaz_paths(_CONTENT)
 
 def display_timezone(content: dict[str, Any]) -> tzinfo | None:
-    """The zone a run's timestamps are shown in — None for the computer's own.
-
-    A run record stores UTC; what a person reads is local time, and which local
-    was one zone name written into ``gui/run_record`` at import. The setting
-    exists for the computer that is not in the zone its user reads times in;
-    unset, ``astimezone`` answers with whatever Windows says the computer is,
-    which is the right answer everywhere else.
-    """
     name = content.get("display_timezone")
     return ZoneInfo(name) if name else None
 
@@ -179,19 +149,6 @@ LOW_DISK_WARNING_GB = 25
 CPU_BUSY_SKIP_THRESHOLD_PCT = 65.0
 CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
 
-# Non-AI library upscaling, whose Topaz settings are util/topaz.py's NON_AI_UPSCALE. These
-# encodes run for hours, so the stage launches one detached ffmpeg at a time and
-# checks on it each scheduler tick.
-# Version families the naming rule cannot see. It reunites an original with a
-# version whose stem is the original's plus a Topaz suffix; a version saved
-# under a name of its own keeps no such thread back, so it is declared instead.
-# Maps that stem to the stem of the video it is a version of — both must sit in
-# the same bucket, and with three versions point them all at the same one.
-# From the overlay for the same reason GENAU_SOURCE is: both halves of a pair
-# are library filenames, and a filename in source is library vocabulary. It was
-# declared here, and the pairs were redacted in place when that was noticed --
-# which left a map that matched no real file and a feature inert as tracked.
-# Optional; absent means the naming rule is the only thread there is.
 NONAI_VERSION_OVERRIDES: dict[str, str] = _CONTENT.get("version_overrides") or {}
 NONAI_OUTPUT_SUFFIX = "_apo8_iris2"
 NONAI_PROCESSED_DIR_NAME = "processed"

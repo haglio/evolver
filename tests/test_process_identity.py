@@ -54,9 +54,6 @@ class TestEveryWindowOnTheTaskbar:
         claims, worn = claimed()
         window = _shown(request, QWidget())
 
-        # The AppUserModelID is a Windows identity contract: it is what makes a
-        # pinned taskbar shortcut belong to Evolver rather than to pythonw, so
-        # the literal is pinned here beside the constant.
         assert claims == ["Evolver.TrayApp"] == [APP_MODEL_ID]
         [(hwnd, app_id, taskbar_app)] = worn
         assert hwnd == int(window.winId())

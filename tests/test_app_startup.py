@@ -69,13 +69,6 @@ class TestBuildingIsNotStarting:
 
 
 class TestCommandWiring:
-    """Each view says what commands it offers; the app says what each one does.
-
-    Ten tray attributes and six window ones used to be connected by hand, so
-    every control was something two files had to agree about with nothing
-    checking that they did -- and a QAction nobody connected raises nothing
-    when clicked, it simply does not work.
-    """
 
     def test_a_command_a_view_offers_with_no_slot_is_refused(self):
         view = SimpleNamespace(commands=lambda: {"run_now": MagicMock(), "quit": MagicMock()})
@@ -434,18 +427,8 @@ class TestPresenceMonitor:
 
 
 class TestSessionManagement:
-    """EvolverApp must log Windows session-management events that could kill it."""
 
     def test_connects_to_commit_data_request(self, request):
-        """The session-end handler is wired to the signal, not merely defined.
-
-        This used to assert ``hasattr(app, "_on_session_end")``, which stays
-        true with the connect line deleted — and then Windows shutdown
-        force-kills the tray with a pipeline still running. The signal
-        cannot be emitted from a test (QSessionManager is not constructible),
-        so pin the connection itself: disconnect names the exact receiver and
-        raises TypeError when it was never connected.
-        """
         app = build_evolver_app(request)
         try:
             app._app.commitDataRequest.disconnect(app._on_session_end)

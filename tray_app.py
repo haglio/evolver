@@ -23,8 +23,7 @@ def main():
     crash_log.record_warnings()
     _name_this_process()
     atexit.register(crash_log.on_exit)
-    # Late so that a Qt or dependency failure raises inside the __main__
-    # try below, where report_startup_crash can put it on the screen.
+    # Late: a Qt or dependency failure must raise inside the try below.
     from shared_ui.application import application  # noqa: PLC0415
 
     from gui.app import EvolverApp  # noqa: PLC0415

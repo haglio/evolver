@@ -73,12 +73,6 @@ def _ink_count(image: QImage, xs: range, ys: range) -> int:
 
 
 def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
-    """Whether *pixel* is *stage_key*'s band fill, within a rounding step.
-
-    Qt's alpha blend and this file's arithmetic can round a channel apart, and
-    pinning the exact rounding would fail on a raster-engine change that no
-    user could see.
-    """
     expected = band_fill(STAGE_COLORS[stage_key])
     return all(abs(p - e) <= 1 for p, e in zip(pixel, expected, strict=True))
 
@@ -415,7 +409,6 @@ class TestXAxisLabels:
 
         with override_config(DISPLAY_TIMEZONE=ZoneInfo("Asia/Tokyo")):
             assert _x_axis_labels(moment, moment, 2) == ["07/15\n12:20"] * 2
-
 
 
 class TestPickYTicks:

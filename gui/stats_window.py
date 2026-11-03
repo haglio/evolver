@@ -23,8 +23,6 @@ from gui.run_history import RunHistory
 from gui.run_record import in_display_zone
 from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 
-# The registry's colors, as the painter wants them. This is the edge where Qt
-# begins: the declaration holds plain RGB so the headless pipeline can read it.
 STAGE_COLORS = {stage.key: QColor(*stage.color) for stage in STAGES}
 
 _Y_MAX = 700.0
@@ -363,9 +361,6 @@ class StatsWindow(QDialog):
         layout = QVBoxLayout(self)
         self._layout = layout
 
-        # Two either-or pairs: what the bands measure, and what the scale is.
-        # Held exclusive by Qt rather than by four slots that each checked one
-        # button and unchecked the other by hand.
         btn_row = QHBoxLayout()
         self._historical_btn = _toggle("Historical", checked=True)
         self._averages_btn = _toggle("Averages")

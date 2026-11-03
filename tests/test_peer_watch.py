@@ -152,12 +152,6 @@ class TestTheAppKeepsTheWatch:
         stand_down.assert_called_once()
 
     def test_windows_ending_the_session_does_not(self, request):
-        """The event Windows sends before a shutdown it may then cancel.
-
-        Evolver quits itself on it, and every long outage in its log starts
-        there. Marking that as deliberate would be marking the exact deaths this
-        pairing exists to undo.
-        """
         app = build_evolver_app(request)
 
         with patch("gui.app.peer_watch.stand_evolver_down") as stand_down, \

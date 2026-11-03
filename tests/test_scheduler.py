@@ -11,10 +11,6 @@ from gui.scheduler import PipelineScheduler
 class TestPipelineScheduler(unittest.TestCase):
 
     def test_emits_run_requested_on_timer_tick(self):
-        """The one end-to-end timer test: the real QTimer wiring, waited on by
-        deadline rather than a fixed sleep. The clock is parked a millisecond
-        short of an aligned slot, so the real alignment arithmetic runs and
-        still hands the timer a delay a test can wait on."""
         almost = datetime(2026, 1, 1, 12, 10, tzinfo=UTC) - timedelta(milliseconds=1)
         scheduler = PipelineScheduler(interval_minutes=10, now=lambda: almost)
 

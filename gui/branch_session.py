@@ -33,7 +33,6 @@ def until(now: datetime) -> str:
 
 
 def model_id(live: str) -> str:
-    """The Windows identity, so a preview's button never merges with the live one's."""
     return taskbar_identity(live, shown_as())
 
 

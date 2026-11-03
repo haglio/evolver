@@ -103,8 +103,6 @@ class TestFoldersTheSharedSettingsPlace(unittest.TestCase):
 
 
 class TestTopazPaths(unittest.TestCase):
-    """Where Topaz Video is installed, which decides whether either upscale
-    stage can run at all: they drive its own ffmpeg build and no other."""
 
     def test_an_overlay_that_says_nothing_gets_the_installer_s_own_paths(self):
         ffmpeg, models = config.topaz_paths({})

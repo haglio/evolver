@@ -11,7 +11,6 @@ from gui.settings_dialog import SettingsDialog
 
 @pytest.fixture
 def dialog_parts():
-    """A dialog over fresh settings, with the disk and Windows kept out of it."""
     settings = EvolverSettings()
     with patch("gui.startup.is_registered", return_value=False), \
          patch.object(EvolverSettings, "save") as save, \
