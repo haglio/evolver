@@ -1,4 +1,3 @@
-#!/usr/bin/env pythonw
 from __future__ import annotations
 
 import atexit

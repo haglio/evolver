@@ -11,7 +11,7 @@ from util import orientation
 
 log = logging.getLogger(__name__)
 
-# A kill does not end a probe stuck on a stalled cloud-drive file, so stop waiting after this long.
+# A kill does not end a probe stuck on a stalled pCloud file, so stop waiting after this long.
 ANSWER_WITHIN_S = 60
 
 _GEOMETRY_ENTRIES = "stream=width,height:stream_tags=rotate"

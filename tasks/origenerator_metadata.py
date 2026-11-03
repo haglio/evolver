@@ -15,7 +15,6 @@ COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
 
 OWN_PROVENANCE = "provenance"
 
-# Where each Origenerator workflow keeps its model.
 MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
 _MODEL_EXT_RE = re.compile(r"\.(safetensors|ckpt|pt|pth|gguf|sft|bin)$", re.IGNORECASE)
 
