@@ -158,33 +158,45 @@ STARTED_UNDER = provenance.reconstructed("evolver", method="non_ai_upscale",
                                          method_version="v000")
 
 
-def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=100.0,
-              source=None, tmp_bytes=b"partial", suspended=False, suspended_at=0.0,
-              suspended_seconds=0.0, job_file=None, stamp=STARTED_UNDER,
-              on_request=False):
+_JOB_DEFAULTS = {
+    "pid": 4242, "started_seconds_ago": 60.0, "expected": 100.0, "source": None,
+    "tmp_bytes": b"partial", "suspended": False, "suspended_at": 0.0,
+    "suspended_seconds": 0.0, "job_file": None, "stamp": STARTED_UNDER, "on_request": False,
+}
+
+
+def _given_over(defaults, given):
+    unknown = given.keys() - defaults.keys()
+    if unknown:
+        raise TypeError(f"unknown option: {', '.join(sorted(unknown))}")
+    return {**defaults, **given}
+
+
+def write_job(root, overrides, **given):
+    options = _given_over(_JOB_DEFAULTS, given)
     non_ai = overrides["NON_AI_DIR"]
-    source = source or make_video(non_ai / "lagoon" / "0 unsorted" / "busy.mp4")
+    source = options["source"] or make_video(non_ai / "lagoon" / "0 unsorted" / "busy.mp4")
     out = non_ai / "lagoon" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
     tmp = partial_path(out, source.stem)
-    if tmp_bytes is not None:
+    if options["tmp_bytes"] is not None:
         tmp.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_bytes(tmp_bytes)
+        tmp.write_bytes(options["tmp_bytes"])
     job = {
-        "pid": pid,
+        "pid": options["pid"],
         "source": str(source),
         "tmp": str(tmp),
         "out": str(out),
-        "expected_duration": expected,
-        "started_at": time.time() - started_seconds_ago,
-        "suspended": suspended,
-        "suspended_at": suspended_at,
-        "suspended_seconds": suspended_seconds,
+        "expected_duration": options["expected"],
+        "started_at": time.time() - options["started_seconds_ago"],
+        "suspended": options["suspended"],
+        "suspended_at": options["suspended_at"],
+        "suspended_seconds": options["suspended_seconds"],
     }
-    if stamp is not None:
-        job["provenance"] = stamp
-    if on_request:
+    if options["stamp"] is not None:
+        job["provenance"] = options["stamp"]
+    if options["on_request"]:
         job["on_request"] = True
-    job_file = job_file or overrides["NONAI_JOB_STATE_FILE"]
+    job_file = options["job_file"] or overrides["NONAI_JOB_STATE_FILE"]
     job_file.parent.mkdir(parents=True, exist_ok=True)
     job_file.write_text(json.dumps(job), encoding="utf-8")
     return source, tmp, out
@@ -284,40 +296,48 @@ def make_run_record(**overrides):
     return RunRecord(**fields)
 
 
-def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**15,
-           popen=None, is_running=True, image="ffmpeg.exe", terminate=True,
-           topaz_pids=(), cmdline=None, available_ram=64.0, idle_seconds=10_000.0):
+_PROBE_DEFAULTS = {
+    "videoai": "", "orientation": "landscape", "duration": 100.0, "free_bytes": 10**15,
+    "popen": None, "is_running": True, "image": "ffmpeg.exe", "terminate": True,
+    "topaz_pids": (), "cmdline": None, "available_ram": 64.0, "idle_seconds": 10_000.0,
+}
+
+
+def probes(**given):
+    options = _given_over(_PROBE_DEFAULTS, given)
     stack = ExitStack()
     mocks = {
         "idle_seconds": stack.enter_context(
             patch("tasks.nonai_encode.seconds_since_input",
-                  return_value=idle_seconds)),
+                  return_value=options["idle_seconds"])),
         "suspend": stack.enter_context(
             patch("util.processes.suspend", return_value=True)),
         "resume": stack.enter_context(
             patch("util.processes.resume", return_value=True)),
         "videoai": stack.enter_context(
-            patch("util.ffprobe.videoai_tag", return_value=videoai)),
+            patch("util.ffprobe.videoai_tag", return_value=options["videoai"])),
         "orientation": stack.enter_context(
-            patch("util.ffprobe.orientation_of", return_value=orientation)),
+            patch("util.ffprobe.orientation_of", return_value=options["orientation"])),
         "duration": stack.enter_context(
-            patch("util.ffprobe.duration_seconds", return_value=duration)),
+            patch("util.ffprobe.duration_seconds", return_value=options["duration"])),
         "free_bytes": stack.enter_context(
-            patch("util.system_resources.free_bytes", return_value=free_bytes)),
+            patch("util.system_resources.free_bytes", return_value=options["free_bytes"])),
         "available_ram": stack.enter_context(
-            patch("util.system_resources.available_ram_gb", return_value=available_ram)),
+            patch("util.system_resources.available_ram_gb",
+                  return_value=options["available_ram"])),
         "popen": stack.enter_context(
-            patch("subprocess.Popen", popen or Mock(return_value=Mock(pid=4242)))),
+            patch("subprocess.Popen",
+                  options["popen"] or Mock(return_value=Mock(pid=4242)))),
         "is_running": stack.enter_context(
-            patch("util.processes.is_running", return_value=is_running)),
+            patch("util.processes.is_running", return_value=options["is_running"])),
         "image_path": stack.enter_context(
-            patch("util.processes.image_path", return_value=image)),
+            patch("util.processes.image_path", return_value=options["image"])),
         "terminate": stack.enter_context(
-            patch("util.processes.terminate", return_value=terminate)),
+            patch("util.processes.terminate", return_value=options["terminate"])),
         "pids_of_image": stack.enter_context(
-            patch("util.processes.pids_of_image", return_value=list(topaz_pids))),
+            patch("util.processes.pids_of_image", return_value=list(options["topaz_pids"]))),
         "command_line": stack.enter_context(
-            patch("util.processes.command_line", return_value=cmdline)),
+            patch("util.processes.command_line", return_value=options["cmdline"])),
         "sign_in_expired": stack.enter_context(
             patch("util.topaz.sign_in_expired", return_value=False)),
     }
