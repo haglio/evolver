@@ -25,13 +25,7 @@ _BUTTON_HEIGHT = _THUMBNAIL_SIZE + 30
 
 
 def _aspect_locked_icon(path: str, side: int) -> QIcon:
-    """An icon of exactly *side*×*side* holding *path*'s frame at its true aspect.
-
-    The frame is scaled to fit the square keeping its ratio, then centered on a
-    transparent square canvas. Because the icon pixmap is already the icon size, no
-    platform button style can stretch it to fill — the fix for portrait/landscape
-    frames coming out squished to square on native Windows.
-    """
+    # The pixmap is already the icon size, so no native Windows button style stretches it to fill.
     source = QPixmap(path)
     if source.isNull():
         return QIcon()

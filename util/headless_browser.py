@@ -1,24 +1,8 @@
-"""Dumping a page's rendered DOM by driving an installed Chrome or Edge headless.
-
-The pages this exists for build their content in JavaScript, so fetching the
-HTML gets an empty shell; the only thing on these computers that will run the
-scripts and hand back what a reader would see is a browser already installed
-for browsing. It is driven as a one-shot subprocess -- launch, dump, exit --
-rather than kept alive, because the caller is a pipeline stage that a watchdog
-kills at eleven minutes and a wedged browser must not be something it inherits.
-
-The profile directory is the caller's to name. The browser writes into it, and
-a default under the checkout is a running app leaving its scratch state in a
-git working tree.
-"""
-
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
 
-# Where the two Chromium-family browsers install themselves on Windows, most
-# likely first. Either will do: the page is dumped, not interacted with.
 _BROWSER_CANDIDATES = (
     Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
     Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),

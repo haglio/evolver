@@ -1,11 +1,3 @@
-"""Liveness, identity, and termination of processes evolver spawned earlier.
-
-The non-AI upscale stage hands a multi-hour encode to a detached ffmpeg and
-finds it again on a later scheduler tick knowing only its pid.  ctypes keeps
-this dependency-free; the identity check exists because a recycled pid must
-never get another process killed in ffmpeg's name.
-"""
-
 from __future__ import annotations
 
 import ctypes
@@ -84,11 +76,7 @@ def pids_of_image(image: Path) -> list[int]:
 
 
 def command_line(pid: int) -> str | None:
-    """The command line *pid* was started with, or None when unreadable.
-
-    Reads the PEB's ProcessParameters (x64 offsets), the only dependency-free
-    way to see another process's arguments on Windows.
-    """
+    # Reads the PEB's ProcessParameters (x64 offsets): the only dependency-free way to see another process's arguments on Windows.
     handle = _kernel32.OpenProcess(
         _PROCESS_QUERY_INFORMATION | _PROCESS_VM_READ, False, pid
     )
@@ -154,13 +142,6 @@ def terminate(pid: int) -> bool:
 
 
 def suspend(pid: int) -> bool:
-    """Freeze *pid* in place. True when the suspend call was accepted.
-
-    Every thread stops; the process keeps its memory and (for an ffmpeg encode)
-    its GPU context but burns zero CPU/GPU, so an in-flight upscale can be
-    parked the moment the user returns and thawed later exactly where it left
-    off — no lost hours, unlike killing it.
-    """
     return _set_frozen(pid, _ntdll.NtSuspendProcess)
 
 

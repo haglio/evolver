@@ -40,11 +40,7 @@ def on_exit() -> None:
 
 
 def install_excepthook() -> None:
-    """Intercept unhandled exceptions before they reach PyQt6's qFatal/abort path.
-
-    Without this, exceptions in Qt slots cause a silent C-level abort() with
-    no Python traceback — especially under pythonw.exe which has no stderr.
-    """
+    # Without this, an exception in a Qt slot is a silent abort() under pythonw, which has no stderr.
     def _hook(exc_type, exc_value, exc_tb):
         write_crash(
             "Unhandled exception in Qt callback:",

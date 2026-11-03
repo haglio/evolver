@@ -1,11 +1,3 @@
-"""Test package marker, the overlay pin, and the modal-dialog gag.
-
-The suite runs against the committed example overlay and the example of the
-settings all of Haglio shares, never the developer's git-ignored
-content.local.json or ~/.haglio, so a run here matches a public checkout. This
-must happen before any test module imports the app, which loads content at
-import time.
-"""
 from __future__ import annotations
 
 import os
@@ -30,12 +22,7 @@ RUN_STATE = Path(_run_state.name)
 
 # No test may open a real modal dialog. Both of these block until a human clicks,
 # so one unguarded call hangs an unattended suite forever instead of failing it.
-# Tests that assert on an alert patch it themselves; this defuses the ones that
-# reach it by accident. Never stopped -- it is an invariant, not a fixture.
-# Gagged at the two calls util/alert.py makes rather than inside them: this line
-# runs before any test module is read, and both are importable on an interpreter
-# with no Windows, so the gag never becomes the thing that decides whether the
-# suite collects at all.
+# Modal dialogs block until a human clicks, so one unguarded call hangs an unattended suite.
 alert_shown(return_value=False).start()
 error_popup().start()
 

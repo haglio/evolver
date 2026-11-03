@@ -47,8 +47,6 @@ class TestTheTurn:
                 assert lock.read_text(encoding="utf-8") == str(os.getpid())
 
     def test_a_turn_older_than_any_run_is_taken_over_whoever_holds_its_number(self):
-        """Windows hands a dead process's number to the next one, so a live
-        number on a turn this old names somebody else."""
         with workspace_temp_dir() as root:
             lock = root / "pipeline.lock"
             lock.write_text(str(os.getpid()), encoding="utf-8")

@@ -23,7 +23,6 @@ def _every_grid_command(vocabulary):
     return [command for group in groups for command in group]
 
 
-
 class FakeSession:
     def __init__(self, videos, outcomes=()):
         self._videos = list(videos)
@@ -307,9 +306,6 @@ class TestBackfillWindow(unittest.TestCase):
             assert button.focusPolicy() == Qt.FocusPolicy.NoFocus
 
     def test_a_portrait_frame_lands_unsquished_on_a_square_icon(self):
-        """The fix for portrait/landscape frames coming out squished to square
-        on native Windows: the icon pixmap is already the icon size, scaled to
-        fit with its ratio kept and centred on transparent margins."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         with tempfile.TemporaryDirectory() as tmp:
             png = Path(tmp) / "portrait.png"
@@ -328,12 +324,6 @@ class TestBackfillWindow(unittest.TestCase):
 
     def test_closing_releases_the_video_the_player_holds(self):
         session = FakeSession([Path("a_topaz.mp4")])
-        # Through the helper, for its cleanups: closing the window inside the
-        # patch below is what this test is about, but the window itself still has
-        # to be deleted afterwards. Left to Python's collector it went at some
-        # unpredictable later moment, and the media player's queued callback
-        # arrived at a half-collected slot -- "TypeError: 'NoneType' object is
-        # not callable" out of the Qt event loop, in five teardowns out of ten.
         window = self._window(session)
 
         with patch.object(window._preview.player, "setSource") as set_source:

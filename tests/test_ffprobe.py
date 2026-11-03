@@ -1,13 +1,3 @@
-"""Tests for util.ffprobe, faked at the module's one real boundary.
-
-Thirteen of these used to patch the module-private ``_probe`` helpers with
-positional side_effect lists, which pinned the parsing of a string the test
-itself supplied and nothing else: the ``-show_entries`` selector each public
-function asks ffprobe for, and the argv framing that makes the output
-parseable at all, were invisible (audit probes 36-39 corrupted both with the
-suite green). The stand-in below answers by selector, the way ffprobe does,
-and records the argv so the tests can pin what was asked.
-"""
 from __future__ import annotations
 
 import subprocess
@@ -95,8 +85,6 @@ class TestDurationSeconds(unittest.TestCase):
 
 
 class _GivesNoAnswer:
-    """An ffprobe stuck on a file the cloud drive never hands over, which a kill
-    does not end either."""
 
     def __init__(self):
         self.killed = False
@@ -146,12 +134,6 @@ GEOMETRY = "stream=width,height:stream_tags=rotate"
 
 
 def _geometry_csv(width, height, rotate=""):
-    """What ffprobe prints for the combined selector.
-
-    The rotate tag is optional, so a clip that has none gets two fields and one
-    that has it gets three -- checked against a real ffprobe 9, on an mp4 with
-    no tag and an mkv with rotate=90.
-    """
     fields = [width, height] + ([rotate] if rotate else [])
     return ",".join(fields)
 
@@ -163,9 +145,6 @@ class TestFfprobeOrientation(unittest.TestCase):
             return orientation_of(Path("x.mp4"))
 
     def test_one_process_answers_width_height_and_rotation(self):
-        """It was three, and the sort stage calls this once per incoming file --
-        so a batch of a hundred clips was three hundred process spawns, and on
-        Windows the spawn is the expensive part, not the probing."""
         calls = []
         self._orientation("1920", "1080", calls=calls)
 

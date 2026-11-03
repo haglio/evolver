@@ -1,24 +1,3 @@
-"""Example thumbnails for the backfill window's clickable buttons.
-
-Each act button shows a still from a video that illustrates that act, so the grid reads
-as a gallery you recognize at a glance rather than a wall of words. A thumbnail is one
-extracted frame, cached under ``config.BACKFILL_THUMBNAIL_DIR`` and reused on every
-later open, so the window only ever loads ready files — it never extracts on open.
-
-A button's example comes from one of two places, curated first:
-
-* ``config.CURATED_EXAMPLES`` pins a specific video to a button by id. This is how the acts
-  the library never tags in a camera-scoped form get a thumbnail — a side gamma, say
-  — and how a video mistagged (or tagged for a different act than it best shows)
-  is still put to use.
-* otherwise the first library video whose ``video.action`` matches the button, taken from
-  a single scan. A compound tag like ``Side Epsilon, Alpha`` counts as each of its
-  comma-separated parts, so it can illustrate either button.
-
-The pure pieces take their effects as arguments or touch only the filesystem, so they
-are tested without ffmpeg or Qt.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -72,12 +51,6 @@ def thumbnail_cache_path(label: str) -> Path:
 
 
 def extract_frame(video: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACTION) -> bool:
-    """Write one downscaled frame of *video* to *dest*; True when it lands.
-
-    Seeks to *at_fraction* of the video's duration (0 when the duration is unknown)
-    and scales to ``_THUMBNAIL_HEIGHT``, keeping the aspect ratio. Uses the same
-    Topaz ffmpeg and console-suppressed invocation the rest of the pipeline does.
-    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         duration = duration_seconds(video)

@@ -1,12 +1,3 @@
-"""Evolver says its own name in the Windows task list.
-
-Why an app names its processes, and why its own is the one it can only name for
-the run after, is :mod:`app_support.process_identity`'s to say.  What is left
-here is what only this repo can be wrong about: that the app makes the copy its
-shortcut starts it through, run against a throwaway venv rather than read off
-``tray_app.py``, and that a failure to make it leaves a trace where this app
-keeps its traces.
-"""
 from __future__ import annotations
 
 import logging

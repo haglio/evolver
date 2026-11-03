@@ -41,11 +41,6 @@ class TestRunTitleIsALink(unittest.TestCase):
         assert self._links() == ["log"]
 
     def test_the_link_is_one_the_mouse_can_reach(self):
-        """The markup alone is not a link. A QLabel emits linkActivated only
-        while its interaction flags allow the mouse at one, and a flag set
-        elsewhere on this label -- selectable text, say -- would replace the
-        default that does, leaving a title that looks like a link and does
-        nothing when clicked."""
         self.widget.show_record(make_run_record())
 
         flags = self.widget._header.textInteractionFlags()

@@ -5,6 +5,8 @@ import sqlite3
 import unittest
 from fractions import Fraction
 
+import pytest
+
 from tests.temp_helpers import workspace_temp_dir
 from util import origenerator_gallery
 
@@ -29,10 +31,10 @@ class TestTheRateOrigeneratorsVideosAreGeneratedAt(unittest.TestCase):
 
 class TestTheGalleryDatabase(unittest.TestCase):
     def test_a_missing_gallery_is_named_in_the_error(self):
-        with workspace_temp_dir() as root, self.assertRaises(FileNotFoundError) as raised:
+        with workspace_temp_dir() as root, pytest.raises(FileNotFoundError) as raised:
             origenerator_gallery.rows(("output_files",), db_path=root / "gallery.db")
 
-        assert "gallery.db" in str(raised.exception)
+        assert "gallery.db" in str(raised.value)
 
     def test_a_column_an_older_gallery_lacks_is_missing_from_every_row(self):
         with workspace_temp_dir() as root:
@@ -47,7 +49,7 @@ class TestTheGalleryDatabase(unittest.TestCase):
             db_path = _gallery_with_columns(root, "output_files", [("[]",)])
             connection = origenerator_gallery._connect_ro(db_path)
             try:
-                with self.assertRaises(sqlite3.OperationalError):
+                with pytest.raises(sqlite3.OperationalError):
                     connection.execute("DELETE FROM generations")
             finally:
                 connection.close()

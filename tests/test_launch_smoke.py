@@ -1,29 +1,3 @@
-"""The launch smoke test: everything ``pythonw tray_app.py`` imports, imported.
-
-The suite can be entirely green while the tray icon never appears, and this is
-the gap. ``tray_app.py`` imports the app itself -- ``from gui.app import
-EvolverApp`` -- *inside* ``main()``, after the crash-log hook is installed, so
-a break anywhere under ``gui`` never touches a test that imports ``tray_app``
-and stops at module level. ``tests/test_app_startup.py`` constructs
-``EvolverApp`` but does it in the pytest process, where the suite's own imports
-and ``tests/__init__.py``'s overlay pin have already run; the shortcut has
-neither.
-
-``pythonw`` is what makes a failure invisible rather than merely broken: it has
-no console, so an import that fails before ``report_startup_crash`` can run
-writes its traceback nowhere at all.
-
-So this drives the launch's import phase the way the shortcut does: a fresh
-interpreter, this repo as the working directory (which is what puts
-``tray_app.py`` beside its ``gui`` and ``util`` packages), no inherited
-``PYTHONPATH``, and the committed example overlay standing in for the
-git-ignored local one -- which is also what a public checkout and CI have.
-
-The walk that reads those imports off the AST and the three assertions that
-replay them are ``app_support.launch_smoke``: seven repos carried a copy of the
-same 200 lines, drifting. What stays here is the half that is this app's --
-which files the launch executes, and how the shortcut starts an interpreter.
-"""
 from __future__ import annotations
 
 import os
@@ -52,13 +26,6 @@ _REACHED_ONLY_FROM_INSIDE_MAIN = ("gui.app",)
 
 
 def _run_the_launchs_way(statements: list[str]) -> subprocess.CompletedProcess:
-    """Run them the way the shortcut runs ``tray_app.py``.
-
-    Its own directory is what Python puts on ``sys.path`` for a script, and it
-    is what makes ``gui`` and ``util`` importable, so the working directory is
-    the whole path story -- any ``PYTHONPATH`` a developer or pytest happens to
-    be carrying is dropped, because the shortcut does not get it.
-    """
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     env["QT_QPA_PLATFORM"] = "offscreen"
 
