@@ -133,10 +133,11 @@ class TestUserPresent(unittest.TestCase):
     SETTINGS = nonai_encode.EncodeSettings()
 
     def test_an_idle_time_that_cannot_be_read_counts_as_the_user_being_present(self):
-        with patch("tasks.nonai_encode.seconds_since_input", side_effect=OSError):
-            assert nonai_encode.user_present(self.SETTINGS)
+        def unreadable():
+            raise OSError
+
+        assert nonai_encode.user_present(self.SETTINGS, idle_seconds=unreadable)
 
     def test_input_older_than_the_threshold_means_the_user_is_away(self):
         away = self.SETTINGS.user_idle_threshold_seconds + 1
-        with patch("tasks.nonai_encode.seconds_since_input", return_value=away):
-            assert not nonai_encode.user_present(self.SETTINGS)
+        assert not nonai_encode.user_present(self.SETTINGS, idle_seconds=lambda: away)
