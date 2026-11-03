@@ -157,8 +157,11 @@ def _lines(x0: np.ndarray, y0: np.ndarray, x1: np.ndarray, y1: np.ndarray) -> li
         x0.tolist(), y0.tolist(), x1.tolist(), y1.tolist(), strict=True)]
 
 
-def _paint_band(painter: QPainter, plot: _Plot, xs: np.ndarray,
-                floor: np.ndarray, top: np.ndarray, color: QColor):
+def _paint_band(painter: QPainter, plot: _Plot, columns: _PixelColumns, row: int,
+                color: QColor):
+    xs = columns.x
+    top = columns.mean[row]
+    floor = columns.mean[row - 1] if row else np.zeros_like(xs)
     fill = QColor(color)
     fill.setAlpha(BAND_ALPHA)
     painter.setBrush(fill)
@@ -252,12 +255,10 @@ class StackedAreaChart(QWidget):
     def _paint_bands(self, painter: QPainter, plot: _Plot):
         heights = np.minimum(np.cumsum(plot.series, axis=0), plot.y_max)
         columns = _PixelColumns.of(plot.x_of(plot.started), heights, self.devicePixelRatioF())
-        band_floor = np.zeros_like(columns.x)
         for row, stage_key in enumerate(ALL_STAGES):
             color = STAGE_COLORS[stage_key]
-            _paint_band(painter, plot, columns.x, band_floor, columns.mean[row], color)
+            _paint_band(painter, plot, columns, row, color)
             _paint_band_top(painter, plot, columns, row, color)
-            band_floor = columns.mean[row]
 
     def _paint_limit_line(self, painter: QPainter, plot: _Plot):
         font = QFont()
