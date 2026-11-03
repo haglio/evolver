@@ -167,15 +167,13 @@
     "tests/test_ffprobe.py": 1,
     "tests/test_origenerator_downtime.py": 1
   },
-  "statements": {
-    "tasks/scripts_sync.py": 331
-  },
+  "statements": {},
   "trailing_comments": {},
   "uncovered_lines": {
     "backfill/window.py": 1,
     "check_correspondence.py": 10,
     "content_overlay.py": 1,
-    "evolver.py": 4,
+    "evolver.py": 3,
     "gui/app.py": 2,
     "gui/main_window.py": 3,
     "gui/peer_watch.py": 2,
@@ -197,7 +195,7 @@
     "tasks/origenerator_metadata.py": 2,
     "tasks/prompt_scrape.py": 2,
     "tasks/scene_scripts.py": 3,
-    "tasks/scripts_sync.py": 7,
+    "tasks/scripts_sync.py": 5,
     "tasks/sort.py": 6,
     "tasks/stray_files.py": 2,
     "tasks/upscale.py": 11,
