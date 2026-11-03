@@ -9,6 +9,8 @@ from fractions import Fraction
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 import config
 from tasks import upscale
 from tests.temp_helpers import (
@@ -735,6 +737,11 @@ class TestOrigeneratorsVideos(unittest.TestCase):
 class TestUpscaleResultSurface(unittest.TestCase):
     def test_the_result_carries_only_counters_something_raises(self):
         assert {f.name for f in dataclasses.fields(upscale.UpscaleResult)} == {"processed", "failed", "stopped_at_budget", "deferred_low_disk", "pending_after_run"}
+
+
+def test_a_folder_the_upscale_does_not_have_is_refused():
+    with pytest.raises(TypeError, match="sorted_folder"):
+        upscale.UpscaleFolders.configured(sorted_folder=Path("x"))
 
 
 if __name__ == "__main__":

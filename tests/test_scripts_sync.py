@@ -619,6 +619,40 @@ class TestScriptsSync(unittest.TestCase):
             assert result.copied_variants == 0
             assert not (scripts / "clip_topaz.funscript").exists()
 
+    def test_versions_of_a_video_that_has_no_script_anywhere_copy_nothing(self):
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            studio = video_root / "2D" / "non_AI" / "studio"
+            studio.mkdir(parents=True)
+            (studio / "clip.mp4").write_bytes(b"original")
+            (studio / "clip_apo8_iris2.mp4").write_bytes(b"variant")
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            assert result.copied_variants == 0
+            assert result.ambiguous_variant_groups == 0
+
+    def test_two_identical_sibling_scripts_are_enough_to_script_the_third_version(self):
+        with workspace_temp_dir() as root:
+            video_root = root / "videos"
+            script_root = root / "scripts"
+            studio = video_root / "2D" / "non_AI" / "studio"
+            studio.mkdir(parents=True)
+            for name in ("clip", "clip_apo8_iris2", "clip_topaz"):
+                (studio / f"{name}.mp4").write_bytes(name.encode())
+            scripts = script_root / "2D" / "non_AI" / "studio"
+            scripts.mkdir(parents=True)
+            for name in ("clip", "clip_apo8_iris2"):
+                (scripts / f"{name}.funscript").write_text('{"actions":[1]}', encoding="utf-8")
+
+            with library_overrides(video_root, script_root):
+                result = scripts_sync.run()
+
+            assert result.copied_variants == 1
+            assert (scripts / "clip_topaz.funscript").read_text(encoding="utf-8") == '{"actions":[1]}'
+
     def test_reports_version_copy_error_without_crashing(self):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
