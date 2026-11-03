@@ -53,7 +53,6 @@ def _make_db(path, rows):
 
 
 def _stamp_row(path, prompt_id, stamp):
-    """The column a gallery that stamps its own generations keeps its stamp in."""
     conn = sqlite3.connect(path)
     conn.execute("ALTER TABLE generations ADD COLUMN provenance TEXT")
     conn.execute("UPDATE generations SET provenance = ? WHERE prompt_id = ?",
@@ -79,9 +78,6 @@ class TestWhatMadeTheVideo(unittest.TestCase):
         assert payload["provenance"] == {"generation": {"schema": provenance.SCHEMA, "app": "origenerator", "app_commit": None, "app_dirty": None, METHOD: "wan22_i2v", METHOD_VERSION: "v007", "stamped_at": None}}
 
     def test_what_an_import_writes_in_place_of_a_workflow_is_recorded_as_unknown(self):
-        """Origenerator fills both columns of a clip it imported rather than
-        generated with placeholders. Carried as they are, "imported" would read
-        as a version, and a sweep comparing versions would take it for one."""
         with workspace_temp_dir() as root:
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", workflow="unknown", version="imported",
@@ -93,8 +89,6 @@ class TestWhatMadeTheVideo(unittest.TestCase):
         assert (generation[METHOD], generation[METHOD_VERSION]) == (None, None)
 
     def test_a_record_the_gallery_keeps_of_its_own_is_carried_as_it_stands(self):
-        """Once Origenerator stamps its own rows it knows what nothing here can
-        work out from the two workflow columns: the commit it ran at, and when."""
         its_own = {
             "schema": provenance.SCHEMA, "app": "origenerator",
             "app_commit": "0123abc", "app_dirty": False,
@@ -190,7 +184,6 @@ class TestBuildMetadata(unittest.TestCase):
             _make_db(db, [_row("vid-1", outputs=["wan22_i2v_00001_.mp4"])])
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
-        # No prompt, no seed, no model, no created -> an empty video block, not keys with "".
         assert payload["video"] == {}
 
 

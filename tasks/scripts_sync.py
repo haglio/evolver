@@ -1,4 +1,3 @@
-"""Stage: align .funscript files to mirror the video library tree."""
 from __future__ import annotations
 
 import filecmp
@@ -57,28 +56,18 @@ class ScriptsSyncResult:
 
 
 class _Duplicate(Enum):
-    """What became of a script whose archived video already had one."""
-
     DISCARDED = auto()
     COLLIDED = auto()
 
 
 @dataclass(frozen=True)
 class _VersionRehome:
-    """What sending an orphan script to a library version came to.
-
-    The two are independent: the archived original can get its self-describing
-    copy and the move to the version still fail.
-    """
-
     moved: bool = False
     archived_copy: bool = False
 
 
 @dataclass(frozen=True)
 class _FollowedRetired:
-    """What became of the scripts whose videos are no longer in the library."""
-
     unmatched: list[Path] = field(default_factory=list)
     followed_to_archive: int = 0
     rehomed_to_variants: int = 0
@@ -97,8 +86,6 @@ class Trees:
 
 @dataclass(frozen=True)
 class _VersionCopies:
-    """What giving every scriptless version its sibling's funscript came to."""
-
     copied: int = 0
     ambiguous_groups: int = 0
     copy_error_paths: list[str] = field(default_factory=list)
@@ -107,17 +94,6 @@ class _VersionCopies:
 def run(show_popup: bool = False, *, video_dir: Path | None = None,
         script_dir: Path | None = None, unmatched_dir: Path | None = None,
         archive_root: Path | None = None, vr_dir: Path | None = None) -> ScriptsSyncResult:
-    """Align the script tree to the video tree, follow videos out of it, and move
-    what matches no video to unmatched_scripts until it is renamed.
-
-    The folders are arguments so the signature says what the stage reads and
-    writes; see :class:`Trees`. They are resolved here rather than in the
-    signature, in the sentinel form -- a default is evaluated at import, which
-    would freeze the value past ``override_config``. The archive and the VR
-    videos' own folder are the ones that can genuinely be None, an unset one
-    meaning there is none, so None cannot be told from "ask config" and the
-    sentinel is the caller passing a path or not.
-    """
     trees = Trees(
         videos=config.VIDEO_LIBRARY_DIR if video_dir is None else video_dir,
         scripts=config.SCRIPT_LIBRARY_DIR if script_dir is None else script_dir,
@@ -215,27 +191,6 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
 
 def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path]],
                            trees: Trees) -> _FollowedRetired:
-    """Send each script whose video left the library for the archive after it.
-
-    With one exception, checked first: when an upscaled sibling of the retired
-    video is still IN the library with no script of its own, the script's real
-    home is that sibling — one funscript serves every version of a video. The
-    library copy moves to the sibling's mirror path, and the archived original
-    merely keeps a duplicate beside it for self-description.
-
-    A retired original is moved out of the library entirely (see
-    :func:`util.nonai_retire._archive_original`) and its funscript goes with
-    it, because the script tree mirrors only the library: a video outside it has
-    to describe itself, script beside it rather than in a tree that no longer
-    covers it. This stage follows rather than trusting the retiring to have done
-    it, because the archive also fills by hand: a funscript stranded by a
-    video swept in matches no video, fails this stage, and would fail it
-    identically on every run afterward.
-
-    Only a stem that names exactly one archived video is followed. Two of them
-    is a guess about which video the script belongs to, and no archived video at
-    all is the real unmatched case this stage exists to report.
-    """
     unmatched: list[Path] = []
     followed_to_archive = 0
     rehomed_to_variants = 0
@@ -266,8 +221,6 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
             continue
 
         try:
-            # shutil, not Path.rename: the archive is a different drive from the
-            # library — the whole point of it — and os.rename cannot cross one.
             shutil.move(str(script_path), str(dest))
         except OSError:
             log.exception("FAILED TO FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
@@ -307,13 +260,6 @@ def _park(script_path: Path, trees: Trees) -> str:
 def _rehome_to_library_version(script_path: Path, video_index: dict[str, list[Path]],
                                archived: dict[str, list[Path]],
                                trees: Trees) -> _VersionRehome:
-    """Move an orphan script to a still-in-library version of its video.
-
-    The scriptless sibling is found by the same normalized-stem-within-bucket
-    rule the version-copy pass uses; the archived original, when it is
-    unambiguous and bare, gets a copy before the move so it can still describe
-    itself.
-    """
     script_bucket = _version_bucket(
         trees.videos / script_path.relative_to(trees.scripts), trees)
     normalized = strip_processing_suffixes(script_path.stem)
@@ -353,15 +299,6 @@ def _rehome_to_library_version(script_path: Path, video_index: dict[str, list[Pa
 
 
 def _discard_or_keep_duplicate(script_path: Path, dest: Path) -> _Duplicate:
-    """Delete the stranded script when the archived video already has its own.
-
-    Two library scripts can name the same archived video — the same funscript
-    filed under both a "1 could use work" and a "2 do not need work" folder, say
-    — so the second one arrives to find the destination taken by the first.
-    Byte-identical means nothing is lost by dropping it: the content is already
-    sitting beside the video. Anything else is a genuine conflict, and the two
-    versions are left for a person to judge.
-    """
     if filecmp.cmp(str(script_path), str(dest), shallow=False):
         script_path.unlink()
         drop_mark(script_path)
@@ -372,11 +309,6 @@ def _discard_or_keep_duplicate(script_path: Path, dest: Path) -> _Duplicate:
 
 
 def _index_archived_videos(root: Path | None) -> dict[str, list[Path]]:
-    """Archived videos by basename — empty when no archive is configured.
-
-    Built only when some script went unmatched, so an ordinary run never walks
-    the archive drive.
-    """
     if root is None or not root.is_dir():
         return {}
     index: dict[str, list[Path]] = defaultdict(list)

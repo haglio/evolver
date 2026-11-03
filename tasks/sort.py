@@ -1,4 +1,3 @@
-"""Move videos from 0_inbox/<source>/ -> 1_sorted/<source>/<orientation>/"""
 from __future__ import annotations
 
 import filecmp
@@ -27,13 +26,6 @@ class SortResult:
 
 
 def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> SortResult:
-    """Move every finalized inbox video into the sorted tree, by source and shape.
-
-    The two folders are arguments so the signature says what the stage
-    touches. They are resolved here rather than in the signature: a default
-    evaluated at import would freeze whatever ``config`` held then, and the
-    suite redirects those paths after this module has been imported.
-    """
     inbox_dir = config.INBOX_DIR if inbox_dir is None else inbox_dir
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
 
@@ -94,10 +86,6 @@ def _a_remake_of(sorted_copy: Path, handed_over: Path, source: str,
 
 
 def _take_the_remake(src: Path, dest: Path, upscale: Path) -> None:
-    """Put the video Origenerator made again in place of the copy sorted before,
-    and have its upscale made again: its record forgets what made the upscale
-    now under its name, and what made the video, which the Provenance stage
-    looks up again."""
     log.info("MADE AGAIN (taking the place of its sorted copy): %s  ->  %s", src, dest)
     src.replace(dest)
     _carry_its_script(src, (dest, upscale))
@@ -111,8 +99,6 @@ def _take_the_remake(src: Path, dest: Path, upscale: Path) -> None:
 
 
 def _carry_its_script(handed_over: Path, copies: tuple[Path, ...]) -> None:
-    """Give each copy the script handed over with *handed_over*, from wherever it
-    waits: beside the video in the inbox, or where Stray Files moved it."""
     for script in (handed_over.with_suffix(config.FUNSCRIPT_EXTENSION),
                    script_library.script_path_for_video(handed_over)):
         if script.is_file():
@@ -125,7 +111,6 @@ def _carry_its_script(handed_over: Path, copies: tuple[Path, ...]) -> None:
 
 
 def _move_unique(src: Path, dest: Path) -> bool:
-    """Move src to dest. If dest exists, delete src instead. Returns True if moved."""
     if not dest.exists():
         src.rename(dest)
         return True

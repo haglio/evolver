@@ -20,7 +20,6 @@ class TestPromptScrape(unittest.TestCase):
         return root / "videos" / "videos" / "2D" / "AI"
 
     def _dirs(self, root):
-        """The two directories the tests themselves reach into."""
         return self._ai_dir(root) / "1_sorted", root / "videos" / "metadata"
 
     def _make_video(self, sorted_dir, source, orient, name):
@@ -62,18 +61,12 @@ class TestPromptScrape(unittest.TestCase):
             assert payload == {"video": {"prompt": "video prompt text", "model": "Video v3", "seed": "123", "created": "2026-03-21"}, "source_image": {"positive_prompt": "positive prompt text", "negative_prompt": "negative prompt text", "model": "X Dream", "seed": "999", "created": "2026-03-26", "style": "Realistic", "creativity": "Balance"}}
 
     def test_a_video_outside_an_orientation_folder_is_never_scraped(self):
-        """The guard against a stray sub-folder: a video not under
-        landscape/ or portrait/ has no derivable mirror path, so scraping it
-        would write its sidecar somewhere wrong -- deleting the skip used to
-        change nothing (audit probe P9)."""
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "extras", "stray.mp4")
 
             with self._override(root):
                 with patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")):
-                    # A real (empty) document, so if the skip is ever removed
-                    # the scrape fails loudly instead of chewing on a Mock.
                     with patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom:
                         result = prompt_scrape.run()
 
@@ -97,8 +90,6 @@ class TestPromptScrape(unittest.TestCase):
             fetch_dom.assert_not_called()
 
     def test_run_builds_origenerator_metadata_without_browser(self):
-        """Origenerator metadata comes from its DB, so it needs no browser and
-        lands at the same mirrored path Provider sidecars do."""
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "origenerator", "portrait", "wan22_i2v_00001_.mp4")
@@ -176,10 +167,6 @@ class TestPromptScrape(unittest.TestCase):
             fetch_dom.assert_not_called()
 
     def test_a_sidecar_holding_only_the_video_kind_is_not_a_scrape(self):
-        """``tasks.video_kinds`` writes a kind onto every library video,
-        including the ones nothing has scraped yet.  Reading that as "already
-        scraped" would lose those prompts for good — the stage never looks at
-        the video again."""
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
@@ -198,10 +185,6 @@ class TestPromptScrape(unittest.TestCase):
             assert video_kind.kind_of(sidecar.read(existing)) == video_kind.SHORT
 
     def test_a_record_of_what_made_the_clip_that_landed_first_survives_the_scrape(self):
-        """The scrape replaces the sidecar wholesale, and the upscale can have
-        stamped it first: a scrape that failed and was let retry lands after its
-        clip was upscaled. Dropping that stamp leaves an upscale nothing says
-        anything about."""
         upscaled = provenance.reconstructed("evolver", method="ai_upscale")
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
@@ -261,7 +244,6 @@ class TestPromptScrape(unittest.TestCase):
             fetch_dom.assert_not_called()
 
     def test_run_scans_sorted_and_writes_metadata_at_outbox_mirror_path(self):
-        """Metadata stage should scan 1_sorted and place JSONs where _is_t2v_provider expects them."""
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
@@ -275,8 +257,6 @@ class TestPromptScrape(unittest.TestCase):
             assert result.ok
             assert result.newly_scraped == 1
 
-            # JSON must land where _is_t2v_provider looks:
-            # METADATA_DIR / "2_outbox" / "upscaled_by_orientation" / <orient> / <source> / <stem>_topaz.json
             expected_path = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             assert expected_path.exists(), f"Expected metadata at {expected_path}"
             payload = json.loads(expected_path.read_text(encoding="utf-8"))
@@ -400,16 +380,6 @@ PAGE_WITH_ONLY_EMBEDDED_JSON = (
 
 
 class TestFieldsAccumulateAcrossCandidateUrls(unittest.TestCase):
-    """One video is looked for at four URLs, and what each says is kept.
-
-    A page can carry a content panel with the metadata labels on it and still
-    have no prompt -- the video pages of one shape do exactly that. The prompt
-    then comes from a later URL's embedded JSON, and the metadata the panel
-    already gave must survive it: the panel's is what a reader sees on the site,
-    and the embedded record is the fallback for what is missing, not a
-    replacement for what was found.
-    """
-
     def test_a_panels_metadata_survives_a_prompt_found_at_a_later_url(self):
         def fetch(url, browser, *, profile_dir):
             if url.endswith("/image/abc"):
@@ -508,13 +478,6 @@ class TestFieldsAccumulateAcrossCandidateUrls(unittest.TestCase):
 
 
 class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
-    """The tree walked and the browser's scratch profile are arguments.
-
-    A sentinel wired to the wrong place -- or resolved once at import, past
-    override_config -- would leave the stage walking the configured tree and
-    handing the browser the configured profile anyway, and nothing would say so.
-    """
-
     def _override(self, root):
         ai = root / "videos" / "videos" / "2D" / "AI"
         return override_config(
@@ -536,8 +499,6 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
                                side_effect=RuntimeError("reached the page")):
                         result = prompt_scrape.run(sorted_dir=elsewhere)
 
-            # The configured tree does not exist, so a stage still reading it
-            # would find nothing at all and report zero of everything.
             assert result.errors == 1
 
     def test_the_browser_gets_the_scratch_profile_the_parameter_names(self):
@@ -623,15 +584,9 @@ class TestExtractProviderEmbeddedMetadata(unittest.TestCase):
 
 class TestTheEmbeddedFieldTable(unittest.TestCase):
     def test_every_declared_field_has_a_reader(self):
-        """The thirteen readers were thirteen copies of the same three lines, so
-        a fourteenth field arriving with no reader looked exactly like the other
-        thirteen and read as absent forever. It has to answer here instead."""
         assert {name for name, _ in prompt_scrape._EMBEDDED_FIELDS} == {field.name for field in dataclasses.fields(prompt_scrape._ProviderEmbeddedMetadata)}
 
     def test_a_reader_answers_the_empty_string_when_its_field_is_absent(self):
-        """The one shape the loop depends on: absent is "", never None, so a
-        field already found is never overwritten and a missing one never has to
-        be special-cased."""
         for name, extract in prompt_scrape._EMBEDDED_FIELDS:
             with self.subTest(field=name):
                 assert extract("{}") == ""
@@ -645,8 +600,6 @@ class TestParseProviderCreatedAt(unittest.TestCase):
         assert prompt_scrape._parse_provider_created_at("3d ago") == "3d ago"
 
     def test_a_date_that_parses_but_cannot_exist_comes_back_as_it_was(self):
-        """The 32nd of March reads as a date and is not one, which is the case
-        the narrowed except is for: date() raises ValueError on it."""
         assert prompt_scrape._parse_provider_created_at("Fri, 32 Mar 2026 09:45:26 GMT") == "Fri, 32 Mar 2026 09:45:26 GMT"
 
     def test_a_year_outside_the_calendar_comes_back_as_it_was(self):
@@ -664,7 +617,6 @@ class TestTitlecaseAction(unittest.TestCase):
 
 
 class TestCssSelector(unittest.TestCase):
-    """The DOM engine's public surface, in util.html_query."""
     def test_query_selector_finds_nested_element(self):
         html = '<body><div class="outer"><div class="inner">found</div></div></body>'
         doc = html_query.parse_document(html)
@@ -678,7 +630,6 @@ class TestCssSelector(unittest.TestCase):
         assert html_query.query_selector(doc, "body > div.missing") is None
 
     def test_the_engine_answers_the_one_selector_production_asks_for(self):
-        """Nothing builds a selector: there is one constant, of this shape."""
         html = (
             "<body><main><div><div>"
             '<div class="flex-1 overflow-hidden"><div class="font-regular">panel</div></div>'
@@ -785,15 +736,6 @@ class TestScrapeVideoEmbeddedMetadataFallback(unittest.TestCase):
 
 
 class TestProviderSettingsAreRedirectable(unittest.TestCase):
-    """The scraped provider's name and site root come from the overlay, and
-    used to be bound the first time this module was imported.
-
-    Nothing could redirect them after that — not a caller, not a test — which
-    is why they were read straight off ``load_content()`` at module level and
-    why four of this module's imports sat below executable code. They are
-    ordinary config values now, resolved when the stage runs.
-    """
-
     def test_the_source_name_and_site_root_come_from_config_at_call_time(self):
         with override_config(
             PROVIDER_SOURCE="examplesource", PROVIDER_BASE_URL="https://example.invalid",

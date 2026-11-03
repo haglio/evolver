@@ -1,17 +1,3 @@
-"""The video asked for now, from the Upscale Queue window.
-
-An encode the stage picks for itself starts only while nobody is at the
-computer and is parked the moment somebody is. The video asked for is the one
-exception: it starts on the next run whoever is at the computer, the toggle off
-or the cooldown not yet over, and nothing parks it until it ends or the ask is
-withdrawn. Asking stops whatever other encode is in flight, which keeps its
-place in line.
-
-The three verbs here are the window's doors, taken under the stage's lock the
-moment they are asked; what a run does with the ask -- make way for it, start
-it -- is here too, called from the stage's tick.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -27,13 +13,6 @@ log = logging.getLogger(__name__)
 
 
 def request_now(video: str) -> None:
-    """Ask for *video* to be upscaled right away, and clear the way for it.
-
-    An encode of another video is stopped here rather than on the next run, so
-    the AI videos that run upscales first are not held back by a Topaz process
-    this request is about to end anyway. The encode itself starts on that run,
-    the one place a Topaz process is ever launched.
-    """
     files = StageFiles.configured()
     with stage_lock:
         own = _put_ahead(video, files, "you asked for another video now")
@@ -46,7 +25,6 @@ def request_now(video: str) -> None:
 
 
 def put_first(video: str) -> None:
-    """Make *video* the next one upscaled, at the usual moment for starting one."""
     files = StageFiles.configured()
     with stage_lock:
         _put_ahead(video, files, "you put another video first")
@@ -54,8 +32,6 @@ def put_first(video: str) -> None:
 
 
 def withdraw_request() -> None:
-    """Stop asking: the video keeps its place at the head of the queue and goes
-    back to the usual rule, upscaled while nobody is at the computer."""
     files = StageFiles.configured()
     with stage_lock:
         nonai_job.clear_request(files.request)
@@ -67,11 +43,6 @@ def withdraw_request() -> None:
 
 
 def make_way_for(video: str, job: dict, files: StageFiles) -> tuple[dict | None, str]:
-    """The job left in flight once *video* has the computer, and what was stopped.
-
-    An encode that has already ended is left alone for supervision to conclude:
-    it may be a finished upscale.
-    """
     if not (job.get("pid") and processes.is_running(job["pid"])):
         return job, ""
     if relpath(Path(job["source"])) == video:
@@ -83,7 +54,6 @@ def make_way_for(video: str, job: dict, files: StageFiles) -> tuple[dict | None,
 
 def start_requested(request: nonai_job.Request, files: StageFiles,
                     settings: EncodeSettings, *, ai_waiting: bool) -> StartAttempt:
-    """Start the video asked for, or record what is holding it back."""
     low_disk = nonai_encode.is_low_disk(settings)
     busy = nonai_encode.LOW_DISK if low_disk else nonai_encode.computer_busy_reason(
         files.cooldown, settings, asked_for=True, ai_waiting=ai_waiting)
@@ -100,7 +70,6 @@ def start_requested(request: nonai_job.Request, files: StageFiles,
 
 
 def _take_over(job: dict, files: StageFiles) -> None:
-    """Let the encode already running stand as the one that was asked for."""
     nonai_encode.resume_job(job, files.job, because=nonai_encode.ASKED_FOR)
     job["on_request"] = True
     nonai_job.save_job(files.job, job)
@@ -108,12 +77,6 @@ def _take_over(job: dict, files: StageFiles) -> None:
 
 
 def _put_ahead(video: str, files: StageFiles, why: str) -> dict | None:
-    """Pin *video* first, and move whatever stood there to just after it.
-
-    Another video's encode is stopped, and another video's ask is dropped:
-    only the first video is upscaled, and only the first can be asked for.
-    Answers *video*'s own encode when that is the one in flight.
-    """
     job = nonai_job.load_job(files.job)
     running = bool(job and job.get("pid") and processes.is_running(job["pid"]))
     next_after = []

@@ -1,4 +1,3 @@
-"""Tests for the main window toolbar controls (quit, settings, toggle, next run, run now)."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -21,8 +20,6 @@ from tests.temp_helpers import make_run_record, override_config
 
 
 class TestRunDetailRendering:
-    """RunDetailWidget should surface scrape successes alongside errors."""
-
     def _record(self):
         return make_run_record(
             id="2026-06-27T22-18-46", started_at="2026-06-27T22:18:46",
@@ -49,8 +46,6 @@ class TestRunDetailRendering:
         assert "errors=58" in details
 
     def test_the_stage_column_reads_the_stage_name_not_its_key(self):
-        """The table is what you read after a run; the key is what the record
-        files it under, and the two are not the same word."""
         widget = RunDetailWidget()
         widget.show_record(self._record())
 
@@ -58,8 +53,6 @@ class TestRunDetailRendering:
         assert widget._table.item(0, 1).toolTip() == STAGE_TOOLTIPS["metadata"]
 
     def test_a_stage_the_registry_does_not_list_still_shows_its_key(self):
-        """Records on disk go back months and name stages this build has since
-        retired, so a row must render rather than raise or come out blank."""
         widget = RunDetailWidget()
         widget.show_record(make_run_record(
             id="x", started_at="2026-06-27T22:18:46", finished_at="2026-06-27T22:18:46",
@@ -80,8 +73,6 @@ class TestRunDetailRendering:
 
 
 class TestRunHistoryMarks:
-    """A run's verdict is its mark's color, never the whole line's."""
-
     def _item(self, status):
         record = make_run_record(status=status)
         self.window = EvolverMainWindow()
@@ -90,7 +81,6 @@ class TestRunHistoryMarks:
         return self.window._history_list.item(0)
 
     def test_a_failed_run_leaves_its_timestamp_the_default_color(self):
-        """Reddening the timestamp too made the line shout without saying why."""
         item = self._item("error")
         assert item.foreground().style() == Qt.BrushStyle.NoBrush
 
@@ -98,15 +88,10 @@ class TestRunHistoryMarks:
         assert not self._item("error").icon().isNull()
 
     def test_the_label_itself_is_just_the_time_and_duration(self):
-        """In the zone the overlay names -- pinned here, because a record
-        stores UTC and an unset zone reads the computer's own, which is not the
-        gate's."""
         with override_config(DISPLAY_TIMEZONE=ZoneInfo("America/Los_Angeles")):
             assert self._item("success").text() == "2026/07/25 08:20 (12s)"
 
     def test_refreshing_selects_the_newest_run_and_shows_its_detail(self):
-        """This selection is what populates the detail pane when the window
-        opens; without it the right half of the window is simply empty."""
         self.window = EvolverMainWindow()
         newest = make_run_record(id="2026-07-25T15-20-02", duration_seconds=34.0)
         older = make_run_record(id="2026-07-25T15-10-02", duration_seconds=99.0)
@@ -118,14 +103,12 @@ class TestRunHistoryMarks:
         assert "99" not in info
 
     def test_closing_the_window_hides_it_to_the_tray_instead(self):
-        """The X must not quit the app: the tray icon keeps it alive, and the
-        ignored close event is the whole difference."""
         self.window = EvolverMainWindow()
         self.window.show()
         assert self.window.isVisible()
         closed = self.window.close()
-        assert closed is False  # the close event was ignored
-        assert not self.window.isVisible()  # ...and the window hid itself
+        assert closed is False
+        assert not self.window.isVisible()
 
 
 def _drawn(icon: QIcon):
@@ -133,16 +116,12 @@ def _drawn(icon: QIcon):
 
 
 class TestStageStatusColumn:
-    """The Status column is a symbol, and only the symbol carries the color."""
-
     def _status_cell(self, status):
         record = make_run_record(
             status="error",
             stages=[{"name": "upscale_non_ai", "status": status,
                      "duration_seconds": 1.0, "result": None}],
         )
-        # Held on self: a local would be collected, taking the table's C++
-        # items with it before the assertions can read them.
         self.widget = RunDetailWidget()
         self.widget.show_record(record)
         return self.widget._table.item(0, 2)
@@ -152,7 +131,6 @@ class TestStageStatusColumn:
         assert _drawn(cell.icon()) == _drawn(QIcon(icon_pixmap("check", 16, GREEN)))
 
     def test_an_errored_stage_shows_a_red_cross(self):
-        """The row a low-disk hold now produces, which no run record had before."""
         cell = self._status_cell("error")
         assert _drawn(cell.icon()) == _drawn(QIcon(icon_pixmap("cross", 16, RED)))
 
@@ -173,12 +151,6 @@ class TestStageStatusColumn:
 
 
 class TestRunVerdictInDetailPane:
-    """The run's own verdict is marked the same way its stages' are.
-
-    It used to be spelled a third way again — "Success" or "Errors" in the info
-    line, over a column of "completed"s, under a history list of ✔ and ✘.
-    """
-
     def _info_text(self, status):
         record = make_run_record(status=status)
         self.widget = RunDetailWidget()
@@ -221,8 +193,6 @@ class TestRunVerdictInDetailPane:
 
 
 class TestSummarizeResult:
-    """Stage detail summaries should make scrape success-vs-error legible."""
-
     def test_metadata_shows_scraped_and_errors_even_when_zero(self):
         result = {"newly_scraped": 0, "no_scrape_strat": 0,
                   "skipped_unknown_orient": 0, "errors": 58}
@@ -242,14 +212,6 @@ class TestSummarizeResult:
 
 
 class TestScriptsSyncSummary:
-    """A red scripts row should say what is wrong and which scripts are at fault.
-
-    The generic numeric dump renders the failure as one bland tally among
-    several ("already_aligned=53, unmatched=15"), with nothing marking which is
-    the problem — and it keeps only the first five counters, so a late one can
-    be dropped from a failing row entirely.
-    """
-
     def _result(self, **overrides):
         result = {
             "moved": 0, "already_aligned": 0, "unmatched": 0, "ambiguous": 0,
@@ -295,7 +257,6 @@ class TestScriptsSyncSummary:
         assert "clip 4.funscript" not in summary
 
     def test_a_late_counter_still_reaches_a_failing_row(self):
-        """Six non-zero counters: the five-field truncation dropped the last."""
         summary = self._result(moved=3, already_aligned=53, collisions=1, copied_variants=2,
                                ambiguous_variant_groups=1, variant_copy_errors=1)
         assert "1 failed to copy to a version" in summary
@@ -327,13 +288,6 @@ class TestScriptsSyncSummary:
 
 
 class TestNonAiUpscaleSummary:
-    """The non-AI row should read as prose: which video, how far, what happened.
-
-    Its result is mostly strings, which the generic numeric dump drops entirely
-    — leaving a bare "suspended=True" and no way to tell which clip was encoding
-    or why an in-flight percent vanished between runs.
-    """
-
     def _result(self, **overrides):
         result = {
             "started": "", "in_flight": "", "in_flight_percent": None,
@@ -360,7 +314,6 @@ class TestNonAiUpscaleSummary:
         assert "suspended=True" not in summary
 
     def test_a_finished_encode_names_what_it_promoted(self):
-        """Why an in-flight percent vanishes between runs: the encode landed."""
         summary = self._result(promoted="lagoon/1 clips/Scene Three 3.mp4",
                                start_deferred="user_present", pending=394)
         assert "finished" in summary
@@ -385,8 +338,6 @@ class TestNonAiUpscaleSummary:
         assert "lagoon/1 clips/Scene Three 9.mp4" in summary
 
     def test_an_encode_you_asked_for_says_so_beside_its_progress(self):
-        """It is the one running while you are at the computer, which the row
-        would otherwise leave looking like a presence check that failed."""
         summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4",
                                in_flight_percent=12, on_request=True)
         assert "encoding lagoon/1 clips/Delia Moss.mp4 (12%, at your request)" in summary
@@ -406,9 +357,6 @@ class TestNonAiUpscaleSummary:
         )
 
     def test_says_how_far_along_the_project_is_and_not_only_the_count(self):
-        """A count alone reads as progress it is not: the queue runs from forty
-        seconds to an hour a clip, so the clips fall away twice as fast as the
-        work does."""
         summary = self._result(pending=180, percent_complete=29,
                                remaining_seconds=149_400.0)
         assert "180 queued" in summary
@@ -416,8 +364,6 @@ class TestNonAiUpscaleSummary:
         assert "41.5h left" in summary
 
     def test_a_library_nothing_has_measured_yet_still_says_the_count(self):
-        """Running times are recorded a batch a run, so the first runs against
-        a library that has never been asked have no percentage to give."""
         summary = self._result(pending=180, percent_complete=None)
         assert summary.endswith("180 queued")
 
@@ -427,7 +373,6 @@ class TestNonAiUpscaleSummary:
         assert "12 not yet measured" in summary
 
     def test_a_stopped_encode_says_the_clip_keeps_its_place(self):
-        """Stopping is no fault of the video, unlike failing — it stays queued."""
         summary = self._result(stopped="lagoon/1 clips/Scene Four 4.mp4")
         assert "stopped" in summary
         assert "lagoon/1 clips/Scene Four 4.mp4" in summary
@@ -579,8 +524,6 @@ class TestMainWindowToolbarExists:
 
 
 class TestToolbarStateUpdates:
-    """show_schedule should keep toolbar widgets in sync."""
-
     def test_next_run_shown_when_scheduled(self, window):
         next_run = datetime(2026, 3, 29, 14, 30, tzinfo=UTC)
         window.show_schedule(ScheduleStatus(next_run_at=next_run))
@@ -604,8 +547,6 @@ class TestToolbarStateUpdates:
         assert window.run_now_action.isEnabled()
 
     def test_a_run_in_flight_outranks_a_pause_here_as_in_the_tray(self, window):
-        # Pausing mid-run used to read "Running..." in the tray and "inactive"
-        # here at the same moment (bug 48); both read the one status now.
         window.show_schedule(ScheduleStatus(is_running=True, is_paused=True))
         assert window._next_run_label.text() == "Running..."
 
@@ -621,15 +562,6 @@ class TestToolbarStateUpdates:
 
 
 class TestToolbarAppWiring:
-    """Triggering each control produces that control's effect.
-
-    These used to assert ``action.receivers(action.triggered) > 0``, which is
-    true for a connection to anything at all — rewiring Quit, Run Now and
-    Settings all to _show_window left the whole suite green (audit probe P8).
-    Every test here fires the real action and asserts what the user gets, with
-    the collaborator patched at the gui.app boundary.
-    """
-
     @pytest.fixture
     def app(self, request):
         return build_evolver_app(request)

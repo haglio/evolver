@@ -1,7 +1,3 @@
-"""Clips Origenerator has taken back, deleted wherever this library filed them.
-
-Fixture values are fabricated throughout (see CLAUDE.md).
-"""
 from __future__ import annotations
 
 import json
@@ -23,7 +19,6 @@ _SCHEMA = (
 
 
 def _gallery(path: Path, rows) -> Path:
-    """An Origenerator gallery holding *rows* -- (prompt_id, filename, column)."""
     conn = sqlite3.connect(path)
     conn.execute(_SCHEMA)
     for prompt_id, filename, unsent_column in rows:
@@ -142,8 +137,6 @@ class TestTheEvolverLane(unittest.TestCase):
         assert result.deleted == 0
 
     def test_a_clip_this_library_never_took_is_no_error(self):
-        # The taking back is a standing answer rather than a request that drains,
-        # so it is read again on every run long after the copies have gone.
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             db = _gallery(root / "gallery.db", [("p1", "made_00004.mp4", "evolver_unsent_at")])
@@ -153,9 +146,6 @@ class TestTheEvolverLane(unittest.TestCase):
         assert (result.deleted, result.failed) == (0, 0)
 
     def test_the_copy_keeps_the_uniquifier_the_inbox_gave_it(self):
-        # Two clips of one name reach the inbox and the second is filed as
-        # "name (2)"; the upscale carries that through, and a taking back has to
-        # follow it or the clip it names is never found.
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             db = _gallery(root / "gallery.db", [("p1", "made_00005.mp4", "evolver_unsent_at")])
@@ -184,9 +174,6 @@ class TestTheEvolverLane(unittest.TestCase):
         assert result.deleted_metadata == 1
 
     def test_an_outbox_copy_that_will_not_go_keeps_its_source_beside_it(self):
-        # 1_sorted and the outbox are held in one-to-one correspondence, and a
-        # missing counterpart pops a dialog -- so a locked upscale leaves its
-        # source where it is, for the next run to take both together.
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             source = lanes.ORIGENERATOR_SOURCE
@@ -233,7 +220,6 @@ class TestTheGenauLane(unittest.TestCase):
 
 
 def _gallery_of_videos_with_sound(path: Path, stems) -> Path:
-    """A gallery whose every row is a video with its sound, listing its soundless copy."""
     conn = sqlite3.connect(path)
     conn.execute(_SCHEMA)
     for n, stem in enumerate(stems):

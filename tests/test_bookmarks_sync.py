@@ -12,7 +12,6 @@ from util import sidecar
 
 
 def favorite(library: LaneLibrary, name: str, page: str = "") -> Path:
-    """A video on disk whose record marks it a favorite, with the page it came from."""
     video = touch_video(library.non_ai / "alpha" / name)
     with library.config():
         mark(sidecar.sidecar_path(video), True, page=page)
@@ -20,8 +19,6 @@ def favorite(library: LaneLibrary, name: str, page: str = "") -> Path:
 
 
 def chrome_profile(root, profile="Profile 2", name="Jane Doe"):
-    """A User Data tree with one named profile; the shape every sync test built
-    by hand. Returns (user_data_dir, bookmarks_path)."""
     user_data_dir = root / "User Data"
     profile_dir = user_data_dir / profile
     profile_dir.mkdir(parents=True, exist_ok=True)
@@ -211,13 +208,6 @@ class TestBookmarksSync(unittest.TestCase):
             assert result.profile_missing
 
     def test_run_uses_the_profile_it_is_given(self):
-        """Three things reach outside this repo, and all three are arguments now.
-
-        `config` still answers when the caller names none of them, which is
-        every other test here and the pipeline itself. Pointing the ambient
-        three at a profile of its own is what proves the given ones are the
-        ones used, rather than merely accepted.
-        """
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
             favorite(library, "scene one.mp4", "https://example.com/given")

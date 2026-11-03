@@ -59,33 +59,22 @@ class NonAiUpscaleResult:
     started: str = ""
     in_flight: str = ""
     in_flight_percent: int | None = None
-    suspended: bool = False  # the in-flight encode is frozen because the user is present
+    suspended: bool = False
     promoted: str = ""
     stopped: str = ""
-    # "user_present" | "topaz_busy" | "low_ram" | "ai_clips_waiting" | "cooldown"
-    # | "topaz_sign_in_expired" when a start was held back
     start_deferred: str = ""
-    failed: str = ""  # the clip whose encode died or came up short, if any
+    failed: str = ""
     pending: int = 0
-    # How far along the project is, weighed by running time rather than by clip
-    # count -- the two say different things, and by half (tasks.nonai_progress).
-    # None until something in the library has a running time recorded.
     percent_complete: int | None = None
     remaining_seconds: float = 0.0
-    # Project videos nothing has measured yet, and so in neither total; falls to
-    # zero once the video-kinds stage has been over the library.
     unmeasured_videos: int = 0
     deferred_low_disk: bool = False
-    # Whether the encode in flight, or the one just started, was asked for from
-    # the queue window rather than picked by the stage.
     on_request: bool = False
     unreachable_archive: str = ""
 
 
 @dataclass(frozen=True)
 class Supervision:
-    """What checking on the in-flight encode came to, this tick."""
-
     in_flight: str = ""
     in_flight_percent: int | None = None
     suspended: bool = False
@@ -98,8 +87,6 @@ class Supervision:
 
 @dataclass(frozen=True)
 class Conclusion:
-    """The verdict on an encode that is no longer running."""
-
     promoted: str = ""
     failed: str = ""
     unreachable_archive: str = ""
@@ -112,23 +99,6 @@ def run(allow_start: bool = True, stop: bool = False,
         skip_list: Path | None = None, pin_list: Path | None = None,
         watch_stats_file: Path | None = None, request_file: Path | None = None,
         settings: EncodeSettings | None = None) -> NonAiUpscaleResult:
-    """Check on the in-flight encode, then start the next one if the computer is free.
-
-    With *stop* (the tray toggle is off), a still-running encode is killed and
-    its video keeps its place in the queue; an already-finished one is still
-    promoted, and nothing new starts.
-
-    With *presence_managed* (the toggle is on), the in-flight encode tracks the
-    user: it is suspended the moment they touch the computer and resumed once
-    they idle out again, so a day of intermittent use makes progress in the
-    gaps instead of throwing partial work away. The headless CLI leaves it off
-    and simply lets an in-flight encode run.
-
-    Every file the stage touches is named at this boundary and resolved once;
-    see :class:`StageFiles`. So is what one encode may cost the computer, which
-    is :class:`tasks.nonai_encode.EncodeSettings` -- seven numbers this stage
-    used to reach for off ``config`` one at a time.
-    """
     files = StageFiles.configured(
         job=job_file, attempts=attempts_file, cooldown=cooldown_file,
         skip_list=skip_list, pin_list=pin_list,
@@ -169,14 +139,8 @@ def run(allow_start: bool = True, stop: bool = False,
             result.start_deferred = attempt.deferred
             result.deferred_low_disk |= attempt.deferred_low_disk
 
-    # Collected a second time on purpose: a start attempt can retire clips to
-    # the skip list, and the count reported is the queue as it stands after
-    # that. The doubled walk is finding tasks/design/008's; merging the two
-    # would change what `pending` means, so it stays and stays visible.
     queued = files.queued_videos()
     result.pending = len(queued)
-    # Handed the queue just collected: nonai_progress reads sidecars and walks
-    # the buckets for what is upscaled, and need not redo this walk too.
     progress = nonai_progress.so_far(queued_video.path for queued_video in queued)
     result.percent_complete = progress.percent
     result.remaining_seconds = progress.remaining_seconds
@@ -200,14 +164,6 @@ def run(allow_start: bool = True, stop: bool = False,
 
 def throttle_to_presence(*, job_file: Path | None = None,
                          settings: EncodeSettings | None = None) -> str:
-    """Between full pipeline ticks, keep the in-flight encode in step with the
-    user: suspend it the moment they return, resume it once they idle out.
-
-    Cheap enough for a short GUI timer — it touches only the one live job, with
-    no queued video scan or disk work. Returns "suspended", "resumed", or "" when
-    nothing changed. Starting a new encode stays with the pipeline tick, which
-    has the queued video scan and resource checks; this only parks and thaws.
-    """
     job_file = StageFiles.configured(job=job_file).job
     settings = EncodeSettings() if settings is None else settings
     if not stage_lock.acquire(blocking=False):
@@ -266,8 +222,6 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
             return Supervision(
                 stopped=nonai_encode.stop_in_flight(job, "the non-AI upscale toggle is off", files))
         if nonai_encode.is_low_disk(settings):
-            # The floor was clear at start, but a 4K60 output plus whatever
-            # else writes overnight can cross it mid-encode.
             return Supervision(
                 deferred_low_disk=True,
                 stopped=nonai_encode.stop_in_flight(
@@ -309,7 +263,6 @@ def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclus
     nonai_job.stamp_encode_ended(files.cooldown)
     if finished:
         tmp.replace(out)
-        # Before the original leaves, and it takes its sidecar and funscript with it.
         carry_metadata(source, out)
         carry_funscript(source, out)
         stamp = job.get("provenance") or nonai_encode.unrecorded_start()

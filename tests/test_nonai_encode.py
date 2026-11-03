@@ -1,4 +1,3 @@
-"""The detached encode, asked about directly rather than through a pipeline tick."""
 from __future__ import annotations
 
 import unittest
@@ -10,12 +9,6 @@ from tests.temp_helpers import workspace_temp_dir
 
 
 class TestParseTopazCommand(unittest.TestCase):
-    """Reading an orphaned encode's input and output back off its command line.
-
-    Library paths hold spaces as a matter of course ("0 unsorted", "1 could use
-    work"), so the quoted forms are the ordinary case here, not the exotic one.
-    """
-
     def test_reads_a_quoted_input_and_a_quoted_output(self):
         source, out = nonai_encode._parse_topaz_command(
             'ffmpeg.exe -i "C:/lib/0 unsorted/scene one.mp4" -vf x '
@@ -89,13 +82,6 @@ class TestPercentEncoded(unittest.TestCase):
 
 
 class TestActiveRuntime(unittest.TestCase):
-    """Wall clock since the encode started, minus the time it spent frozen.
-
-    The runtime cap exists to catch a *stuck* encode; hours parked while the
-    user was at the computer are not the encode's fault. `now` is an argument so
-    that arithmetic can be asked exactly rather than raced against the clock.
-    """
-
     def test_a_plain_run_is_the_time_since_it_started(self):
         job = {"started_at": 1_000.0}
 
@@ -107,8 +93,6 @@ class TestActiveRuntime(unittest.TestCase):
         assert nonai_encode.active_runtime(job, now=4600.0) == 3000.0
 
     def test_a_freeze_still_in_progress_is_not_charged_either(self):
-        """Otherwise a computer left in use overnight would look like a stuck
-        encode and be killed for overrunning."""
         job = {"started_at": 1_000.0, "suspended": True, "suspended_at": 2_000.0}
 
         assert nonai_encode.active_runtime(job, now=4600.0) == 1000.0
@@ -120,10 +104,6 @@ class TestActiveRuntime(unittest.TestCase):
         assert nonai_encode.active_runtime(job, now=4600.0) == 1400.0
 
     def test_a_record_with_no_start_time_reads_as_having_just_started(self):
-        """Pinned rather than endorsed: a job whose `started_at` went missing
-        can never overrun, which finding tasks/design/014 files as a defect of
-        the untyped record. Changing it is a behaviour change and not this
-        item's."""
         assert nonai_encode.active_runtime({}, now=4600.0) == 0.0
 
 

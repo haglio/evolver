@@ -23,9 +23,6 @@ from pathlib import Path
 from tests.product_sources import PROJECT_ROOT
 from tests.temp_helpers import nonai_library_overrides, workspace_temp_dir
 
-# The stage, its queue, its progress accounting, the library shape they read it
-# through, and the three helpers that resolve a library file's path or launch
-# the encoder.
 MODULES = (
     "tasks/nonai_upscale.py",
     "tasks/nonai_files.py",
@@ -41,8 +38,6 @@ MODULES = (
     "util/topaz.py",
 )
 
-# Names that say where something is, so a case that does not redirect one is
-# reading or writing the computer's own.
 PLACES_ON_DISK = {
     "FUN_TIME_WATCH_STATS_FILE",
     "GENERATED_SCRIPTS_DIR",
@@ -61,7 +56,6 @@ PLACES_ON_DISK = {
     "VIDEO_LIBRARY_DIR",
 }
 
-# Everything else these modules read, and why a case may leave it as it is.
 LEFT_AMBIENT = {
     "FFMPEG": "the Topaz install; named into a command line the tests mock away, "
               "and compared by file name against a pid's image -- never opened",
@@ -103,8 +97,6 @@ class TestTheNonAiFixture(unittest.TestCase):
             for name in sorted(PLACES_ON_DISK):
                 with self.subTest(name=name):
                     value = overrides[name]
-                    # None is the archive being unset, which is the public
-                    # checkout's behaviour and keeps the original in-library.
                     if value is not None:
                         assert Path(value).is_relative_to(root)
 

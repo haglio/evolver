@@ -38,32 +38,17 @@ from util.versions import is_processed_stem
 
 @dataclass(frozen=True)
 class Progress:
-    """The project's two totals, in seconds of video, and what is missing."""
-
     done_seconds: float = 0.0
     remaining_seconds: float = 0.0
-    #: Project videos with no recorded running time, so in neither total above.
     unmeasured: int = 0
 
     @property
     def percent(self) -> int | None:
-        """How much of what it can see is done — ``None`` when it sees nothing.
-
-        None rather than 0 because the two are worth telling apart: a library
-        whose running times have not been recorded yet has no answer, where a
-        library with nothing upscaled has the answer zero.
-        """
         total = self.done_seconds + self.remaining_seconds
         return None if total <= 0 else round(self.done_seconds / total * 100)
 
 
 def so_far(queued: Iterable[Path]) -> Progress:
-    """What the project has done and what is ahead of it.
-
-    *queued* is the queue as the stage just collected it.  Passed in rather than
-    gathered again: collecting it opens three files and walks every bucket, and
-    the stage is holding the answer already.
-    """
     done_seconds, unmeasured = _total(_upscaled().values())
     remaining_seconds, still_unmeasured = _total(_recorded_duration(video)
                                                  for video in queued)
@@ -71,7 +56,6 @@ def so_far(queued: Iterable[Path]) -> Progress:
 
 
 def _total(durations: Iterable[float | None]) -> tuple[float, int]:
-    """The running times that are known, added up, and a count of the ones not."""
     total, unmeasured = 0.0, 0
     for seconds in durations:
         if seconds is None:
@@ -82,16 +66,6 @@ def _total(durations: Iterable[float | None]) -> tuple[float, int]:
 
 
 def _upscaled() -> dict[str, float | None]:
-    """Each original the library already holds an upscale of, and how long it ran.
-
-    Keyed by the *original's* stem rather than the version's, because one
-    original can have several versions — other settings, or a version saved
-    under a name of its own (``config.NONAI_VERSION_OVERRIDES``) — and it is one
-    video's worth of the project either way.  The version's own running time
-    answers for the original's: the settings interpolate frames rather than
-    changing the length, which is the same equality the stage checks an encode's
-    completeness against.
-    """
     found: dict[str, float | None] = {}
     for bucket in buckets():
         for video in sorted(bucket.rglob("*")):

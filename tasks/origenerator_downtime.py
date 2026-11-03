@@ -1,10 +1,3 @@
-"""Start the work Origenerator leaves for while it is closed, by asking it to.
-
-Origenerator alone knows what that work is and whether it is closed, so this
-stage only runs the command it publishes beside the rest of what Evolver reads
-of it, and passes on what the command answers: what it did, and whether a fix's
-training now holds the graphics card, which the upscale stays off meanwhile.
-"""
 from __future__ import annotations
 
 import json

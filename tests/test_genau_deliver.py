@@ -1,4 +1,3 @@
-"""The Genau lane's last step: an upscaled flick leaves the outbox for Genau's folder."""
 from __future__ import annotations
 
 import dataclasses
@@ -17,13 +16,10 @@ from tests.temp_helpers import (
 )
 from util import provenance, sidecar, video_kind
 
-# Fabricated: the real folder name is library vocabulary and lives in the
-# overlay, so a test names its own and overrides the config with it.
 GENAU_SOURCE = "example-loop-clips"
 
 
 def _lane(root):
-    """The three folders the lane spans, wired into config for one test."""
     outbox = root / "2_outbox" / "upscaled_by_orientation"
     sorted_dir = root / "1_sorted"
     flicks = root / "genau" / "flicks"
@@ -32,7 +28,6 @@ def _lane(root):
 
 
 def _stage_flick(outbox, sorted_dir, stem="loop_1", orient="landscape"):
-    """One finished upscale in the outbox with the sorted video it was made from."""
     upscaled = outbox / orient / GENAU_SOURCE / f"{stem}_topaz.mp4"
     upscaled.parent.mkdir(parents=True, exist_ok=True)
     upscaled.write_text("upscaled", encoding="utf-8")
@@ -57,14 +52,9 @@ class TestGenauDeliver(unittest.TestCase):
             assert delivered.is_file()
             assert delivered.read_text(encoding="utf-8") == "upscaled"
             assert not upscaled.exists()
-            # The source goes with it: left in place, the upscale stage would remake
-            # this flick every run and the correspondence check would call it a
-            # mismatch (see the module docstring).
             assert not original.exists()
 
     def test_the_flicks_metadata_travels_with_it_and_says_what_it_is(self):
-        """A delivered loop keeps the generation record it was made with, and
-        carries the one thing every app asks a video: what kind it is."""
         with workspace_temp_dir() as root:
             outbox, sorted_dir, flicks = _lane(root)
             upscaled, _original = _stage_flick(outbox, sorted_dir)
@@ -81,12 +71,9 @@ class TestGenauDeliver(unittest.TestCase):
                 delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
             assert delivered["video"]["prompt"] == "a prompt"
             assert video_kind.kind_of(delivered) == video_kind.GENAU_FLICK
-            # The outbox path it mirrored is gone, so the record must not stay there.
             assert not (metadata / "landscape" / GENAU_SOURCE / "loop_1_topaz.json").exists()
 
     def test_delivery_carries_what_made_the_flick_and_adds_nothing_to_it(self):
-        """Delivering moves a file; it makes none. The stamps a loop was
-        generated and upscaled under go with it, and no new one is filed."""
         stamps = {
             provenance.GENERATION: provenance.reconstructed("origenerator", method="loop"),
             provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale"),
@@ -119,8 +106,6 @@ class TestGenauDeliver(unittest.TestCase):
             assert video_kind.kind_of(delivered) == video_kind.GENAU_FLICK
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
-        """Fun Time's audio companion plays ``<audio folder>/<flick name>.mp3``
-        while a flick is up, as it does for the flicks Genaumacher cuts."""
         with workspace_temp_dir() as root:
             outbox, sorted_dir, flicks = _lane(root)
             _stage_flick(outbox, sorted_dir)
@@ -179,7 +164,7 @@ class TestGenauDeliver(unittest.TestCase):
                 result = genau_deliver.run()
 
             assert result.delivered == 1
-            assert other.is_file()  # the ordinary lane stays in the outbox
+            assert other.is_file()
             assert not (flicks / "2D" / "AI" / "video_1_topaz.mp4").exists()
 
     def test_flicks_are_found_under_every_orientation(self):
@@ -248,11 +233,6 @@ class TestGenauDeliver(unittest.TestCase):
             def _locked(self, target):
                 raise OSError("the file is in use")
 
-            # patch.object, not a hand-rolled save and restore: `replace` is
-            # inherited from Path, so reading it off the concrete class and
-            # writing it back leaves an OWN attribute there, shadowing Path's
-            # for the rest of the session -- which silently disarms any later
-            # patch("pathlib.Path.replace"). patch.object deletes instead.
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
                                  GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"), \
@@ -272,16 +252,9 @@ class TestGenauDeliver(unittest.TestCase):
                 result = genau_deliver.run()
 
             assert (result.delivered, result.failed) == (0, 0)
-            assert not (flicks / "2D" / "AI").exists()  # nothing to deliver, nothing created
+            assert not (flicks / "2D" / "AI").exists()
 
     def test_the_lane_runs_between_the_four_places_it_is_given(self):
-        """The lane spans four places, and all four are arguments now.
-
-        `config` still answers when the caller names none of them — the
-        pipeline names none. The ambient four here are pointed at a second
-        staged flick, so a stage still reading them would deliver that one
-        instead of this one.
-        """
         with workspace_temp_dir() as root:
             given_outbox, given_sorted, given_flicks = _lane(root / "given")
             _stage_flick(given_outbox, given_sorted, stem="loop_given")
@@ -308,7 +281,6 @@ class TestGenauDeliver(unittest.TestCase):
 
 class TestGenauDeliverResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
-        """Every field lands in a run record; one nothing reads is dead weight."""
         assert {f.name for f in dataclasses.fields(genau_deliver.GenauDeliverResult)} == {"delivered", "failed"}
 
 

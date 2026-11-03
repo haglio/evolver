@@ -141,8 +141,6 @@ class TestRunStartsAJob(unittest.TestCase):
 
 
 class TestStartGuards(unittest.TestCase):
-    """A new multi-hour encode only starts on a computer with headroom."""
-
     def _one_candidate(self, overrides):
         return make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
 
@@ -175,8 +173,6 @@ class TestStartGuards(unittest.TestCase):
             mocks["popen"].assert_not_called()
 
     def test_a_present_user_defers_the_start(self):
-        """Recent keyboard/mouse input means the user is at the computer; a
-        multi-hour encode waits until they step away."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             self._one_candidate(overrides)
@@ -262,9 +258,6 @@ class TestStartGuards(unittest.TestCase):
 
 
 class TestRunStartsWhatYouAskedFor(unittest.TestCase):
-    """A video asked for from the queue window starts on the next run, even
-    while the user is at the computer -- that is what asking for it now means."""
-
     def test_the_video_you_asked_for_starts_while_you_are_at_the_computer(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -282,8 +275,6 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
             assert request_of(overrides) is None
 
     def test_an_encode_of_another_video_is_stopped_to_make_way(self):
-        """The window stops it when the video is dropped; a run stops it too,
-        for the encode that was adopted or started after the ask."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _busy, tmp, _out = write_job(root, overrides)
@@ -357,8 +348,6 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
             assert request_of(overrides) is None
 
     def test_new_ai_videos_still_waiting_go_first(self):
-        """An AI video takes a minute and an asked-for encode takes hours, and
-        once it runs no AI video can until it ends."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "b.mp4")
@@ -375,9 +364,6 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
 
 
 class TestAnEncodeYouAskedForRunsOn(unittest.TestCase):
-    """Presence parks the encodes Evolver picked for itself. The one the user
-    asked for is the exception: it was wanted while they were at the computer."""
-
     def test_a_present_user_does_not_park_it(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -405,8 +391,6 @@ class TestAnEncodeYouAskedForRunsOn(unittest.TestCase):
             mocks["suspend"].assert_not_called()
 
     def test_the_idle_time_toggle_being_off_does_not_kill_it(self):
-        """Off means Evolver picks nothing of its own; it does not take back a
-        video the user asked for while it was off."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _source, tmp, _out = write_job(root, overrides, on_request=True)
@@ -468,8 +452,6 @@ class TestRunStopsAJob(unittest.TestCase):
 # which is the failure the adoption path below exists to recover from.
 JOB_KEYS_AT_START = {"pid", "source", "tmp", "out", "expected_duration", "started_at",
                      "provenance"}
-# Adoption knows three more, because it takes over an encode already in flight
-# and must be able to say it is not frozen.
 JOB_KEYS_ON_ADOPTION = JOB_KEYS_AT_START | {
     "suspended", "suspended_at", "suspended_seconds",
 }
@@ -490,8 +472,6 @@ class TestTheJobFilesKeys(unittest.TestCase):
             assert set(written) == JOB_KEYS_AT_START
 
     def test_an_encode_started_on_request_adds_only_the_mark_that_says_so(self):
-        """The mark is what keeps presence and the toggle off it, on every run
-        and every presence poll until it ends."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
@@ -526,8 +506,6 @@ class TestTheJobFilesKeys(unittest.TestCase):
             assert set(written) == JOB_KEYS_ON_ADOPTION
 
     def test_suspending_and_resuming_add_no_keys_of_their_own(self):
-        """The throttle rewrites the record on every park and thaw, and it is
-        the same record: three of the nine exist for exactly this."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             write_job(root, overrides)
@@ -543,9 +521,6 @@ class TestTheJobFilesKeys(unittest.TestCase):
 
 class TestWhatMadeTheUpscale(unittest.TestCase):
     def test_a_started_encode_keeps_the_stamp_of_the_settings_and_code_that_started_it(self):
-        """An encode runs for hours and concludes on a later tick -- sometimes
-        after a restart onto newer code -- so what made it is taken when it
-        starts, not when it is promoted."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
@@ -571,8 +546,6 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
             assert stamps == {provenance.UPSCALE_NON_AI: STARTED_UNDER}
 
     def test_an_encode_started_before_stamps_were_kept_files_one_that_says_so(self):
-        """The encode in flight on the day this lands has a record with no stamp
-        in it: it was ours, on our settings, and nothing more is known."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _source, _tmp, out = write_job(root, overrides, expected=100.0, stamp=None)
@@ -632,7 +605,6 @@ class TestOrphanAdoption(unittest.TestCase):
             mocks["popen"].assert_not_called()
 
     def test_a_foreign_topaz_process_blocks_starts_but_is_not_adopted(self):
-        """The user's own Topaz GUI export writes outside the library."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
@@ -650,9 +622,6 @@ class TestOrphanAdoption(unittest.TestCase):
 
 
 class TestPresenceThrottle(unittest.TestCase):
-    """With the toggle on (presence_managed), the in-flight encode follows the
-    user: frozen the moment they return, thawed once they idle out again."""
-
     def test_a_present_user_suspends_the_in_flight_encode(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -696,13 +665,11 @@ class TestPresenceThrottle(unittest.TestCase):
             assert not result.suspended
             job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
             assert not job["suspended"]
-            # The completed suspension is banked (60s prior + ~120s open interval).
             assert job["suspended_seconds"] > 170.0
 
     def test_suspended_time_is_not_charged_against_the_runtime_cap(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            # Wall-clock past the cap, but most of it spent frozen.
             write_job(
                 root, overrides,
                 started_seconds_ago=nonai_encode.EncodeSettings().max_runtime_hours * 3600 + 3600,
@@ -718,8 +685,6 @@ class TestPresenceThrottle(unittest.TestCase):
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
 
     def test_headless_mode_leaves_a_present_users_encode_running(self):
-        """Without presence management (the CLI passes it off), an in-flight
-        encode is neither suspended nor started against — just supervised."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             write_job(root, overrides)
@@ -734,9 +699,6 @@ class TestPresenceThrottle(unittest.TestCase):
 
 
 class TestThrottleToPresence(unittest.TestCase):
-    """The fast between-ticks responder: suspend/resume the live encode alone,
-    with no queued video scan or disk work, so a GUI timer can call it often."""
-
     def test_suspends_a_running_encode_when_the_user_returns(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -768,7 +730,7 @@ class TestThrottleToPresence(unittest.TestCase):
     def test_no_change_when_presence_already_matches_state(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
-            write_job(root, overrides)  # running, not suspended
+            write_job(root, overrides)
 
             stack, mocks = probes(is_running=True, idle_seconds=10_000.0)
             with override_config(**overrides), stack:
@@ -802,10 +764,6 @@ class TestThrottleToPresence(unittest.TestCase):
             mocks["suspend"].assert_not_called()
 
     def test_a_poll_while_a_run_has_the_encode_in_hand_passes_at_once(self):
-        """The poll runs on the window's thread, and a run starting an encode
-        holds it for as long as its checks take: waiting there froze the
-        window. The run applies presence itself, and the next poll is seconds
-        away."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             write_job(root, overrides)
@@ -941,19 +899,6 @@ class TestMakingWayForAiVideos(unittest.TestCase):
 
 
 class TestEveryFileIsAParameter(unittest.TestCase):
-    """The six files the stage touches are arguments, not ambient reads.
-
-    Three it writes -- the job record, the attempt counter, the cooldown stamp
-    -- and three the queue reads -- the skip and pin lists, and Fun Time's
-    watch stats. Each threads through functions that decide whether a live
-    encode is promoted, failed or killed, or which clip is started at all, so a
-    parameter wired to the wrong place -- or resolved once at import, past
-    ``override_config`` -- would leave the stage using the configured path
-    anyway and nothing would say so. These point all six somewhere else and
-    check both halves where there is a file to see: what the stage does follows
-    the paths it was given, and the configured files stay untouched.
-    """
-
     def test_a_start_writes_its_record_and_attempt_where_the_parameters_point(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -1002,7 +947,7 @@ class TestEveryFileIsAParameter(unittest.TestCase):
             elsewhere.mkdir()
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
 
-            stack, _ = probes(videoai="apo8")  # already carries a Topaz tag
+            stack, _ = probes(videoai="apo8")
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(
                     allow_start=True,
@@ -1041,7 +986,6 @@ class TestEveryFileIsAParameter(unittest.TestCase):
                     watch_stats_file=elsewhere / "watch.json",
                 )
 
-            # Alphabetically "a" leads; only the pin puts "z" in front of it.
             assert result.started == "lagoon/0 unsorted/z.mp4"
 
     def test_the_watch_stats_file_it_is_given_decides_which_clip_starts(self):
@@ -1129,7 +1073,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(allow_start=False)
 
-            assert result.in_flight_percent == 38  # 75/200, rounded
+            assert result.in_flight_percent == 38
 
     def test_live_job_percent_is_none_when_the_partial_is_unreadable(self):
         with workspace_temp_dir() as root:
@@ -1365,23 +1309,7 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
 
 
 class TestPromotionCarriesTheRecord(unittest.TestCase):
-    """What the upscale must be handed before its original leaves the library.
-
-    The move itself is :mod:`util.nonai_retire`'s and tested there; these are
-    the stage's half — that promotion does the carry at all, and before the
-    retire rather than after.
-    """
-
     def test_the_upscale_keeps_the_clip_record_the_original_takes_away(self):
-        """Promotion must hand the upscale its own copy first, or the record goes.
-
-        The `clip` object naming which compilation a video was carved out of is
-        what marks it a cut at all, and it lived only on the original — which
-        retirement moves out of the library. The grouping stage would copy one
-        across from an in-library original, but it runs later in the same pass
-        and by then there is none, so an upscaled cut arrived in the library as
-        an anonymous whole video, filed among the very scenes it was cut from.
-        """
         with workspace_temp_dir() as root:
             archive = root / "archive"
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
@@ -1407,9 +1335,6 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
             assert carried["video"] == {"action": "alpha"}
 
     def test_the_carried_sidecar_leaves_the_version_block_alone(self):
-        """`version` describes the file, not the footage — the original is not a
-        processed version and the upscale is, and the grouping stage is the one
-        thing that gets to say so."""
         with workspace_temp_dir() as root:
             archive = root / "archive"
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
@@ -1478,13 +1403,6 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
 
 
 class TestReportingHowFarAlongItIs(unittest.TestCase):
-    """The stage says how much of the project is left, not just how many clips.
-
-    The arithmetic is :mod:`tasks.nonai_progress`'s; what is checked here is
-    that the queue the stage reports on and the queue it weighs are the same
-    one, and that the numbers reach the result the window reads.
-    """
-
     def _lasting(self, video, seconds):
         path = sidecar.sidecar_path(video)
         write_sidecar(path, video_kind.timed(sidecar.read(path), seconds))
@@ -1511,8 +1429,6 @@ class TestReportingHowFarAlongItIs(unittest.TestCase):
             assert result.unmeasured_videos == 0
 
     def test_a_clip_retired_to_the_skip_list_leaves_both_the_count_and_the_hours(self):
-        """The queue is collected again after a start attempt for exactly this
-        reason, and the running times have to come off that same collection."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]

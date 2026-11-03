@@ -1,14 +1,3 @@
-"""Stage: every app's viewing of a video summed on its sidecar as one weight,
-and the phone's favorites marked there.
-
-Fun Time's counts come from its own stats file, the phone's from Warm Gun's
-journal, which reaches this computer inside the synced library.  The sum and
-its weight go on the sidecar (``util.watch``), where Fun Time and Warm Gun
-read one number instead of each keeping a formula.  A favorite made or taken
-back on the phone goes onto the same sidecar, which is where Fun Time keeps
-its own.
-"""
-
 from __future__ import annotations
 
 import json
@@ -47,8 +36,6 @@ class WatchWeightsResult:
 
 @dataclass(frozen=True)
 class _PhoneFavorites:
-    """What marking the phone's favorites came to."""
-
     added: int = 0
     removed: int = 0
     write_errors: int = 0
@@ -117,7 +104,6 @@ def _phone_counts(
 def _apply_phone_favorites(
     journals: dict[str, list[warm_gun.Event]], videos: dict[str, Path | None]
 ) -> _PhoneFavorites:
-    """Each journal's favorites past that journal's own cursor."""
     carried = {True: 0, False: 0}
 
     def carry(event: warm_gun.Event) -> bool:
@@ -159,15 +145,6 @@ def _applied_once(
     journals: dict[str, list[warm_gun.Event]], cursor_file: Path, kinds: Collection[str],
     apply: Callable[[warm_gun.Event], bool],
 ) -> None:
-    """Hand *apply* each journal's events of *kinds* past that journal's own
-    cursor, in time order, so each is applied once and another app may undo it.
-
-    One time per file, not one across them: each computer uploads its whole
-    file in its own time order, but the laptop's can reach the folder after
-    the phone's later lines have been applied, and one time across both would
-    skip its events for good.  *apply* answers False to hold the rest of its
-    journal for a later run; an OSError from it holds every journal.
-    """
     cursors = _cursors(cursor_file)
     applied = dict(cursors)
     try:
@@ -184,10 +161,6 @@ def _applied_once(
 
 
 def _cursors(cursor_file: Path) -> dict[str, int]:
-    """How far each journal's events have been applied, by file name. The
-    favorites' cursor used to hold one time for the one journal there was; that
-    time was reached through the phone's file alone, so it holds that file back
-    and no other."""
     stored = read_dict(cursor_file).get(_CURSOR_FIELD)
     if isinstance(stored, dict):
         return {name: int(t) for name, t in stored.items()}

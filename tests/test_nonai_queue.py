@@ -1,9 +1,3 @@
-"""Which non-AI video is next, and why it beat the others.
-
-These moved out of tests/test_nonai_upscale.py with the queue itself. They no
-longer construct the stage to ask it: the three files a queue is built from are
-arguments, so each test names the list or the stats file it wrote.
-"""
 from __future__ import annotations
 
 import json
@@ -21,7 +15,6 @@ from tests.temp_helpers import (
 
 
 def queue_files(root, overrides, *, pin_list=None):
-    """The three files collect_queued videos reads, defaulted to absent ones."""
     return {
         "skip_list": overrides["NONAI_SKIP_LIST"],
         "pin_list": pin_list or root / "next.txt",
@@ -43,14 +36,9 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            # Sort both sides: which bucket name sorts first is an accident of
-            # the fixture's spelling, not something this test is about.
             assert sorted(c.path for c in queued_videos) == sorted([flagged_video, unsorted_video])
 
     def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
-        """A triage dir's first sub-stage holds manual pre-work (e.g. lagoon's
-        '1 could use work/1_originals_needing_trimming'); those clips are not
-        ready for an unattended multi-hour encode."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -67,8 +55,6 @@ class TestCollectCandidates(unittest.TestCase):
             assert [c.path for c in queued_videos] == [ready]
 
     def test_finds_videos_in_a_triage_dirs_upscale_ready_substages(self):
-        """Past the manual-pre-work one, a triage dir's sub-stages say in their
-        own names that the only thing left is the encode, so they queue too."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -88,8 +74,6 @@ class TestCollectCandidates(unittest.TestCase):
             assert sorted(c.path for c in queued_videos) == [good, trimmed]
 
     def test_pinned_videos_lead_the_queue_in_the_order_listed(self):
-        """The pin list is how the user says "encode this one next", so it
-        outranks the triage digit and every other ordering heuristic."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -109,8 +93,6 @@ class TestCollectCandidates(unittest.TestCase):
             assert [c.path for c in queued_videos][:2] == [first, second]
 
     def test_a_pin_re_queues_a_video_that_already_has_a_processed_version(self):
-        """An existing version normally reads as "already done". When it came
-        from older settings, pinning is how the user asks for the redo."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -161,8 +143,6 @@ class TestCollectCandidates(unittest.TestCase):
             assert [c.path for c in queued_videos] == [fresh]
 
     def test_watched_videos_outrank_funscripted_ones(self):
-        """Fun Time's watch stats (once its Main Funestra tracking records them) are the
-        strongest popularity signal; funscripts break ties among the unwatched."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -234,8 +214,6 @@ class TestPinAhead(unittest.TestCase):
             assert nonai_queue.listed_videos(pins) == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"]
 
     def test_the_pins_already_there_follow_in_their_order_with_their_notes(self):
-        """The list is hand-edited too, so a line's note is the user's and
-        rides along with it wherever the line ends up."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             for name in ("a.mp4", "b.mp4", "c.mp4"):
@@ -250,9 +228,6 @@ class TestPinAhead(unittest.TestCase):
             assert pins.read_text(encoding="utf-8").splitlines() == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/c.mp4\tredo under v2", "lagoon/0 unsorted/a.mp4\tfor the weekend"]
 
     def test_a_pin_whose_video_has_left_the_library_is_dropped(self):
-        """An upscaled original is retired out of the folder it was pinned in,
-        so its pin names nothing -- and would pin whatever arrived there next
-        under the same name."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")

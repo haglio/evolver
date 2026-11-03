@@ -1,9 +1,3 @@
-"""One declaration of the stages, and everything that must agree with it.
-
-The pipeline's order, the popup's bars, the detail table's names, tooltips
-and numbers and the chart's palette all come off ``tasks/stages.py``. What
-is left to check is that the list really is the one the pipeline runs.
-"""
 from __future__ import annotations
 
 import ast
@@ -26,24 +20,11 @@ from tests.color_support import band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
 from tests.test_evolver import _patched_stages, _stage_mocks
 
-# The stages with no `_STAGE_FAILED` rule, and why each one has none: nothing
-# any of them does can come out wrong in a way the run should report.
-# `sort` moves what it can identify and leaves the rest in the inbox;
-# `clip_scripts` and `scene_scripts` write a funscript where one is missing and
-# leave every existing one alone; `group_non_ai` and `title_non_ai` are
-# bookkeeping over whatever files happen to be there; `provenance` only fills in a record where none is,
-# and a gallery it cannot read leaves its clips for a later run.
 CANNOT_FAIL = frozenset({"strays", "sort", "clip_scripts", "scene_scripts", "group_non_ai",
                          "title_non_ai", "video_types", "provenance"})
 
 
 def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
-    """Every literal key the named window functions read off a result dict.
-
-    Read from the syntax tree rather than by running them: the summarizers
-    branch, so no one set of values reaches every field, and a key missed by a
-    probe would look exactly like a key nothing reads.
-    """
     tree = ast.parse(Path(PROJECT_ROOT, "gui", "main_window.py").read_text(encoding="utf-8"))
     keys: set[str] = set()
     for node in ast.walk(tree):
@@ -61,14 +42,6 @@ def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
 
 class TestStageRegistry(unittest.TestCase):
     def test_the_registry_lists_exactly_the_stages_the_pipeline_emits(self):
-        """The gate that can see a stage go missing, which nothing here could.
-
-        `genau_deliver` ran for months with no registry row: it drew no
-        progress bar, its duration was dropped from the chart, and the detail
-        table fell back to numbering it with the number the stage after it
-        already carried. Every test in this file read the registry and none of
-        them imported `evolver`, so the two could not be compared.
-        """
         mocks = _stage_mocks()
         with _patched_stages(mocks):
             result = evolver.run_pipeline()
@@ -76,21 +49,6 @@ class TestStageRegistry(unittest.TestCase):
         assert [stage.name for stage in result.stages] == ALL_STAGES
 
     def test_the_pipeline_spells_the_registry_s_order_and_nothing_else(self):
-        """The same two lists, compared without running anything.
-
-        `run_pipeline` names its stages one call at a time, because each
-        carries its own arguments and skip branches — so the order is written
-        twice and the second copy is checked rather than derived. This reads
-        the names straight out of evolver.py's syntax tree, which means it
-        also covers the four skip branches a single mocked run never takes,
-        and it sees a registry row the pipeline runs nowhere as readily as a
-        pipeline stage the registry does not name.
-
-        A stage may be spelled several times running — `upscale` has three
-        skip branches and one run — so consecutive repeats collapse. Two
-        mentions that are not adjacent do not, because a stage reached from
-        two places in the pipeline is exactly the drift worth failing on.
-        """
         source = Path(PROJECT_ROOT, "evolver.py").read_text(encoding="utf-8")
         calls = [
             node
@@ -113,14 +71,6 @@ class TestStageRegistry(unittest.TestCase):
         assert [name for name, _ in itertools.groupby(spelled)] == ALL_STAGES
 
     def test_a_stage_reaches_the_run_record_through_those_two_calls_and_no_other(self):
-        """The gate above reads two call names, so it is only as good as the
-        claim that a stage cannot be emitted any other way.
-
-        `records.append(StageRecord(...))` inside one of the pipeline's skip
-        branches would emit a stage that neither gate sees — the syntax-tree
-        one because it is not a `_run_stage` call, the mocked run because it
-        takes one path and never enters that branch.
-        """
         tree = ast.parse(Path(PROJECT_ROOT, "evolver.py").read_text(encoding="utf-8"))
         emitters = set()
         enclosing = []
@@ -145,35 +95,11 @@ class TestStageRegistry(unittest.TestCase):
         assert emitters == {"_run_stage", "_skip_stage"}
 
     def test_every_stage_either_has_a_verdict_rule_or_is_declared_unable_to_fail(self):
-        """The last copy of the stage names, and the one that fails silently.
-
-        A stage absent from `_STAGE_FAILED` cannot report an error — that is
-        the table's design, so both a key misspelled there and a stage nobody
-        wrote a rule for come out the same way: the stage keeps running, keeps
-        finishing, and simply never fails. Nothing else in the run looks
-        different either way.
-
-        So the check is an equality rather than a subset, and the stages that
-        genuinely cannot fail are named here. Adding a stage then has to
-        answer "how does this one fail?" instead of defaulting to "it can't".
-        """
         assert sorted(set(evolver._STAGE_FAILED) | CANNOT_FAIL) == sorted(ALL_STAGES)
         assert sorted(set(evolver._STAGE_FAILED) & CANNOT_FAIL) == []
         assert sorted(set(evolver._STAGE_WARNED) - set(ALL_STAGES)) == []
 
     def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
-        """Two more tables keyed by stage string, with the same silent shape.
-
-        `_HEADLINE_FIELDS` exists so a "0 succeeded" stays on screen instead of
-        vanishing and making a total failure look like a partial one, and the
-        summarizers replace a bland numeric tally with the clip names and the
-        words that say what went wrong. A stale key in either loses exactly
-        that, with nothing raised and the row still drawn.
-
-        The two summarizers were `stage_key == "upscale_non_ai"` and
-        `== "scripts"` written into the dispatch, where no gate could see
-        them; they are a table now so this can.
-        """
         for table, name in (
             (main_window._HEADLINE_FIELDS, "_HEADLINE_FIELDS"),
             (main_window._SUMMARIZERS, "_SUMMARIZERS"),
@@ -182,19 +108,6 @@ class TestStageRegistry(unittest.TestCase):
                 assert sorted(set(table) - set(ALL_STAGES)) == []
 
     def test_every_counter_a_summarized_stage_declares_reaches_the_detail_view(self):
-        """A counter no summarizer names is invisible, and stays invisible.
-
-        The detail view reads these two results as plain dicts -- they arrive
-        through `dataclasses.asdict` and a JSON file months older than the
-        build reading it -- so a field added on the stage's side reaches the
-        window as a key nothing asks for, and the run reports doing nothing
-        where it did something. It had already happened twice: a run that
-        rehomed seven scripts to their library versions and left two version
-        groups too ambiguous to copy from said "no funscripts".
-
-        Held by reading the keys out of the window's own source rather than by
-        listing them here, so this cannot drift from what the code asks for.
-        """
         scripts_keys = (
             {key for key, _label, _names in main_window._SCRIPTS_PROBLEMS}
             | {names for _key, _label, names in main_window._SCRIPTS_PROBLEMS if names}
@@ -211,10 +124,6 @@ class TestStageRegistry(unittest.TestCase):
                 assert sorted(shown) == sorted(field.name for field in dataclasses.fields(result_type))
 
     def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
-        """Delivery runs straight after the AI upscale, so a clip made this run
-        reaches Genau this run, and before the correspondence check, which
-        would otherwise see the delivered clip's source still in 1_sorted with
-        nothing beside it in the outbox."""
         assert "genau_deliver" in ALL_STAGES
         assert "upscale_non_ai" in ALL_STAGES
         assert ALL_STAGES.index("genau_deliver") == ALL_STAGES.index("upscale") + 1
@@ -234,25 +143,12 @@ class TestStageRegistry(unittest.TestCase):
         assert ALL_STAGES.index("group_non_ai") == ALL_STAGES.index("scripts") + 1
 
     def test_the_registry_lists_the_script_writing_stages_before_the_sync_that_aligns_them(self):
-        """Both stages carry a funscript between a clip and its scene, and the
-        sync is what settles a new one across a video's version family — so
-        neither can come after it."""
         assert "clip_scripts" in ALL_STAGES
         assert "scene_scripts" in ALL_STAGES
         assert ALL_STAGES.index("scene_scripts") == ALL_STAGES.index("clip_scripts") + 1
         assert ALL_STAGES.index("scene_scripts") == ALL_STAGES.index("scripts") - 1
 
     def test_the_readme_enumerates_the_stages_the_registry_declares(self):
-        """The README walks a reader through the pipeline, which makes it a
-        copy of the list like any other — and it had drifted furthest of all.
-        It enumerated eleven stages, leaving out `clip_scripts`,
-        `scene_scripts` and `group_non_ai` entirely, in an order matching
-        neither the pipeline's nor anything else's: a reader saw Sort Inbox
-        numbered 1 while the run detail table beside it printed 3.
-
-        Each entry leads with the stage's shown name in bold, so the list can
-        be read back and compared rather than maintained by hand.
-        """
         readme = Path(PROJECT_ROOT, "README.md").read_text(encoding="utf-8")
         listed = re.findall(r"^\d+\. \*\*(.+?)\*\*", readme, re.MULTILINE)
 
@@ -260,16 +156,6 @@ class TestStageRegistry(unittest.TestCase):
 
     @pytest.mark.repo_check
     def test_nothing_writes_a_stage_number_of_its_own(self):
-        """Ordering has one home, `STAGES`. A number typed into a log line, a
-        docstring or a paragraph is a second copy that cannot be kept in step
-        with it: four stages were still printing the position they held in a
-        shorter pipeline, so `evolver.log` named a stage nothing else numbered
-        that way, and the README carried a third numbering again.
-
-        The prose is scanned as well as the code because that is where the
-        worst of it was: twenty "Stage N" mentions across a module list and a
-        page of notes, in two numbering schemes, neither the registry's.
-        """
         scanned = product_sources(PROJECT_ROOT) + ["README.md", "docs/maintenance_notes.md"]
         offenders = sorted(
             f"{name}:{i}"
@@ -297,16 +183,6 @@ class TestStageRegistry(unittest.TestCase):
                 assert QColor(*stage.color).isValid()
 
     def test_no_two_stage_bands_are_hard_to_tell_apart(self):
-        """The chart stacks every stage as a band in one column, so a close
-        pair is two bands nobody can separate and a legend that names the same
-        color twice.
-
-        The floor is 20 Delta-E, argued from the units rather than fitted to
-        this palette: ~2 is the smallest difference anyone sees and ~10 already
-        reads as two colors, so 20 is a comfortable "obviously different"
-        rather than the least that would pass. The palette this replaced scored
-        8.8 and would fail it; the one here clears it by three.
-        """
         worst, pair = min(
             (delta_e(band_fill(STAGE_COLORS[one]), band_fill(STAGE_COLORS[other])), (one, other))
             for one, other in itertools.combinations(ALL_STAGES, 2)

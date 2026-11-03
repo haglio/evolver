@@ -15,7 +15,6 @@ def _touch(path: Path, body: str = "x") -> Path:
 
 
 def _library(root: Path) -> tuple[Path, Path, Path]:
-    """A (video_library, non_AI, metadata) triple mirroring the real layout."""
     video_lib = root / "videos"
     non_ai = video_lib / "2D" / "non_AI"
     metadata = root / "metadata"
@@ -51,9 +50,6 @@ class TestNonAiTitles(unittest.TestCase):
                 assert _title_of(clip) == "Jane Doe - Alpha Study: Part Two"
 
     def test_a_scene_takes_the_name_of_the_clip_matched_inside_it(self):
-        """The scene was saved under whatever the download called it; the clip
-        carved from it is the only thing that knows the movie and who is in it,
-        and the clip-match batch proved the pairing on the frames."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -72,9 +68,6 @@ class TestNonAiTitles(unittest.TestCase):
                 assert _title_of(scene) == "Jane Doe - Alpha Study 3"
 
     def test_the_scenes_name_reaches_the_rendition_that_was_not_matched(self):
-        """The batch records its match against the one file it searched, while
-        the apps play whichever rendition they judge best -- so the name is held
-        against the family, not the path."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -96,7 +89,6 @@ class TestNonAiTitles(unittest.TestCase):
                 assert _title_of(upscale) == "Jane Doe - Alpha Study 3"
 
     def test_a_video_nothing_names_is_left_without_one(self):
-        """Its readers fall back to the filename, which is what they always did."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -111,9 +103,6 @@ class TestNonAiTitles(unittest.TestCase):
                 assert (result.titled, result.videos) == (0, 1)
 
     def test_a_name_that_no_longer_holds_is_taken_back_off(self):
-        """A backfill that never ends has to be able to correct itself: strike
-        the clip record and the name it justified goes with it, rather than
-        standing forever over a video nothing says that about."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(

@@ -1,4 +1,3 @@
-"""The stage that puts both apps' viewing on every sidecar, and marks the phone's favorites there."""
 from __future__ import annotations
 
 import json
@@ -21,8 +20,6 @@ from util import sidecar
 
 
 class _Setting(LaneLibrary):
-    """A lane library plus the phone's journal folder and Fun Time's files."""
-
     def __init__(self, root: Path):
         super().__init__(root)
         self.root = root
@@ -53,7 +50,6 @@ class _Setting(LaneLibrary):
         )
 
     def pick_act(self, t: int, video: Path, act: str) -> None:
-        """A line Origenerator writes when an act is picked on a video's Action row."""
         self.journal_dir.mkdir(parents=True, exist_ok=True)
         line = {"t": t, "event": "action", "path": video.relative_to(self.root).as_posix(),
                 "action": act}
@@ -68,7 +64,6 @@ class _Setting(LaneLibrary):
         )
 
     def sorted_clip(self, name: str) -> tuple[Path, Path]:
-        """A generated clip and its upscale, both on disk."""
         video = touch_video(self.sorted_dir / "provider2" / "portrait" / f"{name}.mp4")
         upscale = touch_video(self.outbox / "portrait" / "provider2" / f"{name}_topaz.mp4")
         return video, upscale
@@ -242,10 +237,6 @@ class TestFavorites(unittest.TestCase):
         assert result.favorites_removed == 1
 
     def test_a_second_journal_s_older_favorite_lands_after_the_first_s_newer_one(self):
-        """Two computers upload two files into the one folder, and one of them
-        can arrive late: a laptop is quit from the front as often as not, so
-        its favorite made at ten can reach the folder after the phone's made
-        at twenty has already been applied."""
         with _setting() as s:
             _, upscale_a = s.sorted_clip("clip_a")
             _, upscale_b = s.sorted_clip("clip_b")
@@ -260,9 +251,6 @@ class TestFavorites(unittest.TestCase):
         assert result.favorites_added == 1
 
     def test_the_cursor_a_single_journal_left_behind_speaks_for_the_phone_s_file_only(self):
-        """Before the laptop there was one journal and one time; that time was
-        reached through the phone's file alone, so it holds that file back and
-        no other."""
         with _setting() as s:
             _, upscale_a = s.sorted_clip("clip_a")
             _, upscale_b = s.sorted_clip("clip_b")

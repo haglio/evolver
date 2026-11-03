@@ -57,11 +57,6 @@ _NEITHER_PORTRAIT_NOR_LANDSCAPE = None
 
 @dataclass(frozen=True)
 class _Listed:
-    """A video whose kind this stage owns, its record as it stands, and what its
-    lane settles on its own: the two signals a kind is read off, and the
-    orientation of a video the lane files by it (empty where it has to be
-    measured)."""
-
     video: Path
     sidecar: Path
     payload: dict
@@ -90,15 +85,6 @@ class _Measurements:
 
 @dataclass
 class VideoKindsResult:
-    """What one run reached, counting each video once.
-
-    ``recorded`` wrote a sidecar, ``already`` found nothing left to ask,
-    ``skipped`` could not be measured and so has no kind to write down, and
-    ``deferred`` still owes a later run something — a measurement this run had
-    none left to spend, or one that failed on a video whose kind it could name
-    anyway.
-    """
-
     recorded: int = 0
     already: int = 0
     skipped: int = 0
@@ -106,18 +92,6 @@ class VideoKindsResult:
 
 
 def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsResult:
-    """Record what kind every library video is, how long it runs, and whether it
-    is portrait or landscape.
-
-    *probe* reads a video's running time and *orientation_probe* its
-    orientation; they are the only things here that cost anything, so they are
-    what the batch limit counts, and both are test seams.
-
-    A video is measured once — the first run that reaches it and has a
-    measurement left to spend — and thereafter its sidecar answers.  The kind
-    is then re-derived every run from that recorded time and from the two free
-    signals, so a folder declared a clip after the fact corrects itself.
-    """
     log.info("=== Stage: record video kinds ===")
     result = VideoKindsResult()
     measurements = _Measurements(config.VIDEO_KIND_BATCH_LIMIT,
@@ -134,9 +108,6 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsR
                 if listed.on_the_cloud_drive:
                     measurements.none_more_from_the_cloud_drive()
         if seconds is None and not free:
-            # Nothing free says what this is and no running time did either, so
-            # it is left alone: the sidecar's silence is recoverable on a later
-            # run, and a wrong answer written into it is not.
             if unmeasurable:
                 result.skipped += 1
             else:
@@ -164,8 +135,6 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsR
         if sidecar.update(listed.sidecar, record_what_is_known) is not None:
             result.recorded += 1
         elif seconds is None or (oriented and not orient):
-            # What it could say already on file, still owing a measurement that
-            # this run had none left for, or could not take.
             result.deferred += 1
         else:
             result.already += 1
@@ -199,9 +168,6 @@ def _genau_flicks():
 
 
 def _ai_videos():
-    """Read off ``1_sorted``, which holds the whole AI library while the outbox
-    holds only what has been upscaled so far; the sidecar sits at the upscale's
-    mirrored path either way."""
     for clip in lanes.ai_videos():
         path = sidecar.sidecar_path(clip.upscale)
         filed_under = clip.orientation if clip.orientation in orientation.SORTED else ""
@@ -210,17 +176,6 @@ def _ai_videos():
 
 
 def _non_ai_videos():
-    """The real-footage library, where a carved scene is what stands out.
-
-    A clip is known by the ``clip`` record something wrote when it carved
-    it.  For the batches split before anything wrote one, it is known by the
-    company it keeps: a folder its librarian filed the batch's cuts into and
-    nothing else (:func:`_cut_folders`), or one the overlay declares outright.
-
-    The whole tree, including a folder that holds no stage folders and so is no
-    bucket: the Main Funestra plays every one of these, so every one of them is
-    asked what it is.
-    """
     videos = lanes.non_ai_videos()
     payloads = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
     carved = {video for video, payload in payloads.items() if _was_carved(video, payload)}
@@ -241,12 +196,10 @@ def _vr_videos():
 
 
 def _was_carved(video: Path, payload: dict) -> bool:
-    """Whether something says outright that *video* came out of a longer one."""
     return isinstance(payload.get("clip"), dict) or _in_a_clip_folder(video)
 
 
 def _below_the_library(video: Path) -> tuple[str, ...]:
-    """*video*'s folders below the non-AI root — its batch, then the rest."""
     return video.relative_to(config.NON_AI_DIR).parts[:-1]
 
 
@@ -262,22 +215,6 @@ def _in_a_cut_folder(folders: tuple[str, ...], cuts: dict[str, str]) -> bool:
 def _cut_folders(
     carved: list[tuple[str, ...]], others: list[tuple[str, ...]]
 ) -> dict[str, str]:
-    """Which folder each batch filed its cuts into, where it has one.
-
-    *carved* holds the folders of the videos something says are cuts, *others*
-    those of everything else.  A batch earns an entry only when its cuts have a
-    *dominant* second folder, the rest of it has one too, the two differ, and
-    each of those folders holds more of its own set than of the other: two sets
-    under one batch that share their second folders are separated by their
-    sidecars alone, and the folders they share are the pipeline's stages —
-    which can never stand in for a division of the library.  Dominant rather
-    than unanimous, so one straggler stranded by a move cannot undo a batch
-    that HAS been separated.
-
-    Fun Time reads a library the same way when it has no kind to go on
-    (``library_handles.cut_folders``); the answer belongs here, where it is
-    written down once for everything that asks.
-    """
     def by_batch(folders: list[tuple[str, ...]]) -> dict[str, list[tuple[str, ...]]]:
         grouped: dict[str, list[tuple[str, ...]]] = {}
         for path in folders:
@@ -310,8 +247,6 @@ def _count_under(second: str, folders: list[tuple[str, ...]]) -> int:
 
 
 def _dominant_second(folders: list[tuple[str, ...]]) -> str:
-    """The second folder most of *folders* sit under, or "" when they are split
-    across several — which is what a set of pipeline stages looks like."""
     seconds = Counter(path[1] for path in folders if len(path) > 1)
     if not seconds:
         return ""

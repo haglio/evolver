@@ -1,4 +1,3 @@
-"""Stage: give an unscripted scene the funscript of the clip carved out of it."""
 from __future__ import annotations
 
 import logging
@@ -25,19 +24,6 @@ class SceneScriptsResult:
 
 
 def run() -> SceneScriptsResult:
-    """Place each carved clip's funscript where that clip sits in its scene.
-
-    The mirror of :mod:`tasks.clip_scripts`, for the scenes that arrive the
-    other way round: a compilation's clips were scripted long before anyone
-    scripted the hours they were cut from, so the scene has nothing and the clip
-    has the only motion anybody wrote for it. Shifted back to where the clip
-    sits, that motion gives the scene a mostly-blank script — silent for the
-    length of it, scripted across the stretch the clip covers — which is
-    everything of the scene worth driving the device through.
-
-    A scene that has any script of its own is left alone: this is a floor for
-    scenes with none, never an edit of somebody's work.
-    """
     result = SceneScriptsResult()
 
     log.info("=== Stage: carved clip funscripts -> their source scenes ===")
@@ -46,8 +32,6 @@ def run() -> SceneScriptsResult:
         if not isinstance(clip, dict):
             continue
 
-        # Which scene a clip came from, and where in it, is recorded by the
-        # content-matching stage; until that has run there is nothing to place.
         scene, offset = clip.get("full_video"), clip.get("scene_offset")
         if not scene or offset is None:
             result.unmatched_clip += 1
@@ -55,7 +39,6 @@ def run() -> SceneScriptsResult:
 
         scene = Path(scene)
         if not scene.is_file():
-            # The match named a file since renamed, moved out or deleted.
             result.scene_gone += 1
             continue
 
@@ -69,8 +52,6 @@ def run() -> SceneScriptsResult:
             result.no_clip_script += 1
             continue
 
-        # The scene's own runtime, not the clip's: what the script covers is the
-        # clip's window, but what it is a script *for* is the whole scene.
         duration = ffprobe.duration_seconds(scene)
         if duration is None:
             result.unprobeable += 1

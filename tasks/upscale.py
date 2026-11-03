@@ -1,4 +1,3 @@
-"""Upscale videos from 1_sorted/<source>/<orientation>/ using Topaz."""
 from __future__ import annotations
 
 import logging
@@ -59,14 +58,6 @@ def run(
     low_disk_dismissed_file: Path | None = None,
     origenerator_dir: Path | None = None,
 ) -> UpscaleResult:
-    """Upscale the pending sorted videos into the outbox, within one run's budget.
-
-    The three trees the stage spans, the free-space floor it stops at, the
-    file that remembers the low-disk warning was dismissed and the Origenerator
-    checkout that says the rate its videos are generated at are arguments,
-    resolved here rather than in the signature: a default is evaluated at
-    import, which would freeze the value past ``override_config``.
-    """
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
     trash_dir = config.TRASH_DIR if trash_dir is None else trash_dir
@@ -210,12 +201,6 @@ def collect_queued_videos(
     outbox_dir: Path | None = None,
     trash_dir: Path | None = None,
 ) -> list[tuple[Path, str, str]]:
-    """The pending videos, newly sorted ones first, as (file, source, orient).
-
-    Public, and reached with no roots from ``has_pending_work`` as well as
-    from ``run``, so it resolves its own — which is why all three roots keep a
-    read here on top of the one in ``run``.
-    """
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
     trash_dir = config.TRASH_DIR if trash_dir is None else trash_dir
@@ -266,9 +251,6 @@ def collect_queued_videos(
 
 def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, settings: topaz.Settings,
                 timeout: float | None = None) -> bool:
-    # check=False, said out loud: a non-zero exit is this function's answer --
-    # the caller counts the clip failed, deletes the partial and moves on --
-    # not an exception for the loop to catch around every encode.
     return subprocess.run(
         topaz.command(in_file, tmp, settings), env=env, timeout=timeout,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
@@ -300,8 +282,6 @@ def _settings_for(in_file: Path, source: str, orient: str, outbox_dir: Path,
 
 
 def _record_the_upscale(out: Path, settings: topaz.Settings) -> None:
-    """File what made *out* on its sidecar, which an outbox given from outside
-    the library does not have (see :func:`_is_t2v_provider`)."""
     try:
         path = sidecar_path(out)
     except ValueError:
@@ -311,25 +291,12 @@ def _record_the_upscale(out: Path, settings: topaz.Settings) -> None:
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> bool:
-    """Whether this clip is a text-to-video one, which takes the other settings.
-
-    The sidecar mirror is the *library's*, so ``sidecar_path`` can only answer
-    for a clip inside it and raises for anything else. An outbox given from
-    outside the library therefore has no sidecar to consult, which is a
-    question with no answer rather than a failure: the clip takes the default
-    settings, exactly as one with no sidecar on disk already does.
-    """
     if source != config.PROVIDER_SOURCE:
         return False
     try:
         meta_path = sidecar_path(upscaled_video_path(source, orient, stem, outbox_dir))
     except ValueError:
         return False
-    # An absent or unreadable sidecar reads back empty, and a sidecar holding
-    # nothing but the video's own kind and running time
-    # (util.video_kind.only_the_video_itself) records no generation at all:
-    # neither says text-to-video, so both take the default settings -- the wrong
-    # Topaz model is baked into a finished encode nobody re-runs.
     payload = sidecar.read(meta_path)
     if not payload or video_kind.only_the_video_itself(payload):
         return False
@@ -337,11 +304,6 @@ def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> b
 
 
 def _already_processed(source: str, fname: str, outbox_dir: Path, trash_dir: Path) -> bool:
-    """Whether this output already exists, in either orientation or in trash.
-
-    The roots are required rather than defaulted: a sentinel here would read
-    config again and leave the caller's roots decorative.
-    """
     for orient in orientation.SORTED:
         p = outbox_dir / orient / source / fname
         if p.exists() and p.stat().st_size > 0:

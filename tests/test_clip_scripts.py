@@ -10,8 +10,6 @@ from util import provenance
 
 
 class ClipScriptsCase(CarvedClipLibraryCase):
-    """A carved clip, its source scene, and the scene's script, in a temp library."""
-
     def run_stage(self, duration=2.0):
         with self.library_overrides(), \
              patch.object(clip_scripts.ffprobe, "duration_seconds", return_value=duration):
@@ -35,10 +33,6 @@ class TestClipScripts(ClipScriptsCase):
         assert written["actions"] == [{"at": 0, "pos": 0}, {"at": 500, "pos": 90}, {"at": 1500, "pos": 10}]
 
     def test_a_trimmed_script_says_in_itself_that_this_stage_cut_it(self):
-        """In the script rather than on the clip's sidecar: a script is replaced
-        by hand, copied onto a clip's other versions and followed into the
-        archive, and a stamp left on the sidecar would go on claiming this stage
-        cut a script somebody has since rewritten."""
         scene = self.make_scene(actions=[{"at": 10_000, "pos": 0}, {"at": 10_500, "pos": 90}])
         self.make_clip(scene, scene_offset=10.0)
 
@@ -49,9 +43,6 @@ class TestClipScripts(ClipScriptsCase):
         assert (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("evolver", None, None)
 
     def test_what_made_the_scene_script_comes_along_into_the_clips(self):
-        """A clip's script is only as current as the scene script it was cut
-        from, so a sweep remaking what an old scene script fed has to be able to
-        find the clips that were cut from it."""
         placed = provenance.reconstructed("evolver")
         scene = self.make_scene()
         self.write_scene_script(

@@ -1,18 +1,3 @@
-"""Stage: record each non-AI video's version family in a metadata sidecar.
-
-Real-footage clips carry no generation metadata, but Fun Time's Main Funestra
-still wants to fold an original together with its Topaz-enhanced versions into
-one rotation slot. This stage is the source of truth for that grouping: it
-scans every non_AI bucket, families the clips by name (:mod:`util.version_groups`)
-plus the pairs ``config.NONAI_VERSION_OVERRIDES`` declares, folds together the
-differently named copies whose frames show them to be one video
-(:mod:`util.same_footage`), and writes each a sidecar — mirrored under ``METADATA_DIR`` exactly like the AI tree — recording
-its family id and whether it is a processed version.
-
-Being the source of truth means it rewrites ``version.group`` on every run, so
-editing a sidecar by hand does not hold: an override is the way to correct one.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -33,8 +18,6 @@ from util.video_kind import duration_of
 
 log = logging.getLogger(__name__)
 
-# Measuring a video's frames costs a few seconds of decoding, and a folder of
-# same-length videos arrives all at once; the rest wait for the next run.
 MEASURED_PER_RUN = 8
 
 Fingerprint = Callable[[Path, float], list[str] | None]
@@ -51,7 +34,6 @@ class NonAiGroupResult:
 
 
 def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupResult:
-    """Group every non-AI video and record its family in a mirrored sidecar."""
     log.info("=== Stage: group non-AI versions ===")
     result = NonAiGroupResult()
     measure = _Allowance(fingerprint, MEASURED_PER_RUN)
@@ -68,13 +50,6 @@ def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupRes
         named = group_ids([video.stem for video in videos], config.NONAI_VERSION_OVERRIDES)
         existing_by_video = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
         ids = _joined_by_frames(videos, existing_by_video, named, measure)
-        # A `clip` object (compilation, source, performer) describes one carved
-        # scene, and its re-encodes are the same scene — so an upscaled version
-        # inherits it and stays a navigable short. Keying that on the *family*
-        # would be too broad: a family is name-derived, so a full scene the user
-        # already owned can share it with a clip carved from the same movie, and
-        # would wrongly be marked a clip. Key on the stripped stem instead, which
-        # only ever matches genuine re-encodes of that one file.
         clip_by_origin: dict[str, dict] = {}
         for video in videos:
             clip = existing_by_video[video].get("clip")

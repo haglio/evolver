@@ -1,21 +1,3 @@
-"""Which non-AI video the upscale stage encodes next, and in what order.
-
-Queued videos come from the buckets' triage folders (``0 unsorted``, ``1 could
-use work``), most-wanted first: a pin in the pin list beats everything and
-also re-queues a video whose only processed version came from older
-settings, then an explicit ``1`` flag, then Fun Time's watch score, then clips
-with a funscript — the only per-video engagement signal the non_AI library has
-of its own.
-
-The three files this reads are arguments rather than ambient config: the two
-lists are the user's -- edited by hand, and the pin one also rewritten when
-the queue window is rearranged -- the watch stats are a sibling app's, and
-naming them at the call makes it visible that listing queued videos opens three
-files besides walking the tree. What stays ambient is the library itself —
-where the non-AI root is, and what counts as a video — which is one repo-wide
-answer that no caller varies.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -46,7 +28,6 @@ class QueuedVideo:
 
 def collect_queued_videos(*, skip_list: Path, pin_list: Path,
                        watch_stats_file: Path) -> list[QueuedVideo]:
-    """Unprocessed triage-folder videos, most-wanted first."""
     queued_videos: list[QueuedVideo] = []
     skipped = set(listed_videos(skip_list))
     pinned = listed_videos(pin_list)
@@ -61,9 +42,6 @@ def collect_queued_videos(*, skip_list: Path, pin_list: Path,
                     rel = relpath(video)
                     if is_processed_stem(video.stem):
                         continue
-                    # A version of this video already existing normally means
-                    # there is nothing to do. A pin overrides that: the version
-                    # is from older settings, and the redo is the whole point.
                     if video.stem in processed_stems and rel not in pinned:
                         continue
                     if rel in skipped:
@@ -80,12 +58,6 @@ def collect_queued_videos(*, skip_list: Path, pin_list: Path,
 
 
 def relpath(video: Path) -> str:
-    """*video*'s path within the non-AI library — the key everything here uses.
-
-    Both lists are written in it by hand, the attempt counter is keyed by
-    it, and it is what the stage reports and logs, so one spelling has to serve
-    all four.
-    """
     return video.relative_to(config.NON_AI_DIR).as_posix()
 
 
@@ -105,10 +77,6 @@ def pin_ahead(pin_list: Path, videos: list[str]) -> None:
 
 
 def listed_videos(path: Path) -> list[str]:
-    """A hand-edited list's relative paths, in file order.
-
-    One path per line; anything past a tab is the user's own note about why.
-    """
     return [video for video, _line in _list_lines(path)]
 
 
@@ -121,19 +89,10 @@ def _list_lines(path: Path) -> list[tuple[str, str]]:
 
 
 def _upscale_ready_dirs(triage_dir: Path) -> list[Path]:
-    """*triage_dir* plus the sub-stages of it whose clips need only the encode.
-
-    A triage dir can split into numbered sub-stages. The first is manual
-    pre-work — "1_originals_needing_trimming" still wants a human with a
-    trimmer, so an unattended multi-hour encode would bake in the untrimmed
-    footage. The later ones say in their own names that trimming is settled and
-    upscaling is all that's left, so their clips queue like direct children do.
-    """
     return [triage_dir] + [d for _, d in stage_dirs(triage_dir, digits=(2, 3))]
 
 
 def _processed_stems(bucket: Path) -> set[str]:
-    """Original stems that already have a processed version somewhere in *bucket*."""
     stems = set()
     for video in bucket.rglob("*"):
         if is_finalized_video_file(video) and is_processed_stem(video.stem):
@@ -142,13 +101,6 @@ def _processed_stems(bucket: Path) -> set[str]:
 
 
 def _watch_scores(path: Path) -> dict[str, float]:
-    """Fun Time's per-video watch score, keyed by its normalized path.
-
-    Mirrors the breeding score its playlist weighting uses: completions plus
-    three per lock, minus skips. Empty until Fun Time starts tracking primary
-    (the Main Funestra) plays; satellite entries all point at the AI outbox and simply never
-    match a non-AI queued video.
-    """
     return {
         key: entry.get("completions", 0) + 3 * entry.get("locks", 0) - entry.get("skips", 0)
         for key, entry in read_dict(path).items()
@@ -161,7 +113,6 @@ def _has_funscript(video: Path) -> bool:
 
 
 def _pin_rank(pinned: list[str], video: Path) -> int:
-    """Where *video* sits in the pin list — past the end when it is not pinned."""
     try:
         return pinned.index(relpath(video))
     except ValueError:

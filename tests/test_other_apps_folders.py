@@ -1,4 +1,3 @@
-"""What Evolver's walkers do with Genau's folder and Origenerator's, which the shared settings place inside the video library."""
 from __future__ import annotations
 
 import json

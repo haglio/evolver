@@ -17,7 +17,6 @@ def _touch(path: Path, body: str = "x") -> Path:
 
 
 def _library(root: Path) -> tuple[Path, Path, Path]:
-    """A (video_library, non_AI, metadata) triple mirroring the real layout."""
     video_lib = root / "videos"
     non_ai = video_lib / "2D" / "non_AI"
     metadata = root / "metadata"
@@ -40,7 +39,6 @@ class TestNonAiGroup(unittest.TestCase):
 
                 result = nonai_group.run()
 
-                # The sidecar mirrors the clip's full path under metadata/.
                 assert sidecar.sidecar_path(original) == metadata / "2D" / "non_AI" / "lagoon" / "2 done" / "Jane-Doe-lA0JUsAd.json"
                 orig = sidecar.read(sidecar.sidecar_path(original))
                 var = sidecar.read(sidecar.sidecar_path(version))
@@ -52,8 +50,6 @@ class TestNonAiGroup(unittest.TestCase):
                 assert result.written == 3
 
     def test_merges_version_into_an_existing_clip_sidecar(self):
-        """A clip carved from a compilation carries a `clip` object; grouping must
-        add `version` alongside it, never clobber it."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -74,8 +70,6 @@ class TestNonAiGroup(unittest.TestCase):
                 assert "group" in got["version"]
 
     def test_propagates_clip_across_the_version_family(self):
-        """The upscaled version of a clip inherits the original's `clip` metadata,
-        so the Main Funestra still treats the enhanced file as a navigable short."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -97,9 +91,6 @@ class TestNonAiGroup(unittest.TestCase):
                 assert var["clip"] == {"compilation": "Vol6", "index": 1}
 
     def test_does_not_tag_a_name_neighbour_as_a_clip(self):
-        """A family is name-derived, so a full scene the user already owned can
-        share one with a clip carved from the same movie. Only true re-encodes of
-        the clip inherit its `clip` object — never the neighbour."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -122,8 +113,6 @@ class TestNonAiGroup(unittest.TestCase):
                 assert "clip" not in sidecar.read(sidecar.sidecar_path(neighbour))
 
     def test_a_declared_pair_gets_one_group_the_names_never_would(self):
-        """The stage rewrites `version.group` every run, so a hand edit to a
-        sidecar lasts ten minutes. Declaring the pair is what makes it stick."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
@@ -150,7 +139,7 @@ class TestNonAiGroup(unittest.TestCase):
             ):
                 clip = _touch(non_ai / "lagoon" / "0 unsorted" / "Scene-1.mp4")
                 assert nonai_group.run().written == 1
-                assert nonai_group.run().written == 0  # nothing changed
+                assert nonai_group.run().written == 0
 
                 clip.unlink()
                 result = nonai_group.run()
@@ -176,7 +165,6 @@ ONE_FINGERPRINT = [f"{0x5A5A5A5A5A5A5A5A + moment:016x}" for moment in range(16)
 
 
 def _scene(path: Path, seconds: float) -> Path:
-    """A full-length video whose running time the video-kinds stage has recorded."""
     _touch(path)
     write_sidecar(sidecar.sidecar_path(path),
                   {"video": {"type": "full_length", "duration_seconds": seconds}})
@@ -339,9 +327,6 @@ class TestOneVideoByItsFrames(unittest.TestCase):
 
 class TestGroupingCannotFail(unittest.TestCase):
     def test_the_verdict_rule_lives_in_the_table_and_nowhere_else(self):
-        """Grouping is bookkeeping over whatever files exist: absence from
-        ``_STAGE_FAILED`` is what says it cannot fail, so a result that also
-        advertises an ``ok`` invites a reader to look in the wrong place."""
         assert "group_non_ai" not in evolver._STAGE_FAILED
         assert not hasattr(nonai_group.NonAiGroupResult(), "ok")
 
