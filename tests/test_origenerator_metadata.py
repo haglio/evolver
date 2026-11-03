@@ -21,20 +21,30 @@ _SCHEMA = (
 )
 
 
-def _row(prompt_id, *, workflow="wan22_i2v", version="v001", pos=None, neg=None,
-         seed=None, params=None, outputs=(), created=None):
+_ROW_DEFAULTS = {
+    "workflow": "wan22_i2v", "version": "v001", "pos": None, "neg": None,
+    "seed": None, "params": None, "outputs": (), "created": None,
+}
+
+
+def _row(prompt_id, **given):
+    unknown = given.keys() - _ROW_DEFAULTS.keys()
+    if unknown:
+        raise TypeError(f"unknown row field: {', '.join(sorted(unknown))}")
+    fields = {**_ROW_DEFAULTS, **given}
     return {
         "prompt_id": prompt_id,
-        "workflow_name": workflow,
-        "workflow_version": version,
-        "positive_prompt": pos,
-        "negative_prompt": neg,
-        "seed": seed,
-        "params_json": json.dumps(params or {}),
+        "workflow_name": fields["workflow"],
+        "workflow_version": fields["version"],
+        "positive_prompt": fields["pos"],
+        "negative_prompt": fields["neg"],
+        "seed": fields["seed"],
+        "params_json": json.dumps(fields["params"] or {}),
         "output_files": json.dumps(
-            [{"filename": name, "subfolder": "video", "type": "output"} for name in outputs]
+            [{"filename": name, "subfolder": "video", "type": "output"}
+             for name in fields["outputs"]]
         ),
-        "created_at": created,
+        "created_at": fields["created"],
     }
 
 
