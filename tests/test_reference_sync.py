@@ -107,9 +107,11 @@ class TestGenaumacherSessions(unittest.TestCase):
             gone = str(temp / "Downloads" / "scratch.mp4")
             session = _write_json(temp / "sessions" / "Scratch.json", {"video_path": gone})
 
-            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
-                with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
-                    result = reference_sync.run()
+            with (
+                _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"),
+                self.assertLogs("tasks.reference_sync", level="WARNING") as logged,
+            ):
+                result = reference_sync.run()
 
             assert json.loads(session.read_text(encoding="utf-8"))["video_path"] == gone
             assert result.unresolved == 1
@@ -191,9 +193,11 @@ class TestAFolderThatCannotBeReached(unittest.TestCase):
                 str(vr_root / "finished" / name).lower(): {"completions": 1, "skips": 0, "locks": 0}
                 for name in ("scene one.mp4", "scene two.mp4")})
 
-            with _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, VR_VIDEO_DIR=vr_root):
-                with self.assertLogs("tasks.reference_sync", level="WARNING") as logged:
-                    reference_sync.run()
+            with (
+                _stores_under(temp, FUN_TIME_WATCH_STATS_FILE=stats, VR_VIDEO_DIR=vr_root),
+                self.assertLogs("tasks.reference_sync", level="WARNING") as logged,
+            ):
+                reference_sync.run()
 
             assert logged.output == [f"WARNING:tasks.reference_sync:2 reference(s) not checked: {vr_root} cannot be reached."]
 

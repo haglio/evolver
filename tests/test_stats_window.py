@@ -144,7 +144,7 @@ def _limit_line_rows(image: QImage) -> list[int]:
         grays = sum(
             1
             for x in range(100, 640)
-            if (lambda c: c[0] == c[1] == c[2] and 150 <= c[0] <= 235)(_rgb(image, x, y))
+            if (c := _rgb(image, x, y))[0] == c[1] == c[2] and 150 <= c[0] <= 235
         )
         if grays >= 60:
             rows.append(y)

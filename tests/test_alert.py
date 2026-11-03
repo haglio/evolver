@@ -68,7 +68,7 @@ class TestShowError(unittest.TestCase):
     @error_popup()
     @alert_shown(side_effect=ImportError("no Qt"))
     def test_a_dialog_that_will_not_open_falls_back_to_the_windows_one(
-        self, _show_alert, show_error_popup,
+        self, show_alert, show_error_popup,
     ):
         with self.assertLogs("util.alert", level="ERROR") as logged:
             alert.show_error("Title", "Body")
@@ -79,7 +79,7 @@ class TestShowError(unittest.TestCase):
     @error_popup()
     @alert_shown(side_effect=ImportError("no Qt"))
     def test_the_windows_dialog_spells_out_the_folders_it_cannot_link_to(
-        self, _show_alert, show_error_popup,
+        self, show_alert, show_error_popup,
     ):
         folder = Path("library", "scripts", "alpha")
 
@@ -90,7 +90,7 @@ class TestShowError(unittest.TestCase):
 
     @error_popup()
     @alert_shown(side_effect=ImportError("no Qt"))
-    def test_the_windows_dialog_has_no_dismiss_so_it_comes_back(self, _show_alert, _popup):
+    def test_the_windows_dialog_has_no_dismiss_so_it_comes_back(self, show_alert, popup):
         with self.assertLogs("util.alert", level="ERROR"):
             dismissed = alert.show_error("Title", "Body", dismissible=True)
 
@@ -99,7 +99,7 @@ class TestShowError(unittest.TestCase):
     @error_popup(side_effect=OSError("no user32"))
     @alert_shown(side_effect=ImportError("no Qt"))
     def test_a_stage_that_already_failed_does_not_fail_again_saying_so(
-        self, _show_alert, _show_error_popup,
+        self, show_alert, show_error_popup,
     ):
         with self.assertLogs("util.alert", level="ERROR"):
             alert.show_error("Title", "Body")

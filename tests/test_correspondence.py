@@ -79,9 +79,11 @@ class TestCorrespondence:
             (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-b_topaz.mp4").write_bytes(b"b")
             (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-b_topaz_cfr.mp4").write_bytes(b"c")
 
-            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
-                with patch("check_correspondence.show_error") as show_error:
-                    result = check_correspondence.run(show_popup=True)
+            with (
+                override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir),
+                patch("check_correspondence.show_error") as show_error,
+            ):
+                result = check_correspondence.run(show_popup=True)
 
             assert not result.ok
             assert result.sorted_count == 1

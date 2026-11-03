@@ -40,11 +40,9 @@ def test_no_color_here_is_a_hand_copy_of_a_family_token():
     offenders = []
     for path in _sources():
         for node in strings_outside_docstrings(ast.parse(path.read_text(encoding="utf-8"))):
-            for found in _HEX.findall(node.value):
-                if found.lower() in family:
-                    offenders.append(
-                        f"{path.name}:{node.lineno} {found} is "
-                        f"shared_ui.palette.{family[found.lower()]}")
+            offenders.extend(
+                f"{path.name}:{node.lineno} {found} is shared_ui.palette.{family[found.lower()]}"
+                for found in _HEX.findall(node.value) if found.lower() in family)
     assert not offenders, (
         "a family color written out by hand instead of read from a shared_ui "
         "token: " + ", ".join(offenders))

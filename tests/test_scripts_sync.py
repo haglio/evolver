@@ -172,9 +172,11 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
             script_path = script_root / "VR" / "finished" / "scene one.funscript"
             _write(script_path)
 
-            with library_overrides(video_root, script_root, VR_VIDEO_DIR=a_drive_that_is_not_there() / "VR"):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root, VR_VIDEO_DIR=a_drive_that_is_not_there() / "VR"),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                scripts_sync.run(show_popup=True)
 
             show_error.assert_not_called()
             assert script_path.exists()
@@ -198,9 +200,11 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
             vr_root = a_drive_that_is_not_there() / "VR"
             _write(script_root / "VR" / "finished" / "scene one.funscript")
 
-            with library_overrides(video_root, script_root, VR_VIDEO_DIR=vr_root):
-                with self.assertLogs("tasks.scripts_sync", level="WARNING") as logged:
-                    scripts_sync.run()
+            with (
+                library_overrides(video_root, script_root, VR_VIDEO_DIR=vr_root),
+                self.assertLogs("tasks.scripts_sync", level="WARNING") as logged,
+            ):
+                scripts_sync.run()
 
             assert logged.output == [f"WARNING:tasks.scripts_sync:1 funscript(s) not checked: {vr_root} cannot be reached, so they stay where they are until it can be."]
 
@@ -273,9 +277,11 @@ class TestUnmatchedScriptsFolder(unittest.TestCase):
             waiting.parent.mkdir(parents=True, exist_ok=True)
             waiting.write_text("{}", encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    result = scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                result = scripts_sync.run(show_popup=True)
 
             assert result.ok
             assert result.unmatched_paths == []
@@ -289,9 +295,11 @@ class TestUnmatchedScriptsFolder(unittest.TestCase):
             stray.parent.mkdir(parents=True, exist_ok=True)
             stray.write_text("{}", encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                scripts_sync.run(show_popup=True)
 
             assert show_error.call_args.kwargs["links"] == [("Open unmatched_scripts", unmatched)]
 
@@ -380,9 +388,11 @@ class TestScriptsSync(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text("{}", encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                scripts_sync.run(show_popup=True)
 
             _title, message = show_error.call_args.args
             assert message == "This funscript matches more than one video:\n" + str(Path("unsorted", "clip.funscript"))
@@ -400,9 +410,11 @@ class TestScriptsSync(unittest.TestCase):
                 script_path.parent.mkdir(parents=True, exist_ok=True)
                 script_path.write_text(f'{{"actions":{actions}}}', encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                scripts_sync.run(show_popup=True)
 
             _title, message = show_error.call_args.args
             assert message == "This funscript can't move into place, because a different script is already there:\n" + str(Path("unsorted", "clip.funscript"))
@@ -475,9 +487,11 @@ class TestScriptsSync(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text("{}", encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    result = scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                result = scripts_sync.run(show_popup=True)
 
             assert not result.ok
             assert result.unmatched == 1
@@ -491,9 +505,11 @@ class TestScriptsSync(unittest.TestCase):
             script_path.parent.mkdir(parents=True, exist_ok=True)
             script_path.write_text("{}", encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                scripts_sync.run(show_popup=True)
 
             _title, message = show_error.call_args.args
             assert message == "This funscript matches no video:\nscene one.funscript"
@@ -507,9 +523,11 @@ class TestScriptsSync(unittest.TestCase):
                 script_path.parent.mkdir(parents=True, exist_ok=True)
                 script_path.write_text("{}", encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                scripts_sync.run(show_popup=True)
 
             _title, message = show_error.call_args.args
             assert message == "These funscripts match no video:\nscene one.funscript\nscene two.funscript"
@@ -615,9 +633,11 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             sorted_script.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.shutil.copy2", side_effect=PermissionError("denied")):
-                    result = scripts_sync.run()
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.shutil.copy2", side_effect=PermissionError("denied")),
+            ):
+                result = scripts_sync.run()
 
             outbox_script = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.funscript"
             assert result.variant_copy_errors == 1
@@ -638,10 +658,12 @@ class TestScriptsSync(unittest.TestCase):
             outbox_video.write_bytes(b"upscaled")
             sorted_script.write_text('{"actions":[1]}', encoding="utf-8")
 
-            with library_overrides(video_root, script_root):
-                with patch("tasks.scripts_sync.shutil.copy2", side_effect=PermissionError("denied")):
-                    with patch("tasks.scripts_sync.show_error") as show_error:
-                        scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root),
+                patch("tasks.scripts_sync.shutil.copy2", side_effect=PermissionError("denied")),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                scripts_sync.run(show_popup=True)
 
             _title, message = show_error.call_args.args
             assert message == "This funscript failed to copy to another version of its video:\n" + str(Path("2D", "AI", "1_sorted", "src", "portrait", "clip.funscript"))
@@ -850,9 +872,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             script_path.write_text("{}", encoding="utf-8")
 
             with library_overrides(video_root, script_root,
-                                    NONAI_RETIRED_ROOT=archive_root):
-                with patch("tasks.scripts_sync.shutil.move", side_effect=OSError("denied")):
-                    result = scripts_sync.run()
+                                    NONAI_RETIRED_ROOT=archive_root), patch("tasks.scripts_sync.shutil.move", side_effect=OSError("denied")):
+                result = scripts_sync.run()
 
             assert not result.ok
             assert result.unmatched == 1
@@ -869,9 +890,8 @@ class TestFollowRetiredVideos(unittest.TestCase):
             script_path.write_text("{}", encoding="utf-8")
 
             with library_overrides(video_root, script_root,
-                                    NONAI_RETIRED_ROOT=archive_root):
-                with patch("tasks.scripts_sync._index_archived_videos") as index_archived:
-                    result = scripts_sync.run()
+                                    NONAI_RETIRED_ROOT=archive_root), patch("tasks.scripts_sync._index_archived_videos") as index_archived:
+                result = scripts_sync.run()
 
             assert result.already_aligned == 1
             index_archived.assert_not_called()
@@ -907,9 +927,11 @@ class TestFollowRetiredVideos(unittest.TestCase):
             script_path = script_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.funscript"
             _write(script_path)
 
-            with library_overrides(video_root, script_root, NONAI_RETIRED_ROOT=archive_root):
-                with patch("tasks.scripts_sync.show_error") as show_error:
-                    result = scripts_sync.run(show_popup=True)
+            with (
+                library_overrides(video_root, script_root, NONAI_RETIRED_ROOT=archive_root),
+                patch("tasks.scripts_sync.show_error") as show_error,
+            ):
+                result = scripts_sync.run(show_popup=True)
 
             show_error.assert_not_called()
             assert script_path.exists()

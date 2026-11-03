@@ -55,9 +55,8 @@ def query_selector(root: Node, selector: str) -> Node | None:
         next_nodes: list[Node] = []
         for node in current:
             candidates = _descendants(node) if index == 0 else node.children
-            for candidate in candidates:
-                if _matches_selector_part(candidate, part):
-                    next_nodes.append(candidate)
+            next_nodes.extend(candidate for candidate in candidates
+                              if _matches_selector_part(candidate, part))
         if not next_nodes:
             return None
         current = next_nodes
@@ -66,8 +65,7 @@ def query_selector(root: Node, selector: str) -> Node | None:
 
 def text_content(node: Node) -> str:
     parts = list(node.text_chunks)
-    for child in node.children:
-        parts.append(text_content(child))
+    parts.extend(text_content(child) for child in node.children)
     return "".join(parts)
 
 

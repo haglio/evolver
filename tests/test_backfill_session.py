@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import unittest
 from pathlib import Path
@@ -12,7 +13,6 @@ from backfill.vocabulary import Act
 from tests.temp_helpers import library_tree
 from tests.vocabulary_support import vocabulary_of
 from util.sidecar import sidecar_path
-import contextlib
 
 VOCABULARY = vocabulary_of(Act("beta", "Beta"), Act("dance", "Dancing"), Act("zeta", "Zeta"))
 

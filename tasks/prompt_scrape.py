@@ -283,25 +283,6 @@ class _ProviderEmbeddedMetadata:
 
 _JSON_WINDOW_CHARS = 5000
 
-_EMBEDDED_FIELDS: tuple[tuple[str, Callable[[str], str]], ...] = (
-    ("prompt", lambda blob: _extract_json_string_field(blob, "prompt")),
-    ("negative_prompt",
-     lambda blob: _extract_nullable_json_string_field(blob, "negative_prompt")),
-    ("parent_image_id",
-     lambda blob: _extract_nullable_json_string_field(blob, "parent_image_id")),
-    ("model", lambda blob: _extract_json_string_field(blob, "model")),
-    ("version", lambda blob: _extract_json_string_field(blob, "version")),
-    ("seed", lambda blob: _int_field_as_text(blob, "seed")),
-    ("aspect_ratio", lambda blob: _extract_json_string_field(blob, "aspectRatio")),
-    ("resolution", _resolution_field),
-    ("quality", lambda blob: _extract_json_string_field(blob, "quality")),
-    ("created", _created_field),
-    ("action", _action_field),
-    ("style", lambda blob: _extract_nullable_json_string_field(blob, "styleValue")),
-    ("creativity", lambda blob: _int_field_as_text(blob, "creativity")),
-)
-
-
 def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmbeddedMetadata:
     found: dict[str, str] = {}
     for index in _all_indices(html, page_id):
@@ -336,6 +317,25 @@ def _created_field(blob: str) -> str:
 def _action_field(blob: str) -> str:
     raw_action = _extract_json_first_array_string(blob, "action")
     return _titlecase_action(raw_action) if raw_action else ""
+
+
+_EMBEDDED_FIELDS: tuple[tuple[str, Callable[[str], str]], ...] = (
+    ("prompt", lambda blob: _extract_json_string_field(blob, "prompt")),
+    ("negative_prompt",
+     lambda blob: _extract_nullable_json_string_field(blob, "negative_prompt")),
+    ("parent_image_id",
+     lambda blob: _extract_nullable_json_string_field(blob, "parent_image_id")),
+    ("model", lambda blob: _extract_json_string_field(blob, "model")),
+    ("version", lambda blob: _extract_json_string_field(blob, "version")),
+    ("seed", lambda blob: _int_field_as_text(blob, "seed")),
+    ("aspect_ratio", lambda blob: _extract_json_string_field(blob, "aspectRatio")),
+    ("resolution", _resolution_field),
+    ("quality", lambda blob: _extract_json_string_field(blob, "quality")),
+    ("created", _created_field),
+    ("action", _action_field),
+    ("style", lambda blob: _extract_nullable_json_string_field(blob, "styleValue")),
+    ("creativity", lambda blob: _int_field_as_text(blob, "creativity")),
+)
 
 
 def _extract_json_string_field(blob: str, field_name: str) -> str:
@@ -388,7 +388,7 @@ def _embedded_to_video_metadata(embedded: _ProviderEmbeddedMetadata) -> dict[str
         fields["model"] = f"Video {embedded.version}"
     elif embedded.model:
         fields["model"] = embedded.model
-    for key, value in (
+    fields.update({key: value for key, value in (
         ("action", embedded.action),
         ("resolution", embedded.resolution),
         ("aspect_ratio", embedded.aspect_ratio),
@@ -396,9 +396,7 @@ def _embedded_to_video_metadata(embedded: _ProviderEmbeddedMetadata) -> dict[str
         ("seed", embedded.seed),
         ("created", embedded.created),
         ("style", embedded.style),
-    ):
-        if value:
-            fields[key] = value
+    ) if value})
     return fields
 
 
@@ -406,7 +404,7 @@ def _embedded_to_image_metadata(embedded: _ProviderEmbeddedMetadata) -> dict[str
     fields: dict[str, str] = {}
     if embedded.model:
         fields["model"] = embedded.model
-    for key, value in (
+    fields.update({key: value for key, value in (
         ("action", embedded.action),
         ("resolution", embedded.resolution),
         ("aspect_ratio", embedded.aspect_ratio),
@@ -415,9 +413,7 @@ def _embedded_to_image_metadata(embedded: _ProviderEmbeddedMetadata) -> dict[str
         ("created", embedded.created),
         ("style", embedded.style),
         ("creativity", embedded.creativity),
-    ):
-        if value:
-            fields[key] = value
+    ) if value})
     return fields
 
 

@@ -54,9 +54,11 @@ class TestSortHelpers(unittest.TestCase):
             src = source_dir / "clip.mp4"
             src.write_bytes(b"video")
 
-            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir):
-                with patch("tasks.sort.orientation_of", return_value="landscape"):
-                    result = sort_task.run()
+            with (
+                override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir),
+                patch("tasks.sort.orientation_of", return_value="landscape"),
+            ):
+                result = sort_task.run()
 
             assert result.moved == 1
             assert (sorted_dir / dynamic_source / "landscape" / "clip.mp4").exists()
@@ -70,9 +72,11 @@ class TestSortHelpers(unittest.TestCase):
             source_dir.mkdir(parents=True)
             (source_dir / "clip.mp4").write_bytes(b"video")
 
-            with override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir):
-                with patch("tasks.sort.orientation_of", return_value="landscape"):
-                    sort_task.run()
+            with (
+                override_config(INBOX_DIR=inbox, SORTED_DIR=sorted_dir),
+                patch("tasks.sort.orientation_of", return_value="landscape"),
+            ):
+                sort_task.run()
 
             assert not source_dir.exists()
 
@@ -84,9 +88,11 @@ class TestSortHelpers(unittest.TestCase):
             (inbox / "examplesource" / "clip one.mp4").write_bytes(b"video")
             ambient = td_path / "ambient"
 
-            with override_config(INBOX_DIR=ambient / "0_inbox", SORTED_DIR=ambient / "1_sorted"):
-                with patch("tasks.sort.orientation_of", return_value="portrait"):
-                    result = sort_task.run(inbox_dir=inbox, sorted_dir=sorted_dir)
+            with (
+                override_config(INBOX_DIR=ambient / "0_inbox", SORTED_DIR=ambient / "1_sorted"),
+                patch("tasks.sort.orientation_of", return_value="portrait"),
+            ):
+                result = sort_task.run(inbox_dir=inbox, sorted_dir=sorted_dir)
 
             assert result.moved == 1
             assert (sorted_dir / "examplesource" / "portrait" / "clip one.mp4").exists()

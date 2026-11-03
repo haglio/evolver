@@ -119,10 +119,9 @@ class TestDiscardAsTrash(unittest.TestCase):
                     raise PermissionError(32, "The process cannot access the file")
                 return real_replace(self, target)
 
-            with override_config(TRASH_DIR=trash_dir):
-                with patch.object(type(video), "replace", replace_locked_once), \
+            with override_config(TRASH_DIR=trash_dir), patch.object(type(video), "replace", replace_locked_once), \
                      no_wait_for_a_held_file() as sleep:
-                    destination = send_to_trash(video)
+                destination = send_to_trash(video)
 
             assert len(attempts) == 2
             sleep.assert_called_once()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
@@ -11,7 +12,6 @@ from pathlib import Path
 from app_support.file_channel import retried_while_held
 
 import config
-import contextlib
 
 PARTIAL_MARKER = ".partial."
 

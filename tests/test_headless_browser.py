@@ -30,10 +30,9 @@ class TestFindBrowserExecutable(unittest.TestCase):
 
 
     def test_no_browser_installed_is_no_answer_rather_than_an_error(self):
-        with workspace_temp_dir() as root:
-            with patch.object(headless_browser, "_BROWSER_CANDIDATES",
-                              (root / "chrome.exe",)):
-                assert headless_browser.find_browser_executable() is None
+        with workspace_temp_dir() as root, patch.object(headless_browser, "_BROWSER_CANDIDATES",
+                          (root / "chrome.exe",)):
+            assert headless_browser.find_browser_executable() is None
 
 
 class TestFetchDom(unittest.TestCase):
