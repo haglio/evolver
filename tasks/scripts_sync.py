@@ -286,7 +286,7 @@ def _rehome_to_library_version(script_path: Path, video_index: dict[str, list[Pa
             except OSError:
                 log.exception("FAILED TO COPY SCRIPT TO ARCHIVE  %s  ->  %s", script_path, archive_dest)
 
-    dest = script_path_for_video(sorted(siblings)[0])
+    dest = script_path_for_video(min(siblings))
     try:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(script_path), str(dest))
