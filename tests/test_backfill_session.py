@@ -217,7 +217,7 @@ class TestUndo(unittest.TestCase):
     def test_undoing_a_discard_reclaims_the_video_from_the_trash_folder(self):
         session = self._session()
         video = session.current
-        landed = Path("kinda_weird") / video.name
+        landed = Path("trash") / video.name
 
         with patch("backfill.session.send_to_trash", return_value=landed), \
              patch("backfill.session.reclaim_from_trash") as reclaim:

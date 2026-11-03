@@ -59,7 +59,7 @@ class _LibraryTree:
         self.ai = root / "AI"
         self.upscaled = self.ai / "2_outbox" / "upscaled_by_orientation"
         self.metadata = root / "metadata"
-        self.trash = root / "kinda_weird"
+        self.trash = root / "trash"
 
     def video(self, orient="portrait", source="provider2", name="a_topaz.mp4") -> Path:
         video = self.upscaled / orient / source / name
@@ -126,10 +126,10 @@ class LaneLibrary:
         self.sorted_dir = self.ai / "1_sorted"
         self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
         self.non_ai = self.library / "2D" / "non_AI"
-        self.trash = self.ai / "2_outbox" / "kinda_weird"
+        self.trash = self.ai / "2_outbox" / "trash"
         self.genau = self.library / "genau"
         self.genau_flicks = self.genau / "flicks"
-        self.genau_trash = self.genau / "weird"
+        self.genau_trash = self.genau / "trash"
         self.genau_audio = videos / "audio" / "genau"
         self.origenerator = self.library / "origenerator"
         self.metadata = videos / "metadata"

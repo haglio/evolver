@@ -35,7 +35,7 @@ class TestRelocate(unittest.TestCase):
 
     def test_leaves_a_reference_where_its_video_was_while_the_video_waits_in_kinda_trash(self):
         with workspace_temp_dir() as temp:
-            trash_dir = temp / "videos" / "2_outbox" / "kinda_weird"
+            trash_dir = temp / "videos" / "2_outbox" / "trash"
             _write_video(trash_dir / "clip.mp4")
             with override_config(VIDEO_SEARCH_ROOT=temp / "videos", TRASH_DIR=trash_dir):
                 index = video_locator.build_index()
@@ -44,10 +44,10 @@ class TestRelocate(unittest.TestCase):
 
     def test_leaves_a_reference_where_its_flick_was_while_the_flick_waits_in_genaus_trash_pile(self):
         with workspace_temp_dir() as temp:
-            genau_trash = temp / "videos" / "genau" / "weird"
+            genau_trash = temp / "videos" / "genau" / "trash"
             _write_video(genau_trash / "loop.mp4")
             with override_config(VIDEO_SEARCH_ROOT=temp / "videos",
-                                 TRASH_DIR=temp / "videos" / "2_outbox" / "kinda_weird",
+                                 TRASH_DIR=temp / "videos" / "2_outbox" / "trash",
                                  GENAU_TRASH_DIR=genau_trash):
                 index = video_locator.build_index()
 

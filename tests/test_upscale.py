@@ -25,7 +25,7 @@ from util.sidecar import upscaled_video_path
 
 def library_dirs(root):
     """The three trees every upscale test builds: 1_sorted, the outbox, trash."""
-    return root / "sorted", root / "out", root / "weird"
+    return root / "sorted", root / "out", root / "trash"
 
 
 def fake_run_ffmpeg(_in_file, tmp, _env, _settings=None, **kwargs):
@@ -39,7 +39,7 @@ class TestUpscaleHelpers(unittest.TestCase):
     def test_already_processed_checks_all_locations(self):
         with workspace_temp_dir() as root:
             out = root / "out"
-            trash = root / "weird"
+            trash = root / "trash"
             (out / "landscape" / "provider").mkdir(parents=True)
             (out / "portrait" / "provider").mkdir(parents=True)
             trash.mkdir(parents=True)
@@ -633,7 +633,7 @@ class TestSettingsSelection(unittest.TestCase):
         ai_dir = video_lib / "2D" / "AI"
         sorted_dir = ai_dir / "1_sorted"
         out_dir = ai_dir / "2_outbox" / "upscaled_by_orientation"
-        trash_dir = root / "weird"
+        trash_dir = root / "trash"
         meta_dir = root / "meta"
 
         in_file = sorted_dir / "provider" / "landscape" / "clip.mp4"
