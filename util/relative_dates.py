@@ -18,7 +18,7 @@ def as_iso_date(value: str) -> str:
     amount = int(match.group(1))
     unit = match.group(2).lower()
     now = today()
-    if unit == "m" or unit == "h":
+    if unit in {"m", "h"}:
         return now.isoformat()
     if unit == "d":
         return (now - datetime.timedelta(days=amount)).isoformat()

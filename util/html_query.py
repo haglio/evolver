@@ -111,7 +111,7 @@ def _parse_selector_part(raw: str) -> _SelectorPart:
 
 
 def _matches_selector_part(node: Node, part: _SelectorPart) -> bool:
-    if part.tag != "*" and node.tag != part.tag:
+    if part.tag not in ("*", node.tag):
         return False
     classes = set(node.attrs.get("class", "").split())
     return all(required in classes for required in part.classes)
