@@ -11,6 +11,7 @@ from pathlib import Path
 from app_support.file_channel import retried_while_held
 
 import config
+import contextlib
 
 PARTIAL_MARKER = ".partial."
 
@@ -134,10 +135,8 @@ def child_dirs(root: Path):
 def remove_empty_dirs(root: Path) -> None:
     for path in sorted(root.rglob("*"), reverse=True):
         if path.is_dir():
-            try:
+            with contextlib.suppress(OSError):
                 path.rmdir()
-            except OSError:
-                pass
 
 
 def remove_partial_files(root: Path, logger: logging.Logger, *, keep: Path | None = None) -> int:

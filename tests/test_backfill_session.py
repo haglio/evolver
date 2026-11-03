@@ -12,6 +12,7 @@ from backfill.vocabulary import Act
 from tests.temp_helpers import library_tree
 from tests.vocabulary_support import vocabulary_of
 from util.sidecar import sidecar_path
+import contextlib
 
 VOCABULARY = vocabulary_of(Act("beta", "Beta"), Act("dance", "Dancing"), Act("zeta", "Zeta"))
 
@@ -216,10 +217,8 @@ class TestUndo(unittest.TestCase):
     def test_undoing_a_discard_whose_move_failed_reclaims_nothing(self):
         class SwallowingWorker(ImmediateWorker):
             def submit(self, task):
-                try:
+                with contextlib.suppress(Exception):
                     task()
-                except Exception:
-                    pass
 
         session = self._session(worker=SwallowingWorker())
         video = session.current

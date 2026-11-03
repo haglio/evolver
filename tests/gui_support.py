@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QApplication
 
 from gui.app import EvolverApp
 from util.upscale_queue import UpscaleQueue
+import contextlib
 
 # A QApplication has to exist before the first GUI module is imported.
 QAPP = QApplication.instance() or QApplication([])
@@ -49,10 +50,8 @@ def retire_evolver_app(app) -> None:
     app._peer_timer.stop()
     app._update_timer.stop()
     app._scheduler.stop()
-    try:
+    with contextlib.suppress(TypeError):
         app._app.commitDataRequest.disconnect(app._on_session_end)
-    except TypeError:
-        pass
     app._tray.hide()
     app._tray.setParent(None)
     app._tray.deleteLater()
