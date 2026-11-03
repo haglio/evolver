@@ -206,10 +206,9 @@ class TestThePhonesFolderCannotBeReached(unittest.TestCase):
         assert result.stamped == 1
 
     def test_the_log_says_which_folder_could_not_be_reached(self):
-        with _setting() as s:
-            with s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
-                with self.assertLogs("tasks.watch_weights", level="WARNING") as logged:
-                    watch_weights.run()
+        with _setting() as s, s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
+            with self.assertLogs("tasks.watch_weights", level="WARNING") as logged:
+                watch_weights.run()
 
         assert logged.output == [f"WARNING:tasks.watch_weights:Watch weights and the phone's favorites left as they were: {s.phones_own_folder} cannot be reached."]
 
