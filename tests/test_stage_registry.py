@@ -167,18 +167,8 @@ class TestStageRegistry(unittest.TestCase):
         assert offenders == []
 
     def test_every_declared_color_is_one_qt_can_paint(self):
-        """The fourth column used to be a dict of `QColor`s, which rejected a
-        bad channel where it was written. Plain integers do not, and the
-        annotation is not checked at runtime: `QColor(300, 0, 0)` is simply
-        invalid, and Qt paints an invalid color as black. That would give one
-        stage a black band and a black legend swatch, and the Delta-E floor
-        would not notice, because it measures the same invalid color on both
-        sides of the comparison.
-        """
         for stage in STAGES:
             with self.subTest(stage=stage.key):
-                # Three channels, not four: a fourth would be an alpha Qt
-                # accepts, and the band's alpha is the painter's to decide.
                 assert len(stage.color) == 3
                 assert QColor(*stage.color).isValid()
 
@@ -189,7 +179,6 @@ class TestStageRegistry(unittest.TestCase):
         )
 
         assert worst >= 20.0, f"{pair[0]} and {pair[1]} differ by only {worst:.1f}"
-
 
 
 if __name__ == "__main__":

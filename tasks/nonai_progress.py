@@ -1,27 +1,3 @@
-"""How far through the non-AI upscale project the library is, by running time.
-
-The stage could always say how many clips were queued, and a count is the wrong
-unit for a queue whose clips run from forty seconds to an hour: when this was
-written the library was 59% upscaled by clip and 29% by running time, because
-what went first was the short stuff.  Hours left is the number a person wants,
-and a percentage of hours is the one that moves at a rate they can believe.
-
-The project is what the queue holds plus what the library has already been
-given: every bucket video with a processed version counts as done, whoever made
-it — a good part of the library was upscaled by hand in the Topaz GUI before
-this stage existed, and those are as finished as anything it promoted.  What is
-in neither set is in neither total, because the project cannot reach it: a clip
-in a sub-stage that still wants a human with a trimmer, one the skip list
-retired, one sitting in a bucket's "good to go" that nobody asked to re-encode.
-
-Nothing here measures anything.  A running time comes off the video's sidecar,
-where :mod:`tasks.video_kinds` writes it once (:mod:`util.video_kind`), so this
-costs a walk and a JSON read per video instead of four hundred ffprobe spawns
-every ten minutes.  A video nothing has measured yet is counted apart rather
-than guessed at, so over the first runs against a library that has never been
-asked, the percentage says how much of itself it can see.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterable

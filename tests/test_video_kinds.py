@@ -17,7 +17,6 @@ GENAU_SOURCE = "example-loop-clips"
 
 
 def _probe(durations: dict[str, float]):
-    """A stand-in ffprobe answering by stem, so a test says what it means."""
     return lambda video: durations.get(video.stem)
 
 
@@ -242,7 +241,6 @@ class TestKeepingTheRunningTime(unittest.TestCase):
             assert video_kind.duration_of(payload) == 240.0
 
     def test_measuring_a_free_kind_still_counts_against_the_batch_limit(self):
-        """It is an ffprobe like any other, and the pipeline has a wall clock."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(VIDEO_KIND_BATCH_LIMIT=1):
@@ -480,11 +478,6 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
 
 
 class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
-    """A run measures only so many videos; the library converges over several.
-
-    The first run over a library that has never been asked is one ffprobe per
-    video, and the pipeline it runs inside has a wall clock.
-    """
 
     def test_a_run_measures_no_more_than_the_batch_limit(self):
         with workspace_temp_dir() as root:

@@ -90,10 +90,6 @@ def run(*, sorted_dir: Path | None = None,
                 log.exception("Metadata build failed for: %s", video)
                 continue
 
-            # What landed before the scrape stays on, though the sidecar is
-            # replaced wholesale here: a kind, which would cost another ffprobe
-            # to learn again, and a stamp saying what made the upscale, which
-            # nothing could learn again at all.
             def keep_what_landed_first(current: dict, payload=payload) -> dict:
                 recorded = video_kind.kind_of(current)
                 kept = video_kind.stamped(payload, recorded) if recorded else payload

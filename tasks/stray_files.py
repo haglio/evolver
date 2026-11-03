@@ -12,9 +12,7 @@ log = logging.getLogger(__name__)
 
 _EXTENSION_SEPARATORS = (" ", "_", "-")
 
-# Files Windows writes into a folder by itself.  They are not strays to fix and
-# not news to report: reporting them would put every library folder on a list
-# that never empties, which is how a report stops being read.
+# Files Windows writes by itself.
 _OS_NOISE = frozenset({"desktop.ini", "thumbs.db", ".ds_store"})
 
 

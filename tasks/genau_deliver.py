@@ -1,24 +1,3 @@
-"""Deliver upscaled Genau flicks to the folder Genau plays from.
-
-The last step of the Genau lane, which ``config.GENAU_SOURCE`` describes: once
-the upscale exists, move it into ``2D/AI/`` in Genau's flicks folder and retire
-the ``1_sorted`` copy it was made from. A loop goes through the Topaz stage like
-any other AI video rather than being copied straight across, because one fresh
-out of the graph is visibly softer than the flicks already in that folder, which
-came from upscaled library video.
-
-Both halves leave together, and that is not tidiness:
-
-- The upscale stage decides what still needs doing by looking for the output
-  beside the source (``upscale._already_processed``). Take the output away and
-  leave the source, and every future run upscales that flick again, forever.
-- The correspondence check (``check_correspondence``) requires each ``1_sorted``
-  video to have a ``_topaz`` counterpart in the outbox, and pops a Windows error
-  dialog when one doesn't. Removing one side alone is exactly that mismatch.
-
-Nothing unique is lost with the sorted copy: it was itself a copy, and the flick
-still sits in ComfyUI's output folder and in Origenerator's gallery.
-"""
 from __future__ import annotations
 
 import logging
@@ -136,9 +115,7 @@ def run(
             _save_its_sound(destination, genau_audio_dir)
             _retire_source(upscaled, genau_sorted_dir)
         except OSError:
-            # A flick Genau is playing right now is locked on Windows. Leaving it
-            # is right: it is still a valid outbox entry with its source beside
-            # it, so nothing is inconsistent and the next run delivers it.
+            # Windows locks a flick Genau is playing.
             log.warning("Could not deliver %s; leaving it for the next run",
                         upscaled.name, exc_info=True)
             result.failed += 1

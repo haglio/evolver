@@ -89,6 +89,16 @@ class TestClipScripts(ClipScriptsCase):
         assert result.no_motion_in_window == 1
         assert not self.clip_script().exists()
 
+    def test_a_window_holding_a_single_position_leaves_the_clip_unscripted(self):
+        scene = self.make_scene(actions=[{"at": 10_500, "pos": 90}])
+        self.make_clip(scene, scene_offset=10.0)
+
+        result = self.run_stage(duration=2.0)
+
+        assert result.written == 0
+        assert result.no_motion_in_window == 1
+        assert not self.clip_script().exists()
+
     def test_skips_a_clip_whose_duration_will_not_probe(self):
         scene = self.make_scene(actions=[{"at": 10_500, "pos": 90}, {"at": 11_000, "pos": 10}])
         self.make_clip(scene)

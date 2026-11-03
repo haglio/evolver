@@ -62,7 +62,6 @@ def _stamp_row(path, prompt_id, stamp):
 
 
 def _no_probe():
-    """Patch away ffprobe so resolution is omitted (temp files aren't real videos)."""
     return patch("tasks.origenerator_metadata.video_dimensions", return_value=None)
 
 

@@ -13,9 +13,6 @@ from util.versions import is_upscaled_stem
 
 log = logging.getLogger(__name__)
 
-# How many files one run reads the Topaz note of. A read spawns ffprobe, the
-# first pass over a library is a couple of thousand of them, and the pipeline
-# has a wall clock; the rest wait for the next run, as Video Kinds' do.
 NOTES_READ_PER_RUN = 400
 
 StampFor = Callable[[], "dict | None"]

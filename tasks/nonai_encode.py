@@ -1,24 +1,3 @@
-"""The detached encode itself: start it, adopt it, freeze it, measure it, kill it.
-
-One non-AI encode takes hours while the tray watchdog kills a pipeline run at
-eleven minutes, so nothing here ever waits on ffmpeg. What it does instead is
-everything that touches the process: launching it detached with the non-AI
-settings, rebuilding the record for one whose job file went missing, suspending
-and resuming it as the user comes and goes, reading how far it has got off the
-partial it is still writing, and killing it.
-
-Whether any of that should happen is :mod:`tasks.nonai_upscale`'s -- the
-tick's decision. What that decision is weighed against is :class:`EncodeSettings`,
-which lives here rather than in ``config``: how long an encode may run and how
-much of the computer it may take are this app's own policy, not anything the
-computer or the overlay says, and ``config`` is for the second kind.
-
-The encode's settings are :data:`util.topaz.NON_AI_UPSCALE`, named and versioned
-beside its settings so that every upscale made with it can say which; the
-encoder's own log stays ambient config, the way VIDEO_EXTENSIONS does. The job
-record's file is a parameter, because the stage owns where its state lives.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -73,15 +52,6 @@ def topaz_pids() -> list[int]:
 
 
 def adopt_orphan(job_file: Path) -> dict | None:
-    """Rebuild the job record for a lone still-running encode of ours.
-
-    The job file can vanish out from under a live encode: the sync service
-    covering the project tree renames it mid-run. Without the record the encode
-    is orphaned — unsupervised, never promoted, and no longer blocking new
-    starts. A single Topaz ffmpeg whose output is one of our .partial files in
-    the non-AI tree is unambiguously ours, so it is adopted back under
-    supervision.
-    """
     pids = topaz_pids()
     if len(pids) != 1:
         return None
@@ -114,7 +84,6 @@ def adopt_orphan(job_file: Path) -> dict | None:
 
 
 def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
-    """The -i input and the trailing output of a Topaz ffmpeg command line."""
     token = r'(?:"([^"]+)"|(\S+))'
     source_match = re.search(rf"-i\s+{token}", cmdline)
     output_match = re.search(rf"{token}\s*$", cmdline)
@@ -160,11 +129,6 @@ def active_runtime(job: dict, *, now: float | None = None) -> float:
 
 
 def percent_encoded(job: dict) -> int | None:
-    """How far the running encode has gotten, read off its growing partial.
-
-    ffmpeg writes fragmented mp4, so the partial is probeable mid-write; its
-    duration over the source's is the encode's progress.
-    """
     tmp = Path(job.get("tmp", ""))
     expected = job.get("expected_duration") or 0.0
     encoded = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
@@ -179,7 +143,6 @@ def terminate_ffmpeg(pid: int, reason: str) -> None:
         log.warning("Killing non-AI upscale ffmpeg (pid %d): %s.", pid, reason)
         processes.terminate(pid)
     else:
-        # The pid was recycled by an unrelated process; our ffmpeg is already gone.
         log.warning("Job pid %d is no longer ffmpeg; treating the encode as ended.", pid)
 
 
@@ -187,8 +150,6 @@ def delete_tmp(tmp: Path) -> None:
     try:
         tmp.unlink(missing_ok=True)
     except OSError:
-        # A just-killed ffmpeg can briefly hold the file; the partial sweep
-        # removes it on a later tick.
         log.exception("Could not delete partial output %s yet.", tmp)
 
 
@@ -267,18 +228,6 @@ def is_low_disk(settings: EncodeSettings) -> bool:
 
 def computer_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
                         asked_for: bool = False, ai_waiting: bool = False) -> str:
-    """Why the computer cannot take a new encode right now -- "" when it can.
-
-    A present user comes first: an unattended multi-hour encode has no business
-    starting while someone is at the keyboard. Any live Topaz ffmpeg -- an
-    orphaned encode or the user's own GUI export -- already owns the GPU, and
-    CPU sampling never sees that. RAM and a post-encode cooldown keep an
-    unattended night from running the computer flat out end to end.
-
-    A video *asked_for* from the queue window is wanted now, so the user being
-    at the computer and the cooldown do not hold it back; the rest still do, and
-    so do new AI videos still *ai_waiting*, since none of them can run beside it.
-    """
     if not asked_for and user_present(settings):
         return "user_present"
     if topaz_pids():

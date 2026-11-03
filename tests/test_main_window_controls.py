@@ -169,14 +169,6 @@ class TestRunVerdictInDetailPane:
         return self.widget._info_label.fontMetrics().height()
 
     def test_qt_binds_the_color_to_the_mark_and_to_nothing_else(self):
-        """The markup is only a promise until Qt's text engine has read it.
-
-        The label carries the mark as an image; left on AutoText, Qt decides
-        rich-versus-plain by a heuristic on the string, and a wrong guess would
-        show the user literal markup and no mark. So parse the label's text the
-        way the label does and ask the resulting document what it holds: one
-        image, the mark, and no run of words in a color of its own.
-        """
         document = QTextDocument()
         document.setHtml(self._info_text("error"))
         images, colored = 0, []
@@ -326,7 +318,6 @@ class TestNonAiUpscaleSummary:
             "to take the original, ")
 
     def test_a_died_encode_names_what_failed(self):
-        """The other way a percent vanishes: ffmpeg died partway through."""
         summary = self._result(failed="lagoon/1 clips/Scene Five 1.mp4",
                                start_deferred="cooldown", pending=399)
         assert "failed" in summary
@@ -383,8 +374,6 @@ class TestNonAiUpscaleSummary:
         assert "low disk" in summary
 
     def test_an_encode_that_has_not_reported_yet_reads_progress_unknown(self):
-        """A non-AI encode reports no percent until ffmpeg's first progress
-        line; the row must say so rather than render a blank or a crash."""
         summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4")
         assert "progress unknown" in summary
 
@@ -560,7 +549,6 @@ class TestToolbarStateUpdates:
         assert window.pause_action.iconText() == "Pause Scheduling"
 
 
-
 class TestToolbarAppWiring:
     @pytest.fixture
     def app(self, request):
@@ -664,9 +652,7 @@ class TestToolbarAppWiring:
         assert app._window.isVisible()
 
     def test_the_trays_quit_item_quits_without_asking(self, app):
-        # The tray connects straight to the bound _quit, so patching the
-        # attribute cannot intercept it; the observable end of _quit is the
-        # QApplication being asked to exit.
+        # The tray binds the bound _quit, so only QApplication.quit is observable.
         with patch.object(app._app, "quit") as mock_app_quit, \
              patch("gui.app.QMessageBox") as mock_alert:
             app._tray.quit_action.trigger()

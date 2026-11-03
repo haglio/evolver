@@ -55,10 +55,6 @@ class TestRunStartsAJob(unittest.TestCase):
             assert job["expected_duration"] == 100.0
 
     def test_the_encodes_log_gets_its_warnings_and_progress_and_no_readout_of_the_video(self):
-        """At ffmpeg's default level the log opened with a readout of the source and
-        the output, every tag of the video included -- a generated video's embedded
-        prompt, a downloaded one's title. What the log is for, what went wrong and
-        how far the encode got, is its warnings and its progress line."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
@@ -145,8 +141,6 @@ class TestStartGuards(unittest.TestCase):
         return make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
 
     def test_a_running_topaz_process_defers_the_start(self):
-        """Any live Topaz ffmpeg — an orphaned encode, or the user's own GUI
-        export — means the GPU is taken; starting a second would stack encodes."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             self._one_candidate(overrides)
@@ -445,11 +439,6 @@ class TestRunStopsAJob(unittest.TestCase):
             assert out.exists()
 
 
-# The on-disk record's key names, held exactly. The file lives at
-# %LOCALAPPDATA%\Evolver\nonai_upscale_job.json and describes an encode that
-# is still running: a renamed key orphans it mid-run, and the stage then sees
-# no job, leaves the ffmpeg unsupervised and starts another on top of it --
-# which is the failure the adoption path below exists to recover from.
 JOB_KEYS_AT_START = {"pid", "source", "tmp", "out", "expected_duration", "started_at",
                      "provenance"}
 JOB_KEYS_ON_ADOPTION = JOB_KEYS_AT_START | {
@@ -559,14 +548,6 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
 
 class TestOrphanAdoption(unittest.TestCase):
-    """A lost job file must not orphan a live encode.
-
-    The file sync service covering the project tree renamed the in-flight job
-    file to '... [conflicted N].json' mid-run; the stage then saw no job, the
-    running ffmpeg went unsupervised, and fresh starts stacked encodes until
-    the computer crashed. With the state file gone, a lone Topaz process is
-    re-identified from its own command line and adopted back under supervision.
-    """
 
     def test_a_lone_topaz_process_is_adopted_back_into_a_job(self):
         with workspace_temp_dir() as root:

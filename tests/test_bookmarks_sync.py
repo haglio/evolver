@@ -43,8 +43,6 @@ def _folder(guid, node_id, name, children):
 
 
 def chrome_bookmarks_payload(favs_children=()):
-    """A minimal Chrome Bookmarks file: the bar holding one Fun Time Favs
-    folder with *favs_children*, plus the empty other/synced roots."""
     return {
         "checksum": "",
         "roots": {

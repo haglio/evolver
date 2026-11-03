@@ -30,10 +30,7 @@ def workspace_temp_dir():
     try:
         yield path
     finally:
-        # ignore_errors stays for now: on Windows a file a media backend still
-        # holds open makes rmtree raise, and whether any test leans on that
-        # silence can only be proven on windows-latest, which the publication
-        # freeze keeps out of reach. Dropping it is recorded in the changelog.
+        # Windows raises on a file a media backend holds open.
         shutil.rmtree(path, ignore_errors=True)
 
 

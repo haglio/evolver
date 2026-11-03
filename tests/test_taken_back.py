@@ -218,7 +218,6 @@ class TestTheGenauLane(unittest.TestCase):
                 assert not delivered.exists()
 
 
-
 def _gallery_of_videos_with_sound(path: Path, stems) -> Path:
     conn = sqlite3.connect(path)
     conn.execute(_SCHEMA)

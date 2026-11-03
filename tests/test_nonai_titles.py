@@ -33,8 +33,6 @@ def _title_of(video: Path) -> str:
 
 class TestNonAiTitles(unittest.TestCase):
     def test_a_clip_is_titled_by_the_pair_recorded_for_it(self):
-        """The record carries the movie's own punctuation, which the filename had
-        to drop -- Windows will not hold a colon in one."""
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(

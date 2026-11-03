@@ -520,10 +520,6 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
             assert fetch.call_args.kwargs["profile_dir"] == profile
 
     def test_the_default_scratch_profile_is_not_inside_the_checkout(self):
-        """Nothing passes one in where it matters: evolver.py runs this stage
-        unparameterized every ten minutes, so the default is what the browser
-        really writes its user-data tree into. Under PROJECT_DIR that is a live
-        Chrome profile in a git working tree, rewritten all day."""
         with workspace_temp_dir() as root:
             elsewhere = root / "elsewhere"
             video = elsewhere / config.PROVIDER_SOURCE / "portrait" / "abc.mp4"

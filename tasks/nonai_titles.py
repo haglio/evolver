@@ -14,7 +14,6 @@ from util.nonai_library import buckets
 log = logging.getLogger(__name__)
 
 
-
 @dataclass
 class NonAiTitleResult:
     titled: int = 0

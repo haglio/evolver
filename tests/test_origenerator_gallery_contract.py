@@ -12,14 +12,6 @@ CONTRACT = Path("origenerator") / origenerator_gallery.PUBLISHED
 
 
 def _origenerator_beside_this() -> Path | None:
-    """The Origenerator checkout publishing its document beside this one, or ``None``.
-
-    Walked up from here rather than resolved through the content overlay: the
-    overlay is git-ignored, so a worktree -- which is where every suite runs --
-    has only the placeholder one, pointing at a library that is not there.  The
-    walk lands on the checkout beside the primary from a worktree and from a
-    clone alike.
-    """
     for parent in Path(__file__).resolve().parents:
         if (parent / CONTRACT).is_file():
             return parent / CONTRACT.parent
