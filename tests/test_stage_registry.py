@@ -156,7 +156,7 @@ class TestStageRegistry(unittest.TestCase):
 
     @pytest.mark.repo_check
     def test_nothing_writes_a_stage_number_of_its_own(self):
-        scanned = product_sources(PROJECT_ROOT) + ["README.md", "docs/maintenance_notes.md"]
+        scanned = [*product_sources(PROJECT_ROOT), "README.md", "docs/maintenance_notes.md"]
         offenders = sorted(
             f"{name}:{i}"
             for name in scanned
