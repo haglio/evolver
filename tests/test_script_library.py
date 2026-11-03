@@ -107,9 +107,11 @@ class TestPlace(unittest.TestCase):
 
 class TestScriptPathOutsideTheLibrary(unittest.TestCase):
     def test_a_video_outside_the_library_has_no_script_here(self):
-        with override_config(VIDEO_LIBRARY_DIR=Path("C:/lib/videos"), SCRIPT_LIBRARY_DIR=Path("C:/lib/scripts")):
-            with pytest.raises(ValueError, match="not in the video library"):
-                script_library.script_path_for_video(Path("C:/elsewhere/clip.mkv"))
+        with (
+            override_config(VIDEO_LIBRARY_DIR=Path("C:/lib/videos"), SCRIPT_LIBRARY_DIR=Path("C:/lib/scripts")),
+            pytest.raises(ValueError, match="not in the video library"),
+        ):
+            script_library.script_path_for_video(Path("C:/elsewhere/clip.mkv"))
 
 
 class TestTheMarkSayingNoPersonWroteAScript(unittest.TestCase):
