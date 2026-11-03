@@ -224,8 +224,6 @@ class TestGenauDeliver(unittest.TestCase):
             assert not original.exists()
 
     def test_a_flick_that_cannot_be_moved_is_left_whole_for_the_next_run(self):
-        # Genau holds the file open on Windows while it plays. Leaving both halves
-        # in place keeps the outbox consistent, and the next run delivers it.
         with workspace_temp_dir() as root:
             outbox, sorted_dir, flicks = _lane(root)
             upscaled, original = _stage_flick(outbox, sorted_dir)

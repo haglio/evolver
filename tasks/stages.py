@@ -1,26 +1,3 @@
-"""The pipeline's stages, declared once.
-
-Every stage is a key, the name a person is shown, the sentence explaining it,
-and the color its band is drawn in — in the order ``run_pipeline`` runs them.
-Nothing else declares any of that: the progress popup's bars, the run detail
-table's names, tooltips and numbers, the stats chart's series and its legend
-all read this list.
-
-It sits with the stage implementations — all but the two ``check_*`` scripts
-at the repo root are in this package — and outside ``gui/`` so the headless CLI can read it without Qt. The color is a
-plain RGB triple for the same reason: the one window that paints a band builds
-its own ``QColor`` at the edge where Qt begins.
-
-``run_pipeline`` spells the same order a second time, because each stage
-carries its own arguments and skip branches. That copy is not derived from this
-one; it is held against it by ``tests/test_stage_registry.py``, which reads the
-names out of evolver.py's syntax tree and also runs the pipeline with its
-stages mocked. A stage the pipeline emitted with no row here drew no progress
-bar, lost its duration from the chart and took the number of the stage after
-it, for months (bug 5), because the only thing comparing the two lists never
-imported the pipeline.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

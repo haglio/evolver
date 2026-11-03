@@ -1,5 +1,3 @@
-"""Stage: sync the library's favorites into a Chrome bookmarks folder."""
-
 from __future__ import annotations
 
 import json
@@ -50,13 +48,6 @@ def run(
     chrome_profile_name: str | None = None,
     bookmarks_folder_name: str | None = None,
 ) -> BookmarksSyncResult:
-    """Write the favorites' web URLs into one folder of a Chrome profile.
-
-    The three things this stage reaches for in a browser profile on this
-    computer are arguments rather than names to grep the body for. They are
-    resolved here rather than in the signature: a default is evaluated at
-    import, which would freeze the value past ``override_config``.
-    """
     chrome_user_data_dir = (
         config.CHROME_USER_DATA_DIR if chrome_user_data_dir is None else chrome_user_data_dir
     )
@@ -265,6 +256,5 @@ def _chrome_timestamp() -> str:
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
-    # indent=3 and newline="\n" because that is how Chrome writes this file,
-    # and it is Chrome's to read back.
+    # Chrome writes this file with indent=3, and reads it back that way.
     write_whole(path, json.dumps(data, indent=3) + "\n", newline="\n")

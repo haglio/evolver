@@ -32,7 +32,6 @@ def fake_run_ffmpeg(_in_file, tmp, _env, _settings=None, **kwargs):
     return True
 
 
-
 class TestUpscaleHelpers(unittest.TestCase):
     def test_already_processed_checks_all_locations(self):
         with workspace_temp_dir() as root:
@@ -381,10 +380,6 @@ class TestIsT2vProvider(unittest.TestCase):
                 assert not upscale._is_t2v_provider("provider2", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_the_provider_is_whoever_the_overlay_names(self):
-        # The source name comes from the git-ignored overlay, and the deployed
-        # one is not the committed placeholder.  Compared against a literal
-        # "provider", every text-to-video clip of the real provider took the
-        # default settings and the wrong tag -- silently wrong output (bug 7).
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "examplesource" / "clip_topaz.json"
@@ -572,7 +567,6 @@ class TestSubprocessTimeout(unittest.TestCase):
 
 class TestFfmpegWindowSuppression(unittest.TestCase):
     def test_run_ffmpeg_passes_create_no_window(self):
-        """ffmpeg must not spawn a visible console window on Windows."""
         with patch("tasks.upscale.subprocess.run") as mock_run:
             mock_run.return_value = unittest.mock.MagicMock(returncode=0)
             upscale._run_ffmpeg(

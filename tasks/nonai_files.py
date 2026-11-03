@@ -7,9 +7,6 @@ from pathlib import Path
 import config
 from tasks import nonai_queue
 
-#: The pipeline tick (the worker thread), the presence poll (the GUI thread) and
-#: the queue window's asks (its background thread) all touch the one job record
-#: and its ffmpeg; this keeps a suspend, a resume or a stop from racing a tick.
 stage_lock = threading.Lock()
 
 

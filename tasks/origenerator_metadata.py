@@ -15,13 +15,11 @@ COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
 
 OWN_PROVENANCE = "provenance"
 
-# Param keys naming the model a run used, most-specific first — covers every
-# Origenerator workflow (WAN i2v/t2i use unet_high, Flux uses unet, SDXL uses
-# checkpoint). The first present wins; its filename is cleaned to a bare label.
+# Where each Origenerator workflow keeps its model.
 MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
 _MODEL_EXT_RE = re.compile(r"\.(safetensors|ckpt|pt|pth|gguf|sft|bin)$", re.IGNORECASE)
 
-# ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
+# ComfyUI's LoadImage annotation.
 _TYPE_ANNOTATIONS = ("[output]", "[input]", "[temp]")
 
 _COMMON_RATIOS = ((16, 9), (9, 16), (1, 1), (4, 3), (3, 4), (3, 2), (2, 3),

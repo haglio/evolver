@@ -1,29 +1,3 @@
-"""Stage: gradually upscale the 2D/non_AI library with its own established settings.
-
-The non_AI buckets (``other/full``, ``other/clips``, …) hold real-footage
-scenes the user has been enhancing by hand in the Topaz GUI: apo-8 60 fps
-interpolation plus an iris-2 auto upscale, outputs named ``<stem>_apo8_iris2``
-under the bucket's ``3*/processed/`` folder, originals retired to its ``2*``
-folder.  This stage automates exactly that convention.
-
-One encode takes hours while the tray watchdog kills a pipeline run at eleven
-minutes, so nothing here ever waits on ffmpeg: at most one detached encode is
-in flight, and each scheduler tick either checks on it (promote / fail / kill
-a stuck one) or starts the next queued video when the computer is otherwise idle.
-
-Once the tray toggle is on, the stage auto-manages that encode by user
-presence: it starts or resumes only while the user is away and suspends the
-detached ffmpeg the moment they return (frozen, zero compute, resumed exactly
-where it left off). A fast GUI poll — ``throttle_to_presence`` — parks and
-thaws it between ticks so returning to the computer takes effect in seconds.
-
-Which clip is next, and why it beat the others, is
-:mod:`tasks.nonai_queue`'s; the video asked for from the queue window, which
-the presence rule does not hold back, is :mod:`tasks.nonai_request`'s; how far
-through the whole project the library is, is :mod:`tasks.nonai_progress`'s.
-What is left here is the stage: repair, supervise, maybe start, report.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -284,12 +258,6 @@ def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclus
 
 
 def _sweep_orphaned_partials(keep: Path | None) -> None:
-    """Delete leftover ``.partial.`` outputs no live job owns.
-
-    A crash between launching ffmpeg and a later conclusion can strand one;
-    the live job's own tmp is exempt. A partial a lingering ffmpeg still has
-    open just fails to unlink and gets swept on a later tick.
-    """
     for bucket in buckets():
         for _, done_dir in stage_dirs(bucket, digits=(3,)):
             removed = remove_partial_files(done_dir, log, keep=keep)

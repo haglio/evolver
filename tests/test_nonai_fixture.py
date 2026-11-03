@@ -1,19 +1,3 @@
-"""Every place on disk the non-AI stage touches is redirected by its fixture.
-
-A test that does not redirect one reads or writes the real computer's. That is
-not hypothetical: ``NONAI_RETIRED_ROOT`` comes from the git-ignored overlay and
-``NONAI_PIN_LIST`` is a path inside the checkout, so before both were
-pinned here, four tests that retire an original moved their fixture videos into
-the developer's real archive and then failed the assertion that the video had
-gone to the bucket's ``2*`` folder. They were green on this Mac and on CI only
-because neither has an overlay — which is the shape of gap a fixture cannot be
-trusted to close by care.
-
-So the two sets below are held as an equality against what the stage's modules
-actually read, taken from the syntax tree: a new ambient read has to be filed
-either as a place the fixture redirects or as one it deliberately leaves alone,
-with the reason written down.
-"""
 from __future__ import annotations
 
 import ast

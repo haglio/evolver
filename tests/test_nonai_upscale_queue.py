@@ -18,11 +18,6 @@ from util import nonai_job, sidecar, upscale_queue
 
 @contextmanager
 def running_encode(*, alive=True, percent=50):
-    """The two things the window asks about a live encode, answered.
-
-    Whether the pid is still a process, and how far the partial it is writing
-    has got -- an ffprobe, which no test spawns.
-    """
     with ExitStack() as stack:
         stack.enter_context(patch("util.processes.is_running", return_value=alive))
         stack.enter_context(patch("tasks.nonai_encode.percent_encoded",
