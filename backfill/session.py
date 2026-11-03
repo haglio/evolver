@@ -34,7 +34,7 @@ class _Step(Protocol):
         ...
 
     def roll_back(self) -> None:
-        pass
+        ...
 
 
 @dataclass
