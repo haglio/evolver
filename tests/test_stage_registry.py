@@ -61,7 +61,7 @@ class TestStageRegistry(unittest.TestCase):
 
         spelled = []
         for call in calls:
-            first = call.args[0] if call.args else None
+            first = call.args[1] if len(call.args) > 1 else None
             unnamed = (f"the stage name at evolver.py:{call.lineno} is not a literal, "
                        "so nothing can compare it to the registry")
             assert isinstance(first, ast.Constant), unnamed

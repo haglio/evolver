@@ -160,6 +160,41 @@ def run_pipeline(
                            nonai_enabled, should_stop)
 
 
+@dataclass
+class _Stages:
+    on_start: Callable[[str], None] | None
+    on_complete: Callable[[str, object | None, float, str], None] | None
+    should_stop: Callable[[], bool] | None
+    records: list[StageRecord] = field(default_factory=list)
+
+
+def _begin_stage(stages: _Stages, name: str):
+    if stages.should_stop is not None and stages.should_stop():
+        raise _StopRequested
+    if stages.on_start:
+        stages.on_start(name)
+
+
+def _run_stage(stages: _Stages, name, fn, **kwargs):
+    _begin_stage(stages, name)
+    t0 = time.monotonic()
+    result = fn(**kwargs)
+    elapsed = time.monotonic() - t0
+    status = _stage_status(name, result)
+    stages.records.append(StageRecord(name, status, elapsed, result))
+    if stages.on_complete:
+        stages.on_complete(name, result, elapsed, status)
+    logging.getLogger(__name__).info("")
+    return result
+
+
+def _skip_stage(stages: _Stages, name, reason):
+    _begin_stage(stages, name)
+    stages.records.append(StageRecord(name, "skipped", 0.0, skip_reason=reason))
+    if stages.on_complete:
+        stages.on_complete(name, None, 0.0, "skipped")
+
+
 def _run_stages(
     on_stage_start: Callable[[str], None] | None,
     on_stage_complete: Callable[[str, object | None, float, str], None] | None,
@@ -174,126 +209,125 @@ def _run_stages(
     run_id = run_log.run_id(started_at)
     log_start = run_log.size(log_path)
     log.info(run_log.banner(run_id))
-    records: list[StageRecord] = []
-
-    def _run_stage(name, fn, **kwargs):
-        if should_stop is not None and should_stop():
-            raise _StopRequested
-        if on_stage_start:
-            on_stage_start(name)
-        t0 = time.monotonic()
-        result = fn(**kwargs)
-        elapsed = time.monotonic() - t0
-        status = _stage_status(name, result)
-        records.append(StageRecord(name, status, elapsed, result))
-        if on_stage_complete:
-            on_stage_complete(name, result, elapsed, status)
-        log.info("")
-        return result
-
-    def _skip_stage(name, reason):
-        if should_stop is not None and should_stop():
-            raise _StopRequested
-        if on_stage_start:
-            on_stage_start(name)
-        records.append(StageRecord(name, "skipped", 0.0, skip_reason=reason))
-        if on_stage_complete:
-            on_stage_complete(name, None, 0.0, "skipped")
+    stages = _Stages(on_stage_start, on_stage_complete, should_stop)
 
     try:
-        _run_stage("strays", stray_files.run)
-        _run_stage("withdrawn", taken_back.run)
-        _run_stage("metadata", prompt_scrape.run)
-        sort_result = _run_stage("sort", sort.run)
-        downtime_result = _run_stage("origenerator_downtime", origenerator_downtime.run)
-
-        priority_files = getattr(sort_result, "moved_files", [])
-        upscale_result = None
-        upscale_skipped = False
-        if not upscale.has_pending_work(priority_files=priority_files):
-            log.info("No pending upscale work found. Skipping upscale.")
-            _skip_stage("upscale", "no_pending_work")
-        elif downtime_result is not None and downtime_result.holds_the_graphics_card:
-            log.info("Skipping upscale: Origenerator is training a fix on the graphics card.")
-            upscale_skipped = True
-            _skip_stage("upscale", "origenerator_training")
-        elif nonai_upscale.foreign_topaz_running():
-            log.info("Skipping upscale: a Topaz encode Evolver did not start is running.")
-            upscale_skipped = True
-            _skip_stage("upscale", "topaz_busy")
-        else:
-            with nonai_upscale.frozen_for_ai_videos():
-                if _should_skip_upscale_due_to_cpu(log):
-                    log.info("Skipping upscale because CPU usage is above the configured threshold.")
-                    upscale_skipped = True
-                    _skip_stage("upscale", "cpu_busy")
-                elif topaz.sign_in_expired():
-                    log.info("Skipping upscale: Topaz's sign-in has expired, and Topaz can watermark "
-                             "what it makes until someone signs in to the Topaz Video app.")
-                    upscale_skipped = True
-                    _skip_stage("upscale", topaz.SIGN_IN_EXPIRED)
-                else:
-                    upscale_kwargs: dict = {
-                        "priority_files": priority_files, "max_items": config.UPSCALE_BATCH_LIMIT,
-                    }
-                    if on_stage_progress is not None:
-                        upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
-                    upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
-
-        _run_stage("genau_deliver", genau_deliver.run)
-
-        upscale_still_pending = (
-            upscale_skipped
-            or (upscale_result is not None and upscale_result.pending_after_run > 0)
-        )
-
-        ai_drained = not upscale_skipped and (
-            upscale_result is None or upscale_result.pending_after_run == 0
-        )
-        nonai_allow_start = bool(
-            nonai_enabled and ai_drained and not _should_skip_upscale_due_to_cpu(log)
-        )
-        _run_stage(
-            "upscale_non_ai", nonai_upscale.run,
-            mode=nonai_upscale.RunMode(
-                allow_start=nonai_allow_start, stop=nonai_enabled is False,
-                presence_managed=nonai_enabled is True,
-                take_requests=nonai_enabled is not None,
-                ai_waiting=not ai_drained),
-        )
-
-        if upscale_still_pending:
-            log.info("Skipping correspondence check: upscale has unprocessed files that would cause a false mismatch.")
-            _skip_stage("verify", "upscale_pending")
-        else:
-            _run_stage("verify", check_correspondence.run, show_popup=True)
-
-        _run_stage("references", reference_sync.run)
-        _run_stage("watch_weights", watch_weights.run)
-        _run_stage("bookmarks", bookmarks_sync.run)
-        _run_stage("clip_scripts", clip_scripts.run)
-        _run_stage("scene_scripts", scene_scripts.run)
-        _run_stage("scripts", scripts_sync.run, show_popup=True)
-        _run_stage("group_non_ai", nonai_group.run)
-        _run_stage("title_non_ai", nonai_titles.run)
-        _run_stage("video_types", video_kinds.run)
-        _run_stage("provenance", provenance_sweep.run)
-        _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
+        _run_every_stage(stages, log, on_stage_progress, nonai_enabled)
     except _StopRequested:
         log.warning(
-            "Stop requested; dropping the remaining stages after %d ran.", len(records),
+            "Stop requested; dropping the remaining stages after %d ran.", len(stages.records),
         )
 
     duration_seconds = time.monotonic() - pipeline_t0
     log_end = run_log.size(log_path)
     return PipelineResult(
-        stages=records,
-        has_errors=any(record.status == "error" for record in records),
+        stages=stages.records,
+        has_errors=any(record.status == "error" for record in stages.records),
         duration_seconds=duration_seconds,
         started_at=started_at,
         log_start=log_start,
         log_end=log_end,
     )
+
+
+def _run_every_stage(stages: _Stages, log: logging.Logger,
+                     on_stage_progress: Callable[[str, int, int], None] | None,
+                     nonai_enabled: bool | None):
+    sort_result, downtime_result = _run_intake_stages(stages)
+    priority_files = getattr(sort_result, "moved_files", [])
+    upscale_result, upscale_skipped = _upscale_stage(
+        stages, log, priority_files, downtime_result, on_stage_progress)
+    _run_remaining_stages(stages, log, upscale_result, upscale_skipped, nonai_enabled)
+
+
+def _run_intake_stages(stages: _Stages):
+    _run_stage(stages, "strays", stray_files.run)
+    _run_stage(stages, "withdrawn", taken_back.run)
+    _run_stage(stages, "metadata", prompt_scrape.run)
+    sort_result = _run_stage(stages, "sort", sort.run)
+    downtime_result = _run_stage(stages, "origenerator_downtime", origenerator_downtime.run)
+    return sort_result, downtime_result
+
+
+def _upscale_stage(stages: _Stages, log: logging.Logger, priority_files,
+                   downtime_result, on_stage_progress):
+    if not upscale.has_pending_work(priority_files=priority_files):
+        log.info("No pending upscale work found. Skipping upscale.")
+        _skip_stage(stages, "upscale", "no_pending_work")
+        return None, False
+    if downtime_result is not None and downtime_result.holds_the_graphics_card:
+        log.info("Skipping upscale: Origenerator is training a fix on the graphics card.")
+        _skip_stage(stages, "upscale", "origenerator_training")
+        return None, True
+    if nonai_upscale.foreign_topaz_running():
+        log.info("Skipping upscale: a Topaz encode Evolver did not start is running.")
+        _skip_stage(stages, "upscale", "topaz_busy")
+        return None, True
+    with nonai_upscale.frozen_for_ai_videos():
+        return _upscale_unless_the_computer_is_unfit(
+            stages, log, priority_files, on_stage_progress)
+
+
+def _upscale_unless_the_computer_is_unfit(stages: _Stages, log: logging.Logger,
+                                          priority_files, on_stage_progress):
+    if _should_skip_upscale_due_to_cpu(log):
+        log.info("Skipping upscale because CPU usage is above the configured threshold.")
+        _skip_stage(stages, "upscale", "cpu_busy")
+        return None, True
+    if topaz.sign_in_expired():
+        log.info("Skipping upscale: Topaz's sign-in has expired, and Topaz can watermark "
+                 "what it makes until someone signs in to the Topaz Video app.")
+        _skip_stage(stages, "upscale", topaz.SIGN_IN_EXPIRED)
+        return None, True
+    upscale_kwargs: dict = {
+        "priority_files": priority_files, "max_items": config.UPSCALE_BATCH_LIMIT,
+    }
+    if on_stage_progress is not None:
+        upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
+    return _run_stage(stages, "upscale", upscale.run, **upscale_kwargs), False
+
+
+def _run_remaining_stages(stages: _Stages, log: logging.Logger, upscale_result,
+                          upscale_skipped: bool, nonai_enabled: bool | None):
+    _run_stage(stages, "genau_deliver", genau_deliver.run)
+
+    upscale_still_pending = (
+        upscale_skipped
+        or (upscale_result is not None and upscale_result.pending_after_run > 0)
+    )
+
+    ai_drained = not upscale_skipped and (
+        upscale_result is None or upscale_result.pending_after_run == 0
+    )
+    nonai_allow_start = bool(
+        nonai_enabled and ai_drained and not _should_skip_upscale_due_to_cpu(log)
+    )
+    _run_stage(
+        stages, "upscale_non_ai", nonai_upscale.run,
+        mode=nonai_upscale.RunMode(
+            allow_start=nonai_allow_start, stop=nonai_enabled is False,
+            presence_managed=nonai_enabled is True,
+            take_requests=nonai_enabled is not None,
+            ai_waiting=not ai_drained),
+    )
+
+    if upscale_still_pending:
+        log.info("Skipping correspondence check: upscale has unprocessed files that would cause a false mismatch.")
+        _skip_stage(stages, "verify", "upscale_pending")
+    else:
+        _run_stage(stages, "verify", check_correspondence.run, show_popup=True)
+
+    _run_stage(stages, "references", reference_sync.run)
+    _run_stage(stages, "watch_weights", watch_weights.run)
+    _run_stage(stages, "bookmarks", bookmarks_sync.run)
+    _run_stage(stages, "clip_scripts", clip_scripts.run)
+    _run_stage(stages, "scene_scripts", scene_scripts.run)
+    _run_stage(stages, "scripts", scripts_sync.run, show_popup=True)
+    _run_stage(stages, "group_non_ai", nonai_group.run)
+    _run_stage(stages, "title_non_ai", nonai_titles.run)
+    _run_stage(stages, "video_types", video_kinds.run)
+    _run_stage(stages, "provenance", provenance_sweep.run)
+    _run_stage(stages, "dupes", check_duplicate_sizes.run, show_popup=True)
 
 
 def main():
