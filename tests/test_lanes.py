@@ -21,9 +21,8 @@ class TestAiVideos(unittest.TestCase):
         assert upscales == [lib.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4"]
 
     def test_no_sorted_folder_means_no_clips(self):
-        with workspace_temp_dir() as root:
-            with LaneLibrary(root).config():
-                assert list(lanes.ai_videos()) == []
+        with workspace_temp_dir() as root, LaneLibrary(root).config():
+            assert list(lanes.ai_videos()) == []
 
 
 class TestGenauFlicks(unittest.TestCase):
@@ -49,10 +48,9 @@ class TestGenauFlicks(unittest.TestCase):
                 assert lanes.genau_delivery_dir() == renamed / "2D" / "AI"
 
     def test_finds_no_flicks_and_nowhere_to_deliver_where_no_folder_has_their_shape(self):
-        with workspace_temp_dir() as root:
-            with override_config(GENAU_DIR=root / "genau"):
-                assert list(lanes.genau_flicks()) == []
-                assert lanes.genau_delivery_dir() is None
+        with workspace_temp_dir() as root, override_config(GENAU_DIR=root / "genau"):
+            assert list(lanes.genau_flicks()) == []
+            assert lanes.genau_delivery_dir() is None
 
     def test_lists_the_delivered_loops_and_nothing_still_being_written(self):
         with workspace_temp_dir() as root:
@@ -95,6 +93,5 @@ class TestNonAiVideos(unittest.TestCase):
                 assert lanes.non_ai_videos() == [first, later]
 
     def test_no_non_ai_folder_means_no_videos(self):
-        with workspace_temp_dir() as root:
-            with LaneLibrary(root).config():
-                assert lanes.non_ai_videos() == []
+        with workspace_temp_dir() as root, LaneLibrary(root).config():
+            assert lanes.non_ai_videos() == []
