@@ -22,16 +22,16 @@ NOTHING_TO_REPEAT = "nothing to repeat"
 class _Step(Protocol):
     @property
     def note(self) -> str:
-        pass
+        ...
 
     def take_effect(self, queue: BackfillQueue) -> None:
-        pass
+        ...
 
     def put_back(self, queue: BackfillQueue) -> None:
-        pass
+        ...
 
     def commit(self) -> None:
-        pass
+        ...
 
     def roll_back(self) -> None:
         pass
