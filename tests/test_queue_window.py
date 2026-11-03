@@ -252,8 +252,6 @@ class TestWhatItSaysTheUserDid:
         assert draggable(window, 0)
 
     def test_a_drag_that_ends_in_a_move_leaves_every_row_in_the_list(self, window):
-        """What Qt does after a move of its own is to remove the row the drag
-        started from -- which took the row the user had just placed."""
         window.show_queue(queue(None, *(entry(f"lagoon/0 unsorted/{name}.mp4")
                                           for name in "abc")))
         window._tree.setCurrentItem(window._tree.topLevelItem(2))

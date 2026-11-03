@@ -1,30 +1,3 @@
-"""Who owns the single Evolver instance, and what a launch does about one already up.
-
-Two mechanisms, answering two different questions — keep both:
-
-* the **mutex** answers *may I run?*  Never two Evolvers, because two schedulers
-  mean two pipelines and stacked Topaz encodes, which is what used to exhaust
-  memory and crash the computer.
-* the **pipe** answers *what should the one already running do about me?*  A
-  tray app's window is hidden, so clicking Evolver — a shortcut, the Start
-  menu, or the taskbar pin, whose relaunch command Windows re-runs verbatim —
-  starts a second process whose real job is to open the first one's window.
-  And a branch's preview (``gui/branch_session.py``) is launched to take the
-  work over, so the one running has to get out of its way.
-
-A launch says which of the two it is; the running Evolver answers whether it
-is opening its window or stepping aside.  An Evolver from before launches said
-anything answers nothing, and opens its window on the connection alone.
-
-A wedged instance still holds the mutex while answering nothing on the pipe, so
-the caller learns both answers and can say so rather than exiting into silence.
-
-Both are one object because both are held for the process's life: Windows lets
-a named mutex go when the last handle to it closes, and a collected server
-closes the pipe with it. Held as two loose module globals, the second was a
-return value the caller had to remember to keep -- which is a rule no reader of
-the caller can see, and one nothing would have failed on.
-"""
 
 from __future__ import annotations
 
@@ -74,13 +47,6 @@ class InstanceGateway:
         self._launches: QLocalServer | None = None
 
     def claim(self) -> bool:
-        """Claim the named mutex. True when no other Evolver holds it.
-
-        False also when Windows would not make the mutex at all.  "Could not
-        check" is not "checked": a second scheduler is the failure this guards
-        against, so a refusal to create the mutex is a refusal to run, not a
-        licence to.
-        """
         self._mutex_handle = try_acquire_mutex(_MUTEX_NAME)
         return self._mutex_handle is not None
 

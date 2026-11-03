@@ -588,7 +588,6 @@ class TestCooperativeStop:
 
 class TestCheckDependenciesWindowSuppression:
     def test_ffprobe_check_passes_create_no_window(self):
-        """ffprobe version check must not spawn a visible console window."""
         with patch("evolver.subprocess.run") as mock_run, \
              patch("evolver.config.FFMPEG", Mock(is_file=Mock(return_value=True))):
             mock_run.return_value = Mock(returncode=0)

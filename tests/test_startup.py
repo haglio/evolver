@@ -1,7 +1,3 @@
-"""Tests for gui.startup -- the Start-with-Windows shortcut.
-
-The Startup folder is redirected through APPDATA into a temp tree.
-"""
 from __future__ import annotations
 
 import shutil
@@ -34,8 +30,6 @@ def startup_dir():
 class TestRegisterStartup:
 
     def test_the_shortcut_is_the_one_evolvers_list_keeps_in_the_startup_folder(self, startup_dir):
-        """So "Start with Windows" and the command that keeps the computer in step
-        with every app's list never write two different shortcuts."""
         with override_config(LIVE_DIR=REPO_ROOT):
             startup.register_startup()
 
@@ -54,8 +48,6 @@ class TestRegisterStartup:
         assert Path(written.working_directory) == REPO_ROOT
 
     def test_a_branch_preview_still_points_it_at_the_evolver_that_runs_every_day(self, startup_dir):
-        """A preview is the whole app, settings dialog included, and ticking
-        "Start with Windows" there must not leave Windows starting a branch."""
         with workspace_temp_dir() as live, override_config(LIVE_DIR=live):
             shutil.copy(REPO_ROOT / "pyproject.toml", live / "pyproject.toml")
             startup.register_startup()

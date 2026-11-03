@@ -1,8 +1,3 @@
-"""The Start-with-Windows shortcut: the one Evolver's list keeps in the Startup folder.
-
-Always the checkout the user runs, never a worktree: a preview's settings dialog
-would otherwise leave Windows starting a branch at every sign-in.
-"""
 
 from __future__ import annotations
 

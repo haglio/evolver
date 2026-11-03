@@ -51,11 +51,7 @@ from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
 
 class _NoFocusRectDelegate(QItemDelegate):
-    """QItemDelegate subclass that suppresses the focus rectangle.
-
-    Uses QItemDelegate (not QStyledItemDelegate) because QItemDelegate
-    exposes drawFocus() as a dedicated override point for this purpose.
-    """
+    # QItemDelegate, not QStyledItemDelegate: only it exposes drawFocus().
 
     def drawFocus(self, painter, option, rect):
         pass
@@ -92,9 +88,6 @@ class RunDetailWidget(QWidget):
         layout.addWidget(self._header)
 
         self._info_label = QLabel("")
-        # Explicit, not AutoText: the run's mark is a colored <span>, and
-        # leaving the format to Qt's guess-from-the-string heuristic risks the
-        # line being drawn as literal markup.
         self._info_label.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(self._info_label)
 
@@ -114,8 +107,6 @@ class RunDetailWidget(QWidget):
 
     def show_record(self, record: RunRecord):
         self._record = record
-        # No color of its own: the link wears the palette's, so it reads as a
-        # link in whichever theme Qt has given the rest of the window.
         self._header.setText(f'<a href="log">Run: {record.started_at}</a>')
         self._header.setToolTip("Show what this run wrote to the log")
         mark, color = symbol_for(record.status)

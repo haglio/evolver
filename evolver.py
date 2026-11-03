@@ -126,13 +126,6 @@ def check_dependencies():
 
 
 def throttle_nonai_to_presence() -> str:
-    """Suspend or resume the in-flight non-AI encode as the user comes and goes.
-
-    The one thing the pipeline does while it is not running, and the GUI's one
-    door to it. The layering here is ``util <- tasks <- evolver <- gui``: gui
-    reaches the stages through this module and nothing else, so the window
-    layer does not have to know which stage owns a detached ffmpeg.
-    """
     return nonai_upscale.throttle_to_presence()
 
 

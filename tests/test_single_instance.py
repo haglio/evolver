@@ -236,8 +236,6 @@ class TestAskingTheRunningOne(unittest.TestCase):
         assert later is None
 
     def test_the_listener_is_held_past_the_call_that_made_it(self):
-        """A QLocalServer nothing refers to is collected, and the pipe closes
-        with it — the handoff would then fail for reasons no log would show."""
         with patch.object(single_instance, "_PIPE_NAME", _unique("Held")):
             running = Listening()
             try:

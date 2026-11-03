@@ -74,14 +74,6 @@ def _unmarked_note(record, log_path) -> str:
 
 
 def _wire(view, slots: dict) -> None:
-    """Connect each of *view*'s commands to the slot of the same name.
-
-    The two sides are held equal on purpose. A control a view offers that
-    nothing is wired to is a menu item that does nothing when clicked, and a
-    slot no view offers is a command the user cannot reach -- neither shows up
-    anywhere else, because a QAction with no connection raises nothing. It
-    fails here, while the app is being built and before it has done anything.
-    """
     offered = view.commands()
     if set(offered) != set(slots):
         raise ValueError(
@@ -93,16 +85,6 @@ def _wire(view, slots: dict) -> None:
 
 
 class EvolverApp:
-    """Wires together all GUI components and runs the Qt event loop.
-
-    Split in two on purpose. ``__init__`` only *builds*: it constructs the
-    parts and connects them, and touches nothing outside the process. ``start``
-    is everything the app *does* -- claim the Windows identity, read the run
-    history off disk, start the two timers, show the tray. So constructing one
-    names nothing to the shell and starts no timer, which is what lets a test
-    build one part without a twenty-second presence poll running for the rest
-    of the session.
-    """
 
     def __init__(self, app: QApplication):
         self._app = app
@@ -305,15 +287,6 @@ class EvolverApp:
         )
 
     def _on_session_end(self, manager):
-        """Handle Windows session-management events (shutdown, logoff, installer restart).
-
-        Logs the event, then quits the way the tray menu does: the scheduler
-        stops and the worker thread is given five seconds to finish its stage.
-        What it deliberately does NOT do is touch the detached processes -- the
-        in-flight non-AI encode, the backfill tool -- because those are
-        detached precisely so they outlive this one, and Windows is about to
-        end the session for all of them anyway.
-        """
         crash_log.write_info(
             "Windows session end requested:",
             f"allowsInteraction={manager.allowsInteraction()}\n",
