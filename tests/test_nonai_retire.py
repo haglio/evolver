@@ -1,10 +1,3 @@
-"""Where a superseded original goes, and what the upscale keeps of it.
-
-These moved out of tests/test_nonai_upscale.py with the moves themselves. They
-no longer say where an original goes by overriding config: the archive root is
-an argument, so each case names the answer it is about — a path, or None for
-the bucket's own ``2*`` folder.
-"""
 from __future__ import annotations
 
 import json
@@ -25,9 +18,6 @@ from util import nonai_retire, script_library, sidecar
 
 
 class TestRetireIntoTheBucket(unittest.TestCase):
-    """With no archive configured — the public checkout's case — the original
-    goes to the bucket's ``2*`` folder, as the user does by hand."""
-
     def test_an_unset_archive_keeps_the_user_s_own_retire_folder(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -42,8 +32,6 @@ class TestRetireIntoTheBucket(unittest.TestCase):
             assert not source.exists()
 
     def test_carries_the_sidecar_to_the_retire_folder(self):
-        """A clip's `clip` metadata must follow the file when it is retired, or
-        it is orphaned and pruned — losing the Main Funestra's navigation data."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -65,10 +53,6 @@ class TestRetireIntoTheBucket(unittest.TestCase):
                 assert sidecar.read(sidecar.sidecar_path(dest))["clip"] == {"compilation": "Vol6", "index": 1}
 
     def test_carries_the_funscript_to_the_retire_folder(self):
-        """A script left in the old folder still matches the moved video, so the
-        scripts sync would relocate it — but the clip-scripts stage runs first
-        and writes the clip a fresh script at the new path, and the sync then
-        fails the whole run on a collision nothing can resolve."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -105,15 +89,6 @@ class TestRetireIntoTheBucket(unittest.TestCase):
 
 
 class TestRetireToAnArchive(unittest.TestCase):
-    """With an archive given, a retired original leaves the library entirely.
-
-    The bucket's ``2*`` folder sits on the working drive inside the file-sync
-    pair, so every finished encode left roughly a gigabyte of superseded source
-    in place and the drive filled up. An archive root points those files at
-    somewhere else — cloud storage, another volume — and the library keeps only
-    what is watched.
-    """
-
     def test_the_original_lands_in_the_archive_at_its_library_path(self):
         with workspace_temp_dir() as root:
             archive = root / "archive"
@@ -129,10 +104,6 @@ class TestRetireToAnArchive(unittest.TestCase):
             assert (archive / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4").exists()
 
     def test_the_funscript_goes_with_it_rather_than_being_stranded(self):
-        """A script left in the library still matches the archived video by name,
-        so the scripts sync tries to relocate it — and the clip-scripts stage has
-        already written a fresh script at that destination, so the sync fails the
-        run on a collision nothing can resolve."""
         with workspace_temp_dir() as root:
             archive = root / "archive"
             overrides = library_overrides(root)
@@ -165,9 +136,6 @@ class TestRetireToAnArchive(unittest.TestCase):
                 assert not script_library.is_marked_generated(script)
 
     def test_the_sidecar_goes_with_it_so_the_archive_describes_itself(self):
-        """The metadata tree mirrors the library, and the grouping stage prunes
-        any sidecar no library video maps to — so a stranded sidecar is
-        deleted on the next run, taking the clip's provenance with it."""
         with workspace_temp_dir() as root:
             archive = root / "archive"
             overrides = library_overrides(root)
@@ -189,9 +157,6 @@ class TestRetireToAnArchive(unittest.TestCase):
 
 class TestCarryMetadata(unittest.TestCase):
     def test_the_footage_keys_cross_and_the_file_scoped_one_does_not(self):
-        """``version`` describes the file, not the footage — the original is not
-        a processed version and the upscale is, and the grouping stage is the one
-        thing that gets to say so."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -216,8 +181,6 @@ class TestCarryMetadata(unittest.TestCase):
             assert "version" not in carried
 
     def test_carrying_the_same_record_twice_writes_nothing_the_second_time(self):
-        """The repair pass runs on every tick forever, so a no-op has to say so
-        rather than rewriting every sidecar in the library each time."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]

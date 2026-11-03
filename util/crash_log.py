@@ -1,13 +1,3 @@
-"""How the tray app records the way it died, for the times it dies unwatched.
-
-Under pythonw.exe there is no console and no stderr, so an unhandled exception
-is a silent abort. Everything here exists to leave a written trace of it.
-
-This lives in its own module rather than in tray_app.py because tray_app.py is
-run as a script: importing it from elsewhere makes a *second* module object, so
-the flag one copy sets is not the flag the other copy reads.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -24,21 +14,11 @@ class _Logged:
 
 
 class _WarningsIntoTheCrashLog(logging.Handler):
-    """Under pythonw a warning nobody routed goes nowhere, so it goes here, where
-    every other trace of this process goes."""
-
     def emit(self, record: logging.LogRecord) -> None:
         write_info(f"{record.levelname} from {record.name}:", self.format(record) + "\n")
 
 
 def record_warnings() -> logging.Handler:
-    """Route every warning and error logged in this process into the crash log.
-
-    The tray app configures no logging of its own, so a library that logs why it
-    could not do something -- naming this process for the task list, say -- was
-    saying it to a stderr pythonw does not have.  The handler is handed back so a
-    test can take it off again.
-    """
     handler = _WarningsIntoTheCrashLog(level=logging.WARNING)
     handler.setFormatter(logging.Formatter("%(message)s"))
     logging.getLogger().addHandler(handler)
@@ -46,18 +26,15 @@ def record_warnings() -> logging.Handler:
 
 
 def write_crash(header: str, detail: str) -> None:
-    """Append a timestamped crash entry, and suppress the atexit 'Clean exit' line."""
     _Logged.crash = True
     _append(header, detail)
 
 
 def write_info(header: str, detail: str) -> None:
-    """Append a timestamped entry for something that is not a crash."""
     _append(header, detail)
 
 
 def on_exit() -> None:
-    """Log clean exits so we can distinguish them from external kills."""
     if not _Logged.crash:
         _append("Clean exit", "".join(traceback.format_stack()))
 

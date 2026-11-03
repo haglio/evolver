@@ -137,11 +137,6 @@ class TestSuspendResume:
                     "the child never started writing"
 
                 assert processes.suspend(proc.pid)
-                # A write already past the syscall boundary can still land, so
-                # wait for quiescence by deadline instead of hoping a fixed
-                # sleep was long enough (the old 0.3 s flaked on a loaded
-                # runner). A healthy unsuspended child writes every 5 ms, so a
-                # full second without growth cannot be scheduling noise.
                 def _went_quiet():
                     before = _size(counter)
                     time.sleep(1.0)
@@ -150,7 +145,6 @@ class TestSuspendResume:
 
                 frozen = _size(counter)
                 assert processes.resume(proc.pid)
-                # Fail only if it never advances -- no fixed window to lose.
                 assert _wait_until(lambda: _size(counter) > frozen), \
                     "the resumed child never wrote again"
             finally:

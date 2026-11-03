@@ -31,7 +31,6 @@ from util.ffprobe import (
 
 
 def _ffprobe_answering(answers: dict[str, str], calls: list | None = None):
-    """A subprocess.Popen stand-in that answers by the -show_entries selector."""
     def popen(argv, **kwargs):
         if calls is not None:
             calls.append(argv)
@@ -52,11 +51,9 @@ class TestFrameFingerprint(unittest.TestCase):
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert frame_fingerprint(Path("x.mp4")) == (29.97002997002997, 40561)
         assert _selectors(calls) == ["stream=r_frame_rate,nb_frames"]
-        assert "-select_streams" in calls[0]  # the first video stream's numbers
+        assert "-select_streams" in calls[0]
 
     def test_a_bare_integer_frame_rate_still_fingerprints(self):
-        # Some containers report "30", not "30/1"; the empty denominator must
-        # default to 1 rather than raise.
         fake = _ffprobe_answering({"stream=r_frame_rate,nb_frames": "30,100"})
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert frame_fingerprint(Path("x.mp4")) == (30.0, 100)
@@ -137,7 +134,7 @@ class TestVideoaiTag(unittest.TestCase):
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert videoai_tag(Path("x.mp4")) == "Enhanced using iris-2"
         assert _selectors(calls) == ["format_tags=videoai"]
-        assert "-select_streams" not in calls[0]  # a format probe, not a stream one
+        assert "-select_streams" not in calls[0]
 
     def test_an_untagged_video_reads_as_empty(self):
         fake = _ffprobe_answering({})
@@ -175,8 +172,6 @@ class TestFfprobeOrientation(unittest.TestCase):
         assert _selectors(calls) == [GEOMETRY]
 
     def test_an_unreadable_rotate_tag_is_no_rotation_not_no_answer(self):
-        """The width and height are still good; a tag nothing can parse only
-        means the clip is not rotated as far as this can tell."""
         assert self._orientation("1920", "1080", rotate="N/A") == "landscape"
 
     def test_a_wide_clip_is_landscape(self):
@@ -189,9 +184,6 @@ class TestFfprobeOrientation(unittest.TestCase):
         assert self._orientation("1920", "1080", rotate="90") == "portrait"
 
     def test_a_square_clip_counts_as_landscape(self):
-        # The tie-break: it decides which sorted folder a square video lands
-        # in, and flipping it to portrait used to change nothing (audit
-        # probe 16).
         assert self._orientation("1080", "1080") == "landscape"
 
     def test_a_clip_with_no_dimensions_is_unknown(self):
@@ -231,8 +223,6 @@ class TestHasSound(unittest.TestCase):
 
 class TestFfprobeInvocation(unittest.TestCase):
     def test_every_probe_is_framed_for_bare_csv_output(self):
-        """The -of csv=p=0 framing is what frame_fingerprint's split(',')
-        parses; dropping it used to leave every test green (audit probe 38)."""
         calls = []
         fake = _ffprobe_answering({"format=duration": "1.0"}, calls)
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
@@ -240,10 +230,6 @@ class TestFfprobeInvocation(unittest.TestCase):
         assert calls[0][:5] == ["ffprobe", "-v", "error", "-of", "csv=p=0"]
 
     def test_a_missing_ffprobe_is_no_answer_rather_than_a_crash(self):
-        """Every one of these documents itself as answering None when the probe
-        is unavailable, and none of them did: starting it raises
-        FileNotFoundError, which escaped all the way out of the backfill tool's
-        startup and left it never appearing at all under pythonw."""
         with patch("util.ffprobe.subprocess.Popen",
                    side_effect=FileNotFoundError("ffprobe")):
             assert duration_seconds(Path("x.mp4")) is None

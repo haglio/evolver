@@ -1,4 +1,3 @@
-"""Where Evolver keeps what made a file, and the stamps it keeps there."""
 from __future__ import annotations
 
 import unittest

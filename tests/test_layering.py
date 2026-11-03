@@ -25,18 +25,12 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 
 pytestmark = pytest.mark.repo_check
 
-# Every package and root module of this checkout, so an import of one can be
-# told from an import of a third-party library or the standard one.
 _OURS = (
     "backfill", "backfill_app", "check_correspondence", "check_duplicate_sizes",
     "config", "content_overlay", "evolver", "gui", "review_trash", "review_trash_app", "tasks",
     "tray_app", "util", "vulture_whitelist",
 )
 
-# What each may import. ``gui`` may reach exactly one thing under ``tasks``:
-# tasks/stages.py, the stage registry, which sits with the stage
-# implementations so the headless CLI can read it and which the two windows
-# read their labels, tooltips and band colours out of. Not a stage.
 ALLOWED = {
     "backfill": {"config", "content_overlay", "util"},
     "backfill_app": {"backfill", "evolver", "gui"},
@@ -69,7 +63,6 @@ def _imports(tree: ast.AST):
 
 
 def _edges() -> tuple[dict[str, set[str]], list[str]]:
-    """Which allowed edge each import used, and every import that used none."""
     used: dict[str, set[str]] = {}
     unlisted: list[str] = []
     for name in product_sources(PROJECT_ROOT):
@@ -100,8 +93,6 @@ class TestLayering(unittest.TestCase):
         assert sorted(unlisted) == [], "an import across a layer boundary that nothing declares -- either it belongs in ALLOWED with a reason, or it is the wrong way round"
 
     def test_every_declared_edge_is_one_something_actually_uses(self):
-        """A dependency that has gone is a smaller surface, and the list has to
-        say so -- otherwise it drifts into describing a shape nothing has."""
         used, _unlisted = _edges()
 
         assert used == ALLOWED

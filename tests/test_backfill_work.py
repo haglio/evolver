@@ -45,7 +45,7 @@ class TestSerialWorker(unittest.TestCase):
     def test_draining_a_worker_nothing_was_submitted_to_waits_on_nothing(self):
         worker = self._worker()
         worker.drain()
-        assert worker._latest is None  # nothing was ever waited on
+        assert worker._latest is None
 
     def test_a_failing_task_is_logged_and_never_reaches_the_caller(self):
         worker = self._worker()

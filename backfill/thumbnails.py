@@ -37,27 +37,13 @@ from util.ffprobe import duration_seconds
 log = logging.getLogger(__name__)
 
 _THUMBNAIL_HEIGHT = 96
-# Sample the frame a little under halfway in: past a video's title card or fade-in, and
-# far enough that the act — and the anchor — is actually in frame, not just beginning.
 _SAMPLE_FRACTION = 0.4
 
 def _button_labels(vocabulary: Vocabulary) -> list[str]:
-    """Every button's face, in grid order — the labels a thumbnail fills.
-
-    Labels, not actions: the grid holds control buttons ("Skip", "Trash") that
-    are no act at all, and an act button's label is what the library's
-    ``video.action`` is matched against rather than what it is.
-    """
     return [command.label for row in vocabulary.scoped_grid() for command in row]
 
 
 def _lookups(scan: list[ScannedVideo]) -> tuple[dict[str, Path], dict[str, Path]]:
-    """The two lookups the examples are resolved through.
-
-    ``by_action`` maps each action (and each part of a compound tag), lower-cased, to
-    the first video that carries it; ``by_id`` maps each video's id — its stem without
-    the ``_topaz`` suffix — to the video, for the curated pins.
-    """
     by_action: dict[str, Path] = {}
     by_id: dict[str, Path] = {}
     for video in scan:
@@ -70,15 +56,6 @@ def _lookups(scan: list[ScannedVideo]) -> tuple[dict[str, Path], dict[str, Path]
 
 
 def example_videos(vocabulary: Vocabulary, scan: list[ScannedVideo]) -> dict[str, Path]:
-    """One example video per button of *vocabulary* that has one, as ``button label -> video``.
-
-    A curated pin wins; otherwise the button takes the first library video whose
-    action matches its label. Buttons with neither are simply absent, and stay
-    text-only.
-
-    Takes the scan startup already made, so the library is walked and its
-    sidecars parsed once rather than once per projection.
-    """
     by_action, by_id = _lookups(scan)
     examples: dict[str, Path] = {}
     for label in _button_labels(vocabulary):
@@ -90,7 +67,6 @@ def example_videos(vocabulary: Vocabulary, scan: list[ScannedVideo]) -> dict[str
 
 
 def thumbnail_cache_path(label: str) -> Path:
-    """Where *label*'s cached thumbnail lives — one stable file name per button."""
     slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "unnamed"
     return config.BACKFILL_THUMBNAIL_DIR / f"{slug}.jpg"
 
@@ -104,10 +80,6 @@ def extract_frame(video: Path, dest: Path, *, at_fraction: float = _SAMPLE_FRACT
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
-        # The probe is inside the try too: it also runs a binary, and above the
-        # try a missing one escapes here, escapes build_thumbnails and takes
-        # the whole tool's startup down -- silently, since pythonw.exe has no
-        # console for the traceback.
         duration = duration_seconds(video)
         timestamp = duration * at_fraction if duration else 0.0
         result = subprocess.run(
@@ -135,11 +107,6 @@ def build_thumbnails(
     extract: Callable[[Path, Path], bool],
     cache_path_for: Callable[[str], Path],
 ):
-    """Yield ``(button label, thumbnail path)`` for each example that has, or gets, one.
-
-    A cached frame is reused; otherwise one is extracted and cached. An act whose
-    extraction fails is skipped, so its button simply stays text-only.
-    """
     for label, video in examples.items():
         dest = cache_path_for(label)
         if dest.is_file() or extract(video, dest):

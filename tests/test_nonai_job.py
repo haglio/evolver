@@ -1,10 +1,3 @@
-"""The four JSON files the non-AI upscale stage keeps its state in.
-
-Every function here takes the file it works on, so this module reads no
-``config`` at all and a test needs nothing but a temp directory — which is the
-point of the seam: the stage's persistence used to be reachable only by
-constructing the whole stage and steering it with ``override_config``.
-"""
 from __future__ import annotations
 
 import json
@@ -17,8 +10,6 @@ from util import nonai_job
 
 class TestJobRecord(unittest.TestCase):
     def test_a_saved_job_reads_back_with_the_keys_it_was_given(self):
-        """The file is the on-disk contract with a live multi-hour encode, so
-        the record round-trips unchanged rather than through any schema."""
         with workspace_temp_dir() as root:
             path = root / "state" / "job.json"
             job = {"pid": 4242, "source": "lagoon/0 unsorted/a.mp4", "suspended": False}
@@ -41,8 +32,6 @@ class TestJobRecord(unittest.TestCase):
             assert nonai_job.load_job(root / "job.json") is None
 
     def test_an_unreadable_job_file_means_no_job(self):
-        """The sync service covering the project tree can rename or truncate the
-        file mid-encode; a half-written record must not crash the tick."""
         with workspace_temp_dir() as root:
             path = root / "job.json"
             path.write_text('{"pid": 42', encoding="utf-8")
@@ -57,8 +46,6 @@ class TestJobRecord(unittest.TestCase):
             assert nonai_job.load_job(path) is None
 
     def test_an_empty_record_means_no_job(self):
-        """A record naming no encode has nothing to supervise; read as one, its
-        missing source took the stage down trying to name it."""
         with workspace_temp_dir() as root:
             path = root / "job.json"
             path.write_text("{}", encoding="utf-8")
@@ -104,8 +91,6 @@ class TestAttempts(unittest.TestCase):
             assert nonai_job.attempts_of(path, "other/b.mp4") == 1
 
     def test_clearing_a_key_that_was_never_counted_writes_nothing(self):
-        """The counter is cleared on every stop, most of which never counted the
-        clip, so the common case must not touch the disk."""
         with workspace_temp_dir() as root:
             path = root / "attempts.json"
 
@@ -163,8 +148,6 @@ class TestRequest(unittest.TestCase):
             assert nonai_job.load_request(path) == nonai_job.Request("lagoon/0 unsorted/scene one.mp4")
 
     def test_nothing_was_asked_for_when_the_file_is_absent_or_unreadable(self):
-        """The window writes this while the pipeline reads it, and a reader
-        that crashed on a half-written file would take the tick down with it."""
         for written in (None, '{"video": "lagoon/0 un', "[1, 2]", '{"held_back": "low_ram"}'):
             with self.subTest(written=written), workspace_temp_dir() as root:
                 path = root / "request.json"

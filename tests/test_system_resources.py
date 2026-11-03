@@ -28,9 +28,6 @@ def _fills(**fields):
 
 class TestCpuBusyPercentSurface:
     def test_the_sample_window_has_to_be_named_by_the_caller(self):
-        """The one caller passes `config.CPU_BUSY_SKIP_SAMPLE_SECONDS`; a
-        default here would be a second copy of that tuning value, free to
-        disagree with it."""
         assert (
             inspect.signature(
                 system_resources.measure_cpu_busy_percent
@@ -39,9 +36,6 @@ class TestCpuBusyPercentSurface:
         )
 
     def test_the_name_says_it_takes_time(self):
-        """It reads like a property lookup and blocks for the sample window by
-        construction -- two samples of counters that are totals, with a sleep
-        between them."""
         assert not hasattr(system_resources, "cpu_busy_percent")
 
 
@@ -55,8 +49,6 @@ class TestAvailableRamConversion:
         assert system_resources.available_ram_gb() == 6.0
 
     def test_the_conversion_is_binary_gb_not_a_rounded_guess(self, monkeypatch):
-        # A GB-vs-GiB slip (a factor of 1.074) is exactly what the wide live
-        # bounds could never catch.
         monkeypatch.setattr(
             system_resources.ctypes.windll.kernel32, "GlobalMemoryStatusEx",
             _fills(ullAvailPhys=3 * 1024**3 + 512 * 1024**2),

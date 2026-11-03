@@ -25,14 +25,6 @@ class TestIsProcessedStem:
 
 
 class TestTheUpscaleNamingRule:
-    """"An upscale is named <sorted stem>_topaz" -- one declaration of it.
-
-    Three stages, one utility, the backfill tool and two sibling repos read a
-    file's provenance out of this rule, and it had no constant: six sites spelt
-    it as a literal, each expressing it differently -- append, endswith, slice
-    by len, regex-strip, containment in a suffix tuple.
-    """
-
     def test_the_two_directions_are_inverses(self):
         assert upscaled_stem("clip one") == "clip one_topaz"
         assert sorted_stem_of("clip one_topaz") == "clip one"
@@ -44,8 +36,6 @@ class TestTheUpscaleNamingRule:
         assert is_upscaled_stem("clip one_topaz")
 
     def test_it_takes_one_suffix_off_and_no_more(self):
-        """The general strip is strip_processing_suffixes; this is the inverse
-        of the upscale stage's own naming and nothing else."""
         assert sorted_stem_of("clip_apo8_topaz") == "clip_apo8"
         assert strip_processing_suffixes("clip_apo8_topaz") == "clip"
 

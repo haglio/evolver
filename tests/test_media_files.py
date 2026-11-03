@@ -1,8 +1,3 @@
-"""What counts as a video in this library, and how the tree is walked.
-
-These moved out of tests/test_sort.py, where they had ended up because the sort
-stage was the first caller: none of them is about sorting.
-"""
 from __future__ import annotations
 
 import inspect
@@ -50,9 +45,6 @@ class TestLibraryVideos(unittest.TestCase):
         assert is_partial_path(partial)
 
     def test_what_counts_as_a_video_is_read_when_it_is_asked_not_at_import(self):
-        """Five stages threaded config.VIDEO_EXTENSIONS through one-line
-        wrappers to say this; it is read here now, and still at call time, so
-        override_config reaches it."""
         with workspace_temp_dir() as root:
             mp4 = root / "clip.mp4"
             mkv = root / "clip.mkv"
@@ -133,21 +125,11 @@ class TestChildDirs(unittest.TestCase):
             assert [d.name for d in child_dirs(root)] == ["alpha", "middle", "zebra"]
 
     def test_a_root_that_is_not_there_yields_nothing(self):
-        """The one copy of this that left the guard off raised on a root the
-        pipeline had not created yet."""
         with workspace_temp_dir() as root:
             assert list(child_dirs(root / "nope")) == []
 
 
 class TestTheUniquifier(unittest.TestCase):
-    """"stem", then "stem (2)", "stem (3)"... -- a contract between two apps.
-
-    Origenerator applies it exporting into Evolver's inbox, Evolver applies it
-    again delivering into Genau's folder, and Evolver strips it back off to
-    match a library file to the row that produced it. Three expressions of one
-    rule; two of them are here now, side by side, and cannot drift.
-    """
-
     def test_a_free_name_is_left_alone(self):
         with workspace_temp_dir() as root:
             assert unique_path(root / "clip.mp4") == root / "clip.mp4"
@@ -177,7 +159,6 @@ class TestTheUniquifier(unittest.TestCase):
         assert strip_uniquifier("clip one") == "clip one"
 
     def test_only_a_trailing_number_in_parentheses_is_stripped(self):
-        """A title is free to hold parentheses of its own."""
         assert strip_uniquifier("clip (director's cut)") == "clip (director's cut)"
         assert strip_uniquifier("clip (2) more") == "clip (2) more"
 
@@ -199,8 +180,6 @@ class TestRemoveEmptyDirs(unittest.TestCase):
 
 class TestRemovePartialFiles(unittest.TestCase):
     def test_takes_the_partials_and_leaves_the_rest(self):
-        """Every caller hands it a logger, so it does not carry a branch for
-        the case where it has none."""
         assert inspect.signature(remove_partial_files).parameters["logger"].default is inspect.Parameter.empty
         with workspace_temp_dir() as root:
             partial = partial_path(root / "clip_topaz.mp4", "clip")

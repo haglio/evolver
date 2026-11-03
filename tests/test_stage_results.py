@@ -1,21 +1,3 @@
-"""A stage's result is filled in by the stage, and by nothing it calls.
-
-Every stage returns a dataclass of counters. Fifteen helpers used to take that
-dataclass and write into it instead of returning what they found, so a reader
-could not tell from a call site which counters a call moved, and no helper
-could be tested without building the stage's whole result type. It is the same
-shared mutable state a global is, scoped to one call tree — and it is what kept
-the non-AI supervision welded to its stage.
-
-Held as a gate rather than by care because an out-parameter is ordinary Python
-and raises nothing: the helper compiles, the stage passes, and the coupling is
-invisible until someone tries to move the helper. A helper may still *read* a
-result — formatting a message out of one is what a result is for — but the
-counters go up in the function that owns them.
-
-They were converted one at a time under a ledger of what was left, which
-reached nothing and went with them; what stands is the plain rule.
-"""
 from __future__ import annotations
 
 import ast
@@ -27,8 +9,6 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 
 pytestmark = pytest.mark.repo_check
 
-# Methods that change what they are called on. A call to one of these on a
-# result's field is the same write as an assignment, spelled through the list.
 _MUTATORS = frozenset({
     "add", "append", "clear", "difference_update", "discard", "extend",
     "insert", "intersection_update", "pop", "popitem", "remove", "reverse",
@@ -36,7 +16,6 @@ _MUTATORS = frozenset({
 })
 
 def _result_types(trees: dict[str, ast.AST]) -> set[str]:
-    """The stage-result dataclasses this repo declares, by name."""
     return {
         node.name
         for tree in trees.values()
@@ -54,14 +33,12 @@ def _annotation_name(annotation: ast.expr | None) -> str | None:
 
 
 def _rooted_at(node: ast.expr, name: str) -> bool:
-    """Whether *node* is an attribute chain hanging off the parameter *name*."""
     while isinstance(node, (ast.Attribute, ast.Subscript)):
         node = node.value
     return isinstance(node, ast.Name) and node.id == name
 
 
 def _writes_through(body: list[ast.stmt], name: str) -> bool:
-    """Whether *body* writes through the parameter *name*."""
     for statement in body:
         for node in ast.walk(statement):
             targets: list[ast.expr] = []
@@ -79,7 +56,6 @@ def _writes_through(body: list[ast.stmt], name: str) -> bool:
 
 
 def _out_parameters(tree: ast.AST, result_types: set[str]) -> list[str]:
-    """The functions in *tree* that write through a result they were handed."""
     found: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):

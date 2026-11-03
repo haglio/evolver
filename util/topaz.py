@@ -21,23 +21,14 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Settings:
-    """One way of running Topaz over a video, under the name and version every
-    output made with it records (:mod:`util.provenance`)."""
-
     name: str
     version: str
     filter_complex: str
     videoai_tag: str
     keep_audio: bool = False
-    # The long and short edge of the frame the settings aim at, where it aims at one
-    # rather than at a scale. Its filter names them {width} and {height}, which
-    # only the video's orientation settles: see framed().
     frame: tuple[int, int] | None = None
 
 
-# A change to anything a set of settings runs with owes it a new version: that is how a
-# later sweep tells what it made before the change from what it made after, and
-# tests/test_topaz.py holds each version to the settings it shipped with.
 AI_UPSCALE = Settings(
     name="ai_upscale",
     version="v002",
@@ -61,13 +52,6 @@ AI_UPSCALE_T2V = Settings(
                  "keeping the soundtrack (t2v provider)"),
     keep_audio=True,
 )
-# What the non-AI videos processed by hand in the Topaz GUI carry in their videoai
-# tags: apo-8 60 fps interpolation, then an iris-2 upscale in auto mode with
-# recover-original-detail at 100 (blend=1), aimed at a 4K frame, keeping the
-# soundtrack. vram=0.5 and instances=0 where the AI settings have 1 and 1: an
-# unattended multi-hour encode shares the computer with whatever else is running,
-# so it gets half the VRAM budget and no extra model instance -- slower, but far
-# harder to push the computer into memory exhaustion.
 NON_AI_UPSCALE = Settings(
     name="non_ai_upscale",
     version="v001",
@@ -82,8 +66,6 @@ NON_AI_UPSCALE = Settings(
     frame=(3840, 2160),
 )
 
-# download=0: Topaz otherwise stops to fetch model files it does not need, which
-# on a slow connection has outlasted the stage's run budget.
 AI_UPSCALE_ORIGENERATOR = Settings(
     name="ai_upscale_origenerator",
     version="v001",
@@ -108,15 +90,10 @@ RETIRED_SETTINGS = (
                          "upscale (t2v provider)")),
 )
 
-# A name in parentheses closing a note: the one part of the settings' note that has
-# been reworded while the settings stayed the same.
 _CLOSING_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
 
 SIGN_IN_EXPIRED = "topaz_sign_in_expired"
 
-# What Topaz's own program prints, at its verbose log level only, when the
-# sign-in the Topaz Video app saved for it has run out -- and, when renewing it
-# fails, that it is about to watermark everything it makes.
 _EXPIRED_SIGN_IN_MESSAGES = (
     "Authentication token expired",
     "Authentication Failure",
@@ -126,7 +103,6 @@ _SIGN_IN_CHECK_TIMEOUT_SECONDS = 90
 
 
 def settings_noted(note: str) -> Settings | None:
-    """The settings whose note Topaz wrote into a file is *note*, or None."""
     said = _CLOSING_PARENTHETICAL.sub("", note)
     return next((settings for settings in (*ALL_SETTINGS, *RETIRED_SETTINGS)
                  if _CLOSING_PARENTHETICAL.sub("", settings.videoai_tag) == said), None)
@@ -134,9 +110,6 @@ def settings_noted(note: str) -> Settings | None:
 
 def framed(settings: Settings, orient: str, video_fps: Fraction | None = None,
            generated_fps: Fraction | None = None) -> Settings:
-    """*settings* turned to the video they run over: {width} and {height} wide for
-    landscape and tall otherwise, and {every} and {kept_fps} picking out the frames
-    a model generating at *generated_fps* made."""
     every = _generated_frame_spacing(video_fps, generated_fps)
     settled = {"every": every, "kept_fps": video_fps / every if video_fps else "source_fps"}
     if settings.frame is not None:
@@ -148,14 +121,11 @@ def framed(settings: Settings, orient: str, video_fps: Fraction | None = None,
 
 
 def _generated_frame_spacing(video_fps: Fraction | None, generated_fps: Fraction | None) -> int:
-    """A video written at a whole multiple of the rate its model generated at holds
-    the generated frames that many apart; any other is kept whole."""
     multiple = video_fps / generated_fps if video_fps and generated_fps else Fraction(1)
     return multiple.numerator if multiple.denominator == 1 else 1
 
 
 def environment() -> dict:
-    """os.environ extended with the Topaz model-directory variables."""
     return {
         **os.environ,
         "TVAI_MODEL_DIR": str(config.TVAI_MODEL_DIR),

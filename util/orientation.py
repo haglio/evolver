@@ -18,5 +18,4 @@ from shared_ui.orientation import LANDSCAPE, PORTRAIT
 # where it is rather than guessed into one of the two.
 UNKNOWN = "unknown"
 
-# The order the sorted tree's orientation folders are made and walked in.
 SORTED = (LANDSCAPE, PORTRAIT)

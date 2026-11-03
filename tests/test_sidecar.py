@@ -47,8 +47,6 @@ class TestSidecarPath(unittest.TestCase):
                 assert sidecar_path(video) == metadata / "2D" / "non_AI" / "lagoon" / "3_good_to_go" / "processed" / "clip_apo8_iris2.json"
 
     def test_mirrors_a_genau_flick_from_beside_the_library(self):
-        """Genau's flicks sit next to the video tree rather than inside it, so
-        they mirror from the folder that holds both."""
         with workspace_temp_dir() as root:
             videos = root / "videos"
             metadata = root / "metadata"
@@ -85,17 +83,7 @@ class TestSidecarFolder(unittest.TestCase):
 
 
 class TestUpdate(unittest.TestCase):
-    """The one write, and the lock it holds while it reads and changes.
-
-    Two apps write these documents -- this app's pipeline on a ten-minute
-    timer, Fun Time the moment a viewer strikes an act out -- and each used to
-    read, change and write on its own, so whichever wrote second erased the
-    field the first had just put in.
-    """
-
     def test_no_other_writer_gets_in_while_one_is_inside(self):
-        """The lock is taken on the document's own name, which is the name Fun
-        Time's writer takes: it is kept out, rather than writing alongside."""
         with workspace_temp_dir() as root:
             path = root / "clip.json"
             refused = []
@@ -112,8 +100,6 @@ class TestUpdate(unittest.TestCase):
             assert refused == [True]
 
     def test_it_changes_the_document_the_other_writer_left(self):
-        """The lost update itself: a pass whose turn comes after a rejection
-        writes onto the rejection, not onto what it read before waiting."""
         with workspace_temp_dir() as root:
             path = root / "clip.json"
             sidecar.update(path, lambda _: {"video": {"action": "alpha"}})
@@ -167,9 +153,6 @@ class TestRecordAction(unittest.TestCase):
             assert payload == {"video": {"action": "Side Beta"}}
 
     def test_naming_the_act_answers_a_viewers_rejection_of_the_old_one(self):
-        """``wrong_action`` is a standing question — "this clip is mislabeled,
-        ask me again" — and recording an act is the answer, so the marker goes
-        with it.  Left in place it would jump the queue on every future open."""
         with library_tree() as lib:
             video = lib.video()
             path = sidecar_path(video)

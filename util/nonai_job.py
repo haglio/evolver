@@ -1,22 +1,3 @@
-"""The four JSON files the non-AI upscale stage keeps its state in.
-
-One in-flight record (which encode is running, since when, and whether it is
-frozen), one attempt counter per clip (so a video that fails repeatedly stops
-being retried), one cooldown stamp (when the last encode ended, so an
-unattended night does not run the computer flat out end to end), and one
-request (the video the user asked to have upscaled right away, until it starts).
-
-Every function takes the file it works on rather than reading ``config``: the
-stage owns which paths these are, and a caller — a test, or a second entry
-point — can point them anywhere.  Every reader is tolerant by design.
-The record is the on-disk contract with a live multi-hour encode and the sync
-service covering the project tree has renamed it mid-run, so a missing or
-half-written file has to read as "no state", never as a crash that would strand
-the encode it describes.  Every writer lands its file whole, because the queue
-window reads the record and the request on the GUI thread while the pipeline
-rewrites them on its own.
-"""
-
 from __future__ import annotations
 
 import json
@@ -68,12 +49,6 @@ def stamp_encode_ended(path: Path) -> None:
 
 @dataclass(frozen=True)
 class Request:
-    """A video the user asked to have upscaled right away, by its library path.
-
-    *held_back* names what kept the last run from starting it, so the window
-    can say why it is still waiting.
-    """
-
     video: str
     held_back: str = ""
 

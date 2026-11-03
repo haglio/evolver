@@ -77,8 +77,6 @@ CONFIG_REFERENCE_CEILINGS = {
     "util/trash_folders.py": 9,
 }
 
-# Every key the app reads out of the content overlay, as ``key`` or
-# ``key.subkey``.
 OVERLAY_KEYS = {
     "acts",
     "cameras",
@@ -97,11 +95,6 @@ OVERLAY_KEYS = {
     "warm_gun_outbox",
 }
 
-# The ones the overlay may leave out; each is documented as optional and each
-# has a fallback, so the committed example does not carry them. The two Topaz
-# paths are absent for a second reason: the fallback is where the installer
-# puts them, and an example naming one computer's install would read as the
-# answer rather than as the override it is.
 OPTIONAL_OVERLAY_KEYS = {
     "display_timezone", "retired_root", "topaz_ffmpeg",
     "topaz_models", "version_overrides", "vr_videos", "warm_gun_outbox",
@@ -109,12 +102,6 @@ OPTIONAL_OVERLAY_KEYS = {
 
 
 def _config_references(tree: ast.AST) -> int:
-    """How many times *tree* reaches into the ``config`` module.
-
-    Counts ``config.X`` and any other load of the bare name, so
-    ``getattr(config, name)`` cannot slip the ledger by spelling the read
-    differently.
-    """
     return sum(
         1
         for node in ast.walk(tree)
@@ -123,15 +110,6 @@ def _config_references(tree: ast.AST) -> int:
 
 
 def _config_imports(tree: ast.AST) -> list[int]:
-    """Lines importing ``config`` as anything but the plain module name.
-
-    The ledger counts loads of the name ``config``, so ``from config import X``
-    reaches the same singleton and scores zero — a new ambient read that lands
-    green, and a way to "convert" a module by rewriting its import while
-    lowering its number. Neither spelling exists in the tree; the point of
-    refusing them is that the seam is opened by a parameter, not by a different
-    way of saying the same import.
-    """
     lines = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module == "config":
@@ -142,16 +120,6 @@ def _config_imports(tree: ast.AST) -> list[int]:
 
 
 def _import_time_config_defaults(tree: ast.AST) -> list[int]:
-    """Lines where a signature default is read off ``config``.
-
-    The one rule the whole seam rests on. ``def run(*, x=config.X)`` is
-    evaluated once, when the module is imported, so the value is frozen before
-    anything can redirect it and ``override_config`` — which every stage test
-    steers with — cannot reach it. The sentinel form
-    (``x=None`` then ``x = config.X if x is None else x``) reads at call time.
-    Both spellings hold the same ``config.X``, so the count cannot tell them
-    apart and this does.
-    """
     lines = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -168,41 +136,18 @@ def _import_time_config_defaults(tree: ast.AST) -> list[int]:
 
 
 class _OverlayKeys(ast.NodeVisitor):
-    """The overlay keys one module reads, followed through the names it binds.
-
-    ``load_content()`` returns the overlay mapping; a module either indexes it
-    where it stands or parks it in a name first, and one that reads a nested
-    group parks that too (``_PROVIDER = load_content()["scrape_provider"]``).
-    So the names holding overlay data are collected as they are bound, and each
-    one carries the path it was reached by. Keys read off a comprehension's
-    target -- an ``acts`` entry's own fields -- are the element shape rather
-    than the overlay's key names, and are not followed.
-    """
-
     def __init__(self, prebound: dict[str, str] | None = None):
-        # Only config.py starts with names already holding overlay data —
-        # ``_CONTENT`` and the ``content`` parameter its two helpers take their
-        # mapping as. Seeding those everywhere would harvest the literal keys of
-        # any unrelated dict a module happened to call ``content``.
         self.paths: dict[str, str] = dict(prebound or {})
         self.keys: set[str] = set()
-        # Overlay reads whose key this cannot see: a name, an f-string, a
-        # comprehension target. One of those would put a key into the contract
-        # with nothing recording it, so the gate refuses them rather than
-        # quietly reading past them.
         self.unreadable: list[int] = []
 
     def _path_of(self, node: ast.AST) -> str | None:
-        """The overlay path *node* evaluates to, or None if it is not overlay data."""
         if isinstance(node, ast.Name):
             return self.paths.get(node.id)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "load_content":
             return ""
         if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
                 and node.func.id == "overlay_value" and node.args):
-            # app_support.overlay.overlay_value(<overlay>, "key", "subkey", ...):
-            # the named read, which refuses by name where a subscript would
-            # raise a bare KeyError; the keys are its positional arguments.
             base = self._path_of(node.args[0])
             if base is None:
                 return None
@@ -252,10 +197,6 @@ class _OverlayKeys(ast.NodeVisitor):
             if path:
                 self.keys.add(path)
         if isinstance(func, ast.Attribute) and (base := self._path_of(func.value)) is not None:
-            # ``get`` is the one call this can read a key out of. Every other
-            # method on the mapping — ``pop``, ``setdefault``, ``keys`` — either
-            # names a key it would have to know about or ranges over all of
-            # them, so it is refused rather than read past.
             key = node.args[0] if node.args else None
             if func.attr == "get" and isinstance(key, ast.Constant) and isinstance(key.value, str):
                 self.keys.add(f"{base}.{key.value}".lstrip("."))
@@ -318,8 +259,6 @@ class TestConfigSeam(unittest.TestCase):
         assert found == OVERLAY_KEYS
 
     def test_the_committed_example_carries_every_required_key(self):
-        """A public checkout loads the example, so a key missing from it is a
-        ``KeyError`` at import for everyone who has no overlay of their own."""
         example = json.loads(
             Path(PROJECT_ROOT, "content.example.json").read_text(encoding="utf-8")
         )

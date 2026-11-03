@@ -137,7 +137,6 @@ class TestWatchingOne(_ReviewingALibrary):
 
 
 def _row_colors(view, row: int) -> set[str]:
-    """Every color *row* is painted in, across all its cells."""
     QAPP.processEvents()
     first = view.visualRect(view.model().index(row, 0))
     last = view.visualRect(view.model().index(row, view.model().columnCount() - 1))

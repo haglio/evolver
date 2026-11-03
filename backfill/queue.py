@@ -1,5 +1,3 @@
-"""Which videos still need an action, and the order the backfill tool asks about them."""
-
 from __future__ import annotations
 
 from collections import deque
@@ -13,29 +11,14 @@ from util.media_files import library_videos
 from util.sidecar import action_of, sidecar_path, wrong_action_of
 from util.versions import sorted_stem_of
 
-# Portrait first, and that is not cosmetic: it is the order the tool asks a
-# human about, and most of the unlabeled queue is portrait.
 _ORIENTATIONS = (orientation.PORTRAIT, orientation.LANDSCAPE)
 
 
 def scraped_sources() -> frozenset[str]:
-    """Sources the scrape stage already has a metadata strategy for (see
-    :mod:`tasks.prompt_scrape`): the provider from its website, Origenerator from
-    its gallery database.  Every other source arrives with no upstream record of
-    what it shows, so its act is the one a human has to dictate.
-
-    Read at the call rather than at import: the provider's name is the
-    overlay's, and a literal agreed with it only by happening to.
-    """
     return frozenset({config.PROVIDER_SOURCE, lanes.ORIGENERATOR_SOURCE})
 
 
 def iter_library_videos() -> Iterator[tuple[str, Path]]:
-    """Every finalized upscaled video as ``(source name, path)``, both orientations.
-
-    Walked in a stable order — orientation, then source, then filename — so both
-    the work queue and the example-video scan see videos the same way each run.
-    """
     for orient in _ORIENTATIONS:
         orient_dir = config.OUT_UPSCALED_DIR / orient
         if not orient_dir.is_dir():
@@ -47,8 +30,6 @@ def iter_library_videos() -> Iterator[tuple[str, Path]]:
 
 @dataclass(frozen=True)
 class ScannedVideo:
-    """One library video, as the tool's two startup passes read it."""
-
     source: str
     path: Path
     action: str
@@ -57,17 +38,6 @@ class ScannedVideo:
 
 
 def library_scan() -> list[ScannedVideo]:
-    """Every upscaled video, walked once and its sidecar parsed once.
-
-    Startup wants two different projections of the same data -- the videos with
-    no action, and the first video per action plus an index by video id -- and
-    used to take a full walk and a full sidecar read for each. On a library of
-    thousands, that is a tray-launched tool sitting with no window on screen
-    for twice as long as it needs to.
-
-    In ``iter_library_videos``' order, which is what lets a reopened session
-    resume where it left off: it is not re-sorted here, and must not be.
-    """
     return [
         ScannedVideo(
             source=source,
@@ -82,17 +52,6 @@ def library_scan() -> list[ScannedVideo]:
 
 
 def unlabeled_videos(scan: list[ScannedVideo] | None = None) -> list[Path]:
-    """Every upscaled video whose sidecar records no ``video.action``.
-
-    The ones a viewer *rejected* come first.  Fun Time's "wrong action" empties
-    ``video.action`` and leaves ``video.wrong_action`` in its place, which says a
-    person just looked at that video and told us its label was wrong: they are
-    owed an answer now, not at whatever depth of the library walk the video
-    happens to sit at.  For the same reason a rejection overrides the
-    scraped-source skip below — the scrape's claim about the video is the very
-    thing being contradicted, and re-running the scrape would only assert it
-    again.
-    """
     scan = library_scan() if scan is None else scan
     scraped = scraped_sources()
     rejected: list[Path] = []
@@ -108,48 +67,28 @@ def unlabeled_videos(scan: list[ScannedVideo] | None = None) -> list[Path]:
 
 
 class BackfillQueue:
-    """The videos awaiting an action, kept in the order they were found.
-
-    A stable order is what lets a reopened session pick up where the last left
-    off: labelled videos drop out, so the next open resumes at the first video still
-    unlabelled rather than jumping to a fresh random one.
-
-    The video at the front is the one on screen.  :meth:`resolve` retires it —
-    it has been labelled or discarded — while :meth:`defer` sends it to the
-    back, unanswered, to come round again later.
-
-    :meth:`restore` and :meth:`undefer` are their exact inverses, so undoing a
-    run of decisions back to front rewinds the queue to the order it had.
-    """
-
     def __init__(self, videos: list[Path]) -> None:
         self._pending = deque(videos)
 
     @property
     def remaining(self) -> int:
-        """How many videos still need an action, deferred ones included."""
         return len(self._pending)
 
     @property
     def current(self) -> Path | None:
-        """The video on screen, or None once every video has been resolved."""
         return self._pending[0] if self._pending else None
 
     def resolve(self) -> None:
-        """Retire the current video — it has been labelled or discarded."""
         if self._pending:
             self._pending.popleft()
 
     def defer(self) -> None:
-        """Send the current video to the back, still needing an action."""
         if self._pending:
             self._pending.rotate(-1)
 
     def restore(self, video: Path) -> None:
-        """Put a resolved *video* back on screen — the inverse of :meth:`resolve`."""
         self._pending.appendleft(video)
 
     def undefer(self) -> None:
-        """Bring the deferred video back to the front — the inverse of :meth:`defer`."""
         if self._pending:
             self._pending.rotate(1)

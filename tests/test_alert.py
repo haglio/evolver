@@ -19,12 +19,6 @@ from util import alert
 class TestTheOnlyWayToAModalDialog(unittest.TestCase):
     @pytest.mark.repo_check
     def test_no_other_module_opens_a_dialog_for_itself(self):
-        """``tests/__init__.py`` gags the two calls ``util/alert.py`` makes.
-
-        That gag covers this module and nothing else, so a second module
-        reaching either of them for itself would block an unattended run on a
-        human -- the failure the gag exists to make impossible.
-        """
         openers = [
             name
             for name in product_sources(PROJECT_ROOT)

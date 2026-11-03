@@ -1,4 +1,3 @@
-"""Warm Gun's journal: the phone's viewing, and where each line's video is here."""
 from __future__ import annotations
 
 import json
@@ -43,7 +42,6 @@ class TestReadJournals(unittest.TestCase):
             assert warm_gun.read_journals([root]) == {"a.jsonl": [Event(10, "completion", "1_sorted/provider2/portrait/a.mp4"), Event(20, "skip", "1_sorted/provider2/portrait/b.mp4")], "b.jsonl": [Event(15, "lock", "genau/clips/loop.mp4")]}
 
     def test_a_line_twice_in_a_journal_counts_once(self):
-        """The phone re-uploading its whole history must not double every count."""
         with workspace_temp_dir() as root:
             line = {"t": 10, "event": "completion", "path": "1_sorted/provider2/portrait/a.mp4"}
             _journal(root / "phone.jsonl", [line, line])

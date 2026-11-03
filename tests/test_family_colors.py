@@ -39,7 +39,6 @@ _HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b")
 
 
 def _family_hex() -> dict[str, str]:
-    """Every shared_ui token's ``#rrggbb``, and the names that spell it."""
     named: dict[str, list[str]] = {}
     for name in dir(palette):
         value = getattr(palette, name)
@@ -57,8 +56,6 @@ def _sources() -> list[Path]:
 
 
 def test_no_color_here_is_a_hand_copy_of_a_family_token():
-    # Parsed rather than grepped, so a "#" in a comment or a path is not a hit --
-    # only text the app actually paints with, or a test asserts on.
     family = _family_hex()
     offenders = []
     for path in _sources():

@@ -1,4 +1,3 @@
-"""A video shown over and over, with no sound, until the window lets it go."""
 from __future__ import annotations
 
 from pathlib import Path

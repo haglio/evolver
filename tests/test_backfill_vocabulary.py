@@ -73,7 +73,6 @@ class TestCommandGrid(unittest.TestCase):
         assert second == Command("xyz beta", "XYZ Beta")
 
     def test_an_act_with_alias_forms_shows_a_single_canonical_row(self):
-        """Alpha is heard two ways ("alpha"/"alpha form") but is one button."""
         alpha_rows = [row for row in VOCABULARY.scoped_grid() if row[0].label == "Side Alpha"]
         assert len(alpha_rows) == 1
         assert alpha_rows[0][0] == Command("side alpha", "Side Alpha")
@@ -98,7 +97,6 @@ class TestGrammarPhrases(unittest.TestCase):
         assert VOCABULARY.grammar_phrases() == sorted({*VOCABULARY.actions, *VOCABULARY.controls})
 
     def test_the_committed_example_spells_every_act_in_words_the_vosk_lexicon_knows(self):
-        """The compounds live in the written action, never in a spoken phrase."""
         example = json.loads(EXAMPLE_CONTENT.read_text(encoding="utf-8"))
         with patch("backfill.vocabulary.load_content", return_value=example):
             vocabulary = load_vocabulary()
@@ -107,7 +105,6 @@ class TestGrammarPhrases(unittest.TestCase):
         for act in vocabulary.acts:
             compound = act.action.replace(" ", "").lower()
             if compound in spoken_words:
-                # Only allowed when that IS how the act is said, e.g. "other".
                 assert compound in {form.lower() for form in act.forms()}
 
 

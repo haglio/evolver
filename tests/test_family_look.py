@@ -1,4 +1,3 @@
-"""Evolver wears the family's look: shared_ui's colors, marks, lettering and spacing, none of its own."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,7 +9,6 @@ pytestmark = pytest.mark.repo_check
 
 _CHECKOUT = Path(__file__).resolve().parents[1]
 _PACKAGES = ("gui", "backfill", "review_trash", "tasks", "util", "tools")
-# The Stats chart tells its 19 stages apart by colors of their own, which its owner chose to keep (2026-10-24).
 _WHERE_THE_STAGES_COLORS_ARE = _CHECKOUT / "tasks" / "stages.py"
 
 

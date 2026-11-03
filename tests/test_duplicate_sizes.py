@@ -49,8 +49,6 @@ class TestDuplicateSizes:
             show_error.assert_called_once()
 
     def test_zero_byte_files_are_not_duplicates_of_each_other(self):
-        """A crashed download leaves empty files; two of them share a size for
-        no reason at all, and must not fail the run as a duplicate pair."""
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
             (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
@@ -65,9 +63,6 @@ class TestDuplicateSizes:
             assert result.scanned_count == 2
 
     def test_run_scans_the_folder_it_is_given(self):
-        """The root scanned and the root paths are reported relative to are one
-        thing, and it is an argument now. The ambient folder here holds a
-        duplicate pair the given one does not."""
         with workspace_temp_dir() as root:
             given = root / "given"
             (given / "examplebucket").mkdir(parents=True)
@@ -86,9 +81,6 @@ class TestDuplicateSizes:
 
 
 class TestMain:
-    """The standalone entry point's report and exit code, previously untested
-    (main() was the whole of the file's missing coverage)."""
-
     def test_a_clean_tree_reports_ok_and_exits_zero(self, capsys):
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"

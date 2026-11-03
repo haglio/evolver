@@ -37,11 +37,6 @@ EMPTY_QUEUE = UpscaleQueue(rows=(), head=None)
 
 
 class DoneAtOnce:
-    """The app's background queue, doing each piece of work as it is handed over.
-
-    So the patches a test stands up are still standing when the work runs.
-    """
-
     def run(self, work, then=None):
         answer = work()
         if then is not None:
@@ -52,7 +47,6 @@ class DoneAtOnce:
 
 
 def row_ground(view, row: int) -> str:
-    """The color a list view paints *row* in, read near its right end, past any text."""
     QAPP.processEvents()
     last_cell = view.visualRect(view.model().index(row, view.model().columnCount() - 1))
     painted = view.viewport().grab().toImage()
@@ -89,12 +83,10 @@ def retire_evolver_app(app) -> None:
     try:
         app._app.commitDataRequest.disconnect(app._on_session_end)
     except TypeError:
-        pass  # a test that replaced the handler already broke the connection
+        pass
     app._tray.hide()
     app._tray.setParent(None)
     app._tray.deleteLater()
     app._window.close()
     app._window.deleteLater()
-    # Deleted now, not inside whichever later test next lets the event loop run:
-    # a window dying there takes that test's popped-up menu down with it.
     QAPP.sendPostedEvents(None, QEvent.Type.DeferredDelete)

@@ -1,4 +1,3 @@
-"""One pipeline run on the computer at a time, whichever Evolver starts it."""
 from __future__ import annotations
 
 import os
@@ -30,8 +29,6 @@ class TestTheTurn:
             assert not lock.exists()
 
     def test_a_turn_a_live_process_holds_is_refused(self):
-        """The other Evolver is mid-run: the files this run would move are the
-        ones that one is moving."""
         with workspace_temp_dir() as root:
             lock = root / "pipeline.lock"
             lock.write_text(str(os.getpid()), encoding="utf-8")
@@ -42,8 +39,6 @@ class TestTheTurn:
             assert lock.read_text(encoding="utf-8") == str(os.getpid())
 
     def test_a_turn_left_by_a_process_that_has_ended_is_taken_over(self):
-        """An Evolver killed mid-run leaves its turn held; nothing would ever
-        give it back."""
         with workspace_temp_dir() as root:
             lock = root / "pipeline.lock"
             lock.write_text(str(a_process_that_has_ended()), encoding="utf-8")

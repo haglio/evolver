@@ -26,14 +26,10 @@ _BROWSER_CANDIDATES = (
     Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
 )
 
-# Long enough for the pages in question to finish their fetches and render,
-# short enough that a stalled one dies well inside the pipeline's own ceiling.
-# Virtual time, so it is not wall-clock: the browser fast-forwards its timers.
 _VIRTUAL_TIME_BUDGET_MS = 10000
 
 
 def find_browser_executable() -> Path | None:
-    """The first installed Chromium-family browser, or None if there is none."""
     for candidate in _BROWSER_CANDIDATES:
         if candidate.is_file():
             return candidate
@@ -41,12 +37,6 @@ def find_browser_executable() -> Path | None:
 
 
 def fetch_dom(url: str, browser: Path, *, profile_dir: Path) -> str:
-    """*url*'s rendered DOM, as the given browser sees it after its scripts run.
-
-    Raises ``RuntimeError`` naming the URL when the browser exits non-zero --
-    the caller turns that into a failure marker beside the sidecar it could not
-    write, so the same page is not retried every run.
-    """
     profile_dir.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
         [

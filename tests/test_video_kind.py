@@ -56,8 +56,6 @@ class TestRecording(unittest.TestCase):
 
 
 class TestTheRunningTime(unittest.TestCase):
-    """The measurement the kind is read off, kept beside it."""
-
     def test_reads_the_running_time_off_the_video_block(self):
         assert video_kind.duration_of({"video": {"duration_seconds": 812.5}}) == 812.5
 
@@ -106,10 +104,6 @@ class TestTheOrientation(unittest.TestCase):
 
 
 class TestTellingABareSidecarApart(unittest.TestCase):
-    """Two stages read a sidecar's contents as evidence that something else
-    happened to the clip — a scrape, a generation. Everything this module
-    records has to stay invisible to them, however many fields that becomes."""
-
     def test_a_sidecar_holding_only_a_kind_records_nothing_else(self):
         assert video_kind.only_the_video_itself({"video": {"type": video_kind.SHORT}})
 
@@ -126,15 +120,9 @@ class TestTellingABareSidecarApart(unittest.TestCase):
         assert video_kind.only_the_video_itself({"video": {"type": video_kind.SHORT}, "favorite": True, "web_url": "https://example.com/gallery/101"})
 
     def test_a_record_of_what_made_the_file_beside_them_is_still_nothing_else(self):
-        """An upscale is stamped the moment it is written, which can be before
-        the scrape of the clip it came from has landed -- and a scrape that read
-        the stamp as its own work would never look at the clip again."""
         assert video_kind.only_the_video_itself({"video": {"type": video_kind.SHORT}, provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}})
 
     def test_a_record_of_what_made_the_file_on_its_own_is_nothing_else_either(self):
-        """The upscale's stamp can be the first thing a clip's sidecar ever
-        holds: the kind lands later in the same run, and only when the kinds
-        stage had a measurement left to spend on that clip."""
         assert video_kind.only_the_video_itself({provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}})
 
     def test_a_generation_beside_them_is_something_else(self):

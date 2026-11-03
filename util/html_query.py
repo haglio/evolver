@@ -1,12 +1,3 @@
-"""A small HTML parse-and-query library.
-
-Grown inside the prompt scraper and extracted once it was, in substance, its
-own module: a lenient DOM built on html.parser, a child-combinator CSS
-selector (tag and class), text extraction, and the
-label/value walk the scraped pages use (an ``<h2>`` label answered by the next
-``<h1>`` sibling). Stdlib only; nothing here knows what a video is.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -88,11 +79,6 @@ def find_all_by_tag(node: Node, tag: str):
 
 
 def extract_label_values(root: Node, labels: set[str]) -> dict[str, str]:
-    """The pages' metadata idiom: an ``<h2>`` label, then an ``<h1>`` value.
-
-    Returns {lowercased label: value text} for every ``<h2>`` whose text is in
-    *labels* and that has an ``<h1>`` among its later siblings.
-    """
     fields: dict[str, str] = {}
     for h2 in find_all_by_tag(root, "h2"):
         label = text_content(h2).strip().lower()

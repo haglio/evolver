@@ -1,11 +1,3 @@
-"""Whether two differently named files hold one video, told by their frames.
-
-The naming rule (:mod:`util.version_groups`) finds a version by the thread its
-name keeps back to its original. A copy saved under a name of its own keeps no
-such thread, so the only thing left to go on is the footage: two files that run
-the same length and show the same frames at the same moments are one video.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -15,18 +7,11 @@ import numpy as np
 
 from util.frame_hashes import TOLERANCE, frame_hashes, frames_at
 
-# Two encodes of one video disagree on its length by a frame or two.
 SAME_LENGTH_SECONDS = 0.5
 
-# Measured on a real pair, 2026-09-16: two encodes of one scene agreed at 13 of
-# 16 evenly spaced moments, and every same-length pair of different scenes in
-# that folder agreed at none.
 MOMENTS = 16
 AGREEING_MOMENTS = 10
 
-# Where a video's moments are kept: ``payload["footage"]["fingerprint"]``. They
-# describe the footage rather than the file, so an upscale is handed its
-# original's along with the rest of the sidecar.
 BLOCK = "footage"
 FIELD = "fingerprint"
 
@@ -50,7 +35,6 @@ def fingerprint_of(payload: dict) -> list[str] | None:
 
 
 def fingerprinted(payload: dict, moments: list[str]) -> dict:
-    """*payload* with *moments* recorded on it -- a copy, leaving the original."""
     block = payload.get(BLOCK)
     return {**payload, BLOCK: {**(block if isinstance(block, dict) else {}), FIELD: moments}}
 
@@ -65,7 +49,6 @@ def same_footage(a: Sequence[str], b: Sequence[str]) -> bool:
 
 
 def join(ids: Mapping[str, str], pairs: Iterable[tuple[str, str]]) -> dict[str, str]:
-    """*ids* with every family in *pairs* folded into one, under its first id."""
     anchor: dict[str, str] = {}
 
     def root(family: str) -> str:
