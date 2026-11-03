@@ -4,8 +4,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from tasks import nonai_encode
 from tests.temp_helpers import workspace_temp_dir
 
@@ -127,55 +125,30 @@ class TestOverran(unittest.TestCase):
         assert not nonai_encode.overran(job, self.SETTINGS, now=started + 2 * self.CAP_SECONDS)
 
 
-class TestComputerBusyReason:
+class TestComputerBusyChecks:
     SETTINGS = nonai_encode.EncodeSettings()
 
-    @pytest.fixture(autouse=True)
-    def quiet_computer(self, monkeypatch):
-        monkeypatch.setattr(nonai_encode, "user_present", lambda settings: False)
-        monkeypatch.setattr(nonai_encode, "topaz_pids", list)
-        monkeypatch.setattr(nonai_encode.system_resources, "available_ram_gb", lambda: 1_000.0)
-        monkeypatch.setattr(nonai_encode.nonai_job, "last_encode_ended_at", lambda path: 0.0)
-        monkeypatch.setattr(nonai_encode.topaz, "sign_in_expired", lambda: False)
+    def checks(self, **kwargs):
+        options = {"asked_for": False, "ai_waiting": False, **kwargs}
+        return nonai_encode.busy_checks(Path("cooldown.json"), self.SETTINGS, **options)
 
-    def busy(self, **kwargs):
-        return nonai_encode.computer_busy_reason(Path("cooldown.json"), self.SETTINGS, **kwargs)
+    def test_the_reasons_are_checked_in_the_order_that_decides_which_one_is_given(self):
+        reasons = [reason for reason, _ in self.checks()]
 
-    def test_a_quiet_computer_has_no_reason_to_wait(self):
-        assert self.busy() == ""
+        assert reasons == [
+            "user_present", "topaz_busy", "low_ram", "ai_clips_waiting", "cooldown",
+            nonai_encode.topaz.SIGN_IN_EXPIRED,
+        ]
 
-    def test_the_user_being_present_comes_before_topaz_being_busy(self, monkeypatch):
-        monkeypatch.setattr(nonai_encode, "user_present", lambda settings: True)
-        monkeypatch.setattr(nonai_encode, "topaz_pids", lambda: [4])
+    def test_a_request_from_the_user_skips_the_presence_and_cooldown_checks(self):
+        applies = dict(self.checks(asked_for=True))
 
-        assert self.busy() == "user_present"
+        assert not applies["user_present"]()
+        assert not applies["cooldown"]()
 
-    def test_a_request_from_the_user_ignores_their_presence(self, monkeypatch):
-        monkeypatch.setattr(nonai_encode, "user_present", lambda settings: True)
-
-        assert self.busy(asked_for=True) == ""
-
-    def test_topaz_running_comes_before_low_memory(self, monkeypatch):
-        monkeypatch.setattr(nonai_encode, "topaz_pids", lambda: [4])
-        monkeypatch.setattr(nonai_encode.system_resources, "available_ram_gb", lambda: 0.0)
-
-        assert self.busy() == "topaz_busy"
-
-    def test_clips_waiting_for_the_ai_stage_hold_the_encode_back(self):
-        assert self.busy(ai_waiting=True) == "ai_clips_waiting"
-
-    def test_a_recent_encode_means_cooldown_unless_the_user_asked(self, monkeypatch):
-        monkeypatch.setattr(nonai_encode.time, "time", lambda: 100.0)
-        monkeypatch.setattr(nonai_encode.nonai_job, "last_encode_ended_at", lambda path: 99.0)
-
-        assert self.busy() == "cooldown"
-        assert self.busy(asked_for=True) == ""
-
-    def test_an_expired_topaz_sign_in_is_the_last_reason_checked(self, monkeypatch):
-        monkeypatch.setattr(nonai_encode.topaz, "sign_in_expired", lambda: True)
-
-        assert self.busy() == nonai_encode.topaz.SIGN_IN_EXPIRED
-        assert self.busy(ai_waiting=True) == "ai_clips_waiting"
+    def test_clips_waiting_for_the_ai_stage_apply_only_when_told_so(self):
+        assert dict(self.checks(ai_waiting=True))["ai_clips_waiting"]()
+        assert not dict(self.checks())["ai_clips_waiting"]()
 
 
 if __name__ == "__main__":
