@@ -94,6 +94,16 @@ class Trees:
         )
 
 
+@dataclass
+class _Aligned:
+    orphans: list[Path] = field(default_factory=list)
+    moved: int = 0
+    already_aligned: int = 0
+    not_checked: int = 0
+    ambiguous_paths: list[str] = field(default_factory=list)
+    collision_paths: list[str] = field(default_factory=list)
+
+
 @dataclass(frozen=True)
 class _VersionCopies:
     copied: int = 0
@@ -115,7 +125,13 @@ def run(show_popup: bool = False, *, trees: Trees | None = None) -> ScriptsSyncR
         result.unreachable.append(str(trees.vr))
     video_index = _index_videos(trees)
 
-    orphans = _align_scripts(trees, video_index, result, vr_out_of_reach)
+    aligned = _align_scripts(trees, video_index, vr_out_of_reach)
+    orphans = aligned.orphans
+    result.moved += aligned.moved
+    result.already_aligned += aligned.already_aligned
+    result.not_checked += aligned.not_checked
+    result.ambiguous_paths += aligned.ambiguous_paths
+    result.collision_paths += aligned.collision_paths
 
     if orphans and trees.archive is not None and not reachable(trees.archive):
         result.unreachable.append(str(trees.archive))
@@ -127,16 +143,7 @@ def run(show_popup: bool = False, *, trees: Trees | None = None) -> ScriptsSyncR
         result.rehomed_to_variants += followed.rehomed_to_variants
         result.collision_paths += followed.collision_paths
         result.discarded_duplicates += followed.discarded_duplicates
-    _tidy_and_copy_versions(trees, video_index, result)
-    _report(result, trees, show_popup)
-    return result
-
-
-def _tidy_and_copy_versions(trees: Trees, video_index: dict[str, list[Path]],
-                            result: ScriptsSyncResult):
-    remove_empty_dirs(trees.scripts)
-    remove_empty_mark_folders()
-    versions = _copy_missing_version_scripts(video_index, trees)
+    versions = _tidy_and_copy_versions(trees, video_index)
     result.copied_variants += versions.copied
     result.ambiguous_variant_groups += versions.ambiguous_groups
     result.variant_copy_error_paths += versions.copy_error_paths
@@ -144,6 +151,14 @@ def _tidy_and_copy_versions(trees: Trees, video_index: dict[str, list[Path]],
     result.ambiguous = len(result.ambiguous_paths)
     result.collisions = len(result.collision_paths)
     result.variant_copy_errors = len(result.variant_copy_error_paths)
+    _report(result, trees, show_popup)
+    return result
+
+
+def _tidy_and_copy_versions(trees: Trees, video_index: dict[str, list[Path]]) -> _VersionCopies:
+    remove_empty_dirs(trees.scripts)
+    remove_empty_mark_folders()
+    return _copy_missing_version_scripts(video_index, trees)
 
 
 def _report(result: ScriptsSyncResult, trees: Trees, show_popup: bool):
@@ -161,36 +176,36 @@ def _report(result: ScriptsSyncResult, trees: Trees, show_popup: bool):
 
 
 def _align_scripts(trees: Trees, video_index: dict[str, list[Path]],
-                   result: ScriptsSyncResult, vr_out_of_reach: bool) -> list[Path]:
-    orphans: list[Path] = []
+                   vr_out_of_reach: bool) -> _Aligned:
+    aligned = _Aligned()
     for script_path in _iter_funscripts(trees.scripts, trees.unmatched):
         if vr_out_of_reach and _may_match_a_vr_video(script_path, trees):
-            result.not_checked += 1
+            aligned.not_checked += 1
             continue
         matches = _matching_videos_for_script(script_path, video_index, trees)
         if not matches:
-            orphans.append(script_path)
+            aligned.orphans.append(script_path)
             continue
         if len(matches) > 1:
             log.warning("AMBIGUOUS script match for %s: %s", script_path, ", ".join(str(p) for p in matches))
-            result.ambiguous_paths.append(_shown(script_path, trees))
+            aligned.ambiguous_paths.append(_shown(script_path, trees))
             continue
 
         dest = script_path_for_video(matches[0])
         if script_path == dest:
-            result.already_aligned += 1
+            aligned.already_aligned += 1
             continue
         if dest.exists():
             log.warning("SCRIPT COLLISION (destination exists, leaving source in place): %s -> %s", script_path, dest)
-            result.collision_paths.append(_shown(script_path, trees))
+            aligned.collision_paths.append(_shown(script_path, trees))
             continue
 
         dest.parent.mkdir(parents=True, exist_ok=True)
         log.info("MOVE SCRIPT  %s  ->  %s", script_path, dest)
         script_path.rename(dest)
         carry_mark(script_path, dest)
-        result.moved += 1
-    return orphans
+        aligned.moved += 1
+    return aligned
 
 
 def _log_summary(result: ScriptsSyncResult):

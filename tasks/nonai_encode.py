@@ -4,6 +4,7 @@ import logging
 import re
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -228,7 +229,13 @@ def is_low_disk(settings: EncodeSettings) -> bool:
 
 def computer_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
                         asked_for: bool = False, ai_waiting: bool = False) -> str:
-    in_order = (
+    checks = busy_checks(cooldown_file, settings, asked_for=asked_for, ai_waiting=ai_waiting)
+    return next((reason for reason, applies in checks if applies()), "")
+
+
+def busy_checks(cooldown_file: Path, settings: EncodeSettings, *, asked_for: bool,
+                ai_waiting: bool) -> tuple[tuple[str, Callable[[], object]], ...]:
+    return (
         ("user_present", lambda: not asked_for and user_present(settings)),
         ("topaz_busy", topaz_pids),
         ("low_ram", lambda: system_resources.available_ram_gb() < settings.min_available_ram_gb),
@@ -236,7 +243,6 @@ def computer_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
         ("cooldown", lambda: not asked_for and _cooling_down(cooldown_file, settings)),
         (topaz.SIGN_IN_EXPIRED, topaz.sign_in_expired),
     )
-    return next((reason for reason, applies in in_order if applies()), "")
 
 
 def _cooling_down(cooldown_file: Path, settings: EncodeSettings) -> bool:
