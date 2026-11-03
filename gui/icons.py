@@ -1,19 +1,3 @@
-"""Evolver's icons, every one the family's own mark.
-
-Five of them are named here because other apps of the family wear the same
-mark for the same thing, and the apps sit open side by side:
-
-* quit, the power symbol -- Fun Time paints this same one on its bar,
-* restart, that power symbol with its ring running on into an arrowhead, so the
-  two sit together in a menu as obvious relatives rather than as an unrelated
-  pair (Font Awesome's "redo" is a plain circular arrow, which is what an undo
-  looks like everywhere else here),
-* run now, the play triangle, whose corners are rounded the way an icon font's
-  transport controls are,
-* pause, the two bars the Broker's tray menu pauses with,
-* review trash, the trash can Fun Time's button sends a video to Trash with.
-"""
-
 from __future__ import annotations
 
 from PyQt6.QtGui import QIcon
@@ -21,19 +5,14 @@ from shared_ui.icons import qt_icon
 
 
 def restart_icon(color: str) -> QIcon:
-    """The family's restart mark, tinted for the chrome it sits on."""
     return qt_icon("restart", color=color)
 
 
 def quit_icon(color: str) -> QIcon:
-    """The family's power mark -- and restart is built from its ring and bar,
-    so the two read as relatives where they sit beside each other."""
     return qt_icon("power", color=color)
 
 
 def run_now_icon(color: str) -> QIcon:
-    """The family's play triangle, corners rounded like the transport marks it
-    replaces."""
     return qt_icon("play", color=color)
 
 

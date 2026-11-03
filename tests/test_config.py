@@ -1,10 +1,3 @@
-"""Where the suite's sibling app checkouts are, and how config finds them.
-
-The media library and the sibling apps used to share one root, so every sibling
-path was derived as ``library_root / "projects" / <name>``. They no longer do:
-the repos were moved out of the file-synced tree the library still lives in, so
-their folders are a setting of their own, which all of Haglio shares.
-"""
 from __future__ import annotations
 
 import copy
@@ -60,11 +53,7 @@ class TestProjectRoots(unittest.TestCase):
 
 
 class TestRetiredRoot(unittest.TestCase):
-    """Where a superseded original goes once its upscale exists."""
-
     def test_unset_means_keep_it_in_the_library(self):
-        """A public checkout gets the user's own convention: the bucket's "2*"
-        folder, which is what None tells the upscale stage to use."""
         assert config.retired_root({}) is None
 
     def test_an_empty_value_counts_as_unset(self):
@@ -138,8 +127,6 @@ class TestTopazPaths(unittest.TestCase):
         assert models == Path("E:/topaz-models")
 
     def test_either_one_can_move_without_the_other(self):
-        """They sit in different trees on a stock install, so an overlay that
-        moves one is not saying anything about the other."""
         ffmpeg, models = config.topaz_paths({"topaz_models": "E:/topaz-models"})
 
         assert ffmpeg == config.topaz_paths({})[0]
@@ -167,7 +154,6 @@ class TestProjectDir(unittest.TestCase):
             assert found == moved
 
     def test_falls_through_to_a_later_root_for_a_checkout_that_has_not_moved(self):
-        """The half-migrated state: alpha moved, beta is still where it was."""
         with workspace_temp_dir() as temp:
             (temp / "workspace" / "alpha_app").mkdir(parents=True)
             stayed = temp / "old" / "beta_app"
@@ -178,11 +164,6 @@ class TestProjectDir(unittest.TestCase):
             assert found == stayed
 
     def test_a_sibling_that_is_not_installed_still_resolves_to_a_path(self):
-        """A missing sibling still resolves to a path, so callers can .is_dir() it.
-
-        Raising here would take the whole app down over a sibling that simply
-        isn't installed; every consumer already guards on existence instead.
-        """
         with workspace_temp_dir() as temp:
             found = config.project_dir("gamma_app", (temp / "workspace", temp / "old"))
 
@@ -201,13 +182,6 @@ class TestProjectDir(unittest.TestCase):
 
 
 class TestLiveDir(unittest.TestCase):
-    """Which checkout's run history, log, settings and queue lists a run uses.
-
-    Its own, except in a branch session: the preview launcher runs a worktree's
-    whole app beside the live one, and a preview keeping those files for itself
-    would show a history nobody made and a queue nobody ordered.
-    """
-
     def test_an_ordinary_run_uses_its_own_checkout(self):
         with workspace_temp_dir() as temp:
             (temp / "workspace" / "evolver").mkdir(parents=True)
@@ -237,8 +211,6 @@ class TestLiveDir(unittest.TestCase):
 
 
 class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
-    """The four sibling paths must come from the roots, not from the library root."""
-
     def test_every_sibling_path_sits_under_one_of_the_project_roots(self):
         for name, path in (
             ("FUN_TIME_PROJECT_DIR", config.FUN_TIME_PROJECT_DIR),

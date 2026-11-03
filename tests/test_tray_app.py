@@ -1,4 +1,3 @@
-"""tray_app.main: the application Evolver runs on is one made where it is let go of safely."""
 from __future__ import annotations
 
 from contextlib import contextmanager

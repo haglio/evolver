@@ -1,20 +1,3 @@
-"""The upscale queue: one list, with whatever is being upscaled on the first row.
-
-Two things this window is for. Seeing the order — the stage picks it by watch
-score and a few other signals, and until now the only way to read it was a
-count in a log line. And changing it: a video dragged up the list is kept where
-it was dropped, and one dragged to the top is the next one upscaled, ahead of
-whatever the computer was on.
-
-The first row is the one the computer is on, and the arrow beside it says
-whether it goes ahead while somebody is at the computer: filled it runs anyway,
-hollow it waits until nobody is. Clicking it switches between the two.
-
-The window asks and shows; the app answers. Every verb it offers is a signal
-the app wires to ``evolver``, because the pipeline is the one thing that
-touches the library.
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -49,12 +32,8 @@ VIDEO_MIME = "application/x-evolver-video"
 # colors, and the same gray is what the run history marks its inert rows with.
 _MUTED = TEXT_MUTED.name()
 
-# How often an open window asks for the queue again. The encode it is watching
-# is parked and thawed by a poll of its own between the ten-minute runs, and its
-# percent climbs the whole time.
 REFRESH_SECONDS = 15.0
 
-# What each state of the first row reads as, in the window's own words.
 _STATE_WORDS = {
     upscale_queue.NEXT: "Next, once you're away from the computer",
     upscale_queue.UPSCALING: "Upscaling",
@@ -64,9 +43,6 @@ _STATE_WORDS = {
     upscale_queue.FINISHING: "Done upscaling; Evolver's next run replaces the original with it",
 }
 
-# Why a video asked for has not started yet. The stage's own words for these
-# are in its log and its run record; these are the same holds, said to the
-# person waiting.
 _HELD_BACK_WORDS = {
     "topaz_busy": "waiting for another Topaz upscale to finish",
     "low_ram": "waiting for memory to free up",
@@ -81,7 +57,6 @@ _WAITS_TIP = "Click to upscale this one now, even while you're at the computer."
 
 
 def running_time(seconds: float | None) -> str:
-    """``1:03:24`` for an hour-long scene, ``4:12`` for a short one."""
     if seconds is None:
         return ""
     minutes, secs = divmod(int(seconds), 60)
@@ -90,14 +65,10 @@ def running_time(seconds: float | None) -> str:
 
 
 def dropped_video(mime: QMimeData) -> str:
-    """The video a drag is carrying, or ``""`` when it is carrying none."""
     return bytes(mime.data(VIDEO_MIME)).decode("utf-8") if mime.hasFormat(VIDEO_MIME) else ""
 
 
 class _QueueTree(QTreeWidget):
-    """The queue, in the order the stage will take it, rearranged by dragging."""
-
-    #: A video and the row it was dropped on, counting from zero.
     moved = pyqtSignal(str, int)
     drag_ended = pyqtSignal()
 
@@ -134,10 +105,9 @@ class _QueueTree(QTreeWidget):
                 for row in range(self.topLevelItemCount())]
 
     def move_video(self, video: str, row: int) -> None:
-        """Put *video* on *row*, counting the rows as they are now."""
         was = self.videos().index(video)
         if row in (was, was + 1):
-            return  # dropped back where it already was
+            return
         item = self.takeTopLevelItem(was)
         self.insertTopLevelItem(row - 1 if row > was else row, item)
         self.setCurrentItem(item)
@@ -184,7 +154,6 @@ class _QueueTree(QTreeWidget):
         self.move_video(video, self.dropped_row(event.position().toPoint()))
 
     def dropped_row(self, pos: QPoint) -> int:
-        """Which row a drop at *pos* means, by the half of a row it landed in."""
         index = self.indexAt(pos)
         if not index.isValid():
             return self.topLevelItemCount()
@@ -192,17 +161,10 @@ class _QueueTree(QTreeWidget):
 
 
 class UpscaleQueueWindow(QDialog):
-    """The queue window: it shows a queue, and says what the user did to it."""
-
-    #: The videos now placed by hand, in the order they are to be taken.
     arranged = pyqtSignal(list)
-    #: The video dragged to the top: next, at the usual moment.
     placed_first = pyqtSignal(str)
-    #: The video to upscale now, whoever is at the computer.
     now_requested = pyqtSignal(str)
-    #: The video on the first row goes back to waiting until you are away.
     now_withdrawn = pyqtSignal()
-    #: Asking for the queue again, while the window is open to show it.
     refresh_wanted = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -243,7 +205,6 @@ class UpscaleQueueWindow(QDialog):
         self._clock.timeout.connect(self.refresh_wanted)
 
     def show_queue(self, queue: UpscaleQueue) -> None:
-        """Draw *queue*, or hold it until the row in the air has landed."""
         if self._tree.is_dragging:
             self._held = queue
             return
@@ -271,12 +232,10 @@ class UpscaleQueueWindow(QDialog):
         self._clock.stop()
 
     def _draw_what_waited(self) -> None:
-        """Draw whatever queue arrived while the row was in the air."""
         if self._held is not None:
             self.show_queue(self._held)
 
     def _on_clicked(self, item, column: int) -> None:
-        """The arrow, which only the first row has and only column zero is."""
         if column != 0 or item is not self._tree.topLevelItem(0) or self._head is None:
             return
         if self._head.state == upscale_queue.FINISHING:
@@ -306,7 +265,6 @@ class UpscaleQueueWindow(QDialog):
         self.arranged.emit(order)
 
     def _mark_places(self) -> None:
-        """Number every row, and put the arrow and the state on the first."""
         flags = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
         for row in range(self._tree.topLevelItemCount()):
             item = self._tree.topLevelItem(row)
@@ -320,7 +278,6 @@ class UpscaleQueueWindow(QDialog):
 
 
 def _arrow(head: Head | None):
-    """The first row's arrow: filled it runs now, hollow it waits."""
     if head is None or head.state == upscale_queue.FINISHING:
         return qt_icon("play", color=Qt.GlobalColor.transparent)
     return qt_icon("play", color=BLUE if head.runs_now else TEXT_MUTED)

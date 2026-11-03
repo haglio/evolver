@@ -28,13 +28,6 @@ EXAMPLE_CONTENT = PROJECT_DIR / "content.example.json"
 
 
 def load_content() -> dict[str, Any]:
-    """The local overlay's content when present, else the committed example.
-
-    The two paths are read on each call rather than bound at import, so the
-    test suite can point every consumer at the example overlay by rebinding
-    them (see ``tests/__init__.py``) and behave exactly as a public checkout
-    would. They were parameters until nothing was left that passed one.
-    """
     return read_overlay(LOCAL_CONTENT, EXAMPLE_CONTENT)
 
 

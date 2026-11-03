@@ -1,5 +1,3 @@
-"""Timer-based pipeline scheduler with run-guard, pause/resume, and clock alignment."""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -14,14 +12,8 @@ _HOURS_PER_DAY = 24
 
 
 class PipelineScheduler(QObject):
-    """Fires run_requested at clock-aligned intervals (e.g. :00, :10, :20).
-
-    The scheduler silently drops ticks while a run is in progress (any tick
-    that arrives mid-run is ignored). Pause/resume controls the timer.
-    """
-
-    run_requested = pyqtSignal(str)     # "scheduled" or "manual"
-    status_changed = pyqtSignal(object)  # a ScheduleStatus, whenever it changes
+    run_requested = pyqtSignal(str)
+    status_changed = pyqtSignal(object)
 
     def __init__(self, interval_minutes: int = 10, parent=None,
                  now: Callable[[], datetime] = datetime.now):
@@ -29,11 +21,6 @@ class PipelineScheduler(QObject):
         self._running = False
         self._paused = False
         self._interval_minutes = interval_minutes
-        # The clock is a seam: a test parks it just short of a slot boundary
-        # and gets a real timer firing in milliseconds. The interval is never
-        # one — the spinner offers 1..120 and EvolverSettings.load clamps a
-        # hand-edited file to the same floor, because _schedule_next divides
-        # by it.
         self._now = now
         self._next_run_at: datetime | None = None
         self._timer = QTimer(self)
@@ -106,18 +93,15 @@ class PipelineScheduler(QObject):
         return self._next_run_at
 
     def _schedule_next(self):
-        """Set a one-shot timer for the next clock-aligned interval."""
         now = self._now()
         interval = self._interval_minutes
 
-        # Align to clock: find next minute that's a multiple of interval
         current_minute = now.hour * _MINUTES_PER_HOUR + now.minute
         next_slot = ((current_minute // interval) + 1) * interval
         next_hour, next_minute = divmod(next_slot, _MINUTES_PER_HOUR)
 
         target = now.replace(second=0, microsecond=0)
         if next_hour >= _HOURS_PER_DAY:
-            # Wraps to next day
             target = target.replace(hour=0, minute=0) + timedelta(days=1)
             next_hour, next_minute = divmod(next_slot % (_HOURS_PER_DAY * _MINUTES_PER_HOUR),
                                             _MINUTES_PER_HOUR)
@@ -131,14 +115,7 @@ class PipelineScheduler(QObject):
         self._announce()
 
     def tick(self):
-        """What one firing of the interval timer does.
-
-        Public so tests can drive a tick deterministically instead of waiting
-        on the wall clock; the timer connects here and nothing else calls it.
-        """
         if not self._running:
             self.run_requested.emit("scheduled")
-        # Always schedule the next tick (if the run is in progress, mark_idle
-        # will call _schedule_next when it finishes)
         if not self._running:
             self._schedule_next()

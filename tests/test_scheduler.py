@@ -26,12 +26,6 @@ class TestPipelineScheduler(unittest.TestCase):
         assert fired, "the scheduler's timer never fired"
         assert spy[0][0] == "scheduled"
 
-    # The remaining tick behaviour is driven by calling tick() -- the slot the
-    # timer fires -- directly, so each test asserts an exact signal count
-    # instead of hoping a wall-clock window was long enough (these four were
-    # the slowest tests in the whole suite, and the pause/resume one carried a
-    # comment documenting its own nondeterminism).
-
     def test_suppresses_tick_when_running(self):
         scheduler = PipelineScheduler(interval_minutes=10)
 
@@ -50,7 +44,7 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.tick()
         assert len(spy) == 0
 
-        scheduler.mark_idle()  # reopens scheduling
+        scheduler.mark_idle()
         scheduler.tick()
         scheduler.stop()
 
@@ -75,8 +69,6 @@ class TestPipelineScheduler(unittest.TestCase):
         spy = QSignalSpy(scheduler.run_requested)
         scheduler.start()
         scheduler.pause()
-        # Paused means no tick is scheduled at all -- the timer is stopped and
-        # the next-run display goes blank.
         assert scheduler.next_run_at is None
 
         scheduler.resume()

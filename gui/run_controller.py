@@ -1,20 +1,3 @@
-"""One pipeline run at a time: the worker, its watchdog, and the popup.
-
-Everything about *running* a run lives here — the re-entry guard that keeps a
-second pipeline off a library the first still owns, the wall-clock watchdog and
-its cooperative stop, and the progress popup's whole lifetime. What it does not
-know is who is watching: it says a run began, a run ended, a run finished with
-this record, a run failed with this message, a run overran. The tray's spinner,
-the scheduler's gate, the history refresh and whether a balloon is shown at all
-are the app's answer to those, not this object's business.
-
-The watchdog never pretends: a stage mid-move cannot be cut without risking a
-half-moved library, so an overrun asks the pipeline to stop between stages and
-leaves everything else exactly as it was. The worker stays referenced with its
-signals connected — it is the re-entry guard, and its eventual finish is what
-re-opens scheduling.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -30,12 +13,10 @@ log = logging.getLogger(__name__)
 
 
 class RunController(QObject):
-    """Starts pipeline runs, watches the clock, and says what happened."""
-
     run_started = pyqtSignal()
     run_ended = pyqtSignal()
-    run_finished = pyqtSignal(object)  # RunRecord
-    run_failed = pyqtSignal(str)       # the error, already flattened
+    run_finished = pyqtSignal(object)
+    run_failed = pyqtSignal(str)
     run_overran = pyqtSignal()
 
     def __init__(self, window, nonai_enabled: Callable[[], bool], parent=None):
@@ -63,9 +44,6 @@ class RunController(QObject):
         )
         self._worker.pipeline_finished.connect(self._on_finished)
         self._worker.pipeline_error.connect(self._on_error)
-        # The thread's own signal, not the pipeline's: a run asked to follow
-        # this one must start after the thread has let go, or the re-entry
-        # guard below drops it.
         self._worker.finished.connect(self._start_what_was_waiting)
 
         if self._window.isVisible():
@@ -79,12 +57,6 @@ class RunController(QObject):
         self._watchdog.start(config.PIPELINE_WALL_TIMEOUT_SECONDS * 1000)
 
     def start_when_free(self, trigger: str) -> None:
-        """Run now, or the moment the run in flight has let go of the library.
-
-        The queue window's "upscale this now" lands here: the encode starts on
-        a run, and a run that cannot start is a request that waits out the rest
-        of the interval instead.
-        """
         if self.is_running:
             self._when_free = trigger
         else:
@@ -96,17 +68,10 @@ class RunController(QObject):
             self.start(trigger)
 
     def wait_for_exit(self, msecs: int) -> None:
-        """Give a run in flight *msecs* to finish its stage before the app goes."""
         if self.is_running:
             self._worker.wait(msecs)
 
     def _end_run(self) -> None:
-        """Let go of what one run owned, whichever way it ended.
-
-        The popup is one of them: it is closed by now, and held, the next run
-        started while the window is hidden calls ``on_pipeline_finished()`` on
-        last run's dead one.
-        """
         self._watchdog.stop()
         if self._progress_popup is not None:
             self._progress_popup.on_pipeline_finished()
@@ -124,7 +89,7 @@ class RunController(QObject):
 
     def _on_watchdog(self) -> None:
         if not self.is_running:
-            return  # Run finished just before the timer fired
+            return
 
         log.critical(
             "Watchdog fired: pipeline exceeded %d-second wall-clock limit; "

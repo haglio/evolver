@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""evolver.py - video collection maintenance pipeline.
-
-Invoked by the tray app scheduler or directly via CLI.
-
-What the stages are and what they are called is ``tasks/stages.py``, which is
-also where their order is declared. ``run_pipeline`` below spells that order a
-second time — it has to, because each stage carries its own arguments and skip
-branches, and the reason for its position is a comment beside it — so the two
-are held in step by ``tests/test_stage_registry.py`` rather than by one of them
-being derived from the other. Two gates: one reads the names out of this file's
-syntax tree, one runs the pipeline with its stages mocked.
-"""
 from __future__ import annotations
 
 import logging
@@ -56,35 +44,19 @@ from util import upscale_queue as upscale_queue_shape
 
 @dataclass
 class StageRecord:
-    """Result of a single pipeline stage."""
     name: str
-    status: str  # "completed", "warning", "skipped", "error"
+    status: str
     duration_seconds: float
     result: object | None = None
     skip_reason: str | None = None
 
 
-# What counts as a failure for each stage, read off that stage's own result. A
-# stage absent here cannot fail. The run's verdict is then nothing more than its
-# stages' verdicts (see ``run_pipeline``), which is what keeps the two legible
-# together.
 _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "metadata": lambda r: not r.ok,
     "upscale": lambda r: bool(r.failed),
     "upscale_non_ai": lambda r: bool(r.failed),
-    # A flick that could not be delivered is almost always one Genau has open right
-    # now, and the next run gets it — but it stays visible rather than silent,
-    # because the alternative failure (a folder that cannot be written at all)
-    # looks identical from here and would otherwise never be noticed.
     "genau_deliver": lambda r: bool(r.failed),
-    # A copy that would not delete is, like the one above, almost always a clip
-    # an app has open right now, and the next run gets it -- but it stays visible
-    # for the same reason: a folder that cannot be written at all looks identical
-    # from here, and a taking back that silently never happens leaves the clip in
-    # the library after the user was told it was going.
     "withdrawn": lambda r: bool(r.failed),
-    # Origenerator could not be asked: the work it leaves for while it is closed
-    # would otherwise stop happening with nothing to say so.
     "origenerator_downtime": lambda r: r.failed,
     "verify": lambda r: not r.ok,
     "references": lambda r: not r.ok,
@@ -94,12 +66,6 @@ _STAGE_FAILED: dict[str, Callable[[object], bool]] = {
     "dupes": lambda r: not r.ok,
 }
 
-# What counts as worth a person's eye without being work gone wrong. Two shapes
-# land here. Work held back: there is no room to write another upscale, so the
-# stage parks the queue and picks it up again the moment space frees up. And a
-# finding a person has to judge: the stray-files stage fixes what it can name and
-# reports the rest, where reporting IS the stage doing its job rather than
-# failing at it.
 _STAGE_WARNED: dict[str, Callable[[object], bool]] = {
     "strays": lambda r: not r.ok,
     "scripts": lambda r: bool(r.not_checked),
@@ -110,11 +76,6 @@ _STAGE_WARNED: dict[str, Callable[[object], bool]] = {
 
 
 def _stage_status(name: str, result: object) -> str:
-    """What *result* says about the stage, worst verdict first.
-
-    A stage that both lost an encode and held the rest back reads "error": the
-    dead encode wants a person, where the hold only wants disk space.
-    """
     failed = _STAGE_FAILED.get(name)
     if failed is not None and failed(result):
         return "error"
@@ -126,33 +87,20 @@ def _stage_status(name: str, result: object) -> str:
 
 @dataclass
 class PipelineResult:
-    """Aggregate result of all pipeline stages."""
     stages: list[StageRecord] = field(default_factory=list)
     has_errors: bool = False
     duration_seconds: float = 0.0
-    # When the run began, captured at its first instant rather than worked out
-    # from its finish afterwards -- the run's name is this, and so is the
-    # banner it wrote, so the two agree by construction.
     started_at: datetime = field(
         default_factory=lambda: datetime.now(UTC))
-    # The bytes of the log this run wrote, from the offset its banner sits at
-    # to the offset past its last line. None when the log could not be read at
-    # one end or the other, which is the whole reason both are optional: a run
-    # nobody can point at in the log is still a run.
     log_start: int | None = None
     log_end: int | None = None
 
 
 class _StopRequested(Exception):
-    """Raised at a stage boundary once the caller's should_stop turns true."""
+    pass
 
 
 def setup_logging():
-    """Send this process's logging to the pipeline log, however often it is asked.
-
-    Not ``logging.basicConfig``: it does nothing at all once the root logger has
-    a handler, and the tray app installs one before the worker ever gets here.
-    """
     log_file = config.LOG_FILE
     log_file.parent.mkdir(parents=True, exist_ok=True)
     root = logging.getLogger()
@@ -171,9 +119,6 @@ def setup_logging():
 def check_dependencies():
     if not config.FFMPEG.is_file():
         raise RuntimeError(f"Topaz ffmpeg not found: {config.FFMPEG}")
-    # check=False, said out loud: the returncode is inspected below and turned
-    # into the RuntimeError this function raises for every missing dependency,
-    # rather than a CalledProcessError from one of them.
     probe = subprocess.run(["ffprobe", "-version"], capture_output=True, check=False,
                            **hidden_subprocess_kwargs())
     if probe.returncode != 0:
@@ -192,33 +137,22 @@ def throttle_nonai_to_presence() -> str:
 
 
 def upscale_queue() -> upscale_queue_shape.UpscaleQueue:
-    """What the queue window shows: the video in flight, and what is next.
-
-    The window layer's doors to the non-AI queue are here for the reason
-    ``throttle_nonai_to_presence`` is: the repo's layering is
-    ``util <- tasks <- evolver <- gui``, so gui reaches the stages through this
-    module and nothing else.
-    """
     return nonai_upscale_queue.current()
 
 
 def arrange_upscale_queue(videos: list[str]) -> None:
-    """Put *videos* at the head of the queue, in this order."""
     nonai_queue.pin_ahead(config.NONAI_PIN_LIST, videos)
 
 
 def upscale_now(video: str) -> None:
-    """Ask for *video* to be upscaled right away, stopping whatever is in flight."""
     nonai_request.request_now(video)
 
 
 def upscale_next(video: str) -> None:
-    """Put *video* first in the queue: it takes over, and starts at the usual moment."""
     nonai_request.put_first(video)
 
 
 def withdraw_upscale_now() -> None:
-    """Stop asking: the video asked for waits for nobody at the computer again."""
     nonai_request.withdraw_request()
 
 
@@ -229,30 +163,6 @@ def run_pipeline(
     nonai_enabled: bool | None = None,
     should_stop: Callable[[], bool] | None = None,
 ) -> PipelineResult:
-    """Run the full evolver pipeline, optionally reporting progress via callbacks.
-
-    Args:
-        on_stage_start: Called with (stage_name) before each stage runs.
-        on_stage_complete: Called with (stage_name, result, elapsed_seconds, status)
-            after each stage. status is "completed", "warning", "skipped", or
-            "error".
-        nonai_enabled: The tray's non-AI upscale toggle. True lets Evolver
-            auto-manage an encode by user presence — starting or resuming it
-            while the user is away, suspending it the moment they return. False
-            stops an in-flight one, and None (headless CLI, which has no toggle)
-            leaves any in-flight encode alone and starts nothing. Finished
-            encodes are promoted in every mode.
-        should_stop: Checked at every stage boundary; once it returns True the
-            remaining stages are dropped and the result covers what ran. Only
-            between stages — a stage mid-move must finish its current file, so
-            nothing interrupts one in flight.
-
-    Returns:
-        PipelineResult with per-stage records and aggregate status.
-
-    Raises:
-        run_lock.Busy: another Evolver is running the pipeline, so no stage ran.
-    """
     with run_lock.held(config.PIPELINE_LOCK_FILE):
         return _run_stages(on_stage_start, on_stage_complete, on_stage_progress,
                            nonai_enabled, should_stop)
@@ -268,14 +178,9 @@ def _run_stages(
     log = logging.getLogger(__name__)
     pipeline_t0 = time.monotonic()
     started_at = datetime.now(UTC)
-    # Read once and carried: the two marks either side of the run and the
-    # reader that uses them all take the path rather than reach for it.
     log_path = config.LOG_FILE
     run_id = run_log.run_id(started_at)
     log_start = run_log.size(log_path)
-    # The line that makes this run findable afterwards. Every view of a run is
-    # a summary of counters; what the stages actually said is only ever here,
-    # and a log nothing rotates is far too long to find a run in by reading.
     log.info(run_log.banner(run_id))
     records: list[StageRecord] = []
 
@@ -304,13 +209,7 @@ def _run_stages(
             on_stage_complete(name, None, 0.0, "skipped")
 
     try:
-        # First: every stage below finds videos by a positive extension filter and
-        # funscripts only under the script tree, so a name this one repairs or a
-        # script it rehomes is invisible to all of them until it has run.
         _run_stage("strays", stray_files.run)
-        # Before the scrape and the sort: a clip whose send has been taken back
-        # should not be given a sidecar on its way out, nor filed into 1_sorted
-        # from an inbox it is about to be deleted from.
         _run_stage("withdrawn", taken_back.run)
         _run_stage("metadata", prompt_scrape.run)
         sort_result = _run_stage("sort", sort.run)
@@ -349,9 +248,6 @@ def _run_stages(
                         upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
                     upscale_result = _run_stage("upscale", upscale.run, **upscale_kwargs)
 
-        # Straight after the upscale, so a flick made this run reaches Genau this run —
-        # and before the correspondence check, which would otherwise see the delivered
-        # flick's source still sitting in 1_sorted with nothing beside it in the outbox.
         _run_stage("genau_deliver", genau_deliver.run)
 
         upscale_still_pending = (
@@ -359,9 +255,6 @@ def _run_stages(
             or (upscale_result is not None and upscale_result.pending_after_run > 0)
         )
 
-        # The non-AI stage always runs (it may have a detached encode to check on),
-        # but only starts a new multi-hour encode when the tray toggle is on, the
-        # AI pipeline is drained, and the computer is otherwise quiet.
         ai_drained = not upscale_skipped and (
             upscale_result is None or upscale_result.pending_after_run == 0
         )
@@ -371,11 +264,7 @@ def _run_stages(
         _run_stage(
             "upscale_non_ai", nonai_upscale.run,
             allow_start=nonai_allow_start, stop=nonai_enabled is False,
-            # Toggle on -> Evolver manages the encode by user presence: suspend it
-            # when someone's at the computer, resume it when they idle out.
             presence_managed=nonai_enabled is True,
-            # A video asked for from the queue window starts whatever the
-            # toggle says; only the tray answers that ask, never the CLI.
             take_requests=nonai_enabled is not None,
             ai_waiting=not ai_drained,
         )
@@ -386,30 +275,15 @@ def _run_stages(
         else:
             _run_stage("verify", check_correspondence.run, show_popup=True)
 
-        # After every stage that moves a video, so a saved path is followed
-        # before anything counts it lost.
         _run_stage("references", reference_sync.run)
-        # Before bookmarks, which then picks up the phone's favorites it marked.
         _run_stage("watch_weights", watch_weights.run)
         _run_stage("bookmarks", bookmarks_sync.run)
-        # Before the scripts sync: these write new funscripts into the tree, and the
-        # sync is what settles them across a clip's version family. The two carry a
-        # script between a clip and its scene in opposite directions, and each
-        # leaves an existing script alone, so neither can undo the other.
         _run_stage("clip_scripts", clip_scripts.run)
         _run_stage("scene_scripts", scene_scripts.run)
         _run_stage("scripts", scripts_sync.run, show_popup=True)
         _run_stage("group_non_ai", nonai_group.run)
-        # After the grouping, whose version families are what carries a clip's
-        # name to every rendition of the scene it was cut from.
         _run_stage("title_non_ai", nonai_titles.run)
-        # After the grouping, which is what creates a new non-AI video's sidecar:
-        # the kind then joins a record that is already there rather than making a
-        # second one for the same video in the same run.
         _run_stage("video_types", video_kinds.run)
-        # After every stage that makes or moves a video, so it only ever fills in
-        # what they left unrecorded, and after the kinds, so a video it records
-        # already has the sidecar the kinds stage made for it.
         _run_stage("provenance", provenance_sweep.run)
         _run_stage("dupes", check_duplicate_sizes.run, show_popup=True)
     except _StopRequested:
@@ -418,8 +292,6 @@ def _run_stages(
         )
 
     duration_seconds = time.monotonic() - pipeline_t0
-    # After everything this run had to say, so the offset closes the stretch
-    # the banner opened.
     log_end = run_log.size(log_path)
     return PipelineResult(
         stages=records,
@@ -438,8 +310,6 @@ def main():
     try:
         check_dependencies()
     except RuntimeError as e:
-        # exception, not error: the traceback names which dependency check
-        # raised, which is the whole content of the diagnosis.
         log.exception("Dependency check failed: %s", e)
         sys.exit(1)
 

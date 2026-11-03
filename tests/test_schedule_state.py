@@ -1,4 +1,3 @@
-"""The one decision under every surface that shows the schedule."""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -21,9 +20,9 @@ def test_no_toolbar_label_runs_longer_than_the_longest(status):
 
 
 @pytest.mark.parametrize(("running", "paused", "next_run", "expected"), [
-    (True, True, _AT, RUNNING),     # a run on screen outranks the pause under it
+    (True, True, _AT, RUNNING),
     (True, False, None, RUNNING),
-    (False, True, _AT, PAUSED),     # paused with a run that would have been next
+    (False, True, _AT, PAUSED),
     (False, False, _AT, SCHEDULED),
     (False, False, None, IDLE),
 ])

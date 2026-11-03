@@ -78,5 +78,5 @@ class TestUnregisterStartup:
 
     def test_is_a_noop_when_no_shortcut_exists(self, startup_dir):
         assert not startup.is_registered()
-        startup.unregister_startup()  # must not raise
+        startup.unregister_startup()
         assert not startup.is_registered()

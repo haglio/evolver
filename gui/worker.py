@@ -21,11 +21,11 @@ class PipelineWorker(QThread):
     so GUI slots receiving these signals run safely on the main thread.
     """
 
-    stage_started = pyqtSignal(str)           # stage_name
-    stage_completed = pyqtSignal(str)         # stage_name
-    stage_progress = pyqtSignal(str, int, int)  # name, current, total
-    pipeline_finished = pyqtSignal(object)    # RunRecord
-    pipeline_error = pyqtSignal(str)          # error message
+    stage_started = pyqtSignal(str)
+    stage_completed = pyqtSignal(str)
+    stage_progress = pyqtSignal(str, int, int)
+    pipeline_finished = pyqtSignal(object)
+    pipeline_error = pyqtSignal(str)
 
     def __init__(self, trigger: str = "scheduled", nonai_enabled: bool = False, parent=None):
         super().__init__(parent)
@@ -41,8 +41,6 @@ class PipelineWorker(QThread):
                 on_stage_complete=self._on_stage_complete,
                 on_stage_progress=self._on_stage_progress,
                 nonai_enabled=self._nonai_enabled,
-                # The watchdog's requestInterruption() lands here: the pipeline
-                # checks it between stages and drops the rest of the run.
                 should_stop=self.isInterruptionRequested,
             )
             record = RunRecord.from_pipeline_result(result, trigger=self._trigger)
@@ -52,14 +50,9 @@ class PipelineWorker(QThread):
                 log.exception("Failed to save run record")
             self.pipeline_finished.emit(record)
         except Busy as busy:
-            # The ordinary meeting of a command-line run and the tray's
-            # schedule: said in one line, since there is no stack to show.
             log.info("Pipeline run not started: %s", busy)
             self.pipeline_error.emit(str(busy))
         except Exception as exc:
-            # Logged before it is flattened: str(exc) is all the GUI ever sees,
-            # so without this the only record of where a pipeline died is a
-            # sentence in a toast.
             log.exception("Pipeline run failed")
             self.pipeline_error.emit(str(exc))
 
@@ -67,9 +60,6 @@ class PipelineWorker(QThread):
         self.stage_started.emit(name)
 
     def _on_stage_complete(self, name: str, *_):
-        # run_pipeline hands the callback the result, the elapsed time and the
-        # status too; all three reach the run record by their own route, and
-        # the only listener here marks a bar full.
         self.stage_completed.emit(name)
 
     def _on_stage_progress(self, name: str, current: int, total: int):

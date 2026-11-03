@@ -1,12 +1,3 @@
-"""The Upscale Queue window's keeper: one window at a time, its verbs answered
-through the pipeline module off the window's thread.
-
-The window asks and shows (gui/queue_window.py); the pipeline module is the
-window layer's one door to the non-AI stage (evolver.py). Two things this
-cannot do itself, it says for the app to answer: a run is wanted now, and the
-encode should be parked for whoever is at the computer.
-"""
-
 from __future__ import annotations
 
 from functools import partial
@@ -20,11 +11,7 @@ from gui.queue_window import UpscaleQueueWindow
 
 
 class QueueController(QObject):
-    #: The trigger of the run wanted now: the encode asked for starts on a run
-    #: and nowhere else, so asking brings the next run forward.
     run_wanted = pyqtSignal(str)
-    #: Park the encode for whoever is at the computer now, rather than at the
-    #: presence poll's next tick.
     presence_poll_wanted = pyqtSignal()
 
     def __init__(self, parent_window, background: BackgroundQueue, parent=None):

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Find likely duplicate videos by exact filesize within the non-AI library."""
 from __future__ import annotations
 
 import logging
@@ -27,14 +26,6 @@ class DuplicateSizesResult:
 
 
 def run(show_popup: bool = False, *, non_ai_dir: Path | None = None) -> DuplicateSizesResult:
-    """Report non-AI videos that share an exact filesize with another.
-
-    The folder scanned is an argument, resolved here rather than in the
-    signature: a default is evaluated at import, which would freeze the value
-    past ``override_config``. It is one parameter rather than two because the
-    tree walked and the root paths are reported relative to have to be the
-    same folder — as two reads of the same attribute they only happened to be.
-    """
     non_ai_root = config.NON_AI_DIR if non_ai_dir is None else non_ai_dir
 
     files = sorted(library_videos(non_ai_root))

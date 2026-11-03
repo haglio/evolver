@@ -1,13 +1,3 @@
-"""A branch session: the whole app out of a worktree, in place of the usual Evolver.
-
-What it shares with the usual one (the library, the run history and its log,
-the queue's lists, the settings), the work it takes over from it (the
-schedule, the supervision), and how that work goes back are the whole
-contract, and all three are held here.
-
-The config half runs in a fresh interpreter, because the flag is read at import
-and the suite's own import happened long before any test could set it.
-"""
 from __future__ import annotations
 
 import json
@@ -33,11 +23,6 @@ _PATHS = ("PROJECT_DIR", "LIVE_DIR", "LOG_FILE", "RUNS_DIR", "GUI_SETTINGS_FILE"
 
 
 def config_paths(branch_session: bool) -> dict[str, Path]:
-    """What ``config`` resolves those paths to, with and without the flag.
-
-    A fresh interpreter under the repo root, as the launcher starts one, and on
-    the committed example overlay, which is what a public checkout has.
-    """
     env = {key: value for key, value in os.environ.items()
            if key not in ("PYTHONPATH", "EVOLVER_BRANCH_SESSION")}
     if branch_session:
@@ -56,9 +41,6 @@ def config_paths(branch_session: bool) -> dict[str, Path]:
 
 
 class TestWhatABranchSessionShares:
-    """The files a preview must not keep to itself, or it shows a history
-    nobody made and a queue nobody ordered."""
-
     @pytest.fixture(scope="class")
     def preview(self):
         return config_paths(branch_session=True)
@@ -80,11 +62,6 @@ class TestWhatABranchSessionShares:
 
 
 class TestWhatABranchSessionTakesOver:
-    """A preview is the whole app, and the app is its schedule: one Evolver
-    at a time runs the ten-minute pipeline, parks the encode for the user's
-    presence, and keeps the broker up -- and while a preview runs, that is
-    the preview."""
-
     def _preview(self, request):
         with override_config(BRANCH_SESSION=True):
             return build_evolver_app(request)
@@ -123,7 +100,6 @@ class TestWhatABranchSessionTakesOver:
 
 
 def _session(*, preview: bool, a_run_is_going: bool = False):
-    """A session over a stand-in gateway, with the steps of leaving recorded in order."""
     steps = Mock()
     with override_config(BRANCH_SESSION=preview):
         session = branch_session.BranchSession(steps.gateway, lambda: a_run_is_going)
@@ -132,9 +108,6 @@ def _session(*, preview: bool, a_run_is_going: bool = False):
 
 
 class TestHandingTheWorkBack:
-    """A preview forgotten about must not run a branch's pipeline over the
-    library for good: the usual Evolver takes back over."""
-
     def _started_preview(self, request):
         with override_config(BRANCH_SESSION=True):
             app = build_evolver_app(request)
@@ -145,9 +118,6 @@ class TestHandingTheWorkBack:
         return app
 
     def test_once_it_has_had_its_time_it_makes_way_for_the_usual_evolver(self):
-        """The claim goes first, so the usual Evolver can take it at once: one
-        from before launches spoke hands its launch to whoever holds the
-        claim, which would open the preview's window instead."""
         session, steps = _session(preview=True)
         session.take_the_work()
 
@@ -160,8 +130,6 @@ class TestHandingTheWorkBack:
                                     call.leaving()]
 
     def test_a_run_in_flight_is_let_finish_first(self):
-        """Quitting gives the stage in flight five seconds, and the run it
-        belongs to is the branch's own work."""
         session, steps = _session(preview=True, a_run_is_going=True)
         session.take_the_work()
 
@@ -191,8 +159,6 @@ class TestHandingTheWorkBack:
         stood_down.assert_not_called()
 
     def test_quitting_the_usual_evolver_stands_it_down_and_leaves(self):
-        """The one quit the broker honors: every other way Evolver goes down is
-        undone within the quarter hour."""
         session, steps = _session(preview=False)
 
         with patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver), \
@@ -202,8 +168,6 @@ class TestHandingTheWorkBack:
         assert steps.mock_calls == [call.stand_evolver_down(), call.leaving()]
 
     def test_stepping_aside_leaves_without_standing_evolver_down(self):
-        """Whoever asked is taking the work over; the broker must not be told
-        to leave Evolver down."""
         session, steps = _session(preview=False)
 
         with patch("gui.peer_watch.stand_evolver_down", steps.stand_evolver_down), \
@@ -240,8 +204,6 @@ class TestHandingTheWorkBack:
         assert ", until " in app._window.windowTitle()
 
     def test_the_usual_evolver_is_started_from_its_own_checkout_and_not_as_a_preview(self):
-        """It inherits this process's environment, and the flag in it would
-        make the Evolver started to take back over one more preview."""
         with override_config(LIVE_DIR=Path("C:/live/evolver")), \
              patch.dict(os.environ, {"EVOLVER_BRANCH_SESSION": "1"}), \
              patch("gui.branch_session.subprocess.Popen") as popen:

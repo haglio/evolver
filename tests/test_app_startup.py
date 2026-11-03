@@ -1,4 +1,3 @@
-"""Smoke test: verify the tray app can be constructed without crashing."""
 from __future__ import annotations
 
 import os
@@ -24,21 +23,12 @@ class TestAppStartup:
 
     def test_evolver_app_constructs_without_error(self, request):
         app = build_evolver_app(request)
-        # Tray, window, and scheduler should all exist
         assert app._tray is not None
         assert app._window is not None
         assert app._scheduler is not None
 
 
 class TestRetiringAnApp:
-    """The harness's teardown leaves none of the app's windows alive.
-
-    A window only marked for deletion dies inside whichever later test next lets
-    the event loop run, and a window dying while that test has a menu popped up
-    closes the menu: in the merge queue's shuffled order, the tray's switch tests
-    read an unhighlighted row that way (haglio/evolver#194's queue run).
-    """
-
     def test_its_windows_are_gone_when_the_teardown_returns(self):
         app = build_evolver_app(SimpleNamespace(addfinalizer=lambda _finalizer: None))
         with patch("gui.app.run_log.read_run", return_value=""):
@@ -51,14 +41,6 @@ class TestRetiringAnApp:
 
 
 class TestBuildingIsNotStarting:
-    """Constructing an EvolverApp touches nothing outside the process.
-
-    It used to name this process to the shell, set taskbar properties on a
-    window handle, read the whole run-history directory off disk and begin a
-    twenty-second presence poll -- so a test that wanted any one part paid for
-    all of them, and left a live timer running for the rest of the session.
-    """
-
     def test_construction_claims_no_identity(self, request):
         with patch("gui.app.process_identity.claim") as claim:
             build_evolver_app(request)
@@ -117,21 +99,12 @@ class TestCommandWiring:
         signals["quit"].connect.assert_called_once_with(slots["quit"])
 
     def test_the_two_views_name_their_shared_commands_the_same(self, request):
-        """The toolbar is a subset of the tray menu. A name that drifted on one
-        side would wire fine and just mean two different things."""
         app = build_evolver_app(request)
 
         assert set(app._window.commands()) < set(app._tray.commands())
 
 
 class TestRunTeardown:
-    """What ending a run has to let go of.
-
-    The teardown was written out twice and the toast block three times, and
-    both of the things they forgot are lifetime leaks that only show on the
-    *second* run.
-    """
-
     def _finished_record(self, status="success"):
         record = MagicMock()
         record.status = status
@@ -139,8 +112,6 @@ class TestRunTeardown:
         return record
 
     def test_a_finished_run_lets_go_of_its_progress_popup(self, request):
-        """It is closed by then. Held, the next run started while the window is
-        hidden calls on_pipeline_finished() on last run's dead popup."""
         app = build_evolver_app(request)
         popup = MagicMock()
         app._runs._progress_popup = popup
@@ -183,8 +154,6 @@ class TestRunTeardown:
 
 
 class TestToastPolicy:
-    """One place decides whether a tray balloon is shown at all."""
-
     def _app(self, request, *, enable_toasts):
         settings = EvolverSettings(enable_toasts=enable_toasts)
         with patch("gui.app.EvolverSettings.load", return_value=settings):
@@ -270,8 +239,6 @@ class TestStatsWindowLifetime:
         assert app._stats.current._chart is None
 
     def test_a_second_stats_window_takes_the_first_one_down(self, request):
-        """The dialog is parented to the main window, so one replaced without
-        being closed stays alive for the process's whole life."""
         app = build_evolver_app(request)
         app._background = MagicMock()
         with patch("gui.app.StatsWindow") as stats_cls:
@@ -297,9 +264,6 @@ class TestStatsWindowLifetime:
 
 
 class TestOneRunAfterAnother:
-    """A request cannot wait for the next tick, so the run that answers it
-    follows the one in flight rather than being dropped by the re-entry guard."""
-
     def _started(self, app, worker_cls):
         return worker_cls.call_count
 
@@ -320,7 +284,6 @@ class TestOneRunAfterAnother:
             app._runs.start_when_free("manual")
             assert worker_cls.call_count == 1
 
-            # What the thread's own finished signal reaches, once it has.
             worker.isRunning.return_value = False
             worker.finished.connect.call_args.args[0]()
             assert worker_cls.call_count == 2
@@ -339,9 +302,6 @@ class TestOneRunAfterAnother:
 
 
 class TestTheUpscaleQueueWindowsWiring:
-    """What the queue window's controller asks for, the app answers: a run
-    through the run controller, a presence check through the presence poll."""
-
     def _opened(self, request):
         with patch("gui.app.BackgroundQueue", DoneAtOnce):
             app = build_evolver_app(request)
@@ -376,8 +336,6 @@ class TestTheUpscaleQueueWindowsWiring:
         parked.assert_called_once_with()
 
     def test_a_finished_run_redraws_it(self, request):
-        """A run is what starts, promotes and fails encodes, so the window is
-        stale the moment one ends."""
         app = self._opened(request)
 
         with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE) as queue, \
@@ -440,9 +398,6 @@ class TestNonAiUpscaleToggle:
 
 
 class TestPresenceMonitor:
-    """A fast timer keeps the in-flight encode in step with the user between
-    the slow pipeline ticks."""
-
     def _app_with_toggle(self, request, enabled):
         settings = EvolverSettings()
         settings.nonai_upscale_enabled = enabled
@@ -469,8 +424,6 @@ class TestPresenceMonitor:
         mock_throttle.assert_not_called()
 
     def test_the_toggle_is_read_at_every_poll_not_at_construction(self, request):
-        """The tray flips it while this is running, so a throttle that had to
-        be rebuilt to notice would be a second place the setting lives."""
         app = self._app_with_toggle(request, False)
         app._settings.nonai_upscale_enabled = True
 
@@ -525,10 +478,6 @@ class TestSessionManagement:
 
 
 class TestRestart:
-    """Restart ends this copy and starts the next through Evolver's launcher once
-    this one has gone, so the production updater can bring the checkout up in
-    between: Evolver runs all day, and a restart is when a change reaches it."""
-
     def _restarted(self, request, *, window_visible=False, branch_session=False):
         app = build_evolver_app(request)
         app._session.is_preview = branch_session
@@ -584,9 +533,6 @@ def _the_log_window(app):
 
 
 class TestTakingAnUpdate:
-    """Evolver runs all day, so an update waits for it to close for good: it starts
-    itself again for one once no run is going and nothing of it is on screen."""
-
     def _ticked(self, request, *, branch_session=False, running=False, open_window=None):
         with patch("gui.app.BackgroundQueue", DoneAtOnce):
             app = build_evolver_app(request)
@@ -621,7 +567,6 @@ class TestTakingAnUpdate:
         quit_this_copy.assert_not_called()
 
     def test_a_preview_never_starts_again_for_an_update(self, request, monkeypatch):
-        """It runs out of the everyday checkout's venv, and hands the work back within the hour."""
         start_again, quit_this_copy = self._ticked(request, branch_session=True)
 
         start_again.assert_not_called()
@@ -651,10 +596,6 @@ class TestTakingAnUpdate:
 
 
 class TestALaunchThatFindsEvolverUp:
-    """A second launch is the user clicking Evolver, whose window is hidden in
-    the tray — so it must open the running instance's window, not exit. A
-    preview's launch is the exception: it came to take the work over."""
-
     def _launch(self, request, outcome, *, preview=False):
         with override_config(BRANCH_SESSION=preview):
             app = build_evolver_app(request)
@@ -687,8 +628,6 @@ class TestALaunchThatFindsEvolverUp:
         launch.alert.assert_not_called()
 
     def test_a_handoff_the_running_instance_never_answered_is_visible(self, request):
-        """Exiting into silence here is the whole bug: the user clicked Evolver
-        and nothing at all happened."""
         launch = self._launch(request, Outcome.UNANSWERED)
 
         launch.alert.assert_called_once()
@@ -736,9 +675,6 @@ class TestAStartForWhenEvolverIsNotRunning:
 
 
 class TestAnsweringLaunches:
-    """The other half: without a listener, every later launch falls through
-    to the error dialog and the window still never opens."""
-
     def _run_as_first_instance(self, request, *, preview=False):
         with override_config(BRANCH_SESSION=preview):
             app = build_evolver_app(request)
@@ -769,8 +705,6 @@ class TestAnsweringLaunches:
         assert served["steps_aside_for"](single_instance.PREVIEW)
 
     def test_a_preview_opens_its_window_for_a_launcher_that_says_nothing(self, request):
-        """That launcher predates the answers and exits on the connection, so
-        a preview stepping aside for it would leave no Evolver at all."""
         _, served = self._run_as_first_instance(request, preview=True)
 
         assert not served["steps_aside_for"](b"")
@@ -786,8 +720,6 @@ class TestAnsweringLaunches:
         mock_show.assert_called_once()
 
     def test_stepping_aside_quits_without_standing_evolver_down(self, request):
-        """Whoever asked is taking the work over; the broker must not be told
-        to leave Evolver down."""
         app, served = self._run_as_first_instance(request)
 
         with patch.object(app._app, "quit") as quit_the_application, \
@@ -798,8 +730,6 @@ class TestAnsweringLaunches:
         stood_down.assert_not_called()
 
     def test_an_evolver_on_its_way_out_answers_no_more_launches(self, request):
-        """A launch answered by an Evolver that is quitting would leave with
-        it, and nothing would be running."""
         app = build_evolver_app(request)
 
         with patch.object(app._instance, "stop_serving") as stop, \
@@ -810,8 +740,6 @@ class TestAnsweringLaunches:
 
 
 class TestShowWindowFlag:
-    """--show-window should open the main window on startup."""
-
     def test_run_shows_window_when_flag_present(self, request):
         app = build_evolver_app(request)
 

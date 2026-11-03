@@ -1,4 +1,3 @@
-"""Tests for single-instance ownership, and what a launch does about an Evolver already up."""
 from __future__ import annotations
 
 import ctypes
@@ -19,17 +18,12 @@ from tests.gui_support import QAPP
 
 
 class TestIsFirstInstance(unittest.TestCase):
-    """The mutex must be immune to GetLastError clobbering by injected DLLs
-    (e.g. Windhawk)."""
-
     def test_the_first_evolver_to_ask_is_given_the_claim(self):
         unique = f"TestMutex_{os.getpid()}"
         with patch.object(single_instance, "_MUTEX_NAME", unique):
             assert single_instance.InstanceGateway().claim()
 
     def test_letting_go_frees_the_claim_while_this_process_lives_on(self):
-        """How a preview hands the work back: the Evolver it starts must be
-        able to claim however long this one takes to exit."""
         with patch.object(single_instance, "_MUTEX_NAME", _unique("LetGoMutex")),              patch.object(single_instance, "_PIPE_NAME", _unique("LetGoPipe")):
             holder = single_instance.InstanceGateway()
             assert holder.claim()
@@ -46,8 +40,6 @@ class TestIsFirstInstance(unittest.TestCase):
 
 
 class held_mutex:
-    """The named mutex held the way another Evolver holds it, until let go."""
-
     def __init__(self, name: str):
         self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
         self._kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p]
@@ -71,7 +63,6 @@ class held_mutex:
 
 
 def _pump_until(condition, deadline_seconds: float = 10.0) -> bool:
-    """Spin the shared event loop until *condition* holds, or the deadline passes."""
     deadline = time.monotonic() + deadline_seconds
     while time.monotonic() < deadline:
         QAPP.processEvents()
@@ -90,11 +81,6 @@ def _ask(launch: bytes) -> Answer | None:
 
 
 def in_the_background(work):
-    """Run *work* on a thread while this one serves, and hand back its result.
-
-    The launch blocks on the running Evolver's answer, and the running Evolver
-    answers from the event loop -- which, in one test process, is this thread.
-    """
     done = []
     thread = threading.Thread(target=lambda: done.append(work()), daemon=True)
     thread.start()
@@ -104,8 +90,6 @@ def in_the_background(work):
 
 
 class _Calls(list):
-    """A record of calls that also does *then* on each, as a process exiting would."""
-
     def __init__(self, then):
         super().__init__()
         self._then = then
@@ -116,8 +100,6 @@ class _Calls(list):
 
 
 class Listening:
-    """A running Evolver's side of the pipe, recording what it was asked to do."""
-
     def __init__(self, *, steps_aside_for=lambda launch: False):
         self.shown = []
         self.stepped_aside = []
@@ -132,8 +114,6 @@ class Listening:
 
 
 class Unanswering:
-    """An Evolver that takes the connection and says nothing, ever."""
-
     def __init__(self):
         self._held = []
         self._server = QLocalServer()
@@ -147,9 +127,6 @@ class Unanswering:
 
 
 class AnswersBeforeHearing:
-    """A running Evolver's pipe that answers a launch the moment it connects, takes in
-    what the launch said only a moment later, and hangs up."""
-
     def __init__(self, reply: bytes, heard: bytes):
         self._kernel32 = kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
         handle, number = ctypes.c_void_p, ctypes.c_uint32
@@ -189,9 +166,6 @@ class AnswersBeforeHearing:
 
 
 class TestAskingTheRunningOne(unittest.TestCase):
-    """A launch that finds Evolver up says what it is, and hears what the
-    running one does about it."""
-
     def test_nothing_listening_is_no_answer(self):
         with patch.object(single_instance, "_PIPE_NAME", _unique("Absent")):
             assert _ask(single_instance.USUAL) is None
@@ -234,7 +208,6 @@ class TestAskingTheRunningOne(unittest.TestCase):
         assert answer.reply == single_instance.STEPPING_ASIDE
 
     def test_a_launcher_from_before_launches_spoke_still_opens_the_window(self):
-        """Its whole message is to connect and hang up."""
         heard = []
         with patch.object(single_instance, "_PIPE_NAME", _unique("Old")):
             running = Listening(steps_aside_for=lambda launch: heard.append(launch) or False)
@@ -274,8 +247,6 @@ class TestAskingTheRunningOne(unittest.TestCase):
 
 
 class TestTakingOver(unittest.TestCase):
-    """What a launch comes to: this process is Evolver now, or it is not."""
-
     def test_with_nobody_running_the_launch_is_evolver(self):
         with patch.object(single_instance, "_MUTEX_NAME", _unique("FreeMutex")),              patch.object(single_instance, "_PIPE_NAME", _unique("FreePipe")):
             outcome = single_instance.InstanceGateway().take_over(
@@ -331,8 +302,6 @@ class TestTakingOver(unittest.TestCase):
         terminate.assert_not_called()
 
     def test_a_preview_ends_an_evolver_that_never_answers(self):
-        """One from before launches spoke, or one that has stopped responding: either way
-        it holds the work the preview came to take."""
         mutex = _unique("MuteMutex")
         with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("MutePipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 0.5),              held_mutex(mutex) as holder:
             mute = Unanswering()
@@ -377,8 +346,6 @@ class TestTakingOver(unittest.TestCase):
         assert outcome == single_instance.Outcome.CLAIMED
 
     def test_the_usual_launch_leaves_an_evolver_that_never_answers_alone(self):
-        """The Evolver it reached may simply predate the answers, in which case
-        its window has already opened."""
         mutex = _unique("OldMutex")
         with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("OldPipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 0.5),              held_mutex(mutex):
             mute = Unanswering()
@@ -403,9 +370,6 @@ class TestTakingOver(unittest.TestCase):
 
 
 class TestBecomingEvolver(unittest.TestCase):
-    """The launch as the app asks for it: which launch this is, and what the
-    crash log says when it went to the Evolver already running."""
-
     def _launch(self, *, as_preview=False, only_if_not_running=False, claimed=False,
                 outcome=single_instance.Outcome.HANDED_OFF):
         gateway = single_instance.InstanceGateway()
@@ -490,9 +454,6 @@ app.exec()
 
 
 class TestAcrossProcesses(unittest.TestCase):
-    """In life the two ends are two processes, and the claim is let go only
-    when the one making way has exited."""
-
     def _running_evolver(self, mutex: str, pipe: str, manner: str):
         running = subprocess.Popen(
             [sys.executable, "-c", _RUNNING_EVOLVER, mutex, pipe, manner, str(_STARVED_SECONDS)],

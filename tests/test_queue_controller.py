@@ -1,5 +1,3 @@
-"""The Upscale Queue window's controller: it opens the window, keeps it drawn, and
-answers the window's verbs through the pipeline module, off the window's thread."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -13,7 +11,6 @@ from tests.gui_support import EMPTY_QUEUE, DoneAtOnce
 
 @pytest.fixture
 def parent():
-    """The window the queue window is parented to, taken down with it after the test."""
     widget = QWidget()
     yield widget
     widget.close()
@@ -28,7 +25,6 @@ def _opened(parent) -> tuple[QueueController, MagicMock]:
 
 
 def _heard(signal) -> list:
-    """Every emission of *signal*, each as the tuple of what it carried."""
     heard = []
     signal.connect(lambda *carried: heard.append(carried))
     return heard
@@ -36,8 +32,6 @@ def _heard(signal) -> list:
 
 class TestTheQueueWindowsLifetime:
     def test_the_queue_is_read_off_the_windows_thread(self, parent):
-        """A run holding the stage, or a slow library drive, must not stop
-        the window answering the mouse."""
         background = MagicMock()
         controller = QueueController(parent, background)
 
@@ -67,8 +61,6 @@ class TestTheQueueWindowsLifetime:
         assert controller._window.current is first
 
     def test_it_asks_to_be_redrawn_while_it_is_open(self, parent):
-        """Presence parks and thaws the encode between runs, and the percent
-        climbs the whole time."""
         controller, _lineup = _opened(parent)
 
         with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE) as queue:
@@ -95,8 +87,6 @@ class TestTheQueueWindowsVerbs:
         arranged.assert_called_once_with(["lagoon/0 unsorted/a.mp4"])
 
     def test_a_video_put_first_goes_first_and_asks_for_no_run(self, parent):
-        """Dragging a video to the top is ordering, not asking: it waits for
-        the usual moment like any other."""
         controller, _lineup = _opened(parent)
         runs_wanted = _heard(controller.run_wanted)
 
@@ -111,8 +101,6 @@ class TestTheQueueWindowsVerbs:
         queue.assert_called_once_with()
 
     def test_asking_for_one_now_records_it_and_asks_for_a_run_at_once(self, parent):
-        """The stage starts encodes on a run and nowhere else, so asking for
-        one has to bring the next run forward rather than wait ten minutes."""
         controller, _lineup = _opened(parent)
         runs_wanted = _heard(controller.run_wanted)
 
@@ -124,8 +112,6 @@ class TestTheQueueWindowsVerbs:
         assert runs_wanted == [("manual",)]
 
     def test_withdrawing_the_ask_asks_for_the_presence_poll_before_redrawing(self, parent):
-        """The poll that parks the encode fires every twenty seconds; the click
-        that hands it back should not wait them out."""
         controller, _lineup = _opened(parent)
         polls_wanted = _heard(controller.presence_poll_wanted)
 

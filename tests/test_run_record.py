@@ -24,12 +24,6 @@ from util import run_log
 
 @dataclass
 class _StageOutcome:
-    """A stand-in stage result shaped like the real ones: counters plus paths.
-
-    A real dataclass, not a Mock -- asdict() raises on a Mock, so the old test
-    only ever exercised the repr fallback while claiming to pin the Path
-    conversion.
-    """
     moved: int = 0
     moved_files: list[Path] = dataclass_field(default_factory=list)
 
@@ -47,9 +41,6 @@ class TestResultToDict:
         }
 
     def test_an_unconvertible_result_falls_back_to_its_repr(self):
-        # The safety net the old Mock-based test was actually exercising:
-        # a bare object() has no __dict__ and is no dataclass, so both
-        # conversion strategies raise and the repr fallback answers.
         d = result_to_dict(object())
         assert list(d) == ["repr"]
 
@@ -90,11 +81,9 @@ class TestRunRecordRoundTrip:
 
             save_run(record, runs_dir)
 
-            # File exists
             expected_path = runs_dir / "2026-03-29T14-30-00.json"
             assert expected_path.exists()
 
-            # Round-trip
             loaded = list(every_run(runs_dir))
             assert len(loaded) == 1
             assert loaded[0].id == record.id
@@ -103,9 +92,6 @@ class TestRunRecordRoundTrip:
             assert loaded[0].stages[1]["status"] == "skipped"
 
     def test_a_stage_result_carrying_paths_still_saves(self):
-        """What stops every scheduled run failing to record: sort.run()'s
-        moved_files are Path objects, and json.dumps raises on a Path --
-        the conversion has to happen on the way into the record."""
         pipeline_result = PipelineResult(
             stages=[StageRecord(
                 "sort", "completed", 1.5,
@@ -118,7 +104,7 @@ class TestRunRecordRoundTrip:
 
         with workspace_temp_dir() as tmp:
             runs_dir = tmp / "runs"
-            save_run(record, runs_dir)  # json.dumps on the real payload shape
+            save_run(record, runs_dir)
             loaded = list(every_run(runs_dir))
 
         assert loaded[0].stages[0]["result"]["moved_files"] == [str(Path("C:/videos/a.mp4"))]
@@ -145,14 +131,6 @@ class TestRunRecordRoundTrip:
 
 
 class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
-    """One added field must not take the whole history down with it.
-
-    ``RunRecord(**data)`` inside a bare ``except Exception: continue`` meant a
-    record carrying a key the dataclass does not declare vanished with no word
-    -- so adding one field to the format silently emptied the history list and
-    the stats chart of every run written since, and so did one truncated file.
-    """
-
     def _record(self, run_id, **extra):
         return {
             "id": run_id,
@@ -218,9 +196,6 @@ def _counting_opens(opened: list[str]):
 
 
 class TestLoadingOnlyTheNewest:
-    """Nothing prunes the runs directory, and the main window reads it on the
-    GUI thread after every run."""
-
     def test_a_limit_takes_the_newest_that_many(self):
         with workspace_temp_dir() as root:
             for run_id in ("2026-01-01T00-00-00", "2026-01-02T00-00-00",
@@ -233,9 +208,6 @@ class TestLoadingOnlyTheNewest:
                                                "2026-01-02T00-00-00"]
 
     def test_the_limit_is_applied_before_any_file_is_opened(self):
-        """The whole point: a run's file is named for the moment it started, so
-        newest-first is the reverse of their order and picking the newest N
-        costs one directory listing rather than parsing the lot."""
         with workspace_temp_dir() as root:
             for day in range(1, 6):
                 _write_run(root, f"2026-01-0{day}T00-00-00")
@@ -290,10 +262,6 @@ class TestRunRecordFromPipelineResult:
         assert record.stages[1]["skip_reason"] == "cpu_busy"
 
     def test_started_at_is_the_start_and_finished_at_is_the_finish(self):
-        """Both used to be the finish. So every view that trusts the name was
-        wrong by the run's whole duration -- and at the 660-second watchdog
-        ceiling that is eleven minutes, a full slot past the ten-minute
-        schedule, which reads as belonging to the following tick."""
         pr = PipelineResult(
             stages=[], has_errors=False, duration_seconds=699.7,
             started_at=datetime(2026, 7, 15, 3, 20, 0, tzinfo=UTC),
@@ -305,10 +273,6 @@ class TestRunRecordFromPipelineResult:
         assert record.finished_at == "2026-07-15T03:31:39"
 
     def test_the_start_is_the_pipelines_own_not_one_worked_out_afterwards(self):
-        """The pipeline stamps its start as it begins and names its log banner
-        with it. Recomputing the start here from the finish would drift from
-        that banner by however long the record took to save, and a run whose
-        record and banner disagree is one nothing can find in the log."""
         started = datetime(2026, 7, 15, 3, 20, 0, tzinfo=UTC)
         pr = PipelineResult(stages=[], has_errors=False, duration_seconds=699.7,
                             started_at=started)
@@ -333,9 +297,6 @@ class TestRunRecordFromPipelineResult:
         assert record.id == record.started_at.replace(":", "-")
 
     def test_a_record_with_no_mark_still_loads_back(self):
-        """Every record on disk was written before the mark existed, so the two
-        fields have to be optional at BOTH ends -- reading drops a record
-        whose file is missing a field the dataclass requires."""
         with workspace_temp_dir() as runs_dir:
             (runs_dir / "2026-01-01T00-00-00.json").write_text(json.dumps({
                 "id": "2026-01-01T00-00-00",
@@ -351,20 +312,14 @@ class TestRunRecordFromPipelineResult:
 
 
 class TestFormatRunLabel:
-    """A record stores UTC; a person reads local time."""
-
     def _in_pacific(self):
         return override_config(DISPLAY_TIMEZONE=ZoneInfo("America/Los_Angeles"))
 
     def test_formats_utc_to_the_configured_zone_in_winter(self):
-        # 2026-01-15T06:05:00 UTC = 2026-01-14 22:05 PST (UTC-8)
         with self._in_pacific():
             assert format_run_label("2026-01-15T06:05:00", 5.0) == "2026/01/14 22:05 (5s)"
 
     def test_formats_utc_to_the_configured_zone_in_summer(self):
-        """The zone, not a fixed offset: the same name is an hour apart across
-        the year, and a record read in January must not shift in July."""
-        # 2026-07-15T03:20:00 UTC = 2026-07-14 20:20 PDT (UTC-7)
         with self._in_pacific():
             assert format_run_label("2026-07-15T03:20:00", 12.0) == "2026/07/14 20:20 (12s)"
 
@@ -373,8 +328,6 @@ class TestFormatRunLabel:
             assert format_run_label("2026-03-30T05:20:00", 83.7) == "2026/03/29 22:20 (84s)"
 
     def test_an_unset_zone_reads_the_computer_s_own(self):
-        """What a public checkout gets, and what the setting exists to override
-        on the computer whose clock is not the one its user reads times in."""
         stamp = "2026-03-30T05:20:00"
         expected = (datetime.fromisoformat(stamp).replace(tzinfo=UTC)
                     .astimezone().strftime("%Y/%m/%d %H:%M"))

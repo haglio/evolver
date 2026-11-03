@@ -1,5 +1,3 @@
-"""Floating popup window showing pipeline progress with per-stage bars."""
-
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QTimer
@@ -21,19 +19,11 @@ _CAPTION_GUTTER = 12
 
 
 def _caption_width(font) -> int:
-    """Wide enough for the longest stage label, in the font it will be drawn in.
-
-    Measured rather than guessed: the widest label is a third wider than the
-    widest stage key it replaced, and the gap between them is font-dependent,
-    so a number picked on one computer would clip on another.
-    """
     metrics = QFontMetrics(font)
     return max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values()) + _CAPTION_GUTTER
 
 
 class ProgressPopup(QWidget):
-    """Floating progress window with per-stage bars and a total bar."""
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Evolver - Pipeline Progress")
@@ -100,7 +90,7 @@ class ProgressPopup(QWidget):
     def on_stage_started(self, name: str):
         if name in self._bars:
             bar = self._bars[name]
-            bar.setRange(0, 0)  # indeterminate
+            bar.setRange(0, 0)
 
     def on_stage_completed(self, name: str):
         if name not in self._bars:
@@ -129,7 +119,6 @@ class ProgressPopup(QWidget):
         self._total_bar.setValue(sum(self._stage_values.values()))
 
     def show_over(self, anchor: QWidget):
-        """Show the popup centered on *anchor*'s visible area."""
         self.adjustSize()
         center = anchor.frameGeometry().center()
         x = center.x() - self.width() // 2

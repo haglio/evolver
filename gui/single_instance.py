@@ -46,49 +46,30 @@ log = logging.getLogger(__name__)
 
 _kernel32 = load_dll("kernel32")
 
-# Neither name can change: an Evolver started before a change is not refused by
-# one started after it, and its window cannot be handed a launch.
 _MUTEX_NAME = "EvolverTrayApp_SingleInstance"
 _PIPE_NAME = "EvolverTrayApp_ShowWindow"
 
-# How long a launch waits for the Evolver already running to answer, and again
-# for it to go: stepping aside, it gives the stage it is in five seconds to
-# finish, and a computer under load can keep it from the processor for seconds
-# on end -- starved of it, one took fifteen to answer.
 _PATIENCE_SECONDS = 30.0
 _RETRY_SECONDS = 0.2
 
-#: What a launch says when it finds an Evolver already running: the Evolver
-#: the user runs every day, or a branch's, come to take the work over.
 USUAL = b"usual"
 PREVIEW = b"preview"
 
-#: What the running Evolver answers.
 SHOWING = b"showing"
 STEPPING_ASIDE = b"stepping-aside"
 
-#: What a start that is only for when Evolver is not running says on its command line.
 IF_NOT_RUNNING = "--if-not-running"
 
 
 class Outcome(Enum):
-    """What a launch came to."""
-
-    #: This process is Evolver now.
     CLAIMED = "claimed"
-    #: The Evolver already running took the launch, and opened its window.
     HANDED_OFF = "handed_off"
-    #: An Evolver holds the claim and could not be reached to answer.
     UNANSWERED = "unanswered"
-    #: An Evolver was already running, and this start was one that leaves it be.
     LEFT_AS_IT_WAS = "left_as_it_was"
 
 
 class InstanceGateway:
-    """This process's claim on being *the* Evolver, and the pipe under it."""
-
     def __init__(self):
-        # Each handle IS the thing it claims, so both live as long as this does.
         self._mutex_handle: int | None = None
         self._launches: QLocalServer | None = None
 
@@ -104,12 +85,6 @@ class InstanceGateway:
         return self._mutex_handle is not None
 
     def become_evolver(self, *, as_preview: bool, only_if_not_running: bool) -> Outcome:
-        """Be Evolver, or leave this launch with the one running and log which.
-
-        A preview comes to take the work over, so it ends an Evolver that will
-        not answer; the usual launch leaves such an Evolver be. A start that is
-        only for when none is running asks the running one nothing.
-        """
         if only_if_not_running:
             if self.claim():
                 return Outcome.CLAIMED
@@ -123,14 +98,6 @@ class InstanceGateway:
         return outcome
 
     def take_over(self, launch: bytes, *, end_the_unanswering: bool) -> Outcome:
-        """Become Evolver, or leave this launch with the one already running.
-
-        An Evolver stepping aside is waited out, for as long as its last run's
-        stage takes to finish. One that answers nothing is ended when
-        *end_the_unanswering*, which is how a preview takes the work from an
-        Evolver older than the answers; any other launch leaves it be, since
-        such an Evolver opens its window on the connection alone.
-        """
         deadline = time.monotonic() + _PATIENCE_SECONDS
         while not self.claim():
             if time.monotonic() >= deadline:
@@ -149,13 +116,6 @@ class InstanceGateway:
     def serve_launches(self, *, steps_aside_for: Callable[[bytes], bool],
                        on_show: Callable[[], None],
                        on_step_aside: Callable[[], None]) -> None:
-        """Answer every launch that finds this Evolver running.
-
-        *steps_aside_for* is handed what the launch said -- ``b""`` from a
-        launcher that says nothing -- and decides. Stepping aside stops the
-        listening first, so no later launch is answered by an Evolver on its
-        way out.
-        """
         def _answer(launch: bytes, reply: Callable[[bytes], None]) -> None:
             if steps_aside_for(launch):
                 self.stop_serving()
@@ -167,34 +127,20 @@ class InstanceGateway:
 
         server = running_copy.listen(_PIPE_NAME, _answer)
         if not server.isListening():
-            # Not fatal — this instance still works. But nothing can hand a
-            # launch to it, so say why here rather than in a dialog the user
-            # cannot act on.
             log.error("Cannot listen on %s: %s", _PIPE_NAME, server.errorString())
         self._launches = server
 
     def stop_serving(self) -> None:
-        """Stop answering launches: this Evolver is on its way out."""
         if self._launches is not None:
             self._launches.close()
 
     def let_go(self) -> None:
-        """Stop answering launches and give up the claim, before this process exits.
-
-        How a preview hands the work back: the Evolver it starts next can
-        claim at once, however long this one takes to wind down.
-        """
         self.stop_serving()
         if self._mutex_handle is not None:
             _kernel32.CloseHandle(ctypes.c_void_p(self._mutex_handle))
             self._mutex_handle = None
 
     def ask(self, launch: bytes, *, until: float) -> Answer | None:
-        """Tell the running Evolver what *launch* is, and hear by *until* what it does.
-
-        None when nothing is listening -- an Evolver still starting, or one on
-        its way out.
-        """
         return running_copy.ask(_PIPE_NAME, launch, until=until)
 
 

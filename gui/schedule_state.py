@@ -1,18 +1,3 @@
-"""What the schedule is doing, decided and worded once for every surface.
-
-The tray's tooltip, the status line at the top of its menu and the
-window's toolbar label all report the same moment, so one answer decides it for
-every one of them: a run on screen is the fact the user is looking at, and a
-pause stops the schedule after it, so running outranks paused everywhere.
-
-Each surface asking the same three booleans for itself is what lets them
-disagree -- its own chain, its own ``strftime``, its own wording for an idle
-schedule. The scheduler hands out a :class:`ScheduleStatus` instead, and every
-word a surface shows comes off it -- including the one deliberate difference, the
-window's longer sentence for a paused schedule, which reads as a sentence
-because it sits in a wide toolbar rather than in a hover.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -38,8 +23,6 @@ def schedule_state(is_running: bool, is_paused: bool, next_run_at: datetime | No
 
 @dataclass(frozen=True)
 class ScheduleStatus:
-    """The schedule as the scheduler knows it, and as the surfaces read it."""
-
     is_running: bool = False
     is_paused: bool = False
     next_run_at: datetime | None = None
@@ -49,19 +32,16 @@ class ScheduleStatus:
         return schedule_state(self.is_running, self.is_paused, self.next_run_at)
 
     def headline(self) -> str:
-        """The state, for the menu's status line, with the time of a scheduled run."""
         if self.state == SCHEDULED:
             return f"Scheduled for {self.next_run_at.strftime(_CLOCK)}"
         return {RUNNING: "Running", PAUSED: "Paused"}.get(self.state, "Scheduled")
 
     def next_run_text(self) -> str:
-        """When the next run is, or "" when none is coming."""
         if self.state != SCHEDULED:
             return ""
         return f"Next run: {self.next_run_at.strftime(_CLOCK)}"
 
     def activity(self) -> str:
-        """What is happening, in a hover's worth of words -- "" when nothing is."""
         if self.state == RUNNING:
             return "Running..."
         if self.state == PAUSED:
@@ -69,7 +49,6 @@ class ScheduleStatus:
         return self.next_run_text()
 
     def toolbar_label(self) -> str:
-        """The same, for a wide toolbar, where a paused schedule can say why."""
         if self.state == PAUSED:
             return "No upcoming runs scheduled (inactive)"
         return self.activity()

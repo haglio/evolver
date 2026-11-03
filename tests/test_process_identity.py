@@ -1,4 +1,3 @@
-"""What every window an Evolver process shows tells the taskbar about the app it belongs to."""
 from __future__ import annotations
 
 import logging

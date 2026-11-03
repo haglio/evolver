@@ -24,16 +24,12 @@ PATIENCE_S = 10.0
 
 
 class _Told:
-    """What a listener told the window, and a way to wait for the last of it."""
-
     def __init__(self, listener, *, until_heard):
         self.heard: list[str] = []
         self.failures: list[str] = []
         self.timeline: list[tuple[str, str]] = []
         self._until_heard = until_heard
         self._done = threading.Event()
-        # Direct: the listener speaks from its own thread, and no event loop runs here
-        # to carry a queued signal across to this one.
         listener.heard.connect(self._on_heard, Qt.ConnectionType.DirectConnection)
         listener.hearing.connect(self._on_hearing, Qt.ConnectionType.DirectConnection)
         listener.failed.connect(self._on_failed, Qt.ConnectionType.DirectConnection)
@@ -89,9 +85,6 @@ class TestWhatTheWindowIsTold(unittest.TestCase):
 
 
 class TestWhenListeningCannotGoOn(unittest.TestCase):
-    """The buttons still work, so the window stays open; what it must not do is go on
-    looking like it is listening."""
-
     def test_an_audio_stack_that_is_not_installed_is_a_crash_with_its_reason(self):
         with patch.dict(sys.modules, {"vosk": None}),                 self.assertLogs("backfill.voice", level="ERROR") as logged:
             told = _told_by(VoiceListener(PHRASES))
@@ -134,8 +127,6 @@ class TestWhenListeningCannotGoOn(unittest.TestCase):
 
 class TestStoppingAndRestarting(unittest.TestCase):
     def test_stop_returns_only_once_the_microphone_is_closed(self):
-        """The loop runs inside a PortAudio stream, so returning sooner lets the
-        interpreter tear down while a C callback thread is still live in it."""
         engines = scripted_engines([said("side beta")])
         _told_by(VoiceListener(PHRASES, engines=engines), until_heard="side beta")
 

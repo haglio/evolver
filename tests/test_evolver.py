@@ -19,19 +19,10 @@ from tests.temp_helpers import LaneLibrary, override_config, touch_video, worksp
 from util import run_lock, run_log
 from util.sidecar import sidecar_path
 
-# What logging writes at the end of every line on this platform, and so what
-# a byte offset into the log has to be counted in.
 CRLF = (chr(13) + chr(10)).encode("ascii")
 
 
 def _stage_mocks() -> dict:
-    """A stand-in for every stage the pipeline calls.
-
-    One list, used by both helpers below, so a newly added stage is stubbed
-    everywhere at once. A stage left off it runs for real against the live
-    library and the sibling apps' saved state, which turns a unit test into a
-    maintenance run.
-    """
     return {
         "strays_run": Mock(return_value=Mock(ok=True)),
         "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
@@ -95,35 +86,17 @@ def _patched_stages(mocks: dict) -> ExitStack:
     stack = ExitStack()
     for target, key in _STAGE_PATCHES:
         stack.enter_context(patch(target, mocks[key]))
-    # Each run's own turn: the computer's is the one a running Evolver holds
-    # while the suite runs beside it, and a test holding it would refuse that.
     stack.enter_context(override_config(
         PIPELINE_LOCK_FILE=Path(tempfile.gettempdir()) / "evolver-tests"
         / f"pipeline-{uuid.uuid4().hex}.lock"))
     return stack
 
 
-# The pipeline's stage order has one home, tasks/stages.py, and these
-# tests read it rather than keeping a second copy. It was a second copy while
-# the registry was missing genau_deliver, since deriving from it would have
-# encoded that bug here too; tests/test_stage_registry.py is what holds the
-# two in step now.
 _EXPECTED_STAGE_ORDER = ALL_STAGES
 
 
 class TestEvolverMain:
-    """Tests for the evolver.main() pipeline orchestration."""
-
     def _run_pipeline(self, **overrides):
-        """Run evolver.main() with all stages mocked.
-
-        Returns a dict of mock objects keyed by stage name. Callers can
-        pre-configure mocks via **overrides before the run, e.g.:
-
-            mocks = self._run_pipeline(
-                correspondence_run=Mock(return_value=Mock(ok=False)),
-            )
-        """
         mocks = _stage_mocks() | {"setup_logging": Mock(), "check_dependencies": Mock()}
         mocks.update(overrides)
 
@@ -136,8 +109,6 @@ class TestEvolverMain:
         mocks["exit_code"] = exc.value.code
         return mocks
 
-    # --- Dependency check ---
-
     def test_exits_nonzero_on_dependency_check_failure(self):
         mocks = self._run_pipeline(
             check_dependencies=Mock(side_effect=RuntimeError("ffprobe not found")),
@@ -146,9 +117,6 @@ class TestEvolverMain:
         mocks["sort_run"].assert_not_called()
 
     def test_a_dependency_failure_is_logged_with_its_traceback(self, caplog):
-        """Which of the checks raised is the whole content of the diagnosis, and
-        only the traceback names it -- the message reads "Dependency check
-        failed" either way."""
         with caplog.at_level(logging.ERROR):
             self._run_pipeline(
                 check_dependencies=Mock(side_effect=RuntimeError("ffprobe not found")),
@@ -158,8 +126,6 @@ class TestEvolverMain:
                     if "Dependency check failed" in record.getMessage()]
         assert failures
         assert all(record.exc_info for record in failures)
-
-    # --- Stage sequencing ---
 
     def test_skips_upscale_when_no_pending_work(self):
         mocks = self._run_pipeline()
@@ -196,8 +162,6 @@ class TestEvolverMain:
         mocks["upscale_run"].assert_called_once_with(
             priority_files=["new-file"], max_items=config.UPSCALE_BATCH_LIMIT,
         )
-
-    # --- Non-AI upscale gating ---
 
     def test_ai_upscale_waits_while_a_topaz_encode_evolver_did_not_start_is_running(self):
         mocks = self._run_pipeline(
@@ -242,14 +206,10 @@ class TestEvolverMain:
         assert steps == ["frozen", "cpu sampled", "sign-in asked", "upscaled", "thawed"]
 
     def test_cli_run_neither_starts_nor_stops_nor_manages_nonai_encodes(self):
-        """Nor starts one the queue window asked for: that ask is the tray's to
-        answer, and a run from a terminal leaves it waiting there."""
         mocks = self._run_pipeline()
         mocks["nonai_run"].assert_called_once_with(
             allow_start=False, stop=False, presence_managed=False,
             take_requests=False, ai_waiting=False)
-
-    # --- Exit code propagation ---
 
     @pytest.mark.parametrize(
         "failing_overrides",
@@ -278,23 +238,16 @@ class TestEvolverMain:
         ],
     )
     def test_a_failing_stage_exits_nonzero(self, failing_overrides):
-        """Eight longhand tests differing only in which mock failed, as a table.
-
-        The overrides come from factories so each case gets fresh Mocks.
-        """
         mocks = self._run_pipeline(**failing_overrides())
         assert mocks["exit_code"] == 1
 
     def test_exits_zero_when_upscale_only_held_back_for_low_disk(self):
-        """A hold is not a failure: nothing broke, there is just no room yet."""
         mocks = self._run_pipeline(
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
             upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=True, pending_after_run=3)),
         )
         assert mocks["exit_code"] == 0
-
-    # --- All stages called on clean run ---
 
     def test_all_stages_called_on_clean_run_with_pending_work(self):
         mocks = self._run_pipeline(
@@ -314,23 +267,12 @@ class TestEvolverMain:
 
 
 class TestRunPipeline:
-    """Tests for evolver.run_pipeline() and its callback protocol."""
-
     def _patch_all_stages(self, **overrides):
-        """Return an ExitStack context that patches all stages for run_pipeline()."""
         defaults = _stage_mocks()
         defaults.update(overrides)
         return _patched_stages(defaults), defaults
 
     def test_every_stage_the_pipeline_runs_is_a_stub_from_the_mock_table(self):
-        """The invariant _stage_mocks' docstring states, made enforceable.
-
-        A stage missing from the table runs for real against whatever library
-        the overlay resolves to — genau_deliver was missing for months and 38
-        tests ran a real move-and-delete stage, kept inert only by the example
-        overlay's placeholder path. Driving every stage to actually run and
-        demanding a Mock result catches the next stage added without a stub.
-        """
         stack, _ = self._patch_all_stages(
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
@@ -355,18 +297,12 @@ class TestRunPipeline:
         assert len(result.stages) > 0
 
     def test_the_run_marks_where_in_the_log_it_wrote(self, tmp_path):
-        """Two offsets and a banner, so a run's lines can be pointed at rather
-        than searched for in a file nothing rotates. The offsets are taken
-        either side of the run, so the stretch between them is the run's own."""
         log = tmp_path / "evolver.log"
         log.write_bytes(b"[2026-07-25 08:10:02] an earlier run" + CRLF)
         stack, _ = self._patch_all_stages()
         handler = logging.FileHandler(log, encoding="utf-8")
         logger = logging.getLogger("evolver")
         logger.addHandler(handler)
-        # The suite leaves the root logger at WARNING, and the banner is logged
-        # at INFO -- unset, it never reaches the file and the mark points at
-        # nothing.
         previous_level = logger.level
         logger.setLevel(logging.INFO)
         try:
@@ -383,8 +319,6 @@ class TestRunPipeline:
         assert "an earlier run" not in text
 
     def test_a_log_it_cannot_measure_leaves_the_mark_unset(self):
-        """A run nobody can point at in the log is still a run: the record is
-        saved either way, and the GUI says why the link leads nowhere."""
         missing = Path("no-such-directory") / "evolver.log"
         stack, _ = self._patch_all_stages()
         with stack, patch.object(config, "LOG_FILE", missing):
@@ -449,11 +383,9 @@ class TestRunPipeline:
         stack, mocks = self._patch_all_stages()
         with stack:
             evolver.run_pipeline(on_stage_complete=on_complete)
-        # Any stage would do; this one is picked by name rather than by position,
-        # because its position is the registry's to decide.
         withdrawn_call = next(c for c in on_complete.call_args_list if c.args[0] == "withdrawn")
         assert withdrawn_call.args[1] == mocks["withdrawn_run"].return_value
-        assert isinstance(withdrawn_call.args[2], float)  # elapsed
+        assert isinstance(withdrawn_call.args[2], float)
         assert withdrawn_call.args[3] == "completed"
 
     def test_on_stage_complete_reports_skipped_for_upscale(self):
@@ -462,7 +394,7 @@ class TestRunPipeline:
         with stack:
             evolver.run_pipeline(on_stage_complete=on_complete)
         upscale_call = next(c for c in on_complete.call_args_list if c.args[0] == "upscale")
-        assert upscale_call.args[1] is None  # no result
+        assert upscale_call.args[1] is None
         assert upscale_call.args[3] == "skipped"
 
     def test_enabled_nonai_upscale_starts_when_ai_work_is_drained(self):
@@ -521,13 +453,6 @@ class TestRunPipeline:
         assert result.has_errors
 
     def test_the_failing_stage_is_the_one_marked_error(self):
-        """A run's verdict has to be legible in the stage list it ships with.
-
-        Every stage used to record "completed" the moment its function returned,
-        while the run's verdict was computed separately from the result payloads
-        — so a run read "error" with twelve stages all reading "completed" and
-        nothing anywhere saying which one went wrong.
-        """
         stack, _ = self._patch_all_stages(
             withdrawn_run=Mock(return_value=Mock(failed=1)),
         )
@@ -537,14 +462,6 @@ class TestRunPipeline:
         assert errored == ["withdrawn"]
 
     def test_a_low_disk_hold_warns_on_the_non_ai_stage_instead_of_failing_it(self):
-        """The condition that reddened almost every run for days on end.
-
-        Free space fell under the floor, the non-AI stage held its encode back,
-        and the run was flagged an error. Space stays low for days at a stretch,
-        so that verdict left the history a wall of red crosses standing over a
-        condition nobody has to act on. The stage names the hold itself now, and
-        names it in gray.
-        """
         stack, _ = self._patch_all_stages(
             nonai_run=Mock(return_value=Mock(failed="", deferred_low_disk=True)),
         )
@@ -576,8 +493,6 @@ class TestRunPipeline:
         assert not result.has_errors
 
     def test_a_dead_encode_outranks_a_hold_on_the_same_stage(self):
-        """One tick can lose an encode and then find no room for the next. The
-        lost encode wants a person; the hold only wants disk space."""
         stack, _ = self._patch_all_stages(
             nonai_run=Mock(return_value=Mock(failed="example/clip one.mp4",
                                              deferred_low_disk=True)),
@@ -588,12 +503,6 @@ class TestRunPipeline:
         assert statuses["upscale_non_ai"] == "error"
 
     def test_skips_alone_do_not_make_a_run_a_failure(self):
-        """Skipping is how the pipeline stays out of the way, not how it fails.
-
-        A Topaz encode Evolver did not start parks the AI upscale, which parks
-        the correspondence check after it — two skipped stages on a run where
-        nothing at all went wrong.
-        """
         stack, _ = self._patch_all_stages(
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
@@ -607,11 +516,6 @@ class TestRunPipeline:
         assert not result.has_errors
 
     def test_duration_seconds_is_positive(self):
-        # duration_seconds is time.monotonic() end-minus-start. On a fast runner
-        # an all-mocked pipeline can finish inside the clock's resolution, so the
-        # real clock reads the same value twice and the span is 0.0 -- a genuine
-        # flake, not a bug in the code. Drive the clock so it advances on every
-        # read, making the measured span deterministically positive.
         ticks = itertools.count(start=1.0, step=1.0)
         stack, _ = self._patch_all_stages()
         with stack, patch("evolver.time.monotonic", lambda: next(ticks)):
@@ -619,7 +523,6 @@ class TestRunPipeline:
         assert result.duration_seconds > 0.0
 
     def test_on_stage_progress_forwarded_to_upscale(self):
-        """When on_stage_progress is provided, upscale.run receives on_progress."""
         on_progress = Mock()
         stack, mocks = self._patch_all_stages(
             has_pending_work=Mock(return_value=True),
@@ -627,13 +530,11 @@ class TestRunPipeline:
         )
         with stack:
             evolver.run_pipeline(on_stage_progress=on_progress)
-        # upscale.run should have been called with on_progress kwarg
         call_kwargs = mocks["upscale_run"].call_args.kwargs
         assert "on_progress" in call_kwargs
         assert call_kwargs["on_progress"] is not None
 
     def test_on_stage_progress_not_passed_when_none(self):
-        """When on_stage_progress is None, upscale.run does not receive on_progress."""
         stack, mocks = self._patch_all_stages(
             has_pending_work=Mock(return_value=True),
             sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
@@ -644,11 +545,9 @@ class TestRunPipeline:
         assert "on_progress" not in call_kwargs
 
     def test_on_stage_progress_callback_binds_stage_name(self):
-        """The on_progress closure passed to upscale.run calls on_stage_progress with stage name."""
         progress_calls = []
 
         def capture_upscale_run(**kwargs):
-            # Simulate upscale calling on_progress
             cb = kwargs.get("on_progress")
             if cb:
                 cb(1, 5)
@@ -668,15 +567,7 @@ class TestRunPipeline:
 
 
 class TestCooperativeStop:
-    """The watchdog's stop request: honored between stages, never mid-stage."""
-
     def test_stops_between_stages_once_asked(self):
-        """Asked after whatever ran first, the run ends there.
-
-        Which stage that is belongs to the registry, so the stop is armed by
-        the first completion rather than by naming a stage — and the record
-        holding exactly one entry is what says the rest were dropped.
-        """
         completed: list[str] = []
         mocks = _stage_mocks()
         with _patched_stages(mocks):
@@ -708,12 +599,6 @@ class TestCheckDependenciesWindowSuppression:
 
 
 class TestCpuBusySkip:
-    """The probe alone decides whether the upscale stage stands down.
-
-    Nothing else exercised `_should_skip_upscale_due_to_cpu`: every pipeline
-    test patches it out, so the body it guards two stages with had no cover.
-    """
-
     def _verdict(self, probe: Mock) -> bool:
         with patch("evolver.system_resources.measure_cpu_busy_percent", probe):
             return evolver._should_skip_upscale_due_to_cpu(logging.getLogger("test"))
@@ -735,7 +620,6 @@ class TestCpuBusySkip:
 
 @contextmanager
 def _isolated_root_logger():
-    """The root logger as the test found it, whatever the test does to it."""
     root = logging.getLogger()
     before, level = list(root.handlers), root.level
     try:
@@ -750,8 +634,6 @@ def _isolated_root_logger():
 
 
 class TestSetupLogging:
-    """Every popup sends the user to the log, so the log has to be written."""
-
     def test_writes_the_log_even_when_something_configured_logging_first(self):
         with workspace_temp_dir() as folder, _isolated_root_logger() as root:
             root.addHandler(logging.NullHandler())
@@ -778,9 +660,6 @@ class TestSetupLogging:
 
 
 class TestTheWindowsDoorToTheQueue:
-    """The window layer reaches the stages through this module and nowhere else
-    (tests/test_layering.py), so the queue window's verbs live here."""
-
     def test_the_lineup_is_the_queues_own(self):
         with patch("tasks.nonai_upscale_queue.current") as queue:
             assert evolver.upscale_queue() is queue.return_value
@@ -851,8 +730,6 @@ class TestWhatIsMarkedTrash:
 
 
 class TestOneRunAtATime:
-    """A command-line run beside the tray's would sort and upscale the same files."""
-
     def test_while_another_evolver_holds_the_turn_no_stage_runs(self):
         with workspace_temp_dir() as root:
             lock = root / "pipeline.lock"
