@@ -68,6 +68,14 @@ class TestRunDetailRendering:
         ))
 
         assert widget._table.item(0, 1).text() == "regen_cutover"
+
+    def test_a_stage_the_registry_does_not_list_has_no_number_in_the_stage_column(self):
+        widget = RunDetailWidget()
+        widget.show_record(make_run_record(
+            stages=[{"name": "regen_cutover", "status": "completed", "duration_seconds": 1.0}],
+        ))
+
+        assert widget._table.item(0, 0).text() == "—"
         assert widget._table.item(0, 0).text() == "\u2014"
 
 

@@ -110,6 +110,14 @@ class TestPipelineScheduler(unittest.TestCase):
         assert nra.microsecond == 0
         scheduler.stop()
 
+    def test_the_slot_after_the_last_one_of_the_day_is_midnight_of_the_next_day(self):
+        late = datetime(2026, 1, 1, 23, 55, tzinfo=UTC)
+        scheduler = PipelineScheduler(interval_minutes=10, now=lambda: late)
+        scheduler.start()
+
+        assert scheduler.next_run_at == datetime(2026, 1, 2, 0, 0, tzinfo=UTC)
+        scheduler.stop()
+
     def test_next_run_at_is_none_when_paused(self):
         scheduler = PipelineScheduler(interval_minutes=10)
         scheduler.start()
