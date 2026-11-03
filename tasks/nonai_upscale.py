@@ -66,17 +66,19 @@ class Conclusion:
     unreachable_archive: str = ""
 
 
-def run(allow_start: bool = True, stop: bool = False,
-        presence_managed: bool = False, *, take_requests: bool = False,
-        ai_waiting: bool = False, job_file: Path | None = None,
-        attempts_file: Path | None = None, cooldown_file: Path | None = None,
-        skip_list: Path | None = None, pin_list: Path | None = None,
-        watch_stats_file: Path | None = None, request_file: Path | None = None,
+@dataclass(frozen=True)
+class RunMode:
+    allow_start: bool = True
+    stop: bool = False
+    presence_managed: bool = False
+    take_requests: bool = False
+    ai_waiting: bool = False
+
+
+def run(mode: RunMode | None = None, files: StageFiles | None = None,
         settings: EncodeSettings | None = None) -> NonAiUpscaleResult:
-    files = StageFiles.configured(
-        job=job_file, attempts=attempts_file, cooldown=cooldown_file,
-        skip_list=skip_list, pin_list=pin_list,
-        watch_stats=watch_stats_file, request=request_file)
+    mode = RunMode() if mode is None else mode
+    files = StageFiles.configured() if files is None else files
     settings = EncodeSettings() if settings is None else settings
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
@@ -86,12 +88,12 @@ def run(allow_start: bool = True, stop: bool = False,
         if job is None:
             job = nonai_encode.adopt_orphan(files.job)
         _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
-        request = nonai_job.load_request(files.request) if take_requests else None
+        request = nonai_job.load_request(files.request) if mode.take_requests else None
         if job is not None and request is not None:
             job, result.stopped = nonai_request.make_way_for(request.video, job, files)
         if job is not None:
-            supervised = _supervise(job, files, settings, stop=stop,
-                                    presence_managed=presence_managed)
+            supervised = _supervise(job, files, settings, stop=mode.stop,
+                                    presence_managed=mode.presence_managed)
             result.in_flight = supervised.in_flight
             result.in_flight_percent = supervised.in_flight_percent
             result.suspended = supervised.suspended
@@ -104,9 +106,10 @@ def run(allow_start: bool = True, stop: bool = False,
 
         attempt = None
         if not result.in_flight and request is not None:
-            attempt = nonai_request.start_requested(request, files, settings, ai_waiting=ai_waiting)
+            attempt = nonai_request.start_requested(
+                request, files, settings, ai_waiting=mode.ai_waiting)
             result.on_request = bool(attempt.started)
-        elif not result.in_flight and allow_start and not stop:
+        elif not result.in_flight and mode.allow_start and not mode.stop:
             attempt = _start_next_queued_video(files, settings)
         if attempt is not None:
             result.started = attempt.started

@@ -21,19 +21,20 @@ class StageFiles:
     request: Path
 
     @classmethod
-    def configured(cls, *, job: Path | None = None, attempts: Path | None = None,
-                   cooldown: Path | None = None, skip_list: Path | None = None,
-                   pin_list: Path | None = None, watch_stats: Path | None = None,
-                   request: Path | None = None) -> StageFiles:
-        return cls(
-            job=job or config.NONAI_JOB_STATE_FILE,
-            attempts=attempts or config.NONAI_ATTEMPTS_FILE,
-            cooldown=cooldown or config.NONAI_COOLDOWN_FILE,
-            skip_list=skip_list or config.NONAI_SKIP_LIST,
-            pin_list=pin_list or config.NONAI_PIN_LIST,
-            watch_stats=watch_stats or config.FUN_TIME_WATCH_STATS_FILE,
-            request=request or config.NONAI_REQUEST_FILE,
-        )
+    def configured(cls, **given: Path | None) -> StageFiles:
+        defaults = {
+            "job": config.NONAI_JOB_STATE_FILE,
+            "attempts": config.NONAI_ATTEMPTS_FILE,
+            "cooldown": config.NONAI_COOLDOWN_FILE,
+            "skip_list": config.NONAI_SKIP_LIST,
+            "pin_list": config.NONAI_PIN_LIST,
+            "watch_stats": config.FUN_TIME_WATCH_STATS_FILE,
+            "request": config.NONAI_REQUEST_FILE,
+        }
+        unknown = given.keys() - defaults.keys()
+        if unknown:
+            raise TypeError(f"unknown stage file: {', '.join(sorted(unknown))}")
+        return cls(**{name: given.get(name) or default for name, default in defaults.items()})
 
     def queued_videos(self) -> list[nonai_queue.QueuedVideo]:
         return nonai_queue.collect_queued_videos(

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from tasks import nonai_files
 from tests.temp_helpers import nonai_library_overrides, override_config, workspace_temp_dir
 
@@ -33,3 +35,8 @@ def test_the_candidates_are_collected_from_its_three_lists():
 
     collect.assert_called_once_with(skip_list=Path("skip"), pin_list=Path("pin"),
                                     watch_stats_file=Path("watch"))
+
+
+def test_a_file_name_it_does_not_have_is_refused():
+    with pytest.raises(TypeError, match="jobs"):
+        nonai_files.StageFiles.configured(jobs=Path("job.json"))

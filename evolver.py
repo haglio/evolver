@@ -255,10 +255,11 @@ def _run_stages(
         )
         _run_stage(
             "upscale_non_ai", nonai_upscale.run,
-            allow_start=nonai_allow_start, stop=nonai_enabled is False,
-            presence_managed=nonai_enabled is True,
-            take_requests=nonai_enabled is not None,
-            ai_waiting=not ai_drained,
+            mode=nonai_upscale.RunMode(
+                allow_start=nonai_allow_start, stop=nonai_enabled is False,
+                presence_managed=nonai_enabled is True,
+                take_requests=nonai_enabled is not None,
+                ai_waiting=not ai_drained),
         )
 
         if upscale_still_pending:

@@ -38,7 +38,7 @@ class TestRunStartsAJob(unittest.TestCase):
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == "lagoon/0 unsorted/a.mp4"
             cmd = mocks["popen"].call_args.args[0]
@@ -61,7 +61,7 @@ class TestRunStartsAJob(unittest.TestCase):
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=True)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             cmd = mocks["popen"].call_args.args[0]
             assert cmd[cmd.index("-loglevel") + 1] == "warning"
@@ -74,7 +74,7 @@ class TestRunStartsAJob(unittest.TestCase):
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=True)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
             assert mocks["popen"].call_args.args[0][-1] == job["tmp"]
@@ -90,7 +90,7 @@ class TestRunStartsAJob(unittest.TestCase):
             stack, mocks = probes()
             mocks["videoai"].side_effect = ["Enhanced using iris-2", ""]
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == "lagoon/0 unsorted/b fresh.mp4"
             assert str(fresh) in mocks["popen"].call_args.args[0]
@@ -104,7 +104,7 @@ class TestRunStartsAJob(unittest.TestCase):
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.started == ""
             assert result.pending == 1
@@ -117,7 +117,7 @@ class TestRunStartsAJob(unittest.TestCase):
 
             stack, mocks = probes(free_bytes=1)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.deferred_low_disk
             assert result.started == ""
@@ -130,7 +130,7 @@ class TestRunStartsAJob(unittest.TestCase):
 
             stack, mocks = probes(free_bytes=30 * 1024 ** 3)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.deferred_low_disk
             mocks["popen"].assert_not_called()
@@ -147,7 +147,7 @@ class TestStartGuards(unittest.TestCase):
 
             stack, mocks = probes(topaz_pids=(31337,))
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == ""
             assert result.start_deferred == "topaz_busy"
@@ -160,7 +160,7 @@ class TestStartGuards(unittest.TestCase):
 
             stack, mocks = probes(available_ram=2.5)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == ""
             assert result.start_deferred == "low_ram"
@@ -173,7 +173,7 @@ class TestStartGuards(unittest.TestCase):
 
             stack, mocks = probes(idle_seconds=5.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == ""
             assert result.start_deferred == "user_present"
@@ -187,7 +187,7 @@ class TestStartGuards(unittest.TestCase):
             stack, mocks = probes()
             mocks["sign_in_expired"].return_value = True
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == ""
             assert result.start_deferred == "topaz_sign_in_expired"
@@ -201,7 +201,7 @@ class TestStartGuards(unittest.TestCase):
 
                 stack, mocks = probes(**held)
                 with override_config(**overrides), stack:
-                    nonai_upscale.run(allow_start=True)
+                    nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
                 mocks["sign_in_expired"].assert_not_called()
 
@@ -213,7 +213,7 @@ class TestStartGuards(unittest.TestCase):
             stack, _mocks = probes(
                 idle_seconds=nonai_encode.EncodeSettings().user_idle_threshold_seconds + 60)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == "lagoon/0 unsorted/a.mp4"
             assert result.start_deferred == ""
@@ -228,7 +228,7 @@ class TestStartGuards(unittest.TestCase):
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == ""
             assert result.start_deferred == "cooldown"
@@ -245,7 +245,7 @@ class TestStartGuards(unittest.TestCase):
 
             stack, _mocks = probes()
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == "lagoon/0 unsorted/a.mp4"
             assert result.start_deferred == ""
@@ -261,7 +261,7 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
 
             stack, mocks = probes(idle_seconds=5.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, take_requests=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, take_requests=True))
 
             assert result.started == "lagoon/0 unsorted/b.mp4"
             assert result.on_request
@@ -277,7 +277,7 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, take_requests=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, take_requests=True))
 
             mocks["terminate"].assert_called_once_with(4242)
             assert not tmp.exists()
@@ -293,7 +293,7 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
 
             stack, mocks = probes(available_ram=2.5)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, take_requests=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, take_requests=True))
 
             assert (result.started, result.start_deferred) == ("", "low_ram")
             mocks["popen"].assert_not_called()
@@ -308,7 +308,7 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
 
             stack, _mocks = probes()
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, take_requests=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, take_requests=True))
 
             assert result.started == "lagoon/0 unsorted/b.mp4"
 
@@ -320,7 +320,7 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
 
             stack, mocks = probes(free_bytes=10)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, take_requests=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, take_requests=True))
 
             assert result.started == ""
             assert result.deferred_low_disk
@@ -335,7 +335,7 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, take_requests=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, take_requests=True))
 
             assert result.started == ""
             mocks["popen"].assert_not_called()
@@ -349,8 +349,8 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
 
             stack, mocks = probes()
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, take_requests=True,
-                                           ai_waiting=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, take_requests=True,
+                                           ai_waiting=True))
 
             assert (result.started, result.start_deferred) == ("", "ai_clips_waiting")
             mocks["popen"].assert_not_called()
@@ -365,7 +365,7 @@ class TestAnEncodeYouAskedForRunsOn(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, idle_seconds=5.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, presence_managed=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, presence_managed=True))
 
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
             assert not result.suspended
@@ -391,7 +391,7 @@ class TestAnEncodeYouAskedForRunsOn(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, stop=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, stop=True))
 
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
             assert result.stopped == ""
@@ -411,7 +411,7 @@ class TestRunStopsAJob(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, image=str(config.FFMPEG))
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True, stop=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True, stop=True))
 
             mocks["terminate"].assert_called_once_with(4242)
             mocks["popen"].assert_not_called()
@@ -432,7 +432,7 @@ class TestRunStopsAJob(unittest.TestCase):
 
             stack, mocks = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, stop=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, stop=True))
 
             mocks["terminate"].assert_not_called()
             assert result.promoted == "lagoon/0 unsorted/busy.mp4"
@@ -454,7 +454,7 @@ class TestTheJobFilesKeys(unittest.TestCase):
 
             stack, _ = probes()
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=True)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             written = json.loads(
                 overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
@@ -468,7 +468,7 @@ class TestTheJobFilesKeys(unittest.TestCase):
 
             stack, _ = probes()
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False, take_requests=True)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, take_requests=True))
 
             written = json.loads(
                 overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
@@ -488,7 +488,7 @@ class TestTheJobFilesKeys(unittest.TestCase):
 
             stack, _ = probes(topaz_pids=(31337,), cmdline=cmdline, duration=581.0)
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             written = json.loads(
                 overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
@@ -516,7 +516,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
             stack, _ = probes()
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=True)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             stamp = json.loads(
                 overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))["provenance"]
@@ -529,7 +529,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
             stack, _ = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
                 stamps = sidecar.read(sidecar.sidecar_path(out)).get(provenance.BLOCK)
             assert stamps == {provenance.UPSCALE_NON_AI: STARTED_UNDER}
@@ -541,7 +541,7 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
             stack, _ = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
                 stamps = sidecar.read(sidecar.sidecar_path(out)).get(provenance.BLOCK)
             assert stamps == {provenance.UPSCALE_NON_AI: provenance.reconstructed("evolver", method="non_ai_upscale")}
@@ -562,7 +562,7 @@ class TestOrphanAdoption(unittest.TestCase):
 
             stack, mocks = probes(topaz_pids=(31337,), cmdline=cmdline, duration=581.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
             mocks["popen"].assert_not_called()
@@ -579,7 +579,7 @@ class TestOrphanAdoption(unittest.TestCase):
 
             stack, mocks = probes(topaz_pids=(111, 222))
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert not overrides["NONAI_JOB_STATE_FILE"].exists()
             assert result.start_deferred == "topaz_busy"
@@ -595,7 +595,7 @@ class TestOrphanAdoption(unittest.TestCase):
                 cmdline=r'"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe" -i "D:\gui\in.mp4" "D:\gui\out.mp4"',
             )
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert not overrides["NONAI_JOB_STATE_FILE"].exists()
             assert result.start_deferred == "topaz_busy"
@@ -610,7 +610,7 @@ class TestPresenceThrottle(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, idle_seconds=5.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True, presence_managed=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True, presence_managed=True))
 
             mocks["suspend"].assert_called_once_with(4242)
             mocks["terminate"].assert_not_called()
@@ -627,7 +627,7 @@ class TestPresenceThrottle(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, idle_seconds=5.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True, presence_managed=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True, presence_managed=True))
 
             mocks["suspend"].assert_not_called()
             assert result.suspended
@@ -640,7 +640,7 @@ class TestPresenceThrottle(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, idle_seconds=10_000.0, duration=None)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True, presence_managed=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True, presence_managed=True))
 
             mocks["resume"].assert_called_once_with(4242)
             assert not result.suspended
@@ -660,7 +660,7 @@ class TestPresenceThrottle(unittest.TestCase):
             stack, mocks = probes(is_running=True, idle_seconds=10_000.0, duration=None,
                                   image=str(config.FFMPEG))
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, presence_managed=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, presence_managed=True))
 
             mocks["terminate"].assert_not_called()
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
@@ -672,7 +672,7 @@ class TestPresenceThrottle(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, idle_seconds=5.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False, presence_managed=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, presence_managed=False))
 
             mocks["suspend"].assert_not_called()
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
@@ -883,11 +883,11 @@ class TestEveryFileIsAParameter(unittest.TestCase):
             stack, _ = probes()
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(
-                    allow_start=True,
-                    job_file=elsewhere / "job.json",
-                    attempts_file=elsewhere / "attempts.json",
-                    cooldown_file=elsewhere / "cooldown.json",
-                )
+                    nonai_upscale.RunMode(allow_start=True),
+                    files=nonai_upscale.StageFiles.configured(
+                        job=elsewhere / "job.json",
+                        attempts=elsewhere / "attempts.json",
+                        cooldown=elsewhere / "cooldown.json"))
 
             assert result.started == "lagoon/0 unsorted/a.mp4"
             assert (elsewhere / "job.json").is_file()
@@ -905,11 +905,11 @@ class TestEveryFileIsAParameter(unittest.TestCase):
             stack, _ = probes(is_running=False, duration=99.5)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(
-                    allow_start=False,
-                    job_file=elsewhere / "job.json",
-                    attempts_file=elsewhere / "attempts.json",
-                    cooldown_file=elsewhere / "cooldown.json",
-                )
+                    nonai_upscale.RunMode(allow_start=False),
+                    files=nonai_upscale.StageFiles.configured(
+                        job=elsewhere / "job.json",
+                        attempts=elsewhere / "attempts.json",
+                        cooldown=elsewhere / "cooldown.json"))
 
             assert result.promoted == "lagoon/0 unsorted/busy.mp4"
             assert "ended_at" in json.loads((elsewhere / "cooldown.json").read_text(encoding="utf-8"))
@@ -925,14 +925,14 @@ class TestEveryFileIsAParameter(unittest.TestCase):
             stack, _ = probes(videoai="apo8")
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(
-                    allow_start=True,
-                    job_file=elsewhere / "job.json",
-                    attempts_file=elsewhere / "attempts.json",
-                    cooldown_file=elsewhere / "cooldown.json",
-                    skip_list=elsewhere / "skip.txt",
-                    pin_list=elsewhere / "next.txt",
-                    watch_stats_file=elsewhere / "watch.json",
-                )
+                    nonai_upscale.RunMode(allow_start=True),
+                    files=nonai_upscale.StageFiles.configured(
+                        job=elsewhere / "job.json",
+                        attempts=elsewhere / "attempts.json",
+                        cooldown=elsewhere / "cooldown.json",
+                        skip_list=elsewhere / "skip.txt",
+                        pin_list=elsewhere / "next.txt",
+                        watch_stats=elsewhere / "watch.json"))
 
             assert result.started == ""
             assert (elsewhere / "skip.txt").read_text(encoding="utf-8").splitlines() == ["lagoon/0 unsorted/a.mp4\talready carries a Topaz videoai tag"]
@@ -952,14 +952,14 @@ class TestEveryFileIsAParameter(unittest.TestCase):
             stack, _ = probes()
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(
-                    allow_start=True,
-                    job_file=elsewhere / "job.json",
-                    attempts_file=elsewhere / "attempts.json",
-                    cooldown_file=elsewhere / "cooldown.json",
-                    skip_list=elsewhere / "skip.txt",
-                    pin_list=elsewhere / "next.txt",
-                    watch_stats_file=elsewhere / "watch.json",
-                )
+                    nonai_upscale.RunMode(allow_start=True),
+                    files=nonai_upscale.StageFiles.configured(
+                        job=elsewhere / "job.json",
+                        attempts=elsewhere / "attempts.json",
+                        cooldown=elsewhere / "cooldown.json",
+                        skip_list=elsewhere / "skip.txt",
+                        pin_list=elsewhere / "next.txt",
+                        watch_stats=elsewhere / "watch.json"))
 
             assert result.started == "lagoon/0 unsorted/z.mp4"
 
@@ -978,14 +978,14 @@ class TestEveryFileIsAParameter(unittest.TestCase):
             stack, _ = probes()
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(
-                    allow_start=True,
-                    job_file=elsewhere / "job.json",
-                    attempts_file=elsewhere / "attempts.json",
-                    cooldown_file=elsewhere / "cooldown.json",
-                    skip_list=elsewhere / "skip.txt",
-                    pin_list=elsewhere / "next.txt",
-                    watch_stats_file=elsewhere / "watch.json",
-                )
+                    nonai_upscale.RunMode(allow_start=True),
+                    files=nonai_upscale.StageFiles.configured(
+                        job=elsewhere / "job.json",
+                        attempts=elsewhere / "attempts.json",
+                        cooldown=elsewhere / "cooldown.json",
+                        skip_list=elsewhere / "skip.txt",
+                        pin_list=elsewhere / "next.txt",
+                        watch_stats=elsewhere / "watch.json"))
 
             assert result.started == "lagoon/0 unsorted/z.mp4"
 
@@ -1015,7 +1015,7 @@ class TestPortraitTargets(unittest.TestCase):
 
             stack, mocks = probes(orientation="portrait")
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=True)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             cmd = mocks["popen"].call_args.args[0]
             filter_arg = cmd[cmd.index("-filter_complex") + 1]
@@ -1031,7 +1031,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, mocks = probes(is_running=True)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
             assert result.started == ""
@@ -1046,7 +1046,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, _ = probes(is_running=True, duration=75.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.in_flight_percent == 38
 
@@ -1057,7 +1057,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, _ = probes(is_running=True, duration=None)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
             assert result.in_flight_percent is None
@@ -1072,7 +1072,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, _mocks = probes(is_running=False, duration=99.5)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.promoted == "lagoon/0 unsorted/busy.mp4"
             assert result.failed == ""
@@ -1089,7 +1089,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, _ = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.promoted == "lagoon/0 unsorted/busy.mp4"
             assert out.exists()
@@ -1102,7 +1102,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, _mocks = probes(is_running=False, duration=42.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.failed == "lagoon/0 unsorted/busy.mp4"
             assert result.promoted == ""
@@ -1123,7 +1123,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, _mocks = probes(is_running=False, duration=None)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.failed == "lagoon/0 unsorted/busy.mp4"
             skip_list = overrides["NONAI_SKIP_LIST"].read_text(encoding="utf-8")
@@ -1142,7 +1142,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             stack, mocks = probes(is_running=True, duration=1.0,
                                   image=str(config.FFMPEG))
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             mocks["terminate"].assert_called_once_with(4242)
             assert result.failed == "lagoon/0 unsorted/busy.mp4"
@@ -1156,14 +1156,14 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, _ = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
             assert overrides["NONAI_COOLDOWN_FILE"].exists()
 
             overrides["NONAI_COOLDOWN_FILE"].unlink()
             write_job(root, overrides)
             stack, _ = probes(is_running=True, image=str(config.FFMPEG))
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False, stop=True)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False, stop=True))
             assert not overrides["NONAI_COOLDOWN_FILE"].exists()
 
     def test_low_disk_mid_flight_stops_the_encode_without_penalty(self):
@@ -1173,7 +1173,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, image=str(config.FFMPEG), free_bytes=1)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             mocks["terminate"].assert_called_once_with(4242)
             assert result.deferred_low_disk
@@ -1192,7 +1192,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
 
             stack, _ = probes(is_running=True)
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert not orphan.exists()
             assert tmp.exists()
@@ -1208,7 +1208,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             stack, mocks = probes(is_running=True, duration=1.0,
                                   image=r"C:\Windows\notepad.exe")
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             mocks["terminate"].assert_not_called()
 
@@ -1221,7 +1221,7 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
 
             stack, _ = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert (result.promoted, result.failed) == ("", "")
             assert (source.exists(), tmp.exists(), out.exists()) == (True, True, False)
@@ -1235,7 +1235,7 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
 
             stack, mocks = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == ""
             mocks["popen"].assert_not_called()
@@ -1248,9 +1248,9 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
 
             stack, _ = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
                 with override_config(NONAI_RETIRED_ROOT=root / "archive"):
-                    result = nonai_upscale.run(allow_start=False)
+                    result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.promoted == "lagoon/0 unsorted/busy.mp4"
             assert out.exists()
@@ -1265,7 +1265,7 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
 
             stack, _ = probes(is_running=False, duration=100.0)
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert (result.in_flight, result.unreachable_archive) == ("lagoon/0 unsorted/busy.mp4", str(archive))
 
@@ -1281,7 +1281,7 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
                 stack,
                 self.assertLogs("tasks.nonai_upscale", level="WARNING") as logged,
             ):
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert f"WARNING:tasks.nonai_upscale:The upscale of {source} is finished and waits until {archive} can be reached to take the original." in logged.output
 
@@ -1306,7 +1306,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
                     "clip": {"compilation": "Volume One", "index": 1, "count": 4},
                 })
 
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
                 carried = sidecar.read(sidecar.sidecar_path(out))
             assert carried["clip"] == {"compilation": "Volume One", "index": 1, "count": 4}
@@ -1330,7 +1330,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
                     "clip": {"compilation": "Volume One", "index": 1},
                 })
 
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
                 assert "version" not in sidecar.read(sidecar.sidecar_path(out))
 
@@ -1344,7 +1344,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
             with override_config(**overrides), stack:
                 funscript.write(script_library.script_path_for_video(source), script)
 
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
                 assert funscript.read(script_library.script_path_for_video(out)) == script
 
@@ -1359,7 +1359,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
                 funscript.write(original, {"actions": [{"at": 0, "pos": 20}, {"at": 400, "pos": 80}]})
                 script_library.mark_generated(original)
 
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
                 assert script_library.is_marked_generated(script_library.script_path_for_video(out))
 
@@ -1375,7 +1375,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
                                 {"actions": [{"at": 0, "pos": 20}, {"at": 400, "pos": 80}]})
                 funscript.write(script_library.script_path_for_video(out), written_for_the_upscale)
 
-                nonai_upscale.run(allow_start=False)
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
                 assert funscript.read(script_library.script_path_for_video(out)) == written_for_the_upscale
 
@@ -1399,7 +1399,7 @@ class TestReportingHowFarAlongItIs(unittest.TestCase):
                     make_video(non_ai / "lagoon" / "3_good_to_go" / "processed"
                                / "older_apo8_iris2.mp4"), 300.0)
 
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.pending == 1
             assert result.remaining_seconds == 900.0
@@ -1419,7 +1419,7 @@ class TestReportingHowFarAlongItIs(unittest.TestCase):
                 self._lasting(
                     make_video(non_ai / "lagoon" / "0 unsorted" / "b fresh.mp4"), 900.0)
 
-                result = nonai_upscale.run(allow_start=True)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == "lagoon/0 unsorted/b fresh.mp4"
             assert result.pending == 1
@@ -1433,7 +1433,7 @@ class TestReportingHowFarAlongItIs(unittest.TestCase):
 
             stack, _ = probes()
             with override_config(**overrides), stack:
-                result = nonai_upscale.run(allow_start=False)
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
             assert result.pending == 1
             assert result.percent_complete is None
