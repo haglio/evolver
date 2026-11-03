@@ -776,10 +776,9 @@ class TestMakingWayForAiVideos(unittest.TestCase):
             write_job(root, overrides)
 
             stack, mocks = probes(is_running=True)
-            with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_videos():
-                    frozen_during = [call.args for call in mocks["suspend"].call_args_list]
-                    thawed_during = mocks["resume"].called
+            with override_config(**overrides), stack, nonai_upscale.frozen_for_ai_videos():
+                frozen_during = [call.args for call in mocks["suspend"].call_args_list]
+                thawed_during = mocks["resume"].called
 
             assert frozen_during == [(4242,)]
             assert not thawed_during
@@ -791,9 +790,8 @@ class TestMakingWayForAiVideos(unittest.TestCase):
             write_job(root, overrides, suspended=True, suspended_at=time.time() - 30)
 
             stack, mocks = probes(is_running=True)
-            with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_videos():
-                    pass
+            with override_config(**overrides), stack, nonai_upscale.frozen_for_ai_videos():
+                pass
 
             mocks["resume"].assert_not_called()
             job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
@@ -804,9 +802,8 @@ class TestMakingWayForAiVideos(unittest.TestCase):
             overrides = library_overrides(root)
 
             stack, mocks = probes()
-            with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_videos():
-                    pass
+            with override_config(**overrides), stack, nonai_upscale.frozen_for_ai_videos():
+                pass
 
             mocks["suspend"].assert_not_called()
             mocks["resume"].assert_not_called()
@@ -818,9 +815,8 @@ class TestMakingWayForAiVideos(unittest.TestCase):
             record_before = overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8")
 
             stack, mocks = probes(is_running=False)
-            with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_videos():
-                    pass
+            with override_config(**overrides), stack, nonai_upscale.frozen_for_ai_videos():
+                pass
 
             mocks["suspend"].assert_not_called()
             assert overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8") == record_before
@@ -835,11 +831,10 @@ class TestMakingWayForAiVideos(unittest.TestCase):
                 daemon=True)
 
             stack, mocks = probes(is_running=True, idle_seconds=10_000.0)
-            with override_config(**overrides), stack:
-                with nonai_upscale.frozen_for_ai_videos():
-                    poll.start()
-                    poll.join(timeout=10)
-                    thawed_during = mocks["resume"].called
+            with override_config(**overrides), stack, nonai_upscale.frozen_for_ai_videos():
+                poll.start()
+                poll.join(timeout=10)
+                thawed_during = mocks["resume"].called
 
             assert answered == [""]
             assert not thawed_during
@@ -869,9 +864,8 @@ class TestMakingWayForAiVideos(unittest.TestCase):
 
             stack, _ = probes(is_running=True)
             with override_config(**overrides), stack, \
-                    self.assertLogs("tasks.nonai_encode", level="INFO") as logged:
-                with nonai_upscale.frozen_for_ai_videos():
-                    pass
+                    self.assertLogs("tasks.nonai_encode", level="INFO") as logged, nonai_upscale.frozen_for_ai_videos():
+                pass
 
             said = "\n".join(logged.output)
             assert "AI videos" in said
@@ -1282,9 +1276,12 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
             source, _tmp, _out = write_job(root, overrides, expected=100.0)
 
             stack, _ = probes(is_running=False, duration=100.0)
-            with override_config(**overrides), stack:
-                with self.assertLogs("tasks.nonai_upscale", level="WARNING") as logged:
-                    nonai_upscale.run(allow_start=False)
+            with (
+                override_config(**overrides),
+                stack,
+                self.assertLogs("tasks.nonai_upscale", level="WARNING") as logged,
+            ):
+                nonai_upscale.run(allow_start=False)
 
             assert f"WARNING:tasks.nonai_upscale:The upscale of {source} is finished and waits until {archive} can be reached to take the original." in logged.output
 

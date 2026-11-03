@@ -556,12 +556,12 @@ class TestTakingAnUpdate:
         quit_this_copy.assert_not_called()
 
     def test_the_running_evolver_looks_for_an_update_every_minute(self, request):
-        app = build_evolver_app(request)
+        with patch("gui.app.production_update.UpdateWatch.tick") as looked:
+            app = build_evolver_app(request)
 
-        with patch.object(app._peer, "tick"), patch("gui.app.process_identity.claim"), \
-             patch.object(app._updates, "tick") as looked:
-            app.start()
-            app._update_timer.timeout.emit()
+            with patch.object(app._peer, "tick"), patch("gui.app.process_identity.claim"):
+                app.start()
+                app._update_timer.timeout.emit()
 
         assert app._update_timer.isActive()
         assert app._update_timer.interval() == 60_000

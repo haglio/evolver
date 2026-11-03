@@ -66,10 +66,9 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=5)
+                result = upscale.run(max_items=5)
 
             assert result.processed == 1
             assert result.failed == 0
@@ -153,10 +152,9 @@ class TestUpscaleHelpers(unittest.TestCase):
             stale_partial.parent.mkdir(parents=True)
             stale_partial.write_bytes(b"partial")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=1)
+                result = upscale.run(max_items=1)
 
             assert result.processed == 1
             assert not stale_partial.exists()
@@ -184,10 +182,9 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", return_value=False), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", return_value=False), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=5)
+                result = upscale.run(max_items=5)
 
             assert result.processed == 0
             assert result.failed == 1
@@ -217,11 +214,10 @@ class TestUpscaleHelpers(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg") as ffmpeg_mock, \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg") as ffmpeg_mock, \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=1), \
                      patch("tasks.upscale.show_error"):
-                    result = upscale.run(max_items=5)
+                result = upscale.run(max_items=5)
 
             assert result.deferred_low_disk
             assert result.processed == 0
@@ -238,10 +234,9 @@ class TestUpscaleHelpers(unittest.TestCase):
                 tmp.write_bytes(b"")
                 return True
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg_empty), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg_empty), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=5)
+                result = upscale.run(max_items=5)
 
             assert result.processed == 0
             assert result.failed == 1
@@ -444,10 +439,9 @@ class TestOnProgressCallback(unittest.TestCase):
 
             progress_calls = []
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+                upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
 
             assert len(progress_calls) == 3
             assert progress_calls[0] == (1, 3)
@@ -464,10 +458,9 @@ class TestOnProgressCallback(unittest.TestCase):
 
             progress_calls = []
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", return_value=False), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", return_value=False), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+                upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
 
             assert len(progress_calls) == 2
             assert progress_calls[-1] == (2, 2)
@@ -479,10 +472,9 @@ class TestOnProgressCallback(unittest.TestCase):
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=5)
+                result = upscale.run(max_items=5)
 
             assert result.processed == 1
 
@@ -495,10 +487,9 @@ class TestSubprocessTimeout(unittest.TestCase):
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=5)
+                result = upscale.run(max_items=5)
 
             assert result.stopped_at_budget == 1
             assert result.failed == 0
@@ -513,10 +504,9 @@ class TestSubprocessTimeout(unittest.TestCase):
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)) as mock_ffmpeg, \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)) as mock_ffmpeg, \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=10)
+                result = upscale.run(max_items=10)
 
             mock_ffmpeg.assert_called_once()
             assert result.stopped_at_budget == 1
@@ -539,9 +529,12 @@ class TestSubprocessTimeout(unittest.TestCase):
                     return fake_run_ffmpeg(in_file, tmp, *args, **kwargs)
                 raise subprocess.TimeoutExpired("ffmpeg", 5)
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=encode_then_run_out_of_time),                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    result = upscale.run(max_items=5)
+            with (
+                override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir),
+                patch("tasks.upscale._run_ffmpeg", side_effect=encode_then_run_out_of_time),
+                patch("tasks.upscale.system_resources.free_bytes", return_value=10**15),
+            ):
+                result = upscale.run(max_items=5)
 
             assert result.processed == 1
             assert result.stopped_at_budget == 1
@@ -556,10 +549,9 @@ class TestSubprocessTimeout(unittest.TestCase):
 
             progress_calls = []
 
-            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                with patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
+            with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    upscale.run(max_items=5, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+                upscale.run(max_items=5, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
 
             assert len(progress_calls) == 1
             assert progress_calls[0] == (0, 1)
@@ -605,10 +597,9 @@ class TestSettingsSelection(unittest.TestCase):
             return True
 
         with override_config(VIDEO_LIBRARY_DIR=video_lib, AI_DIR=ai_dir, SORTED_DIR=sorted_dir,
-                             OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir, METADATA_DIR=meta_dir):
-            with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                             OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir, METADATA_DIR=meta_dir), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=1)
+            upscale.run(max_items=1)
         return encoded_with
 
     def test_run_uses_the_t2v_settings_for_t2v_provider(self):

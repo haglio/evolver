@@ -46,11 +46,8 @@ def buckets() -> list[Path]:
 
 
 def stage_dirs(parent: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
-    found = []
-    for child in sorted(parent.iterdir()):
-        if child.is_dir() and child.name[:1].isdigit() and int(child.name[:1]) in digits:
-            found.append((int(child.name[:1]), child))
-    return found
+    return [(int(child.name[:1]), child) for child in sorted(parent.iterdir())
+            if child.is_dir() and child.name[:1].isdigit() and int(child.name[:1]) in digits]
 
 
 def bucket_of(video: Path) -> Path | None:
