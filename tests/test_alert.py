@@ -70,10 +70,6 @@ class TestShowError(unittest.TestCase):
     def test_a_dialog_that_will_not_open_falls_back_to_the_windows_one(
         self, _show_alert, show_error_popup,
     ):
-        """The startup crash reporter runs on an interpreter that has just
-        failed to import something; Qt is a candidate for what it failed on,
-        and a crash nobody is shown is indistinguishable from a launcher that
-        did nothing."""
         with self.assertLogs("util.alert", level="ERROR") as logged:
             alert.show_error("Title", "Body")
 

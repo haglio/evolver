@@ -1,10 +1,3 @@
-"""The two orientations the library files a video under, in one place.
-
-The value ffprobe produces, the directory name a path is built from, and the
-folder names four stages walk were three separate spellings of the same three
-strings across six modules, with nothing connecting them: a typo in any one was
-a silently empty listing rather than an error.
-"""
 from __future__ import annotations
 
 import ast
@@ -26,8 +19,6 @@ class TestTheOrientations(unittest.TestCase):
         assert orientation.SORTED == (orientation.LANDSCAPE, orientation.PORTRAIT)
 
     def test_the_third_answer_is_not_one_of_the_two(self):
-        """A video ffprobe cannot measure is left where it is rather than
-        guessed into a folder, so UNKNOWN must never pass a `in SORTED` test."""
         assert orientation.UNKNOWN not in orientation.SORTED
 
 

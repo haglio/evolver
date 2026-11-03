@@ -1,11 +1,3 @@
-"""The gates that hold the config seam open once it has been opened.
-
-``config`` is a module-level singleton built at import from a git-ignored JSON
-overlay, and every stage reaches into it rather than declaring what it needs.
-Converting that is a ratchet, not a rewrite: each stage's ``run()`` grows
-explicit keyword parameters, and the reads it used to make disappear one at a
-time.
-"""
 from __future__ import annotations
 
 import ast

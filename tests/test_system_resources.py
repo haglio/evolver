@@ -1,12 +1,3 @@
-"""Tests for util.system_resources.
-
-The two live tests at the end read the real computer and only prove the
-numbers are in-range on Windows. The unit conversions -- bytes to GB, tick
-stamps to seconds, the 32-bit wrap -- feed the non-AI stage's decision to
-start or suspend a multi-hour encode, so they are pinned exactly at the
-Win32 boundary with the structures filled by hand; those tests run on any
-platform.
-"""
 from __future__ import annotations
 
 import inspect
@@ -18,7 +9,6 @@ from util import system_resources
 
 
 def _fills(**fields):
-    """A Win32 stand-in that writes *fields* into the caller's structure."""
     def fake(ref):
         for name, value in fields.items():
             setattr(ref._obj, name, value)

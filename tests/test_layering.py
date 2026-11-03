@@ -1,18 +1,3 @@
-"""Which packages may import which, held by the imports rather than by care.
-
-The repo's layering is ``util <- tasks <- evolver <- gui <- tray_app``: the
-stages reach the library through util, the orchestrator sequences the stages,
-and the window layer reaches the stages only through the orchestrator. It is
-the invariant that makes "the pipeline is what touches the library" true, and
-it was broken by one line -- ``gui/app.py`` importing ``tasks.nonai_upscale``
-to suspend a detached ffmpeg from a twenty-second GUI timer, outside any
-pipeline run, with no stage record and no run record.
-
-Nothing said so, and nothing could: an upward import is ordinary Python and
-raises nothing. So the edges are listed, and held as an equality. A new one
-fails here; an edge nobody uses any more fails too, and is lowered in the
-commit that removed it.
-"""
 from __future__ import annotations
 
 import ast

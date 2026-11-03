@@ -30,8 +30,7 @@ _POPCOUNT = np.array([i.bit_count() for i in range(256)], dtype=np.uint8)
 PROBE_POINTS = (0.2, 0.5, 0.8)
 PROBE_SECONDS = 4.0
 
-# ffmpeg's own reading of "black" (anything this dark), and the multiple it
-# rounds the rectangle it finds to.
+# ffmpeg's cropdetect: 'black' is anything below 24, rounded to a multiple of 2.
 _CROP_LIMIT, _CROP_ROUND = 24, 2
 
 MIN_CONTENT_FRACTION = 0.5
@@ -54,8 +53,7 @@ def content_crop_in(
     right = max(corner[2] for corner in corners)
     lower = max(corner[3] for corner in corners)
 
-    # Chroma is subsampled, so an odd rectangle is one ffmpeg's crop refuses.
-    # Rounding outward keeps this the widest reading rather than the tightest.
+    # ffmpeg's crop refuses an odd rectangle (subsampled chroma).
     left, upper = max(0, left - left % 2), max(0, upper - upper % 2)
     crop_width = min(width - left, right - left + right % 2)
     crop_height = min(height - upper, lower - upper + lower % 2)
@@ -69,7 +67,6 @@ def content_crop_in(
 
 
 def _cropdetect(video: Path, at: float) -> str:
-    """What ffmpeg's cropdetect says about the seconds of *video* from *at*."""
     command = [
         "ffmpeg", "-nostats", "-ss", f"{at:.3f}", "-t", str(PROBE_SECONDS),
         "-i", str(video), "-an",
@@ -97,27 +94,11 @@ def content_crop(video: Path) -> tuple[int, int, int, int] | None:
 
 
 def sample_frames(video: Path, fps: float) -> np.ndarray:
-    """*video* decoded to gray thumbnails, *fps* of them a second.
-
-    Its black bars are cropped off first, so the thumbnails hold the content and
-    nothing else -- a pillarboxed clip and the unpadded scene it came out of are
-    the same frames, and have to reach the hash as the same grid of cells.
-
-    Empty when ffmpeg cannot read the file, which leaves that video matching
-    nothing rather than stopping the batch. Files with damaged frames do decode,
-    complaining on stderr the whole way -- held back unless the run really fails,
-    since a batch over hundreds of videos is unreadable otherwise.
-    """
     filters = ",".join([f"fps={fps}", *_content_filters(content_crop(video))])
     return _thumbnails(_decode(video, ["-i", str(video), "-an", "-vf", filters]))
 
 
 def frames_at(video: Path, seconds: Iterable[float]) -> np.ndarray:
-    """*video*'s frame at each of *seconds*, as :func:`sample_frames` reads one.
-
-    A moment ffmpeg cannot read is left out, so a caller that needs them all
-    counts what came back.
-    """
     filters = ",".join(_content_filters(content_crop(video)))
     moments = [
         _thumbnails(_decode(video, ["-ss", f"{at:.3f}", "-i", str(video), "-an",

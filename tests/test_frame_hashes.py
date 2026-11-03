@@ -43,7 +43,6 @@ class TestFrameHashes:
 
 
 class TestContentCropIn:
-    """What to crop off a frame, read out of ffmpeg's cropdetect reports."""
 
     def _report(self, width: int, height: int, x: int = 0, y: int = 0) -> str:
         return (
@@ -77,7 +76,6 @@ class TestContentCropIn:
         assert content_crop_in(["ffmpeg version 7.1", ""], 1920, 1080) is None
 
     def test_the_rectangle_is_even_on_every_side(self):
-        """Chroma is subsampled, so ffmpeg's crop refuses an odd rectangle."""
         crop = content_crop_in([self._report(1437, 1077, x=241, y=1)], 1920, 1080)
 
         assert crop is not None

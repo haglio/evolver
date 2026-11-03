@@ -47,8 +47,6 @@ class TestFetchDom(unittest.TestCase):
             assert dom == "<p>hi</p>"
 
     def test_the_profile_directory_it_is_given_is_the_one_the_browser_gets(self):
-        """The browser writes into it, so a default under the checkout would be
-        a running app leaving scratch state in a git working tree."""
         with workspace_temp_dir() as root:
             profile = root / "somewhere" / "profile"
 

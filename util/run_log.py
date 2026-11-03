@@ -41,9 +41,7 @@ def read_run(
         if banner(run_id) not in first.decode("utf-8", "replace"):
             return None
         rest = handle.read(max(0, min(end, start + max_bytes) - handle.tell()))
-    # Normalized, not passed through: logging writes this file in text mode,
-    # so on Windows every line ends CRLF, and a text widget handed those draws
-    # a blank line between every line of the log.
+    # logging writes CRLF in text mode on Windows; a text widget draws a blank line between them.
     text = (first + rest).decode("utf-8", "replace").replace("\r\n", "\n")
     text = text.rstrip("\n")
     if end - start > max_bytes:

@@ -28,11 +28,6 @@ _MANUAL_VERSION_TAGS = frozenset({"trimmed"})
 
 
 def is_version_marker(token: str) -> bool:
-    """Whether *token* marks another copy of a video rather than naming one.
-
-    A copy counter — bare or parenthesized, as Windows writes it saving a file
-    that is already there — or one of the tags above.
-    """
     return token.strip("()").isdigit() or token in _MANUAL_VERSION_TAGS
 
 

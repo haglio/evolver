@@ -14,9 +14,6 @@ from tests.vocabulary_support import vocabulary_of
 
 VOCABULARY = vocabulary_of(Act("alpha", "Alpha"), Act("beta", "Beta"), Act("gamma", "Gamma"))
 
-# Fabricated: a real pin names a video inside the library, which is why the pins
-# moved to the git-ignored overlay in the first place. The button label is one the
-# act table above produces.
 PINNED_BUTTON = "Side Gamma"
 PINNED_ID = "11111111-2222-3333-4444-555555555555"
 
@@ -143,7 +140,7 @@ class TestBuildThumbnails(unittest.TestCase):
             )
 
             assert result == [("Side Beta", cached)]
-            assert extracted == []  # a cache hit never shells out to ffmpeg
+            assert extracted == []
 
     def test_an_extraction_failure_skips_that_action(self):
         examples = {"Good": Path("g.mp4"), "Bad": Path("b.mp4")}
@@ -163,7 +160,7 @@ class TestExtractFrame(unittest.TestCase):
             dest = root / "out.jpg"
 
             def fake_run(argv, **kwargs):
-                dest.write_bytes(b"img")  # ffmpeg wrote the frame
+                dest.write_bytes(b"img")
                 return SimpleNamespace(returncode=0)
 
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \

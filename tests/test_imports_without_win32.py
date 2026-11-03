@@ -1,15 +1,3 @@
-"""What this suite does on a computer that has no Win32.
-
-Evolver binds Win32 while its modules are being imported, and the test package
-itself resolved a dotted name through ``ctypes.windll`` before any test module
-ran.  On an interpreter whose ``ctypes`` has no Windows half that was not a
-handful of Windows tests failing -- it was nothing collected at all, so the
-suite could say nothing about the code that has no platform in it.
-
-This pins the other outcome.  The child interpreter below deletes the Windows
-half of ``ctypes`` and then collects the suite, so it asks the same question on
-Windows as it does anywhere else.
-"""
 from __future__ import annotations
 
 import os
@@ -20,27 +8,14 @@ from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 
-# The names ``ctypes`` grows only on Windows, and that the modules under test
-# reach for while they are being imported.
 _WIN32_CTYPES_NAMES = (
     "windll", "oledll", "WinDLL", "OleDLL", "WINFUNCTYPE", "HRESULT",
     "get_last_error", "set_last_error",
 )
 
-# Third-party packages that reach that surface while THEY are being imported,
-# on Windows.  Taking it away leaves a computer that cannot exist -- one whose
-# sys.platform still says win32, so platform-branching code takes the Windows
-# branch with the Windows half gone.  That is the point for this repo's own
-# modules, which is what the question is about; it is only noise for a
-# dependency, so a dependency is imported while the surface is still there and
-# is served from sys.modules afterwards.  A new one announces itself here, as a
-# collection error naming its own file.
+# Imported while the Win32 surface still exists, then served from sys.modules.
 _DEPENDENCIES_THAT_NEED_WIN32_TO_IMPORT = ("app_support.processes",)
 
-# The same holds for what a dependency does on Windows while one of this repo's
-# modules is being imported: util.provenance has app_support read the checkout,
-# which runs git in a Win32 job object, so that reading is taken while the
-# surface is still there and app_support serves it from its cache afterwards.
 _CHECKOUT_READ_WHILE_IMPORTING = REPO_DIR / "util" / "provenance.py"
 
 _STRIP_WIN32_FROM_CTYPES = f"""
@@ -59,11 +34,6 @@ for _name in {_WIN32_CTYPES_NAMES!r}:
 
 
 def run_without_the_win32_ctypes_surface(body):
-    """Run *body* in a child whose ``ctypes`` has had its Windows half removed.
-
-    ``PYTHONPATH`` is dropped so the child cannot pick up a shim that fakes that
-    surface back in, the way a run on a developer's non-Windows computer does.
-    """
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     return subprocess.run(
         [sys.executable, "-c", _STRIP_WIN32_FROM_CTYPES + body],
@@ -74,15 +44,6 @@ def run_without_the_win32_ctypes_surface(body):
 
 class TestTheWholeSuite(unittest.TestCase):
     def test_it_collects_where_ctypes_has_no_windll(self):
-        """Asked of the suite as a whole, and of pytest rather than of a list.
-
-        A list of the modules that bind Win32 would only ever hold the ones
-        somebody remembered to add, and the cost of forgetting one is not that
-        module's tests -- it is every test module that reaches it, dropped from
-        the run as a collection error nobody reads.  Collecting the suite is the
-        question itself: the next module to bind Win32 at import fails here, on
-        the commit that adds it.
-        """
         result = run_without_the_win32_ctypes_surface(
             "import sys, pytest\n"
             "sys.exit(pytest.main(['--collect-only', '-q']))\n"

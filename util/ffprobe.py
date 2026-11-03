@@ -1,11 +1,3 @@
-"""Asking ffprobe about a video, one process per question at most.
-
-Every function here answers None (or "") when ffprobe cannot say, including
-when it is not installed at all: these are called from the tray pipeline and
-from the backfill tool, and the tool has no console for a traceback to land
-in -- an escaping FileNotFoundError left it never appearing on screen.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -19,29 +11,14 @@ from util import orientation
 
 log = logging.getLogger(__name__)
 
-# A video on the cloud drive that has stalled keeps ffprobe reading it for good,
-# and a kill does not end a process stuck there, so a probe stops waiting after
-# this long and never waits on the process again.
+# A kill does not end a probe stuck on a stalled cloud-drive file, so stop waiting after this long.
 ANSWER_WITHIN_S = 60
 
-# Width, height and the rotation tag in one invocation. ffprobe takes several
-# -show_entries sections at once, and the tag is optional, so the CSV comes
-# back with two fields or three.
 _GEOMETRY_ENTRIES = "stream=width,height:stream_tags=rotate"
 _ROTATION_FIELD = 2
 
 
 def _stream_geometry(file: Path) -> tuple[int, int, int] | None:
-    """(width, height, rotation degrees) for the first video stream, or None.
-
-    One process for all three. The sort stage asks this once per incoming file,
-    so a probe per field makes a batch of a hundred clips three hundred process
-    spawns -- and on Windows the spawn is the expensive part, not the probing.
-
-    A rotation nothing can parse counts as none: the width and height are still
-    good, and a tag this cannot read only means the clip is not rotated as far
-    as it can tell.
-    """
     fields = _probe(file, _GEOMETRY_ENTRIES).split(",")
     if len(fields) not in (2, 3):
         return None
@@ -118,14 +95,6 @@ def _probe_format(file: Path, show_entries: str) -> str:
 
 
 def _run_ffprobe(args: list[str]) -> str:
-    """ffprobe's answer, or "" when there is none to be had.
-
-    OSError covers ffprobe not being installed, which is the case that used to
-    escape: every function here documents itself as answering None when the
-    probe is unavailable, and none of them did. The exit code goes unread --
-    a non-zero exit means ffprobe had nothing to say about this file, which is
-    the same "" as any other silence.
-    """
     try:
         process = subprocess.Popen(
             ["ffprobe", "-v", "error", "-of", "csv=p=0", *args],

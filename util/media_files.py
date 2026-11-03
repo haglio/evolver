@@ -84,8 +84,7 @@ _IN_USE_WAIT_SECONDS = 0.2
 
 
 def retry_while_in_use[T](action: Callable[[], T]) -> T:
-    # Windows refuses to move or delete a file a player still has open, and a
-    # player told to let go of one closes it a moment later, on a thread of its own.
+    # Windows refuses to move or delete a file a player still has open.
     return retried_while_held(action, attempts=_IN_USE_TRIES, delay_s=_IN_USE_WAIT_SECONDS)
 
 

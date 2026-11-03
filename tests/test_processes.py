@@ -38,10 +38,7 @@ class TestImagePath:
 
 class TestPidsOfImage:
     def test_finds_the_current_interpreter_by_its_image(self):
-        # Probe with the process's real image, not sys.executable: a Windows
-        # venv python.exe is a redirect stub whose backing image is the base
-        # interpreter (e.g. C:\Python314\python.exe), so QueryFullProcessImageName
-        # reports that, and pids_of_image(sys.executable) never matches us.
+        # A Windows venv python.exe is a redirect stub whose image is the base interpreter.
         image = processes.image_path(os.getpid())
         assert image is not None
         assert os.getpid() in processes.pids_of_image(Path(image))
@@ -72,8 +69,6 @@ class TestCommandLine:
         assert processes.command_line(proc.pid) is None
 
 
-
-
 class TestTerminate:
     def test_kills_a_live_process(self):
         proc = subprocess.Popen(
@@ -89,16 +84,6 @@ class TestTerminate:
 
 
 def _base_python():
-    """The base interpreter, spawned directly.
-
-    A venv's python.exe is a launcher that waits on a child doing the real work,
-    and suspending the launcher would leave that child running. Topaz's ffmpeg
-    (the real target) is a plain exe, so this only matters for the test.
-
-    Asked for when a test needs it rather than while this module is imported:
-    it is a Win32 call, and one made at import decides whether this file can be
-    collected at all.
-    """
     return processes.image_path(os.getpid())
 
 

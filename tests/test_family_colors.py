@@ -1,21 +1,3 @@
-"""No color here is a hand-typed copy of one the family already owns.
-
-`shared_ui.colors` carries the family's palette and `shared_ui.palette` is the
-same list without Qt; a hex literal whose value is one of those tokens is a
-second copy of a number that has one home.  It drifts: Fun Time's reference page
-mirrored seven of them by hand and its border ended up three points off the
-token it was copied from.
-
-The tests are walked as well as the source, because that is where this repo's
-copies were -- a run's green check asserted as ``"#30a030"`` goes red the day
-the family's green moves, over a window that is drawing exactly what it should.
-``status_symbols`` already answers with the token, so the assertion can too.
-
-Only hex literals are checked.  ``(255, 255, 255)`` is white to anything that
-draws, and refusing every triple that happens to equal a token would refuse
-plain white pixels in a fixture.
-"""
-
 from __future__ import annotations
 
 import ast
@@ -33,8 +15,6 @@ _ROOT = Path(__file__).resolve().parent.parent
 _TREES = (_ROOT / "gui", _ROOT / "evolver", _ROOT / "backfill", _ROOT / "review_trash", _ROOT / "tasks",
           _ROOT / "util", _ROOT / "tools", _ROOT / "tests")
 
-# "#abc" and "#aabbcc" -- how a color reaches a Qt stylesheet or an HTML label
-# when it did not come from a token.
 _HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b")
 
 

@@ -1,5 +1,3 @@
-"""How both upscale stages run Topaz: the settings, the ffmpeg invocation that carries them, and whether Topaz's sign-in has expired."""
-
 from __future__ import annotations
 
 import logging
@@ -134,7 +132,6 @@ def environment() -> dict:
 
 
 def command(in_file: Path, out_file: Path, settings: Settings) -> list[str]:
-    """The full Topaz ffmpeg argv for one video."""
     left = [name for _, name, _, _ in string.Formatter().parse(settings.filter_complex) if name]
     if left:
         raise ValueError(f"{settings.name} still names {', '.join(left)}: "
@@ -186,8 +183,7 @@ def sign_in_expired() -> bool:
     return any(message in check.stderr for message in _EXPIRED_SIGN_IN_MESSAGES)
 
 
-# A real encode at the verbose log level crashes Topaz's ffmpeg a few seconds
-# in, after it has printed the sign-in lines, so the check is a clip of its own.
+# At the verbose log level Topaz's ffmpeg crashes a few seconds into a real encode, so the sign-in check is a clip of its own.
 def _sign_in_check_command() -> list[str]:
     return [
         _ffmpeg(), "-hide_banner", "-nostdin", "-loglevel", "verbose",

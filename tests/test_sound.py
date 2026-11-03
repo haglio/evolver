@@ -1,4 +1,3 @@
-"""A video's soundtrack saved on its own, faked at ffmpeg."""
 from __future__ import annotations
 
 import subprocess
@@ -33,8 +32,6 @@ class TestSaveAsMp3(unittest.TestCase):
         assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
 
     def test_the_sound_takes_no_tags_from_the_video(self):
-        """ComfyUI writes the prompt into a video's tags; a copy of them in the
-        sound file would carry it somewhere else."""
         calls = []
         with workspace_temp_dir() as root, \
              patch("util.sound.subprocess.run", side_effect=_ffmpeg_writing_its_output(calls)):

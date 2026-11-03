@@ -1,26 +1,4 @@
-"""The spoken vocabulary of the metadata backfill tool.
-
-A recognized phrase labels the video on screen with a ``video.action`` — the field
-Fun Time's metadata filter matches against.  Kept free of the vosk runtime so the
-tests import it without an audio backend, the same split Fun Time draws between
-its voice_commands and voice_control.
-
-The vosk model's lexicon lacks most of the domain-specific compounds the
-library records as actions, and a word missing from the lexicon is silently
-dropped from a grammar.  Every phrase is therefore voiced in words the model
-knows, and the compound survives only in the action it writes.
-
-The act table and the camera words are content, not logic, so they live in a
-JSON overlay (``content.local.json``, git-ignored) with a committed
-``content.example.json`` placeholder; the grammar and the grid behave the same
-whichever is loaded.
-
-A :class:`Vocabulary` is the single source of truth for two consumers: the
-recognizer grammar and the window's clickable reference grid.  An act voiced
-more than one way is one ``spoken`` form plus its ``aliases``, so the grammar
-hears every form while the grid shows one button.  Every act is scoped by a
-camera word: a video is always tagged with one of them, never bare.
-"""
+# vosk's lexicon lacks most compounds and silently drops unknown words from a grammar, so phrases are voiced in words it knows.
 
 from __future__ import annotations
 

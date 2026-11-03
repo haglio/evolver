@@ -1,9 +1,4 @@
-"""Evolver's way of saying what a stage could not go on without.
-
-Everything Qt is imported inside the call, not at the top: the startup crash
-reporter comes through here on an interpreter that has just failed to import
-something, and PyQt6 is one of the things it could have failed on.
-"""
+# Qt is imported inside the call: the startup crash reporter comes through here when PyQt6 may be what failed to import.
 
 from __future__ import annotations
 
