@@ -12,7 +12,13 @@ import pytest
 import config
 from tasks import prompt_scrape
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util import html_query, provenance, sidecar, video_kind
+from util import (
+    html_query,
+    provenance,
+    sidecar,
+    video_kind,
+)
+from util.html_query import parse_document
 
 
 class TestPromptScrape(unittest.TestCase):
@@ -762,6 +768,28 @@ class TestProviderSettingsAreRedirectable(unittest.TestCase):
         _video, image_url, _browser, base_url, _profile = scrape.call_args.args
         assert image_url == "https://example.invalid/image/abc"
         assert base_url == "https://example.invalid"
+
+
+class TestTheNegativePromptOnAPage:
+    def test_a_positive_prompt_that_mentions_the_label_is_not_taken_for_it(self):
+        panel = parse_document(
+            '<div><div class="max-h-80">no negative prompt here</div>'
+            '<span>Negative prompt</span><div class="max-h-80">blurry</div></div>')
+
+        assert prompt_scrape._extract_negative_prompt_text(panel.children[0]) == "blurry"
+
+
+class TestTheRecordAPageEmbeds:
+    def test_the_first_mention_of_the_id_that_has_a_prompt_is_the_record(self):
+        padding = " " * 12_000
+        html = '{"id":"abc","prompt":"first"}' + padding + '{"id":"abc","prompt":"second"}'
+
+        assert prompt_scrape._extract_provider_embedded_metadata(html, "abc").prompt == "first"
+
+    def test_a_prompt_far_enough_away_belongs_to_the_next_item_and_is_not_read(self):
+        html = '{"id":"abc"}' + " " * 6_000 + '{"id":"next","prompt":"not mine"}'
+
+        assert prompt_scrape._extract_provider_embedded_metadata(html, "abc").prompt == ""
 
 
 if __name__ == "__main__":

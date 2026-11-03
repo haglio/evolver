@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
 from evolver import PipelineResult, StageRecord
+from gui import run_record
 from gui.run_record import (
     RunRecord,
     every_run,
@@ -334,3 +335,21 @@ class TestFormatRunLabel:
 
         with override_config(DISPLAY_TIMEZONE=None):
             assert format_run_label(stamp, 1.0) == f"{expected} (1s)"
+
+
+class TestWritingARun:
+    def test_a_result_that_is_not_a_dataclass_keeps_its_public_fields_only(self):
+        class Result:
+            def __init__(self):
+                self.moved = 3
+                self._scratch = "x"
+
+        assert run_record.result_to_dict(Result()) == {"moved": 3}
+
+    def test_a_dataclass_result_keeps_every_field(self):
+        @dataclass
+        class Result:
+            moved: int = 3
+            _scratch: str = "x"
+
+        assert run_record.result_to_dict(Result()) == {"moved": 3, "_scratch": "x"}

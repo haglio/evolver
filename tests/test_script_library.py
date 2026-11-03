@@ -157,5 +157,19 @@ class TestTheMarkSayingNoPersonWroteAScript(unittest.TestCase):
             assert not script_library.is_marked_generated(script)
 
 
+class TestStampingAScript:
+    def test_the_script_given_is_not_written_on(self):
+        script = {"actions": [], "metadata": {"title": "scene one"}}
+
+        script_library.stamped(script, "trim")
+
+        assert script == {"actions": [], "metadata": {"title": "scene one"}}
+
+    def test_a_script_with_no_metadata_gets_the_stamp_alone(self):
+        stamped = script_library.stamped({"actions": []}, "trim")
+
+        assert list(stamped["metadata"]["provenance"]) == ["trim"]
+
+
 if __name__ == "__main__":
     unittest.main()

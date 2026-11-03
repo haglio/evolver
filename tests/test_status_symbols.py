@@ -6,7 +6,7 @@ import unittest
 from shared_ui.colors import GREEN, RED, TEXT_MUTED
 
 from gui import status_symbols
-from gui.status_symbols import symbol_for
+from gui.status_symbols import status_icon, symbol_for
 
 
 class TestMarkFor(unittest.TestCase):
@@ -38,6 +38,11 @@ class TestMarkFor(unittest.TestCase):
     def test_an_unknown_status_draws_nothing_rather_than_crashing(self):
         symbol, _ = symbol_for("something_new")
         assert symbol == ""
+
+
+class TestAStatusWithNoMark:
+    def test_it_gives_an_icon_with_nothing_drawn(self):
+        assert status_icon("never heard of it").isNull()
 
 
 if __name__ == "__main__":

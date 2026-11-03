@@ -137,3 +137,10 @@ class TestWithdrawingTheAsk(unittest.TestCase):
             mocks["terminate"].assert_not_called()
             assert tmp.exists()
             assert "on_request" not in nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"])
+
+
+class TestAnEncodeThatHasAlreadyEnded:
+    def test_asking_for_another_video_leaves_it_alone_to_be_concluded(self):
+        job = {"pid": None, "source": "lagoon/0 unsorted/a.mp4"}
+
+        assert nonai_request.make_way_for("lagoon/0 unsorted/b.mp4", job, files=None) == (job, "")

@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from tests.temp_helpers import override_config, workspace_temp_dir
+from util import nonai_library
 from util.nonai_library import bucket_of, buckets, stage_dirs
 
 
@@ -92,6 +93,11 @@ class TestSplitInProgress(unittest.TestCase):
             with override_config(**overrides):
                 found = buckets()
             assert [str(path.relative_to(non_ai)) for path in found] == ["alpha"]
+
+
+class TestAFolderThatCannotBeListed:
+    def test_it_does_not_hold_the_stages(self, tmp_path):
+        assert not nonai_library.holds_stages(tmp_path / "gone")
 
 
 if __name__ == "__main__":
