@@ -59,17 +59,11 @@ def _stream_geometry(file: Path) -> tuple[int, int, int] | None:
 
 
 def video_dimensions(file: Path) -> tuple[int, int] | None:
-    """The (width, height) of a file's first video stream, or None if unavailable.
-
-    Raw stored dimensions — rotation is not applied. Callers that need display
-    orientation (see :func:`orientation_of`) fold the rotate tag in themselves.
-    """
     geometry = _stream_geometry(file)
     return None if geometry is None else geometry[:2]
 
 
 def orientation_of(file: Path) -> str:
-    """Return 'landscape', 'portrait', or 'unknown' based on the first video stream."""
     geometry = _stream_geometry(file)
     if geometry is None:
         return orientation.UNKNOWN
@@ -80,7 +74,6 @@ def orientation_of(file: Path) -> str:
 
 
 def duration_seconds(file: Path) -> float | None:
-    """The container duration of *file* in seconds, or None if unavailable."""
     try:
         return float(_probe_format(file, "format=duration"))
     except ValueError:
@@ -88,12 +81,6 @@ def duration_seconds(file: Path) -> float | None:
 
 
 def frame_fingerprint(file: Path) -> tuple[float, int] | None:
-    """The (fps, frame count) of *file*, or None when the container counts no frames.
-
-    Enough to tell one cut of footage from another: a re-encode that changes
-    either number is a different video as far as anything holding frame indices
-    is concerned.
-    """
     match _probe(file, "stream=r_frame_rate,nb_frames").split(","):
         case [said_rate, frames]:
             rate = _rate(said_rate)
@@ -114,7 +101,6 @@ def _rate(said: str) -> Fraction | None:
 
 
 def videoai_tag(file: Path) -> str:
-    """The Topaz ``videoai`` metadata tag of *file* — empty when untagged."""
     return _probe_format(file, "format_tags=videoai")
 
 

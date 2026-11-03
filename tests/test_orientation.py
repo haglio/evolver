@@ -16,13 +16,8 @@ import pytest
 from tests.product_sources import PROJECT_ROOT, product_sources, strings_outside_docstrings
 from util import orientation
 
-# The module that owns them, plus the one that names them in an assertion of
-# its own -- this file.
 _OWNER = "util/orientation.py"
 
-# The same word meaning something else, as (module, string). Origenerator's
-# importer writes "unknown" into the workflow name of a clip it found rather
-# than generated, which is no orientation at all.
 _SAME_WORD_ELSEWHERE = {("tasks/origenerator_metadata.py", orientation.UNKNOWN)}
 
 

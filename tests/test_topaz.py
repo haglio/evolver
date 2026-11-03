@@ -19,7 +19,6 @@ _EXAMPLE = topaz.Settings(name="example", version="v000",
 
 
 def _turned_to_an_example_video(settings: topaz.Settings, orient: str) -> topaz.Settings:
-    """*settings* turned to a video written at 112 fps by a model generating at 16."""
     return topaz.framed(settings, orient, video_fps=Fraction(112), generated_fps=Fraction(16))
 
 
@@ -49,13 +48,10 @@ class TestCommand(unittest.TestCase):
         assert cmd[cmd.index("-f") + 1] == "mp4"
 
     def test_settings_aimed_at_a_frame_are_refused_until_turned_to_the_video(self):
-        """Unframed, its filter would reach Topaz still asking for {width}."""
         with pytest.raises(ValueError, match="non_ai_upscale still names"):
             topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.NON_AI_UPSCALE)
 
 
-# The chain chosen by comparing versions side by side, as the trial ran it on a
-# video Origenerator generated at 16 fps and wrote at 112.
 _THE_TRIALS_CHAIN = (
     "select='not(mod(n,7))',fps=16,"
     "tvai_up=model=rxl-1:scale=4:estimate=20:preblur=-0.4:noise=0:details=0.7:halo=0:blur=0.8:"
@@ -86,15 +82,10 @@ class TestTheOrigeneratorSettings(unittest.TestCase):
         assert _frames_given_to_topaz(video_fps=None, generated_fps=Fraction(16)) == "select='not(mod(n,1))',fps=source_fps"
 
     def test_is_refused_until_it_is_turned_to_the_video(self):
-        """Unturned, its filter would reach Topaz still asking for {every}."""
         with pytest.raises(ValueError, match="ai_upscale_origenerator still names"):
             topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.AI_UPSCALE_ORIGENERATOR)
 
 
-# Every version a set of settings has shipped under, and a fingerprint of everything that
-# version runs Topaz with. A retune bumps the settings' version in util/topaz.py
-# and adds a line here for the new one; it never edits a line already here,
-# because outputs on disk already name that version as what made them.
 SHIPPED = {
     ("ai_upscale", "v001"): "ba105a7372baef8f",
     ("ai_upscale_t2v", "v001"): "433ce5942b2b7849",
@@ -106,8 +97,6 @@ SHIPPED = {
 
 
 def _fingerprint(settings: topaz.Settings) -> str:
-    """Every command a set of settings runs -- one per orientation -- bar the two file
-    paths and the path to Topaz itself, which are the computer's, not the settings'."""
     argvs = [
         topaz.command(Path("in"), Path("out"), _turned_to_an_example_video(settings, orient))[1:]
         for orient in orientation.SORTED
@@ -136,8 +125,6 @@ class TestWhatAFilesNoteSaysMadeIt(unittest.TestCase):
                 assert (noted.name, noted.version, noted.keep_audio) == (retired.name, "v001", False)
 
     def test_a_note_differing_only_in_the_name_in_parentheses_at_its_end_names_it_too(self):
-        """The text-to-video settings' note once named a site in those parentheses,
-        and the files written then still say which settings made them."""
         note = topaz.AI_UPSCALE_T2V.videoai_tag
         written_then = note[:note.rindex("(")] + "(t2v examplesite)"
 
@@ -145,8 +132,6 @@ class TestWhatAFilesNoteSaysMadeIt(unittest.TestCase):
         assert topaz.settings_noted(written_then) is topaz.AI_UPSCALE_T2V
 
     def test_a_note_in_topazs_own_words_or_no_note_at_all_names_no_settings(self):
-        """Topaz describes an export made by hand in its own phrasing; that, or a
-        file carrying no note, was not made by any settings here."""
         for note in (("Processed using apo-8 replacing duplicate frames. Enhanced using gcg-5. "
                       "4x upscale"), ""):
             with self.subTest(note=note):

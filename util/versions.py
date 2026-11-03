@@ -1,10 +1,3 @@
-"""What a processed video version's name says about its original.
-
-The library names an upscaled/enhanced clip by appending the Topaz models that
-made it: ``foo_apo8_iris2.mp4`` is ``foo.mp4`` after apo-8 interpolation and an
-iris-2 upscale.  Stripping those suffixes recovers the original's stem, which
-is how originals and their processed versions are matched across the tree.
-"""
 from __future__ import annotations
 
 import re
@@ -13,22 +6,14 @@ from app_support.video_names import UPSCALE_SUFFIX, strip_processing_suffixes
 
 
 def upscaled_stem(sorted_stem: str) -> str:
-    """The stem the upscale stage writes for the 1_sorted video *sorted_stem*."""
     return f"{sorted_stem}{UPSCALE_SUFFIX}"
 
 
 def is_upscaled_stem(stem: str) -> bool:
-    """Whether *stem* names an AI upscale rather than the video it came from."""
     return stem.endswith(UPSCALE_SUFFIX)
 
 
 def sorted_stem_of(stem: str) -> str:
-    """The 1_sorted stem an upscale came from — *stem* itself when it is not one.
-
-    The exact inverse of :func:`upscaled_stem`, and only that: it takes one
-    suffix off the end and nothing else. ``strip_processing_suffixes`` is the
-    general form, which strips every Topaz token iteratively.
-    """
     return stem[: -len(UPSCALE_SUFFIX)] if is_upscaled_stem(stem) else stem
 
 
@@ -39,10 +24,6 @@ def source_stem(stem: str) -> str:
     return re.sub(r"_apo8_gcg5(?:_.*)?$", "", stem)
 
 
-# Words the user appends by hand to keep a second copy of a video distinct from
-# the first — the pipeline never writes these, so they arrive as ordinary
-# trailing tokens rather than as suffixes to strip. Kept short on purpose: each
-# word here is one a real title can no longer be told apart by.
 _MANUAL_VERSION_TAGS = frozenset({"trimmed"})
 
 
@@ -56,6 +37,5 @@ def is_version_marker(token: str) -> bool:
 
 
 def is_processed_stem(stem: str) -> bool:
-    """Whether *stem* names a processed version rather than an original."""
     return strip_processing_suffixes(stem) != stem
 

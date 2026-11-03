@@ -1,14 +1,8 @@
-"""The watch block on a sidecar: every app's viewing of one video, summed, and
-the playback weight that sum earns.  Written by ``tasks.watch_weights`` and
-read by Fun Time and Warm Gun, so the formula lives here alone."""
-
 from __future__ import annotations
 
 BLOCK = "watch"
 COUNT_FIELDS = ("completions", "skips", "locks")
 
-# score = completions + 3*locks - skips, softened by /3 and clamped so one
-# video can be at most 8x more (or 8x less) frequent than a fresh one.
 _LOCK_SCORE = 3.0
 _SCORE_SOFTENING = 3.0
 _MAX_DOUBLINGS = 3.0

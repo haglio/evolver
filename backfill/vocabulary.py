@@ -33,8 +33,8 @@ from content_overlay import load_content
 
 @dataclass(frozen=True)
 class _Voiced:
-    spoken: str  # the canonical phrase: what a click re-emits and a button is built from
-    aliases: tuple[str, ...] = field(default=(), kw_only=True)  # other phrases heard as it
+    spoken: str
+    aliases: tuple[str, ...] = field(default=(), kw_only=True)
 
     def forms(self) -> tuple[str, ...]:
         return (self.spoken, *self.aliases)
@@ -42,31 +42,22 @@ class _Voiced:
 
 @dataclass(frozen=True)
 class Act(_Voiced):
-    action: str  # the Title Case act stem a camera word prefixes
+    action: str
 
 
 @dataclass(frozen=True)
 class Camera(_Voiced):
-    prefix: str  # what it writes in front of the act, and the grid's column header
+    prefix: str
 
 
 @dataclass(frozen=True)
 class _Control(_Voiced):
-    """A non-labeling command — skip, discard, undo, repeat."""
-
-    label: str  # the grid button text, e.g. "Trash"
-    kind: str  # the control constant it maps to (SKIP / TRASH / UNDO / SAME)
+    label: str
+    kind: str
 
 
 @dataclass(frozen=True)
 class Command:
-    """One thing the viewer can invoke: speak its ``phrase`` or click its button.
-
-    ``label`` is the outcome shown on the button — the action recorded, or the
-    control's name; ``phrase`` is what the recognizer listens for and what a click
-    hands to the session, so the mouse and the microphone drive one code path.
-    """
-
     phrase: str
     label: str
 
@@ -76,10 +67,6 @@ TRASH = "trash"
 UNDO = "undo"
 SAME = "same"
 
-# "skip" defers the video to the back of the queue; "trash"/"trash" moves it to the
-# trash folder, as Fun Time's "send to Trash" does; "undo" takes back the last
-# decision, and keeps stepping back through them; "same" repeats the last act you
-# spoke, for a run of videos that share one.
 _CONTROLS: tuple[_Control, ...] = (
     _Control("skip", "Skip", SKIP),
     _Control("trash", "Trash", TRASH),
@@ -104,7 +91,6 @@ class Vocabulary:
         }
 
     def scoped_grid(self) -> list[list[Command]]:
-        """A row per act, one cell per camera word in the order the cameras are listed."""
         return [
             [
                 Command(f"{camera.spoken} {act.spoken}", f"{camera.prefix} {act.action}")

@@ -25,9 +25,6 @@ def _every_grid_command(vocabulary):
 
 
 class FakeSession:
-    """Stands in for BackfillSession: each scripted outcome is the note a phrase
-    returns, plus the queue it leaves in place (None when the queue is untouched)."""
-
     def __init__(self, videos, outcomes=()):
         self._videos = list(videos)
         self._outcomes = list(outcomes)
@@ -94,9 +91,6 @@ class TestBackfillWindow(unittest.TestCase):
         assert window.hearing_text() == ""
 
     def test_a_dead_recognizer_says_so_where_the_live_guess_was(self):
-        """The buttons still work -- they are clickable -- so nothing closes or
-        disables. What the window must not do is go on looking like it is
-        listening while the microphone path has gone."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         window.on_hearing("side eta")
 
@@ -140,7 +134,6 @@ class TestBackfillWindow(unittest.TestCase):
         assert window.last_text() == last
 
     def test_a_decision_that_leaves_the_video_on_screen_does_not_restart_it(self):
-        """An undo with nothing to undo, or a skip with only one video left."""
         session = FakeSession([Path("a_topaz.mp4")], [("nothing to undo", None)])
         window = self._window(session)
 
@@ -165,7 +158,6 @@ class TestBackfillWindow(unittest.TestCase):
         assert window.status_text() == "Nothing left to label."
 
     def test_emptying_the_queue_releases_the_last_video(self):
-        """Otherwise the player still holds the file the background move is renaming."""
         session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → Trash", [])])
         window = self._window(session)
 
@@ -188,8 +180,6 @@ class TestBackfillWindow(unittest.TestCase):
         assert window.last_text() == "Last: undid a_topaz.mp4 → Dancing"
 
     def test_the_window_is_built_from_a_session_its_vocabulary_and_its_thumbnails(self):
-        """It is the top-level window of its own process — nothing owns it, so
-        there is no parent to take."""
         assert list(inspect.signature(BackfillWindow.__init__).parameters)[1:] == ["session", "vocabulary", "thumbnails"]
 
     def test_the_buttons_are_the_commands_of_the_vocabulary_it_was_handed(self):
@@ -203,11 +193,6 @@ class TestBackfillWindow(unittest.TestCase):
         assert {command.phrase: window.button_for(command.phrase).text() for command in _every_grid_command(VOCABULARY)} == {command.phrase: command.label for command in _every_grid_command(VOCABULARY)}
 
     def test_every_command_keeps_its_own_button(self):
-        """One command's phrase can equal another's label: the vocabulary is
-        private and its acts are named by the user, so a spoken "dancing" and
-        an act labeled "Dancing" can coexist. Neither may take the other's
-        button — the phrase would click the wrong act, and the example frame
-        would land on the wrong face."""
         shadowing = vocabulary_of(Act("dancing", "Dance Move"), Act("dance", "Dancing"))
         window = self._window(FakeSession([Path("a_topaz.mp4")]), shadowing)
 
@@ -246,7 +231,6 @@ class TestBackfillWindow(unittest.TestCase):
             assert not window.button_for("side beta").icon().isNull()
 
     def test_an_example_stored_under_older_casing_still_lights_its_button(self):
-        """Library videos tagged "Xyz ..." must reach the "XYZ ..." button."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         with tempfile.TemporaryDirectory() as tmp:
             window.set_thumbnail("Xyz Beta", str(self._png(tmp)))
@@ -256,9 +240,8 @@ class TestBackfillWindow(unittest.TestCase):
     def test_a_thumbnail_for_an_action_with_no_button_is_ignored(self):
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
 
-        window.set_thumbnail("Not An Act", "whatever.png")  # must not raise
+        window.set_thumbnail("Not An Act", "whatever.png")
 
-        # ...and must not have decorated some other act's button with it either
         assert all(button.icon().isNull() for button in window.findChildren(QToolButton))
 
     def test_an_empty_thumbnail_path_leaves_the_button_iconless(self):
@@ -280,8 +263,6 @@ class TestBackfillWindow(unittest.TestCase):
             assert not window.button_for("side beta").icon().isNull()
 
     def test_the_video_plays_with_no_sound_output_at_all(self):
-        """The microphone is open the whole session; a video's audio would be
-        one more thing for the recognizer to mishear."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         assert window._preview.player.audioOutput() is None
 
@@ -290,9 +271,6 @@ class TestBackfillWindow(unittest.TestCase):
         assert window._preview.player.loops() == QMediaPlayer.Loops.Infinite
 
     def test_releasing_the_last_video_also_stops_the_player(self):
-        """Dropping the source without stop() left playback tearing at a file
-        the background discard is renaming (audit probe 25 deleted the stop
-        with the suite green)."""
         session = FakeSession([Path("a_topaz.mp4")], [("a_topaz.mp4 → Trash", [])])
         window = self._window(session)
 
@@ -322,8 +300,6 @@ class TestBackfillWindow(unittest.TestCase):
         assert not window.isVisible()
 
     def test_no_button_ever_takes_keyboard_focus(self):
-        """The space bar must not re-fire the last clicked button, and Esc must
-        keep closing the window rather than being swallowed by a button."""
         window = self._window(FakeSession([Path("a_topaz.mp4")]))
         buttons = window.findChildren(QToolButton)
         assert buttons
@@ -338,7 +314,7 @@ class TestBackfillWindow(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             png = Path(tmp) / "portrait.png"
             pixmap = QPixmap(20, 40)
-            pixmap.fill()  # opaque white
+            pixmap.fill()
             pixmap.save(str(png))
             window.set_thumbnail("Side Beta", str(png))
 
@@ -346,8 +322,6 @@ class TestBackfillWindow(unittest.TestCase):
             rendered = icon.pixmap(96, 96)
             assert (rendered.width(), rendered.height()) == (96, 96)
             image = rendered.toImage()
-            # a 20x40 frame fits 96x96 as 48x96: opaque centre, transparent
-            # margins on the short axis
             assert image.pixelColor(48, 48).alpha() == 255
             assert image.pixelColor(5, 48).alpha() == 0
             assert image.pixelColor(90, 48).alpha() == 0

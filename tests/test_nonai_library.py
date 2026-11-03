@@ -1,4 +1,3 @@
-"""Where the non-AI stages think a bucket is."""
 from __future__ import annotations
 
 import unittest
@@ -33,15 +32,6 @@ class TestBuckets(unittest.TestCase):
             assert [path.name for path in found] == ["alpha", "beta"]
 
     def test_a_folder_split_into_sub_libraries_yields_each_of_them(self):
-        """The stages moved a level down, so the buckets follow them.
-
-        A bucket is whatever holds the numbered stage folders — that is the only
-        thing every stage does with one (retire into its ``2*``, publish into its
-        ``3*``, scan its ``0*``/``1*`` for work).  Split a folder into two
-        sub-libraries that each keep their own copy of the stages and the parent
-        stops being a bucket: it has no stages of its own, and reading it as one
-        leaves every stage looking for folders that are no longer there.
-        """
         with workspace_temp_dir() as root:
             overrides = library(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -80,8 +70,6 @@ class TestBucketOf(unittest.TestCase):
 
 
 class TestSplitInProgress(unittest.TestCase):
-    """A move over hundreds of files can leave a stage folder standing."""
-
     def test_a_leftover_stage_folder_does_not_unsplit_the_library(self):
         with workspace_temp_dir() as root:
             overrides = library(root)
@@ -111,8 +99,6 @@ if __name__ == "__main__":
 
 
 class TestStageDirs(unittest.TestCase):
-    """The numbered-folder convention, read at either level of it."""
-
     def test_finds_only_the_digits_asked_for_and_names_each_one(self):
         with workspace_temp_dir() as root:
             for name in ("0 unsorted", "1 could use work", "2 do not need work",

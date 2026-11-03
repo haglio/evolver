@@ -39,15 +39,8 @@ from app_support.launch_smoke import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-# tray_app.py is a script beside the packages, not a package of its own, so no
-# relative import can appear in the launch files and there is nothing to resolve
-# them against.
 PACKAGE = ""
 
-# The files a launch runs: the tray script and the module holding the app --
-# and the second entry point, the backfill tool the tray spawns DETACHED, whose
-# ImportError otherwise writes its traceback nowhere while the menu item
-# simply does nothing.
 LAUNCH_FILES = (
     REPO_ROOT / "tray_app.py",
     REPO_ROOT / "gui" / "app.py",
@@ -55,9 +48,6 @@ LAUNCH_FILES = (
     REPO_ROOT / "review_trash_app.py",
 )
 
-# Reached only from inside main(), so a module-level import test never saw it.
-# Asserted present, so a walk that silently found nothing -- a renamed file, a
-# parse that returned an empty tree -- cannot pass as a clean launch.
 _REACHED_ONLY_FROM_INSIDE_MAIN = ("gui.app",)
 
 
@@ -74,9 +64,6 @@ def _run_the_launchs_way(statements: list[str]) -> subprocess.CompletedProcess:
 
     driver = "\n".join(
         [
-            # Before anything that reads content at import time: a public
-            # checkout has only the committed example, so that is what the
-            # launch has to come up on.
             "import content_overlay as _content",
             "_content.LOCAL_CONTENT = _content.EXAMPLE_CONTENT",
             *statements,
@@ -93,27 +80,17 @@ def _run_the_launchs_way(statements: list[str]) -> subprocess.CompletedProcess:
 
 
 def test_the_launch_imports_everything_it_names():
-    """Failing here means the tray icon never appears and nothing says why:
-    pythonw has no console, and the failure precedes the crash-log hook."""
     assert_every_import_resolves(
         _run_the_launchs_way, launch_imports(PACKAGE, LAUNCH_FILES))
 
 
 def test_the_walk_reaches_the_imports_buried_in_main():
-    """The guard above is only worth anything if the walk found the lazy one --
-    which is the entire app."""
     assert_the_walk_reached(
         launch_imports(PACKAGE, LAUNCH_FILES), _REACHED_ONLY_FROM_INSIDE_MAIN)
 
 
 def test_a_launch_import_that_cannot_resolve_fails_here():
-    """A negative control: if the subprocess reported success regardless, every
-    assertion above would pass vacuously and the guard would be decorative."""
     assert_an_unresolvable_import_is_caught(
         _run_the_launchs_way, launch_imports(PACKAGE, LAUNCH_FILES),
         "gui.app")
 
-
-# Restart being a launch of the same script on the same interpreter is pinned
-# behaviourally in test_app_startup.py's TestRestart (the Popen argv), not by
-# grepping gui/app.py's source, which broke on any reformat.

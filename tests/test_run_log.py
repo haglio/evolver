@@ -1,10 +1,3 @@
-"""Reading back the bytes a run marked as its own.
-
-The mark is two byte offsets and a banner. The offsets make the read a seek
-rather than a search of a file nothing rotates; the banner is what keeps a
-stale offset from showing somebody else's run under this run's title.
-"""
-
 from __future__ import annotations
 
 import unittest
@@ -15,12 +8,6 @@ from util import run_log
 
 
 def _lines(*texts: str) -> bytes:
-    """Log lines as the file really holds them: stamped, CRLF, UTF-8.
-
-    Bytes, not text, because the mark is a byte offset: a fixture written in
-    whichever newline the platform prefers puts every offset out by a byte a
-    line, and the test would then pass or fail by where it ran.
-    """
     return "".join(f"[2026-07-25 08:20:02] {t}\r\n" for t in texts).encode("utf-8")
 
 
@@ -31,7 +18,6 @@ class TestRunId(unittest.TestCase):
         assert run_log.run_id(started) == "2026-07-15T03-20-02"
 
     def test_the_banner_carries_that_name(self):
-        """It is how a byte offset is checked, so the name has to be in it."""
         assert "2026-07-15T03-20-02" in run_log.banner("2026-07-15T03-20-02")
 
 
@@ -48,9 +34,6 @@ class TestSize(unittest.TestCase):
         assert run_log.size(log) == len(_lines("a line"))
 
     def test_a_log_that_is_not_there_measures_none_rather_than_zero(self):
-        """Zero is a real offset -- the top of a log that exists -- so a run
-        that could not be marked has to answer differently from one that
-        starts at the beginning."""
         assert run_log.size(self.root / "no-such.log") is None
 
 
@@ -82,8 +65,6 @@ class TestReadRun(unittest.TestCase):
         assert "a later run" not in text
 
     def test_the_lines_come_back_one_to_a_line(self):
-        """logging writes this file in text mode, so every line ends CRLF; a
-        text widget handed those draws a blank line between every one."""
         assert len(self._read().splitlines()) == 3
         assert "\r" not in self._read()
 
@@ -101,17 +82,11 @@ class TestReadRun(unittest.TestCase):
         assert self._read() is None
 
     def test_a_mark_landing_on_another_runs_lines_is_refused(self):
-        """The case the banner exists for. A log deleted and started again is
-        the same file to an offset, and the offsets still land inside it -- so
-        without the check this shows a stranger's run under this run's title."""
         self.log.write_bytes(_lines("a fresh log") * 40)
 
         assert self._read() is None
 
     def test_the_banner_opens_what_comes_back(self):
-        """It is the first thing a run writes, so it is the first line read --
-        and it names the run, which is what makes the window self-identifying
-        rather than an anonymous slab of log."""
         assert self._read().splitlines()[0].endswith(run_log.banner(self.run_id))
 
     def test_a_stretch_past_the_ceiling_says_so_instead_of_running_on(self):

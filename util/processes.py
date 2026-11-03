@@ -61,7 +61,6 @@ class _UNICODE_STRING(ctypes.Structure):
 
 
 def pids_of_image(image: Path) -> list[int]:
-    """Every live pid whose executable is exactly *image* (full-path match)."""
     target = str(image).lower()
     basename = image.name.lower()
     pids: list[int] = []
@@ -131,7 +130,6 @@ def _read_memory(handle, address: int, size: int) -> bytes | None:
 
 
 def image_path(pid: int) -> str | None:
-    """The executable path for *pid*, or None when it cannot be read."""
     handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     if not handle:
         return None
@@ -146,7 +144,6 @@ def image_path(pid: int) -> str | None:
 
 
 def terminate(pid: int) -> bool:
-    """Forcibly end *pid*. True when the terminate call was accepted."""
     handle = _kernel32.OpenProcess(_PROCESS_TERMINATE, False, pid)
     if not handle:
         return False
@@ -168,11 +165,6 @@ def suspend(pid: int) -> bool:
 
 
 def resume(pid: int) -> bool:
-    """Thaw a process suspended earlier. True when the resume call was accepted.
-
-    Safe to call on a process that was never suspended (its suspend count is
-    already zero), which lets an adopted orphan be unconditionally un-frozen.
-    """
     return _set_frozen(pid, _ntdll.NtResumeProcess)
 
 
@@ -181,13 +173,12 @@ def _set_frozen(pid: int, nt_call) -> bool:
     if not handle:
         return False
     try:
-        return nt_call(handle) == 0  # 0 == STATUS_SUCCESS
+        return nt_call(handle) == 0
     finally:
         _kernel32.CloseHandle(handle)
 
 
 def is_running(pid: int) -> bool:
-    """Whether *pid* names a live process (a pid that exited 259 reads as live)."""
     handle = _kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     if not handle:
         return False

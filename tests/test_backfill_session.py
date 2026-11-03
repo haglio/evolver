@@ -17,8 +17,6 @@ VOCABULARY = vocabulary_of(Act("beta", "Beta"), Act("dance", "Dancing"), Act("ze
 
 
 class ImmediateWorker:
-    """Stands in for SerialWorker: runs each task at once, so drain has nothing to do."""
-
     def __init__(self):
         self.drained = 0
 
@@ -30,8 +28,6 @@ class ImmediateWorker:
 
 
 class DeferredWorker:
-    """Holds tasks until drained, so a test can watch the ordering undo relies on."""
-
     def __init__(self):
         self.pending = []
 
@@ -61,9 +57,6 @@ class TestBackfillSession(unittest.TestCase):
         assert note == f"{video.name} → XYZ Kappa"
 
     def test_a_control_the_session_does_not_dispatch_moves_no_file(self):
-        """The four controls are dispatched by name. A fifth added to the
-        vocabulary and not here has to do nothing: the fallback used to be the
-        discard path, which moves the video on screen into the trash folder."""
         vocabulary = vocabulary_of(Act("beta", "Beta"))
         vocabulary.controls["reticulate"] = "reticulate"
         session = self._session(vocabulary=vocabulary)
@@ -143,14 +136,6 @@ class TestBackfillSession(unittest.TestCase):
         assert session.current is None
 
     def test_the_video_advances_before_the_file_work_runs(self):
-        """The session's headline promise, observed at the dispatch itself.
-
-        A worker that merely held every task could not see the ordering:
-        swapping take_effect and submit in _commit left the whole suite green
-        (audit probe 19), because record_action was unrun under either order.
-        This worker looks at the queue the moment submit is called, so the
-        order of the two statements is the thing under test.
-        """
         class QueueWatchingWorker:
             def __init__(self):
                 self.pending = []
@@ -176,7 +161,6 @@ class TestBackfillSession(unittest.TestCase):
 
             record.assert_not_called()
             assert session.current != video
-            # the video had already left the screen when its work was dispatched
             assert worker.on_screen_at_submit == [session.current]
 
             worker.drain()
@@ -230,14 +214,7 @@ class TestUndo(unittest.TestCase):
         assert session.remaining == 3
 
     def test_undoing_a_discard_whose_move_failed_reclaims_nothing(self):
-        """A discard can die on a video the player never releases; its file work
-        raised and nothing landed in the trash folder. Undo must not then try
-        to reclaim from where nothing is -- the None-guard in roll_back was
-        deletable with the suite green (audit probe 18)."""
         class SwallowingWorker(ImmediateWorker):
-            """SerialWorker's real contract: a failing task never reaches the
-            caller."""
-
             def submit(self, task):
                 try:
                     task()
@@ -341,15 +318,6 @@ class TestUndo(unittest.TestCase):
 
 
 class TestSame(unittest.TestCase):
-    """"Same" against the real decisions module: the sidecars are the record.
-
-    These eight tests used to patch record_action and read the mock's calls --
-    part of the 46 patches this file held on backfill.decisions, which is the
-    unit's own cheap collaborator over the filesystem, not a boundary
-    (evolver/util_backfill/tests/004). What "same" did is now read where Fun
-    Time and genau would read it: the sidecar JSON.
-    """
-
     def _session(self, lib, count=3):
         videos = [lib.video(name=f"clip{i}_topaz.mp4") for i in range(count)]
         return BackfillSession(BackfillQueue(videos), ImmediateWorker(), VOCABULARY)
@@ -374,11 +342,6 @@ class TestSame(unittest.TestCase):
             assert second != first
 
     def test_same_repeats_the_most_recent_act_not_the_first(self):
-        """No other test ever speaks two DIFFERENT acts before "same", so the
-        direction of _last_action's walk was invisible: reversing it -- making
-        "same" repeat the session's first act -- left all 149 tests green
-        (audit probe 9). In use that writes the wrong action into every video
-        of a run, and fun_time and genau read the sidecar it lands in."""
         with library_tree() as lib:
             session = self._session(lib, count=4)
 
@@ -472,8 +435,6 @@ class TestSame(unittest.TestCase):
 
 
 class TestUndoAgainstRealFiles(unittest.TestCase):
-    """The two reversals that actually touch disk, driven end to end."""
-
     def _session(self, video):
         return BackfillSession(BackfillQueue([video]), ImmediateWorker(), VOCABULARY)
 
@@ -519,14 +480,6 @@ class TestUndoAgainstRealFiles(unittest.TestCase):
 
 
 class TestTheStepContract(unittest.TestCase):
-    """The three decision kinds are related only by carrying the same five names.
-
-    The module's docstring said every decision is a :class:`_Step` while no such
-    thing existed anywhere in the repo, so the cross-reference pointed at
-    nothing and a reader went looking for a class that was never written. It is
-    a Protocol now, and this is what says the three still answer to it.
-    """
-
     def test_every_decision_kind_carries_all_five_attributes(self):
         for kind in (session._Labelled, session._Discarded, session._Deferred):
             with self.subTest(kind=kind.__name__):
@@ -534,8 +487,6 @@ class TestTheStepContract(unittest.TestCase):
                     assert hasattr(kind, attribute), attribute
 
     def test_the_protocol_names_exactly_those_five(self):
-        """So a sixth attribute added to one kind and not the others cannot quietly
-        become something the session calls."""
         declared = {
             name for name in vars(session._Step)
             if not name.startswith("_")

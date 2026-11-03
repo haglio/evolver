@@ -1,4 +1,3 @@
-"""Driving an installed browser headless to get a page's rendered DOM."""
 from __future__ import annotations
 
 import subprocess
@@ -31,8 +30,6 @@ class TestFindBrowserExecutable(unittest.TestCase):
 
 
     def test_no_browser_installed_is_no_answer_rather_than_an_error(self):
-        """The stage degrades to "scraping unavailable this run" on a None; an
-        exception here would take the whole pipeline tick down."""
         with workspace_temp_dir() as root:
             with patch.object(headless_browser, "_BROWSER_CANDIDATES",
                               (root / "chrome.exe",)):

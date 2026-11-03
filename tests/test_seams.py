@@ -1,13 +1,3 @@
-"""The seams the first audit cut and the second found regrown (item 74), each held
-by a ceiling that only comes down.
-
-The tray app had been cut to its wiring and grew back to 43 methods, and the
-non-AI upscale stage from 427 lines to 665, because every feature since was
-written onto them beside the module that already stood for its part. A number
-here fails the build before that happens again: the next feature gives its
-glue a controller or a module of its own, or moves it onto the collaborator
-that exists, rather than growing either of these.
-"""
 from __future__ import annotations
 
 from pathlib import Path

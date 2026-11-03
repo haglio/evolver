@@ -92,11 +92,6 @@ class TestCorrespondence:
             show_error.assert_called_once()
 
     def test_run_detects_two_outbox_files_sharing_a_basename(self):
-        """The duplicate map is a named failure mode of the stage -- it fails
-        the run and names both paths in the popup -- yet the detection ran under
-        no test at all: relaxing `len(paths) > 1` to `> 99` changed nothing
-        (audit probe P24). Two orientations of one clip both upscaled produce
-        exactly this: same basename, two outbox folders, every file matched."""
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
             outbox_dir = root / "outbox"
@@ -116,8 +111,6 @@ class TestCorrespondence:
             assert len(paths) == 2
             assert any("landscape" in p for p in paths)
             assert any("portrait" in p for p in paths)
-            # the duplicate pair is fully matched, so it is only the
-            # duplication that fails the run
             assert result.orphan_outbox == []
             assert result.orphan_sorted == []
 
@@ -141,13 +134,6 @@ class TestCorrespondence:
             assert result.outbox_count == 1
 
     def test_run_checks_the_two_trees_it_is_given(self):
-        """The pair the stage compares is an argument, not something to grep for.
-
-        `config` still answers when the caller names neither, which is what the
-        pipeline does. The ambient pair here holds a mismatch the given pair
-        does not, so a stage still reading it would report a failure instead of
-        a clean check.
-        """
         with workspace_temp_dir() as root:
             given_sorted = root / "given" / "sorted"
             given_outbox = root / "given" / "outbox"
@@ -173,10 +159,6 @@ class TestCorrespondence:
 
 
 class TestMain:
-    """The standalone entry point: the exit code is the contract a shell or a
-    scheduled task reads, and the printed report is how the check is run by
-    hand. Neither had a single test (66% file coverage, main() all missing)."""
-
     def test_a_clean_tree_reports_ok_and_exits_zero(self, capsys):
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
@@ -208,7 +190,7 @@ class TestMain:
 
         out = capsys.readouterr().out
         assert exit_code == 1
-        assert "[MISMATCH]" not in out  # counts match at 1 vs 1
+        assert "[MISMATCH]" not in out
         assert "[ORPHAN-OUTBOX]" in out
         assert "clip-b_topaz.mp4" in out
         assert "[ORPHAN-SORTED]" in out

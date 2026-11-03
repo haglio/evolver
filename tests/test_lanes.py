@@ -1,4 +1,3 @@
-"""The library's three lanes, walked once for every stage that asks."""
 from __future__ import annotations
 
 import unittest
@@ -76,10 +75,6 @@ class TestSentLanes(unittest.TestCase):
                 assert [(lane.source, lane.unsent_column) for lane in sent] == [("origenerator", "evolver_unsent_at"), ("example-loop-clips", "genau_unsent_at")]
 
     def test_only_the_genau_lane_delivers_its_clips_out_of_the_library(self):
-        # The other lane's clips rest in the outbox, so there is nowhere else to
-        # look for a copy of one; this lane's leave for the folder Genau plays
-        # from, which is the whole reason a withdrawal cannot be done from the
-        # app that sent them.
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():

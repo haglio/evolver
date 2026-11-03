@@ -1,4 +1,3 @@
-"""The watch block: both apps' viewing summed on a sidecar, and its weight."""
 from __future__ import annotations
 
 import unittest

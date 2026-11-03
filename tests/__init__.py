@@ -25,8 +25,6 @@ content_overlay.LOCAL_CONTENT = content_overlay.EXAMPLE_CONTENT
 import config  # noqa: E402
 from util import crash_log  # noqa: E402
 
-# The suite's own copies of files the app keeps outside the test's reach, for
-# the life of the run.
 _run_state = tempfile.TemporaryDirectory(prefix="evolver-tests-", ignore_cleanup_errors=True)
 RUN_STATE = Path(_run_state.name)
 
@@ -41,26 +39,10 @@ RUN_STATE = Path(_run_state.name)
 alert_shown(return_value=False).start()
 error_popup().start()
 
-# No test may write or delete the stand-down marker. It lives under LOCALAPPDATA,
-# outside every checkout, and it is the file that tells the broker whether the
-# Evolver the user is running was closed on purpose -- so a suite run that
-# cleared one would put their app back up half an hour after they closed it.
-# Tests that assert on these patch them again themselves, which nests fine.
-# Never stopped -- an invariant, not a fixture.
-#
-# gui.peer_watch's other half, launching the broker, needs no gag: it starts a
-# launcher found through the overlay pinned above, and the example overlay's
-# project root does not exist. A test that wants it stubbed patches it.
 patch("gui.peer_watch.stand_evolver_down").start()
 patch("gui.peer_watch.clear_evolver_stand_down").start()
 
-# Nor the low-disk warning's dismissal, which lives beside it: every upscale run
-# that finds room on its drive clears it, so a suite run would bring back a
-# warning the user dismissed.
 patch.object(config, "LOW_DISK_WARNING_DISMISSED_FILE",
              RUN_STATE / "low_disk_warning_dismissed").start()
 
-# Nor the crash log, which sits in the checkout: every test that has Evolver
-# step aside writes a line to it, and a suite run in the primary checkout
-# would put those lines among the user's real ones.
 patch.object(crash_log, "CRASH_LOG", RUN_STATE / "tray_crash.log").start()

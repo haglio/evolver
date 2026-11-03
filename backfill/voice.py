@@ -1,8 +1,3 @@
-"""What the backfill tool does with what the family's listener hears: a spoken
-phrase is handed to the window.  Hearing itself is voice_core's, the same
-listener Fun Time runs.
-"""
-
 from __future__ import annotations
 
 import logging

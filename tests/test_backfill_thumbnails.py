@@ -45,12 +45,11 @@ class TestExampleVideos(unittest.TestCase):
 
     def test_an_unlabeled_video_contributes_no_example(self):
         with library_tree() as lib:
-            lib.video("portrait", "provider2", "a_topaz.mp4")  # no sidecar
+            lib.video("portrait", "provider2", "a_topaz.mp4")
 
             assert self._examples() == {}
 
     def test_a_scraped_source_is_a_valid_example(self):
-        """Unlike the work queue, the gallery welcomes already-labeled scraped videos."""
         with library_tree() as lib:
             video = lib.video("landscape", "provider", "b_topaz.mp4")
             self._tag(lib, "landscape", "provider", "b_topaz", "XYZ Gamma")
@@ -93,8 +92,6 @@ class TestExampleVideos(unittest.TestCase):
                 assert self._examples()[PINNED_BUTTON] == pinned
 
     def test_a_pin_naming_a_video_the_library_does_not_hold_falls_through(self):
-        """Which is every pin on every computer but the one whose library the
-        overlay describes -- so it has to be the ordinary case, not an error."""
         with library_tree() as lib:
             auto = lib.video("portrait", "provider2", "auto_topaz.mp4")
             self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_BUTTON)
@@ -103,7 +100,6 @@ class TestExampleVideos(unittest.TestCase):
                 assert self._examples()[PINNED_BUTTON] == auto
 
     def test_no_pins_at_all_leaves_every_button_to_the_automatic_match(self):
-        """A public checkout's overlay carries an empty curated_examples."""
         with library_tree() as lib:
             auto = lib.video("portrait", "provider2", "auto_topaz.mp4")
             self._tag(lib, "portrait", "provider2", "auto_topaz", PINNED_BUTTON)
@@ -172,10 +168,6 @@ class TestExtractFrame(unittest.TestCase):
 
             with patch("backfill.thumbnails.duration_seconds", return_value=10.0), \
                  patch("backfill.thumbnails.subprocess.run", side_effect=fake_run) as run:
-                # No at_fraction: the default IS the tuned value, chosen to
-                # sample past a video's title card, and passing it explicitly
-                # left the constant free to drift (audit probe 28 moved it to
-                # 0.9 with the suite green).
                 ok = thumbnails.extract_frame(Path("video.mp4"), dest)
 
             assert ok
@@ -184,8 +176,6 @@ class TestExtractFrame(unittest.TestCase):
             assert str(dest) in argv
 
     def test_scales_to_the_one_thumbnail_height(self):
-        """Like at_fraction, the height is the tuned value and no caller names
-        it — the grid draws every button at one size."""
         assert "height" not in inspect.signature(thumbnails.extract_frame).parameters
         with workspace_temp_dir() as root:
             dest = root / "out.jpg"
@@ -224,11 +214,6 @@ class TestExtractFrame(unittest.TestCase):
                 assert not thumbnails.extract_frame(Path("video.mp4"), dest)
 
     def test_a_missing_probe_leaves_the_button_text_only_rather_than_crashing(self):
-        """duration_seconds sat ABOVE the try that exists to survive a missing
-        binary, so a FileNotFoundError from it escaped extract_frame, escaped
-        the build_thumbnails generator and took backfill_app.main() down -- and
-        under pythonw.exe there is no console, so the tool simply never
-        appeared."""
         with workspace_temp_dir() as root:
             dest = root / "out.jpg"
 

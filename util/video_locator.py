@@ -1,5 +1,3 @@
-"""Where a video went, for references that still point at where it was."""
-
 from __future__ import annotations
 
 import math
@@ -17,7 +15,6 @@ from util.trash_folders import trash_dirs
 
 
 def build_index() -> dict[str, list[Path]]:
-    """Index every video under the search root by lowercased filename."""
     index: dict[str, list[Path]] = defaultdict(list)
     root = config.VIDEO_SEARCH_ROOT
     if not root.is_dir():
@@ -31,18 +28,11 @@ def build_index() -> dict[str, list[Path]]:
 
 
 def relocate(was_at: Path, index: dict[str, list[Path]]) -> Path | None:
-    """The one video now carrying that filename, or None if none or several do."""
     matches = index.get(was_at.name.lower(), [])
     return matches[0] if len(matches) == 1 else None
 
 
 def another_version_of(was_at: Path, index: dict[str, list[Path]]) -> Path | None:
-    """The smallest other version of that video still in its bucket, if any.
-
-    The upscale that replaces a non-AI original is published into the same
-    bucket under the original's name plus processing suffixes, and the original
-    leaves -- so this is where a video that was upscaled away is found.
-    """
     bucket = bucket_of(was_at)
     if bucket is None:
         return None
@@ -56,14 +46,6 @@ def another_version_of(was_at: Path, index: dict[str, list[Path]]) -> Path | Non
 
 
 def renamed_in_place(was_at: Path, fingerprint: tuple[float, int]) -> Path | None:
-    """The video that took this one's name in the same folder, by frame fingerprint.
-
-    A rename leaves nothing of the old name to match on, so the only handle left
-    is the footage itself — and a reference that records fps and a frame count
-    is holding exactly that. The search stays in the one folder the reference
-    named, since renaming a file in place is what this covers and probing the
-    whole library on the off chance is not worth the minutes it costs.
-    """
     matches = [
         candidate
         for candidate in sorted(was_at.parent.glob("*"))

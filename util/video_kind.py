@@ -55,42 +55,23 @@ CLIP = "excerpt"
 SHORT = "short"
 FULL_LENGTH = "full_length"
 
-#: Every kind, in the order :func:`classify` settles them.
 TYPES = (GENAU_FLICK, CLIP, SHORT, FULL_LENGTH)
 
-#: A video runs short when it is no longer than this.  One number for the whole
-#: family: the Main Funestra split its library at 60 seconds and Warm Gun at 10, so a clip
-#: between the two was a short on the phone and a full-length scene on the
-#: desktop — the disagreement this field exists to end.
 SHORT_MAX_SECONDS = 10.0
 
-#: Where the kind sits on the sidecar: ``payload["video"]["type"]``.
 BLOCK = "video"
 FIELD = "type"
 
-#: And the running time beside it: ``payload["video"]["duration_seconds"]``.
 DURATION_FIELD = "duration_seconds"
 
 ORIENTATION_FIELD = "orientation"
 
-#: Everything this module records, which is what tells a sidecar holding
-#: nothing but these from one that holds a scrape or a generation
-#: (:func:`only_the_video_itself`).
 _OWN_FIELDS = frozenset({FIELD, DURATION_FIELD, ORIENTATION_FIELD})
 
-# What other stages and apps stamp on a record, none of it saying what made the clip.
 _STAMPS = frozenset({watch.BLOCK, provenance.BLOCK, favorites.FAVORITE_KEY, favorites.PAGE_KEY})
 
 
 def free_kind(*, genau: bool, clip: bool) -> str:
-    """The kind the signals that cost nothing already settle, or ``""``.
-
-    Where a video *sits* and what its sidecar already says are both free to
-    read, and both outrank a running time — so the two kinds they name can be
-    re-derived on every run, and an answer recorded before something was known
-    (a folder of clips the overlay had not been told about yet, a ``clip``
-    record written after the split) corrects itself rather than standing.
-    """
     if genau:
         return GENAU_FLICK
     if clip:
@@ -99,12 +80,6 @@ def free_kind(*, genau: bool, clip: bool) -> str:
 
 
 def classify(*, genau: bool, clip: bool, duration_seconds: float | None) -> str:
-    """Which kind a video is, from the three signals that can identify one.
-
-    *genau* is whether it sits in Genau's flicks folder, *clip* whether
-    something carved it out of a longer video, and *duration_seconds* its
-    running time — ``None`` when it could not be measured.
-    """
     free = free_kind(genau=genau, clip=clip)
     if free:
         return free
@@ -114,11 +89,6 @@ def classify(*, genau: bool, clip: bool, duration_seconds: float | None) -> str:
 
 
 def kind_of(payload: dict) -> str:
-    """The kind *payload* records, or ``""`` when it records none.
-
-    Empty is the ordinary answer for a sidecar written before this field
-    existed, not an error: every reader falls back to what it did before.
-    """
     return _word_recorded(payload, FIELD, TYPES)
 
 
@@ -148,23 +118,6 @@ def _block(payload: dict) -> dict:
 
 
 def only_the_video_itself(payload: dict) -> bool:
-    """Whether *payload* holds what this module records and nothing else.
-
-    A sidecar :mod:`tasks.video_kinds` created for a video nothing else has
-    recorded anything about.  It exists, and that is all it says — so the two
-    stages that used to read a sidecar's mere existence as evidence of
-    something else ("this clip has been scraped", "this clip is
-    text-to-video") ask this first.
-
-    Against :data:`_OWN_FIELDS` rather than against the kind alone, so that
-    adding a second automatic field cannot quietly turn a bare sidecar back
-    into evidence — which is exactly what the running time would have done.
-
-    A stamp saying what made the file is no evidence either: an upscale is
-    stamped the moment it is written, which can be before its clip's scrape has
-    landed, or its kind.  A document holding nothing at all still is, because
-    that is also what an unreadable one reads as.
-    """
     besides_the_stamps = set(payload) - _STAMPS
     if not besides_the_stamps:
         return provenance.BLOCK in payload
@@ -175,17 +128,10 @@ def only_the_video_itself(payload: dict) -> bool:
 
 
 def stamped(payload: dict, video_kind: str) -> dict:
-    """*payload* with *video_type* recorded on it — a copy, leaving the original.
-
-    Creates the ``video`` block for the sidecars that have none: a non-AI scene
-    carries no generation parameters, so its sidecar holds nothing but a version
-    family until the kind arrives to join it.
-    """
     return _recorded(payload, FIELD, _one_of(TYPES, video_kind, "a video type"))
 
 
 def timed(payload: dict, duration_seconds: float) -> dict:
-    """*payload* with *duration_seconds* recorded on it — a copy, as above."""
     if duration_seconds < 0:
         raise ValueError(f"not a running time: {duration_seconds!r}")
     return _recorded(payload, DURATION_FIELD, float(duration_seconds))

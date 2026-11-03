@@ -1,5 +1,3 @@
-"""Reading two videos down to comparable frames, and finding one inside the other."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,23 +18,18 @@ from util.frame_hashes import (
 
 
 def _hashes(n: int, seed: int = 0) -> np.ndarray:
-    """A run of *n* distinct frame hashes, as an unrelated video would give."""
     rng = np.random.default_rng(seed)
     return rng.integers(0, 2**64, size=n, dtype=np.uint64)
 
 
 class TestFrameHashes:
     def test_a_dimmer_copy_of_a_frame_hashes_the_same(self):
-        """The clip and the scene are different encodes of one frame, so what
-        the hash reads has to be the shape of the frame, not its exposure."""
         rng = np.random.default_rng(3)
         frames = rng.integers(40, 200, size=(5, SAMPLE_HEIGHT, SAMPLE_WIDTH), dtype=np.uint8)
 
         assert list(frame_hashes(frames - 20)) == list(frame_hashes(frames))
 
     def test_a_video_ffmpeg_could_not_read_hashes_to_nothing(self):
-        """One unreadable file among hundreds must cost that file its match, not
-        the whole batch."""
         nothing = np.empty((0, SAMPLE_HEIGHT, SAMPLE_WIDTH), dtype=np.uint8)
 
         assert len(frame_hashes(nothing)) == 0
@@ -69,17 +62,12 @@ class TestContentCropIn:
         assert content_crop_in([report], 1920, 1080) is None
 
     def test_the_widest_window_wins(self):
-        """A window that lands on a fade or a dark shot reads black where there
-        is content. Cropping a scene its own clip does not crop is how a real
-        pair stops matching, so a narrow reading never overrides a wide one."""
         dark = self._report(600, 400, x=660, y=340)
         lit = self._report(1440, 1080, x=240)
 
         assert content_crop_in([dark, lit, dark], 1920, 1080) == (1440, 1080, 240, 0)
 
     def test_a_video_that_reads_as_nearly_all_black_is_left_alone(self):
-        """Below this much content the likelier story is a dark video, not a
-        letterbox -- no real one takes half the frame."""
         sliver = int(1080 * MIN_CONTENT_FRACTION) - 20
         report = self._report(1920, sliver, y=(1080 - sliver) // 2)
 
@@ -109,7 +97,6 @@ class TestContentCrop:
 
 class TestSampleFrames:
     def _filters(self, crop) -> str:
-        """The filter chain ``sample_frames`` builds for a video cropped *crop*."""
         seen: dict[str, list[str]] = {}
 
         class _Finished:
@@ -124,8 +111,6 @@ class TestSampleFrames:
         return command[command.index("-vf") + 1]
 
     def test_the_bars_come_off_before_the_frame_is_scaled_down(self):
-        """Scaling first would squash the bars into the thumbnail, which is the
-        whole problem -- the content has to fill the grid the hash reads."""
         assert self._filters((1440, 1080, 240, 0)) == (
             f"fps=8.0,crop=1440:1080:240:0,scale={SAMPLE_WIDTH}:{SAMPLE_HEIGHT}:flags=area"
         )
@@ -176,15 +161,9 @@ class TestFramesAt:
 
 class TestAlign:
     def test_bars_stop_a_clip_aligning_with_the_scene_it_came_from(self):
-        """Why the crop happens at all. A hash says where things sit in the
-        frame, so pillarboxing a scene into a wider one moves its whole content
-        inward and hashes as a different video -- a real excerpt then places
-        none of itself, which is what a 4:3 scene cut into a 16:9 compilation
-        did."""
         rng = np.random.default_rng(21)
         scene = rng.integers(40, 220, size=(60, SAMPLE_HEIGHT, SAMPLE_WIDTH), dtype=np.uint8)
         excerpt = scene[20:50]
-        # The same pixels, squeezed into the middle of a frame of black.
         narrow = np.linspace(0, SAMPLE_WIDTH - 1, SAMPLE_WIDTH - 8).round().astype(int)
         pillarboxed = np.zeros_like(excerpt)
         pillarboxed[:, :, 4:-4] = excerpt[:, :, narrow]
@@ -202,9 +181,6 @@ class TestAlign:
         assert found.offset == 15.0
 
     def test_a_clip_from_elsewhere_does_not_align(self):
-        """Frames of unrelated videos collide often enough at this tolerance --
-        two performers on one bed look alike pooled down to 72 cells. What
-        scattered collisions cannot do is agree on a single offset."""
         clip, scene = _hashes(40, seed=1), _hashes(400, seed=2)
         for clip_frame, scene_frame in ((3, 17), (11, 250), (12, 88), (30, 301), (37, 130)):
             scene[scene_frame] = clip[clip_frame]
@@ -212,10 +188,6 @@ class TestAlign:
         assert align(clip, scene, fps=8.0) is None
 
     def test_counts_an_excerpt_that_jitters_by_a_frame(self):
-        """Sampling 8 a second off a 24fps scene lands on exact source frames; off
-        a 30fps clip it does not, so consecutive frames of one excerpt answer to
-        offsets a bucket apart. Scoring only the single best bucket read a real
-        match -- a 4:3 scene against its 16:9 clip -- as 31% of itself."""
         scene = _hashes(400)
         clip = np.array([scene[200 + i + (i % 2)] for i in range(40)], dtype=np.uint64)
 
@@ -242,9 +214,6 @@ class TestLocate:
         assert found.offset == 25.0
 
     def test_no_candidate_belongs_to_this_scene(self):
-        """Most of the library's scenes were never in a compilation; a performer
-        with several scenes still offers their other clips as candidates, and
-        every one of them has to be turned down."""
         candidates = {Path(f"{i}.mp4"): _hashes(40, seed=10 + i) for i in range(3)}
 
         assert locate(_hashes(400), candidates, fps=8.0) is None

@@ -1,4 +1,3 @@
-"""A fabricated vocabulary, in the committed example's placeholder style."""
 from __future__ import annotations
 
 from backfill.vocabulary import Act, Camera, Vocabulary

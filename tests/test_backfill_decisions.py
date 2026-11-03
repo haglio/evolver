@@ -51,9 +51,8 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
         with library_tree() as lib:
             video = lib.video()
 
-            restore_sidecar(video, None)  # must not raise
+            restore_sidecar(video, None)
 
-            # ...and must not have conjured a sidecar out of the nothing
             assert not sidecar_path(video).exists()
 
 

@@ -1,5 +1,3 @@
-"""A video's soundtrack, saved on its own for a player that plays sound files."""
-
 from __future__ import annotations
 
 import os

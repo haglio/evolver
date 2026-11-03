@@ -1,19 +1,3 @@
-"""The files across the suite that record a video's path, and how to repoint them.
-
-Each store is one file holding references Evolver can break by moving a video.
-``read`` reports the video paths it names; ``rewrite`` applies an old -> new
-mapping in place. Neither ever drops a reference: a path Evolver cannot find a
-new home for is left exactly as it was, for a human to judge.
-
-All but one kind of these files belong to another repo, and none of those repos
-hears about this one -- so before rewriting one, ``shape_complaint`` asks
-whether it is still the shape this stage was written against, and a file that is
-not is left alone and reported. Genaumacher and Scripture each stamp a version their
-own tests hold. Fun Time's watch counts carry none and cannot, since every key
-there is a video path, so their shape is what is checked. The one kind that is
-this app's own is a carved clip's sidecar, naming the scene the clip was found in.
-"""
-
 from __future__ import annotations
 
 import json
@@ -27,18 +11,13 @@ import config
 from util import lanes, sidecar
 from util.json_reads import read_dict_strict
 
-# The versions the two apps that stamp one write today, and the ones this stage
-# was written against. A file saying anything else has moved on without this
-# stage, and rewriting it blind is how one app corrupts another's saved work.
 GENAUMACHER_SESSION_VERSION = 1
 SCRIPTURE_PROJECT_VERSION = 1
 
-# What one row of Fun Time's watch counts holds.
 _WATCH_COUNTS = frozenset({"completions", "skips", "locks"})
 
 
 def _no_fingerprint(_path: Path) -> tuple[float, int] | None:
-    """Most stores record only a path, so a renamed video is beyond their reach."""
     return None
 
 
@@ -48,55 +27,28 @@ def _nothing_to_check(_path: Path) -> str | None:
 
 @dataclass(frozen=True)
 class ReferenceStore:
-    """One file that names videos, and what this can ask of it.
-
-    The readers are held as fields rather than as subclasses because what
-    varies between stores is exactly these functions and one flag.
-    They are private and reached through the methods below: a store handing its
-    own path back into its own function -- ``store.read(store.path)`` -- is a
-    hand-rolled vtable, and the one thing it makes possible is passing the
-    wrong path.
-    """
-
     label: str
     path: Path
     _read: Callable[[Path], list[str]]
     _rewrite: Callable[[Path, dict[str, str]], None]
-    # (fps, frame count) of the video this file references, when it records one —
-    # the only handle left once a rename has taken the filename away.
     _fingerprint: Callable[[Path], tuple[float, int] | None] = _no_fingerprint
-    # What stops this file being rewritten, when something does.
     _shape: Callable[[Path], str | None] = _nothing_to_check
-    # Whether another version of the video -- its upscale, say -- serves this
-    # file as well as the one it names: true of a place in seconds, false of a
-    # frame index, which only means anything against the exact file.
     any_version_will_do: bool = False
 
     def read(self) -> list[str]:
-        """Every video path this file names."""
         return self._read(self.path)
 
     def rewrite(self, moves: dict[str, str]) -> None:
-        """Apply an old -> new mapping in place, dropping nothing."""
         self._rewrite(self.path, moves)
 
     def fingerprint(self) -> tuple[float, int] | None:
-        """The video's (fps, frame count), when this store records one."""
         return self._fingerprint(self.path)
 
     def shape_complaint(self) -> str | None:
-        """Why this file must not be rewritten, or None when nothing says so.
-
-        The repo that owns it does not know this one exists, so a format it
-        changes arrives here as a file that still parses and still looks
-        rewritable. This is what turns that into a refusal somebody reads
-        rather than a rewrite nobody notices.
-        """
         return self._shape(self.path)
 
 
 def discover() -> Iterator[ReferenceStore]:
-    """Every store file that currently exists, in a stable order."""
     yield from _session_files(
         config.GENAUMACHER_SESSIONS_DIR, "*.json", "Genaumacher session", GENAUMACHER_SESSION_VERSION
     )
@@ -118,7 +70,6 @@ def discover() -> Iterator[ReferenceStore]:
 
 
 def _clip_pairings() -> Iterator[ReferenceStore]:
-    """Each carved clip's sidecar that names the scene the clip was found in."""
     for video in lanes.non_ai_videos():
         path = sidecar.sidecar_path(video)
         if _read_paired_scene(path):
@@ -166,13 +117,6 @@ def _session_files(
 
 
 def _stamped(version: int) -> Callable[[Path], str | None]:
-    """A check that the file says it is the version this stage knows.
-
-    A file written before its app stamped one is that first version, so silence
-    reads as agreement -- every session and project on disk today is one of
-    those.
-    """
-
     def complaint(path: Path) -> str | None:
         found = _load_json(path).get("version", version)
         return None if found == version else f"says version {found!r}, not {version}"
@@ -181,11 +125,6 @@ def _stamped(version: int) -> Callable[[Path], str | None]:
 
 
 def _is_counts_by_path(path: Path) -> str | None:
-    """Fun Time's counts, checked by shape because they carry no version.
-
-    They cannot carry one: every top-level key there is a video path, so a key
-    holding a number would reach this stage as a video to go looking for.
-    """
     for key, value in _load_json(path).items():
         if not isinstance(value, dict) or not set(value) >= _WATCH_COUNTS:
             return f"{key!r} does not hold the watch counts this stage re-keys"
@@ -208,7 +147,6 @@ def _rewrite_video_path_field(path: Path, moves: dict[str, str]) -> None:
 
 
 def _session_fingerprint(path: Path) -> tuple[float, int] | None:
-    """A session's own record of the footage it was cut against."""
     payload = _load_json(path)
     fps, total_frames = payload.get("fps"), payload.get("total_frames")
     if isinstance(fps, int | float) and isinstance(total_frames, int) and fps > 0 and total_frames > 0:
@@ -221,23 +159,14 @@ def _read_json_object_keys(path: Path) -> list[str]:
 
 
 def _rewrite_json_object_keys(path: Path, moves: dict[str, str]) -> None:
-    """Re-key in place, keeping Fun Time's ``path.strip().lower()`` normalization.
-
-    A key written in any other case simply never matches again, so the counts
-    would be stranded just as thoroughly as by the move itself.
-    """
     payload = _load_json(path)
     _write_json(path, {moves.get(key, key).lower(): value for key, value in payload.items()})
 
 
 
 def _load_json(path: Path) -> dict:
-    """Strict on purpose: these files belong to the sibling apps, so one this
-    cannot read must stop the rewrite rather than be treated as empty and
-    replaced with a new one."""
     return read_dict_strict(path)
 
 
 def _write_json(path: Path, payload: dict) -> None:
-    # newline="\n" because the app that owns this file wrote it that way.
     write_whole(path, json.dumps(payload, indent=2) + "\n", newline="\n")

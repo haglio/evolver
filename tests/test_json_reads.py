@@ -1,4 +1,3 @@
-"""The two ways this app reads one of its small JSON files."""
 from __future__ import annotations
 
 import json
@@ -38,9 +37,6 @@ class TestReadDict(unittest.TestCase):
 
 
 class TestReadDictStrict(unittest.TestCase):
-    """For a file another app owns: stop, rather than treat it as empty and
-    write a new one over the top."""
-
     def test_reads_back_what_was_written(self):
         with workspace_temp_dir() as root:
             path = root / "a.json"

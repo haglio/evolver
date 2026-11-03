@@ -1,14 +1,3 @@
-"""The document this repo publishes about its pipeline, held against the config.
-
-Origenerator hands clips to this pipeline by copying a file into one folder and
-reads the upscale back out of another, and it cannot import this repo -- so it
-had both paths and the half-written-file marker written out on its own side.
-Renaming a folder here left it dropping clips where nothing ingests them, with
-both suites green.
-
-``evolver_contract.json`` at the checkout root is how those names travel now.
-These hold the document to what this repo actually reads and writes.
-"""
 from __future__ import annotations
 
 import json
@@ -32,16 +21,12 @@ def _document() -> dict:
 
 class PublishedDocument(unittest.TestCase):
     def test_the_tracked_copy_is_what_publishing_writes(self):
-        """Run ``util.contract.publish()`` when this fails: a document
-        that has drifted from this module tells a sender something untrue."""
         tracked = contract.contract_path(REPO_ROOT)
 
         with workspace_temp_dir() as root:
             assert contract.publish(root).read_text(encoding="utf-8") == tracked.read_text(encoding="utf-8")
 
     def test_each_folder_it_names_is_the_one_this_repo_uses(self):
-        """Library-relative, because the library root is private and the two
-        apps resolve it from their own overlays."""
         document = _document()
 
         assert {name: config.LIBRARY_ROOT / Path(value) for name, value in document["library_relative"].items()} == {"inbox_dir": config.INBOX_DIR, "upscaled_dir": config.OUT_UPSCALED_DIR}
@@ -53,8 +38,6 @@ class PublishedDocument(unittest.TestCase):
         assert mirrored_path(video, roots=library_roots_beside(metadata), mirror_root=metadata, suffix=".json") == sidecar.sidecar_path(video)
 
     def test_a_name_carrying_the_marker_is_one_this_repo_refuses_to_ingest(self):
-        """The whole point of the marker: a copy still being written must not be
-        read as a finished video."""
         marker = _document()["partial_marker"]
 
         assert media_files.is_partial_path(Path(f"a-clip{marker}mp4"))
@@ -66,47 +49,33 @@ if __name__ == "__main__":
 
 
 class TheLibraryRecord(unittest.TestCase):
-    """What a reader of a library video's record may rely on.
-
-    Fun Time reads one on every clip it shows and writes one field back, and
-    both sides spelled every name for themselves until this document existed.
-    """
-
     def setUp(self):
         self.record = _document()["library_record"]
 
     def test_every_kind_it_names_is_one_this_repo_records(self):
-        """A reader branching on the kind has to know the whole set."""
         assert self.record["video_kinds"] == list(video_kind.TYPES)
 
     def test_the_orientations_it_names_are_the_familys_two_words(self):
         assert self.record["video_orientations"] == list(ORIENTATIONS)
 
     def test_the_field_the_reader_writes_is_the_one_this_repo_clears(self):
-        """Fun Time strikes an act out and leaves this in its place; only the
-        backfill tool clears it, once a viewer has finally named the act."""
         video = self.record["blocks"][video_kind.BLOCK]
 
         assert video["written_by_the_reader"] == [sidecar.WRONG_ACTION_FIELD]
         assert sidecar.WRONG_ACTION_FIELD in video["fields"]
 
     def test_the_watch_block_it_names_is_the_one_this_repo_stamps(self):
-        """The counts and the weight a shuffled playlist draws by."""
         stamped = watch.stamped({}, dict.fromkeys(watch.COUNT_FIELDS, 1))
 
         assert sorted(stamped[watch.BLOCK]) == sorted(self.record["blocks"][watch.BLOCK]["fields"])
 
     def test_a_favorite_and_its_page_are_the_ones_the_apps_that_mark_them_write(self):
-        """Fun Time and this repo mark a favorite through app_support.favorites,
-        so the keys this repo promises are that module's, and they are the
-        readers' to write rather than anything this repo derives."""
         both = [favorites.FAVORITE_KEY, favorites.PAGE_KEY]
 
         assert set(both) <= set(self.record["top_level_keys"])
         assert self.record["top_level_written_by_the_reader"] == both
 
     def test_the_kind_the_running_time_and_the_orientation_sit_where_it_says(self):
-        """All three go in the video block, which is where a reader looks for them."""
         stamped = video_kind.oriented(
             video_kind.timed(video_kind.stamped({}, video_kind.SHORT), 12.5), PORTRAIT)
         own = {video_kind.FIELD, video_kind.DURATION_FIELD, video_kind.ORIENTATION_FIELD}
@@ -117,9 +86,6 @@ class TheLibraryRecord(unittest.TestCase):
 
 
 class TheJournals(unittest.TestCase):
-    """What another app writes for the favorites stage to mark on a video's
-    record, the way the phone's journal is carried."""
-
     def setUp(self):
         self.journals = _document()["journals"]
 

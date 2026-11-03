@@ -1,4 +1,3 @@
-"""The product's own Python files, and the strings they hold, for the tests that read the tree as text."""
 from __future__ import annotations
 
 import ast

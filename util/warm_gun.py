@@ -1,12 +1,3 @@
-"""Warm Gun's journals: one JSON line per event, one file per computer that
-plays (the phone's, and since 2026-10 the laptop's beside it), each naming its
-video by the lane it was played from — ``1_sorted/<source>/<orientation>/x.mp4``,
-``non_AI/<bucket>/…`` or ``genau/clips/2D/AI/x.mp4``, whatever Genau's flicks
-folder is called -- or, written before that folder split into 2D and VR,
-``genau/clips/x.mp4``.  Another app of the family names an upscale by its
-place under the library root instead (``evolver_contract.json`` publishes the
-folder and the fields)."""
-
 from __future__ import annotations
 
 import json
@@ -21,9 +12,7 @@ from util.sidecar import upscaled_video_path
 JOURNAL_PATTERN = "*.jsonl"
 FIELDS = ("t", "event", "path")
 FAVORITE_EVENTS = {"favorite": True, "unfavorite": False}
-# An act picked on a video's Action row in Origenerator, named in a field of its own.
 ACT_EVENT = ACT_FIELD = "action"
-# What the phone's file is called -- the one journal there was before the laptop's.
 PHONE_JOURNAL = "warm-gun-journal.jsonl"
 PHONES_NAME_FOR_GENAUS_FLICKS_FOLDER = "clips"
 
@@ -37,13 +26,6 @@ class Event:
 
 
 def read_journals(directories: Iterable[Path]) -> dict[str, list[Event]]:
-    """Each journal's events by the journal's file name, each in time order.
-
-    A computer uploads its whole file every time, in its own order, so a file is
-    the unit that arrives in time order — and the one a cursor can be kept
-    for. The same name reached through two folders is one journal; a line
-    twice in it counts once.
-    """
     events: dict[str, set[Event]] = {}
     for directory in directories:
         if not directory.is_dir():

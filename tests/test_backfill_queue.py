@@ -36,10 +36,6 @@ class TestUnlabeledVideos(unittest.TestCase):
             assert unlabeled_videos() == []
 
     def test_the_scraped_provider_is_whoever_the_overlay_names(self):
-        # The provider's source name is the overlay's, and the deployed one is
-        # not the committed placeholder: compared against a literal, every one
-        # of the real provider's unlabeled videos was queued for dictation --
-        # exactly what the skip exists to prevent (bug 12).
         with library_tree() as lib, override_config(PROVIDER_SOURCE="examplesource"):
             lib.video("portrait", "examplesource", "a_topaz.mp4")
             placeholder = lib.video("portrait", "provider", "b_topaz.mp4")
@@ -53,13 +49,7 @@ class TestUnlabeledVideos(unittest.TestCase):
             assert unlabeled_videos() == []
 
     def test_a_video_whose_act_was_called_wrong_is_asked_about_first(self):
-        """Fun Time strikes a mislabeled act out of the sidecar and leaves
-        ``wrong_action`` in its place.  Someone said that video is wrong *just now*, so
-        it goes to the head of the queue rather than the back of a library walk
-        they may never reach."""
         with library_tree() as lib:
-            # The rejected video sits last in the library walk (portrait sweeps
-            # before landscape), so only a reordering can bring it to the front.
             plain = lib.video("portrait", "provider2", "a_topaz.mp4")
             rejected = lib.video("landscape", "provider2", "b_topaz.mp4")
             lib.sidecar("landscape", "provider2", "b_topaz",
@@ -68,9 +58,6 @@ class TestUnlabeledVideos(unittest.TestCase):
             assert unlabeled_videos() == [rejected, plain]
 
     def test_a_scraped_video_whose_act_was_called_wrong_is_offered_anyway(self):
-        """A scraped act is skipped because the scrape stage knows what the video
-        shows — which is exactly the claim a viewer has just contradicted, and
-        the stage cannot correct itself."""
         with library_tree() as lib:
             rejected = lib.video("portrait", "origenerator", "a_topaz.mp4")
             lib.sidecar("portrait", "origenerator", "a_topaz",
@@ -170,7 +157,6 @@ class TestBackfillQueue(unittest.TestCase):
         assert rewound == original
 
     def test_the_queue_keeps_the_order_it_was_given(self):
-        """Stable order is what lets a reopened session resume where it left off."""
         videos = [Path(f"clip{i}.mp4") for i in range(10)]
 
         queue = BackfillQueue(videos)

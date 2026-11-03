@@ -1,34 +1,17 @@
-"""The shape of the 2D/non_AI library both non-AI stages walk.
-
-A bucket is whatever folder holds the numbered stage folders, because that is
-the only thing every stage does with one: retire an original into its ``2*``,
-publish an upscale into its ``3*``, scan its ``0*``/``1*`` for work.  Usually
-that is a top-level folder like ``other``.
-
-A top-level folder can also be split into sub-libraries that each keep their own
-copy of the stages, and then the parent is not a bucket: it has no stages of its
-own, and reading it as one leaves every stage hunting for folders that moved a
-level down.  Each of those sub-libraries is a bucket instead.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
 
 import config
 
-# A stage folder is named for its place in the pipeline: "0 unsorted", "1 could
-# use work", "2 …", "3_good_to_go".  The leading digit is the whole convention.
 _STAGE_DIGITS = "0123"
 
 
 def is_stage_dir(path: Path) -> bool:
-    """Whether *path* is one of a bucket's numbered stage folders."""
     return path.is_dir() and path.name[:1] in _STAGE_DIGITS
 
 
 def holds_stages(folder: Path) -> bool:
-    """Whether the stage folders sit directly in *folder*."""
     try:
         return any(is_stage_dir(child) for child in folder.iterdir())
     except OSError:
@@ -36,13 +19,6 @@ def holds_stages(folder: Path) -> bool:
 
 
 def _sub_libraries(folder: Path) -> list[Path]:
-    """*folder*'s own copies of the pipeline, if it was split into some.
-
-    Only its UNNUMBERED children can be one: the numbered children are its
-    stages, and a stage holds numbered sub-stages of its own ("1 could use
-    work/2_originals…"), so "holds stage folders" alone would read every stage
-    as a library and every bucket as their parent.
-    """
     try:
         children = sorted(folder.iterdir())
     except OSError:
@@ -55,13 +31,6 @@ def _sub_libraries(folder: Path) -> list[Path]:
 
 
 def buckets() -> list[Path]:
-    """Every bucket under the non-AI root, in path order.
-
-    A top-level folder that holds the stages itself is one; a folder split into
-    sub-libraries contributes each of those instead, and is not a bucket even
-    while a leftover stage folder of its own is still standing — the split is
-    what it is *for* now, and half-finished is still split.
-    """
     if not config.NON_AI_DIR.is_dir():
         return []
     found: list[Path] = []
@@ -77,13 +46,6 @@ def buckets() -> list[Path]:
 
 
 def stage_dirs(parent: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
-    """*parent*'s numbered stage folders whose names start with one of *digits*.
-
-    Serves both levels of the convention: a bucket's triage/stage folders, and
-    the sub-stages a triage folder splits into.  Returned with the digit, since
-    every caller either wants a particular place in the pipeline or wants to
-    know which place it found.
-    """
     found = []
     for child in sorted(parent.iterdir()):
         if child.is_dir() and child.name[:1].isdigit() and int(child.name[:1]) in digits:
@@ -92,13 +54,6 @@ def stage_dirs(parent: Path, digits: tuple[int, ...]) -> list[tuple[int, Path]]:
 
 
 def bucket_of(video: Path) -> Path | None:
-    """The bucket *video* lives in, or None when it is in none of them.
-
-    Read off the shape rather than the depth, so a split library resolves to the
-    sub-library and an unsplit one to the top-level folder with no rule about
-    which.  None for a video outside the library — and for one still sitting in
-    a split folder's leftover stage, which belongs to no sub-library yet.
-    """
     try:
         relative = video.relative_to(config.NON_AI_DIR)
     except ValueError:

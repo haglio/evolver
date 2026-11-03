@@ -1,12 +1,3 @@
-"""Where a funscript lives, with the mark saying no person wrote it, and how to
-carry one between a clip and its scene — cut out of the scene's, or placed back
-into the scene's timeline — saying in the script itself which of those acts
-wrote it.
-
-What a funscript *is* belongs to every app in this family that reads or writes
-one and lives in :mod:`app_support.funscript`, not here.
-"""
-
 from __future__ import annotations
 
 import shutil
@@ -21,15 +12,6 @@ from util.media_files import kept_by_another_app, remove_empty_dirs
 
 
 def script_path_for_video(video: Path) -> Path:
-    """The funscript mirroring *video*'s path under ``SCRIPT_LIBRARY_DIR``.
-
-    Scripts parallel the video tree the way sidecars do (see
-    :func:`util.sidecar.sidecar_path`), so a video's script is found by
-    swapping the root and the suffix.
-
-    Raises ``ValueError`` for a video outside the library, which has no script
-    here: an archived original keeps its own copy beside it instead.
-    """
     script = None if kept_by_another_app(video) else mirrored_path(
         video,
         roots=(config.VIDEO_LIBRARY_DIR,),
@@ -54,12 +36,6 @@ def scripts_held_for(*videos: Path | None) -> list[Path]:
 
 
 def generated_mark(script: Path) -> Path | None:
-    """Where the mark saying no person wrote *script* sits, for a script in the
-    scripts tree.
-
-    Fun Time's F-mode plays only the scripts a person wrote and knows the rest
-    by this empty file alone, so the mark goes wherever its script goes.
-    """
     return mirrored_path(
         script,
         roots=(config.SCRIPT_LIBRARY_DIR,),
@@ -112,13 +88,6 @@ def remove_empty_mark_folders() -> None:
 
 
 def trim(script: dict, start_seconds: float, duration_seconds: float) -> dict:
-    """The part of *script* covering ``[start, start + duration]``, rebased to zero.
-
-    The action preceding the window is carried forward to ``at == 0`` when the
-    window opens between two actions: without it the device holds whatever
-    position it was left in and lurches at the clip's first motion, where the
-    scene had it already travelling.
-    """
     start_ms = round(start_seconds * 1000)
     end_ms = start_ms + round(duration_seconds * 1000)
     source = sorted(actions_of(script), key=lambda action: action["at"])
@@ -138,14 +107,6 @@ def trim(script: dict, start_seconds: float, duration_seconds: float) -> dict:
 
 
 def place(script: dict, start_seconds: float, duration_seconds: float) -> dict:
-    """*script* moved to begin *start_seconds* into a *duration_seconds* timeline.
-
-    The reverse of :func:`trim`: where that cuts a clip's script out of its
-    scene's, this puts a clip's script back where the clip sits in the scene.
-    Nothing is invented for the rest of the scene — a script that says nothing
-    over a stretch leaves the device still, which is the truth about a stretch
-    nobody has scripted.
-    """
     start_ms = round(start_seconds * 1000)
     actions = [
         {**action, "at": action["at"] + start_ms}
@@ -160,25 +121,12 @@ def place(script: dict, start_seconds: float, duration_seconds: float) -> dict:
 
 
 def stamped(script: dict, act: str) -> dict:
-    """*script* saying in its own metadata that this app's *act* wrote it -- a copy.
-
-    In the file rather than on its video's sidecar: a funscript is replaced by
-    hand, copied onto a video's other versions and followed into the archive,
-    and a stamp left on the sidecar through any of that would go on naming a
-    script that is no longer the one there.
-    """
     metadata = script.get("metadata")
     metadata = metadata if isinstance(metadata, dict) else {}
     return {**script, "metadata": provenance.recorded(metadata, act, provenance.by_evolver())}
 
 
 def _retime_metadata(metadata: dict, duration_seconds: float) -> dict:
-    """*metadata* re-dated for a timeline of *duration_seconds*.
-
-    Bookmarks and chapters are wall-clock strings into the video they were
-    written for, so neither a clip nor a scene inherits the other's: cut loose
-    from their timeline they would point at minutes that are not there.
-    """
     retimed = dict(metadata)
     if "duration" in retimed:
         retimed["duration"] = int(duration_seconds)

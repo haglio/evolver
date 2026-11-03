@@ -1,15 +1,3 @@
-"""What a heard phrase does to the queue — the backfill tool's whole semantics.
-
-Separated from the window so it can be exercised without a media backend, and so
-the window is left with only what a window should do: show a video, show a count.
-
-Every decision is a :class:`_Step` — the contract below, which
-:class:`_Labelled`, :class:`_Discarded` and :class:`_Deferred` each satisfy by
-carrying the same five names.  That is how each knows to take itself back in
-both places it landed: the queue, and the disk.  The session keeps them on a
-stack, so "undo" walks back through a whole run of them.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -32,36 +20,25 @@ NOTHING_TO_REPEAT = "nothing to repeat"
 
 
 class _Step(Protocol):
-    """One decision, and how to take it back.
-
-    Declared rather than left implied: the three classes below were related
-    only by happening to carry the same five names, and the two methods that
-    traffic in them were the only unannotated ones in the module -- annotating
-    them meant a three-way union that a fourth kind of decision would have to
-    be added to in two more places.
-    """
-
     @property
     def note(self) -> str:
-        """What to show the viewer about what just happened."""
+        pass
 
     def take_effect(self, queue: BackfillQueue) -> None:
-        """Move the video out of the way in the queue."""
+        pass
 
     def put_back(self, queue: BackfillQueue) -> None:
-        """Undo that: the video is on screen again."""
+        pass
 
     def commit(self) -> None:
-        """Do the disk work, off the GUI thread."""
+        pass
 
     def roll_back(self) -> None:
-        """Undo the disk work."""
+        pass
 
 
 @dataclass
 class _Labelled:
-    """The viewer named the act; the video keeps whatever else its sidecar held."""
-
     video: Path
     action: str
     _snapshot: dict | None = field(default=None, init=False, repr=False)
@@ -86,8 +63,6 @@ class _Labelled:
 
 @dataclass
 class _Discarded:
-    """The video was trash; it now sits in the trash folder."""
-
     video: Path
     _landed_at: Path | None = field(default=None, init=False, repr=False)
 
@@ -105,14 +80,12 @@ class _Discarded:
         self._landed_at = send_to_trash(self.video)
 
     def roll_back(self) -> None:
-        if self._landed_at is not None:  # the move failed; there is nothing to reclaim
+        if self._landed_at is not None:
             reclaim_from_trash(self._landed_at, self.video)
 
 
 @dataclass
 class _Deferred:
-    """Not now — the video goes to the back of the queue, untouched on disk."""
-
     video: Path
 
     @property
@@ -126,20 +99,13 @@ class _Deferred:
         queue.undefer()
 
     def commit(self) -> None:
-        """A deferral touches no file."""
+        pass
 
     def roll_back(self) -> None:
-        """A deferral touches no file."""
+        pass
 
 
 class BackfillSession:
-    """Applies heard phrases to the queue, dispatching the file work off-thread.
-
-    A video leaves the screen the instant a phrase lands: the disk work — writing
-    the sidecar, or moving the video to the trash folder — goes to *worker* and the
-    next video starts playing without waiting for it.
-    """
-
     def __init__(self, queue: BackfillQueue, worker: SerialWorker, vocabulary: Vocabulary) -> None:
         self._queue = queue
         self._worker = worker
@@ -148,16 +114,13 @@ class BackfillSession:
 
     @property
     def remaining(self) -> int:
-        """How many videos still need an action, deferred ones included."""
         return self._queue.remaining
 
     @property
     def current(self) -> Path | None:
-        """The video that should be on screen, or None once the queue is empty."""
         return self._queue.current
 
     def apply(self, phrase: str) -> str | None:
-        """React to *phrase*; returns what it did, or None if it meant nothing here."""
         control = self._vocabulary.controls.get(phrase)
         if control == UNDO:
             return self._undo()
@@ -173,7 +136,6 @@ class BackfillSession:
         return self._commit(step)
 
     def _repeat(self) -> str | None:
-        """Apply the most recent action again, to the video now on screen."""
         video = self._queue.current
         if video is None:
             return None
@@ -183,14 +145,12 @@ class BackfillSession:
         return self._commit(_Labelled(video, action))
 
     def _commit(self, step: _Step) -> str:
-        """Land a decision: retire its video, dispatch its file work, remember it."""
         step.take_effect(self._queue)
         self._worker.submit(step.commit)
         self._history.append(step)
         return step.note
 
     def _last_action(self) -> str | None:
-        """The action of the most recent labelling, or None if none stands."""
         for step in reversed(self._history):
             if isinstance(step, _Labelled):
                 return step.action
@@ -205,22 +165,13 @@ class BackfillSession:
             return _Deferred(video)
         if control == TRASH:
             return _Discarded(video)
-        # UNDO and SAME are answered in apply() before a step is asked for, and
-        # anything else is a control this dispatch does not know: do nothing
-        # rather than fall through to the branch that moves a file.
         return None
 
     def _undo(self) -> str:
-        """Take the last decision back, in the queue and on disk."""
         if not self._history:
             return NOTHING_TO_UNDO
         step = self._history.pop()
 
-        # The decision's own file work may still be in flight, and reversing a write
-        # that has not happened would leave the video labelled. Wait for it, then
-        # reverse it here rather than on the worker: the window reloads the restored
-        # video the moment this returns, and a discarded video has to be back in place
-        # by then for the player to find it.
         self._worker.drain()
         step.roll_back()
         step.put_back(self._queue)

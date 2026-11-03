@@ -1,5 +1,3 @@
-"""Every video the library holds, lane by lane."""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -12,7 +10,6 @@ import config
 from util.media_files import is_finalized_video_file, library_videos, listed_videos
 from util.sidecar import upscaled_video_path
 
-#: The source folder Origenerator's videos arrive under, in 0_inbox and 1_sorted.
 ORIGENERATOR_SOURCE = "origenerator"
 
 VR_FOLDER = "VR"
@@ -20,24 +17,6 @@ VR_FOLDER = "VR"
 
 @dataclass(frozen=True)
 class SentLane:
-    """One lane Origenerator hands a clip down, seen from the receiving end.
-
-    ``key`` is what Origenerator's published document calls this lane, which is
-    how the two sides' tables are compared at all. ``source`` is the ``0_inbox``
-    folder the clip arrives under -- the whole of what a send says, since routing
-    by that name is the only thing passing between the two apps -- and
-    ``unsent_column`` is where Origenerator's gallery records a send being taken
-    back. Both are names agreed with that repo and must stay spelled as it
-    spells them; ``tests/test_origenerator_gallery_contract.py`` is what holds
-    them to it.
-
-    ``delivered_dir`` is where a finished clip of this lane leaves the library
-    for, or ``None`` for the lane whose clips stay in the outbox. It is the one
-    way the two differ, and it is why a withdrawal has to be answered here: by
-    the time one is asked for, the clip has been sorted, upscaled and in that
-    lane's case moved somewhere Origenerator has never heard of.
-    """
-
     key: str
     source: str
     unsent_column: str
@@ -45,12 +24,6 @@ class SentLane:
 
 
 def sent_lanes() -> tuple[SentLane, ...]:
-    """Both lanes Origenerator sends down, resolved against config as it is now.
-
-    A function rather than a table, for the reason ``trash_folders`` is one: the
-    Genau lane's folder is found on disk each time, and a tuple built at import
-    freezes whatever was there then.
-    """
     return (
         SentLane("evolver", ORIGENERATOR_SOURCE, "evolver_unsent_at",
                  delivered_dir=None),
@@ -84,7 +57,6 @@ def ai_videos() -> Iterator[AiVideo]:
 
 
 def upscale_filed_for(video: Path) -> Path | None:
-    """Where the upscale of *video* is filed, when *video* is a 1_sorted copy."""
     try:
         source, orientation, *inside = video.relative_to(config.SORTED_DIR).parts
     except ValueError:
