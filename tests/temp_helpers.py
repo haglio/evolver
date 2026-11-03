@@ -79,13 +79,13 @@ def write_sidecar(path: Path, payload: dict) -> dict:
 def library_tree(**config_extra):
     with workspace_temp_dir() as root:
         tree = _LibraryTree(root)
-        overrides = dict(
-            VIDEO_LIBRARY_DIR=tree.root,
-            AI_DIR=tree.ai,
-            OUT_UPSCALED_DIR=tree.upscaled,
-            METADATA_DIR=tree.metadata,
-            TRASH_DIR=tree.trash,
-        )
+        overrides = {
+            "VIDEO_LIBRARY_DIR": tree.root,
+            "AI_DIR": tree.ai,
+            "OUT_UPSCALED_DIR": tree.upscaled,
+            "METADATA_DIR": tree.metadata,
+            "TRASH_DIR": tree.trash,
+        }
         overrides.update(config_extra)
         with override_config(**overrides):
             yield tree
@@ -192,23 +192,23 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
 
 def nonai_library_overrides(root: Path, **extra):
     video_lib = root / "videos"
-    overrides = dict(
-        VIDEO_LIBRARY_DIR=video_lib,
-        VIDEO_SEARCH_ROOT=video_lib,
-        NON_AI_DIR=video_lib / "2D" / "non_AI",
-        METADATA_DIR=root / "metadata",
-        SCRIPT_LIBRARY_DIR=root / "scripts",
-        GENERATED_SCRIPTS_DIR=root / "generated",
-        NONAI_RETIRED_ROOT=None,
-        NONAI_PIN_LIST=root / "next.txt",
-        NONAI_SKIP_LIST=root / "skip.txt",
-        NONAI_JOB_STATE_FILE=root / "job.json",
-        NONAI_ATTEMPTS_FILE=root / "attempts.json",
-        NONAI_COOLDOWN_FILE=root / "cooldown.json",
-        NONAI_REQUEST_FILE=root / "request.json",
-        NONAI_FFMPEG_LOG=root / "ffmpeg.log",
-        FUN_TIME_WATCH_STATS_FILE=root / "watch_stats.json",
-    )
+    overrides = {
+        "VIDEO_LIBRARY_DIR": video_lib,
+        "VIDEO_SEARCH_ROOT": video_lib,
+        "NON_AI_DIR": video_lib / "2D" / "non_AI",
+        "METADATA_DIR": root / "metadata",
+        "SCRIPT_LIBRARY_DIR": root / "scripts",
+        "GENERATED_SCRIPTS_DIR": root / "generated",
+        "NONAI_RETIRED_ROOT": None,
+        "NONAI_PIN_LIST": root / "next.txt",
+        "NONAI_SKIP_LIST": root / "skip.txt",
+        "NONAI_JOB_STATE_FILE": root / "job.json",
+        "NONAI_ATTEMPTS_FILE": root / "attempts.json",
+        "NONAI_COOLDOWN_FILE": root / "cooldown.json",
+        "NONAI_REQUEST_FILE": root / "request.json",
+        "NONAI_FFMPEG_LOG": root / "ffmpeg.log",
+        "FUN_TIME_WATCH_STATS_FILE": root / "watch_stats.json",
+    }
     overrides.update(extra)
     return overrides
 
@@ -269,17 +269,17 @@ class CarvedClipLibraryCase(unittest.TestCase):
 
 
 def make_run_record(**overrides):
-    fields = dict(
-        id="2026-07-25T15-20-02",
-        started_at="2026-07-25T15:20:02",
-        finished_at="2026-07-25T15:20:14",
-        duration_seconds=12.0,
-        trigger="scheduled",
-        status="success",
-        stages=[],
-        log_start=None,
-        log_end=None,
-    )
+    fields = {
+        "id": "2026-07-25T15-20-02",
+        "started_at": "2026-07-25T15:20:02",
+        "finished_at": "2026-07-25T15:20:14",
+        "duration_seconds": 12.0,
+        "trigger": "scheduled",
+        "status": "success",
+        "stages": [],
+        "log_start": None,
+        "log_end": None,
+    }
     fields.update(overrides)
     return RunRecord(**fields)
 

@@ -194,7 +194,7 @@ class TestStartGuards(unittest.TestCase):
             mocks["popen"].assert_not_called()
 
     def test_the_sign_in_is_only_checked_when_nothing_else_holds_the_start(self):
-        for held in (dict(topaz_pids=(31337,)), dict(idle_seconds=5.0)):
+        for held in ({"topaz_pids": (31337,)}, {"idle_seconds": 5.0}):
             with self.subTest(held=sorted(held)), workspace_temp_dir() as root:
                 overrides = library_overrides(root)
                 self._one_candidate(overrides)

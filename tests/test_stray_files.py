@@ -129,9 +129,9 @@ class TestStrayFunscripts(unittest.TestCase):
 class TestScriptsOrigeneratorHandsOver(unittest.TestCase):
     def _library(self, root):
         videos = root / "videos"
-        return videos, dict(VIDEO_LIBRARY_DIR=videos, INBOX_DIR=videos / "2D" / "AI" / "0_inbox",
-                            SCRIPT_LIBRARY_DIR=root / "scripts",
-                            GENERATED_SCRIPTS_DIR=root / "generated")
+        return videos, {"VIDEO_LIBRARY_DIR": videos, "INBOX_DIR": videos / "2D" / "AI" / "0_inbox",
+                            "SCRIPT_LIBRARY_DIR": root / "scripts",
+                            "GENERATED_SCRIPTS_DIR": root / "generated"}
 
     def test_a_script_handed_over_with_its_clip_is_marked_as_no_persons(self):
         with workspace_temp_dir() as root:
