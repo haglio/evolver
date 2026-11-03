@@ -244,9 +244,9 @@ def computer_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
     return ""
 
 
-def user_present(settings: EncodeSettings, *, idle_seconds=seconds_since_input) -> bool:
+def user_present(settings: EncodeSettings, *, idle_seconds=None) -> bool:
     try:
-        idle = idle_seconds()
+        idle = (idle_seconds or seconds_since_input)()
     except OSError:
         return True
     return idle < settings.user_idle_threshold_seconds
