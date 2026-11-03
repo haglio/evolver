@@ -101,10 +101,8 @@ class TestStampingAScript:
 
 
 class TestMeasuringTheCpu:
-    def test_a_clock_that_did_not_move_reads_as_idle(self, monkeypatch):
-        monkeypatch.setattr(system_resources, "_get_system_times", lambda: (10, 20, 30))
-
-        assert system_resources.measure_cpu_busy_percent(0.0) == 0.0
+    def test_a_clock_that_did_not_move_reads_as_idle(self):
+        assert system_resources.measure_cpu_busy_percent(0.0, read_times=lambda: (10, 20, 30)) == 0.0
 
 
 class TestTheNegativePromptOnAPage:
