@@ -46,10 +46,10 @@ class TestPipelineWorker(unittest.TestCase):
             return pipeline_result
 
         worker = PipelineWorker(trigger=trigger)
-        worker.stage_started.connect(lambda name: started.append(name))
+        worker.stage_started.connect(started.append)
         worker.stage_completed.connect(lambda *args: completed.append(args))
-        worker.pipeline_finished.connect(lambda rec: finished.append(rec))
-        worker.pipeline_error.connect(lambda msg: errors.append(msg))
+        worker.pipeline_finished.connect(finished.append)
+        worker.pipeline_error.connect(errors.append)
         worker.stage_progress.connect(lambda *args: progress.append(args))
 
         with patch("gui.worker.evolver.setup_logging"), \

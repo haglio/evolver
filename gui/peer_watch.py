@@ -40,8 +40,8 @@ def launch_broker_tray(
 def watch_the_broker(**kwargs) -> peer_watch.PeerWatch:
     return peer_watch.PeerWatch(
         peer_key=BROKER_KEY,
-        is_up=lambda: broker_tray_is_up(),
-        launch=lambda: launch_broker_tray(),
+        is_up=broker_tray_is_up,
+        launch=launch_broker_tray,
         **kwargs,
     )
 

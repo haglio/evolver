@@ -160,7 +160,7 @@ class EvolverApp:
             start_again=self._restart, logger=log)
         self._update_timer = QTimer()
         self._update_timer.setInterval(_UPDATE_CHECK_MS)
-        self._update_timer.timeout.connect(lambda: self._updates.tick())
+        self._update_timer.timeout.connect(self._updates.tick)
 
     def _a_good_moment_for_an_update(self) -> bool:
         on_screen = (self._window.isVisible(), self._stats.is_on_screen, self._queue.is_on_screen,
