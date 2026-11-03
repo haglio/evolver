@@ -94,10 +94,9 @@ class TestUpscaleHelpers(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                 result = upscale.run(
                     max_items=5,
-                    sorted_dir=given_sorted,
-                    outbox_dir=given_out,
-                    trash_dir=given_trash,
-                    low_disk_floor_gb=1,
+                    folders=upscale.UpscaleFolders.configured(
+                        sorted=given_sorted, outbox=given_out, trash=given_trash),
+                    low_disk=upscale.LowDiskWarning.configured(floor_gb=1),
                 )
 
             assert result.processed == 1
@@ -116,8 +115,9 @@ class TestUpscaleHelpers(unittest.TestCase):
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                 result = upscale.run(
                     max_items=5,
-                    sorted_dir=sorted_dir, outbox_dir=out_dir, trash_dir=trash_dir,
-                    low_disk_floor_gb=1,
+                    folders=upscale.UpscaleFolders.configured(
+                        sorted=sorted_dir, outbox=out_dir, trash=trash_dir),
+                    low_disk=upscale.LowDiskWarning.configured(floor_gb=1),
                 )
 
             assert result.processed == 1
@@ -169,8 +169,11 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg) as run_ffmpeg, \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=1, sorted_dir=sorted_dir, outbox_dir=out_dir,
-                            trash_dir=trash_dir, low_disk_floor_gb=1)
+                upscale.run(
+                    max_items=1,
+                    folders=upscale.UpscaleFolders.configured(
+                        sorted=sorted_dir, outbox=out_dir, trash=trash_dir),
+                    low_disk=upscale.LowDiskWarning.configured(floor_gb=1))
 
             written_to = run_ffmpeg.call_args.args[1]
             assert written_to.suffix.lower() not in config.VIDEO_EXTENSIONS
@@ -257,9 +260,12 @@ class TestTheLowDiskWarning(unittest.TestCase):
                  patch("tasks.upscale.show_error", return_value=clicked_dismiss) as show_error:
                 for free in free_bytes_each_run:
                     free_bytes.return_value = free
-                    upscale.run(max_items=5, sorted_dir=sorted_dir, outbox_dir=out_dir,
-                                trash_dir=trash_dir, low_disk_floor_gb=1,
-                                low_disk_dismissed_file=root / "state" / "dismissed")
+                    upscale.run(
+                        max_items=5,
+                        folders=upscale.UpscaleFolders.configured(
+                            sorted=sorted_dir, outbox=out_dir, trash=trash_dir),
+                        low_disk=upscale.LowDiskWarning.configured(
+                            floor_gb=1, dismissed_file=root / "state" / "dismissed"))
         return show_error
 
     def test_the_low_disk_warning_offers_dismiss(self):
@@ -275,9 +281,12 @@ class TestTheLowDiskWarning(unittest.TestCase):
             with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=30 * 1024 ** 3), \
                  patch("tasks.upscale.show_error") as show_error:
-                result = upscale.run(max_items=5, sorted_dir=sorted_dir, outbox_dir=out_dir,
-                                     trash_dir=trash_dir,
-                                     low_disk_dismissed_file=root / "state" / "dismissed")
+                result = upscale.run(
+                    max_items=5,
+                    folders=upscale.UpscaleFolders.configured(
+                        sorted=sorted_dir, outbox=out_dir, trash=trash_dir),
+                    low_disk=upscale.LowDiskWarning.configured(
+                        dismissed_file=root / "state" / "dismissed"))
 
         assert result.processed == 1
         show_error.assert_not_called()
@@ -636,7 +645,9 @@ class TestOrigeneratorsVideos(unittest.TestCase):
              patch("tasks.upscale._run_ffmpeg", side_effect=encode), \
              patch("tasks.upscale.ffprobe.frame_rate", return_value=Fraction(112)) as probed, \
              patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-            upscale.run(max_items=1, origenerator_dir=origenerator)
+            upscale.run(
+                max_items=1,
+                folders=upscale.UpscaleFolders.configured(origenerator=origenerator))
         return video, encoded_with, probed
 
     def test_take_the_settings_chosen_for_them_given_only_the_frames_their_model_made(self):

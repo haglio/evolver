@@ -5,6 +5,7 @@ import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum, auto
 from functools import partial
 from pathlib import Path
 
@@ -46,55 +47,97 @@ class UpscaleResult:
     pending_after_run: int = 0
 
 
+@dataclass(frozen=True)
+class UpscaleFolders:
+    sorted: Path
+    outbox: Path
+    trash: Path
+    origenerator: Path
+
+    @classmethod
+    def configured(cls, **given: Path | None) -> UpscaleFolders:
+        defaults = {
+            "sorted": config.SORTED_DIR,
+            "outbox": config.OUT_UPSCALED_DIR,
+            "trash": config.TRASH_DIR,
+            "origenerator": config.ORIGENERATOR_PROJECT_DIR,
+        }
+        return cls(**_given_or_configured(given, defaults))
+
+
+@dataclass(frozen=True)
+class LowDiskWarning:
+    floor_gb: float
+    dismissed_file: Path
+
+    @classmethod
+    def configured(cls, **given: float | Path | None) -> LowDiskWarning:
+        defaults = {
+            "floor_gb": config.LOW_DISK_WARNING_GB,
+            "dismissed_file": config.LOW_DISK_WARNING_DISMISSED_FILE,
+        }
+        return cls(**_given_or_configured(given, defaults))
+
+
+def _given_or_configured(given: dict, defaults: dict) -> dict:
+    unknown = given.keys() - defaults.keys()
+    if unknown:
+        raise TypeError(f"unknown setting: {', '.join(sorted(unknown))}")
+    return {name: default if given.get(name) is None else given[name]
+            for name, default in defaults.items()}
+
+
+class _Outcome(Enum):
+    UPSCALED = auto()
+    FAILED = auto()
+    BUDGET_SPENT = auto()
+
+
+@dataclass(frozen=True)
+class _Budget:
+    run_seconds: float
+    min_start_remaining_seconds: float
+    started_at: float
+
+    @classmethod
+    def starting_now(cls) -> _Budget:
+        return cls(max(config.UPSCALE_RUN_BUDGET_SECONDS, 0),
+                   max(config.UPSCALE_MIN_START_REMAINING_SECONDS, 0), time.monotonic())
+
+    def elapsed(self) -> float:
+        return time.monotonic() - self.started_at
+
+    def remaining(self) -> float:
+        return self.run_seconds - self.elapsed()
+
+    def too_little_left_for_another(self, already_worked: bool) -> bool:
+        return bool(self.run_seconds and already_worked
+                    and self.remaining() < self.min_start_remaining_seconds)
+
+    def encode_timeout(self) -> float | None:
+        return max(self.remaining(), 1) if self.run_seconds else None
+
+
 def run(
     *,
     priority_files: list[Path] | None = None,
     max_items: int | None = None,
     on_progress: Callable[[int, int], None] | None = None,
-    sorted_dir: Path | None = None,
-    outbox_dir: Path | None = None,
-    trash_dir: Path | None = None,
-    low_disk_floor_gb: float | None = None,
-    low_disk_dismissed_file: Path | None = None,
-    origenerator_dir: Path | None = None,
+    folders: UpscaleFolders | None = None,
+    low_disk: LowDiskWarning | None = None,
 ) -> UpscaleResult:
-    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
-    outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
-    trash_dir = config.TRASH_DIR if trash_dir is None else trash_dir
-    low_disk_floor_gb = (
-        config.LOW_DISK_WARNING_GB if low_disk_floor_gb is None else low_disk_floor_gb
-    )
-    low_disk_dismissed_file = (
-        config.LOW_DISK_WARNING_DISMISSED_FILE if low_disk_dismissed_file is None
-        else low_disk_dismissed_file
-    )
-    origenerator_dir = (
-        config.ORIGENERATOR_PROJECT_DIR if origenerator_dir is None else origenerator_dir
-    )
-
+    folders = UpscaleFolders.configured() if folders is None else folders
+    low_disk = LowDiskWarning.configured() if low_disk is None else low_disk
     result = UpscaleResult()
     max_items = config.UPSCALE_BATCH_LIMIT if max_items is None else max_items
-    run_budget_seconds = max(config.UPSCALE_RUN_BUDGET_SECONDS, 0)
-    min_start_remaining_seconds = max(config.UPSCALE_MIN_START_REMAINING_SECONDS, 0)
-    started_at = time.monotonic()
+    budget = _Budget.starting_now()
 
-    for orient in orientation.SORTED:
-        (outbox_dir / orient).mkdir(parents=True, exist_ok=True)
-    trash_dir.mkdir(parents=True, exist_ok=True)
-    removed_partial_outputs = remove_partial_files(outbox_dir, logger=log)
-    if system_resources.free_gb(outbox_dir) >= low_disk_floor_gb:
-        _bring_back_the_low_disk_warning(low_disk_dismissed_file)
-
-    log.info("=== Stage: upscale from 1_sorted ===")
-    log.info("OUT: %s/{landscape,portrait}/<source>/", outbox_dir)
-    log.info("Also skip if exists in: %s", trash_dir)
-    if removed_partial_outputs:
-        log.info("Removed %d stale partial output file(s) from %s", removed_partial_outputs, outbox_dir)
+    _prepare_outbox(folders, low_disk)
 
     env = topaz.environment()
     candidates = collect_queued_videos(
         priority_files=priority_files,
-        sorted_dir=sorted_dir, outbox_dir=outbox_dir, trash_dir=trash_dir,
+        sorted_dir=folders.sorted, outbox_dir=folders.outbox, trash_dir=folders.trash,
     )
     total_pending = len(candidates)
     if max_items is not None:
@@ -103,79 +146,38 @@ def run(
         "Queued %d pending video(s); processing up to %d this run (budget %.1f min, keep %.1f min buffer)",
         total_pending,
         len(candidates),
-        run_budget_seconds / 60 if run_budget_seconds else 0,
-        min_start_remaining_seconds / 60 if min_start_remaining_seconds else 0,
+        budget.run_seconds / 60 if budget.run_seconds else 0,
+        budget.min_start_remaining_seconds / 60 if budget.min_start_remaining_seconds else 0,
     )
 
     for in_file, source, orient in candidates:
-        elapsed = time.monotonic() - started_at
-        remaining_budget = run_budget_seconds - elapsed
-        if run_budget_seconds and (result.processed or result.failed) and remaining_budget < min_start_remaining_seconds:
+        if budget.too_little_left_for_another(bool(result.processed or result.failed)):
             log.info(
                 "Stopping the upscale stage before starting another video to stay under the run budget "
                 "(elapsed %.1f min, remaining %.1f min).",
-                elapsed / 60,
-                max(remaining_budget, 0) / 60,
+                budget.elapsed() / 60,
+                max(budget.remaining(), 0) / 60,
             )
             break
 
-        if system_resources.free_gb(outbox_dir) < low_disk_floor_gb:
+        if system_resources.free_gb(folders.outbox) < low_disk.floor_gb:
             result.deferred_low_disk = True
             result.pending_after_run = total_pending - result.processed - result.failed
-            _show_low_disk_warning(outbox_dir, low_disk_floor_gb, low_disk_dismissed_file)
+            _show_low_disk_warning(folders.outbox, low_disk.floor_gb, low_disk.dismissed_file)
             log.warning("Stopping the upscale stage early due to low free disk space.")
             break
 
-        out = upscaled_video_path(source, orient, in_file.stem, outbox_dir)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        tmp = partial_path(out, in_file.stem)
-
-        log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
-
-        settings = _settings_for(in_file, source, orient, outbox_dir, origenerator_dir)
-
-        ffmpeg_timeout = max(remaining_budget, 1) if run_budget_seconds else None
-        ffmpeg_ok = False
-        try:
-            ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, settings, timeout=ffmpeg_timeout)
-        except subprocess.TimeoutExpired:
-            elapsed_at_stop = time.monotonic() - started_at
-            log.info(
-                "Run budget spent after %.1fs; stopped this encode and left the video queued: %s",
-                elapsed_at_stop, in_file,
-            )
-            tmp.unlink(missing_ok=True)
-            result.stopped_at_budget += 1
-            if on_progress:
-                on_progress(result.processed + result.failed, len(candidates))
-            break
-        except OSError:
-            log.exception("FAILED (ffmpeg launch error): %s", in_file)
-
-        if ffmpeg_ok:
-            if tmp.exists() and tmp.stat().st_size > 0:
-                try:
-                    retry_while_in_use(partial(take_its_place, tmp, out))
-                except OSError:
-                    result.failed += 1
-                    log.info("FAILED (a player still holds the upscale it replaces): %s", out)
-                else:
-                    result.processed += 1
-                    log.info("Wrote: %s", out)
-                    _record_the_upscale(out, settings)
-                finally:
-                    tmp.unlink(missing_ok=True)
-            else:
-                tmp.unlink(missing_ok=True)
-                result.failed += 1
-                log.info("FAILED (empty output): %s", in_file)
-        else:
-            tmp.unlink(missing_ok=True)
+        outcome = _upscale_one(in_file, source, orient, env, folders, budget)
+        if outcome is _Outcome.UPSCALED:
+            result.processed += 1
+        elif outcome is _Outcome.FAILED:
             result.failed += 1
-            log.info("FAILED (ffmpeg error): %s", in_file)
-
+        else:
+            result.stopped_at_budget += 1
         if on_progress:
             on_progress(result.processed + result.failed, len(candidates))
+        if outcome is _Outcome.BUDGET_SPENT:
+            break
 
     if not result.deferred_low_disk:
         result.pending_after_run = max(total_pending - result.processed - result.failed, 0)
@@ -187,6 +189,71 @@ def run(
     if result.pending_after_run:
         log.info("Pending after this run: %d", result.pending_after_run)
     return result
+
+
+def _prepare_outbox(folders: UpscaleFolders, low_disk: LowDiskWarning):
+    for orient in orientation.SORTED:
+        (folders.outbox / orient).mkdir(parents=True, exist_ok=True)
+    folders.trash.mkdir(parents=True, exist_ok=True)
+    removed_partial_outputs = remove_partial_files(folders.outbox, logger=log)
+    if system_resources.free_gb(folders.outbox) >= low_disk.floor_gb:
+        _bring_back_the_low_disk_warning(low_disk.dismissed_file)
+
+    log.info("=== Stage: upscale from 1_sorted ===")
+    log.info("OUT: %s/{landscape,portrait}/<source>/", folders.outbox)
+    log.info("Also skip if exists in: %s", folders.trash)
+    if removed_partial_outputs:
+        log.info("Removed %d stale partial output file(s) from %s",
+                 removed_partial_outputs, folders.outbox)
+
+
+def _upscale_one(in_file: Path, source: str, orient: str, env: dict,
+                 folders: UpscaleFolders, budget: _Budget) -> _Outcome:
+    out = upscaled_video_path(source, orient, in_file.stem, folders.outbox)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = partial_path(out, in_file.stem)
+
+    log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
+
+    settings = _settings_for(in_file, source, orient, folders.outbox, folders.origenerator)
+
+    ffmpeg_ok = False
+    try:
+        ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, settings, timeout=budget.encode_timeout())
+    except subprocess.TimeoutExpired:
+        log.info(
+            "Run budget spent after %.1fs; stopped this encode and left the video queued: %s",
+            budget.elapsed(), in_file,
+        )
+        tmp.unlink(missing_ok=True)
+        return _Outcome.BUDGET_SPENT
+    except OSError:
+        log.exception("FAILED (ffmpeg launch error): %s", in_file)
+
+    if not ffmpeg_ok:
+        tmp.unlink(missing_ok=True)
+        log.info("FAILED (ffmpeg error): %s", in_file)
+        return _Outcome.FAILED
+    return _promote_the_output(in_file, tmp, out, settings)
+
+
+def _promote_the_output(in_file: Path, tmp: Path, out: Path,
+                        settings: topaz.Settings) -> _Outcome:
+    if not (tmp.exists() and tmp.stat().st_size > 0):
+        tmp.unlink(missing_ok=True)
+        log.info("FAILED (empty output): %s", in_file)
+        return _Outcome.FAILED
+    try:
+        retry_while_in_use(partial(take_its_place, tmp, out))
+    except OSError:
+        log.info("FAILED (a player still holds the upscale it replaces): %s", out)
+        return _Outcome.FAILED
+    else:
+        log.info("Wrote: %s", out)
+        _record_the_upscale(out, settings)
+        return _Outcome.UPSCALED
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def has_pending_work(priority_files: list[Path] | None = None) -> bool:
