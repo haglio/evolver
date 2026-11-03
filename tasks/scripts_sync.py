@@ -83,6 +83,16 @@ class Trees:
     archive: Path | None
     vr: Path | None
 
+    @classmethod
+    def configured(cls) -> Trees:
+        return cls(
+            videos=config.VIDEO_LIBRARY_DIR,
+            scripts=config.SCRIPT_LIBRARY_DIR,
+            unmatched=config.UNMATCHED_SCRIPTS_DIR,
+            archive=config.NONAI_RETIRED_ROOT,
+            vr=config.VR_VIDEO_DIR,
+        )
+
 
 @dataclass(frozen=True)
 class _VersionCopies:
@@ -91,16 +101,8 @@ class _VersionCopies:
     copy_error_paths: list[str] = field(default_factory=list)
 
 
-def run(show_popup: bool = False, *, video_dir: Path | None = None,
-        script_dir: Path | None = None, unmatched_dir: Path | None = None,
-        archive_root: Path | None = None, vr_dir: Path | None = None) -> ScriptsSyncResult:
-    trees = Trees(
-        videos=config.VIDEO_LIBRARY_DIR if video_dir is None else video_dir,
-        scripts=config.SCRIPT_LIBRARY_DIR if script_dir is None else script_dir,
-        unmatched=config.UNMATCHED_SCRIPTS_DIR if unmatched_dir is None else unmatched_dir,
-        archive=config.NONAI_RETIRED_ROOT if archive_root is None else archive_root,
-        vr=config.VR_VIDEO_DIR if vr_dir is None else vr_dir,
-    )
+def run(show_popup: bool = False, *, trees: Trees | None = None) -> ScriptsSyncResult:
+    trees = Trees.configured() if trees is None else trees
     result = ScriptsSyncResult()
     trees.scripts.mkdir(parents=True, exist_ok=True)
 
@@ -113,6 +115,53 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         result.unreachable.append(str(trees.vr))
     video_index = _index_videos(trees)
 
+    orphans = _align_scripts(trees, video_index, result, vr_out_of_reach)
+
+    if orphans and trees.archive is not None and not reachable(trees.archive):
+        result.unreachable.append(str(trees.archive))
+        result.not_checked += len(orphans)
+    else:
+        followed = _follow_retired_videos(orphans, video_index, trees)
+        result.unmatched_paths += [_park(script_path, trees) for script_path in followed.unmatched]
+        result.followed_to_archive += followed.followed_to_archive
+        result.rehomed_to_variants += followed.rehomed_to_variants
+        result.collision_paths += followed.collision_paths
+        result.discarded_duplicates += followed.discarded_duplicates
+    _tidy_and_copy_versions(trees, video_index, result)
+    _report(result, trees, show_popup)
+    return result
+
+
+def _tidy_and_copy_versions(trees: Trees, video_index: dict[str, list[Path]],
+                            result: ScriptsSyncResult):
+    remove_empty_dirs(trees.scripts)
+    remove_empty_mark_folders()
+    versions = _copy_missing_version_scripts(video_index, trees)
+    result.copied_variants += versions.copied
+    result.ambiguous_variant_groups += versions.ambiguous_groups
+    result.variant_copy_error_paths += versions.copy_error_paths
+    result.unmatched = len(result.unmatched_paths)
+    result.ambiguous = len(result.ambiguous_paths)
+    result.collisions = len(result.collision_paths)
+    result.variant_copy_errors = len(result.variant_copy_error_paths)
+
+
+def _report(result: ScriptsSyncResult, trees: Trees, show_popup: bool):
+    _log_summary(result)
+    if result.not_checked:
+        log.warning("%d funscript(s) not checked: %s cannot be reached, so they stay where they "
+                    "are until it can be.", result.not_checked, " and ".join(result.unreachable))
+    if not result.ok:
+        log.error("Scripts sync failed. See log entries above for unresolved funscript alignment issues.")
+        if show_popup:
+            log.info("Showing error popup for scripts-sync failure")
+            links = [("Open unmatched_scripts", trees.unmatched)] if result.unmatched_paths else []
+            show_error("Evolver - Funscript Match Error", _popup_message(result), links=links)
+            log.info("Error popup closed")
+
+
+def _align_scripts(trees: Trees, video_index: dict[str, list[Path]],
+                   result: ScriptsSyncResult, vr_out_of_reach: bool) -> list[Path]:
     orphans: list[Path] = []
     for script_path in _iter_funscripts(trees.scripts, trees.unmatched):
         if vr_out_of_reach and _may_match_a_vr_video(script_path, trees):
@@ -141,27 +190,10 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         script_path.rename(dest)
         carry_mark(script_path, dest)
         result.moved += 1
+    return orphans
 
-    if orphans and trees.archive is not None and not reachable(trees.archive):
-        result.unreachable.append(str(trees.archive))
-        result.not_checked += len(orphans)
-    else:
-        followed = _follow_retired_videos(orphans, video_index, trees)
-        result.unmatched_paths += [_park(script_path, trees) for script_path in followed.unmatched]
-        result.followed_to_archive += followed.followed_to_archive
-        result.rehomed_to_variants += followed.rehomed_to_variants
-        result.collision_paths += followed.collision_paths
-        result.discarded_duplicates += followed.discarded_duplicates
-    remove_empty_dirs(trees.scripts)
-    remove_empty_mark_folders()
-    versions = _copy_missing_version_scripts(video_index, trees)
-    result.copied_variants += versions.copied
-    result.ambiguous_variant_groups += versions.ambiguous_groups
-    result.variant_copy_error_paths += versions.copy_error_paths
-    result.unmatched = len(result.unmatched_paths)
-    result.ambiguous = len(result.ambiguous_paths)
-    result.collisions = len(result.collision_paths)
-    result.variant_copy_errors = len(result.variant_copy_error_paths)
+
+def _log_summary(result: ScriptsSyncResult):
     log.info(
         "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Version copies: %d, Ambiguous version groups: %d, Version copy errors: %d, Rehomed to versions: %d, Followed to archive: %d, Discarded duplicates: %d",
         result.moved,
@@ -176,17 +208,6 @@ def run(show_popup: bool = False, *, video_dir: Path | None = None,
         result.followed_to_archive,
         result.discarded_duplicates,
     )
-    if result.not_checked:
-        log.warning("%d funscript(s) not checked: %s cannot be reached, so they stay where they "
-                    "are until it can be.", result.not_checked, " and ".join(result.unreachable))
-    if not result.ok:
-        log.error("Scripts sync failed. See log entries above for unresolved funscript alignment issues.")
-        if show_popup:
-            log.info("Showing error popup for scripts-sync failure")
-            links = [("Open unmatched_scripts", trees.unmatched)] if result.unmatched_paths else []
-            show_error("Evolver - Funscript Match Error", _popup_message(result), links=links)
-            log.info("Error popup closed")
-    return result
 
 
 def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path]],
