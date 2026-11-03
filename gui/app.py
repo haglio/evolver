@@ -42,7 +42,7 @@ log = logging.getLogger(__name__)
 _UPDATE_CHECK_MS = 60_000
 
 _SHOW_WINDOW = "--show-window"
-# AllowSetForegroundWindow takes -1 (ASFW_ANY): the pid of the next copy is unknowable here.
+# Win32's AllowSetForegroundWindow takes -1 (ASFW_ANY): the pid of the next copy is unknowable here.
 _ANY_PROCESS = -1
 STEPS = (("Loading Evolver...", 1.0),)
 
