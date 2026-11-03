@@ -12,6 +12,7 @@ from app_support.testing import no_wait_for_a_held_file
 
 import config
 from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
+from util import media_files
 from util.media_files import (
     child_dirs,
     is_partial_path,
@@ -269,6 +270,17 @@ class TestRetryWhileInUse(unittest.TestCase):
 
         with no_wait_for_a_held_file(), pytest.raises(PermissionError):
             retry_while_in_use(always_held_open)
+
+
+class TestAFileThatCannotBeRead:
+    def test_its_size_reads_as_zero(self, tmp_path):
+        assert media_files.file_size(tmp_path / "gone.mp4") == 0
+
+    def test_a_file_reads_as_its_size_in_bytes(self, tmp_path):
+        video = tmp_path / "a.mp4"
+        video.write_bytes(b"12345")
+
+        assert media_files.file_size(video) == 5
 
 
 if __name__ == "__main__":

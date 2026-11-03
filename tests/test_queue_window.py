@@ -3,11 +3,11 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QMimeData, QPoint, Qt
 from shared_ui.colors import BLUE
 
 from gui import queue_window
-from gui.queue_window import UpscaleQueueWindow, running_time
+from gui.queue_window import VIDEO_MIME, UpscaleQueueWindow, dropped_video, running_time
 from tests.gui_support import row_ground
 from util.upscale_queue import (
     ASKED_FOR,
@@ -297,3 +297,14 @@ class TestRunningTime:
     ])
     def test_reads_as_a_clock(self, seconds, shown):
         assert running_time(seconds) == shown
+
+
+class TestADragCarryingNoVideo:
+    def test_it_reads_as_an_empty_name(self):
+        assert dropped_video(QMimeData()) == ""
+
+    def test_a_dragged_video_is_read_back_by_name(self):
+        carried = QMimeData()
+        carried.setData(VIDEO_MIME, b"lagoon/b.mp4")
+
+        assert dropped_video(carried) == "lagoon/b.mp4"

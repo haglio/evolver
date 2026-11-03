@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import Mock, call, patch
 
@@ -261,3 +262,17 @@ class TestTellingTheTwoApart:
 
         assert app._window.windowTitle() == "Evolver"
         assert app._tray.toolTip().startswith("Evolver")
+
+
+class TestWhenAPreviewHandsTheWorkBack:
+    def test_the_hour_is_read_on_a_twelve_hour_clock_without_a_leading_zero(self):
+        assert branch_session.until(datetime(2026, 1, 1, 8, 30, tzinfo=UTC)) == "9:30 AM"
+        assert branch_session.until(datetime(2026, 1, 1, 12, 15, tzinfo=UTC)) == "1:15 PM"
+
+
+class TestRelaunchingAPreview:
+    def test_a_preview_is_started_again_through_its_own_launcher(self):
+        with override_config(BRANCH_SESSION=True, PROJECT_DIR=Path("checkout")):
+            command = branch_session.relaunch_command()
+
+        assert command == f'wscript.exe "{Path("checkout") / "launch_preview_branch.vbs"}"'
