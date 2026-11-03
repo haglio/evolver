@@ -1,25 +1,3 @@
-"""Stage: record what to call each 2D/non_AI video, on its mirrored sidecar.
-
-Every app in the family shows a video's name somewhere -- Fun Time's browser
-tiles, the name its Funestras print over the video, the same line in the headset
--- and until this stage the only name any of them had was the filename, which is
-whatever the download called it.  A name is worked out once here and read
-everywhere, rather than each reader walking the library to work it out again at
-launch.
-
-The answer is the ``clip`` record: a clip carved out of a compilation was
-recorded with the performer and the movie it came from, which is the name.  A
-whole scene has no such record of its own, so it takes the name of the clip
-Evolver's clip-match batch found inside it -- the library saved that scene under
-whatever the download called it, and the clip is the only thing that knows what
-is in it.  A video neither names keeps no ``title`` at all, and its readers fall
-back to the filename as they always did.
-
-Like :mod:`tasks.video_kinds` this is a backfill that never ends: it walks the
-whole non-AI library every run and rewrites what it finds, so a clip matched to
-its scene tomorrow is titled on the next run with no one-off script to remember.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -39,16 +17,12 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class NonAiTitleResult:
-    """What one run reached: how many videos it could name, of how many, and how
-    many sidecars that came to rewriting."""
-
     titled: int = 0
     videos: int = 0
     written: int = 0
 
 
 def _scene_matched(payload: dict) -> str:
-    """The scene Evolver's clip-match batch found *payload*'s clip inside."""
     clip = payload.get("clip")
     if not isinstance(clip, dict):
         return ""
@@ -60,11 +34,6 @@ def _path_key(path: str | Path) -> str:
 
 
 def titles_by_family(payloads: dict[Path, dict]) -> dict[str, str]:
-    """What to call each version family a clip record speaks for.
-
-    Keyed by family rather than by path, since a match is recorded against the
-    one rendition that was searched while the apps play whichever they like.
-    """
     family_by_path = {_path_key(video): version_group_of(payload)
                       for video, payload in payloads.items()}
     titles: dict[str, str] = {}
@@ -79,7 +48,6 @@ def titles_by_family(payloads: dict[Path, dict]) -> dict[str, str]:
 
 
 def run() -> NonAiTitleResult:
-    """Title every non-AI video a clip record can name, on its own sidecar."""
     log.info("=== Stage: title non-AI videos ===")
     result = NonAiTitleResult()
     payloads: dict[Path, dict] = {}

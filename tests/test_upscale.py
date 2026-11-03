@@ -24,12 +24,10 @@ from util.sidecar import upscaled_video_path
 
 
 def library_dirs(root):
-    """The three trees every upscale test builds: 1_sorted, the outbox, trash."""
     return root / "sorted", root / "out", root / "trash"
 
 
 def fake_run_ffmpeg(_in_file, tmp, _env, _settings=None, **kwargs):
-    """A successful encode: writes the temp output the stage promotes."""
     tmp.write_bytes(b"upscaled")
     return True
 
@@ -52,8 +50,6 @@ class TestUpscaleHelpers(unittest.TestCase):
                 assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
                 p1.unlink()
-                # The portrait arm on its own -- narrowing the loop to
-                # ('landscape',) used to leave this test green (audit probe P3).
                 p2 = out / "portrait" / "provider" / "a_topaz.mp4"
                 p2.write_bytes(b"1")
                 assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
@@ -82,13 +78,6 @@ class TestUpscaleHelpers(unittest.TestCase):
             assert (out_dir / "landscape" / source / "clip_topaz.mp4").exists()
 
     def test_run_upscales_between_the_three_trees_it_is_given(self):
-        """The stage spans three trees and a disk floor, and says so now.
-
-        `config` still answers when the caller names none of them, which is
-        what the pipeline does and what every other test here relies on. The
-        ambient three are pointed at a second sorted clip, so a stage still
-        reading them would upscale that one instead.
-        """
         with workspace_temp_dir() as root:
             given_sorted, given_out, given_trash = library_dirs(root / "given")
             given_in = given_sorted / "examplesource" / "landscape" / "clip one.mp4"
@@ -119,16 +108,6 @@ class TestUpscaleHelpers(unittest.TestCase):
             assert ambient_in.exists()
 
     def test_a_given_outbox_outside_the_library_still_upscales(self):
-        """The scraped provider's own clips, upscaled into a folder of one's own.
-
-        A given outbox is not under the library root, and the sidecar mirror
-        is the library's — so asking for one there is a question with no
-        answer rather than an error. The choice of settings degrades to the default
-        exactly as it does for a clip that simply has no sidecar; it must not
-        take the stage down before it has processed anything.
-        """
-        # The guard is reached only for a clip under the provider's own source
-        # name, which is the overlay's to say.
         with workspace_temp_dir() as root, override_config(PROVIDER_SOURCE="provider"):
             sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / config.PROVIDER_SOURCE / "landscape" / "clip one.mp4"
@@ -222,7 +201,6 @@ class TestUpscaleHelpers(unittest.TestCase):
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
 
-            # Set a tiny budget so after the first item, remaining < min_start
             with override_config(
                 SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir,
                 UPSCALE_RUN_BUDGET_SECONDS=1, UPSCALE_MIN_START_REMAINING_SECONDS=9999,
@@ -230,7 +208,6 @@ class TestUpscaleHelpers(unittest.TestCase):
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
                 result = upscale.run(max_items=10)
 
-            # With budget=0, it should process the first item but stop before the second
             assert result.processed == 1
             assert result.pending_after_run > 0
 
@@ -277,10 +254,6 @@ ROOMY_DRIVE = 10**15
 
 class TestTheLowDiskWarning(unittest.TestCase):
     def runs(self, *free_bytes_each_run: int, clicked_dismiss: bool = False) -> MagicMock:
-        """One run of the stage per entry, with a video waiting every time.
-
-        The encode fails, so the video is still waiting for the next run.
-        """
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, trash_dir = library_dirs(root)
             touch_video(sorted_dir / "src" / "landscape" / "clip.mp4")
@@ -316,7 +289,6 @@ class TestTheLowDiskWarning(unittest.TestCase):
         show_error.assert_not_called()
 
     def test_no_test_can_reach_the_dismissal_on_the_computer_running_the_suite(self):
-        """Every upscale test with room on its drive clears the dismissal it sees."""
         assert not config.LOW_DISK_WARNING_DISMISSED_FILE.is_relative_to(config.LOCAL_STATE_DIR)
 
     def test_ok_leaves_it_coming_back_every_run_the_drive_is_low(self):
@@ -399,10 +371,6 @@ class TestIsT2vProvider(unittest.TestCase):
                 assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_for_non_provider_source(self):
-        # The sidecar is a valid t2v one, so only the source-name guard can
-        # answer False here -- with no sidecar on disk the second check
-        # answered False anyway and the guard could be deleted unseen (audit
-        # probe P4b).
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider2" / "clip_topaz.json"
@@ -428,8 +396,6 @@ class TestIsT2vProvider(unittest.TestCase):
                 assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_when_the_sidecar_is_not_readable_as_json(self):
-        """A half-written sidecar must take the default settings, not the t2v ones:
-        the wrong Topaz model is baked into a finished encode nobody re-runs."""
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = (meta_dir / "2D" / "AI" / "2_outbox"
@@ -442,8 +408,6 @@ class TestIsT2vProvider(unittest.TestCase):
                 assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_when_the_sidecar_holds_something_other_than_a_record(self):
-        """Valid JSON that is not an object: the containment test would raise
-        on a number, and that is a malformed sidecar like any other."""
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = (meta_dir / "2D" / "AI" / "2_outbox"
@@ -456,9 +420,6 @@ class TestIsT2vProvider(unittest.TestCase):
                 assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
     def test_false_when_the_sidecar_holds_only_the_video_kind(self):
-        """A sidecar the kinds stage made for a clip nothing has scraped says
-        nothing about how the clip was generated — least of all that it was
-        text-to-video, which is what "no source_image" would otherwise mean."""
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
@@ -517,7 +478,6 @@ class TestOnProgressCallback(unittest.TestCase):
             assert progress_calls[-1] == (2, 2)
 
     def test_on_progress_not_required(self):
-        """Existing callers without on_progress still work."""
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, trash_dir = library_dirs(root)
             f = sorted_dir / "src" / "landscape" / "clip.mp4"
@@ -625,10 +585,6 @@ class TestFfmpegWindowSuppression(unittest.TestCase):
 
 class TestSettingsSelection(unittest.TestCase):
     def _run_capturing_the_settings(self, root, sidecar_payload):
-        """Upscale one provider clip whose sidecar holds *sidecar_payload*, capturing the
-        settings it is encoded with.  The video tree nests under VIDEO_LIBRARY_DIR because a
-        sidecar mirrors its clip's path relative to that root.
-        """
         video_lib = root / "videos"
         ai_dir = video_lib / "2D" / "AI"
         sorted_dir = ai_dir / "1_sorted"
@@ -678,8 +634,6 @@ class TestSettingsSelection(unittest.TestCase):
 
 class TestOrigeneratorsVideos(unittest.TestCase):
     def _upscale(self, root: Path, source: str):
-        """Upscale one 112 fps video sorted under *source*, beside an Origenerator
-        whose published document says its model generates at 16 fps."""
         lib = LaneLibrary(root)
         video = touch_video(lib.sorted_dir / source / "portrait" / "scene one.mp4")
         origenerator = root / "origenerator"
@@ -784,7 +738,6 @@ class TestOrigeneratorsVideos(unittest.TestCase):
 
 class TestUpscaleResultSurface(unittest.TestCase):
     def test_the_result_carries_only_counters_something_raises(self):
-        """A counter nothing increments reads as a tally and is always a lie."""
         assert {f.name for f in dataclasses.fields(upscale.UpscaleResult)} == {"processed", "failed", "stopped_at_budget", "deferred_low_disk", "pending_after_run"}
 
 

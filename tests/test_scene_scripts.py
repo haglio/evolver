@@ -10,8 +10,6 @@ from util import provenance
 
 
 class SceneScriptsCase(CarvedClipLibraryCase):
-    """A carved clip with a script, and the scene it came out of, in a temp library."""
-
     def run_stage(self, duration=600.0):
         with self.library_overrides(), \
              patch.object(scene_scripts.ffprobe, "duration_seconds", return_value=duration):
@@ -44,9 +42,6 @@ class TestSceneScripts(SceneScriptsCase):
         assert (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("evolver", None, None)
 
     def test_the_rest_of_the_scene_is_left_unscripted(self):
-        """A scene runs for an hour and the clip covers a minute of it. Nothing
-        is invented for the rest: silence leaves the device still, which is the
-        truth about a stretch nobody has scripted."""
         scene = self.make_scene()
         self.make_clip(scene, scene_offset=300.0, actions=[{"at": 0, "pos": 0}, {"at": 900, "pos": 90}])
 
@@ -76,8 +71,6 @@ class TestSceneScripts(SceneScriptsCase):
         assert not self.scene_script().exists()
 
     def test_skips_a_clip_the_matcher_has_not_placed_yet(self):
-        """Most clips have no ``full_video``: the scene they were cut from is
-        not in the library at all, and nothing here can guess it."""
         video = self.videos / LAGOON / "clips" / "unmatched.mp4"
         video.parent.mkdir(parents=True, exist_ok=True)
         video.write_bytes(b"clip")
@@ -91,8 +84,6 @@ class TestSceneScripts(SceneScriptsCase):
         assert result.unmatched_clip == 1
 
     def test_skips_a_scene_that_has_left_the_library(self):
-        """A recorded match names a file that can since have been renamed,
-        archived or deleted; writing its script would only litter the tree."""
         gone = self.videos / LAGOON / "scenes" / "moved-away.mp4"
         self.make_clip(gone, actions=[{"at": 0, "pos": 90}])
 
@@ -102,8 +93,6 @@ class TestSceneScripts(SceneScriptsCase):
         assert result.scene_gone == 1
 
     def test_a_whole_video_that_is_not_a_clip_is_not_a_source(self):
-        """Only a carved clip carries the record; an ordinary video has no
-        sidecar ``clip`` object and is never read as one."""
         plain = self.videos / LAGOON / "scenes" / "ordinary.mp4"
         plain.parent.mkdir(parents=True, exist_ok=True)
         plain.write_bytes(b"scene")

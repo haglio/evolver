@@ -26,12 +26,6 @@ def _write_json(path: Path, payload: dict) -> Path:
 
 @contextmanager
 def _stores_under(temp: Path, **used):
-    """Point every store at *temp*, then let the test name the ones it uses.
-
-    Listing them all matters: a store left at its real location gets read — and
-    rewritten — out of the live suite by whichever test forgot it. Add each new
-    store here as it is registered.
-    """
     unused = temp / "no-such-store"
     with override_config(
         VIDEO_SEARCH_ROOT=temp / "videos",
@@ -51,7 +45,6 @@ def _stores_under(temp: Path, **used):
 
 @contextmanager
 def _paired_library(temp: Path):
-    """A non-AI library at *temp* whose clip sidecars are the only store in use."""
     library = temp / "videos" / "videos"
     with _stores_under(
         temp, VIDEO_LIBRARY_DIR=library, NON_AI_DIR=library / "2D" / "non_AI",
@@ -77,7 +70,6 @@ class TestGenaumacherSessions(unittest.TestCase):
             assert result.relocated == 1
 
     def test_follows_a_video_that_was_renamed_where_it_stood(self):
-        """No name left to match on — but the session records the footage's shape."""
         with workspace_temp_dir() as temp:
             folder = temp / "videos" / "lagoon" / "0 unsorted"
             renamed_to = _write_video(folder / "Clip_topaz.mp4")
@@ -121,8 +113,6 @@ class TestGenaumacherSessions(unittest.TestCase):
 
             assert json.loads(session.read_text(encoding="utf-8"))["video_path"] == gone
             assert result.unresolved == 1
-            # The stage no longer carries the paths on its result, so the log is
-            # the only place that says *which* reference could not be followed.
             assert gone in logged.records[0].getMessage()
 
     def test_leaves_a_session_whose_video_never_moved_untouched(self):
@@ -286,12 +276,6 @@ class TestClipPairings(unittest.TestCase):
 
 class TestUnwritableStore(unittest.TestCase):
     def test_a_store_that_cannot_be_rewritten_is_counted_and_the_rest_are_followed(self):
-        """One unwritable file must not abort the stage, and must not pass as ok.
-
-        The stores are other apps' files, and one of them open in the app that
-        owns it is an ordinary Tuesday -- so a failed rewrite is news about that
-        store, not the end of the run.
-        """
         with workspace_temp_dir() as temp:
             moved_to = _write_video(temp / "videos" / "2D" / "non_AI" / "other" / "clip.mp4")
             was_at = temp / "videos" / "2D" / "other" / "clip.mp4"
@@ -324,14 +308,6 @@ class TestUnwritableStore(unittest.TestCase):
 
 
 class TestReferenceStoreSurface(unittest.TestCase):
-    """A store asks its own file, rather than being handed it back.
-
-    Every call site read `store.read(store.path)`, `store.rewrite(store.path,
-    moves)`, `store.fingerprint(store.path)` -- the object passing its own
-    field into its own function, three times out of three, with nothing
-    stopping a caller passing a different one.
-    """
-
     def _store(self, calls):
         return reference_stores.ReferenceStore(
             "example",
@@ -352,8 +328,6 @@ class TestReferenceStoreSurface(unittest.TestCase):
         assert calls == [("read", store.path), ("rewrite", store.path, {"a.mp4": "b.mp4"}), ("fingerprint", store.path)]
 
     def test_a_store_that_records_no_fingerprint_answers_none(self):
-        """Most of them record only a path, so a renamed video is beyond their
-        reach and the last-resort match is skipped rather than guessed."""
         store = reference_stores.ReferenceStore(
             "example", Path("C:/somewhere/refs.json"), lambda path: [],
             lambda path, moves: None,
@@ -363,12 +337,6 @@ class TestReferenceStoreSurface(unittest.TestCase):
 
 
 class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
-    """Each of these files belongs to a repo that never hears about this one, so
-    a format it changes arrives here as a file that still parses and still looks
-    rewritable. Rewriting one blind is how this app corrupts another's saved
-    work, and the reference it would have followed is stranded either way -- so
-    the file is left exactly as it is and somebody is told."""
-
     def test_a_session_stamped_with_a_version_this_stage_does_not_know_is_left_alone(self):
         with workspace_temp_dir() as temp:
             _write_video(temp / "videos" / "2D" / "other" / "moved" / "clip.mp4")
@@ -388,7 +356,6 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
             assert result.ok
 
     def test_a_session_written_before_the_stamp_existed_is_the_first_version(self):
-        """Every session and project on disk today was written without one."""
         with workspace_temp_dir() as temp:
             moved_to = _write_video(temp / "videos" / "2D" / "other" / "moved" / "clip.mp4")
             session = _write_json(
@@ -417,8 +384,6 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
             assert result.refused == 1
 
     def test_watch_counts_that_are_not_counts_are_left_alone(self):
-        """These carry no version and cannot: every key there is a video path.
-        Their shape is the contract instead."""
         with workspace_temp_dir() as temp:
             _write_video(temp / "videos" / "non_AI" / "other" / "clip.mp4")
             was_at = str(temp / "videos" / "other" / "clip.mp4").lower()
@@ -433,7 +398,6 @@ class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
 
 class TestReferenceSyncResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
-        """Every field lands in a run record; one nothing reads is dead weight."""
         assert {f.name for f in dataclasses.fields(reference_sync.ReferenceSyncResult)} == {"checked", "relocated", "unresolved", "not_checked", "write_errors", "refused"}
 
 

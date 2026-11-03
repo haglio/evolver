@@ -1,4 +1,3 @@
-"""Stage: give a carved clip the part of its source scene's funscript it was cut from."""
 from __future__ import annotations
 
 import logging
@@ -33,8 +32,6 @@ def run() -> ClipScriptsResult:
         if not isinstance(clip, dict):
             continue
 
-        # Which scene a clip came from, and where in it, is recorded by the
-        # content-matching stage; until that has run there is nothing to cut.
         scene, offset = clip.get("full_video"), clip.get("scene_offset")
         if not scene or offset is None:
             result.unmatched_clip += 1
@@ -50,9 +47,6 @@ def run() -> ClipScriptsResult:
             result.no_scene_script += 1
             continue
 
-        # The clip may be a re-encode of the scene at another frame rate, so how
-        # far its window reaches is the clip's own business, not arithmetic on
-        # the scene's timeline.
         duration = ffprobe.duration_seconds(video)
         if duration is None:
             result.unprobeable += 1
@@ -60,9 +54,6 @@ def run() -> ClipScriptsResult:
             continue
 
         trimmed = script_library.trim(funscript.read(scene_script), offset, duration)
-        # One action is a position the device holds, not a motion: a script of
-        # it would drive nothing, and having one stops anybody scripting the
-        # clip properly later.
         if len(trimmed["actions"]) <= 1:
             result.no_motion_in_window += 1
             log.info("NO MOTION for clip window, leaving unscripted: %s", video)

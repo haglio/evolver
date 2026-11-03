@@ -1,4 +1,3 @@
-"""The files the non-AI upscale stage touches, resolved once at its boundary."""
 from __future__ import annotations
 
 from pathlib import Path

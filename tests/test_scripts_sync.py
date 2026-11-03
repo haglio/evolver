@@ -10,15 +10,6 @@ from tests.temp_helpers import a_drive_that_is_not_there, override_config, works
 
 
 def library_overrides(video_root, script_root, **extra):
-    """Every store scripts_sync reads or writes, in one place.
-
-    Listing them all matters (the discipline test_reference_sync.py's
-    _stores_under documents): a store left at its real location gets read --
-    and rewritten -- out of the live suite by whichever test forgot it.
-    NONAI_RETIRED_ROOT was previously pinned by only two of the eleven tests
-    and left to the imported config everywhere else, correct only because the
-    example overlay happens to supply None.
-    """
     overrides = dict(VIDEO_LIBRARY_DIR=video_root, SCRIPT_LIBRARY_DIR=script_root,
                      NONAI_RETIRED_ROOT=None, VR_VIDEO_DIR=None,
                      UNMATCHED_SCRIPTS_DIR=script_root.parent / "unmatched_scripts",
@@ -240,8 +231,6 @@ class TestVrVideosKeptOffTheLibrarysDrive(unittest.TestCase):
 
 
 class TestUnmatchedScriptsFolder(unittest.TestCase):
-    """A script that matches no video waits in unmatched_scripts until renamed."""
-
     def _roots(self, root):
         return root / "videos", root / "scripts", root / "unmatched_scripts"
 
@@ -592,11 +581,6 @@ class TestScriptsSync(unittest.TestCase):
             assert original_script.read_text(encoding="utf-8") == processed_script.read_text(encoding="utf-8")
 
     def test_two_differing_sibling_scripts_leave_the_version_unscripted(self):
-        """The guard against copying one clip's funscript onto another version:
-        when two siblings hold DIFFERING scripts there is no right source, so
-        the stage must refuse and count the group -- dropping the filecmp
-        comparison entirely used to change nothing (audit probe P19), and the
-        counter was asserted nowhere."""
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
@@ -714,13 +698,6 @@ class TestOneVideoSentDownTwoLanes(unittest.TestCase):
 
 
 class TestFollowRetiredVideos(unittest.TestCase):
-    """A script whose video was archived should follow it out, not fail forever.
-
-    Retiring an original moves it out of the library, and the script tree mirrors
-    only the library — so a stranded funscript matches no video on every run
-    from then on, and the stage can never go green again by itself.
-    """
-
     def _tree(self, root):
         video_root = root / "videos"
         script_root = root / "scripts"
@@ -730,9 +707,6 @@ class TestFollowRetiredVideos(unittest.TestCase):
         return video_root, script_root, archive_root
 
     def test_orphan_script_rehomes_to_surviving_upscaled_version(self):
-        """An upscaled sibling still in the library inherits the retired
-        original's script — one funscript serves every version of a video, so
-        upscaling must never strand the surviving copy scriptless."""
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
             version = video_root / "2D" / "non_AI" / "studio" / "3 done" / "processed" / "scene one_apo8_iris2.mp4"
@@ -802,7 +776,6 @@ class TestFollowRetiredVideos(unittest.TestCase):
             assert followed.read_text(encoding="utf-8") == '{"actions":[1]}'
 
     def test_discards_the_identical_duplicate_left_under_another_folder(self):
-        """Two library folders can hold the same script for one archived video."""
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
             archived_video = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"
@@ -849,7 +822,6 @@ class TestFollowRetiredVideos(unittest.TestCase):
             assert archived_script.read_text(encoding="utf-8") == '{"actions":[9]}'
 
     def test_a_script_two_archived_videos_share_a_name_with_waits_for_a_person(self):
-        """Which video it belongs to is a guess, so it waits in unmatched_scripts."""
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
             script_path = script_root / "2D" / "non_AI" / "studio" / "scene one.funscript"
@@ -887,7 +859,6 @@ class TestFollowRetiredVideos(unittest.TestCase):
             assert script_path.exists()
 
     def test_does_not_walk_the_archive_when_every_script_matched(self):
-        """An ordinary run must not touch the archive drive at all."""
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
             video_path = video_root / "2D" / "AI" / "clip.mp4"
@@ -947,5 +918,4 @@ class TestFollowRetiredVideos(unittest.TestCase):
 
 class TestScriptsSyncResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
-        """The lists name the scripts the popup and the main window show."""
         assert {f.name for f in dataclasses.fields(scripts_sync.ScriptsSyncResult)} == {"moved", "already_aligned", "unmatched", "ambiguous", "collisions", "copied_variants", "ambiguous_variant_groups", "variant_copy_errors", "rehomed_to_variants", "followed_to_archive", "discarded_duplicates", "not_checked", "unreachable", "unmatched_paths", "ambiguous_paths", "collision_paths", "variant_copy_error_paths"}

@@ -1,5 +1,3 @@
-"""Stage: scrape AI prompt metadata into mirrored JSON files."""
-
 from __future__ import annotations
 
 import datetime
@@ -48,14 +46,6 @@ class PromptScrapeResult:
 
 def run(*, sorted_dir: Path | None = None,
         browser_profile_dir: Path | None = None) -> PromptScrapeResult:
-    """Scrape each newly sorted video's generation metadata into its mirrored sidecar.
-
-    *sorted_dir* is the tree walked; *browser_profile_dir* is the scratch
-    profile the headless browser is given. Both are sentinels rather than
-    signature defaults: a default is evaluated at import, which would freeze
-    whatever ``config`` held then and put the value out of reach of
-    ``override_config``.
-    """
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     browser_profile_dir = (
         config.PROMPT_BROWSER_PROFILE_DIR if browser_profile_dir is None
@@ -125,24 +115,11 @@ def run(*, sorted_dir: Path | None = None,
 
 
 def _already_scraped(output_path: Path) -> bool:
-    """Whether the sidecar at *output_path* already holds what this stage writes.
-
-    Existence is not the same question: ``tasks.video_kinds`` records a kind
-    and a running time on every library video, including the ones nothing has
-    scraped yet. A sidecar holding nothing but those is not a scrape, and
-    reading it as one loses the prompts for good — a video this stage has
-    skipped once is never looked at again.
-    """
     return output_path.exists() and not video_kind.only_the_video_itself(
         sidecar.read(output_path))
 
 
 def _failure_marker_path(output_path: Path) -> Path:
-    """Sidecar marking a video whose scrape failed, so it is not retried every run.
-
-    Delete this file to force a retry (e.g. after a transient failure is resolved).
-    Kept separate from the JSON so it never confuses _is_t2v_provider in the upscale stage.
-    """
     return output_path.with_name(output_path.name + ".failed")
 
 
@@ -153,14 +130,11 @@ def _write_failure_marker(output_path: Path, video: Path, error: BaseException) 
 
 
 def _provider_image_url(video: Path, base_url: str) -> str:
-    """The Provider image-page URL a video's stem maps to — its scrape entry point."""
     return f"{base_url}/image/{source_stem(video.stem)}"
 
 
 @dataclass(frozen=True)
 class _VideoFields:
-    """What the walk has learned about one video so far."""
-
     prompt: str = ""
     source_image_url: str = ""
     metadata: dict[str, str] = field(default_factory=dict)
@@ -169,12 +143,6 @@ class _VideoFields:
 def _scrape_provider_video(
     video_path: Path, image_url: str, browser: Path, base_url: str, profile_dir: Path,
 ) -> dict[str, object]:
-    """The sidecar payload for one video: its own record, and its source image's.
-
-    The video is looked for at four URLs because the site files one under
-    several paths depending on how it was made, and the first that yields a
-    prompt is taken to be it.
-    """
     image_id = image_url.rstrip("/").split("/")[-1]
     found = _VideoFields()
     for candidate in _candidate_urls(image_url, image_id, base_url):
@@ -195,12 +163,6 @@ def _scrape_provider_video(
 
 
 def _candidate_urls(image_url: str, image_id: str, base_url: str) -> list[str]:
-    """Where one video might be filed, most likely first.
-
-    Which of the three video paths a clip sits under depends on how it was
-    made, and nothing in the file name says which; the image path is tried
-    first because it is the one a video's own stem maps to.
-    """
     return [
         image_url,
         f"{base_url}/video/{image_id}",
@@ -211,14 +173,6 @@ def _candidate_urls(image_url: str, image_id: str, base_url: str) -> list[str]:
 
 def _folded_in(found: _VideoFields, html: str, image_id: str,
                base_url: str) -> _VideoFields:
-    """*found*, plus what one more candidate page says.
-
-    A content panel replaces all three wholesale -- it is what a reader sees on
-    the site, so a page that has one is the authority on that page. The record
-    embedded in the page is the fallback, and fills in only what is still
-    missing: a panel that carried the metadata labels but no prompt keeps its
-    metadata even when the prompt arrives from a later page's JSON.
-    """
     document = parse_document(html)
     panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
     if panel is not None:
@@ -242,11 +196,6 @@ def _folded_in(found: _VideoFields, html: str, image_id: str,
 
 
 def _scrape_source_image(url: str, browser: Path, *, profile_dir: Path) -> dict[str, str]:
-    """What the image a video was made from says about itself.
-
-    Same two ways round as the video: the content panel if the page has one,
-    the record embedded in it if not.
-    """
     html = fetch_dom(url, browser, profile_dir=profile_dir)
     document = parse_document(html)
     panel = query_selector(document, _CONTENT_PANEL_SELECTOR)
@@ -267,13 +216,6 @@ def _scrape_source_image(url: str, browser: Path, *, profile_dir: Path) -> dict[
 
 
 def _build_strategies(browser, profile_dir):
-    """Map each ingest source to a ``(video) -> payload`` metadata builder.
-
-    Origenerator is a normal external content source whose metadata Evolver pulls
-    from its own gallery database (see :mod:`tasks.origenerator_metadata`), so it
-    needs no browser and is always available. Provider metadata is scraped from its
-    website, so it registers only when a headless browser was found.
-    """
     provider_source = config.PROVIDER_SOURCE
     base_url = config.PROVIDER_BASE_URL
     strategies = {lanes.ORIGENERATOR_SOURCE: origenerator_metadata.build_metadata}
@@ -285,11 +227,6 @@ def _build_strategies(browser, profile_dir):
 
 
 def _extract_prompt_text(panel: Node) -> str:
-    """Extract the positive prompt text from a content panel.
-
-    The prompt is the first text block inside a div > div structure that
-    doesn't contain h2 labels (which would be metadata fields).
-    """
     for child in panel.children:
         if child.tag != "div":
             continue
@@ -303,11 +240,6 @@ def _extract_prompt_text(panel: Node) -> str:
 
 
 def _extract_negative_prompt_text(panel: Node) -> str:
-    """Extract the negative prompt text from a content panel.
-
-    The negative prompt is in a div with class 'max-h-80' that appears after
-    a span/div containing 'Negative prompt'.
-    """
     found_label = False
     for child in panel.children:
         if not found_label:
@@ -321,7 +253,6 @@ def _extract_negative_prompt_text(panel: Node) -> str:
 
 
 def _extract_source_image_url(panel: Node, base_url: str) -> str:
-    """Find the source image thumbnail img and derive the image page URL."""
     for img in find_all_by_tag(panel, "img"):
         src = img.attrs.get("src", "")
         if src:
@@ -354,17 +285,8 @@ class _ProviderEmbeddedMetadata:
     creativity: str = ""
 
 
-# How wide a slice of the page around each mention of the id is read as the
-# record for it. The embedded JSON is minified onto one line with everything
-# else on the page, so there is no delimiter to stop at; 5,000 characters
-# either side comfortably spans one record's fields without reaching the next
-# item's on a listing page.
 _JSON_WINDOW_CHARS = 5000
 
-# Each field of the embedded record: what it is called on the dataclass, and
-# how to read it out of a window. Every reader answers "" for absent, so the
-# loop below has one shape rather than thirteen copies of it -- three of which
-# differed only in converting an int, joining a pair, or reformatting a date.
 _EMBEDDED_FIELDS: tuple[tuple[str, Callable[[str], str]], ...] = (
     ("prompt", lambda blob: _extract_json_string_field(blob, "prompt")),
     ("negative_prompt",
@@ -385,14 +307,6 @@ _EMBEDDED_FIELDS: tuple[tuple[str, Callable[[str], str]], ...] = (
 
 
 def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmbeddedMetadata:
-    """The record the page embeds for *page_id*, read out of the JSON around it.
-
-    Each mention of the id is tried in turn, and each window twice -- once as
-    it stands and once with the backslash-escaped quotes unescaped, because the
-    same record appears both as JSON and as a JSON string holding JSON. The
-    first mention that yields a prompt is taken to be the right one; a field
-    already found is never overwritten by a later window.
-    """
     found: dict[str, str] = {}
     for index in _all_indices(html, page_id):
         window = html[max(0, index - _JSON_WINDOW_CHARS): index + _JSON_WINDOW_CHARS]
@@ -402,8 +316,6 @@ def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmb
                     found[attribute] = extract(candidate)
         if found.get("prompt"):
             break
-    # By keyword, so a name in the table that no field answers to is a
-    # TypeError here rather than a value silently going nowhere.
     return _ProviderEmbeddedMetadata(**found)
 
 
@@ -459,26 +371,12 @@ def _extract_json_first_array_string(blob: str, field_name: str) -> str:
 
 
 def _titlecase_action(raw_action: str) -> str:
-    """Title-case a Provider action, but write a camera word as the overlay does.
-
-    A plain ``str.title()`` would render an initialism, "xyz_gamma", as "Xyz
-    Gamma"; the library — and the backfill tool's spoken vocabulary — write it
-    "XYZ Gamma", so one Fun Time filter query still reaches both producers'
-    clips.
-    """
     as_written = {prefix.lower(): prefix for prefix in config.CAMERA_PREFIXES}
     words = raw_action.replace("_", " ").split()
     return " ".join(as_written.get(word.lower(), word.title()) for word in words)
 
 
 def _parse_provider_created_at(value: str) -> str:
-    """*value* as an ISO date, or *value* itself when it does not name one.
-
-    ``parsedate`` is lenient enough to read a day number no month has, so the
-    ValueError comes from building the date rather than from parsing it. That
-    is the only failure this expects: a non-string reaching here would be a
-    caller bug and should say so rather than pass silently through.
-    """
     try:
         t = parsedate(value)
         if t is not None:

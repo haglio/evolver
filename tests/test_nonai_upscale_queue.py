@@ -1,9 +1,3 @@
-"""What the upscale queue window is handed to show.
-
-One list: row 1 is the video being upscaled (or the one that starts next), and
-the head says what it is doing. Everything here is fabricated: buckets named the
-way the committed example names them, and videos called a, b and c.
-"""
 from __future__ import annotations
 
 import unittest
@@ -77,8 +71,6 @@ class TestTheList(unittest.TestCase):
             assert not queue.head.runs_now
 
     def test_a_video_is_called_by_its_recorded_title_where_it_has_one(self):
-        """The title the library records is what the other apps show; a video
-        with none falls back to its file name, as they do."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -95,8 +87,6 @@ class TestTheList(unittest.TestCase):
 
 
 class TestRowOne(unittest.TestCase):
-    """Row 1 is whatever the computer is on, ahead of the order the stage keeps."""
-
     def test_the_video_in_flight_is_row_one_whatever_the_order_says(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -132,8 +122,6 @@ class TestRowOne(unittest.TestCase):
             assert queue.head.runs_now
 
     def test_an_encode_whose_process_has_ended_is_finishing(self):
-        """Its output is promoted on the next run, which is when the video
-        leaves the queue for good."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             write_job(root, overrides)

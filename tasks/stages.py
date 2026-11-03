@@ -32,8 +32,6 @@ _FLICK = config.GENAU_FLICK_WORD
 
 @dataclass(frozen=True)
 class Stage:
-    """One pipeline stage: what it is called, what it does, how it is drawn."""
-
     key: str
     label: str
     tooltip: str

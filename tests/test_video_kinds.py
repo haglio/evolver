@@ -1,4 +1,3 @@
-"""The stage that records what kind every library video is."""
 from __future__ import annotations
 
 import unittest
@@ -14,8 +13,6 @@ from tests.temp_helpers import (
 )
 from util import orientation, sidecar, video_kind
 
-# Fabricated: the real folder name is library vocabulary and lives in the
-# overlay, so a test names its own and overrides the config with it.
 GENAU_SOURCE = "example-loop-clips"
 
 
@@ -52,12 +49,6 @@ class TestAiLane(unittest.TestCase):
             assert result.recorded == 1
 
     def test_an_act_struck_out_while_the_stage_measures_is_still_there_after(self):
-        """Bug 8's lost update, from the stage's side.
-
-        Measuring a clip takes seconds, and Fun Time can strike an act out of
-        the same sidecar in the middle of one.  The kind is written onto the
-        document as it stands when the write comes, so the rejection stays.
-        """
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
@@ -94,8 +85,6 @@ class TestAiLane(unittest.TestCase):
                 assert video_kind.kind_of(sidecar.read(path)) == video_kind.FULL_LENGTH
 
     def test_a_clip_in_the_genau_source_is_a_genau_loop_before_it_is_delivered(self):
-        """It is bound for Genau's folder, and its kind does not wait on a
-        running time — the measurement here fails and the kind lands anyway."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
@@ -184,8 +173,6 @@ class TestRunningItAgain(unittest.TestCase):
             assert video.name == "clip_c.mp4"
 
     def test_a_kind_recorded_before_running_times_were_kept_is_measured_once(self):
-        """The sidecars this stage wrote before it began keeping the
-        measurement have a kind and no running time; one run each fills it in."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
@@ -226,9 +213,6 @@ def _refuses_to_be_called(video):
 
 
 class TestKeepingTheRunningTime(unittest.TestCase):
-    """The measurement is written down rather than thrown away once it has
-    settled a kind, and it is taken even where no kind needed it."""
-
     def test_the_running_time_lands_beside_the_kind(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
@@ -243,8 +227,6 @@ class TestKeepingTheRunningTime(unittest.TestCase):
             assert video_kind.kind_of(payload) == video_kind.FULL_LENGTH
 
     def test_an_excerpt_is_measured_even_though_its_kind_was_free(self):
-        """Two thirds of the videos the non-AI upscale project accounts for are
-        clips, and it weighs the queue by running time."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
@@ -535,7 +517,6 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
             assert (result.recorded, result.already, result.deferred) == (1, 0, 2)
 
     def test_the_free_answers_are_not_held_back_by_it(self):
-        """Only measuring costs anything, so only measuring is counted."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(VIDEO_KIND_BATCH_LIMIT=0):
@@ -550,13 +531,6 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
 
 
 class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
-    """The two kinds a folder settles are re-derived every run.
-
-    They cost nothing to reach, so a library recorded before its clip
-    folders were declared corrects itself on the next run rather than keeping
-    an answer nobody can see is wrong.
-    """
-
     def test_a_scene_the_overlay_later_declares_an_excerpt_is_corrected(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
@@ -575,8 +549,6 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
             assert (result.recorded, result.already) == (1, 0)
 
     def test_a_scene_carved_after_it_was_recorded_is_corrected_too(self):
-        """The `clip` record arrives when something splits the video, which is
-        long after this stage first saw it."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             video = lib.non_ai / "alpha" / "0 unsorted" / "Jane-Doe-scene-3.mp4"
@@ -592,8 +564,6 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 assert video_kind.kind_of(sidecar.read(path)) == video_kind.CLIP
 
     def test_a_scene_that_is_no_longer_an_excerpt_is_reclassified(self):
-        """Undeclaring the folder puts the running time back in charge, and the
-        one already on file answers — nothing is measured a second time."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             video = lib.non_ai / "alpha" / "excerpts" / "0 unsorted" / "Ada-Roe-8.mp4"
@@ -622,13 +592,6 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
 
 
 class TestFindingTheExcerptFoldersItself(unittest.TestCase):
-    """Where the librarian filed a batch's cuts into a folder of their own,
-    that folder is visible in the library and needs no declaring.
-
-    The overlay's `excerpt_folders` stays the way to say so outright, for the
-    batches whose folder was never separated.
-    """
-
     def _batch(self, lib, folder, name, carved=False):
         video = touch_video(lib.non_ai / "alpha" / folder / "0 unsorted" / name)
         if carved:
@@ -655,9 +618,6 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
             assert kinds["whole-0.mp4"] == video_kind.FULL_LENGTH
 
     def test_a_batch_that_never_separated_its_cuts_keeps_every_whole_video(self):
-        """The pipeline's own stage folders can never stand in for a division
-        of the library, so a batch with one carved scene among its scenes says
-        nothing about the rest."""
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):

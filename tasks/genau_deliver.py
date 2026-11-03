@@ -51,11 +51,6 @@ class GenauDeliverResult:
 
 
 def _upscaled_genau_flicks(root: Path, genau_source: str):
-    """Every finished Genau upscale waiting in the outbox, whatever its orientation.
-
-    The upscale stage files its output under ``<orient>/<source>/``, so the lane's
-    flicks are spread across the orientation folders rather than gathered in one.
-    """
     for orient_dir in child_dirs(root):
         source_dir = orient_dir / genau_source
         if source_dir.is_dir():
@@ -63,12 +58,6 @@ def _upscaled_genau_flicks(root: Path, genau_source: str):
 
 
 def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
-    """The ``1_sorted`` video ``upscaled`` was made from, if it is still there.
-
-    The upscale stage names its output ``<sorted stem>_topaz`` under the same
-    ``<orient>/<source>`` pair, so the source path is recoverable from the output
-    path alone — no bookkeeping to keep in step.
-    """
     if not is_upscaled_stem(upscaled.stem):
         return None
     orient = upscaled.parent.parent.name
@@ -81,35 +70,17 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
 
 
 def _deliver(upscaled: Path, delivery_dir: Path, made_again: Callable[[], set[str]]) -> Path:
-    """Move one finished upscale into Genau's AI folder; return where it landed."""
     delivery_dir.mkdir(parents=True, exist_ok=True)
     played = delivery_dir / upscaled.name
     if played.exists() and origenerator_gallery.origin_stem(upscaled.stem) in made_again():
         take_its_place(upscaled, played)
         return played
-    # A name can genuinely already be taken there, and delivering must never
-    # overwrite a flick that is already being played.
     destination = unique_path(played)
     upscaled.replace(destination)
     return destination
 
 
 def _move_sidecar(upscaled: Path, destination: Path) -> None:
-    """Re-file the flick's metadata under where it now lives, saying what it is.
-
-    The record travels with the flick rather than dying at the door: what a loop
-    was generated from is worth as much in Genau's folder as it was in the
-    outbox, and the kind Genau's flicks *are* (:mod:`util.video_kind`) has to be
-    written down somewhere for the apps that ask.  A flick delivered with no
-    record at all still gets one, holding that one answer.
-
-    Neither half is a reason to abandon a delivery that has already happened:
-    ``sidecar_path`` raises for a video under neither library root, and a flick
-    that somehow sits outside them simply has nowhere to keep a record, while a
-    metadata tree that cannot be written costs the generation record but not the
-    kind — ``tasks.video_kinds`` finds the delivered flick with none and writes
-    one on its next run.
-    """
     try:
         was, now = sidecar.sidecar_path(upscaled), sidecar.sidecar_path(destination)
         sidecar.update(now, lambda delivered: video_kind.stamped(
@@ -130,10 +101,6 @@ def _save_its_sound(flick: Path, audio_dir: Path) -> None:
 
 
 def _retire_source(upscaled: Path, genau_sorted_dir: Path) -> None:
-    """Remove the ``1_sorted`` copy the delivered flick was made from.
-
-    See the module docstring for why this is not optional.
-    """
     original = _sorted_original(upscaled, genau_sorted_dir)
     if original is not None:
         original.unlink(missing_ok=True)
@@ -148,21 +115,11 @@ def run(
     delivery_dir: Path | None = None,
     genau_audio_dir: Path | None = None,
 ) -> GenauDeliverResult:
-    """Move every finished Genau upscale into Genau's folder, retiring its source.
-
-    The four places the lane spans are arguments, resolved here rather than in
-    the signature: a default is evaluated at import, which would freeze the
-    value past ``override_config``. ``genau_source`` is the folder name the
-    settings all of Haglio share under that key, which origenerator reads too; a
-    parameter changes where the value can come from, not what it is called.
-    """
     outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     genau_source = config.GENAU_SOURCE if genau_source is None else genau_source
     delivery_dir = lanes.genau_delivery_dir() if delivery_dir is None else delivery_dir
     genau_audio_dir = config.GENAU_AUDIO_DIR if genau_audio_dir is None else genau_audio_dir
-    # The lane's own corner of 1_sorted. Composed once so the two helpers that
-    # need it take one path rather than two halves they could pair differently.
     genau_sorted_dir = sorted_dir / genau_source
 
     result = GenauDeliverResult()

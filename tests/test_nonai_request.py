@@ -1,4 +1,3 @@
-"""The video asked for now, from the Upscale Queue window: asked for, put first, withdrawn."""
 from __future__ import annotations
 
 import time
@@ -19,9 +18,6 @@ from util import nonai_job
 
 
 class TestAskingForOneNow(unittest.TestCase):
-    """What the queue window's "upscale this now" does the moment it is asked,
-    before any run picks the request up."""
-
     def test_it_leads_the_queue_and_is_recorded_as_asked_for(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -35,8 +31,6 @@ class TestAskingForOneNow(unittest.TestCase):
             assert request_of(overrides) == nonai_job.Request("lagoon/0 unsorted/b.mp4")
 
     def test_it_stops_the_encode_in_flight_and_queues_that_video_next(self):
-        """Stopping here rather than on the next run is what lets that run
-        upscale its AI videos first: they wait on any live Topaz process."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _busy, tmp, _out = write_job(root, overrides)
@@ -53,8 +47,6 @@ class TestAskingForOneNow(unittest.TestCase):
             assert request_of(overrides).video == "lagoon/0 unsorted/b.mp4"
 
     def test_asking_for_the_one_already_encoding_lets_it_run_on(self):
-        """It is already the video wanted; killing it to start it again would
-        throw away the hours it has done."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             write_job(root, overrides, suspended=True, suspended_at=time.time() - 60)
@@ -72,9 +64,6 @@ class TestAskingForOneNow(unittest.TestCase):
 
 
 class TestPuttingOneFirst(unittest.TestCase):
-    """A video dragged to the top of the queue window: it is next, and it waits
-    for the usual moment to start like any other."""
-
     def test_it_leads_the_queue_without_being_asked_for(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -88,8 +77,6 @@ class TestPuttingOneFirst(unittest.TestCase):
             assert request_of(overrides) is None
 
     def test_it_takes_over_from_the_encode_in_flight_which_goes_next(self):
-        """Put first means first: the encode of another video stops, and that
-        video waits second in line to start over."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _busy, tmp, _out = write_job(root, overrides, suspended=True)
@@ -106,7 +93,6 @@ class TestPuttingOneFirst(unittest.TestCase):
             assert request_of(overrides) is None
 
     def test_a_video_asked_for_and_not_yet_started_goes_next_and_is_no_longer_asked_for(self):
-        """Only the first video can be asked for, and it is no longer first."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             for name in "ab":
@@ -122,9 +108,6 @@ class TestPuttingOneFirst(unittest.TestCase):
 
 
 class TestWithdrawingTheAsk(unittest.TestCase):
-    """The queue window's hollow arrow: the first video stays first, and goes
-    back to waiting for nobody to be at the computer."""
-
     def test_a_video_not_yet_started_is_no_longer_asked_for_and_keeps_its_place(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)

@@ -1,9 +1,3 @@
-"""How far through the non-AI upscale project the library is, by running time.
-
-The unit these are about is seconds of video, not clips: the number that made
-this worth writing is that the real library was 59% upscaled by clip and 29% by
-running time, because the short clips went first.
-"""
 from __future__ import annotations
 
 import unittest
@@ -22,7 +16,6 @@ from util import sidecar, video_kind
 
 
 def lasting(video, seconds):
-    """*video*, with *seconds* recorded on its sidecar as the kinds stage would."""
     path = sidecar.sidecar_path(video)
     write_sidecar(path, video_kind.timed(sidecar.read(path), seconds))
     return video
@@ -51,8 +44,6 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
             assert progress.unmeasured == 0
 
     def test_the_percentage_is_of_running_time_not_of_clips(self):
-        """Three of four clips done and a quarter of the project done are the
-        same library — which is the whole reason a count would not do."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -70,8 +61,6 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
             assert progress.percent == 25
 
     def test_an_empty_project_has_no_percentage_rather_than_zero(self):
-        """A library whose running times nothing has recorded yet has no
-        answer; one with nothing upscaled has the answer zero."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             with override_config(**overrides):
@@ -92,8 +81,6 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
 
 class TestWhatItWillNotGuessAt(unittest.TestCase):
     def test_a_video_nothing_has_measured_is_counted_apart(self):
-        """It goes in neither total, so the percentage stays a percentage of
-        what the library can actually see of itself."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -117,8 +104,6 @@ class TestWhatItWillNotGuessAt(unittest.TestCase):
 
 class TestWhatCountsAsDone(unittest.TestCase):
     def test_an_original_with_two_versions_is_one_video_of_the_project(self):
-        """Other settings, or a version saved under a name of its own, is not
-        a second video's worth of work."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -132,8 +117,6 @@ class TestWhatCountsAsDone(unittest.TestCase):
             assert progress.done_seconds == 400.0
 
     def test_an_original_still_in_the_library_is_not_counted_twice(self):
-        """The original of an upscale is retired, but not always at once, and a
-        copy left standing is the same one video."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -148,8 +131,6 @@ class TestWhatCountsAsDone(unittest.TestCase):
             assert progress.done_seconds == 400.0
 
     def test_a_video_the_project_cannot_reach_is_in_neither_total(self):
-        """A clip parked where a human still has to trim it is not queued and
-        not upscaled; counting it as either would misreport the project."""
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]

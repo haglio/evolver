@@ -1,4 +1,3 @@
-"""Stage: give every library video a record of what made it, wherever it has none."""
 from __future__ import annotations
 
 import logging
@@ -19,15 +18,11 @@ log = logging.getLogger(__name__)
 # has a wall clock; the rest wait for the next run, as Video Kinds' do.
 NOTES_READ_PER_RUN = 400
 
-# The stamp for one act, asked for only when a video's record lacks it -- and
-# None when it cannot be had this run.
 StampFor = Callable[[], "dict | None"]
 
 
 @dataclass(frozen=True)
 class _Filled:
-    """What filling in one video's record came to: the stamps filed, by act."""
-
     written: dict[str, dict] = field(default_factory=dict)
     waiting: bool = False
 
@@ -54,14 +49,11 @@ class ProvenanceResult:
 
 
 class _Gallery:
-    """Origenerator's gallery, read the first time a clip needs it and at most once."""
-
     def __init__(self) -> None:
         self._generation_of: Callable[[Path], dict] | None = None
         self._unreadable = False
 
     def generation_of(self, video: Path) -> dict | None:
-        """What made *video*, or None while the gallery cannot be read."""
         if self._generation_of is None and not self._unreadable:
             try:
                 self._generation_of = origenerator_metadata.generation_records()
@@ -73,14 +65,11 @@ class _Gallery:
 
 
 class _Notes:
-    """The notes Topaz wrote into files, read up to a run's limit."""
-
     def __init__(self, read_note: Callable[[Path], str], limit: int) -> None:
         self._read_note = read_note
         self._left = limit
 
     def made(self, video: Path) -> dict | None:
-        """What *video*'s note says made it, or None once this run has read its fill."""
         if self._left <= 0:
             return None
         self._left -= 1
@@ -92,7 +81,6 @@ class _Notes:
 
 def run(read_note: Callable[[Path], str] = ffprobe.videoai_tag,
         notes_per_run: int = NOTES_READ_PER_RUN) -> ProvenanceResult:
-    """*read_note* reads the note Topaz wrote into a file; a test seam."""
     log.info("=== Stage: record what made each video ===")
     result = ProvenanceResult()
     notes = _Notes(read_note, notes_per_run)
@@ -108,8 +96,6 @@ def run(read_note: Callable[[Path], str] = ffprobe.videoai_tag,
 def _what_each_video_went_through(
     gallery: _Gallery, notes: _Notes,
 ) -> Iterator[tuple[Path, dict[str, StampFor]]]:
-    """Every library video that shows an act, with where its record is and a
-    stamp for each act it shows."""
     for clip in lanes.ai_videos():
         acts: dict[str, StampFor] = {}
         if clip.source == lanes.ORIGENERATOR_SOURCE:
@@ -129,7 +115,6 @@ def _what_each_video_went_through(
 
 
 def _fill_in(path: Path, acts: dict[str, StampFor]) -> _Filled:
-    """Record at *path* each of *acts* its record lacks, asking for a stamp only then."""
     recorded = provenance.stamps_of(sidecar.read(path))
     stamps: dict[str, dict] = {}
     waiting = False
@@ -145,11 +130,6 @@ def _fill_in(path: Path, acts: dict[str, StampFor]) -> _Filled:
 
 
 def _record(path: Path, stamps: dict[str, dict]) -> dict[str, dict]:
-    """File each of *stamps* the record at *path* does not have yet; the stamps filed.
-
-    Asked again inside the file's lock, so a stamp that landed since the record
-    was read -- the upscale stage writing its own -- is never written over.
-    """
     written: dict[str, dict] = {}
 
     def record_what_is_missing(current: dict) -> dict | None:

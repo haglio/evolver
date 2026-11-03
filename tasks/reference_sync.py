@@ -1,19 +1,3 @@
-"""Stage: repoint the suite's saved video references at videos that moved.
-
-Evolver relocates videos — sorting them, retiring an upscaled original, and the
-library gets reorganized by hand between runs too. Every sibling app that saved
-a video's path (Genaumacher's clip bounds, Fun Time's favorites and watch counts)
-is left pointing at where the file used to be, and so is the scene this app
-recorded each carved clip was found in. This stage walks those stores each run
-and follows the move.
-
-Each of those files belongs to a repo that has never heard of this one, so a
-format one of them changes would arrive here as a file that still parses and
-still looks rewritable. A store whose shape this stage was not written for is
-therefore left exactly as it is and reported for a person to look at
-(:meth:`util.reference_stores.ReferenceStore.shape_complaint`).
-"""
-
 from __future__ import annotations
 
 import logging
@@ -42,19 +26,11 @@ class ReferenceSyncResult:
 
     @property
     def needs_an_eye(self) -> bool:
-        """A sibling's file is no longer the shape this stage was written for.
-
-        Not a failure: leaving it alone is this stage doing its job. It is a
-        person's to look at, because until somebody does, the references in
-        that file stop following the videos they point at.
-        """
         return bool(self.refused)
 
 
 @dataclass(frozen=True)
 class _Reconciled:
-    """What following one store's references came to."""
-
     checked: int = 0
     relocated: int = 0
     unresolved: int = 0
@@ -154,7 +130,6 @@ def _another_version(
 
 
 def _renamed(store: reference_stores.ReferenceStore, was_at: Path) -> Path | None:
-    """Last resort: the video is still where it was, under a name it no longer has."""
     fingerprint = store.fingerprint()
     if fingerprint is None or not was_at.parent.is_dir():
         return None

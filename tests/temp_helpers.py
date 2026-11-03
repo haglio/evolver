@@ -19,11 +19,6 @@ from gui.run_record import RunRecord
 from util import nonai_job, provenance
 from util.media_files import partial_path
 
-# The system temp dir, not a directory inside the checkout: the suite must not
-# write into the tree it is testing (a killed run left case directories in the
-# repo, a read-only checkout could not run at all, and fixture paths were bound
-# to wherever the repo happened to live, so a second worktree behaved
-# differently from the primary one).
 ROOT = Path(tempfile.gettempdir()) / "evolver-tests" / "unittest"
 
 
@@ -44,7 +39,6 @@ def workspace_temp_dir():
 
 @contextmanager
 def override_config(**overrides):
-    """Temporarily override config module attributes with auto-restore."""
     with ExitStack() as stack:
         for key, value in overrides.items():
             stack.enter_context(patch.object(config, key, value))
@@ -52,8 +46,6 @@ def override_config(**overrides):
 
 
 class _LibraryTree:
-    """Paths into one temp AI-library tree, plus builders for its files."""
-
     def __init__(self, root: Path):
         self.root = root
         self.ai = root / "AI"
@@ -81,12 +73,6 @@ def a_drive_that_is_not_there() -> Path:
 
 
 def write_sidecar(path: Path, payload: dict) -> dict:
-    """A sidecar as a test finds it, written outright.
-
-    Setting a fixture up is not the contention :func:`util.sidecar.update`
-    exists for -- nothing else is in the file yet -- so a test says what the
-    document holds rather than how it got there.
-    """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return payload
@@ -94,13 +80,6 @@ def write_sidecar(path: Path, payload: dict) -> dict:
 
 @contextmanager
 def library_tree(**config_extra):
-    """The AI-library temp tree and the config pointing at it, together.
-
-    The layout is a real contract (config.py mirrors it, and genau and
-    fun_time read the same shape); it used to be re-implemented by hand in
-    four test files with 26 copies of the same four-key override_config line.
-    Extra config keys (e.g. TRASH_DIR) ride along per test.
-    """
     with workspace_temp_dir() as root:
         tree = _LibraryTree(root)
         overrides = dict(
@@ -116,8 +95,6 @@ def library_tree(**config_extra):
 
 
 class LaneLibrary:
-    """The folders a library spans across its three lanes, wired into config together."""
-
     def __init__(self, root: Path):
         videos = root / "videos"
         self.library = videos / "videos"
@@ -158,7 +135,6 @@ class LaneLibrary:
 
 
 def gallery_of_videos_made_again(path: Path, names) -> Path:
-    """An Origenerator gallery in which each video named in *names* was made again in place."""
     conn = sqlite3.connect(path)
     conn.execute("CREATE TABLE generations (prompt_id TEXT, output_files TEXT, remade_at TEXT)")
     for number, name in enumerate(names):
@@ -176,7 +152,6 @@ def touch_video(path: Path) -> Path:
 
 
 def make_video(path: Path) -> Path:
-    """A file at *path* that every "is this a video" check will accept."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"video")
     return path
@@ -190,13 +165,6 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
               source=None, tmp_bytes=b"partial", suspended=False, suspended_at=0.0,
               suspended_seconds=0.0, job_file=None, stamp=STARTED_UNDER,
               on_request=False):
-    """A persisted in-flight job whose tmp file exists under the bucket.
-
-    *job_file* writes the record somewhere other than the configured path, which
-    is how the tests for the state-file parameters put the record where only a
-    caller passing that path could find it. *stamp* None is a record written
-    before encodes kept one.
-    """
     non_ai = overrides["NON_AI_DIR"]
     source = source or make_video(non_ai / "lagoon" / "0 unsorted" / "busy.mp4")
     out = non_ai / "lagoon" / "3_good_to_go" / "processed" / f"{source.stem}_apo8_iris2.mp4"
@@ -226,31 +194,9 @@ def write_job(root, overrides, *, pid=4242, started_seconds_ago=60.0, expected=1
 
 
 def nonai_library_overrides(root: Path, **extra):
-    """Config overrides mapping a temp tree shaped like the real non-AI library.
-
-    METADATA_DIR belongs here with the rest: a sidecar's path is the metadata
-    root joined to the video's path *within the library*, so pointing only the
-    library at the temp tree sends every sidecar a test writes to whatever
-    metadata root the checkout is configured with — the real one, on a computer
-    that has a real one. Tests then also share that tree with each other, and
-    two of them naming a clip the same way read back one another's fixtures.
-
-    NONAI_RETIRED_ROOT and NONAI_PIN_LIST are here for the same
-    reason, and both default to a computer's own answer rather than to nothing:
-    the archive comes from the overlay's ``retired_root``, and the pin list
-    is a path *inside the checkout*. So on a computer that has configured an
-    archive, retiring an original in a test moved the fixture into the real one
-    and then failed the assertion that it had gone to the bucket's ``2*``
-    folder — four tests, green here and on CI only because neither has an
-    overlay. Pinned to the case's own temp tree, they cannot.
-    """
     video_lib = root / "videos"
     overrides = dict(
         VIDEO_LIBRARY_DIR=video_lib,
-        # The sidecar mirror answers for a video under either root. Pinned to
-        # the library itself rather than to its parent, so an archived original
-        # a case parks beside the tree stays outside both, as the real archive
-        # sits off the working drive.
         VIDEO_SEARCH_ROOT=video_lib,
         NON_AI_DIR=video_lib / "2D" / "non_AI",
         METADATA_DIR=root / "metadata",
@@ -274,14 +220,6 @@ LAGOON = Path("2D") / "non_AI" / "lagoon"
 
 
 class CarvedClipLibraryCase(unittest.TestCase):
-    """A carved clip, its source scene, and their scripts, in a temp library.
-
-    The shared half of the clip_scripts and scene_scripts fixtures: the two
-    stages carry a funscript between a clip and its scene in opposite
-    directions, so the tree is one shape with the script on either end. Each
-    test file used to carry its own byte-near-identical copy of this class.
-    """
-
     def setUp(self):
         self._workspace = workspace_temp_dir()
         self.root = self._workspace.__enter__()
@@ -334,13 +272,6 @@ class CarvedClipLibraryCase(unittest.TestCase):
 
 
 def make_run_record(**overrides):
-    """A RunRecord with every field defaulted to an invented value.
-
-    Five test classes each built the same seven fields by hand, three of
-    them repeating identical literal timestamps -- so adding a RunRecord
-    field meant editing five places. All values are fabricated, per this
-    repo's fixture rule.
-    """
     fields = dict(
         id="2026-07-25T15-20-02",
         started_at="2026-07-25T15:20:02",
@@ -359,17 +290,6 @@ def make_run_record(**overrides):
 def probes(videoai="", orientation="landscape", duration=100.0, free_bytes=10**15,
            popen=None, is_running=True, image="ffmpeg.exe", terminate=True,
            topaz_pids=(), cmdline=None, available_ram=64.0, idle_seconds=10_000.0):
-    """An ExitStack patching every outside contact the stage makes.
-
-    Patched on the module that owns each function rather than through whichever
-    stage module imports it: ``patch("tasks.nonai_upscale.processes.suspend")``
-    resolves ``processes`` to ``util.processes`` and sets the attribute there
-    anyway, so the prefix never scoped anything -- it only recorded which file
-    happened to call it, and went stale the moment the call moved.
-
-    idle_seconds defaults to a long idle (the user is away), so the presence
-    throttle lets encodes start unless a test says otherwise.
-    """
     stack = ExitStack()
     mocks = {
         "idle_seconds": stack.enter_context(

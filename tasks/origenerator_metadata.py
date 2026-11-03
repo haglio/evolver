@@ -1,20 +1,3 @@
-"""Build a video's metadata sidecar from Origenerator's own gallery database.
-
-Origenerator is a sibling video-generation app that drops its finished videos in
-``0_inbox/origenerator/``. To Evolver it is a normal external content source, no
-different from Provider: Evolver *pulls* what it needs and Origenerator never reaches
-back. Where the Provider strategy scrapes prompts from a website, this one reads them
-straight from Origenerator's ``generations`` database (read-only) — the same
-authoritative record its own gallery groups by — and shapes them into the sidecar
-schema the downstream browser consumes (a ``video`` block, a ``provenance`` stamp
-naming the workflow and the version of it that made the clip, plus a
-``source_image`` block for the start frame an image-to-video clip was animated from).
-
-The only knowledge of Origenerator's schema that lives here is the handful of
-column/param names read below; keeping that knowledge on Evolver's side is the
-whole point of the pull direction.
-"""
-
 from __future__ import annotations
 
 import json
@@ -27,17 +10,9 @@ from util import origenerator_gallery, provenance
 from util.ffprobe import video_dimensions
 from util.media_files import strip_uniquifier
 
-# Columns read from Origenerator's ``generations`` table. ``params_json`` carries
-# the model/LoRA/input_image a run used; the prompts and seed are first-class.
-# Public because they are this repo's reading surface against another repo, and
-# tests/test_origenerator_gallery_contract.py holds them to what that repo
-# publishes it will keep.
 COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
             "negative_prompt", "seed", "params_json", "output_files", "created_at")
 
-# The stamp a gallery that records its own generations keeps on each row. Read
-# where the table has it; where it does not, the two workflow columns are all
-# there is to reconstruct one from.
 OWN_PROVENANCE = "provenance"
 
 # Param keys naming the model a run used, most-specific first — covers every
@@ -49,22 +24,12 @@ _MODEL_EXT_RE = re.compile(r"\.(safetensors|ckpt|pt|pth|gguf|sft|bin)$", re.IGNO
 # ComfyUI's LoadImage annotates a non-input source as "name [output|input|temp]".
 _TYPE_ANNOTATIONS = ("[output]", "[input]", "[temp]")
 
-# Aspect ratios a raw WxH is snapped to for display when it lands close enough.
 _COMMON_RATIOS = ((16, 9), (9, 16), (1, 1), (4, 3), (3, 4), (3, 2), (2, 3),
                   (21, 9), (9, 21), (5, 4), (4, 5))
 _RATIO_TOLERANCE = 0.05
 
 
 def build_metadata(video_path, db_path=None) -> dict:
-    """The sidecar payload for an Origenerator video, from its generation row.
-
-    Matches ``video_path`` to the generation that produced it (by output
-    filename), builds the ``video`` block from that row, and — when the clip was
-    animated from a generated start frame — resolves and adds a ``source_image``
-    block from the image row that frame came from. Raises ``LookupError`` when no
-    row produced this file (so the stage records a retryable failure marker),
-    ``FileNotFoundError`` when the database is absent.
-    """
     video_path = Path(video_path)
     rows = _load_rows(db_path)
     row = _match_video_row(video_path, rows)
@@ -84,11 +49,6 @@ def build_metadata(video_path, db_path=None) -> dict:
 
 
 def generation_records(db_path=None) -> Callable[[Path], dict]:
-    """What made each of Origenerator's videos, answered from one read of its gallery.
-
-    Raises ``FileNotFoundError`` when the database is absent, as
-    :func:`build_metadata` does.
-    """
     rows = _load_rows(db_path)
 
     def generation_of(video: Path) -> dict:
@@ -101,13 +61,11 @@ def generation_records(db_path=None) -> Callable[[Path], dict]:
 
 
 def _load_rows(db_path) -> list[dict]:
-    """Every generation row, holding the columns this strategy reads."""
     return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE,),
                                      db_path=db_path)
 
 
 def _match_video_row(video_path: Path, rows: list[dict]) -> dict | None:
-    """The row whose output files include ``video_path`` (uniquifier stripped)."""
     key = _frame_name(strip_uniquifier(video_path.stem) + video_path.suffix)
     for row in rows:
         if key in _output_frame_names(row):
@@ -116,12 +74,6 @@ def _match_video_row(video_path: Path, rows: list[dict]) -> dict | None:
 
 
 def _find_source_image_row(video_row: dict, rows: list[dict]) -> dict | None:
-    """The image row whose output matches ``video_row``'s ``input_image``.
-
-    None when the row has no input image (a text-to-video clip) or the start
-    frame was hand-picked/external/since-deleted rather than a generation of its
-    own — the clip then simply carries no ``source_image`` block.
-    """
     target = _frame_name(_parse_params(video_row).get("input_image"))
     if not target:
         return None
@@ -147,9 +99,6 @@ def _video_block(row: dict, video_path: Path) -> dict:
     return block
 
 
-# What Origenerator's importer writes into the two workflow columns of a clip it
-# found rather than generated (origenerator/importer.py): placeholders, not a
-# workflow or a version of one.
 _IMPORT_PLACEHOLDERS = frozenset({"unknown", "imported"})
 
 
@@ -178,14 +127,11 @@ def _source_image_block(row: dict) -> dict:
 
 
 def _put(block: dict, key: str, value) -> None:
-    """Record ``key`` only when it has a non-empty value — a sparse sidecar, so a
-    missing field never splits a group from an otherwise-identical one."""
     if value:
         block[key] = value
 
 
 def _model_label(params: dict) -> str:
-    """A bare model name from a row's params (first present of ``MODEL_KEYS``)."""
     for key in MODEL_KEYS:
         value = params.get(key)
         if value:
@@ -200,13 +146,10 @@ def _seed_str(row: dict) -> str:
 
 
 def _created_date(row: dict) -> str:
-    """The date part of a row's ``created_at`` timestamp ("YYYY-MM-DD ...")."""
     return (row.get("created_at") or "").split(" ")[0].split("T")[0]
 
 
 def _aspect_ratio(width: int, height: int) -> str:
-    """A display ratio for ``width``x``height`` — a common ratio when close, else
-    the reduced fraction. Empty for a degenerate size."""
     if width <= 0 or height <= 0:
         return ""
     target = width / height
@@ -222,7 +165,6 @@ def _parse_params(row: dict) -> dict:
 
 
 def _decoded(raw: str | None, kind: type[dict] | type[list]):
-    """A JSON column's value, or an empty *kind* when it holds nothing of that shape."""
     if not raw:
         return kind()
     try:
@@ -233,7 +175,6 @@ def _decoded(raw: str | None, kind: type[dict] | type[list]):
 
 
 def _output_frame_names(row: dict) -> set[str]:
-    """The comparison keys for every file a row produced (see :func:`_frame_name`)."""
     return {
         _frame_name(f.get("filename"))
         for f in _row_output_files(row)
@@ -246,9 +187,6 @@ def _row_output_files(row: dict) -> list:
 
 
 def _frame_name(ref: str | None) -> str:
-    """A filename's comparison key: basename, lowercased, any ``[output]``-style
-    annotation stripped — so a LoadImage reference and a stored output filename
-    match by the plain file they name (mirrors Origenerator's own matching)."""
     ref = ref or ""
     stem, _, tag = ref.rpartition(" ")
     if stem and tag in _TYPE_ANNOTATIONS:

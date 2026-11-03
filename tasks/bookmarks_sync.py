@@ -39,8 +39,6 @@ class BookmarksSyncResult:
 
 @dataclass(frozen=True)
 class _Favorites:
-    """The web addresses the favorites carry, and what reading them found."""
-
     urls: list[str] = field(default_factory=list)
     no_url: int = 0
     bad_url: int = 0

@@ -1,5 +1,3 @@
-"""The batch that tells each carved clip which library scene it came out of."""
-
 from __future__ import annotations
 
 import json
@@ -13,7 +11,6 @@ from tests.temp_helpers import override_config, workspace_temp_dir
 from util import sidecar
 from util.frame_hashes import SAMPLE_HEIGHT, SAMPLE_WIDTH
 
-# Every name below is invented, per this repo's fixture rule.
 NORA = "Nora Quill"
 JANE_AND_ADA = "Jane Doe, Ada Roe"
 
@@ -28,11 +25,6 @@ def _clip_record(performer: str, compilation: str = "Vol3", index: int = 5) -> d
 
 
 def _library(root: Path, files: tuple[tuple[str, int, dict], ...]):
-    """*files* -- (path under the non-AI library, size, sidecar) -- written out.
-
-    Returns the non-AI root and the config override that points the app at the
-    tree, its mirrored metadata beside it.
-    """
     library = root / "videos"
     non_ai = library / "2D" / "non_AI"
     metadata = root / "metadata"
@@ -66,9 +58,6 @@ TWO_SCENES_ONE_CLIP = (
     ("clips/Petra Vance - Scene Three 8.mp4", 1, {"clip": _clip_record("Petra Vance", "Vol7", 4)}),
 )
 
-# Two different cuts saved as "X" and "X (2)". Evolver reads a version family
-# off the name, so the two land in one -- but they are different footage, cut
-# from two different scenes of the same performer.
 TWO_CUTS_IN_ONE_FAMILY = (
     ("scenes/Nora-Quill_540-izb4ykfa.mp4", 100, {}),
     ("scenes/Nora-Quill-2_720-qq7mnbet.mp4", 100, {}),
@@ -80,7 +69,6 @@ TWO_CUTS_IN_ONE_FAMILY = (
 
 
 def _two_cuts_sampler():
-    """A sampler putting each of the two cuts in a scene of its own."""
     first, second = _frames(400, seed=21), _frames(400, seed=22)
 
     def sampler(video, fps):
@@ -139,8 +127,6 @@ class TestClipMatch(unittest.TestCase):
                 assert _recorded(cut_from_it)["index"] == 9
 
     def test_decodes_the_cheapest_version_of_a_scene(self):
-        """Upscales cost minutes where the original costs seconds, and they hold
-        the same frames, so only the smallest file of a family is ever read."""
         with workspace_temp_dir() as root:
             _, settings = _library(root, ONE_SCENE_TWO_CLIPS)
             sampled = []
@@ -155,10 +141,6 @@ class TestClipMatch(unittest.TestCase):
             assert not [v for v in sampled if "apo8" in v.name]
 
     def test_separates_two_scenes_whose_names_share_a_prefix(self):
-        """Two scenes of one performer can share a name prefix without being the
-        same video. Folding them would decode one and leave the other
-        unmatchable, so a cut is only another's version when the whole reduced
-        title agrees, not its start."""
         with workspace_temp_dir() as root:
             _, settings = _library(root, TWO_SCENES_ONE_CLIP)
             scenes = []
@@ -174,10 +156,6 @@ class TestClipMatch(unittest.TestCase):
             assert len(scenes) == 2
 
     def test_the_better_alignment_takes_a_clip_two_scenes_both_hold(self):
-        """The library keeps a 540p release and a 4k re-release of one scene, cut
-        to different lengths, and the clip is genuinely inside both. Only one can
-        be its full_video, so the closer alignment gets it rather than whichever
-        scene the sweep reached last."""
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, TWO_SCENES_ONE_CLIP)
             release_540 = _frames(400, seed=6)
@@ -186,7 +164,7 @@ class TestClipMatch(unittest.TestCase):
             def sampler(video, fps):
                 if video.name.startswith("Petra-Vance_540"):
                     return release_540
-                if video.name.endswith("60fps.mp4"):  # the same scene, trimmed
+                if video.name.endswith("60fps.mp4"):
                     return np.concatenate([_frames(24, seed=9), clip_frames[:20]])
                 return clip_frames
 
@@ -200,12 +178,6 @@ class TestClipMatch(unittest.TestCase):
                 assert _recorded(clip)["scene_offset"] == 10.0
 
     def test_matches_a_scene_bucketed_under_a_shared_version_group(self):
-        """A version group is not always one video -- it buckets by a title read
-        out of the name, so unrelated scenes of a performer land in one group.
-        Read as a family, the biggest entry's name is what the candidates are
-        gated on and the smallest entry's frames are what gets searched, which
-        leaves the clip of every other scene in the bucket unmatchable however
-        exactly its frames align."""
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, (
                 ("scenes/Jane Doe_iris2.mp4", 900, {"version": {"group": "Jane Doe"}}),
@@ -234,9 +206,6 @@ class TestClipMatch(unittest.TestCase):
                 assert _recorded(clip)["scene_offset"] == 10.0
 
     def test_a_family_entry_is_measured_rather_than_told(self):
-        """The winner's answer used to go to every entry of its family. Where a
-        family is two different cuts, that filed one under a scene it is not in
-        -- and handed that scene the wrong cut's funscript."""
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, TWO_CUTS_IN_ONE_FAMILY)
 
@@ -251,9 +220,6 @@ class TestClipMatch(unittest.TestCase):
                 assert smaller["scene_offset"] == 25.0
 
     def test_a_family_entry_that_is_another_encode_still_gets_the_answer(self):
-        """The family is worth having: a genuine re-encode holds the same
-        frames, aligns in the same scene, and is recorded without being
-        decoded twice for the search."""
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, (
                 ("scenes/Nora-Quill_540-izb4ykfa.mp4", 100, {}),
@@ -275,9 +241,6 @@ class TestClipMatch(unittest.TestCase):
                     assert _recorded(non_ai / "clips" / name)["full_video"] == str(scene)
 
     def test_a_wrong_match_an_earlier_run_wrote_is_dropped(self):
-        """Self-healing: the sidecars already carry answers handed out on trust,
-        and an entry proved not to be in that scene must lose the one it has
-        rather than keep pointing at it."""
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, TWO_CUTS_IN_ONE_FAMILY)
             stale = (root / "metadata" / "2D" / "non_AI" / "clips"
@@ -297,8 +260,6 @@ class TestClipMatch(unittest.TestCase):
                 assert recorded["compilation"] == "Vol3"
 
     def test_a_family_entry_in_no_scene_at_all_is_left_with_nothing(self):
-        """The other half of measuring rather than telling: an entry that aligns
-        nowhere keeps no answer, not even the one an earlier run handed it."""
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, (
                 ("scenes/Nora-Quill_540-izb4ykfa.mp4", 100, {}),

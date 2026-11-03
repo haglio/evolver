@@ -42,59 +42,29 @@ log = logging.getLogger(__name__)
 
 _LOG_WARNINGS_AND_PROGRESS_ONLY = ("-loglevel", "warning", "-stats")
 
-#: Why a start was held back when the library's drive, rather than the computer, is the reason.
 LOW_DISK = "low_disk"
-#: Why an encode asked for from the queue window is resumed, or let run on.
 ASKED_FOR = "it is the video asked for now"
 
 
 @dataclass(frozen=True)
 class EncodeSettings:
-    """What one unattended non-AI encode may cost the computer, and when.
-
-    Seven numbers the stage used to reach for off ``config`` one at a time, so
-    its signature said nothing about what governed it and a test moving one
-    patched a module attribute rather than passing a value. They are one record
-    because they are one policy: how long an encode may run, how complete its
-    output has to be to be believed, how many tries a clip gets, and the three
-    conditions the computer has to meet before the next one starts.
-    """
-
     max_runtime_hours: float = 24
     max_attempts: int = 2
-    # How much of the source's running time the output has to cover to be
-    # believed. Short of it, the encode is treated as having died partway.
     complete_duration_fraction: float = 0.98
     min_available_ram_gb: float = 8.0
     min_free_disk_gb: float = 250.0
     cooldown_minutes: int = 30
-    # Presence throttle: once the toggle is on, Evolver auto-manages the encode
-    # by how long the user has been away from the keyboard/mouse. Below this
-    # idle threshold the user counts as present -- no new encode starts and any
-    # in-flight one is suspended (frozen, zero compute); past it the computer is
-    # "away" and an encode may start or resume. Five minutes rides out ordinary
-    # reading/watching pauses without treating them as the user leaving.
     user_idle_threshold_seconds: float = 300.0
 
 
 @dataclass(frozen=True)
 class StartAttempt:
-    """What trying to start an encode came to, this tick.
-
-    Either a clip was started, or it was held back -- ``deferred`` naming which
-    of the computer's six reasons, and ``deferred_low_disk`` the one that is
-    about the library's drive rather than the computer's load.
-    """
-
     started: str = ""
     deferred: str = ""
     deferred_low_disk: bool = False
 
 
 def unrecorded_start() -> dict:
-    """What made an encode of ours whose start nobody recorded -- one adopted
-    after its record was lost, or begun before encodes kept a stamp: our settings,
-    but which version of them, and under which commit, is gone."""
     return provenance.reconstructed("evolver", method=topaz.NON_AI_UPSCALE.name)
 
 
@@ -121,24 +91,19 @@ def adopt_orphan(job_file: Path) -> dict | None:
     try:
         tmp.relative_to(config.NON_AI_DIR)
     except ValueError:
-        return None  # some other Topaz run, e.g. a manual GUI export
+        return None
     job = {
         "pid": pids[0],
         "source": str(source),
         "tmp": str(tmp),
         "out": str(tmp.with_name(f"{partial_stem(tmp)}{config.NONAI_OUTPUT_SUFFIX}.mp4")),
         "expected_duration": ffprobe.duration_seconds(source) or 0.0,
-        # The true start time is unknown; counting the runtime cap from
-        # adoption is the conservative reading.
         "started_at": time.time(),
         "suspended": False,
         "suspended_at": 0.0,
         "suspended_seconds": 0.0,
         "provenance": unrecorded_start(),
     }
-    # A crash could have left the encode frozen; thaw it so adoption never
-    # inherits a permanently-suspended process. resume() no-ops if it is
-    # already running.
     processes.resume(pids[0])
     nonai_job.save_job(job_file, job)
     log.warning(
@@ -161,7 +126,6 @@ def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
 
 
 def suspend_job(job: dict, job_file: Path, *, because: str) -> None:
-    """Freeze the encode and remember when, so the pause is not charged runtime."""
     if job.get("suspended"):
         return
     processes.suspend(job.get("pid", 0))
@@ -172,7 +136,6 @@ def suspend_job(job: dict, job_file: Path, *, because: str) -> None:
 
 
 def resume_job(job: dict, job_file: Path, *, because: str) -> None:
-    """Thaw the encode and bank the time it spent frozen."""
     if not job.get("suspended"):
         return
     processes.resume(job.get("pid", 0))
@@ -189,17 +152,6 @@ def overran(job: dict, settings: EncodeSettings, *, now: float | None = None) ->
 
 
 def active_runtime(job: dict, *, now: float | None = None) -> float:
-    """Wall-clock since the encode started, minus the time it spent suspended.
-
-    The runtime cap exists to catch a *stuck* encode; hours parked frozen while
-    the user was at the computer are not the encode's fault and must not count.
-
-    *now* is the moment to measure against, defaulting to this one. It is an
-    argument because this arithmetic is what decides that a live multi-hour
-    encode is stuck and kills it, and against the wall clock the only way to
-    ask it a question is to build a job that started a chosen number of seconds
-    ago and accept the answer to within the test's own runtime.
-    """
     now = time.time() if now is None else now
     suspended = job.get("suspended_seconds", 0.0)
     if job.get("suspended") and job.get("suspended_at"):
@@ -254,7 +206,6 @@ def launch(source: Path, tmp: Path, orient: str) -> int:
 
 
 def start(queued_video: QueuedVideo, files: StageFiles, *, on_request: bool = False) -> bool:
-    """Start *queued_video*'s encode, or retire it to the skip list unstarted."""
     source = queued_video.path
     expected_duration = ffprobe.duration_seconds(source)
     orient = ffprobe.orientation_of(source)
@@ -301,10 +252,6 @@ def _output_path(queued_video: QueuedVideo) -> Path:
 
 
 def stop_in_flight(job: dict, reason: str, files: StageFiles) -> str:
-    """End the encode through no fault of its video -- no retry penalty.
-
-    Answers the clip that was stopped, which keeps its place in the queue.
-    """
     source = Path(job.get("source", ""))
     terminate_ffmpeg(job.get("pid", 0), reason)
     delete_tmp(Path(job.get("tmp", "")))
@@ -349,11 +296,6 @@ def computer_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
 
 
 def user_present(settings: EncodeSettings) -> bool:
-    """Whether the user has touched the computer recently.
-
-    On any failure to read the idle time, err toward present: holding back an
-    unattended encode is always safer than hogging a computer someone is using.
-    """
     try:
         idle = seconds_since_input()
     except OSError:
