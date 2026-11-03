@@ -55,3 +55,33 @@ class TestFingerprint:
     def test_a_video_whose_moments_cannot_all_be_read_has_none(self):
         assert same_footage.fingerprint(
             Path("scene.mp4"), 160.0, grab=lambda video, seconds: _frames(11)) is None
+
+
+class TestJoin:
+    def test_a_pair_folds_two_families_into_the_one_whose_id_sorts_first(self):
+        ids = {"scene one": "scene one", "copy": "copy", "other": "other"}
+
+        assert same_footage.join(ids, [("scene one", "copy")]) == {
+            "scene one": "copy", "copy": "copy", "other": "other"}
+
+    def test_pairs_that_chain_end_in_one_family(self):
+        ids = {"a": "a", "b": "b", "c": "c"}
+
+        assert same_footage.join(ids, [("c", "b"), ("b", "a")]) == {"a": "a", "b": "a", "c": "a"}
+
+    def test_no_pairs_leaves_every_family_as_it_was(self):
+        assert same_footage.join({"a": "a", "b": "b"}, []) == {"a": "a", "b": "b"}
+
+
+class TestFingerprinted:
+    def test_records_the_moments_and_keeps_the_rest_without_touching_the_original(self):
+        payload = {"title": "scene one", same_footage.BLOCK: {"other": 1}}
+
+        recorded = same_footage.fingerprinted(payload, ["00"] * 16)
+
+        assert recorded == {"title": "scene one", same_footage.BLOCK: {"other": 1, same_footage.FIELD: ["00"] * 16}}
+        assert payload == {"title": "scene one", same_footage.BLOCK: {"other": 1}}
+
+    def test_a_record_with_no_block_gets_one(self):
+        assert same_footage.fingerprinted({}, ["00"] * 16) == {same_footage.BLOCK: {same_footage.FIELD: ["00"] * 16}}
+
