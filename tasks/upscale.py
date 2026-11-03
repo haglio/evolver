@@ -150,7 +150,7 @@ def run(
         budget.min_start_remaining_seconds / 60 if budget.min_start_remaining_seconds else 0,
     )
 
-    for in_file, source, orient in candidates:
+    for candidate in candidates:
         if budget.too_little_left_for_another(bool(result.processed or result.failed)):
             log.info(
                 "Stopping the upscale stage before starting another video to stay under the run budget "
@@ -167,7 +167,7 @@ def run(
             log.warning("Stopping the upscale stage early due to low free disk space.")
             break
 
-        outcome = _upscale_one(in_file, source, orient, env, folders, budget)
+        outcome = _upscale_one(candidate, env, folders, budget)
         if outcome is _Outcome.UPSCALED:
             result.processed += 1
         elif outcome is _Outcome.FAILED:
@@ -207,8 +207,9 @@ def _prepare_outbox(folders: UpscaleFolders, low_disk: LowDiskWarning):
                  removed_partial_outputs, folders.outbox)
 
 
-def _upscale_one(in_file: Path, source: str, orient: str, env: dict,
+def _upscale_one(candidate: tuple[Path, str, str], env: dict,
                  folders: UpscaleFolders, budget: _Budget) -> _Outcome:
+    in_file, source, orient = candidate
     out = upscaled_video_path(source, orient, in_file.stem, folders.outbox)
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = partial_path(out, in_file.stem)

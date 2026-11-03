@@ -136,25 +136,35 @@ class _OverlayKeys(ast.NodeVisitor):
     def _path_of(self, node: ast.AST) -> str | None:
         if isinstance(node, ast.Name):
             return self.paths.get(node.id)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "load_content":
-            return ""
-        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-                and node.func.id == "overlay_value" and node.args):
-            base = self._path_of(node.args[0])
-            if base is None:
-                return None
-            keys = node.args[1:]
-            if all(isinstance(key, ast.Constant) and isinstance(key.value, str) for key in keys):
-                return ".".join([base, *(key.value for key in keys)]).lstrip(".")
-            self.unreadable.append(node.lineno)
-            return None
+        if isinstance(node, ast.Call):
+            return self._path_of_call(node)
         if isinstance(node, ast.Subscript):
-            base = self._path_of(node.value)
-            if base is None:
-                return None
-            if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
-                return f"{base}.{node.slice.value}".lstrip(".")
-            self.unreadable.append(node.lineno)
+            return self._path_of_subscript(node)
+        return None
+
+    def _path_of_call(self, node: ast.Call) -> str | None:
+        if not isinstance(node.func, ast.Name):
+            return None
+        if node.func.id == "load_content":
+            return ""
+        if node.func.id != "overlay_value" or not node.args:
+            return None
+        base = self._path_of(node.args[0])
+        if base is None:
+            return None
+        keys = node.args[1:]
+        if all(isinstance(key, ast.Constant) and isinstance(key.value, str) for key in keys):
+            return ".".join([base, *(key.value for key in keys)]).lstrip(".")
+        self.unreadable.append(node.lineno)
+        return None
+
+    def _path_of_subscript(self, node: ast.Subscript) -> str | None:
+        base = self._path_of(node.value)
+        if base is None:
+            return None
+        if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+            return f"{base}.{node.slice.value}".lstrip(".")
+        self.unreadable.append(node.lineno)
         return None
 
     def _bind(self, target: ast.AST, value: ast.AST) -> None:
