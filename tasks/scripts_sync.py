@@ -11,6 +11,12 @@ from pathlib import Path
 from app_support.video_names import strip_processing_suffixes
 
 import config
+from tasks.script_versions import (
+    VersionCopies,
+    ai_filing,
+    copy_missing_version_scripts,
+    version_bucket,
+)
 from util import lanes
 from util.alert import show_error
 from util.media_files import (
@@ -21,7 +27,6 @@ from util.media_files import (
 )
 from util.script_library import (
     carry_mark,
-    copy_script,
     drop_mark,
     remove_empty_mark_folders,
     script_path_for_video,
@@ -104,13 +109,6 @@ class _Aligned:
     collision_paths: list[str] = field(default_factory=list)
 
 
-@dataclass(frozen=True)
-class _VersionCopies:
-    copied: int = 0
-    ambiguous_groups: int = 0
-    copy_error_paths: list[str] = field(default_factory=list)
-
-
 def run(show_popup: bool = False, *, trees: Trees | None = None) -> ScriptsSyncResult:
     trees = Trees.configured() if trees is None else trees
     result = ScriptsSyncResult()
@@ -155,10 +153,10 @@ def run(show_popup: bool = False, *, trees: Trees | None = None) -> ScriptsSyncR
     return result
 
 
-def _tidy_and_copy_versions(trees: Trees, video_index: dict[str, list[Path]]) -> _VersionCopies:
+def _tidy_and_copy_versions(trees: Trees, video_index: dict[str, list[Path]]) -> VersionCopies:
     remove_empty_dirs(trees.scripts)
     remove_empty_mark_folders()
-    return _copy_missing_version_scripts(video_index, trees)
+    return copy_missing_version_scripts(video_index, trees.videos, trees.scripts)
 
 
 def _report(result: ScriptsSyncResult, trees: Trees, show_popup: bool):
@@ -296,15 +294,15 @@ def _park(script_path: Path, trees: Trees) -> str:
 def _rehome_to_library_version(script_path: Path, video_index: dict[str, list[Path]],
                                archived: dict[str, list[Path]],
                                trees: Trees) -> _VersionRehome:
-    script_bucket = _version_bucket(
-        trees.videos / script_path.relative_to(trees.scripts), trees)
+    script_bucket = version_bucket(
+        trees.videos / script_path.relative_to(trees.scripts), trees.videos)
     normalized = strip_processing_suffixes(script_path.stem)
     siblings = [
         video_path
         for matches in video_index.values()
         for video_path in matches
         if strip_processing_suffixes(video_path.stem) == normalized
-        and _version_bucket(video_path, trees) == script_bucket
+        and version_bucket(video_path, trees.videos) == script_bucket
         and not script_path_for_video(video_path).exists()
     ]
     if not siblings:
@@ -382,9 +380,9 @@ def _matching_videos_for_script(script_path: Path, video_index: dict[str, list[P
         return matches
     filed = {video_path: video_path.relative_to(trees.videos) for video_path in matches}
     matches = [video_path for video_path in matches if _ai_or_non_ai(filed[video_path]) == kind]
-    source = _ai_filing(script_path.relative_to(trees.scripts)).source
+    source = ai_filing(script_path.relative_to(trees.scripts)).source
     same_source = [video_path for video_path in matches
-                   if _ai_filing(filed[video_path]).source == source]
+                   if ai_filing(filed[video_path]).source == source]
     return same_source if source and same_source else matches
 
 
@@ -403,113 +401,6 @@ def _ai_or_non_ai(rel: Path) -> str | None:
         case ("2D", "AI" | "non_AI" as kind, *_):
             return kind
     return None
-
-
-@dataclass(frozen=True)
-class _AiFiling:
-    source: str | None = None
-    orientation: str | None = None
-
-
-def _ai_filing(rel: Path) -> _AiFiling:
-    match rel.parts[:-1]:
-        case ("2D", "AI", "0_inbox", source, *_):
-            return _AiFiling(source)
-        case ("2D", "AI", "1_sorted", source, orientation, *_):
-            return _AiFiling(source, orientation)
-        case ("2D", "AI", "2_outbox", "upscaled_by_orientation", orientation, source, *_):
-            return _AiFiling(source, orientation)
-    return _AiFiling()
-
-
-def _copy_missing_version_scripts(video_index: dict[str, list[Path]],
-                                  trees: Trees) -> _VersionCopies:
-    copied = 0
-    ambiguous_groups = 0
-    copy_error_paths: list[str] = []
-    groups: dict[tuple[tuple[str, ...], str], list[Path]] = defaultdict(list)
-    for matches in video_index.values():
-        for video_path in matches:
-            key = (_version_bucket(video_path, trees),
-                   strip_processing_suffixes(video_path.stem))
-            groups[key].append(video_path)
-
-    for (_, normalized_stem), videos in sorted(groups.items()):
-        if len(videos) <= 1:
-            continue
-
-        missing_targets = [video for video in videos if not script_path_for_video(video).exists()]
-        if not missing_targets:
-            continue
-
-        existing_sources = [video for video in videos if script_path_for_video(video).exists()]
-        if not existing_sources:
-            continue
-
-        for target_video in sorted(missing_targets):
-            source_video = _pick_version_source(target_video, existing_sources, trees)
-            if source_video is None:
-                log.warning(
-                    "AMBIGUOUS VERSION SCRIPT GROUP for stem %s: %s",
-                    normalized_stem,
-                    ", ".join(str(script_path_for_video(video)) for video in sorted(existing_sources)),
-                )
-                ambiguous_groups += 1
-                continue
-
-            source_script = script_path_for_video(source_video)
-            dest_script = script_path_for_video(target_video)
-            try:
-                copy_script(source_script, dest_script)
-            except OSError:
-                copy_error_paths.append(str(source_script.relative_to(trees.scripts)))
-                log.exception("FAILED TO COPY VERSION SCRIPT  %s  ->  %s", source_script, dest_script)
-                continue
-            copied += 1
-            existing_sources.append(target_video)
-            log.info("COPY VERSION SCRIPT  %s  ->  %s", source_script, dest_script)
-
-    return _VersionCopies(copied, ambiguous_groups, copy_error_paths)
-
-
-def _pick_version_source(target_video: Path, existing_sources: list[Path],
-                         trees: Trees) -> Path | None:
-    ordered = sorted(
-        existing_sources,
-        key=lambda path: (
-            _version_kind(path, trees) == _version_kind(target_video, trees),
-            str(path),
-        ),
-    )
-    if len(ordered) == 1:
-        return ordered[0]
-
-    first_script = script_path_for_video(ordered[0])
-    for candidate in ordered[1:]:
-        if not filecmp.cmp(first_script, script_path_for_video(candidate), shallow=False):
-            return None
-    return ordered[0]
-
-
-def _version_bucket(video_path: Path, trees: Trees) -> tuple[str, ...]:
-    rel = video_path.relative_to(trees.videos)
-    filing = _ai_filing(rel)
-    if filing.source and filing.orientation:
-        return ("2D", "AI", filing.source, filing.orientation)
-    match rel.parts:
-        case ("2D", "non_AI", source, *_):
-            return ("2D", "non_AI", source)
-    return rel.parts[:2]
-
-
-def _version_kind(video_path: Path, trees: Trees) -> str:
-    rel = video_path.relative_to(trees.videos)
-    match rel.parts:
-        case ("2D", "AI", "1_sorted", *_):
-            return "original"
-        case ("2D", "AI", "2_outbox", *_):
-            return "processed"
-    return "processed" if "processed" in rel.parts else "original"
 
 
 def _popup_message(result: ScriptsSyncResult) -> str:
