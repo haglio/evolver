@@ -1,10 +1,4 @@
 #!/usr/bin/env pythonw
-"""Metadata backfill tool entry point, launched from Evolver's tray menu or toolbar.
-
-Plays every video that still lacks a ``video.action``, looping in a stable order,
-and records the act the viewer speaks.  Runs as its own process so an open
-microphone or a wedged media backend can never take the tray down with it.
-"""
 from __future__ import annotations
 
 import sys
@@ -31,11 +25,6 @@ _TITLE = "Backfill Metadata"
 
 
 def _ready_thumbnails(vocabulary: Vocabulary, scan: list[ScannedVideo]) -> dict[str, str]:
-    """Every button's cached thumbnail, ready to hand the window at construction.
-
-    Cached frames are read straight back; only an act whose frame was never made
-    (a new curated example) is extracted here, so a warmed cache opens instantly.
-    """
     return {
         action: str(path)
         for action, path in build_thumbnails(
@@ -52,8 +41,6 @@ def main() -> int:
 def _label_the_unlabeled(app) -> int:
     process_identity.claim(app)
 
-    # One walk of the library, one parse of each sidecar: the work queue and
-    # the example videos are two projections of it (util_backfill/design/005).
     scan = library_scan()
     videos = unlabeled_videos(scan)
     if not videos:

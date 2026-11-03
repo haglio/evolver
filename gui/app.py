@@ -1,5 +1,3 @@
-"""Top-level application wiring: tray, window, scheduler, worker."""
-
 from __future__ import annotations
 
 import ctypes
@@ -44,8 +42,6 @@ log = logging.getLogger(__name__)
 _UPDATE_CHECK_MS = 60_000
 
 _SHOW_WINDOW = "--show-window"
-# AllowSetForegroundWindow's ASFW_ANY: the copy that will want the foreground is
-# the launcher's grandchild, whose pid nothing here can know.
 _ANY_PROCESS = -1
 STEPS = (("Loading Evolver...", 1.0),)
 
@@ -60,8 +56,6 @@ def open_the_loading_screen():
 
 
 def _say_the_running_evolver_did_not_answer(app: QApplication) -> None:
-    """A wedged Evolver holds the claim while answering nothing, and exiting into
-    silence there looks exactly like a shortcut that does nothing."""
     process_identity.claim(app)
     show_error(
         "Evolver",
@@ -72,7 +66,6 @@ def _say_the_running_evolver_did_not_answer(app: QApplication) -> None:
 
 
 def _unmarked_note(record, log_path) -> str:
-    """Why a run's lines are not on screen, in the window's own words."""
     if record.log_start is None:
         return ("This run predates Evolver marking its runs in the log, so "
                 "there is no mark to find its lines by.")
@@ -120,8 +113,6 @@ class EvolverApp:
         self._checkout = config.PROJECT_DIR
         self._settings = EvolverSettings.load()
         self._stats = OneWindow()
-        # The queue window's reads and verbs reach into the non-AI stage, which
-        # a run can hold for as long as starting an encode takes.
         self._background = BackgroundQueue()
         self._log_window: RunLogWindow | None = None
         self._instance = InstanceGateway()
@@ -130,17 +121,9 @@ class EvolverApp:
         self._session.leaving.connect(self._shutdown)
         self._sign_in_notice = SignInNotice()
 
-        # Parks and thaws the in-flight non-AI encode between the slow pipeline
-        # ticks, so returning to the computer suspends it in seconds. Reads the
-        # opt-in at every poll, since it can be switched while it runs.
         self._presence = PresenceThrottle(
             lambda: self._settings.nonai_upscale_enabled)
 
-        # The other half of the pair that keeps both apps up. Evolver starts the
-        # broker's tray when it finds it gone, and that tray does the same for
-        # Evolver -- which is where Evolver's own supervision comes from, since
-        # the tray is revived by a scheduled task and Evolver is revived by the
-        # tray. See gui/peer_watch.py.
         self._peer = peer_watch.watch_the_broker()
         self._peer_timer = QTimer()
         self._peer_timer.setInterval(peer_watch.PEER_CHECK_INTERVAL_MS)
@@ -151,8 +134,6 @@ class EvolverApp:
         self._window = EvolverMainWindow()
         self._window.setWindowTitle(self._session.name)
         self._window.set_nonai_enabled(self._settings.nonai_upscale_enabled)
-        # Not one of the window's commands: those are the toolbar's, named the
-        # same on the tray. This one carries the run that was clicked.
         self._window.log_requested.connect(self._show_run_log)
 
         self._tray = EvolverTray(self._session.name, shown_as=branch_session.shown_as())
@@ -160,8 +141,6 @@ class EvolverApp:
         self._scheduler.status_changed.connect(self._tray.show_schedule)
         self._scheduler.status_changed.connect(self._window.show_schedule)
 
-        # The non-AI opt-in is read at every start rather than held from
-        # construction: it can be switched between runs.
         self._runs = RunController(
             self._window, lambda: self._settings.nonai_upscale_enabled)
         self._scheduler.run_requested.connect(self._runs.start)
@@ -173,8 +152,6 @@ class EvolverApp:
         self._queue = QueueController(self._window, self._background)
         self._queue.run_wanted.connect(self._runs.start_when_free)
         self._queue.presence_poll_wanted.connect(self._presence.poll)
-        # A run is what starts, promotes and fails encodes, so the queue on
-        # screen is a run old the moment one ends.
         self._runs.run_ended.connect(self._scheduler.mark_idle)
         self._runs.run_ended.connect(self._window.refresh_history)
         self._runs.run_ended.connect(self._queue.refresh)
@@ -192,8 +169,6 @@ class EvolverApp:
         }
         _wire(self._tray, {**shared_commands,
                            "open": self._show_window, "quit": self._session.quit})
-        # Quit is the one command that means something different here: from the
-        # window it asks first, because the window is where a stray click lands.
         _wire(self._window, {**shared_commands, "quit": self._confirm_quit})
 
         self._app.commitDataRequest.connect(self._on_session_end)
@@ -211,12 +186,6 @@ class EvolverApp:
         return not self._session.is_preview and not self._runs.is_running and not any(on_screen)
 
     def start(self) -> None:
-        """Everything the app does to the computer, in the order it must happen.
-
-        The identity goes first: the taskbar reads it when a window of this
-        process first appears, so claiming it after the tray is up is claiming
-        it too late.
-        """
         process_identity.claim(self._app)
         self._window.refresh_history()
         self._tray.show()
@@ -227,11 +196,6 @@ class EvolverApp:
             self._show_window()
 
     def _keep_the_schedule(self) -> None:
-        """Start the timers only the one running Evolver keeps: the schedule,
-        the presence poll that parks the non-AI encode, and the broker watch."""
-        # Whatever the user wanted the last time they closed Evolver, starting it
-        # is them wanting it up now -- so the stand-down goes before the first
-        # peer check, not after it.
         peer_watch.clear_evolver_stand_down()
         self._presence.start()
         self._scheduler.start()
@@ -269,7 +233,6 @@ class EvolverApp:
         self._window.activateWindow()
 
     def _set_nonai_enabled(self, enabled: bool):
-        """Persist the one-time opt-in; presence polling and the next tick act on it."""
         self._settings.nonai_upscale_enabled = enabled
         self._settings.save()
         self._tray.set_nonai_enabled(enabled)
@@ -292,17 +255,9 @@ class EvolverApp:
             window.show_history(history)
 
     def _show_run_log(self, record: RunRecord):
-        """Open the log where this run wrote, rather than at its top.
-
-        Rebuilt each time rather than raised like the stats window: a different
-        run is different content, and the one before it is closed and dropped
-        so a window per click cannot pile up under the main one.
-        """
         if self._log_window is not None:
             self._log_window.close()
             self._log_window.deleteLater()
-        # Read once and handed on: the reader takes the path, so it does not
-        # have to reach for the ambient config itself.
         log_path = config.LOG_FILE
         text = run_log.read_run(
             log_path, record.id, record.log_start, record.log_end)
@@ -316,15 +271,12 @@ class EvolverApp:
         self._log_window.activateWindow()
 
     def _launch_tool(self, script: str):
-        # Its own process: a tool plays video, and a media backend that wedges
-        # or crashes must not take the tray down with it.
         subprocess.Popen(
             [sys.executable, str(self._checkout / script)],
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
 
     def _notify(self, body: str, icon: QSystemTrayIcon.MessageIcon, msecs: int):
-        """Say something in a tray balloon, if the user asked for balloons."""
         if not self._settings.enable_toasts:
             return
         self._tray.showMessage("Evolver", body, icon, msecs)
@@ -345,11 +297,6 @@ class EvolverApp:
                      QSystemTrayIcon.MessageIcon.Critical, 8000)
 
     def _on_overrun(self):
-        """An overrun is news and nothing else: the run really is still going.
-
-        No mark_idle and no set_running(False) -- either would re-enable Run
-        Now and let the scheduler tick into a run that cannot start.
-        """
         self._notify(
             f"Pipeline still running past the {config.PIPELINE_WALL_TIMEOUT_SECONDS // 60}-minute "
             "limit; stopping after the current stage. New runs wait until it exits.",

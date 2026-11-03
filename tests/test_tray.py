@@ -1,10 +1,3 @@
-"""Tests for the tray's schedule display — the app's primary surface.
-
-The window is normally hidden in the tray, so the tooltip and the
-status line at the top of the tray menu are what the user actually reads;
-they show the same schedule (Running / Paused / Next run) the window's
-toolbar shows, off the one status the scheduler hands both.
-"""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -25,8 +18,6 @@ from tests.gui_support import QAPP
 
 class TestTrayMenu:
     def test_the_upscale_queue_is_on_the_menu_as_it_is_on_the_toolbar(self):
-        """Both surfaces carry it, so the one that is to hand is the one used
-        -- the tray while the window is closed, the toolbar while it is open."""
         tray = EvolverTray()
         assert "queue" in tray.commands()
         assert tray.queue_action.text() == "Upscale Queue..."
@@ -172,9 +163,6 @@ class TestTrayScheduleDisplay:
         assert tray.run_now_action.isEnabled()
 
     def test_running_outranks_paused_in_the_tray(self):
-        """A run on screen is the fact the user is looking at; the pause stops
-        the schedule after it.  The window reads it the same way, off the same
-        status (bug 48)."""
         tray = EvolverTray()
         tray.show_schedule(ScheduleStatus(is_running=True, is_paused=True))
         assert "Running..." in tray.toolTip()

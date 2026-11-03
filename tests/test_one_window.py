@@ -1,4 +1,3 @@
-"""One window of a kind at a time: the stats and queue windows' lifetime, held once."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -36,8 +35,6 @@ class TestOneWindow:
         up.activateWindow.assert_called_once_with()
 
     def test_one_since_closed_is_taken_down_before_the_next_is_built(self):
-        """Parented to the main window, one replaced without being taken down
-        stays alive for the process's whole life."""
         closed, replacement = _window(visible=False), _window(visible=False)
         one = OneWindow()
         one.show(lambda: closed)

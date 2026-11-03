@@ -1,5 +1,3 @@
-"""Settings dialog for the tray application."""
-
 from __future__ import annotations
 
 import logging

@@ -1,4 +1,3 @@
-"""Tests for the stats window and stacked area chart."""
 from __future__ import annotations
 
 import time
@@ -34,7 +33,6 @@ from tests.temp_helpers import make_run_record, override_config
 def _make_record(
     stage_durations: dict[str, float], started_at: str = "2026-03-30T00:00:00",
 ) -> RunRecord:
-    """Build a minimal RunRecord with the given stage durations."""
     stages = [
         {"name": name, "status": "completed", "duration_seconds": dur}
         for name, dur in stage_durations.items()
@@ -49,18 +47,11 @@ def _make_record(
     )
 
 
-_UNPAINTED = (255, 0, 255)  # the sentinel _render fills with; paintEvent covers it
+_UNPAINTED = (255, 0, 255)
 _WHITE = (255, 255, 255)
 
 
 def _render(chart, w: int = 800, h: int = 400) -> QImage:
-    """Render the chart into an image, which enters paintEvent even offscreen.
-
-    ``repaint()`` on a widget that was never shown dispatches no paint event at
-    all on the offscreen platform, which is how four earlier "does not crash"
-    tests covered none of the drawing code. The image starts magenta so a
-    paintEvent that returns without painting is distinguishable from white.
-    """
     chart.resize(w, h)
     image = QImage(w, h, QImage.Format.Format_ARGB32)
     image.fill(0xFFFF00FF)
@@ -73,7 +64,6 @@ def _rgb(image: QImage, x: int, y: int) -> tuple[int, int, int]:
 
 
 def _ink_count(image: QImage, xs: range, ys: range) -> int:
-    """Pixels in the region that are neither the white ground nor unpainted."""
     return sum(
         1
         for y in ys
@@ -94,8 +84,6 @@ def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
 
 
 class TestStackedAreaChartSeries:
-    """_compute_series should return correct values for historical and averages modes."""
-
     @pytest.fixture
     def chart(self):
         return StackedAreaChart(RunHistory.of([
@@ -116,7 +104,6 @@ class TestStackedAreaChartSeries:
 
     def test_a_stage_no_run_mentions_is_flat_at_zero(self, chart):
         series = chart._compute_series()
-        # "metadata" is a stage the records here do not mention
         metadata_series = series[ALL_STAGES.index("metadata")]
         assert metadata_series.tolist() == [0.0, 0.0, 0.0]
 
@@ -124,14 +111,12 @@ class TestStackedAreaChartSeries:
         chart.set_mode("averages")
         series = chart._compute_series()
         withdrawn_series = series[ALL_STAGES.index("withdrawn")]
-        # raw = [1, 2, 3], running avg = [1/1, 3/2, 6/3] = [1.0, 1.5, 2.0]
         assert withdrawn_series == pytest.approx([1.0, 1.5, 2.0])
 
     def test_averages_mode_means_every_stage_not_just_the_first(self, chart):
         chart.set_mode("averages")
         series = chart._compute_series()
         sort_series = series[ALL_STAGES.index("sort")]
-        # raw = [2, 4, 6], running avg = [2/1, 6/2, 12/3] = [2.0, 3.0, 4.0]
         assert sort_series == pytest.approx([2.0, 3.0, 4.0])
 
 
@@ -160,12 +145,6 @@ def _every_ten_minutes(**seconds_by_stage: np.ndarray) -> RunHistory:
 
 
 def _limit_line_rows(image: QImage) -> list[int]:
-    """Rows in the 10-minute line's neighbourhood holding a long gray dash run.
-
-    At the default 700 s scale the dotted line lands at y = 67; antialiasing
-    splits it across two rows of mid-gray. Sixty gray pixels across the chart's
-    middle cannot come from any band, whose colors are never gray.
-    """
     rows = []
     for y in range(55, 81):
         grays = sum(
@@ -179,18 +158,7 @@ def _limit_line_rows(image: QImage) -> list[int]:
 
 
 class TestStackedAreaChartPainting:
-    """What the rendered chart shows.
-
-    Four earlier tests called ``repaint()`` on a widget that was never shown,
-    which dispatches no paint event offscreen; a ``raise`` at the top of
-    paintEvent left all four green. Everything here goes through ``_render``,
-    which does enter paintEvent, and asserts on the ink that comes out.
-    """
-
     def test_a_run_paints_each_stage_as_a_band_of_its_own_color(self):
-        # Which of the two stacks first is the registry's to say, so the test
-        # asks it rather than assuming: bands go up in registry order, so the
-        # lower 200 s belongs to whichever of the two comes earlier in it.
         lower, upper = sorted(("withdrawn", "sort"), key=ALL_STAGES.index)
         chart = StackedAreaChart(
             _two_runs({lower: 200.0, upper: 200.0}, {lower: 200.0, upper: 200.0})
@@ -199,7 +167,7 @@ class TestStackedAreaChartPainting:
 
         assert _is_band_fill(_rgb(image, 380, 300), lower)
         assert _is_band_fill(_rgb(image, 380, 230), upper)
-        assert _rgb(image, 380, 120) == _WHITE  # above the stack: bare ground
+        assert _rgb(image, 380, 120) == _WHITE
 
     def test_a_history_of_one_run_still_gets_its_axes_dated(self):
         image = _render(StackedAreaChart(RunHistory.of([_make_record({"sort": 300.0})])))
@@ -211,9 +179,6 @@ class TestStackedAreaChartPainting:
         assert _ink_count(image, range(71, 690, 2), range(21, 350, 2)) > 20
 
     def test_fit_mode_rescales_the_bands_to_fill_the_chart(self):
-        # 50 s of work is 7 % of the fixed 700 s scale -- a sliver along the
-        # chart's lower edge. Fit mode rescales to the tallest run plus
-        # headroom, so the same band then covers most of the chart's height.
         historical = _render(StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0})))
         fitted_chart = StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0}))
         fitted_chart.set_fit(True)
@@ -222,15 +187,10 @@ class TestStackedAreaChartPainting:
         assert _is_band_fill(_rgb(fitted, 380, 185), "sort")
 
     def test_averages_mode_charts_the_running_mean_not_the_raw_run(self):
-        # sort runs 100 s then 300 s: the second run's raw band reaches 300 s,
-        # its running mean only 200 s, so a pixel between the two heights near
-        # the newest run is inked in one mode and bare in the other.
         historical = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
         averaged_chart = StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0}))
         averaged_chart.set_mode("averages")
         averaged = _render(averaged_chart)
-        # Just inside the chart's right edge, which the legend's measured width
-        # decides -- a fixed x here would land in the margin on another font.
         newest = 800 - chart_right_margin() - 10
         assert _is_band_fill(_rgb(historical, newest, 230), "sort")
         assert _rgb(averaged, newest, 230) == _WHITE
@@ -238,7 +198,6 @@ class TestStackedAreaChartPainting:
     def test_the_10_minute_line_appears_only_when_the_scale_reaches_it(self):
         tall = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
         assert _limit_line_rows(tall), "no dotted 10-minute line at the 700 s scale"
-        # Fit mode over 50 s runs scales to ~57 s, far short of 600 s
         fitted_chart = StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0}))
         fitted_chart.set_fit(True)
         fitted = _render(fitted_chart)
@@ -258,9 +217,6 @@ class TestStackedAreaChartPainting:
             )
 
     def test_the_legend_names_each_stage_rather_than_its_key(self):
-        """Patching the labels to nothing takes the legend's words with them,
-        which is what says the words come from the label table and not from
-        the keys the chart iterates."""
         chart = StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0}))
         text_band = (
             range(800 - chart_right_margin() + 26, 795),
@@ -278,9 +234,6 @@ class TestStackedAreaChartPainting:
         assert named > blank + 100
 
     def test_the_legend_is_wide_enough_for_the_longest_label(self):
-        """The words are up to half again the width of the keys they replaced,
-        and by how much is the computer's font's business, so the panel is
-        measured from them rather than set to a number picked on one computer."""
         metrics = QFontMetrics(_legend_font())
         widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())
 
@@ -421,8 +374,6 @@ class TestStatsWindow:
 
 
 class TestXAxisLabels:
-    """The dates under the runs, and when a date is not enough on its own."""
-
     _ZONE = ZoneInfo("America/Los_Angeles")
 
     @pytest.fixture(autouse=True)
@@ -441,9 +392,6 @@ class TestXAxisLabels:
         assert labels == ["03/30", "04/01", "04/04"]
 
     def test_runs_inside_one_day_get_their_clock_time_too(self):
-        """A library that runs the pipeline every ten minutes puts several
-        labels on one date, and a row of identical dates says nothing about
-        where a run sits."""
         first, last = self._at((2026, 3, 30, 12, 0), (2026, 3, 30, 13, 0))
 
         labels = _x_axis_labels(first, last, 3)
@@ -458,7 +406,6 @@ class TestXAxisLabels:
         assert labels == ["03/30\n00:00", "03/30\n12:00", "03/31"]
 
     def test_a_single_moment_still_yields_a_label_per_tick(self):
-        """Every run at the same instant is a degenerate span, not a crash."""
         (only,) = self._at((2026, 3, 30, 9, 0))
 
         assert _x_axis_labels(only, only, 4) == ["03/30\n09:00"] * 4
@@ -472,8 +419,6 @@ class TestXAxisLabels:
 
 
 class TestPickYTicks:
-    """The tick rule: a handful of round values, not a wall of gridlines."""
-
     _NICE_STEPS = (1, 2, 5, 10, 15, 30, 60, 120, 180, 300, 600)
 
     def _assert_readable(self, ticks, y_max):
@@ -503,7 +448,3 @@ class TestStatsActionExists:
     def test_window_has_stats_action(self):
         window = EvolverMainWindow()
         assert window.stats_action is not None
-
-    # The receivers()-count wiring assertion that used to live here is replaced
-    # by TestToolbarAppWiring's stats tests in test_main_window_controls.py,
-    # which trigger the real actions and assert a StatsWindow opens.

@@ -1,4 +1,3 @@
-"""Work the windows hand off their own thread, and the answers that come back to it."""
 from __future__ import annotations
 
 import threading
@@ -40,7 +39,6 @@ def test_the_work_is_done_off_this_thread_and_its_answer_comes_back_on_it(queue)
 
 
 def test_work_is_done_in_the_order_it_was_asked_for(queue):
-    """Switching the arrow on and straight off again must end with it off."""
     done = []
 
     for step in range(5):

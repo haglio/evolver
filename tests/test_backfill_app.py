@@ -1,9 +1,3 @@
-"""Tests for backfill_app.main() — the repo's second entry point.
-
-The tray spawns it DETACHED, so a failure in here has no console to land in;
-until this module existed, main() and _ready_thumbnails() were entirely
-unexercised and backfill_app.py appeared in no coverage report at all.
-"""
 from __future__ import annotations
 
 import json
@@ -91,8 +85,6 @@ class TestMain(unittest.TestCase):
         listener.return_value.heard.connect.assert_called_once_with(
             window.return_value.on_phrase
         )
-        # A recognizer that dies has to reach the window, or the grid goes on
-        # looking like it is listening.
         listener.return_value.failed.connect.assert_called_once_with(
             window.return_value.on_voice_failed
         )
@@ -100,8 +92,6 @@ class TestMain(unittest.TestCase):
         worker.return_value.shutdown.assert_called_once()
 
     def test_teardown_runs_even_when_the_event_loop_dies(self):
-        """The finally clause is what keeps a crashed session from leaving the
-        microphone open and the worker thread alive."""
         patches = self._patched([Path("a_topaz.mp4")])
         with patches["setup_logging"], patches["application"] as application, patches["claim"], \
              patches["alert"], patches["unlabeled"], patches["thumbnails"], \
@@ -156,9 +146,6 @@ class TestReadyThumbnails(unittest.TestCase):
         examples.assert_called_once_with(vocabulary, scan)
 
     def test_the_library_is_walked_once_for_both_of_startup_s_questions(self):
-        """The work queue and the example videos are two projections of one
-        scan. Two walks and two sidecar parses is a tray-launched tool sitting
-        with no window on screen for twice as long as it needs to."""
         with patch("backfill_app.library_scan", return_value=[]) as scan, \
                 patch("backfill_app.unlabeled_videos", return_value=[]), \
                 patch("backfill_app.application"), \
@@ -170,9 +157,6 @@ class TestReadyThumbnails(unittest.TestCase):
         scan.assert_called_once_with()
 
 
-# In a fresh interpreter, because an import-time read is a cost this process has
-# already paid. Config reads the overlay as it is imported, so it is imported
-# before the count starts, and what is counted is the tool's own.
 _OVERLAY_READS = """
 import json
 from pathlib import Path

@@ -1,4 +1,3 @@
-"""Backfill Metadata..., in the tray menu or on the toolbar, starts the tool in its own process."""
 from __future__ import annotations
 
 import subprocess

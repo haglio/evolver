@@ -1,10 +1,3 @@
-"""Evolver's half of the pair: what it checks, what it starts, and when it doesn't.
-
-The policy itself — the throttle, the stand-down, the guard around a failing
-launcher — is app_support's and is tested there. What is tested here is the part
-only Evolver can get wrong: which mutex answers "is the broker up", which file is
-run to start one, and that no quit except the user's own leaves a mark.
-"""
 from __future__ import annotations
 
 import subprocess
@@ -25,11 +18,6 @@ class TestIsTheBrokerUp:
         assert peer_watch.broker_tray_is_up(is_held=lambda name: False) is False
 
     def test_it_asks_after_the_tray_rather_than_the_broker_process(self):
-        """The tray is the broker's own supervisor, and the thing to restart.
-
-        Asking after the broker process instead would fight the tray's own Pause,
-        which stops the broker and leaves the tray running on purpose.
-        """
         asked: list[str] = []
 
         peer_watch.broker_tray_is_up(is_held=lambda name: asked.append(name) or True)
@@ -77,8 +65,6 @@ class TestStartingTheBroker:
         popen.assert_not_called()
 
     def test_a_launch_is_written_where_the_tray_log_always_works(self, tmp_path):
-        """Not the module logger: Evolver's root logger gets its handler from the
-        first pipeline run, so a start-up launch would go nowhere."""
         launcher = tmp_path / "launch_broker_tray.vbs"
         launcher.write_text("' launcher", encoding="utf-8")
 
@@ -129,8 +115,6 @@ class TestTheWatch:
 
 
 class TestTheAppKeepsTheWatch:
-    """Wiring: the timer, the first check, and which quits leave a mark."""
-
     def test_the_app_checks_on_the_broker_as_it_starts(self, request):
         app = build_evolver_app(request)
 
@@ -183,7 +167,6 @@ class TestTheAppKeepsTheWatch:
         stand_down.assert_not_called()
 
     def test_restarting_does_not(self, request):
-        """A restart is Evolver on its way back up, not on its way down."""
         app = build_evolver_app(request)
 
         with patch("gui.app.peer_watch.stand_evolver_down") as stand_down, \

@@ -1,12 +1,3 @@
-"""Quit, restart, Run Now and pause wear the family's marks, in the window and
-the tray.
-
-What evolver owns here is which symbol each function asks shared_ui for, and
-that the caller's ink color reaches the drawing. How the glyphs are drawn --
-their geometry, their disabled rendering, their relative ink weights -- is
-shared_ui's contract, pinned in shared_ui's own suite; re-asserting it here
-turned a legitimate symbol redesign into a red evolver suite.
-"""
 from __future__ import annotations
 
 from PyQt6.QtCore import QSize
@@ -25,9 +16,6 @@ def _rendered(icon: QIcon) -> QImage:
 class TestRestartIcon:
 
     def test_it_is_the_familys_restart_mark(self):
-        # Not Font Awesome's "redo": that is a plain circular arrow, which is
-        # what an undo looks like everywhere else here. The family draws this
-        # control as a power symbol whose ring runs on into an arrowhead.
         assert _rendered(restart_icon("#ddd")) == icon_pixmap("restart", 48, QColor("#ddd")).toImage()
 
     def test_it_takes_the_ink_the_chrome_it_sits_on_needs(self):
@@ -40,8 +28,6 @@ class TestRestartIcon:
 class TestQuitIcon:
 
     def test_it_is_the_familys_power_mark(self):
-        # Fun Time paints this same one on its bar, and the two apps are open
-        # together -- so quit has to be one drawing, not two weights of one idea.
         assert _rendered(quit_icon("#ddd")) == icon_pixmap("power", 48, QColor("#ddd")).toImage()
 
 
@@ -54,6 +40,4 @@ class TestRunNowIcon:
 class TestPauseIcon:
 
     def test_it_is_the_familys_pause_bars(self):
-        # The Broker's tray menu pauses with this same mark, and its icon sits
-        # beside this app's in the tray.
         assert _rendered(pause_icon("#ddd")) == icon_pixmap("pause", 48, QColor("#ddd")).toImage()

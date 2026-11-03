@@ -14,6 +14,4 @@ from tests import gui_support  # noqa: F401  -- builds the shared QApplication
 
 @pytest.fixture(autouse=True)
 def _a_restart_never_starts_a_real_evolver(monkeypatch):
-    """A press of Restart in a test would leave a real wait behind it, which starts
-    this checkout's launcher, on his screen, once the run has ended."""
     monkeypatch.setattr(gui.app.production_update, "start_again_after", lambda pid, launcher: None)

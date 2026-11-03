@@ -37,23 +37,13 @@ from util import crash_log
 # shared one: both halves of the pair look for each other equally often.
 PEER_CHECK_INTERVAL_MS = int(peer_watch.DEFAULT_INTERVAL_SECONDS * 1000)
 
-# The two names this pair calls each other by. They are strings rather than an
-# import because the two apps share no code and never will; the broker spells
-# the same pair in osr2_broker/peer_watch.py, and the two files are the only
-# places either appears.
 EVOLVER_KEY = "evolver"
 BROKER_KEY = "broker"
 
-# The broker's tray holds this for as long as it is alive, so it answers
-# "is the broker being looked after?" outright — which is the question here.
-# The broker *process* is the tray's business, and a tray told to pause it is
-# not something to override. Spelled out rather than imported for the same
-# reason as the keys above: nothing here imports the broker.
 BROKER_TRAY_MUTEX = "Global\\OSR2Broker.Tray"
 
 
 def broker_tray_is_up(*, is_held=is_mutex_held) -> bool:
-    """Whether the broker's tray — the broker's own supervisor — is running."""
     return is_held(BROKER_TRAY_MUTEX)
 
 
@@ -62,16 +52,6 @@ def launch_broker_tray(
     launcher: Path | None = None,
     popen=subprocess.Popen,
 ) -> None:
-    """Start the broker's tray, hidden, unless there is no broker to start.
-
-    A missing launcher is the ordinary case, not an error: a checkout without the
-    broker beside it has no peer, and saying so once per interval in a log nobody
-    reads would be the only effect.
-
-    Recorded in ``tray_crash.log`` rather than through the module logger because
-    that log is the one that always works — Evolver's root logger gets its
-    handler from the first pipeline run, and this can fire before one.
-    """
     launcher = config.BROKER_TRAY_LAUNCHER if launcher is None else launcher
     if not launcher.is_file():
         return
@@ -82,12 +62,6 @@ def launch_broker_tray(
 
 
 def watch_the_broker(**kwargs) -> peer_watch.PeerWatch:
-    """The watch Evolver keeps on the broker. Its ``tick`` is safe to call anywhere.
-
-    Both halves go in as lambdas so each beat looks the names up again rather
-    than holding whatever they meant when the app was built -- which is what lets
-    a test stand in for either without having to reach inside the watch.
-    """
     return peer_watch.PeerWatch(
         peer_key=BROKER_KEY,
         is_up=lambda: broker_tray_is_up(),
@@ -97,10 +71,8 @@ def watch_the_broker(**kwargs) -> peer_watch.PeerWatch:
 
 
 def stand_evolver_down() -> None:
-    """Record that this quit was asked for, so the broker leaves Evolver down."""
     peer_watch.stand_down(EVOLVER_KEY)
 
 
 def clear_evolver_stand_down() -> None:
-    """Forget any earlier stand-down. Being started at all is the user asking for this."""
     peer_watch.clear_stand_down(EVOLVER_KEY)

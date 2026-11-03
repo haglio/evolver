@@ -1,5 +1,3 @@
-"""Stats window with a stacked area chart of pipeline stage durations."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,7 +27,7 @@ from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 # begins: the declaration holds plain RGB so the headless pipeline can read it.
 STAGE_COLORS = {stage.key: QColor(*stage.color) for stage in STAGES}
 
-_Y_MAX = 700.0  # seconds — keeps the 600s line near the top
+_Y_MAX = 700.0
 _LIMIT_SECONDS = 600.0
 _FEWEST_TICKS = 3
 _MOST_TICKS = 7
@@ -38,9 +36,6 @@ _MARGIN_LEFT = 70
 _MARGIN_TOP = 20
 _MARGIN_LOWER = 50
 
-# What a band is painted with. Named because the tests compare stage colors as
-# the bands the eye actually sees — translucent over white, which draws them
-# closer together than the colors themselves are.
 BAND_ALPHA = 180
 
 _LEGEND_POINT_SIZE = SIZE_TINY
@@ -48,7 +43,7 @@ _LEGEND_SWATCH = 10
 _LEGEND_PADDING = GAP_MEDIUM
 _LEGEND_TEXT_GAP = GAP_MEDIUM
 _LEGEND_LINE_HEIGHT = 16
-_LEGEND_INSET = MARGIN_STANDARD  # between the legend panel and both the chart and the widget edge
+_LEGEND_INSET = MARGIN_STANDARD
 
 
 def _legend_font() -> QFont:
@@ -58,24 +53,16 @@ def _legend_font() -> QFont:
 
 
 def legend_width() -> int:
-    """The legend panel's width: enough for the longest stage label, measured.
-
-    Not a fixed number, because the labels run half again the width of the
-    stage keys they replaced and by how much depends on the computer's font —
-    a number picked here would clip the legend wherever that font is wider.
-    """
     metrics = QFontMetrics(_legend_font())
     widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())
     return _LEGEND_PADDING + _LEGEND_SWATCH + _LEGEND_TEXT_GAP + widest + _LEGEND_PADDING
 
 
 def chart_right_margin() -> int:
-    """What the legend costs the chart: its own width, inset from both sides."""
     return legend_width() + 2 * _LEGEND_INSET
 
 
 def _pick_y_ticks(y_max: float) -> list[float]:
-    """Choose ~5 nice round tick values spanning (0, y_max], skipping 0."""
     nice = [1, 2, 5, 10, 15, 30, 60, 120, 180, 300, 600]
     best_step = nice[-1]
     for step in nice:
@@ -93,18 +80,10 @@ def _pick_y_ticks(y_max: float) -> list[float]:
 
 
 def _label_count(chart_w: int) -> int:
-    """How many dates fit along an axis this wide, between two and a dozen."""
     return min(12, max(2, chart_w // 70))
 
 
 def _x_axis_labels(t_min: float, t_max: float, count: int) -> list[str]:
-    """*count* evenly spaced dates across the span, disambiguated by time.
-
-    A library that ran the pipeline every ten minutes puts several labels on
-    one date, and a row of identical dates says nothing about where a run sits;
-    those get their clock time on a second line. A label with a distinct date
-    does not, because the date is the thing being read.
-    """
     span = t_max - t_min or 1.0
     moments = [in_display_zone(datetime.fromtimestamp(t_min + span * i / (count - 1), UTC))
                for i in range(count)]
@@ -208,8 +187,6 @@ def _draw_vertical_lines(painter: QPainter, lines: list[QLineF]):
 
 
 class StackedAreaChart(QWidget):
-    """Custom-painted stacked area chart of stage durations across runs."""
-
     def __init__(self, history: RunHistory, parent=None):
         super().__init__(parent)
         self._history = history
@@ -252,11 +229,6 @@ class StackedAreaChart(QWidget):
         painter.end()
 
     def _plot(self) -> _Plot | None:
-        """Where the chart sits and how a run and a duration become a point.
-
-        None when the widget is too small to hold one, which is the only case
-        the drawing below cannot handle.
-        """
         chart_w = self.width() - _MARGIN_LEFT - chart_right_margin()
         chart_h = self.height() - _MARGIN_TOP - _MARGIN_LOWER
         if chart_w <= 0 or chart_h <= 0:
@@ -274,16 +246,10 @@ class StackedAreaChart(QWidget):
         )
 
     def _y_max(self, series: np.ndarray) -> float:
-        """The top of the scale: the watchdog's ceiling, or the tallest run.
-
-        The fixed scale is what makes two runs comparable at a glance -- a band
-        the same height means the same seconds, on any chart. Fit mode gives
-        that up on purpose, for a library whose runs are all far below it.
-        """
         if not self._fit:
             return _Y_MAX
         tallest = float(series.sum(axis=0).max(initial=0.0))
-        return max(tallest * 1.15, 1.0)  # 15% headroom
+        return max(tallest * 1.15, 1.0)
 
     def _paint_bands(self, painter: QPainter, plot: _Plot):
         heights = np.minimum(np.cumsum(plot.series, axis=0), plot.y_max)
@@ -296,7 +262,6 @@ class StackedAreaChart(QWidget):
             band_floor = columns.mean[row]
 
     def _paint_limit_line(self, painter: QPainter, plot: _Plot):
-        """The watchdog's ten minutes, dotted -- only when the scale reaches it."""
         font = QFont()
         font.setPointSize(SIZE_TINY)
         painter.setFont(font)
@@ -309,7 +274,6 @@ class StackedAreaChart(QWidget):
         painter.drawText(plot.left + plot.width - 40, limit_y - 4, "10 min")
 
     def _paint_y_axis(self, painter: QPainter, plot: _Plot):
-        """The duration ticks, their labels, and the rotated axis name."""
         painter.setPen(colors.BORDER_SUBTLE)
         for secs in _pick_y_ticks(plot.y_max):
             y = int(plot.y_of(secs))
@@ -328,7 +292,6 @@ class StackedAreaChart(QWidget):
         painter.restore()
 
     def _paint_x_axis(self, painter: QPainter, plot: _Plot):
-        """The baseline, the left border, and the dates under the runs."""
         baseline_y = int(plot.y_of(0))
         painter.setPen(colors.TEXT_MUTED)
         painter.drawLine(plot.left, baseline_y, plot.left + plot.width, baseline_y)
@@ -383,7 +346,6 @@ def _toggle(label: str, *, checked: bool = False) -> QPushButton:
 
 
 def _either_or(parent, *buttons: QPushButton) -> QButtonGroup:
-    """A group where exactly one of *buttons* is checked, whichever is clicked."""
     group = QButtonGroup(parent)
     group.setExclusive(True)
     for button in buttons:
@@ -392,8 +354,6 @@ def _either_or(parent, *buttons: QPushButton) -> QButtonGroup:
 
 
 class StatsWindow(QDialog):
-    """Non-modal dialog showing pipeline run statistics."""
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Evolver \u2014 Run Statistics")

@@ -1,13 +1,3 @@
-"""Run one stage on its own, logging to the console:
-
-    python tools/run_stage.py watch_weights
-
-From a worktree this runs the branch's copy of the stage against the real
-library, which is how a stage is shown before it lands.  Only a stage whose
-``run()`` takes no arguments can be run this way; the upscales are the
-pipeline's to call.
-"""
-
 from __future__ import annotations
 
 import importlib

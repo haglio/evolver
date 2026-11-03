@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Verify 1_sorted and the active outbox set are in 1-to-1 correspondence."""
 from __future__ import annotations
 
 import logging
@@ -41,12 +40,6 @@ def run(
     sorted_dir: Path | None = None,
     outbox_dir: Path | None = None,
 ) -> CorrespondenceResult:
-    """Check that every sorted video has exactly one upscale, and vice versa.
-
-    The two trees compared are arguments, resolved here rather than in the
-    signature: a default is evaluated at import, which would freeze the value
-    past ``override_config``.
-    """
     sorted_root = config.SORTED_DIR if sorted_dir is None else sorted_dir
     outbox_root = config.OUTBOX_DIR if outbox_dir is None else outbox_dir
 

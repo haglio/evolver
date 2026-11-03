@@ -39,12 +39,6 @@ def taskbar_app() -> TaskbarApp:
 
 
 def claim(app: QApplication) -> QObject:
-    """Name this process to the shell, and dress each window *app* shows from now on
-    in Evolver's letter.
-
-    A refusal is logged, not raised: a button wearing Python's icon is still a
-    button, and an icon is never worth failing to start over.
-    """
     claimed = identity()
     try:
         set_app_user_model_id(claimed)

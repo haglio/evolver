@@ -1,5 +1,3 @@
-"""Main window with run history list and detail/progress panel."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -60,7 +58,7 @@ class _NoFocusRectDelegate(QItemDelegate):
     """
 
     def drawFocus(self, painter, option, rect):
-        pass  # Don't draw the focus rectangle
+        pass
 
     def paint(self, painter, option, index):
         mark = index.data(Qt.ItemDataRole.DecorationRole)
@@ -75,11 +73,6 @@ class _NoFocusRectDelegate(QItemDelegate):
 
 
 class RunDetailWidget(QWidget):
-    """Shows details of a completed run."""
-
-    # The run whose log to show. What the stage table holds is a summary of
-    # each stage's counters; the words the stages actually wrote -- which file,
-    # which error -- only ever existed in the log, and this is the way there.
     log_requested = pyqtSignal(object)
 
     def __init__(self, parent=None):
@@ -94,9 +87,6 @@ class RunDetailWidget(QWidget):
         font.setPointSize(SIZE_BODY)
         font.setBold(True)
         self._header.setFont(font)
-        # The title carries an <a href> once a run is in hand, so the format is
-        # stated rather than guessed at from the string -- the same reason the
-        # info line below sets it.
         self._header.setTextFormat(Qt.TextFormat.RichText)
         self._header.linkActivated.connect(self._on_title_clicked)
         layout.addWidget(self._header)
@@ -129,8 +119,6 @@ class RunDetailWidget(QWidget):
         self._header.setText(f'<a href="log">Run: {record.started_at}</a>')
         self._header.setToolTip("Show what this run wrote to the log")
         mark, color = symbol_for(record.status)
-        # Rich text so the mark alone is colored; the rest of the line stays
-        # the label's own color, matching the history list beside it.
         status = inline_icon(mark, color=color, size=self._info_label.fontMetrics().height()) if mark else ""
         self._info_label.setText(
             f"Trigger: {record.trigger}  |  Duration: {record.duration_seconds:.1f}s"
@@ -144,10 +132,6 @@ class RunDetailWidget(QWidget):
 
             no_edit = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 
-            # A record can name a stage this build no longer has — regeneration
-            # mode was one — and its position in a run is not its position in
-            # the pipeline. Guessing an ordinal there is what let a stage with
-            # no registry row take the number of the stage after it.
             num = STAGE_NUMBER.get(stage_key)
             num_item = QTableWidgetItem("\u2014" if num is None else str(num))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -160,8 +144,6 @@ class RunDetailWidget(QWidget):
             name_item.setFlags(no_edit)
             self._table.setItem(i, 1, name_item)
 
-            # Column 2: status, as its mark — the word is the tooltip, so the
-            # color lands on a mark rather than on a block of text.
             status = stage.get("status", "")
             status_item = QTableWidgetItem()
             status_item.setIcon(status_icon(status))
@@ -190,8 +172,6 @@ class RunDetailWidget(QWidget):
             self.log_requested.emit(self._record)
 
 
-# Fields always shown for a stage even when zero, so "0 succeeded" stays visible
-# instead of vanishing and making a total failure look like a partial one.
 _HEADLINE_FIELDS = {
     "metadata": ("newly_scraped", "errors"),
 }
@@ -202,7 +182,6 @@ def _summarize_result(
     skip_reason: str | None = None,
     stage_key: str = "",
 ) -> str:
-    """Build a short summary string from a stage result dict."""
     if skip_reason:
         return f"Reason: {skip_reason}"
     if not result:
@@ -213,7 +192,6 @@ def _summarize_result(
     headline = _HEADLINE_FIELDS.get(stage_key, ())
     parts = [f"{key}={result[key]}" for key in headline
              if isinstance(result.get(key), (int, float))]
-    # Then any other interesting non-zero numeric fields.
     for key, value in result.items():
         if key in headline:
             continue
@@ -222,11 +200,6 @@ def _summarize_result(
     return ", ".join(parts[:5])
 
 
-# What each scripts-sync counter means, in words. The first group is what a
-# person has to deal with, the second the work the stage got done.
-#
-# Ambiguous version groups are the one problem here that does not also make the
-# stage red -- whether they should is the stage's call, not the view's.
 _SCRIPTS_PROBLEMS = (
     ("unmatched", "match no video", "unmatched_paths"),
     ("ambiguous", "match more than one video", "ambiguous_paths"),
@@ -246,15 +219,6 @@ _SCRIPTS_NAMES_SHOWN = 3
 
 
 def _summarize_scripts_sync(result: dict[str, Any]) -> str:
-    """Say what made this stage red, in words, and name the scripts at fault.
-
-    The generic numeric dump lists the counters in dataclass order and keeps the
-    first five, which read as bland tallies — an "unmatched=15" sitting beside
-    an "already_aligned=53" with nothing marking which one is the failure, and a
-    counter as late as variant_copy_errors dropped off the line entirely.
-    Naming the offending scripts is the difference between knowing the stage
-    failed and knowing what to go fix.
-    """
     problems = [_naming(f"{result[key]} {label}", result.get(names) or [])
                 for key, label, names in _SCRIPTS_PROBLEMS
                 if isinstance(result.get(key), int) and result[key]]
@@ -272,21 +236,12 @@ def _naming(said: str, names: list[str]) -> str:
 
 
 def _name_sample(names: list[str]) -> str:
-    """The first few names, with a count standing in for the rest."""
     shown = ", ".join(names[:_SCRIPTS_NAMES_SHOWN])
     remainder = len(names) - _SCRIPTS_NAMES_SHOWN
     return f"{shown} +{remainder} more" if remainder > 0 else shown
 
 
 def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
-    """Say which non-AI video is in hand and what just happened to it.
-
-    This stage reports its outcomes as clip names — strings the generic numeric
-    dump drops entirely, leaving a bare "suspended=True" and no way to tell
-    which video was encoding or why its percent vanished between runs. Several
-    of these can land on one tick (an encode finishes, then the next start is
-    held back), so they read as a list rather than a single verdict.
-    """
     parts = []
     asked_for = " at your request" if result.get("on_request") else ""
     if result.get("started"):
@@ -311,21 +266,9 @@ def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
 
 
 def _whats_left(result: dict[str, Any]) -> str:
-    """What is left of the project: clips, running time, and how far along.
-
-    A clip count on its own says very little here. The queue runs from forty
-    seconds to an hour a clip, and the short ones went first, so the library
-    was 59% upscaled by clip and 29% by running time on the day this was
-    written — the count moves twice as fast as the work does. The percentage is
-    what moves at a rate worth reading, and the hours are what a person plans
-    around.
-    """
     left = f"{result.get('pending', 0)} queued"
     percent = result.get("percent_complete")
     if percent is None:
-        # Nothing in the library has a running time recorded yet (the video
-        # kinds stage writes them, a batch a run), so there is no percentage to
-        # give and the count is all there is.
         return left
     hours = (result.get("remaining_seconds") or 0.0) / 3600
     unmeasured = result.get("unmeasured_videos") or 0
@@ -334,7 +277,6 @@ def _whats_left(result: dict[str, Any]) -> str:
 
 
 def _encode_state(result: dict[str, Any]) -> str:
-    """How far the in-flight encode has gotten, and whether it is frozen."""
     percent = result.get("in_flight_percent")
     state = "progress unknown" if percent is None else f"{percent}%"
     if result.get("suspended"):
@@ -345,11 +287,6 @@ def _encode_state(result: dict[str, Any]) -> str:
 
 
 class EvolverMainWindow(QMainWindow):
-    """Main window: run history list on the left, detail/progress on the right."""
-
-    # Passed straight out of the detail pane. The app owns every window this
-    # one opens beside it, the stats window included, so the view asks rather
-    # than opens.
     log_requested = pyqtSignal(object)
 
     def __init__(self, parent=None):
@@ -457,12 +394,6 @@ class EvolverMainWindow(QMainWindow):
         return toolbar.sizeHint().width() + _growth(pause, pause_or_resume(is_paused=True))
 
     def commands(self):
-        """Each toolbar command's signal, by the name the app knows it as.
-
-        The same names the tray menu uses, so a command the two share is
-        connected once on each side rather than spelled out twice in the app.
-        Quit is the one that differs in what it does: from here it asks first.
-        """
         return {
             "run_now": self.run_now_action.triggered,
             "pause": self.pause_action.triggered,
@@ -480,7 +411,6 @@ class EvolverMainWindow(QMainWindow):
         self.nonai_switch.setChecked(enabled)
 
     def refresh_history(self):
-        """Reload run records from disk."""
         self._records = newest_runs(config.RUNS_DIR, config.RUNS_SHOWN)
         self._history_list.clear()
         for record in self._records:
@@ -499,13 +429,11 @@ class EvolverMainWindow(QMainWindow):
             self._detail_widget.show_record(self._records[row])
 
     def show_schedule(self, status: ScheduleStatus):
-        """Put the schedule on the toolbar's three surfaces."""
         self.run_now_action.setEnabled(not status.is_running)
         set_label(self.pause_action, pause_or_resume(status.is_paused))
         self._next_run_label.setText(status.toolbar_label())
 
     def closeEvent(self, event):
-        """Hide instead of close — the tray icon keeps the app alive."""
         event.ignore()
         self.hide()
 
@@ -515,10 +443,6 @@ def _growth(button: QToolButton, longer_text: str) -> int:
     return max(0, metrics.horizontalAdvance(longer_text) - metrics.horizontalAdvance(button.text()))
 
 
-# The two stages whose results are names and words rather than counts, so the
-# generic numeric dump has nothing useful to say about them. A table rather
-# than two `stage_key ==` branches, so a key that stops naming a stage is
-# something a test can see (tests/test_stage_registry.py).
 _SUMMARIZERS = {
     "upscale_non_ai": _summarize_nonai_upscale,
     "scripts": _summarize_scripts_sync,

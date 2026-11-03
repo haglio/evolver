@@ -1,5 +1,3 @@
-"""Run record persistence — one JSON file per pipeline run."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -19,39 +17,18 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class RunRecord:
-    """Serializable record of a single pipeline run."""
     id: str
     started_at: str
     finished_at: str
     duration_seconds: float
-    trigger: str  # "scheduled" or "manual"
-    status: str   # "success" or "error"
+    trigger: str
+    status: str
     stages: list[dict[str, Any]] = field(default_factory=list)
-    # Where this run's lines sit in the log, from the offset of the banner it
-    # opened with to the offset past its last line. None on every record
-    # written before runs marked themselves, and on any run whose log could not
-    # be measured -- so both carry a default, and a record saved without them
-    # still loads.
     log_start: int | None = None
     log_end: int | None = None
 
     @classmethod
     def from_pipeline_result(cls, result, trigger: str = "scheduled") -> RunRecord:
-        """Build a RunRecord from a PipelineResult, called as the run ends.
-
-        The start is the pipeline's own, captured at its first instant, and the
-        finish is that plus the duration -- so ``finished_at - started_at ==
-        duration_seconds`` holds by construction and the three cannot drift
-        apart. Stamping both at the finish puts every view that trusts the name
-        -- the history label, the chart's x axis -- out by the run's whole
-        duration, which at the 660-second watchdog ceiling is a full slot past
-        the ten-minute schedule and reads as the next tick's run.
-
-        A record written under an older convention is repaired by hand rather
-        than by the app: a one-shot migration wired into a scheduler tick
-        becomes a permanent walk of the whole history, run forever to find
-        nothing.
-        """
         started = result.started_at
         finished = started + timedelta(seconds=result.duration_seconds)
         run_id = run_log.run_id(started)
@@ -84,11 +61,6 @@ class RunRecord:
 
 
 def utc_time(stamp: str) -> datetime:
-    """One of a record's timestamps as an aware datetime.
-
-    A record stores them naive and means UTC by them -- the convention every
-    reader has to know, and now knows in one place rather than at each of them.
-    """
     return datetime.fromisoformat(stamp).replace(tzinfo=UTC)
 
 
@@ -97,20 +69,11 @@ def in_display_zone(moment: datetime) -> datetime:
 
 
 def format_run_label(started_at: str, duration_seconds: float) -> str:
-    """When a run started and how long it took, e.g. "2026/03/30 22:20 (5s)".
-
-    Shown in the zone the overlay names, or the computer's own when it names
-    none -- read at the call, so a test can point it somewhere. The verdict is
-    deliberately not in here: it rides beside this text as a colored mark (see
-    :mod:`gui.status_symbols`), so coloring the verdict cannot color the
-    timestamp along with it.
-    """
     shown = in_display_zone(utc_time(started_at))
     return f"{shown.strftime('%Y/%m/%d %H:%M')} ({duration_seconds:.0f}s)"
 
 
 def result_to_dict(result: Any) -> dict[str, Any] | None:
-    """Convert a stage result object to a JSON-safe dict."""
     if result is None:
         return None
     try:
@@ -119,9 +82,6 @@ def result_to_dict(result: Any) -> dict[str, Any] | None:
         else:
             d = {k: v for k, v in vars(result).items() if not k.startswith("_")}
     except TypeError:
-        # Something with no __dict__ to read -- a bare object, an int. Nothing
-        # downstream reads this shape; it exists so one odd stage result cannot
-        # cost the whole run its record.
         log.warning("Stage result %r could not be described; keeping its repr.",
                     type(result).__name__)
         return {"repr": repr(result)}
@@ -129,7 +89,6 @@ def result_to_dict(result: Any) -> dict[str, Any] | None:
 
 
 def _make_json_safe(obj: Any) -> Any:
-    """Recursively convert Path and other non-JSON types."""
     if isinstance(obj, dict):
         return {k: _make_json_safe(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
@@ -140,7 +99,6 @@ def _make_json_safe(obj: Any) -> Any:
 
 
 def save_run(record: RunRecord, runs_dir: Path) -> Path:
-    """Write a RunRecord as JSON. Returns the file path."""
     runs_dir.mkdir(parents=True, exist_ok=True)
     path = runs_dir / f"{record.id}.json"
     data = dataclasses.asdict(record)
@@ -172,9 +130,6 @@ def _read_records(paths: Iterable[Path]) -> Iterator[RunRecord]:
                 if key in RunRecord.__dataclass_fields__
             })
         except (OSError, json.JSONDecodeError, TypeError, AttributeError):
-            # AttributeError: valid JSON that is not an object, so .items() is
-            # not there to call. TypeError: a record missing a field the
-            # dataclass requires.
             log.warning("Could not read run record %s; skipping it.", path,
                         exc_info=True)
             continue

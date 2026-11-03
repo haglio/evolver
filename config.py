@@ -27,46 +27,20 @@ PROJECT_ROOTS = haglio_settings.project_roots()
 
 
 def retired_root(content: dict[str, Any]) -> Path | None:
-    """Where a non-AI original goes once its upscale is made — None to keep it.
-
-    None means the bucket's ``2*`` folder, which is the convention the user
-    established by hand and what a public checkout gets. A path means the
-    original leaves the library for that archive instead, sidecar and funscript
-    beside it. The setting exists because those ``2*`` folders sit on the drive
-    the encodes write to, so keeping every superseded original there is what
-    walks that drive into the free-space floor the stage holds itself back at.
-    """
     configured = content.get("retired_root")
     return Path(configured) if configured else None
 
 
 def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
-    """The sibling checkout *name*, from the first root that actually holds it.
-
-    Falls back to a path under the first root when no root does: a sibling that
-    isn't installed is every consumer's ordinary case (they all guard on
-    existence), so it must not be an import-time crash.
-    """
     return siblings.project_dir(name, PROJECT_ROOTS if roots is None else roots)
 
 
-# This repo, located from the source file rather than the library root: the
-# app's own assets travel with the code, not with the media.
 PROJECT_DIR  = Path(__file__).resolve().parent
 
-# What ``launch_preview_branch.vbs`` sets, and nothing else does: this run is a
-# worktree's whole app, run in place of the Evolver the user runs every day.
 BRANCH_SESSION_FLAG = "EVOLVER_BRANCH_SESSION"
 
 
 def live_dir(environ: dict, project_dir_path: Path, roots: tuple[Path, ...]) -> Path:
-    """The checkout whose run history, log, settings and queue lists to use.
-
-    This one, except in a branch session, which shares the usual Evolver's: a
-    preview keeping those for itself would show a history nobody made and a
-    queue nobody ordered, and the user judges a change by the real ones (see
-    ``gui/branch_session.py``).
-    """
     if environ.get(BRANCH_SESSION_FLAG) != "1":
         return project_dir_path
     return siblings.project_dir("evolver", roots)
@@ -75,31 +49,13 @@ def live_dir(environ: dict, project_dir_path: Path, roots: tuple[Path, ...]) -> 
 LIVE_DIR = live_dir(os.environ, PROJECT_DIR, PROJECT_ROOTS)
 BRANCH_SESSION = LIVE_DIR != PROJECT_DIR
 FUN_TIME_PROJECT_DIR = project_dir("fun_time")
-# Fun Time's per-video watch counts, keyed by path.strip().lower().
 FUN_TIME_WATCH_STATS_FILE = FUN_TIME_PROJECT_DIR / "state" / "watch_stats.json"
-# Origenerator (a sibling video-generation app) is treated as a normal external
-# content source: for videos it drops in 0_inbox/origenerator/, Evolver pulls the
-# generation metadata straight from Origenerator's own gallery database, read-only
-# (see tasks/origenerator_metadata.py). Origenerator never reaches into Evolver.
 ORIGENERATOR_PROJECT_DIR = project_dir("origenerator")
 ORIGENERATOR_DB_PATH = ORIGENERATOR_PROJECT_DIR / "state" / "origenerator.db"
-# Sibling apps that record a video's path in their own saved work. Evolver moves
-# videos, so it owns keeping these pointed at the right file (see
-# tasks/reference_sync.py); left alone they strand hand-made clip bounds,
-# transcript splits, and watch counts on paths that no longer exist.
 GENAUMACHER_SESSIONS_DIR = project_dir("genaumacher") / "sessions"
 SCRIPTURE_SESSIONS_DIR = project_dir("scripture") / "sessions"
-# The OSR2 broker is the sibling Evolver pairs with to stay up: each watches the
-# other and starts it again when it finds it gone (gui/peer_watch.py). This is
-# the launcher Evolver runs to do that. A checkout with no broker beside it —
-# every public one — leaves this pointing at nothing, which is how the watch
-# turns itself off.
 BROKER_TRAY_LAUNCHER = project_dir("broker") / "launch_broker_tray.vbs"
 VIDEO_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "videos"
-# Where to hunt for a video a stored reference has lost track of. Wider than the
-# library itself, because videos also get parked in sibling folders such as
-# a compilations archive — a reference into one of those still deserves
-# to be followed rather than dropped.
 VIDEO_SEARCH_ROOT = LIBRARY_ROOT / "videos"
 METADATA_DIR = LIBRARY_ROOT / "videos" / "metadata"
 
@@ -113,18 +69,6 @@ def warm_gun_outbox(content: dict[str, Any]) -> Path | None:
 
 
 def warm_gun_journal_dirs(content: dict[str, Any], library_dir: Path) -> tuple[Path, ...]:
-    """Every folder Warm Gun's journal is read from, in order.
-
-    Inside the library is where it belongs: the folder sync that carries the
-    videos carries the journal too, so the phone's viewing arrives as an
-    ordinary local file. ``warm_gun_outbox`` names the folder of its own the
-    phone's app writes to instead, outside the library and shared by some other
-    route; it is read as well, so the phone's viewing lands here whichever
-    folder the app has been taught to write to, and a line reached through both
-    still counts once. The key exists so that the app can be changed and the
-    folder retired without a day where the two sides disagree; drop it once the
-    folder is gone.
-    """
     outbox = warm_gun_outbox(content)
     return (library_dir, *([outbox] if outbox else []))
 
@@ -133,8 +77,6 @@ WARM_GUN_OUTBOX = warm_gun_outbox(_CONTENT)
 WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, Path(haglio_settings.value("warm_gun_journal_dir")))
 SCRIPT_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
 UNMATCHED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "unmatched_scripts"
-# Fun Time's F-mode reads this mirror of the video tree (fun_time/modes.py): an
-# empty "<name>.generated" there says no person wrote that video's funscript.
 GENERATED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "generated"
 
 
@@ -157,11 +99,6 @@ OUTBOX_DIR   = AI_DIR / "2_outbox"
 OUT_UPSCALED_DIR = OUTBOX_DIR / "upscaled_by_orientation"
 TRASH_DIR        = OUTBOX_DIR / "trash"
 
-# The Genau lane: Origenerator drops a looping video it made for Genau under the
-# genau_source inbox folder, and the lane delivers its upscale into Genau's flicks
-# folder, the one folder Genau plays. The inbox folder's name comes from the
-# settings all of Haglio shares, because a library folder name is what the
-# sanitize blocklist keeps out of a public commit and Origenerator reads it too.
 GENAU_SOURCE    = haglio_settings.value("genau_source")
 GENAU_FLICK_WORD = haglio_settings.value("genau_flick_words", "one")
 GENAU_DIR = Path(haglio_settings.value("genau_dir"))
@@ -173,17 +110,9 @@ def kept_by_other_apps() -> tuple[Path, Path]:
     return GENAU_DIR, ORIGENERATOR_VIDEOS_DIR
 
 
-# The scraped provider: the 0_inbox folder its clips arrive under, and the site
-# root the metadata stage fetches their prompt pages from. Both are private, so
-# they come from the overlay for the same reason GENAU_SOURCE does. They live
-# here rather than in the stage because a value read at the stage's own import
-# is bound before anything can redirect it — which is exactly what they were.
 _SCRAPE_PROVIDER = overlay_value(_CONTENT, "scrape_provider", path=LOCAL_CONTENT)
 PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
 PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]
-# The camera words as the library writes them in front of an act. Library
-# vocabulary, so from the overlay like the acts they prefix; the backfill tool
-# reads the same list for what it hears and records.
 CAMERA_PREFIXES = tuple(
     camera["prefix"] for camera in overlay_value(_CONTENT, "cameras", path=LOCAL_CONTENT))
 # The scratch profile the metadata stage hands its headless browser: a whole
@@ -193,22 +122,7 @@ CAMERA_PREFIXES = tuple(
 # live browser profile every ten minutes.
 PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-browser-profile"
 
-# Button label -> the id of the clip that best illustrates it, for the acts the
-# library has no clip tagged with. From the overlay for the same reason
-# GENAU_SOURCE is: these name clips inside the library, and a clip id in source
-# is library vocabulary. Optional, and empty in the committed example: without
-# it every button simply takes the first library clip whose action matches, which
-# is what it does for any button with no pin anyway.
 CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
-# Non-AI folders holding scenes carved out of longer videos and nothing else,
-# as paths relative to the video library ("2D/non_AI/<bucket>/<folder>").
-# ``tasks.video_kinds`` reads them as clips whether or not each one carries
-# the ``clip`` record that normally says so: the batches that were split before
-# anything wrote that record are clips all the same, and the folder they were
-# filed into is the only thing left that knows it. From the overlay, not from
-# source, for the same reason ``GENAU_SOURCE`` is — these are folder names, and
-# folder names are library vocabulary. Optional; absent means the ``clip``
-# record is the only test.
 CLIP_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
 
 # Where the Windows installer puts Topaz Video's own ffmpeg build and its
@@ -256,17 +170,11 @@ VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm", ".m4v"}
 FUNSCRIPT_EXTENSION = ".funscript"
 
 UPSCALE_BATCH_LIMIT = 5
-# How many ffprobes one run of the video-kinds stage will spend. Only a running
-# time or an orientation not yet recorded costs one, so this bounds the first runs
-# over a library that has never been asked and is never reached again after.
 VIDEO_KIND_BATCH_LIMIT = 400
-# And how many of those it spends on the VR videos kept on the cloud drive, where
-# each one fetches part of a file that is not on this computer, perhaps while the
-# headset is playing another from the same drive.
 CLOUD_VIDEO_KIND_BATCH_LIMIT = 10
 UPSCALE_RUN_BUDGET_SECONDS = 8 * 60
 UPSCALE_MIN_START_REMAINING_SECONDS = 2 * 60
-PIPELINE_WALL_TIMEOUT_SECONDS = UPSCALE_RUN_BUDGET_SECONDS + 3 * 60  # 11 min
+PIPELINE_WALL_TIMEOUT_SECONDS = UPSCALE_RUN_BUDGET_SECONDS + 3 * 60
 LOW_DISK_WARNING_GB = 25
 CPU_BUSY_SKIP_THRESHOLD_PCT = 65.0
 CPU_BUSY_SKIP_SAMPLE_SECONDS = 0.75
@@ -289,52 +197,26 @@ NONAI_OUTPUT_SUFFIX = "_apo8_iris2"
 NONAI_PROCESSED_DIR_NAME = "processed"
 NONAI_FALLBACK_DONE_DIR_NAME = "3_good_to_go"
 NONAI_RETIRED_ROOT = retired_root(_CONTENT)
-# Rewrite-heavy runtime state lives OUTSIDE the synced project tree: the file
-# sync service covering the project dir kept renaming the in-flight job file to
-# "nonai_upscale_job [conflicted N].json" mid-run, which orphaned live encodes
-# (they piled up unsupervised and crashed the computer). LOCALAPPDATA is local-only.
 LOCAL_STATE_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver"
 NONAI_JOB_STATE_FILE = LOCAL_STATE_DIR / "nonai_upscale_job.json"
 NONAI_ATTEMPTS_FILE = LOCAL_STATE_DIR / "nonai_upscale_attempts.json"
 NONAI_COOLDOWN_FILE = LOCAL_STATE_DIR / "nonai_upscale_cooldown.json"
-# The video the queue window asked to have upscaled right away, until a run starts it.
 NONAI_REQUEST_FILE = LOCAL_STATE_DIR / "nonai_upscale_request.json"
 LOW_DISK_WARNING_DISMISSED_FILE = LOCAL_STATE_DIR / "low_disk_warning_dismissed"
-# Whose turn it is to run the pipeline, when two Evolvers are up (util/run_lock.py).
 PIPELINE_LOCK_FILE = LOCAL_STATE_DIR / "pipeline.lock"
 NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
-# The last phone favorite marked on a video's sidecar, so one is applied
-# exactly once and Fun Time can undo it (tasks/watch_weights.py).
 WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
-# The same for acts picked in Origenerator, written into each video's record.
 PICKED_ACTS_CURSOR_FILE = LOCAL_STATE_DIR / "picked_acts.json"
-NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"  # user-editable, stays visible
-# The counterpart to the skip list: videos to encode next, in the order listed.
-# A pin outranks every ordering heuristic and re-queues a video the bucket
-# already holds an older processed version of, which is the only way to ask for
-# a redo under newer settings.
+NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"
 NONAI_PIN_LIST = LIVE_DIR / ".nonai-upscale-next.txt"
-# What one non-AI encode may cost the computer and when is
-# tasks.nonai_encode.EncodeSettings, not here: those numbers are this app's
-# own policy, and what belongs in this file is what the computer and the overlay
-# say.
-# The GUI polls presence far more often than the 10-minute pipeline tick, so a
-# returning user parks the encode within seconds instead of minutes.
 NONAI_PRESENCE_POLL_SECONDS = 20.0
 
 LOG_FILE = LIVE_DIR / "evolver.log"
 RUNS_DIR = LIVE_DIR / "runs"
-# How many runs the main window's history list reads. Nothing prunes RUNS_DIR
-# -- about 144 files a day at the default interval, kept forever -- and the
-# read happens on the GUI thread after every run, so it needs a ceiling. A
-# thousand is a week at ten minutes and months at longer intervals; the files
-# themselves are all still there, and the stats window still charts every one.
 RUNS_SHOWN = 1000
 GUI_SETTINGS_FILE = LIVE_DIR / "gui_settings.json"
 
 VOICE_SAMPLE_RATE = 16000
 VOICE_CONFIDENCE_THRESHOLD = 0.7
 
-# One example frame per act, cached for the backfill window's clickable buttons. Local
-# only (like the non-AI state above) and disposable — delete the folder to rebuild.
 BACKFILL_THUMBNAIL_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver" / "backfill_thumbnails"

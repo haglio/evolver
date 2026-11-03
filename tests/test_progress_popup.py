@@ -22,17 +22,12 @@ class TestPopupConstruction(unittest.TestCase):
         assert len(self.popup._bars) == len(ALL_STAGES)
 
     def test_every_row_is_captioned_with_the_stage_label(self):
-        """The bars are read while a run is in flight, so they say what the
-        stage is rather than the key the run record files it under."""
         captions = {label.text() for label in self.popup.findChildren(QLabel)}
 
         assert set(STAGE_LABELS.values()) <= captions
         assert captions & set(STAGE_LABELS) == set()
 
     def test_a_caption_is_never_clipped_by_the_column_it_sits_in(self):
-        """The column is sized from the labels, not from a guess: the widest
-        one is 137 px in this computer's default font and was 91 as a key, and
-        the font is whatever the computer running it has."""
         for label in self.popup.findChildren(QLabel):
             if label.text() in set(STAGE_LABELS.values()):
                 with self.subTest(caption=label.text()):
@@ -65,7 +60,6 @@ class TestPopupStageLifecycle(unittest.TestCase):
     def test_stage_started_sets_indeterminate(self):
         self.popup.on_stage_started("sort")
         bar = self.popup._bars["sort"]
-        # Indeterminate: max == 0
         assert bar.maximum() == 0
 
     def test_stage_completed_sets_bar_to_100(self):
@@ -97,16 +91,13 @@ class TestPopupIntraProgress(unittest.TestCase):
         self.popup.on_stage_started("upscale")
         self.popup.on_stage_progress("upscale", 3, 10)
         bar = self.popup._bars["upscale"]
-        # Should switch from indeterminate to determinate
         assert bar.maximum() == 100
         assert bar.value() == 30
 
     def test_stage_progress_updates_total_bar(self):
-        # Complete sort (contributes 100), then partial progress on upscale
         self.popup.on_stage_completed("sort")
         self.popup.on_stage_started("upscale")
         self.popup.on_stage_progress("upscale", 2, 5)
-        # sort=100, upscale=40, rest=0 => total=140
         assert self.popup._total_bar.value() == 140
 
 

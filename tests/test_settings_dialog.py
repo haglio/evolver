@@ -1,5 +1,3 @@
-"""Tests for the Settings dialog — where the two saved settings are written
-and the Startup shortcut is created or removed."""
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -34,8 +32,6 @@ class TestDialogShowsCurrentSettings:
         assert dialog._startup_check.isChecked()
 
     def test_the_startup_check_reflects_the_real_shortcut(self):
-        """The shortcut can be deleted without the app knowing, so the check asks
-        the Startup folder — which is the only record of it there is."""
         with patch("gui.startup.is_registered", return_value=False):
             dialog = SettingsDialog(EvolverSettings())
         assert not dialog._startup_check.isChecked()
@@ -75,8 +71,6 @@ class TestAccept:
         register.assert_not_called()
 
     def test_a_failing_shortcut_write_warns_instead_of_crashing(self, dialog_parts):
-        """A read-only Startup folder must cost the shortcut and nothing else:
-        the settings are already saved, and the dialog still closes accepted."""
         dialog, _, save, register, _ = dialog_parts
         register.side_effect = OSError("Startup folder is read-only")
         dialog._startup_check.setChecked(True)

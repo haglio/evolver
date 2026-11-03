@@ -14,12 +14,6 @@ class TestPipelineWorker(unittest.TestCase):
 
     def _run_worker(self, pipeline_result=None, pipeline_error=None, trigger="manual",
                     progress_events=None):
-        """Run a PipelineWorker with mocked pipeline, collect emitted signals.
-
-        Args:
-            progress_events: List of (name, current, total) tuples to emit via
-                on_stage_progress during the fake pipeline run.
-        """
         if pipeline_result is None and pipeline_error is None:
             pipeline_result = PipelineResult(
                 stages=[
@@ -65,7 +59,6 @@ class TestPipelineWorker(unittest.TestCase):
              patch("gui.worker.config"):
             worker.run()
 
-        # Process pending signals
         loop = QEventLoop()
         QTimer.singleShot(50, loop.quit)
         loop.exec()
@@ -73,9 +66,6 @@ class TestPipelineWorker(unittest.TestCase):
         return started, completed, finished, errors, progress
 
     def test_a_run_another_evolver_has_the_turn_for_says_why_it_did_not_start(self):
-        """Not a crash: the tray's run landing on a command-line one is the
-        ordinary case, and a traceback would bury the one line that says what
-        happened."""
         with self.assertLogs("gui.worker", level="INFO") as logged:
             _, _, finished, errors, _ = self._run_worker(
                 pipeline_error=Busy("another Evolver (process 42) is running the pipeline"))
@@ -89,9 +79,6 @@ class TestPipelineWorker(unittest.TestCase):
         assert started == ["sort", "upscale"]
 
     def test_emits_stage_completed_for_each_stage(self):
-        """Only the name crosses: the popup marks a bar full and reads nothing
-        else, and the stage's result, duration and status reach the run record
-        by their own route."""
         _, completed, _, _, _ = self._run_worker()
         assert completed == [("sort",), ("upscale",)]
 
@@ -107,8 +94,6 @@ class TestPipelineWorker(unittest.TestCase):
         assert "boom" in errors[0]
 
     def test_the_traceback_is_logged_before_the_message_is_flattened(self):
-        """str(exc) is all the GUI ever sees. Without this the only record of
-        where a pipeline died is a sentence in a toast."""
         with self.assertLogs("gui.worker", level="ERROR") as caught:
             self._run_worker(pipeline_error=RuntimeError("boom"))
 
@@ -137,8 +122,6 @@ class TestPipelineWorker(unittest.TestCase):
         assert run_pipeline.call_args.kwargs["nonai_enabled"]
 
     def test_hands_its_own_interruption_state_to_the_pipeline(self):
-        """The watchdog's requestInterruption() must reach run_pipeline's
-        between-stage check, or an overrun pipeline can never be stopped."""
         worker = PipelineWorker(trigger="scheduled")
         with patch("gui.worker.evolver.setup_logging"), \
              patch("gui.worker.evolver.check_dependencies"), \

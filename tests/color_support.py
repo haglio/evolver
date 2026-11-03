@@ -1,13 +1,3 @@
-"""How two chart colors are compared, in the terms the eye sees them.
-
-The stacked area chart draws every stage as a band in one column, so what
-matters is not whether two ``STAGE_COLORS`` entries differ but whether a
-reader can separate the bands they paint — which are drawn translucent over
-white, and so are closer together than the colors themselves. Distance is
-CIE76 Delta-E in CIE Lab, where the units mean something a threshold can be
-argued from: ~2 is the smallest difference anyone sees, ~10 reads as two
-colors rather than two shades.
-"""
 from __future__ import annotations
 
 import math
@@ -16,7 +6,6 @@ from gui.stats_window import BAND_ALPHA
 
 
 def band_fill(color) -> tuple[int, int, int]:
-    """The pixel a stage's band actually paints: its color over white ground."""
     red, green, blue = color.getRgb()[:3] if hasattr(color, "getRgb") else color
     return tuple(
         round((channel * BAND_ALPHA + 255 * (255 - BAND_ALPHA)) / 255)
@@ -42,5 +31,4 @@ def _to_lab(rgb: tuple[int, int, int]) -> tuple[float, float, float]:
 
 
 def delta_e(first: tuple[int, int, int], second: tuple[int, int, int]) -> float:
-    """CIE76 Delta-E between two RGB triples."""
     return math.dist(_to_lab(first), _to_lab(second))

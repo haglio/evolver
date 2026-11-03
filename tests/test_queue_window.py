@@ -1,7 +1,3 @@
-"""The upscale queue window: what it shows, and what it says the user did.
-
-Every video here is invented, and so is every title.
-"""
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -43,7 +39,6 @@ def window():
 
 
 def icon_of(window, row: int):
-    """What the first column of *row* draws, as pixels to compare."""
     return window._tree.topLevelItem(row).icon(0).pixmap(16, 16).toImage()
 
 
@@ -121,8 +116,6 @@ class TestWhatItShows:
 
 
 class TestTheArrow:
-    """Only the first row has one: you cannot ask for two videos at once."""
-
     def test_it_is_filled_while_the_first_row_runs_whoever_is_here(self, window):
         window.show_queue(queue(Head(ASKED_FOR, percent=2),
                                   entry("lagoon/0 unsorted/a.mp4"),
@@ -194,8 +187,6 @@ class TestWhatItSaysTheUserDid:
         return seen
 
     def test_a_video_dragged_to_the_top_goes_first_and_waits_like_any_other(self, window):
-        """Putting a video first is not asking for it now: the arrow stays
-        off until it is clicked."""
         window.show_queue(queue(Head(UPSCALING, percent=41),
                                   *(entry(f"lagoon/0 unsorted/{name}.mp4") for name in "abc")))
         asked, first = [], []
@@ -215,8 +206,6 @@ class TestWhatItSaysTheUserDid:
         assert icon_of(window, 0) == arrow(filled=False)
 
     def test_a_video_dragged_lower_down_keeps_everything_above_it_where_it_is(self, window):
-        """Its place is only its place if the videos it was put after stay
-        where they are."""
         window.show_queue(queue(None, *(entry(f"lagoon/0 unsorted/{name}.mp4")
                                           for name in "abcd")))
         seen = self._arrangements(window)
@@ -286,8 +275,6 @@ class TestWhatItSaysTheUserDid:
         assert tree.dropped_row(QPoint(20, second.top() + 400)) == 3
 
     def test_a_lineup_arriving_mid_drag_waits_for_the_row_to_land(self, window):
-        """The refresh timer goes on firing inside the drag's own event loop,
-        and a rebuild there deletes the row being dragged."""
         window.show_queue(queue(None, entry("lagoon/0 unsorted/a.mp4")))
         window._tree._dragging = True
 
