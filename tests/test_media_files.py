@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import os
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -23,6 +24,7 @@ from util.media_files import (
     remove_partial_files,
     retry_while_in_use,
     strip_uniquifier,
+    take_its_place,
     unique_path,
 )
 
@@ -203,6 +205,32 @@ class TestRemovePartialFiles(unittest.TestCase):
                 removed = remove_partial_files(root, log)
 
             assert removed == 0
+
+
+class TestTakeItsPlace(unittest.TestCase):
+    def test_the_replacement_is_dated_a_second_after_the_file_it_replaces(self):
+        with workspace_temp_dir() as root:
+            old, new = root / "clip.mp4", root / "clip_new.mp4"
+            old.write_bytes(b"old")
+            new.write_bytes(b"new")
+            os.utime(old, (1_000_000, 1_000_000))
+
+            take_its_place(new, old)
+
+            assert old.read_bytes() == b"new"
+            assert old.stat().st_mtime == 1_000_001
+            assert not new.exists()
+
+    def test_with_nothing_to_replace_it_keeps_its_own_date(self):
+        with workspace_temp_dir() as root:
+            old, new = root / "clip.mp4", root / "clip_new.mp4"
+            new.write_bytes(b"new")
+            os.utime(new, (2_000_000, 2_000_000))
+
+            take_its_place(new, old)
+
+            assert old.read_bytes() == b"new"
+            assert old.stat().st_mtime == 2_000_000
 
 
 class TestRetryWhileInUse(unittest.TestCase):
