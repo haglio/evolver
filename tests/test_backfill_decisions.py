@@ -60,7 +60,7 @@ class TestSidecarSnapshotAndRestore(unittest.TestCase):
 class TestReclaimFromTrash(unittest.TestCase):
     def test_a_discarded_video_goes_back_where_it_came_from(self):
         with workspace_temp_dir() as root:
-            trash_dir = root / "kinda_weird"
+            trash_dir = root / "trash"
             video = root / "upscaled" / "portrait" / "provider2" / "a_topaz.mp4"
             video.parent.mkdir(parents=True)
             video.write_bytes(b"video")
@@ -83,7 +83,7 @@ class TestDiscardAsTrash(unittest.TestCase):
 
     def test_moves_the_video_into_the_trash_folder(self):
         with workspace_temp_dir() as root:
-            trash_dir = root / "kinda_weird"
+            trash_dir = root / "trash"
             video = self._make_video(root)
 
             with override_config(TRASH_DIR=trash_dir):
@@ -95,7 +95,7 @@ class TestDiscardAsTrash(unittest.TestCase):
 
     def test_a_name_collision_never_overwrites_an_earlier_discard(self):
         with workspace_temp_dir() as root:
-            trash_dir = root / "kinda_weird"
+            trash_dir = root / "trash"
             trash_dir.mkdir()
             (trash_dir / "a_topaz.mp4").write_bytes(b"earlier")
             video = self._make_video(root)
@@ -109,7 +109,7 @@ class TestDiscardAsTrash(unittest.TestCase):
 
     def test_waits_out_a_player_that_still_holds_the_video_open(self):
         with workspace_temp_dir() as root:
-            trash_dir = root / "kinda_weird"
+            trash_dir = root / "trash"
             video = self._make_video(root)
             real_replace = type(video).replace
             attempts = []
