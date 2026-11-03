@@ -471,7 +471,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 touch_video(vr_root / "finished" / f"scene {index}.mp4")
             asked = []
             with lib.config(VR_VIDEO_DIR=vr_root):
-                result = video_kinds.run(probe=lambda video: asked.append(video),
+                result = video_kinds.run(probe=asked.append,
                                          orientation_probe=_refuses_to_be_called)
 
             assert (len(asked), result.skipped, result.deferred) == (1, 1, 2)

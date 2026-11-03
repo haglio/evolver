@@ -293,10 +293,10 @@ _EMBEDDED_FIELDS: tuple[tuple[str, Callable[[str], str]], ...] = (
     ("version", lambda blob: _extract_json_string_field(blob, "version")),
     ("seed", lambda blob: _int_field_as_text(blob, "seed")),
     ("aspect_ratio", lambda blob: _extract_json_string_field(blob, "aspectRatio")),
-    ("resolution", lambda blob: _resolution_field(blob)),
+    ("resolution", _resolution_field),
     ("quality", lambda blob: _extract_json_string_field(blob, "quality")),
-    ("created", lambda blob: _created_field(blob)),
-    ("action", lambda blob: _action_field(blob)),
+    ("created", _created_field),
+    ("action", _action_field),
     ("style", lambda blob: _extract_nullable_json_string_field(blob, "styleValue")),
     ("creativity", lambda blob: _int_field_as_text(blob, "creativity")),
 )
