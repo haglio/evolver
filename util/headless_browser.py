@@ -10,6 +10,7 @@ _BROWSER_CANDIDATES = (
     Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
 )
 
+# Chrome virtual time, not wall clock: the browser fast-forwards its timers.
 _VIRTUAL_TIME_BUDGET_MS = 10000
 
 
