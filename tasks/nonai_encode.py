@@ -228,20 +228,20 @@ def is_low_disk(settings: EncodeSettings) -> bool:
 
 def computer_busy_reason(cooldown_file: Path, settings: EncodeSettings, *,
                         asked_for: bool = False, ai_waiting: bool = False) -> str:
-    if not asked_for and user_present(settings):
-        return "user_present"
-    if topaz_pids():
-        return "topaz_busy"
-    if system_resources.available_ram_gb() < settings.min_available_ram_gb:
-        return "low_ram"
-    if ai_waiting:
-        return "ai_clips_waiting"
-    if not asked_for and (time.time() - nonai_job.last_encode_ended_at(cooldown_file)
-                          < settings.cooldown_minutes * 60):
-        return "cooldown"
-    if topaz.sign_in_expired():
-        return topaz.SIGN_IN_EXPIRED
-    return ""
+    in_order = (
+        ("user_present", lambda: not asked_for and user_present(settings)),
+        ("topaz_busy", topaz_pids),
+        ("low_ram", lambda: system_resources.available_ram_gb() < settings.min_available_ram_gb),
+        ("ai_clips_waiting", lambda: ai_waiting),
+        ("cooldown", lambda: not asked_for and _cooling_down(cooldown_file, settings)),
+        (topaz.SIGN_IN_EXPIRED, topaz.sign_in_expired),
+    )
+    return next((reason for reason, applies in in_order if applies()), "")
+
+
+def _cooling_down(cooldown_file: Path, settings: EncodeSettings) -> bool:
+    since_last_encode = time.time() - nonai_job.last_encode_ended_at(cooldown_file)
+    return since_last_encode < settings.cooldown_minutes * 60
 
 
 def user_present(settings: EncodeSettings, *, idle_seconds=None) -> bool:
