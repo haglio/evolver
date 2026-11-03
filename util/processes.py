@@ -83,29 +83,33 @@ def command_line(pid: int) -> str | None:
     if not handle:
         return None
     try:
-        pbi = _PROCESS_BASIC_INFORMATION()
-        if _ntdll.NtQueryInformationProcess(
-            handle, 0, ctypes.byref(pbi), ctypes.sizeof(pbi), None
-        ) != 0 or not pbi.PebBaseAddress:
-            return None
-        params_raw = _read_memory(handle, pbi.PebBaseAddress + 0x20, 8)
-        if params_raw is None:
-            return None
-        params_ptr = ctypes.c_void_p.from_buffer_copy(params_raw).value
-        if not params_ptr:
-            return None
-        ustr_raw = _read_memory(handle, params_ptr + 0x70, ctypes.sizeof(_UNICODE_STRING))
-        if ustr_raw is None:
-            return None
-        ustr = _UNICODE_STRING.from_buffer_copy(ustr_raw)
-        if not ustr.Buffer or not ustr.Length:
-            return None
-        raw = _read_memory(handle, ustr.Buffer, ustr.Length)
-        if raw is None:
-            return None
-        return raw.decode("utf-16-le", errors="replace")
+        params_ptr = _process_parameters_address(handle)
+        return _read_command_line_text(handle, params_ptr) if params_ptr else None
     finally:
         _kernel32.CloseHandle(handle)
+
+
+def _process_parameters_address(handle) -> int | None:
+    pbi = _PROCESS_BASIC_INFORMATION()
+    if _ntdll.NtQueryInformationProcess(
+        handle, 0, ctypes.byref(pbi), ctypes.sizeof(pbi), None
+    ) != 0 or not pbi.PebBaseAddress:
+        return None
+    params_raw = _read_memory(handle, pbi.PebBaseAddress + 0x20, 8)
+    if params_raw is None:
+        return None
+    return ctypes.c_void_p.from_buffer_copy(params_raw).value
+
+
+def _read_command_line_text(handle, params_ptr: int) -> str | None:
+    ustr_raw = _read_memory(handle, params_ptr + 0x70, ctypes.sizeof(_UNICODE_STRING))
+    if ustr_raw is None:
+        return None
+    ustr = _UNICODE_STRING.from_buffer_copy(ustr_raw)
+    if not ustr.Buffer or not ustr.Length:
+        return None
+    raw = _read_memory(handle, ustr.Buffer, ustr.Length)
+    return None if raw is None else raw.decode("utf-16-le", errors="replace")
 
 
 def _read_memory(handle, address: int, size: int) -> bytes | None:
