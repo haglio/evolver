@@ -439,8 +439,8 @@ class TestIsT2vProvider(unittest.TestCase):
                 assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
 
-class TestOnProgressCallback(unittest.TestCase):
-    def test_on_progress_called_per_item(self):
+class TestListeners(unittest.TestCase):
+    def test_each_item_is_said_with_its_source_the_moment_it_is_filed_and_counted(self):
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, trash_dir = library_dirs(root)
             for name in ("a", "b", "c"):
@@ -448,18 +448,26 @@ class TestOnProgressCallback(unittest.TestCase):
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
 
-            progress_calls = []
+            progress_calls, filed = [], []
+
+            def on_filed(source):
+                upscales = (out_dir / "landscape" / "src").iterdir()
+                filed.append((source, sorted(upscale.name for upscale in upscales)))
 
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+                upscale.run(max_items=10, listeners=upscale.Listeners(
+                    on_progress=lambda cur, tot: progress_calls.append((cur, tot)),
+                    on_filed=on_filed))
 
+            assert filed == [("src", ["a_topaz.mp4"]), ("src", ["a_topaz.mp4", "b_topaz.mp4"]),
+                             ("src", ["a_topaz.mp4", "b_topaz.mp4", "c_topaz.mp4"])]
             assert len(progress_calls) == 3
             assert progress_calls[0] == (1, 3)
             assert progress_calls[1] == (2, 3)
             assert progress_calls[2] == (3, 3)
 
-    def test_on_progress_counts_failures(self):
+    def test_a_failed_encode_is_counted_and_never_said_to_be_filed(self):
         with workspace_temp_dir() as root:
             sorted_dir, out_dir, trash_dir = library_dirs(root)
             for name in ("a", "b"):
@@ -467,12 +475,15 @@ class TestOnProgressCallback(unittest.TestCase):
                 f.parent.mkdir(parents=True, exist_ok=True)
                 f.write_bytes(b"video")
 
-            progress_calls = []
+            progress_calls, filed = [], []
 
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", return_value=False), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=10, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+                upscale.run(max_items=10, listeners=upscale.Listeners(
+                    on_progress=lambda cur, tot: progress_calls.append((cur, tot)),
+                    on_filed=filed.append))
 
+            assert filed == []
             assert len(progress_calls) == 2
             assert progress_calls[-1] == (2, 2)
 
@@ -562,7 +573,8 @@ class TestSubprocessTimeout(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir), patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=5, on_progress=lambda cur, tot: progress_calls.append((cur, tot)))
+                upscale.run(max_items=5, listeners=upscale.Listeners(
+                    on_progress=lambda cur, tot: progress_calls.append((cur, tot))))
 
             assert len(progress_calls) == 1
             assert progress_calls[0] == (0, 1)

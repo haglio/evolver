@@ -26,15 +26,6 @@ def generated_fps(checkout: Path) -> Fraction | None:
     return rate if rate > 0 else None
 
 
-def downtime_command(checkout: Path) -> tuple[str, ...] | None:
-    try:
-        published = json.loads((checkout / PUBLISHED).read_text(encoding="utf-8"))
-        command = tuple(str(part) for part in published["downtime_command"])
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-    return command or None
-
-
 def database(db_path=None) -> Path:
     db_path = Path(db_path) if db_path is not None else config.ORIGENERATOR_DB_PATH
     if not db_path.exists():

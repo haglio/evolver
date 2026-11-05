@@ -79,6 +79,12 @@ class LowDiskWarning:
         return cls(**_given_or_configured(given, defaults))
 
 
+@dataclass(frozen=True)
+class Listeners:
+    on_progress: Callable[[int, int], None] = lambda done, queued: None
+    on_filed: Callable[[str], None] = lambda source: None
+
+
 def _given_or_configured(given: dict, defaults: dict) -> dict:
     unknown = given.keys() - defaults.keys()
     if unknown:
@@ -122,10 +128,11 @@ def run(
     *,
     priority_files: list[Path] | None = None,
     max_items: int | None = None,
-    on_progress: Callable[[int, int], None] | None = None,
+    listeners: Listeners | None = None,
     folders: UpscaleFolders | None = None,
     low_disk: LowDiskWarning | None = None,
 ) -> UpscaleResult:
+    listeners = Listeners() if listeners is None else listeners
     folders = UpscaleFolders.configured() if folders is None else folders
     low_disk = LowDiskWarning.configured() if low_disk is None else low_disk
     result = UpscaleResult()
@@ -170,12 +177,12 @@ def run(
         outcome = _upscale_one(candidate, env, folders, budget)
         if outcome is _Outcome.UPSCALED:
             result.processed += 1
+            listeners.on_filed(candidate[1])
         elif outcome is _Outcome.FAILED:
             result.failed += 1
         else:
             result.stopped_at_budget += 1
-        if on_progress:
-            on_progress(result.processed + result.failed, len(candidates))
+        listeners.on_progress(result.processed + result.failed, len(candidates))
         if outcome is _Outcome.BUDGET_SPENT:
             break
 

@@ -40,7 +40,7 @@ CONFIG_REFERENCE_CEILINGS = {
     "tasks/nonai_group.py": 1,
     "tasks/nonai_queue.py": 2,
     "tasks/nonai_upscale.py": 1,
-    "tasks/origenerator_downtime.py": 1,
+    "tasks/origenerator_commands.py": 1,
     "tasks/prompt_scrape.py": 6,
     "tasks/provenance_sweep.py": 1,
     "tasks/reference_sync.py": 2,

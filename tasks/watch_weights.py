@@ -28,10 +28,11 @@ class WatchWeightsResult:
     acts_named: int = 0
     unmapped: int = 0
     write_errors: int = 0
+    gallery_untold: bool = False
 
     @property
     def ok(self) -> bool:
-        return not self.write_errors
+        return not self.write_errors and not self.gallery_untold
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,13 @@ class _PhoneFavorites:
     write_errors: int = 0
 
 
-def run() -> WatchWeightsResult:
+def run(*, tell_the_gallery: Callable[[], bool] = lambda: True) -> WatchWeightsResult:
+    result = _records_brought_up_to_what_was_watched()
+    result.gallery_untold = not tell_the_gallery()
+    return result
+
+
+def _records_brought_up_to_what_was_watched() -> WatchWeightsResult:
     result = WatchWeightsResult()
     log.info("=== Stage: watch weights ===")
     outbox = config.WARM_GUN_OUTBOX

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 import config
-from tasks import origenerator_metadata, taken_back
+from tasks import origenerator_commands, origenerator_metadata, taken_back
 from util import lanes, origenerator_gallery
 
 CONTRACT = Path("origenerator") / origenerator_gallery.PUBLISHED
@@ -27,8 +27,16 @@ class OrigeneratorGalleryContract(unittest.TestCase):
             (self.origenerator / origenerator_gallery.PUBLISHED).read_text(encoding="utf-8"))
 
     def test_the_command_for_origenerators_work_while_closed_is_read_as_it_promises_it(self):
-        promised = self.promise.get("downtime_command")
-        read = origenerator_gallery.downtime_command(self.origenerator)
+        promised = self.promise.get(origenerator_commands.DOWNTIME)
+        read = origenerator_commands.published_command(
+            self.origenerator, origenerator_commands.DOWNTIME)
+
+        assert read == (None if promised is None else tuple(promised))
+
+    def test_the_command_that_writes_gallery_entries_is_read_as_it_promises_it(self):
+        promised = self.promise.get(origenerator_commands.GALLERY_ENTRIES)
+        read = origenerator_commands.published_command(
+            self.origenerator, origenerator_commands.GALLERY_ENTRIES)
 
         assert read == (None if promised is None else tuple(promised))
 
