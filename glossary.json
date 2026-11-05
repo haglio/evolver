@@ -139,6 +139,20 @@
       ]
     },
     {
+      "id": "scene",
+      "thing": "the full video a carved clip came from",
+      "screen": [
+        "Scene Scripts"
+      ],
+      "his_word": "scene (2026-11-05: 'scene is fine in this context')",
+      "code_today": [
+        "scene"
+      ],
+      "code_word": "scene",
+      "status": "ruled",
+      "ruled": "2026-11-05, his words"
+    },
+    {
       "id": "clip",
       "thing": "a short piece cut from a full scene",
       "screen": [
