@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.chrome import toolbar_rules
+from shared_ui.chrome import style_toolbar
 from shared_ui.fonts import SIZE_BODY
 from shared_ui.icons import inline_icon
 from shared_ui.spacing import BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
@@ -325,7 +325,7 @@ class EvolverMainWindow(QMainWindow):
         toolbar.setFloatable(False)
         toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         toolbar.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
-        toolbar.setStyleSheet(toolbar_rules())
+        style_toolbar(toolbar)
         self.addToolBar(toolbar)
 
         left_pad = QWidget()
