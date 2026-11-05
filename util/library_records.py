@@ -22,9 +22,10 @@ VIDEO_GENERATION_FIELDS = (
 )
 
 SOURCE_IMAGE_BLOCK = "source_image"
+FRAME_OF_VIDEO_BLOCK = "frame_of_video"
 SOURCE_IMAGE_FIELDS = (
     "positive_prompt", "negative_prompt", "model", "action", "resolution",
-    "aspect_ratio", "quality", "style", "creativity", "seed", "created",
+    "aspect_ratio", "quality", "style", "creativity", "seed", "created", FRAME_OF_VIDEO_BLOCK,
 )
 
 CLIP_BLOCK = "clip"

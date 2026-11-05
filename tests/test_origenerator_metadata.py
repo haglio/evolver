@@ -240,3 +240,94 @@ class TestFrameName(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+_WORDS_VIDEO = {"prompt": "a boat on a lake", "model": "Motion B", "seed": "7"}
+_FRAME = "frame-one.jpg"
+
+
+def _library_row(prompt_id, library_path, frame=_FRAME):
+    return {**_row(prompt_id, params={"input_image": frame}),
+            "output_files": json.dumps([{"filename": Path(library_path).name,
+                                         "library_path": str(library_path)}])}
+
+
+def _record_of(root, name, record):
+    path = root / "metadata" / f"{name}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record), encoding="utf-8")
+    return path
+
+
+class _ALibrary:
+    def __init__(self, root):
+        self.root = root
+        self.db = root / "origenerator.db"
+
+    def __enter__(self):
+        videos = self.root / "videos"
+        self._patches = [patch("config.VIDEO_LIBRARY_DIR", videos),
+                         patch("config.VIDEO_SEARCH_ROOT", videos),
+                         patch("config.METADATA_DIR", self.root / "metadata"),
+                         _no_probe()]
+        for one in self._patches:
+            one.start()
+        return self
+
+    def __exit__(self, *_):
+        for one in self._patches:
+            one.stop()
+
+    def with_rows(self, *rows):
+        _make_db(self.db, list(rows))
+        return self
+
+    def t2v_video_and_its_frame(self):
+        _record_of(self.root, "words-one", {"video": _WORDS_VIDEO})
+        return (_row("frame-1", pos="the words of the frame", seed=3, outputs=[_FRAME]),
+                _library_row("words-1", self.root / "videos" / "words-one.mp4"))
+
+
+class TestAVideoMadeFromAT2VVideosStartingFrame(unittest.TestCase):
+    def test_its_source_image_block_names_the_t2v_video_it_was_taken_from(self):
+        with workspace_temp_dir() as root, _ALibrary(root) as library:
+            frame, words = library.t2v_video_and_its_frame()
+            library.with_rows(frame, words, _row("made-1", params={"input_image": _FRAME},
+                                                 outputs=["wan22_i2v_00001_.mp4"]))
+            payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=library.db)
+
+        assert payload["source_image"]["frame_of_video"] == _WORDS_VIDEO
+        assert payload["source_image"]["positive_prompt"] == "the words of the frame"
+
+    def test_it_finds_the_t2v_video_through_any_file_of_the_frame(self):
+        with workspace_temp_dir() as root, _ALibrary(root) as library:
+            frame, words = library.t2v_video_and_its_frame()
+            frame = {**frame, "output_files": json.dumps(
+                [{"filename": _FRAME}, {"filename": "frame-one-enhanced.png"}])}
+            library.with_rows(frame, words, _row("made-1", params={"input_image": "frame-one-enhanced.png"},
+                                                 outputs=["wan22_i2v_00001_.mp4"]))
+            payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=library.db)
+
+        assert payload["source_image"]["frame_of_video"] == _WORDS_VIDEO
+
+    def test_a_video_made_from_an_image_names_no_video(self):
+        with workspace_temp_dir() as root, _ALibrary(root) as library:
+            _record_of(root, "other-one", {"video": _WORDS_VIDEO,
+                                           "source_image": {"positive_prompt": "its image"}})
+            library.with_rows(_row("image-1", pos="an image", outputs=[_FRAME]),
+                              _library_row("other-1", root / "videos" / "other-one.mp4"),
+                              _row("made-1", params={"input_image": _FRAME},
+                                   outputs=["wan22_i2v_00001_.mp4"]))
+            payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=library.db)
+
+        assert "frame_of_video" not in payload["source_image"]
+
+    def test_a_video_kept_outside_the_library_names_no_video(self):
+        with workspace_temp_dir() as root, _ALibrary(root) as library:
+            library.with_rows(_row("image-1", pos="an image", outputs=[_FRAME]),
+                              _library_row("other-1", root / "elsewhere" / "other-one.mp4"),
+                              _row("made-1", params={"input_image": _FRAME},
+                                   outputs=["wan22_i2v_00001_.mp4"]))
+            payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=library.db)
+
+        assert "frame_of_video" not in payload["source_image"]

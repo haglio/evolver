@@ -6,8 +6,9 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from util import origenerator_gallery, provenance
+from util import origenerator_gallery, provenance, sidecar
 from util.ffprobe import video_dimensions
+from util.library_records import FRAME_OF_VIDEO_BLOCK, SOURCE_IMAGE_BLOCK
 from util.media_files import strip_uniquifier
 
 COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
@@ -28,7 +29,7 @@ _RATIO_TOLERANCE = 0.05
 
 def build_metadata(video_path, db_path=None) -> dict:
     video_path = Path(video_path)
-    rows = _load_rows(db_path)
+    rows = load_rows(db_path)
     row = _match_video_row(video_path, rows)
     if row is None:
         raise LookupError(f"No Origenerator generation produced {video_path.name}")
@@ -37,16 +38,49 @@ def build_metadata(video_path, db_path=None) -> dict:
         "video": _video_block(row, video_path),
         provenance.BLOCK: {provenance.GENERATION: _generation_provenance(row)},
     }
-    image_row = _find_source_image_row(row, rows)
-    if image_row is not None:
-        source_block = _source_image_block(image_row)
-        if source_block:
-            payload["source_image"] = source_block
+    source_block = source_image_block_of(row, rows)
+    if source_block:
+        payload[SOURCE_IMAGE_BLOCK] = source_block
     return payload
 
 
+def source_image_block_of(row: dict, rows: list[dict]) -> dict:
+    image_row = _find_source_image_row(row, rows)
+    if image_row is None:
+        return {}
+    block = _source_image_block(image_row)
+    video = _t2v_video_with_the_start_frame_in(image_row, row, rows)
+    return {**block, FRAME_OF_VIDEO_BLOCK: video} if video and block else block
+
+
+def _t2v_video_with_the_start_frame_in(image_row: dict, video_row: dict,
+                                       rows: list[dict]) -> dict | None:
+    frames = _output_frame_names(image_row)
+    for row in rows:
+        if row is video_row or _frame_name(_parse_params(row).get("input_image")) not in frames:
+            continue
+        for path in _library_paths_of(row):
+            record = _record_of(path)
+            video = record.get("video")
+            if not record.get(SOURCE_IMAGE_BLOCK) and isinstance(video, dict) and video.get("prompt"):
+                return video
+    return None
+
+
+def _library_paths_of(row: dict) -> list[Path]:
+    return [Path(file["library_path"]) for file in _row_output_files(row)
+            if isinstance(file, dict) and file.get("library_path")]
+
+
+def _record_of(video: Path) -> dict:
+    try:
+        return sidecar.read(sidecar.sidecar_path(video))
+    except ValueError:
+        return {}
+
+
 def generation_records(db_path=None) -> Callable[[Path], dict]:
-    rows = _load_rows(db_path)
+    rows = load_rows(db_path)
 
     def generation_of(video: Path) -> dict:
         row = _match_video_row(Path(video), rows)
@@ -57,9 +91,13 @@ def generation_records(db_path=None) -> Callable[[Path], dict]:
     return generation_of
 
 
-def _load_rows(db_path) -> list[dict]:
+def load_rows(db_path) -> list[dict]:
     return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE,),
                                      db_path=db_path)
+
+
+def video_row_named(name: str, rows: list[dict]) -> dict | None:
+    return _match_video_row(Path(name), rows)
 
 
 def _match_video_row(video_path: Path, rows: list[dict]) -> dict | None:
