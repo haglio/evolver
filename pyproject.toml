@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-timeout>=2.4,<3", "vulture>=2.16,<3", "ruff==0.16.6"]
+dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-timeout>=2.4,<3", "pytest-xdist>=3.8,<4", "vulture>=2.16,<3", "ruff==0.16.6"]
 
 [tool.pytest.ini_options]
 # A ceiling on a hang, not a performance budget. The slowest test on a
@@ -75,6 +75,7 @@ unbounded = ["tzdata"]
 # shipped, and waits out an update of it already under way, before it starts
 # Evolver (app_support.production_update).
 [tool.haglio.production]
+tests-run-from-its-venv = true
 
 # What Evolver will not open without (content_overlay.refuse_an_incomplete_overlay):
 # every key content.example.json documents, in content.local.json. The production

@@ -182,7 +182,7 @@ class TestSignInExpired(unittest.TestCase):
 
     def test_a_check_that_cannot_run_does_not_claim_the_sign_in_expired(self):
         for failure in (OSError("no ffmpeg"), subprocess.TimeoutExpired("ffmpeg", 90)):
-            with self.subTest(failure=failure), \
+            with self.subTest(failure=repr(failure)), \
                  patch("subprocess.run", side_effect=failure), \
                  self.assertLogs("util.topaz", level="WARNING"):
                 assert not topaz.sign_in_expired()

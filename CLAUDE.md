@@ -2,6 +2,19 @@
 
 Shared rules are in the global `~/.claude/CLAUDE.md`. This file contains only evolver-specific overrides.
 
+## The whole test run
+
+```bash
+"<primary checkout>/.venv/Scripts/python.exe" -m pytest -x -q -n 8
+```
+
+from the worktree: every test and check in eight worker processes, about half a
+minute against a minute and a half in one. A run that names a file goes without
+`-n`. A value handed to `subTest` is plain text or a number, since a worker sends
+it to the run that started it. A venv without the plugin answers
+`unrecognized arguments: -n`: the production updater installs it once Evolver has
+closed for the commit naming it, and until then run without `-n`.
+
 ## Judging a branch before it lands
 
 Every worktree carries `launch_preview_branch.vbs` (tracked). Double-clicking it
