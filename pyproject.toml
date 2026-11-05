@@ -19,7 +19,7 @@ requires-python = ">=3.14"
 # other half had not landed turned all of them red at once. Moving to a newer
 # one is this repo's own commit, with its own suite to answer for it.
 dependencies = [
-    "app-support @ git+https://github.com/haglio/app_support@v0.1.431",
+    "app-support @ git+https://github.com/haglio/app_support@v0.1.434",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.343",
     # The family's listener, for the backfill tool: it brings vosk and sounddevice.
     "voice-core @ git+https://github.com/haglio/voice_core@v0.1.130",
@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-timeout>=2.4,<3", "vulture>=2.16,<3", "ruff==0.16.6"]
+dev = ["pytest>=9,<10", "pytest-cov>=7,<8", "pytest-timeout>=2.4,<3", "pytest-xdist>=3.8,<4", "vulture>=2.16,<3", "ruff==0.16.6"]
 
 [tool.pytest.ini_options]
 # A ceiling on a hang, not a performance budget. The slowest test on a
@@ -75,6 +75,7 @@ unbounded = ["tzdata"]
 # shipped, and waits out an update of it already under way, before it starts
 # Evolver (app_support.production_update).
 [tool.haglio.production]
+tests-run-from-its-venv = true
 
 # What Evolver will not open without (content_overlay.refuse_an_incomplete_overlay):
 # every key content.example.json documents, in content.local.json. The production
