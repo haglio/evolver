@@ -414,6 +414,14 @@ class TestToolbarMatchesTheTrayMenu:
         assert bar[bar.index("Run Now"):] == menu[menu.index("Run Now"):]
 
 
+def test_the_toolbar_is_styled_the_way_that_holds_on_any_address():
+    with patch("gui.main_window.style_toolbar") as styled:
+        window = EvolverMainWindow()
+
+    [toolbar] = window.findChildren(QToolBar)
+    styled.assert_called_once_with(toolbar)
+
+
 def _shown(window):
     window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
     window.show()
