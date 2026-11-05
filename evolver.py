@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
@@ -24,7 +24,7 @@ from tasks import (
     nonai_titles,
     nonai_upscale,
     nonai_upscale_queue,
-    origenerator_downtime,
+    origenerator_commands,
     prompt_scrape,
     provenance_sweep,
     reference_sync,
@@ -245,7 +245,8 @@ def _run_intake_stages(stages: _Stages):
     _run_stage(stages, "withdrawn", taken_back.run)
     _run_stage(stages, "metadata", prompt_scrape.run)
     sort_result = _run_stage(stages, "sort", sort.run)
-    downtime_result = _run_stage(stages, "origenerator_downtime", origenerator_downtime.run)
+    downtime_result = _run_stage(stages, "origenerator_downtime",
+                                 origenerator_commands.run_downtime)
     return sort_result, downtime_result
 
 
@@ -279,12 +280,13 @@ def _upscale_unless_the_computer_is_unfit(stages: _Stages, log: logging.Logger,
                  "what it makes until someone signs in to the Topaz Video app.")
         _skip_stage(stages, "upscale", topaz.SIGN_IN_EXPIRED)
         return None, True
-    upscale_kwargs: dict = {
-        "priority_files": priority_files, "max_items": config.UPSCALE_BATCH_LIMIT,
-    }
+    listeners = upscale.Listeners(
+        on_filed=origenerator_commands.write_the_gallery_entry_of_a_video_from)
     if on_stage_progress is not None:
-        upscale_kwargs["on_progress"] = lambda cur, tot: on_stage_progress("upscale", cur, tot)
-    return _run_stage(stages, "upscale", upscale.run, **upscale_kwargs), False
+        listeners = replace(
+            listeners, on_progress=lambda cur, tot: on_stage_progress("upscale", cur, tot))
+    return _run_stage(stages, "upscale", upscale.run, priority_files=priority_files,
+                      max_items=config.UPSCALE_BATCH_LIMIT, listeners=listeners), False
 
 
 def _run_remaining_stages(stages: _Stages, log: logging.Logger, upscale_result,
@@ -318,7 +320,8 @@ def _run_remaining_stages(stages: _Stages, log: logging.Logger, upscale_result,
         _run_stage(stages, "verify", check_correspondence.run, show_popup=True)
 
     _run_stage(stages, "references", reference_sync.run)
-    _run_stage(stages, "watch_weights", watch_weights.run)
+    _run_stage(stages, "watch_weights", watch_weights.run,
+               tell_the_gallery=origenerator_commands.write_gallery_entries)
     _run_stage(stages, "bookmarks", bookmarks_sync.run)
     _run_stage(stages, "clip_scripts", clip_scripts.run)
     _run_stage(stages, "scene_scripts", scene_scripts.run)

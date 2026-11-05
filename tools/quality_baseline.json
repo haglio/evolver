@@ -166,8 +166,7 @@
   "simple_namespaces": {
     "tests/test_app_startup.py": 6,
     "tests/test_backfill_thumbnails.py": 4,
-    "tests/test_ffprobe.py": 1,
-    "tests/test_origenerator_downtime.py": 1
+    "tests/test_ffprobe.py": 1
   },
   "statements": {},
   "trailing_comments": {},

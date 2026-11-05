@@ -362,3 +362,36 @@ class TestActsPickedInOrigenerator(unittest.TestCase):
 
             assert sidecar.action_of(sidecar.read(sidecar.sidecar_path(upscale))) == "Act Gamma"
         assert result.acts_named == 2
+
+
+class TestTellingOrigeneratorsGallery(unittest.TestCase):
+    def test_the_gallery_is_told_once_the_records_say_what_this_run_carried(self):
+        with _setting() as s:
+            _, upscale = s.sorted_clip("clip_a")
+            s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
+            s.pick_act(20, upscale, "Act Beta")
+            seen = []
+
+            def tell_the_gallery() -> bool:
+                read = sidecar.read(sidecar.sidecar_path(upscale))
+                seen.append((is_favorite(read), sidecar.action_of(read)))
+                return True
+
+            result = watch_weights.run(tell_the_gallery=tell_the_gallery)
+
+        assert seen == [(True, "Act Beta")]
+        assert result.ok
+
+    def test_a_gallery_that_could_not_be_told_fails_the_stage(self):
+        with _setting():
+            result = watch_weights.run(tell_the_gallery=lambda: False)
+
+        assert not result.ok
+
+    def test_the_gallery_is_told_what_the_records_hold_though_the_phones_folder_cannot_be_reached(
+            self):
+        told = []
+        with _setting() as s, s.config(WARM_GUN_OUTBOX=s.phones_own_folder):
+            watch_weights.run(tell_the_gallery=lambda: told.append(True) or True)
+
+        assert told == [True]

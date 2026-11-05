@@ -57,7 +57,7 @@ def _stage_mocks() -> dict:
 _STAGE_PATCHES = [
     ("evolver.stray_files.run", "strays_run"),
     ("evolver.sort.run", "sort_run"),
-    ("evolver.origenerator_downtime.run", "origenerator_downtime_run"),
+    ("evolver.origenerator_commands.run_downtime", "origenerator_downtime_run"),
     ("evolver.video_kinds.run", "video_types_run"),
     ("evolver.provenance_sweep.run", "provenance_sweep_run"),
     ("evolver.taken_back.run", "withdrawn_run"),
@@ -162,7 +162,15 @@ class TestEvolverMain:
         assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_called_once_with(
             priority_files=["new-file"], max_items=config.UPSCALE_BATCH_LIMIT,
+            listeners=evolver.upscale.Listeners(
+                on_filed=evolver.origenerator_commands.write_the_gallery_entry_of_a_video_from),
         )
+
+    def test_watch_weights_tells_origenerators_gallery_what_the_records_hold(self):
+        mocks = self._run_pipeline()
+
+        mocks["watch_weights_run"].assert_called_once_with(
+            tell_the_gallery=evolver.origenerator_commands.write_gallery_entries)
 
     def test_ai_upscale_waits_while_a_topaz_encode_evolver_did_not_start_is_running(self):
         mocks = self._run_pipeline(
@@ -536,9 +544,8 @@ class TestRunPipeline:
         )
         with stack:
             evolver.run_pipeline(on_stage_progress=on_progress)
-        call_kwargs = mocks["upscale_run"].call_args.kwargs
-        assert "on_progress" in call_kwargs
-        assert call_kwargs["on_progress"] is not None
+        mocks["upscale_run"].call_args.kwargs["listeners"].on_progress(1, 5)
+        on_progress.assert_called_once_with("upscale", 1, 5)
 
     def test_on_stage_progress_not_passed_when_none(self):
         stack, mocks = self._patch_all_stages(
@@ -547,17 +554,15 @@ class TestRunPipeline:
         )
         with stack:
             evolver.run_pipeline(on_stage_progress=None)
-        call_kwargs = mocks["upscale_run"].call_args.kwargs
-        assert "on_progress" not in call_kwargs
+        listeners = mocks["upscale_run"].call_args.kwargs["listeners"]
+        assert listeners.on_progress is evolver.upscale.Listeners().on_progress
 
     def test_on_stage_progress_callback_binds_stage_name(self):
         progress_calls = []
 
         def capture_upscale_run(**kwargs):
-            cb = kwargs.get("on_progress")
-            if cb:
-                cb(1, 5)
-                cb(2, 5)
+            kwargs["listeners"].on_progress(1, 5)
+            kwargs["listeners"].on_progress(2, 5)
             return Mock(failed=0, deferred_low_disk=False, pending_after_run=0)
 
         stack, _ = self._patch_all_stages(
