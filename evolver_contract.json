@@ -39,7 +39,8 @@
           "style",
           "creativity",
           "seed",
-          "created"
+          "created",
+          "frame_of_video"
         ]
       },
       "clip": {
