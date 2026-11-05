@@ -14,12 +14,12 @@ Evolver is a video collection maintenance pipeline that runs as a system tray ap
 10. **Follow Moved Videos** — repoints the suite's saved video paths at videos that have since moved, so a Genaumacher session or Fun Time's watch counts survive the library being rearranged (see "Following videos that moved" below).
 11. **Watch Weights** — sums what Fun Time and Warm Gun each completed, skipped and locked onto every library video's sidecar, as a `watch` block carrying the playback weight both apps shuffle by, and marks the phone's favorites and unfavorites on the same sidecars. See "What both apps watched" below. Once the sidecars say what this run carried, it has Origenerator bring its gallery up to them (see "Origenerator's gallery entries" below); a gallery that could not be told fails the stage.
 12. **Bookmarks Sync** — writes the `web_url` of every favorite whose video is still there into a `Fun Time Favs` folder on the Chrome bookmarks bar, keeping the folder's order and adding a new favorite at its end.
-13. **Clip Scripts** — cuts each carved clip's funscript out of its full video's, using the offset the clip was matched at.
-14. **Scene Scripts** — gives an unscripted full video a mostly-blank funscript holding its carved clip's, placed where the clip sits in it.
+13. **Clip Scripts** — cuts each carved clip's funscript out of its full scene's, using the offset the clip was matched at.
+14. **Scene Scripts** — gives an unscripted source scene a mostly-blank funscript holding its carved clip's, placed where the clip sits in it.
 15. **Scripts Sync** — rehomes `.funscript` files under `videos/scripts/scripts` so they mirror the matched video path under `videos/videos`. A script only moves when there is exactly one basename match: scripts under `2D/AI` only consider `2D/AI` videos, and scripts under `2D/non_AI` only consider `2D/non_AI` videos. Where several `2D/AI` videos share its name, the one filed under the same source folder as the script is its match (`0_inbox/<source>`, `1_sorted/<source>`, or the outbox's `<orientation>/<source>`): Origenerator can send one video down both of its lanes, so it arrives under two source folders, and only the Kino lane's copy comes with a funscript. A script whose video is gone from the library but present in the `retired_root` archive (see "Non-AI library upscaling" below) follows it out and comes to sit beside it; a stranded duplicate of a script the archive already holds is discarded once the two compare byte-identical. A script that matches no video at all moves to `videos/scripts/unmatched_scripts`, and the popup names it with a link to that folder; renamed there to match its video, it moves into place on the next run, and while it waits there it brings no popup back. A script that matches more than one video is left where it is and named in the popup. VR videos kept off the library's drive (`vr_videos` in the content overlay) are matched as though they sat in `videos/videos/VR`. While the drive that folder or the `retired_root` archive is on is not there (the cloud drive is down, say), a script that could belong to a video kept there stays where it is, unchecked: the log says so in a warning, the stage's row says how many went unchecked and which folder could not be reached, and no popup comes up. It also copies missing funscripts across matching processed/original video versions.
 16. **Group non-AI** — records each `2D/non_AI` video's version family, the original and its processed versions, in a mirrored metadata sidecar. A copy saved under a name of its own joins the family too when it runs the same length and shows the same frames: a video with a same-length neighbor in its bucket has its frame read at 16 evenly spaced moments, once, kept on its sidecar, and two that agree at most of those moments are one video. `version_overrides` in the content overlay is left for the pairs the frames cannot settle, such as a trim saved under a new name.
-17. **Title non-AI** — records what to call each `2D/non_AI` video: the performer and movie its clip record names, carried across to the full video that clip was cut out of, so every app reads one name rather than working it out at launch. A video no clip record names keeps none, and its readers fall back to the filename.
-18. **Video Kinds** — records what kind each library video is — a generation, an excerpt carved from a longer video, a Genau flick — and how long it runs, on its mirrored metadata sidecar, so the apps that ask can read both rather than measure them.
+17. **Title non-AI** — records what to call each `2D/non_AI` video: the performer and movie its clip record names, carried across to the full scene that clip was cut out of, so every app reads one name rather than working it out at launch. A video no clip record names keeps none, and its readers fall back to the filename.
+18. **Video Kinds** — records what kind each library video is — a generation, an excerpt carved from a longer scene, a Genau flick — and how long it runs, on its mirrored metadata sidecar, so the apps that ask can read both rather than measure them.
 19. **Provenance** — records on each library video's metadata sidecar what made it: which app, at which version of its code, with which workflow or Topaz settings. The stages that make something stamp it as they do — the upscales, the Origenerator scrape, the two script stages (inside the funscript itself) — so this one fills in only what they could not: a video made before any of that was recorded, or one that arrived by a path that stamps nothing, such as an upscale exported by hand from the Topaz GUI. What made an Origenerator video is looked up in Origenerator's own gallery, and an upscale's Topaz settings are read from the note Topaz wrote into the file — a few hundred files a run, until the whole library has been read once. Whatever neither can say, the version of a workflow or settings above all, is recorded as unknown rather than guessed, so a later sweep that remakes old work never skips a file believing it current.
 20. **Duplicate Check** — scans the `non_AI` folder for likely accidental duplicates: video files with the same exact filesize but different filenames, with a Windows error dialog if any are found.
 
@@ -42,10 +42,10 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `tasks/stray_files.py` - non-videos in the video tree: malformed extensions repaired, funscripts rehomed, the rest reported
   - `tasks/sort.py` - inbox sorting
   - `tasks/scripts_sync.py` - funscript/video tree alignment and processed/original version copying
-  - `tasks/clip_scripts.py` - carving a clip's funscript out of its full video's
-  - `tasks/scene_scripts.py` - giving an unscripted full video a funscript holding its clip's
+  - `tasks/clip_scripts.py` - carving a clip's funscript out of its scene's
+  - `tasks/scene_scripts.py` - giving an unscripted scene a funscript holding its clip's
   - `tasks/nonai_group.py` - recording a non-AI video's version family in its sidecar
-  - `tasks/clip_match.py` - the batch that finds which full video each carved clip came out of, and where in it
+  - `tasks/clip_match.py` - the batch that finds which scene each carved clip came out of, and where in it
   - `tasks/bookmarks_sync.py` - favorites -> Chrome bookmarks sync
   - `tasks/prompt_scrape.py` - prompt scraping into mirrored JSON files
   - `tasks/upscale.py` - Topaz processing
@@ -221,7 +221,7 @@ While the sign-in has expired, the AI upscale is skipped with the reason `topaz_
 
 ## Non-AI library upscaling
 
-The `2D/non_AI` buckets (`other/full`, `other/clips`, …) hold real-footage videos, full ones and the clips cut out of them, that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the Topaz settings the already-processed videos record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), as the AI videos do. The encode runs at half the AI stage's Topaz memory budget (`vram=0.5`, no extra model instance) — slower, but a background job never gets to push the computer toward memory exhaustion.
+The `2D/non_AI` buckets (`other/full`, `other/clips`, …) hold real-footage scenes, full videos and the clips cut out of them, that were being enhanced by hand in the Topaz GUI. Evolver now works through that backlog on its own, using the Topaz settings the already-processed videos record in their `videoai` metadata tags: **apo-8** 60 fps interpolation, then an **iris-2** upscale in auto mode with recover-original-detail at 100, aimed at a 4K frame (Topaz caps small sources at the model's 4x). Real videos keep their soundtrack (re-encoded to AAC), as the AI videos do. The encode runs at half the AI stage's Topaz memory budget (`vram=0.5`, no extra model instance) — slower, but a background job never gets to push the computer toward memory exhaustion.
 
 It follows the bucket conventions already in use:
 
@@ -254,7 +254,7 @@ In-flight state lives in `%LOCALAPPDATA%\Evolver\` (`nonai_upscale_job.json`, `n
 
 ## Following videos that moved
 
-Moving a video is Evolver's whole job, and every move silently breaks whatever else in the suite had written that video's path down. Genaumacher stores a session's `video_path` absolutely, so a video you clipped last month stops opening — "Could not open video" — the moment its folder is rearranged. Evolver owns that breakage, so it owns repairing it.
+Moving a video is Evolver's whole job, and every move silently breaks whatever else in the suite had written that video's path down. Genaumacher stores a session's `video_path` absolutely, so a scene you clipped last month stops opening — "Could not open video" — the moment its folder is rearranged. Evolver owns that breakage, so it owns repairing it.
 
 Each run, after every stage that could have moved something, Evolver walks the suite's saved references and follows the moves:
 
@@ -264,19 +264,19 @@ Each run, after every stage that could have moved something, Evolver walks the s
 | `scripture/sessions/*.scripture` | a project's `video_path` — its splits, tracking and ground truth |
 
 | `fun_time/state/watch_stats.json` | the completions/skips/locks keyed by video path, re-keyed in Fun Time's own lowercased form |
-| `videos/metadata/2D/non_AI/**/*.json` | a carved clip's `clip.full_video` — the full video the matching batch found it in, which Fun Time's jumps between the two go by |
+| `videos/metadata/2D/non_AI/**/*.json` | a carved clip's `clip.full_video` — the scene the matching batch found it in, which Fun Time's jumps between the two go by |
 
 Those four are the stores that hold something you cannot get back cheaply: clip bounds and splits made by hand, watch counts accumulated over months, and a pairing it takes the matching batch minutes of decoding to find again. Playlists, HUD state, duration caches and thumbnail caches are all regenerated from the library on demand, so a stale entry in one costs a rebuild rather than the data, and Evolver leaves them alone.
 
-A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder, such as a compilations archive, is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same video but not the same footage, and a Genaumacher session's frame numbers only mean anything against the exact file they were set on.
+A reference whose file is missing is matched against the library by **exact filename**, case-insensitively, across everything under `videos/` — wider than the library proper, so a video parked in a sibling folder, such as a compilations archive, is still found. Matching on the full filename rather than the stem is deliberate: `clip.mp4` and `clip_apo8_iris2.mp4` are the same scene but not the same footage, and a Genaumacher session's frame numbers only mean anything against the exact file they were set on.
 
-A clip's pairing also follows its full video to another version of it: when the non-AI upscale replaces a full video with `<stem>_apo8_iris2` and moves the original out of the library, no file carries the old name any more, so the pairing is matched to the smallest file in the same bucket whose name, processing suffixes taken off, is the one it names. That is safe for a pairing and for nothing else here, because its offset is in seconds, which an upscale keeps, where a Genaumacher session's frame numbers are not.
+A clip's pairing also follows its scene to another version of it: when the non-AI upscale replaces a scene with `<stem>_apo8_iris2` and moves the original out of the library, no file carries the old name any more, so the pairing is matched to the smallest file in the same bucket whose name, processing suffixes taken off, is the one it names. That is safe for a pairing and for nothing else here, because its offset is in seconds, which an upscale keeps, where a Genaumacher session's frame numbers are not.
 
 Nothing is ever dropped. A reference is rewritten only when exactly one file in the tree carries that name; when none does, or several do, it is left untouched and logged as `UNRESOLVED`. Videos sitting in either trash folder — `trash/` and Genau's — are excluded from the search, so a reference goes on naming the place its video was, which is where the video goes back to if you put it back. So are the videos Origenerator keeps in its own folder (`origenerator_videos_dir` in the settings all of Haglio shares): they are not Evolver's to follow.
 
 A reference into a folder whose videos are kept off the library's drive, `vr_videos` or `retired_root`, is not looked for at all while the drive that folder is on is not there: its video is not missing, its drive is down, and matching the name against the library could repoint it at a different video. The stage counts it as not checked and says once in the log which folder could not be reached.
 
-**When the name itself is gone.** A rename leaves nothing to match on, so there is one fallback, and only for the stores that can support it: a Genaumacher session and a Scripture project each record the `fps` and `total_frames` of the footage they were cut against, which is a usable fingerprint for the video itself. If the filename resolves to nothing, Evolver probes the videos in the one folder the reference named — a renamed file usually stays put, and probing the whole library on the off chance would cost minutes — and repoints only when exactly one of them reports that same frame rate and frame count. An inexact match is not a match: two cuts of the same video have different frame counts, and a session's clip bounds are frame indices that mean nothing against the wrong one.
+**When the name itself is gone.** A rename leaves nothing to match on, so there is one fallback, and only for the stores that can support it: a Genaumacher session and a Scripture project each record the `fps` and `total_frames` of the footage they were cut against, which is a usable fingerprint for the video itself. If the filename resolves to nothing, Evolver probes the videos in the one folder the reference named — a renamed file usually stays put, and probing the whole library on the off chance would cost minutes — and repoints only when exactly one of them reports that same frame rate and frame count. An inexact match is not a match: two cuts of the same scene have different frame counts, and a session's clip bounds are frame indices that mean nothing against the wrong one.
 
 `grep "REPOINT\|UNRESOLVED" evolver.log` is the quickest way to see what moved and what still needs a human.
 
@@ -309,23 +309,23 @@ sibling packages Evolver imports):
 
 A command-line run that finds the tray (or any other Evolver) in the middle of a run starts nothing, says so in the log, and exits 1.
 
-## Matching carved clips to their full videos
+## Matching carved clips to their scenes
 
-A clip carved out of a compilation is a literal excerpt of a full video in the library, but
-the filenames cannot say which one: the full videos are named for a performer and a
+A clip carved out of a compilation is a literal excerpt of a full scene, but
+the filenames cannot say which one: the scenes are named for a performer and a
 hash, with no movie title to match against. So the answer comes from the
 frames. `tasks/clip_match.py` samples both sides down to small gray
 thumbnails, hashes each frame as a grid of light and dark cells, and looks for
-the offset at which a clip's run of hashes sits inside a full video's; black bars are
+the offset at which a clip's run of hashes sits inside a scene's; black bars are
 cropped off first, since a hash says where things are in the frame and a
 pillarboxed clip has moved its whole content inward. What it finds is written
 into the clip's sidecar as `clip.full_video` and `clip.scene_offset`, which is
 what the Clip Scripts and Scene Scripts stages carry a funscript by, and what
-The Main Funestra steps from a clip to its full video by.
+The Main Funestra steps from a clip to its scene by.
 
 It is not a pipeline stage: it reads every candidate video end to end, which
 takes minutes over a library of hundreds, where the pipeline holds itself to
-eleven and runs every ten. Run it by hand after the library has gained full videos or
+eleven and runs every ten. Run it by hand after the library has gained scenes or
 clips worth matching:
 
 ```bash
@@ -333,7 +333,7 @@ python tools/run_stage.py clip_match
 ```
 
 Only the `2D/non_AI` library is searched, that being where carved clips and the
-full videos they came from both live. A full video is any video with no `clip` record on
+scenes they came from both live. A scene is any video with no `clip` record on
 its sidecar; every version of one cut is folded together so only the cheapest is
 decoded, and a clip's own version family (the one `tasks/nonai_group.py`
 records) is offered the winner's answer rather than told it, since a family read
