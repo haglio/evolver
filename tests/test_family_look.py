@@ -9,7 +9,7 @@ pytestmark = pytest.mark.repo_check
 
 _CHECKOUT = Path(__file__).resolve().parents[1]
 _PACKAGES = ("gui", "backfill", "review_trash", "tasks", "util", "tools")
-_WHERE_THE_STAGES_COLORS_ARE = _CHECKOUT / "tasks" / "stages.py"
+_WHERE_THE_STAGES_COLORS_ARE = _CHECKOUT / "evolver.py"
 
 
 def test_everything_evolver_draws_with_comes_from_shared_ui():

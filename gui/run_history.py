@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
+from evolver import ALL_STAGES
 from gui.run_record import RunRecord, every_run, utc_time
-from tasks.stages import ALL_STAGES
 
 _ROW_OF_STAGE = {stage: row for row, stage in enumerate(ALL_STAGES)}
 

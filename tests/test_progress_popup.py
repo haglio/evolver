@@ -7,8 +7,8 @@ import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QMainWindow, QProgressBar
 
+from evolver import ALL_STAGES, STAGE_LABELS
 from gui.progress_popup import ProgressPopup
-from tasks.stages import ALL_STAGES, STAGE_LABELS
 
 
 class TestPopupConstruction(unittest.TestCase):

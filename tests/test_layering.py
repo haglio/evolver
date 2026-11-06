@@ -24,7 +24,7 @@ ALLOWED = {
     "config": {"content_overlay"},
     "evolver": {"check_correspondence", "check_duplicate_sizes", "config",
                 "tasks", "util"},
-    "gui": {"config", "evolver", "tasks.stages", "util"},
+    "gui": {"config", "evolver", "util"},
     "review_trash": {"config", "util"},
     "review_trash_app": {"evolver", "gui", "review_trash"},
     "tasks": {"config", "util"},
