@@ -11,10 +11,10 @@ from PyQt6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToo
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
 from shared_ui.icons import icon_pixmap, inline_icon
 
+from evolver import STAGE_LABELS, STAGE_TOOLTIPS
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
 from gui.schedule_state import ScheduleStatus
 from gui.tray import EvolverTray
-from tasks.stages import STAGE_LABELS, STAGE_TOOLTIPS
 from tests.gui_support import QAPP, build_evolver_app
 from tests.temp_helpers import make_run_record, override_config
 

@@ -7,7 +7,9 @@ import subprocess
 import tempfile
 import uuid
 from contextlib import ExitStack, contextmanager, nullcontext
+from dataclasses import dataclass, replace
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -15,327 +17,193 @@ import pytest
 import config
 import evolver
 from check_correspondence import CorrespondenceResult
-from check_duplicate_sizes import DuplicateSizesResult
+from gui.run_record import RunRecord
 from tasks import nonai_upscale
-from tasks.bookmarks_sync import BookmarksSyncResult
-from tasks.clip_scripts import ClipScriptsResult
-from tasks.genau_deliver import GenauDeliverResult
-from tasks.nonai_group import NonAiGroupResult
-from tasks.nonai_titles import NonAiTitleResult
 from tasks.nonai_upscale import NonAiUpscaleResult
 from tasks.origenerator_commands import DowntimeResult
-from tasks.prompt_scrape import PromptScrapeResult
-from tasks.provenance_sweep import ProvenanceResult
-from tasks.reference_sync import ReferenceSyncResult
-from tasks.scene_scripts import SceneScriptsResult
-from tasks.scripts_sync import ScriptsSyncResult
 from tasks.sort import SortResult
-from tasks.stages import ALL_STAGES
-from tasks.stray_files import StrayFilesResult
-from tasks.taken_back import TakenBackResult
 from tasks.upscale import UpscaleResult
-from tasks.video_kinds import VideoKindsResult
-from tasks.watch_weights import WatchWeightsResult
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
-from util import run_lock, run_log
+from util import run_lock, run_log, topaz
 from util.sidecar import sidecar_path
+from util.stage_result import StageResult
 
 CRLF = (chr(13) + chr(10)).encode("ascii")
 
 
-def _stage_mocks() -> dict:
-    return {
-        "strays_run": Mock(return_value=StrayFilesResult()),
-        "sort_run": Mock(return_value=SortResult()),
-        "withdrawn_run": Mock(return_value=TakenBackResult()),
-        "scripts_sync_run": Mock(return_value=ScriptsSyncResult()),
-        "bookmarks_sync_run": Mock(return_value=BookmarksSyncResult()),
-        "prompt_scrape_run": Mock(return_value=PromptScrapeResult()),
-        "origenerator_downtime_run": Mock(return_value=DowntimeResult()),
-        "upscale_run": Mock(return_value=UpscaleResult()),
-        "genau_deliver_run": Mock(return_value=GenauDeliverResult()),
-        "nonai_run": Mock(return_value=NonAiUpscaleResult()),
-        "nonai_group_run": Mock(return_value=NonAiGroupResult()),
-        "nonai_titles_run": Mock(return_value=NonAiTitleResult()),
-        "video_types_run": Mock(return_value=VideoKindsResult()),
-        "provenance_sweep_run": Mock(return_value=ProvenanceResult()),
-        "clip_scripts_run": Mock(return_value=ClipScriptsResult()),
-        "scene_scripts_run": Mock(return_value=SceneScriptsResult()),
-        "reference_sync_run": Mock(return_value=ReferenceSyncResult()),
-        "watch_weights_run": Mock(return_value=WatchWeightsResult()),
-        "duplicate_sizes_run": Mock(return_value=DuplicateSizesResult(scanned_count=0)),
-        "correspondence_run": Mock(return_value=CorrespondenceResult(sorted_count=0, outbox_count=0)),
-        "has_pending_work": Mock(return_value=False),
-        "should_skip_cpu": Mock(return_value=False),
-        "foreign_topaz_running": Mock(return_value=False),
-        "frozen_for_ai_videos": Mock(side_effect=nullcontext),
-        "topaz_sign_in_expired": Mock(return_value=False),
-    }
+@dataclass
+class _Done(StageResult):
+    went_wrong: bool = False
+    wants_an_eye: bool = False
+
+    @property
+    def ok(self) -> bool:
+        return not self.went_wrong
+
+    @property
+    def needs_an_eye(self) -> bool:
+        return self.wants_an_eye
 
 
-_STAGE_PATCHES = [
-    ("evolver.stray_files.run", "strays_run"),
-    ("evolver.sort.run", "sort_run"),
-    ("evolver.origenerator_commands.run_downtime", "origenerator_downtime_run"),
-    ("evolver.video_kinds.run", "video_types_run"),
-    ("evolver.provenance_sweep.run", "provenance_sweep_run"),
-    ("evolver.taken_back.run", "withdrawn_run"),
-    ("evolver.clip_scripts.run", "clip_scripts_run"),
-    ("evolver.scene_scripts.run", "scene_scripts_run"),
-    ("evolver.scripts_sync.run", "scripts_sync_run"),
-    ("evolver.upscale.run", "upscale_run"),
-    ("evolver.genau_deliver.run", "genau_deliver_run"),
-    ("evolver.nonai_upscale.run", "nonai_run"),
-    ("evolver.nonai_group.run", "nonai_group_run"),
-    ("evolver.nonai_titles.run", "nonai_titles_run"),
-    ("evolver.reference_sync.run", "reference_sync_run"),
-    ("evolver.watch_weights.run", "watch_weights_run"),
-    ("evolver.bookmarks_sync.run", "bookmarks_sync_run"),
-    ("evolver.check_correspondence.run", "correspondence_run"),
-    ("evolver.check_duplicate_sizes.run", "duplicate_sizes_run"),
-    ("evolver.upscale.has_pending_work", "has_pending_work"),
-    ("evolver._should_skip_upscale_due_to_cpu", "should_skip_cpu"),
-    ("evolver.nonai_upscale.foreign_topaz_running", "foreign_topaz_running"),
-    ("evolver.nonai_upscale.frozen_for_ai_videos", "frozen_for_ai_videos"),
-    ("util.topaz.sign_in_expired", "topaz_sign_in_expired"),
-    ("evolver.prompt_scrape.run", "prompt_scrape_run"),
-]
+def _made_up(key: str, run=None) -> evolver.Stage:
+    return evolver.Stage(key, f"Made-up {key}", f"A stage made up for a test: {key}",
+                         (0x10, 0x20, 0x30), run=run or (lambda _: _Done()))
 
 
-def _patched_stages(mocks: dict) -> ExitStack:
-    stack = ExitStack()
-    for target, key in _STAGE_PATCHES:
-        stack.enter_context(patch(target, mocks[key]))
-    stack.enter_context(override_config(
-        PIPELINE_LOCK_FILE=Path(tempfile.gettempdir()) / "evolver-tests"
-        / f"pipeline-{uuid.uuid4().hex}.lock"))
-    return stack
+def _a_lock_of_its_own():
+    return override_config(PIPELINE_LOCK_FILE=Path(tempfile.gettempdir()) / "evolver-tests"
+                           / f"pipeline-{uuid.uuid4().hex}.lock")
 
 
-_EXPECTED_STAGE_ORDER = ALL_STAGES
+def _run(*stages: evolver.Stage, **listeners) -> evolver.PipelineResult:
+    with _a_lock_of_its_own():
+        return evolver.run_pipeline(stages=stages, **listeners)
 
 
-class TestEvolverMain:
-    def _run_pipeline(self, **overrides):
-        mocks = _stage_mocks() | {"setup_logging": Mock(), "check_dependencies": Mock()}
-        mocks.update(overrides)
-
-        with _patched_stages(mocks) as stack:
-            stack.enter_context(patch("evolver.setup_logging", mocks["setup_logging"]))
-            stack.enter_context(patch("evolver.check_dependencies", mocks["check_dependencies"]))
-            with pytest.raises(SystemExit) as exc:
-                evolver.main()
-
-        mocks["exit_code"] = exc.value.code
-        return mocks
-
-    def test_exits_nonzero_on_dependency_check_failure(self):
-        mocks = self._run_pipeline(
-            check_dependencies=Mock(side_effect=RuntimeError("ffprobe not found")),
-        )
-        assert mocks["exit_code"] == 1
-        mocks["sort_run"].assert_not_called()
-
-    def test_a_dependency_failure_is_logged_with_its_traceback(self, caplog):
-        with caplog.at_level(logging.ERROR):
-            self._run_pipeline(
-                check_dependencies=Mock(side_effect=RuntimeError("ffprobe not found")),
-            )
-
-        failures = [record for record in caplog.records
-                    if "Dependency check failed" in record.getMessage()]
-        assert failures
-        assert all(record.exc_info for record in failures)
-
-    def test_skips_upscale_when_no_pending_work(self):
-        mocks = self._run_pipeline()
-        assert mocks["exit_code"] == 0
-        mocks["upscale_run"].assert_not_called()
-        mocks["correspondence_run"].assert_called_once_with(show_popup=True)
-
-    def test_skips_correspondence_when_upscale_has_pending(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=SortResult(moved=3, moved_files=["a", "b", "c"])),
-            has_pending_work=Mock(return_value=True),
-            upscale_run=Mock(return_value=UpscaleResult(pending_after_run=1)),
-        )
-        assert mocks["exit_code"] == 0
-        mocks["upscale_run"].assert_called_once()
-        mocks["correspondence_run"].assert_not_called()
-
-    def test_skips_upscale_and_correspondence_when_cpu_busy(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["new-file"])),
-            has_pending_work=Mock(return_value=True),
-            should_skip_cpu=Mock(return_value=True),
-        )
-        assert mocks["exit_code"] == 0
-        mocks["upscale_run"].assert_not_called()
-        mocks["correspondence_run"].assert_not_called()
-
-    def test_runs_upscale_with_priority_files(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["new-file"])),
-            has_pending_work=Mock(return_value=True),
-        )
-        assert mocks["exit_code"] == 0
-        mocks["upscale_run"].assert_called_once_with(
-            priority_files=["new-file"], max_items=config.UPSCALE_BATCH_LIMIT,
-            listeners=evolver.upscale.Listeners(
-                on_filed=evolver.origenerator_commands.write_the_gallery_entry_of_a_video_from),
-        )
-
-    def test_watch_weights_tells_origenerators_gallery_what_the_records_hold(self):
-        mocks = self._run_pipeline()
-
-        mocks["watch_weights_run"].assert_called_once_with(
-            tell_the_gallery=evolver.origenerator_commands.write_gallery_entries)
-
-    def test_ai_upscale_waits_while_a_topaz_encode_evolver_did_not_start_is_running(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-            foreign_topaz_running=Mock(return_value=True),
-        )
-        assert mocks["exit_code"] == 0
-        mocks["upscale_run"].assert_not_called()
-        mocks["frozen_for_ai_videos"].assert_not_called()
-        mocks["correspondence_run"].assert_not_called()
-
-    def test_ai_upscale_waits_while_origenerator_trains_a_fix_on_the_graphics_card(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-            origenerator_downtime_run=Mock(return_value=DowntimeResult(holds_the_graphics_card=True)),
-        )
-        assert mocks["exit_code"] == 0
-        mocks["upscale_run"].assert_not_called()
-
-    def test_ai_videos_upscale_with_the_library_encode_frozen_around_every_topaz_step(self):
-        steps = []
-
-        @contextmanager
-        def frozen():
-            steps.append("frozen")
-            yield
-            steps.append("thawed")
-
-        self._run_pipeline(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-            frozen_for_ai_videos=Mock(side_effect=frozen),
-            should_skip_cpu=Mock(side_effect=lambda log: steps.append("cpu sampled") and False),
-            topaz_sign_in_expired=Mock(side_effect=lambda: steps.append("sign-in asked") and False),
-            upscale_run=Mock(side_effect=lambda **kwargs: steps.append("upscaled") or UpscaleResult()),
-        )
-
-        assert steps == ["frozen", "cpu sampled", "sign-in asked", "upscaled", "thawed"]
-
-    def test_cli_run_neither_starts_nor_stops_nor_manages_nonai_encodes(self):
-        mocks = self._run_pipeline()
-        mocks["nonai_run"].assert_called_once_with(
-            mode=nonai_upscale.RunMode(
-                allow_start=False, stop=False, presence_managed=False,
-                take_requests=False, ai_waiting=False))
-
-    @pytest.mark.parametrize(
-        "failing_overrides",
-        [
-            pytest.param(lambda: {
-                "withdrawn_run": Mock(return_value=TakenBackResult(failed=1))}, id="withdrawn"),
-            pytest.param(lambda: {
-                "nonai_run": Mock(return_value=NonAiUpscaleResult(failed="example/scene one.mp4"))}, id="upscale_non_ai"),
-            pytest.param(lambda: {
-                "sort_run": Mock(return_value=SortResult(moved=1, moved_files=["new-file"])),
-                "has_pending_work": Mock(return_value=True),
-                "correspondence_run": Mock(return_value=CorrespondenceResult(
-                    sorted_count=1, outbox_count=0, orphan_sorted=["example/video one.mp4"]))}, id="verify"),
-            pytest.param(lambda: {
-                "duplicate_sizes_run": Mock(return_value=DuplicateSizesResult(
-                    scanned_count=2, duplicate_groups={7: ["a/one.mp4", "b/two.mp4"]}))}, id="dupes"),
-            pytest.param(lambda: {
-                "scripts_sync_run": Mock(return_value=ScriptsSyncResult(unmatched=1))}, id="scripts"),
-            pytest.param(lambda: {
-                "bookmarks_sync_run": Mock(return_value=BookmarksSyncResult(profile_missing=True))}, id="bookmarks"),
-            pytest.param(lambda: {
-                "sort_run": Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-                "has_pending_work": Mock(return_value=True),
-                "upscale_run": Mock(return_value=UpscaleResult(failed=2))}, id="upscale"),
-            pytest.param(lambda: {
-                "prompt_scrape_run": Mock(return_value=PromptScrapeResult(errors=1))}, id="metadata"),
-        ],
-    )
-    def test_a_failing_stage_exits_nonzero(self, failing_overrides):
-        mocks = self._run_pipeline(**failing_overrides())
-        assert mocks["exit_code"] == 1
-
-    def test_exits_zero_when_upscale_only_held_back_for_low_disk(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-            upscale_run=Mock(return_value=UpscaleResult(deferred_low_disk=True, pending_after_run=3)),
-        )
-        assert mocks["exit_code"] == 0
-
-    def test_all_stages_called_on_clean_run_with_pending_work(self):
-        mocks = self._run_pipeline(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-        )
-        assert mocks["exit_code"] == 0
-        mocks["sort_run"].assert_called_once()
-        mocks["withdrawn_run"].assert_called_once()
-        mocks["clip_scripts_run"].assert_called_once()
-        mocks["scripts_sync_run"].assert_called_once_with(show_popup=True)
-        mocks["bookmarks_sync_run"].assert_called_once()
-        mocks["prompt_scrape_run"].assert_called_once()
-        mocks["upscale_run"].assert_called_once()
-        mocks["duplicate_sizes_run"].assert_called_once_with(show_popup=True)
-        mocks["correspondence_run"].assert_called_once_with(show_popup=True)
+def _with_their_work_left_undone(stages=evolver.STAGES) -> tuple[evolver.Stage, ...]:
+    return tuple(replace(stage, run=lambda _: _Done()) for stage in stages)
 
 
-class TestRunPipeline:
-    def _patch_all_stages(self, **overrides):
-        defaults = _stage_mocks()
-        defaults.update(overrides)
-        return _patched_stages(defaults), defaults
+def _stage(key: str) -> evolver.Stage:
+    return next(stage for stage in evolver.STAGES if stage.key == key)
 
-    def test_every_stage_the_pipeline_runs_is_a_stub_from_the_mock_table(self):
-        stack, stubs = self._patch_all_stages(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        assert len(result.stages) == len(ALL_STAGES)
-        for stage in result.stages:
-            assert stage.status != "skipped", \
-                f"stage {stage.name!r} must actually run in this test"
-            assert any(stage.result is stub.return_value for stub in stubs.values()), (
-                f"stage {stage.name!r} ran its real function -- add it to "
-                "_stage_mocks and _STAGE_PATCHES"
-            )
+
+def _statuses(result: evolver.PipelineResult) -> dict[str, str]:
+    return {record.name: record.status for record in result.stages}
+
+
+class TestTheListOfStagesRunsItself:
+    def test_the_stages_run_in_the_order_the_list_gives_them(self):
+        result = _run(_made_up("first"), _made_up("second"), _made_up("third"))
+
+        assert [record.name for record in result.stages] == ["first", "second", "third"]
+
+    def test_a_stage_added_to_the_list_runs_in_its_place_and_reaches_the_run_record(self):
+        ran = []
+        added = evolver.Stage("tidy_example", "Tidy Example", "Tidy the example folder",
+                              (0x40, 0x50, 0x60), run=lambda _: ran.append("tidied") or _Done())
+
+        record = RunRecord.from_pipeline_result(_run(_made_up("before"), added, _made_up("after")))
+
+        assert ran == ["tidied"]
+        assert [stage["name"] for stage in record.stages] == ["before", "tidy_example", "after"]
+        assert record.stages[1]["status"] == "completed"
+        assert record.stages[1]["result"] == {"went_wrong": False, "wants_an_eye": False}
+
+    def test_the_pipeline_runs_every_stage_of_its_own_list_in_that_order(self):
+        result = _run(*_with_their_work_left_undone())
+
+        assert [record.name for record in result.stages] == list(evolver.ALL_STAGES)
+
+    def test_each_stage_sees_how_the_stages_before_it_went(self):
+        seen = []
+
+        def look_back(this_run: evolver.ThisRun) -> _Done:
+            seen.append((this_run.outcome_of("first"), this_run.outcome_of("second"),
+                         this_run.outcome_of("third")))
+            return _Done()
+
+        _run(_made_up("first", run=lambda _: _Done(wants_an_eye=True)),
+             _made_up("second", run=lambda _: evolver.Skipped("nothing to do")),
+             _made_up("third", run=look_back))
+
+        assert seen == [(_Done(wants_an_eye=True), evolver.Skipped("nothing to do"), None)]
+
+    def test_each_stage_is_announced_as_it_starts(self):
+        started = []
+
+        _run(_made_up("first"), _made_up("second"), on_stage_start=started.append)
+
+        assert started == ["first", "second"]
+
+    def test_each_stage_reports_what_it_did_how_long_it_took_and_how_it_went(self):
+        did = _Done(wants_an_eye=True)
+        completed = Mock()
+
+        _run(_made_up("first", run=lambda _: did), on_stage_complete=completed)
+
+        key, result, seconds, status = completed.call_args.args
+        assert (key, result, status) == ("first", did, "warning")
+        assert isinstance(seconds, float)
+
+    def test_a_stage_that_has_nothing_to_do_is_recorded_as_skipped_with_its_reason(self):
+        completed = Mock()
+
+        result = _run(_made_up("first", run=lambda _: evolver.Skipped("no_pending_work")),
+                      on_stage_complete=completed)
+
+        record = result.stages[0]
+        assert (record.status, record.skip_reason, record.duration_seconds, record.result) == (
+            "skipped", "no_pending_work", 0.0, None)
+        completed.assert_called_once_with("first", None, 0.0, "skipped")
+
+    def test_each_stage_reports_its_progress_under_its_own_name(self):
+        progress = []
+
+        _run(_made_up("counting", run=lambda this_run: this_run.progress_of("counting")(1, 5)
+                      or _Done()),
+             on_stage_progress=lambda *reported: progress.append(reported))
+
+        assert progress == [("counting", 1, 5)]
+
+    def test_a_run_without_a_progress_bar_hands_its_stages_none(self):
+        handed = []
+
+        _run(_made_up("counting", run=lambda this_run: handed.append(
+            this_run.progress_of("counting")) or _Done()))
+
+        assert handed == [None]
 
     def test_a_clean_run_reports_every_stage_it_ran_and_no_errors(self):
-        stack, _ = self._patch_all_stages()
-        with stack:
-            result = evolver.run_pipeline()
+        result = _run(_made_up("first"), _made_up("second"))
+
         assert isinstance(result, evolver.PipelineResult)
         assert not result.has_errors
-        assert len(result.stages) > 0
+        assert _statuses(result) == {"first": "completed", "second": "completed"}
+
+    def test_a_stage_that_went_wrong_is_the_one_marked_error_and_the_run_has_errors(self):
+        result = _run(_made_up("first"), _made_up("second", run=lambda _: _Done(went_wrong=True)),
+                      _made_up("third"))
+
+        assert result.has_errors
+        assert _statuses(result) == {"first": "completed", "second": "error", "third": "completed"}
+
+    def test_a_stage_that_wants_an_eye_warns_instead_of_failing(self):
+        result = _run(_made_up("first", run=lambda _: _Done(wants_an_eye=True)))
+
+        assert _statuses(result) == {"first": "warning"}
+        assert not result.has_errors
+
+    def test_going_wrong_outranks_wanting_an_eye_on_the_same_stage(self):
+        result = _run(_made_up("first", run=lambda _: _Done(went_wrong=True, wants_an_eye=True)))
+
+        assert _statuses(result) == {"first": "error"}
+
+    def test_skips_alone_do_not_make_a_run_a_failure(self):
+        result = _run(_made_up("first", run=lambda _: evolver.Skipped("cpu_busy")),
+                      _made_up("second", run=lambda _: evolver.Skipped("upscale_pending")))
+
+        assert _statuses(result) == {"first": "skipped", "second": "skipped"}
+        assert not result.has_errors
+
+    def test_duration_seconds_is_positive(self):
+        ticks = itertools.count(start=1.0, step=1.0)
+        with patch("evolver.time.monotonic", lambda: next(ticks)):
+            result = _run(_made_up("first"))
+
+        assert result.duration_seconds > 0.0
 
     def test_the_run_marks_where_in_the_log_it_wrote(self, tmp_path):
         log = tmp_path / "evolver.log"
         log.write_bytes(b"[2026-07-25 08:10:02] an earlier run" + CRLF)
-        stack, _ = self._patch_all_stages()
         handler = logging.FileHandler(log, encoding="utf-8")
         logger = logging.getLogger("evolver")
         logger.addHandler(handler)
         previous_level = logger.level
         logger.setLevel(logging.INFO)
         try:
-            with stack, patch.object(config, "LOG_FILE", log):
-                result = evolver.run_pipeline()
+            with patch.object(config, "LOG_FILE", log):
+                result = _run(_made_up("first"))
         finally:
             logger.setLevel(previous_level)
             logger.removeHandler(handler)
@@ -348,270 +216,300 @@ class TestRunPipeline:
 
     def test_a_log_it_cannot_measure_leaves_the_mark_unset(self):
         missing = Path("no-such-directory") / "evolver.log"
-        stack, _ = self._patch_all_stages()
-        with stack, patch.object(config, "LOG_FILE", missing):
-            result = evolver.run_pipeline()
+        with patch.object(config, "LOG_FILE", missing):
+            result = _run(_made_up("first"))
 
         assert (result.log_start, result.log_end) == (None, None)
-
-    def test_stage_records_have_correct_names(self):
-        stack, _ = self._patch_all_stages()
-        with stack:
-            result = evolver.run_pipeline()
-        names = [s.name for s in result.stages]
-        assert names == _EXPECTED_STAGE_ORDER
-
-    def test_the_phone_s_favorites_are_marked_before_bookmarks_reads_the_marks(self):
-        stack, _ = self._patch_all_stages()
-        with stack:
-            result = evolver.run_pipeline()
-        names = [s.name for s in result.stages]
-        assert names.index("watch_weights") < names.index("bookmarks")
-
-    def test_skipped_stages_have_skip_status(self):
-        stack, _ = self._patch_all_stages()
-        with stack:
-            result = evolver.run_pipeline()
-        upscale_stage = next(s for s in result.stages if s.name == "upscale")
-        assert upscale_stage.status == "skipped"
-        assert upscale_stage.skip_reason == "no_pending_work"
-
-    def test_upscaling_waits_with_its_reason_while_topaz_is_signed_out(self):
-        stack, mocks = self._patch_all_stages(
-            has_pending_work=Mock(return_value=True),
-            topaz_sign_in_expired=Mock(return_value=True),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        upscale_stage = next(s for s in result.stages if s.name == "upscale")
-        assert upscale_stage.skip_reason == "topaz_sign_in_expired"
-        mocks["upscale_run"].assert_not_called()
-
-    def test_topaz_is_asked_about_its_sign_in_only_when_an_upscale_could_start(self):
-        for overrides in (
-            {"has_pending_work": Mock(return_value=False)},
-            {"has_pending_work": Mock(return_value=True),
-                 "foreign_topaz_running": Mock(return_value=True)},
-        ):
-            stack, mocks = self._patch_all_stages(**overrides)
-            with stack:
-                evolver.run_pipeline()
-            mocks["topaz_sign_in_expired"].assert_not_called()
-
-    def test_on_stage_start_called_for_each_stage(self):
-        on_start = Mock()
-        stack, _ = self._patch_all_stages()
-        with stack:
-            evolver.run_pipeline(on_stage_start=on_start)
-        started_names = [call.args[0] for call in on_start.call_args_list]
-        assert started_names == _EXPECTED_STAGE_ORDER
-
-    def test_on_stage_complete_called_with_result_and_status(self):
-        on_complete = Mock()
-        stack, mocks = self._patch_all_stages()
-        with stack:
-            evolver.run_pipeline(on_stage_complete=on_complete)
-        withdrawn_call = next(c for c in on_complete.call_args_list if c.args[0] == "withdrawn")
-        assert withdrawn_call.args[1] == mocks["withdrawn_run"].return_value
-        assert isinstance(withdrawn_call.args[2], float)
-        assert withdrawn_call.args[3] == "completed"
-
-    def test_on_stage_complete_reports_skipped_for_upscale(self):
-        on_complete = Mock()
-        stack, _ = self._patch_all_stages()
-        with stack:
-            evolver.run_pipeline(on_stage_complete=on_complete)
-        upscale_call = next(c for c in on_complete.call_args_list if c.args[0] == "upscale")
-        assert upscale_call.args[1] is None
-        assert upscale_call.args[3] == "skipped"
-
-    def test_enabled_nonai_upscale_starts_when_ai_work_is_drained(self):
-        stack, mocks = self._patch_all_stages()
-        with stack:
-            evolver.run_pipeline(nonai_enabled=True)
-        mocks["nonai_run"].assert_called_once_with(
-            mode=nonai_upscale.RunMode(
-                allow_start=True, stop=False, presence_managed=True,
-                take_requests=True, ai_waiting=False))
-
-    def test_enabled_nonai_upscale_never_starts_while_ai_work_remains(self):
-        stack, mocks = self._patch_all_stages(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-            upscale_run=Mock(return_value=UpscaleResult(pending_after_run=2)),
-        )
-        with stack:
-            evolver.run_pipeline(nonai_enabled=True)
-        mocks["nonai_run"].assert_called_once_with(
-            mode=nonai_upscale.RunMode(
-                allow_start=False, stop=False, presence_managed=True,
-                take_requests=True, ai_waiting=True))
-
-    def test_ai_videos_held_back_by_a_topaz_encode_evolver_did_not_start_are_still_waiting(self):
-        stack, mocks = self._patch_all_stages(
-            has_pending_work=Mock(return_value=True),
-            foreign_topaz_running=Mock(return_value=True),
-        )
-        with stack:
-            evolver.run_pipeline(nonai_enabled=True)
-        assert mocks["nonai_run"].call_args.kwargs["mode"].ai_waiting is True
-
-    def test_enabled_nonai_upscale_never_starts_when_cpu_is_busy(self):
-        stack, mocks = self._patch_all_stages(
-            should_skip_cpu=Mock(return_value=True),
-        )
-        with stack:
-            evolver.run_pipeline(nonai_enabled=True)
-        mocks["nonai_run"].assert_called_once_with(
-            mode=nonai_upscale.RunMode(
-                allow_start=False, stop=False, presence_managed=True,
-                take_requests=True, ai_waiting=False))
-
-    def test_disabled_nonai_upscale_stops_the_in_flight_encode(self):
-        stack, mocks = self._patch_all_stages()
-        with stack:
-            evolver.run_pipeline(nonai_enabled=False)
-        mocks["nonai_run"].assert_called_once_with(
-            mode=nonai_upscale.RunMode(
-                allow_start=False, stop=True, presence_managed=False,
-                take_requests=True, ai_waiting=False))
-
-    def test_has_errors_true_when_stage_fails(self):
-        stack, _ = self._patch_all_stages(
-            withdrawn_run=Mock(return_value=TakenBackResult(failed=1)),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        assert result.has_errors
-
-    def test_the_failing_stage_is_the_one_marked_error(self):
-        stack, _ = self._patch_all_stages(
-            withdrawn_run=Mock(return_value=TakenBackResult(failed=1)),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        errored = [s.name for s in result.stages if s.status == "error"]
-        assert errored == ["withdrawn"]
-
-    def test_a_low_disk_hold_warns_on_the_non_ai_stage_instead_of_failing_it(self):
-        stack, _ = self._patch_all_stages(
-            nonai_run=Mock(return_value=NonAiUpscaleResult(deferred_low_disk=True)),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        statuses = {s.name: s.status for s in result.stages}
-        assert statuses["upscale_non_ai"] == "warning"
-        assert not result.has_errors
-
-    def test_scripts_left_unchecked_while_a_folder_cannot_be_reached_warn_instead_of_failing(self):
-        stack, _ = self._patch_all_stages(
-            scripts_sync_run=Mock(return_value=ScriptsSyncResult(not_checked=15)),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        statuses = {s.name: s.status for s in result.stages}
-        assert statuses["scripts"] == "warning"
-        assert not result.has_errors
-
-    def test_a_finished_encode_waiting_for_the_archive_warns_instead_of_failing(self):
-        stack, _ = self._patch_all_stages(
-            nonai_run=Mock(return_value=NonAiUpscaleResult(unreachable_archive="Q:/archive")),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        statuses = {s.name: s.status for s in result.stages}
-        assert statuses["upscale_non_ai"] == "warning"
-        assert not result.has_errors
-
-    def test_a_dead_encode_outranks_a_hold_on_the_same_stage(self):
-        stack, _ = self._patch_all_stages(
-            nonai_run=Mock(return_value=NonAiUpscaleResult(failed="example/clip one.mp4",
-                                                           deferred_low_disk=True)),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        statuses = {s.name: s.status for s in result.stages}
-        assert statuses["upscale_non_ai"] == "error"
-
-    def test_skips_alone_do_not_make_a_run_a_failure(self):
-        stack, _ = self._patch_all_stages(
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            has_pending_work=Mock(return_value=True),
-            foreign_topaz_running=Mock(return_value=True),
-        )
-        with stack:
-            result = evolver.run_pipeline()
-        statuses = {s.name: s.status for s in result.stages}
-        assert statuses["upscale"] == "skipped"
-        assert statuses["verify"] == "skipped"
-        assert not result.has_errors
-
-    def test_duration_seconds_is_positive(self):
-        ticks = itertools.count(start=1.0, step=1.0)
-        stack, _ = self._patch_all_stages()
-        with stack, patch("evolver.time.monotonic", lambda: next(ticks)):
-            result = evolver.run_pipeline()
-        assert result.duration_seconds > 0.0
-
-    def test_on_stage_progress_forwarded_to_upscale(self):
-        on_progress = Mock()
-        stack, mocks = self._patch_all_stages(
-            has_pending_work=Mock(return_value=True),
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-        )
-        with stack:
-            evolver.run_pipeline(on_stage_progress=on_progress)
-        mocks["upscale_run"].call_args.kwargs["listeners"].on_progress(1, 5)
-        on_progress.assert_called_once_with("upscale", 1, 5)
-
-    def test_on_stage_progress_not_passed_when_none(self):
-        stack, mocks = self._patch_all_stages(
-            has_pending_work=Mock(return_value=True),
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-        )
-        with stack:
-            evolver.run_pipeline(on_stage_progress=None)
-        listeners = mocks["upscale_run"].call_args.kwargs["listeners"]
-        assert listeners.on_progress is evolver.upscale.Listeners().on_progress
-
-    def test_on_stage_progress_callback_binds_stage_name(self):
-        progress_calls = []
-
-        def capture_upscale_run(**kwargs):
-            kwargs["listeners"].on_progress(1, 5)
-            kwargs["listeners"].on_progress(2, 5)
-            return UpscaleResult()
-
-        stack, _ = self._patch_all_stages(
-            has_pending_work=Mock(return_value=True),
-            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
-            upscale_run=Mock(side_effect=capture_upscale_run),
-        )
-        with stack:
-            evolver.run_pipeline(
-                on_stage_progress=lambda name, cur, tot: progress_calls.append((name, cur, tot)),
-            )
-        assert progress_calls == [("upscale", 1, 5), ("upscale", 2, 5)]
 
 
 class TestCooperativeStop:
     def test_stops_between_stages_once_asked(self):
         completed: list[str] = []
-        mocks = _stage_mocks()
-        with _patched_stages(mocks):
-            result = evolver.run_pipeline(
-                on_stage_complete=lambda name, *_: completed.append(name),
-                should_stop=lambda: bool(completed),
-            )
 
-        assert [s.name for s in result.stages] == ALL_STAGES[:1]
+        result = _run(_made_up("first"), _made_up("second"), _made_up("third"),
+                      on_stage_complete=lambda key, *_: completed.append(key),
+                      should_stop=lambda: bool(completed))
+
+        assert [record.name for record in result.stages] == ["first"]
 
     def test_a_stop_that_is_never_requested_changes_nothing(self):
-        mocks = _stage_mocks()
-        with _patched_stages(mocks):
-            result = evolver.run_pipeline(should_stop=lambda: False)
+        result = _run(_made_up("first"), _made_up("second"), should_stop=lambda: False)
 
-        assert len(result.stages) == len(ALL_STAGES)
+        assert [record.name for record in result.stages] == ["first", "second"]
+
+
+class TestEachStagesWork:
+    @pytest.mark.parametrize(("key", "work", "settings"), [
+        pytest.param("strays", "evolver.stray_files.run", {}, id="strays"),
+        pytest.param("withdrawn", "evolver.taken_back.run", {}, id="withdrawn"),
+        pytest.param("metadata", "evolver.prompt_scrape.run", {}, id="metadata"),
+        pytest.param("sort", "evolver.sort.run", {}, id="sort"),
+        pytest.param("origenerator_downtime", "evolver.origenerator_commands.run_downtime", {},
+                     id="origenerator_downtime"),
+        pytest.param("genau_deliver", "evolver.genau_deliver.run", {}, id="genau_deliver"),
+        pytest.param("references", "evolver.reference_sync.run", {}, id="references"),
+        pytest.param("watch_weights", "evolver.watch_weights.run",
+                     {"tell_the_gallery": evolver.origenerator_commands.write_gallery_entries},
+                     id="watch_weights tells origenerator's gallery"),
+        pytest.param("bookmarks", "evolver.bookmarks_sync.run", {}, id="bookmarks"),
+        pytest.param("clip_scripts", "evolver.clip_scripts.run", {}, id="clip_scripts"),
+        pytest.param("scene_scripts", "evolver.scene_scripts.run", {}, id="scene_scripts"),
+        pytest.param("scripts", "evolver.scripts_sync.run", {"show_popup": True},
+                     id="scripts shows its popup"),
+        pytest.param("group_non_ai", "evolver.nonai_group.run", {}, id="group_non_ai"),
+        pytest.param("title_non_ai", "evolver.nonai_titles.run", {}, id="title_non_ai"),
+        pytest.param("video_types", "evolver.video_kinds.run", {}, id="video_types"),
+        pytest.param("provenance", "evolver.provenance_sweep.run", {}, id="provenance"),
+        pytest.param("dupes", "evolver.check_duplicate_sizes.run", {"show_popup": True},
+                     id="dupes shows its popup"),
+    ])
+    def test_each_stage_runs_its_own_work_and_hands_back_what_it_did(self, key, work, settings):
+        did = _Done()
+        with patch(work, return_value=did) as done:
+            assert _stage(key).run(evolver.ThisRun()) is did
+
+        done.assert_called_once_with(**settings)
+
+
+def _after(**outcomes) -> evolver.ThisRun:
+    return evolver.ThisRun(outcomes=dict(outcomes))
+
+
+def _newly_sorted(*videos: str) -> dict:
+    return {"sort": SortResult(moved=len(videos), moved_files=list(videos))}
+
+
+@contextmanager
+def _the_computer(*, pending=True, foreign_topaz=False, cpu_busy=False, signed_out=False,
+                  upscaled=None, frozen=nullcontext):
+    with ExitStack() as stack:
+        yield SimpleNamespace(
+            pending=stack.enter_context(
+                patch("evolver.upscale.has_pending_work", return_value=pending)),
+            foreign_topaz=stack.enter_context(
+                patch("evolver.nonai_upscale.foreign_topaz_running", return_value=foreign_topaz)),
+            frozen=stack.enter_context(
+                patch("evolver.nonai_upscale.frozen_for_ai_videos", side_effect=frozen)),
+            cpu_busy=stack.enter_context(
+                patch("evolver._should_skip_upscale_due_to_cpu", return_value=cpu_busy)),
+            signed_out=stack.enter_context(
+                patch("util.topaz.sign_in_expired", return_value=signed_out)),
+            upscale=stack.enter_context(
+                patch("evolver.upscale.run", return_value=upscaled or UpscaleResult())),
+        )
+
+
+class TestTheUpscaleStage:
+    def test_skips_with_its_reason_when_nothing_is_pending(self):
+        with _the_computer(pending=False) as computer:
+            outcome = _stage("upscale").run(_after(**_newly_sorted()))
+
+        assert outcome == evolver.Skipped("no_pending_work")
+        computer.upscale.assert_not_called()
+
+    def test_waits_while_origenerator_trains_a_fix_on_the_graphics_card(self):
+        with _the_computer() as computer:
+            outcome = _stage("upscale").run(_after(
+                **_newly_sorted("f"),
+                origenerator_downtime=DowntimeResult(holds_the_graphics_card=True)))
+
+        assert outcome == evolver.Skipped("origenerator_training")
+        computer.upscale.assert_not_called()
+
+    def test_waits_while_a_topaz_encode_evolver_did_not_start_is_running(self):
+        with _the_computer(foreign_topaz=True) as computer:
+            outcome = _stage("upscale").run(_after(**_newly_sorted("f")))
+
+        assert outcome == evolver.Skipped("topaz_busy")
+        computer.upscale.assert_not_called()
+        computer.frozen.assert_not_called()
+
+    def test_waits_while_the_computer_is_busy(self):
+        with _the_computer(cpu_busy=True) as computer:
+            outcome = _stage("upscale").run(_after(**_newly_sorted("new-file")))
+
+        assert outcome == evolver.Skipped("cpu_busy")
+        computer.upscale.assert_not_called()
+
+    def test_waits_with_its_reason_while_topaz_is_signed_out(self):
+        with _the_computer(signed_out=True) as computer:
+            outcome = _stage("upscale").run(_after(**_newly_sorted("f")))
+
+        assert outcome == evolver.Skipped(topaz.SIGN_IN_EXPIRED)
+        computer.upscale.assert_not_called()
+
+    def test_topaz_is_asked_about_its_sign_in_only_when_an_upscale_could_start(self):
+        for held_back in ({"pending": False}, {"foreign_topaz": True}):
+            with _the_computer(**held_back) as computer:
+                _stage("upscale").run(_after(**_newly_sorted("f")))
+
+            computer.signed_out.assert_not_called()
+
+    def test_upscales_the_newly_sorted_videos_first_within_the_batch_limit(self):
+        upscaled = UpscaleResult(processed=1)
+        with _the_computer(upscaled=upscaled) as computer:
+            outcome = _stage("upscale").run(_after(**_newly_sorted("new-file")))
+
+        assert outcome is upscaled
+        computer.upscale.assert_called_once_with(
+            priority_files=["new-file"], max_items=config.UPSCALE_BATCH_LIMIT,
+            listeners=evolver.upscale.Listeners(
+                on_filed=evolver.origenerator_commands.write_the_gallery_entry_of_a_video_from),
+        )
+
+    def test_the_library_encode_is_frozen_around_every_topaz_step(self):
+        steps = []
+
+        @contextmanager
+        def frozen():
+            steps.append("frozen")
+            yield
+            steps.append("thawed")
+
+        with _the_computer(frozen=frozen) as computer:
+            computer.cpu_busy.side_effect = lambda log: steps.append("cpu sampled") and False
+            computer.signed_out.side_effect = lambda: steps.append("sign-in asked") and False
+            computer.upscale.side_effect = lambda **kwargs: steps.append("upscaled") or UpscaleResult()
+            _stage("upscale").run(_after(**_newly_sorted("f")))
+
+        assert steps == ["frozen", "cpu sampled", "sign-in asked", "upscaled", "thawed"]
+
+    def test_it_reports_its_progress_under_its_own_name(self):
+        progress = []
+
+        def two_of_five(**kwargs):
+            kwargs["listeners"].on_progress(1, 5)
+            kwargs["listeners"].on_progress(2, 5)
+            return UpscaleResult()
+
+        with _the_computer() as computer:
+            computer.upscale.side_effect = two_of_five
+            _stage("upscale").run(evolver.ThisRun(
+                outcomes=_newly_sorted("f"), on_progress=lambda *said: progress.append(said)))
+
+        assert progress == [("upscale", 1, 5), ("upscale", 2, 5)]
+
+    def test_without_a_progress_bar_it_keeps_the_upscales_own_listener(self):
+        with _the_computer() as computer:
+            _stage("upscale").run(_after(**_newly_sorted("f")))
+
+        listeners = computer.upscale.call_args.kwargs["listeners"]
+        assert listeners.on_progress is evolver.upscale.Listeners().on_progress
+
+
+def _the_non_ai_mode(this_run: evolver.ThisRun, *, cpu_busy=False) -> nonai_upscale.RunMode:
+    with patch("evolver.nonai_upscale.run", return_value=NonAiUpscaleResult()) as run, \
+         patch("evolver._should_skip_upscale_due_to_cpu", return_value=cpu_busy):
+        _stage("upscale_non_ai").run(this_run)
+    return run.call_args.kwargs["mode"]
+
+
+_NOTHING_PENDING = {"upscale": evolver.Skipped("no_pending_work")}
+
+
+class TestTheNonAiUpscaleStage:
+    def test_a_command_line_run_neither_starts_nor_stops_nor_manages_its_encodes(self):
+        assert _the_non_ai_mode(_after(**_NOTHING_PENDING)) == nonai_upscale.RunMode(
+            allow_start=False, stop=False, presence_managed=False,
+            take_requests=False, ai_waiting=False)
+
+    def test_switched_on_it_starts_once_the_ai_videos_are_done(self):
+        this_run = evolver.ThisRun(nonai_enabled=True, outcomes=dict(_NOTHING_PENDING))
+
+        assert _the_non_ai_mode(this_run) == nonai_upscale.RunMode(
+            allow_start=True, stop=False, presence_managed=True,
+            take_requests=True, ai_waiting=False)
+
+    def test_switched_on_it_never_starts_while_ai_videos_remain(self):
+        this_run = evolver.ThisRun(nonai_enabled=True,
+                                   outcomes={"upscale": UpscaleResult(pending_after_run=2)})
+
+        assert _the_non_ai_mode(this_run) == nonai_upscale.RunMode(
+            allow_start=False, stop=False, presence_managed=True,
+            take_requests=True, ai_waiting=True)
+
+    def test_ai_videos_held_back_by_a_topaz_encode_evolver_did_not_start_are_still_waiting(self):
+        this_run = evolver.ThisRun(nonai_enabled=True,
+                                   outcomes={"upscale": evolver.Skipped("topaz_busy")})
+
+        assert _the_non_ai_mode(this_run).ai_waiting is True
+
+    def test_switched_on_it_never_starts_while_the_computer_is_busy(self):
+        this_run = evolver.ThisRun(nonai_enabled=True, outcomes=dict(_NOTHING_PENDING))
+
+        assert _the_non_ai_mode(this_run, cpu_busy=True) == nonai_upscale.RunMode(
+            allow_start=False, stop=False, presence_managed=True,
+            take_requests=True, ai_waiting=False)
+
+    def test_switched_off_it_stops_the_encode_under_way(self):
+        this_run = evolver.ThisRun(nonai_enabled=False, outcomes=dict(_NOTHING_PENDING))
+
+        assert _the_non_ai_mode(this_run) == nonai_upscale.RunMode(
+            allow_start=False, stop=True, presence_managed=False,
+            take_requests=True, ai_waiting=False)
+
+
+class TestTheCorrespondenceCheck:
+    @pytest.mark.parametrize("upscaled", [
+        pytest.param(evolver.Skipped("no_pending_work"), id="nothing was pending"),
+        pytest.param(UpscaleResult(processed=2, pending_after_run=0), id="the upscale drained it"),
+    ])
+    def test_it_checks_with_its_popup_once_no_upscale_is_left(self, upscaled):
+        checked = CorrespondenceResult(sorted_count=1, outbox_count=1)
+        with patch("evolver.check_correspondence.run", return_value=checked) as check:
+            outcome = _stage("verify").run(_after(upscale=upscaled))
+
+        assert outcome is checked
+        check.assert_called_once_with(show_popup=True)
+
+    @pytest.mark.parametrize("upscaled", [
+        pytest.param(UpscaleResult(processed=1, pending_after_run=1), id="videos still pending"),
+        pytest.param(evolver.Skipped("cpu_busy"), id="the upscale held back"),
+    ])
+    def test_it_waits_while_videos_are_left_to_upscale(self, upscaled):
+        with patch("evolver.check_correspondence.run") as check:
+            outcome = _stage("verify").run(_after(upscale=upscaled))
+
+        assert outcome == evolver.Skipped("upscale_pending")
+        check.assert_not_called()
+
+
+class TestEvolverMain:
+    def _main(self, *stages: evolver.Stage, dependencies=None) -> int:
+        with _a_lock_of_its_own(), patch("evolver.setup_logging"), \
+             patch("evolver.check_dependencies", dependencies or Mock()), \
+             pytest.raises(SystemExit) as exited:
+            evolver.main(stages=stages)
+        return exited.value.code
+
+    def test_exits_nonzero_on_dependency_check_failure(self):
+        ran = []
+
+        code = self._main(_made_up("first", run=lambda _: ran.append(1) or _Done()),
+                          dependencies=Mock(side_effect=RuntimeError("ffprobe not found")))
+
+        assert code == 1
+        assert ran == []
+
+    def test_a_dependency_failure_is_logged_with_its_traceback(self, caplog):
+        with caplog.at_level(logging.ERROR):
+            self._main(_made_up("first"),
+                       dependencies=Mock(side_effect=RuntimeError("ffprobe not found")))
+
+        failures = [record for record in caplog.records
+                    if "Dependency check failed" in record.getMessage()]
+        assert failures
+        assert all(record.exc_info for record in failures)
+
+    def test_exits_zero_when_every_stage_went_well(self):
+        assert self._main(_made_up("first"), _made_up("second")) == 0
+
+    def test_a_stage_that_went_wrong_exits_nonzero(self):
+        assert self._main(_made_up("first", run=lambda _: _Done(went_wrong=True))) == 1
+
+    def test_exits_zero_when_a_stage_was_only_held_back(self):
+        assert self._main(_made_up("first", run=lambda _: _Done(wants_an_eye=True)),
+                          _made_up("second", run=lambda _: evolver.Skipped("cpu_busy"))) == 0
 
 
 class TestCheckDependenciesWindowSuppression:
@@ -722,8 +620,8 @@ def _a_record_for(video: Path) -> Path:
 
 
 def _a_run(lib: LaneLibrary) -> None:
-    with lib.config(), _patched_stages(_stage_mocks()):
-        evolver.run_pipeline()
+    with lib.config():
+        _run(*_with_their_work_left_undone())
 
 
 class TestWhatIsMarkedTrash:
@@ -761,24 +659,22 @@ class TestOneRunAtATime:
         with workspace_temp_dir() as root:
             lock = root / "pipeline.lock"
             lock.write_text(str(os.getpid()), encoding="utf-8")
-            mocks = _stage_mocks()
+            ran = []
 
-            with _patched_stages(mocks), override_config(PIPELINE_LOCK_FILE=lock), \
-                 pytest.raises(run_lock.Busy):
-                evolver.run_pipeline()
+            with override_config(PIPELINE_LOCK_FILE=lock), pytest.raises(run_lock.Busy):
+                evolver.run_pipeline(stages=(_made_up("first", run=lambda _: ran.append(1)
+                                                       or _Done()),))
 
-            mocks["strays_run"].assert_not_called()
+            assert ran == []
 
     def test_the_turn_is_held_through_the_run_and_given_back(self):
         with workspace_temp_dir() as root:
             lock = root / "pipeline.lock"
             held_while_running = []
-            mocks = _stage_mocks()
-            mocks["strays_run"] = Mock(side_effect=lambda: (
-                held_while_running.append(lock.exists()) or StrayFilesResult()))
 
-            with _patched_stages(mocks), override_config(PIPELINE_LOCK_FILE=lock):
-                evolver.run_pipeline()
+            with override_config(PIPELINE_LOCK_FILE=lock):
+                evolver.run_pipeline(stages=(_made_up("first", run=lambda _: (
+                    held_while_running.append(lock.exists()) or _Done())),))
 
             assert held_while_running == [True]
             assert not lock.exists()
@@ -788,10 +684,10 @@ class TestOneRunAtATime:
             lock = root / "pipeline.lock"
             lock.write_text(str(os.getpid()), encoding="utf-8")
 
-            with _patched_stages(_stage_mocks()), override_config(PIPELINE_LOCK_FILE=lock), \
+            with override_config(PIPELINE_LOCK_FILE=lock), \
                  patch("evolver.setup_logging"), patch("evolver.check_dependencies"), \
                  caplog.at_level(logging.WARNING), pytest.raises(SystemExit) as exited:
-                evolver.main()
+                evolver.main(stages=(_made_up("first"),))
 
         assert exited.value.code == 1
         assert "running the pipeline" in caplog.text

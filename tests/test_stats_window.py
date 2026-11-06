@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 from PyQt6.QtGui import QFontMetrics, QImage
 
+from evolver import ALL_STAGES, STAGE_LABELS
 from gui.main_window import EvolverMainWindow
 from gui.run_history import RunHistory
 from gui.run_record import RunRecord
@@ -25,7 +26,6 @@ from gui.stats_window import (
     legend_width,
 )
 from gui.tray import EvolverTray
-from tasks.stages import ALL_STAGES, STAGE_LABELS
 from tests.color_support import band_fill
 from tests.temp_helpers import make_run_record, override_config
 
@@ -218,11 +218,7 @@ class TestStackedAreaChartPainting:
         )
 
         named = _ink_count(_render(chart), *text_band)
-        with patch.dict(
-            "gui.stats_window.STAGE_LABELS",
-            dict.fromkeys(STAGE_LABELS, ""),
-            clear=True,
-        ):
+        with patch("gui.stats_window.STAGE_LABELS", dict.fromkeys(STAGE_LABELS, "")):
             blank = _ink_count(_render(chart), *text_band)
 
         assert named > blank + 100

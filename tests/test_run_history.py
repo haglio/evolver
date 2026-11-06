@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from evolver import ALL_STAGES
 from gui.run_history import RunHistory
 from gui.run_record import save_run
-from tasks.stages import ALL_STAGES
 from tests.temp_helpers import make_run_record, workspace_temp_dir
 
 

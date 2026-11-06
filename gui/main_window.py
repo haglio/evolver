@@ -29,6 +29,7 @@ from shared_ui.spacing import BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
+from evolver import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 from gui.commands import (
     BACKFILL,
     NONAI,
@@ -47,7 +48,6 @@ from gui.run_record import RunRecord, format_run_label, newest_runs
 from gui.schedule_state import ScheduleStatus
 from gui.status_symbols import GRAY, status_icon, symbol_for
 from gui.switches import SwitchButton
-from tasks.stages import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 
 
 class _NoFocusRectDelegate(QItemDelegate):

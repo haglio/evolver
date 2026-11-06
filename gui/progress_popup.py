@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 from shared_ui.fonts import SIZE_BODY
 from shared_ui.spacing import MARGIN_DIALOG
 
-from tasks.stages import ALL_STAGES, STAGE_LABELS
+from evolver import ALL_STAGES, STAGE_LABELS
 
 _CAPTION_GUTTER = 12
 

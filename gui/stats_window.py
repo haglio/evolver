@@ -19,9 +19,9 @@ from shared_ui import colors, palette
 from shared_ui.fonts import SIZE_SMALL, SIZE_TINY
 from shared_ui.spacing import BUTTON_GROUP_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
+from evolver import ALL_STAGES, STAGE_LABELS, STAGES
 from gui.run_history import RunHistory
 from gui.run_record import in_display_zone
-from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 
 STAGE_COLORS = {stage.key: QColor(*stage.color) for stage in STAGES}
 

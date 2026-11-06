@@ -10,15 +10,13 @@ from pathlib import Path
 import pytest
 from PyQt6.QtGui import QColor
 
-import evolver
+from evolver import ALL_STAGES, STAGE_LABELS, STAGES
 from gui import main_window
 from gui.stats_window import STAGE_COLORS
 from tasks.nonai_upscale import NonAiUpscaleResult
 from tasks.scripts_sync import ScriptsSyncResult
-from tasks.stages import ALL_STAGES, STAGE_LABELS, STAGES
 from tests.color_support import band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
-from tests.test_evolver import _patched_stages, _stage_mocks
 
 
 def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
@@ -38,59 +36,6 @@ def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
 
 
 class TestStageRegistry(unittest.TestCase):
-    def test_the_registry_lists_exactly_the_stages_the_pipeline_emits(self):
-        mocks = _stage_mocks()
-        with _patched_stages(mocks):
-            result = evolver.run_pipeline()
-
-        assert [stage.name for stage in result.stages] == ALL_STAGES
-
-    def test_the_pipeline_spells_the_registry_s_order_and_nothing_else(self):
-        source = Path(PROJECT_ROOT, "evolver.py").read_text(encoding="utf-8")
-        calls = [
-            node
-            for node in ast.walk(ast.parse(source))
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id in ("_run_stage", "_skip_stage")
-        ]
-        calls.sort(key=lambda node: (node.lineno, node.col_offset))
-
-        spelled = []
-        for call in calls:
-            first = call.args[1] if len(call.args) > 1 else None
-            unnamed = (f"the stage name at evolver.py:{call.lineno} is not a literal, "
-                       "so nothing can compare it to the registry")
-            assert isinstance(first, ast.Constant), unnamed
-            assert isinstance(first.value, str), unnamed
-            spelled.append(first.value)
-
-        assert [name for name, _ in itertools.groupby(spelled)] == ALL_STAGES
-
-    def test_a_stage_reaches_the_run_record_through_those_two_calls_and_no_other(self):
-        tree = ast.parse(Path(PROJECT_ROOT, "evolver.py").read_text(encoding="utf-8"))
-        emitters = set()
-        enclosing = []
-
-        def walk(node):
-            named = isinstance(node, ast.FunctionDef)
-            if named:
-                enclosing.append(node.name)
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "StageRecord"
-            ):
-                emitters.add(enclosing[-1] if enclosing else "<module>")
-            for child in ast.iter_child_nodes(node):
-                walk(child)
-            if named:
-                enclosing.pop()
-
-        walk(tree)
-
-        assert emitters == {"_run_stage", "_skip_stage"}
-
     def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
         for table, name in (
             (main_window._HEADLINE_FIELDS, "_HEADLINE_FIELDS"),
@@ -139,6 +84,9 @@ class TestStageRegistry(unittest.TestCase):
         assert "scene_scripts" in ALL_STAGES
         assert ALL_STAGES.index("scene_scripts") == ALL_STAGES.index("clip_scripts") + 1
         assert ALL_STAGES.index("scene_scripts") == ALL_STAGES.index("scripts") - 1
+
+    def test_the_phones_favorites_are_marked_before_bookmarks_reads_the_marks(self):
+        assert ALL_STAGES.index("watch_weights") < ALL_STAGES.index("bookmarks")
 
     def test_the_readme_enumerates_the_stages_the_registry_declares(self):
         readme = Path(PROJECT_ROOT, "README.md").read_text(encoding="utf-8")
