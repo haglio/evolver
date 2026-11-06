@@ -12,7 +12,16 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from app_support import processes
 from app_support.flick_folder import flat_flicks_in
+from app_support.testing import (
+    process_alive,
+    process_exe,
+    process_resumed,
+    process_suspended,
+    process_terminated,
+    processes_listed,
+)
 
 import config
 from gui.run_record import RunRecord
@@ -299,8 +308,15 @@ def make_run_record(**overrides):
 _PROBE_DEFAULTS = {
     "videoai": "", "orientation": "landscape", "duration": 100.0, "free_bytes": 10**15,
     "popen": None, "is_running": True, "image": "ffmpeg.exe", "terminate": True,
-    "topaz_pids": (), "cmdline": None, "available_ram": 64.0, "idle_seconds": 10_000.0,
+    "topaz_pids": (), "arguments": (), "available_ram": 64.0, "idle_seconds": 10_000.0,
 }
+
+
+def _topaz_encodes(pids, arguments) -> list[processes.Process]:
+    return [processes.Process(pid=pid, ppid=1, started=0.0, name=config.FFMPEG.name,
+                              exe=str(config.FFMPEG), cmdline=" ".join(arguments),
+                              arguments=tuple(arguments))
+            for pid in pids]
 
 
 def probes(**given):
@@ -310,10 +326,8 @@ def probes(**given):
         "idle_seconds": stack.enter_context(
             patch("tasks.nonai_encode.seconds_since_input",
                   return_value=options["idle_seconds"])),
-        "suspend": stack.enter_context(
-            patch("util.processes.suspend", return_value=True)),
-        "resume": stack.enter_context(
-            patch("util.processes.resume", return_value=True)),
+        "suspend": stack.enter_context(process_suspended(return_value=True)),
+        "resume": stack.enter_context(process_resumed(return_value=True)),
         "videoai": stack.enter_context(
             patch("util.ffprobe.videoai_tag", return_value=options["videoai"])),
         "orientation": stack.enter_context(
@@ -328,16 +342,11 @@ def probes(**given):
         "popen": stack.enter_context(
             patch("subprocess.Popen",
                   options["popen"] or Mock(return_value=Mock(pid=4242)))),
-        "is_running": stack.enter_context(
-            patch("util.processes.is_running", return_value=options["is_running"])),
-        "image_path": stack.enter_context(
-            patch("util.processes.image_path", return_value=options["image"])),
-        "terminate": stack.enter_context(
-            patch("util.processes.terminate", return_value=options["terminate"])),
-        "pids_of_image": stack.enter_context(
-            patch("util.processes.pids_of_image", return_value=list(options["topaz_pids"]))),
-        "command_line": stack.enter_context(
-            patch("util.processes.command_line", return_value=options["cmdline"])),
+        "is_running": stack.enter_context(process_alive(return_value=options["is_running"])),
+        "exe": stack.enter_context(process_exe(return_value=options["image"])),
+        "terminate": stack.enter_context(process_terminated(return_value=options["terminate"])),
+        "running": stack.enter_context(processes_listed(
+            side_effect=lambda: _topaz_encodes(options["topaz_pids"], options["arguments"]))),
         "sign_in_expired": stack.enter_context(
             patch("util.topaz.sign_in_expired", return_value=False)),
     }

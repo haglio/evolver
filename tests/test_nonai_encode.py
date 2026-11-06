@@ -9,29 +9,23 @@ from tests.temp_helpers import workspace_temp_dir
 from util import nonai_job
 
 
-class TestParseTopazCommand(unittest.TestCase):
-    def test_reads_a_quoted_input_and_a_quoted_output(self):
-        source, out = nonai_encode._parse_topaz_command(
-            'ffmpeg.exe -i "C:/lib/0 unsorted/scene one.mp4" -vf x '
-            '"C:/lib/3 done/scene one.partial.ab12.mp4"'
-        )
+class TestParseTopazArguments(unittest.TestCase):
+    def test_reads_the_input_and_the_output_whatever_spaces_they_hold(self):
+        source, out = nonai_encode._parse_topaz_arguments((
+            "ffmpeg.exe", "-i", "C:/lib/0 unsorted/scene one.mp4", "-vf", "x",
+            "C:/lib/3 done/scene one.partial.ab12.mp4"))
 
         assert source == Path("C:/lib/0 unsorted/scene one.mp4")
         assert out == Path("C:/lib/3 done/scene one.partial.ab12.mp4")
 
-    def test_reads_unquoted_ones_too(self):
-        source, out = nonai_encode._parse_topaz_command(
-            "ffmpeg.exe -i /lib/a.mp4 -vf x /lib/a.partial.ab12.mp4"
-        )
+    def test_arguments_with_no_input_name_neither(self):
+        assert nonai_encode._parse_topaz_arguments(("ffmpeg.exe", "-version")) == (None, None)
 
-        assert source == Path("/lib/a.mp4")
-        assert out == Path("/lib/a.partial.ab12.mp4")
+    def test_an_input_flag_with_nothing_after_it_names_neither(self):
+        assert nonai_encode._parse_topaz_arguments(("ffmpeg.exe", "-i")) == (None, None)
 
-    def test_a_command_line_with_no_input_names_neither(self):
-        assert nonai_encode._parse_topaz_command("ffmpeg.exe -version") == (None, None)
-
-    def test_an_empty_command_line_names_neither(self):
-        assert nonai_encode._parse_topaz_command("") == (None, None)
+    def test_no_arguments_name_neither(self):
+        assert nonai_encode._parse_topaz_arguments(()) == (None, None)
 
 
 class TestPercentEncoded(unittest.TestCase):

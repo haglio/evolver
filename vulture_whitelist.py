@@ -26,7 +26,6 @@ _.handle_startendtag
 _.handle_data
 
 # -- Win32 ctypes struct fields (consumed by C API, not Python) --
-_.dwSize
 _.dwLength
 
 # -- Dataclass fields consumed via dataclasses.asdict() --

@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import logging
-import re
 import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support import processes
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 from app_support.win32 import seconds_since_input
 
 import config
 from tasks.nonai_files import StageFiles
 from tasks.nonai_queue import QueuedVideo, add_to_skip_list, relpath
-from util import ffprobe, nonai_job, orientation, processes, provenance, system_resources, topaz
+from util import ffprobe, nonai_job, orientation, provenance, system_resources, topaz
 from util.media_files import is_partial_path, partial_path, partial_stem
 from util.nonai_library import stage_dirs
 
@@ -49,14 +49,20 @@ def unrecorded_start() -> dict:
 
 
 def topaz_pids() -> list[int]:
-    return processes.pids_of_image(config.FFMPEG)
+    return [encode.pid for encode in _topaz_encodes()]
+
+
+def _topaz_encodes() -> list[processes.Process]:
+    topaz = str(config.FFMPEG).lower()
+    return [process for process in processes.running() if process.exe.lower() == topaz]
 
 
 def adopt_orphan(job_file: Path) -> nonai_job.Job | None:
-    pids = topaz_pids()
-    if len(pids) != 1:
+    encodes = _topaz_encodes()
+    if len(encodes) != 1:
         return None
-    source, tmp = _parse_topaz_command(processes.command_line(pids[0]) or "")
+    pid = encodes[0].pid
+    source, tmp = _parse_topaz_arguments(encodes[0].arguments)
     if source is None or tmp is None or not is_partial_path(tmp):
         return None
     try:
@@ -64,28 +70,25 @@ def adopt_orphan(job_file: Path) -> nonai_job.Job | None:
     except ValueError:
         return None
     job = nonai_job.Job.adopted(
-        pid=pids[0], source=source, tmp=tmp,
+        pid=pid, source=source, tmp=tmp,
         out=tmp.with_name(f"{partial_stem(tmp)}{config.NONAI_OUTPUT_SUFFIX}.mp4"),
         expected_duration=ffprobe.duration_seconds(source) or 0.0,
         started_at=time.time(), provenance=unrecorded_start())
-    processes.resume(pids[0])
+    processes.resume(pid)
     nonai_job.save_job(job_file, job)
     log.warning(
         "Adopted an orphaned non-AI encode (pid %d) of %s; its job state had gone missing.",
-        pids[0], source,
+        pid, source,
     )
     return job
 
 
-def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
-    token = r'(?:"([^"]+)"|(\S+))'
-    source_match = re.search(rf"-i\s+{token}", cmdline)
-    output_match = re.search(rf"{token}\s*$", cmdline)
-    if not source_match or not output_match:
+def _parse_topaz_arguments(arguments: tuple[str, ...]) -> tuple[Path | None, Path | None]:
+    try:
+        source = arguments[arguments.index("-i") + 1]
+    except (ValueError, IndexError):
         return None, None
-    source = source_match.group(1) or source_match.group(2)
-    output = output_match.group(1) or output_match.group(2)
-    return Path(source), Path(output)
+    return Path(source), Path(arguments[-1])
 
 
 def suspend_job(job: nonai_job.Job, job_file: Path, *, because: str) -> None:
@@ -121,7 +124,7 @@ def percent_encoded(job: nonai_job.Job) -> int | None:
 
 
 def terminate_ffmpeg(pid: int, reason: str) -> None:
-    image = processes.image_path(pid)
+    image = processes.exe_of(pid)
     if image and Path(image).name.lower() == config.FFMPEG.name.lower():
         log.warning("Killing non-AI upscale ffmpeg (pid %d): %s.", pid, reason)
         processes.terminate(pid)

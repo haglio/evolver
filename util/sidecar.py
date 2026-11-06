@@ -4,11 +4,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app_support import favorites
-from app_support.json_store import locked_update
+from app_support.json_store import locked_update, read_json_or_empty
 from app_support.mirrored_tree import mirrored_path
 
 import config
-from util.json_reads import read_dict
 from util.versions import upscaled_stem
 
 
@@ -48,7 +47,7 @@ def library_favorites() -> list[favorites.Favorite]:
 
 
 def read(path: Path) -> dict:
-    return read_dict(path)
+    return read_json_or_empty(path)
 
 
 def update(path: Path, change: Callable[[dict], dict | None]) -> dict | None:

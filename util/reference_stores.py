@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.file_channel import write_whole
+from app_support.json_store import read_json
 
 import config
 from util import lanes, sidecar
-from util.json_reads import read_dict_strict
 
 GENAUMACHER_SESSION_VERSION = 1
 SCRIPTURE_PROJECT_VERSION = 1
@@ -165,7 +165,7 @@ def _rewrite_json_object_keys(path: Path, moves: dict[str, str]) -> None:
 
 
 def _load_json(path: Path) -> dict:
-    return read_dict_strict(path)
+    return read_json(path)
 
 
 def _write_json(path: Path, payload: dict) -> None:

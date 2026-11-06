@@ -7,13 +7,14 @@ import time
 from collections.abc import Callable
 from enum import Enum
 
+from app_support import processes
 from app_support.win32 import try_acquire_mutex
 from app_support.win32_loader import load_dll
 from PyQt6.QtNetwork import QLocalServer
 from shared_ui import running_copy
 from shared_ui.running_copy import Answer
 
-from util import crash_log, processes
+from util import crash_log
 
 log = logging.getLogger(__name__)
 
