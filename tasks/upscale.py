@@ -32,6 +32,7 @@ from util.media_files import (
     take_its_place,
 )
 from util.sidecar import sidecar_path, upscaled_video_path
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
@@ -39,12 +40,20 @@ _SORTED_DEPTH = 3
 
 
 @dataclass
-class UpscaleResult:
+class UpscaleResult(StageResult):
     processed: int = 0
     failed: int = 0
     stopped_at_budget: int = 0
     deferred_low_disk: bool = False
     pending_after_run: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return not self.failed
+
+    @property
+    def needs_an_eye(self) -> bool:
+        return self.deferred_low_disk
 
 
 @dataclass(frozen=True)

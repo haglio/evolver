@@ -9,6 +9,7 @@ from app_support.video_names import UPSCALE_SUFFIX
 import config
 from util.alert import show_error
 from util.media_files import library_videos
+from util.stage_result import StageResult
 from util.versions import upscaled_stem
 
 log = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ _LISTED = 10
 
 
 @dataclass
-class CorrespondenceResult:
+class CorrespondenceResult(StageResult):
     sorted_count: int
     outbox_count: int
     orphan_outbox: list[str] = field(default_factory=list)

@@ -21,6 +21,7 @@ from util import (
 from util.media_files import reachable, remove_partial_files
 from util.nonai_library import buckets, stage_dirs
 from util.nonai_retire import carry_funscript, carry_metadata, retire_original
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ _COMPUTER_IS_IDLE = "the computer is idle again"
 
 
 @dataclass
-class NonAiUpscaleResult:
+class NonAiUpscaleResult(StageResult):
     started: str = ""
     in_flight: str = ""
     in_flight_percent: int | None = None
@@ -45,6 +46,14 @@ class NonAiUpscaleResult:
     deferred_low_disk: bool = False
     on_request: bool = False
     unreachable_archive: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return not self.failed
+
+    @property
+    def needs_an_eye(self) -> bool:
+        return self.deferred_low_disk or bool(self.unreachable_archive)
 
 
 @dataclass(frozen=True)

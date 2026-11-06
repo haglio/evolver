@@ -14,8 +14,28 @@ import pytest
 
 import config
 import evolver
+from check_correspondence import CorrespondenceResult
+from check_duplicate_sizes import DuplicateSizesResult
 from tasks import nonai_upscale
+from tasks.bookmarks_sync import BookmarksSyncResult
+from tasks.clip_scripts import ClipScriptsResult
+from tasks.genau_deliver import GenauDeliverResult
+from tasks.nonai_group import NonAiGroupResult
+from tasks.nonai_titles import NonAiTitleResult
+from tasks.nonai_upscale import NonAiUpscaleResult
+from tasks.origenerator_commands import DowntimeResult
+from tasks.prompt_scrape import PromptScrapeResult
+from tasks.provenance_sweep import ProvenanceResult
+from tasks.reference_sync import ReferenceSyncResult
+from tasks.scene_scripts import SceneScriptsResult
+from tasks.scripts_sync import ScriptsSyncResult
+from tasks.sort import SortResult
 from tasks.stages import ALL_STAGES
+from tasks.stray_files import StrayFilesResult
+from tasks.taken_back import TakenBackResult
+from tasks.upscale import UpscaleResult
+from tasks.video_kinds import VideoKindsResult
+from tasks.watch_weights import WatchWeightsResult
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
 from util import run_lock, run_log
 from util.sidecar import sidecar_path
@@ -25,27 +45,26 @@ CRLF = (chr(13) + chr(10)).encode("ascii")
 
 def _stage_mocks() -> dict:
     return {
-        "strays_run": Mock(return_value=Mock(ok=True)),
-        "sort_run": Mock(return_value=Mock(moved=0, moved_files=[])),
-        "withdrawn_run": Mock(return_value=Mock(failed=0)),
-        "scripts_sync_run": Mock(return_value=Mock(ok=True, not_checked=0)),
-        "bookmarks_sync_run": Mock(return_value=Mock(ok=True)),
-        "prompt_scrape_run": Mock(return_value=Mock(ok=True)),
-        "origenerator_downtime_run": Mock(return_value=Mock(holds_the_graphics_card=False,
-                                                            failed=False)),
-        "upscale_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=0)),
-        "genau_deliver_run": Mock(return_value=Mock(failed=0)),
-        "nonai_run": Mock(return_value=Mock(failed=0, deferred_low_disk=False, unreachable_archive="")),
-        "nonai_group_run": Mock(),
-        "nonai_titles_run": Mock(),
-        "video_types_run": Mock(),
-        "provenance_sweep_run": Mock(),
-        "clip_scripts_run": Mock(),
-        "scene_scripts_run": Mock(),
-        "reference_sync_run": Mock(return_value=Mock(ok=True)),
-        "watch_weights_run": Mock(return_value=Mock(ok=True)),
-        "duplicate_sizes_run": Mock(return_value=Mock(ok=True)),
-        "correspondence_run": Mock(return_value=Mock(ok=True)),
+        "strays_run": Mock(return_value=StrayFilesResult()),
+        "sort_run": Mock(return_value=SortResult()),
+        "withdrawn_run": Mock(return_value=TakenBackResult()),
+        "scripts_sync_run": Mock(return_value=ScriptsSyncResult()),
+        "bookmarks_sync_run": Mock(return_value=BookmarksSyncResult()),
+        "prompt_scrape_run": Mock(return_value=PromptScrapeResult()),
+        "origenerator_downtime_run": Mock(return_value=DowntimeResult()),
+        "upscale_run": Mock(return_value=UpscaleResult()),
+        "genau_deliver_run": Mock(return_value=GenauDeliverResult()),
+        "nonai_run": Mock(return_value=NonAiUpscaleResult()),
+        "nonai_group_run": Mock(return_value=NonAiGroupResult()),
+        "nonai_titles_run": Mock(return_value=NonAiTitleResult()),
+        "video_types_run": Mock(return_value=VideoKindsResult()),
+        "provenance_sweep_run": Mock(return_value=ProvenanceResult()),
+        "clip_scripts_run": Mock(return_value=ClipScriptsResult()),
+        "scene_scripts_run": Mock(return_value=SceneScriptsResult()),
+        "reference_sync_run": Mock(return_value=ReferenceSyncResult()),
+        "watch_weights_run": Mock(return_value=WatchWeightsResult()),
+        "duplicate_sizes_run": Mock(return_value=DuplicateSizesResult(scanned_count=0)),
+        "correspondence_run": Mock(return_value=CorrespondenceResult(sorted_count=0, outbox_count=0)),
         "has_pending_work": Mock(return_value=False),
         "should_skip_cpu": Mock(return_value=False),
         "foreign_topaz_running": Mock(return_value=False),
@@ -136,9 +155,9 @@ class TestEvolverMain:
 
     def test_skips_correspondence_when_upscale_has_pending(self):
         mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=3, moved_files=["a", "b", "c"])),
+            sort_run=Mock(return_value=SortResult(moved=3, moved_files=["a", "b", "c"])),
             has_pending_work=Mock(return_value=True),
-            upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=1)),
+            upscale_run=Mock(return_value=UpscaleResult(pending_after_run=1)),
         )
         assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_called_once()
@@ -146,7 +165,7 @@ class TestEvolverMain:
 
     def test_skips_upscale_and_correspondence_when_cpu_busy(self):
         mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["new-file"])),
             has_pending_work=Mock(return_value=True),
             should_skip_cpu=Mock(return_value=True),
         )
@@ -156,7 +175,7 @@ class TestEvolverMain:
 
     def test_runs_upscale_with_priority_files(self):
         mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["new-file"])),
             has_pending_work=Mock(return_value=True),
         )
         assert mocks["exit_code"] == 0
@@ -174,7 +193,7 @@ class TestEvolverMain:
 
     def test_ai_upscale_waits_while_a_topaz_encode_evolver_did_not_start_is_running(self):
         mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
             foreign_topaz_running=Mock(return_value=True),
         )
@@ -185,10 +204,9 @@ class TestEvolverMain:
 
     def test_ai_upscale_waits_while_origenerator_trains_a_fix_on_the_graphics_card(self):
         mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
-            origenerator_downtime_run=Mock(return_value=Mock(holds_the_graphics_card=True,
-                                                             failed=False)),
+            origenerator_downtime_run=Mock(return_value=DowntimeResult(holds_the_graphics_card=True)),
         )
         assert mocks["exit_code"] == 0
         mocks["upscale_run"].assert_not_called()
@@ -203,13 +221,12 @@ class TestEvolverMain:
             steps.append("thawed")
 
         self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
             frozen_for_ai_videos=Mock(side_effect=frozen),
             should_skip_cpu=Mock(side_effect=lambda log: steps.append("cpu sampled") and False),
             topaz_sign_in_expired=Mock(side_effect=lambda: steps.append("sign-in asked") and False),
-            upscale_run=Mock(side_effect=lambda **kwargs: steps.append("upscaled") or Mock(
-                failed=0, deferred_low_disk=False, pending_after_run=0)),
+            upscale_run=Mock(side_effect=lambda **kwargs: steps.append("upscaled") or UpscaleResult()),
         )
 
         assert steps == ["frozen", "cpu sampled", "sign-in asked", "upscaled", "thawed"]
@@ -225,26 +242,27 @@ class TestEvolverMain:
         "failing_overrides",
         [
             pytest.param(lambda: {
-                "withdrawn_run": Mock(return_value=Mock(failed=1))}, id="withdrawn"),
+                "withdrawn_run": Mock(return_value=TakenBackResult(failed=1))}, id="withdrawn"),
             pytest.param(lambda: {
-                "nonai_run": Mock(return_value=Mock(failed=1, deferred_low_disk=False))}, id="upscale_non_ai"),
+                "nonai_run": Mock(return_value=NonAiUpscaleResult(failed="example/scene one.mp4"))}, id="upscale_non_ai"),
             pytest.param(lambda: {
-                "sort_run": Mock(return_value=Mock(moved=1, moved_files=["new-file"])),
+                "sort_run": Mock(return_value=SortResult(moved=1, moved_files=["new-file"])),
                 "has_pending_work": Mock(return_value=True),
-                "correspondence_run": Mock(return_value=Mock(ok=False))}, id="verify"),
+                "correspondence_run": Mock(return_value=CorrespondenceResult(
+                    sorted_count=1, outbox_count=0, orphan_sorted=["example/video one.mp4"]))}, id="verify"),
             pytest.param(lambda: {
-                "duplicate_sizes_run": Mock(return_value=Mock(ok=False))}, id="dupes"),
+                "duplicate_sizes_run": Mock(return_value=DuplicateSizesResult(
+                    scanned_count=2, duplicate_groups={7: ["a/one.mp4", "b/two.mp4"]}))}, id="dupes"),
             pytest.param(lambda: {
-                "scripts_sync_run": Mock(return_value=Mock(ok=False))}, id="scripts"),
+                "scripts_sync_run": Mock(return_value=ScriptsSyncResult(unmatched=1))}, id="scripts"),
             pytest.param(lambda: {
-                "bookmarks_sync_run": Mock(return_value=Mock(ok=False))}, id="bookmarks"),
+                "bookmarks_sync_run": Mock(return_value=BookmarksSyncResult(profile_missing=True))}, id="bookmarks"),
             pytest.param(lambda: {
-                "sort_run": Mock(return_value=Mock(moved=1, moved_files=["f"])),
+                "sort_run": Mock(return_value=SortResult(moved=1, moved_files=["f"])),
                 "has_pending_work": Mock(return_value=True),
-                "upscale_run": Mock(return_value=Mock(
-                    failed=2, deferred_low_disk=False, pending_after_run=0))}, id="upscale"),
+                "upscale_run": Mock(return_value=UpscaleResult(failed=2))}, id="upscale"),
             pytest.param(lambda: {
-                "prompt_scrape_run": Mock(return_value=Mock(ok=False))}, id="metadata"),
+                "prompt_scrape_run": Mock(return_value=PromptScrapeResult(errors=1))}, id="metadata"),
         ],
     )
     def test_a_failing_stage_exits_nonzero(self, failing_overrides):
@@ -253,15 +271,15 @@ class TestEvolverMain:
 
     def test_exits_zero_when_upscale_only_held_back_for_low_disk(self):
         mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
-            upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=True, pending_after_run=3)),
+            upscale_run=Mock(return_value=UpscaleResult(deferred_low_disk=True, pending_after_run=3)),
         )
         assert mocks["exit_code"] == 0
 
     def test_all_stages_called_on_clean_run_with_pending_work(self):
         mocks = self._run_pipeline(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
         )
         assert mocks["exit_code"] == 0
@@ -283,8 +301,8 @@ class TestRunPipeline:
         return _patched_stages(defaults), defaults
 
     def test_every_stage_the_pipeline_runs_is_a_stub_from_the_mock_table(self):
-        stack, _ = self._patch_all_stages(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+        stack, stubs = self._patch_all_stages(
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
         )
         with stack:
@@ -293,7 +311,7 @@ class TestRunPipeline:
         for stage in result.stages:
             assert stage.status != "skipped", \
                 f"stage {stage.name!r} must actually run in this test"
-            assert isinstance(stage.result, Mock), (
+            assert any(stage.result is stub.return_value for stub in stubs.values()), (
                 f"stage {stage.name!r} ran its real function -- add it to "
                 "_stage_mocks and _STAGE_PATCHES"
             )
@@ -418,9 +436,9 @@ class TestRunPipeline:
 
     def test_enabled_nonai_upscale_never_starts_while_ai_work_remains(self):
         stack, mocks = self._patch_all_stages(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
-            upscale_run=Mock(return_value=Mock(failed=0, deferred_low_disk=False, pending_after_run=2)),
+            upscale_run=Mock(return_value=UpscaleResult(pending_after_run=2)),
         )
         with stack:
             evolver.run_pipeline(nonai_enabled=True)
@@ -460,7 +478,7 @@ class TestRunPipeline:
 
     def test_has_errors_true_when_stage_fails(self):
         stack, _ = self._patch_all_stages(
-            withdrawn_run=Mock(return_value=Mock(failed=1)),
+            withdrawn_run=Mock(return_value=TakenBackResult(failed=1)),
         )
         with stack:
             result = evolver.run_pipeline()
@@ -468,7 +486,7 @@ class TestRunPipeline:
 
     def test_the_failing_stage_is_the_one_marked_error(self):
         stack, _ = self._patch_all_stages(
-            withdrawn_run=Mock(return_value=Mock(failed=1)),
+            withdrawn_run=Mock(return_value=TakenBackResult(failed=1)),
         )
         with stack:
             result = evolver.run_pipeline()
@@ -477,7 +495,7 @@ class TestRunPipeline:
 
     def test_a_low_disk_hold_warns_on_the_non_ai_stage_instead_of_failing_it(self):
         stack, _ = self._patch_all_stages(
-            nonai_run=Mock(return_value=Mock(failed="", deferred_low_disk=True)),
+            nonai_run=Mock(return_value=NonAiUpscaleResult(deferred_low_disk=True)),
         )
         with stack:
             result = evolver.run_pipeline()
@@ -487,7 +505,7 @@ class TestRunPipeline:
 
     def test_scripts_left_unchecked_while_a_folder_cannot_be_reached_warn_instead_of_failing(self):
         stack, _ = self._patch_all_stages(
-            scripts_sync_run=Mock(return_value=Mock(ok=True, not_checked=15)),
+            scripts_sync_run=Mock(return_value=ScriptsSyncResult(not_checked=15)),
         )
         with stack:
             result = evolver.run_pipeline()
@@ -497,8 +515,7 @@ class TestRunPipeline:
 
     def test_a_finished_encode_waiting_for_the_archive_warns_instead_of_failing(self):
         stack, _ = self._patch_all_stages(
-            nonai_run=Mock(return_value=Mock(failed="", deferred_low_disk=False,
-                                             unreachable_archive="Q:/archive")),
+            nonai_run=Mock(return_value=NonAiUpscaleResult(unreachable_archive="Q:/archive")),
         )
         with stack:
             result = evolver.run_pipeline()
@@ -508,8 +525,8 @@ class TestRunPipeline:
 
     def test_a_dead_encode_outranks_a_hold_on_the_same_stage(self):
         stack, _ = self._patch_all_stages(
-            nonai_run=Mock(return_value=Mock(failed="example/clip one.mp4",
-                                             deferred_low_disk=True)),
+            nonai_run=Mock(return_value=NonAiUpscaleResult(failed="example/clip one.mp4",
+                                                           deferred_low_disk=True)),
         )
         with stack:
             result = evolver.run_pipeline()
@@ -518,7 +535,7 @@ class TestRunPipeline:
 
     def test_skips_alone_do_not_make_a_run_a_failure(self):
         stack, _ = self._patch_all_stages(
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             has_pending_work=Mock(return_value=True),
             foreign_topaz_running=Mock(return_value=True),
         )
@@ -540,7 +557,7 @@ class TestRunPipeline:
         on_progress = Mock()
         stack, mocks = self._patch_all_stages(
             has_pending_work=Mock(return_value=True),
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
         )
         with stack:
             evolver.run_pipeline(on_stage_progress=on_progress)
@@ -550,7 +567,7 @@ class TestRunPipeline:
     def test_on_stage_progress_not_passed_when_none(self):
         stack, mocks = self._patch_all_stages(
             has_pending_work=Mock(return_value=True),
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
         )
         with stack:
             evolver.run_pipeline(on_stage_progress=None)
@@ -563,11 +580,11 @@ class TestRunPipeline:
         def capture_upscale_run(**kwargs):
             kwargs["listeners"].on_progress(1, 5)
             kwargs["listeners"].on_progress(2, 5)
-            return Mock(failed=0, deferred_low_disk=False, pending_after_run=0)
+            return UpscaleResult()
 
         stack, _ = self._patch_all_stages(
             has_pending_work=Mock(return_value=True),
-            sort_run=Mock(return_value=Mock(moved=1, moved_files=["f"])),
+            sort_run=Mock(return_value=SortResult(moved=1, moved_files=["f"])),
             upscale_run=Mock(side_effect=capture_upscale_run),
         )
         with stack:
@@ -758,7 +775,7 @@ class TestOneRunAtATime:
             held_while_running = []
             mocks = _stage_mocks()
             mocks["strays_run"] = Mock(side_effect=lambda: (
-                held_while_running.append(lock.exists()) or Mock(ok=True)))
+                held_while_running.append(lock.exists()) or StrayFilesResult()))
 
             with _patched_stages(mocks), override_config(PIPELINE_LOCK_FILE=lock):
                 evolver.run_pipeline()

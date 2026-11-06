@@ -12,6 +12,7 @@ from app_support.subprocess_utils import hidden_subprocess_kwargs
 import config
 from util import lanes
 from util.origenerator_gallery import PUBLISHED
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
@@ -22,10 +23,14 @@ _UNANSWERED = (OSError, subprocess.TimeoutExpired, ValueError, KeyError, IndexEr
 
 
 @dataclass
-class DowntimeResult:
+class DowntimeResult(StageResult):
     did: str = ""
     holds_the_graphics_card: bool = False
     failed: bool = False
+
+    @property
+    def ok(self) -> bool:
+        return not self.failed
 
 
 def published_command(checkout: Path, name: str) -> tuple[str, ...] | None:

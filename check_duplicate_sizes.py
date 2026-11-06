@@ -8,6 +8,7 @@ from pathlib import Path
 import config
 from util.alert import show_error
 from util.media_files import library_videos
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ _LISTED = 10
 
 
 @dataclass
-class DuplicateSizesResult:
+class DuplicateSizesResult(StageResult):
     scanned_count: int
     duplicate_groups: dict[int, list[str]] = field(default_factory=dict)
 

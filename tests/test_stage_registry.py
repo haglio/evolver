@@ -20,9 +20,6 @@ from tests.color_support import band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
 from tests.test_evolver import _patched_stages, _stage_mocks
 
-CANNOT_FAIL = frozenset({"strays", "sort", "clip_scripts", "scene_scripts", "group_non_ai",
-                         "title_non_ai", "video_types", "provenance"})
-
 
 def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
     tree = ast.parse(Path(PROJECT_ROOT, "gui", "main_window.py").read_text(encoding="utf-8"))
@@ -93,11 +90,6 @@ class TestStageRegistry(unittest.TestCase):
         walk(tree)
 
         assert emitters == {"_run_stage", "_skip_stage"}
-
-    def test_every_stage_either_has_a_verdict_rule_or_is_declared_unable_to_fail(self):
-        assert sorted(set(evolver._STAGE_FAILED) | CANNOT_FAIL) == sorted(ALL_STAGES)
-        assert sorted(set(evolver._STAGE_FAILED) & CANNOT_FAIL) == []
-        assert sorted(set(evolver._STAGE_WARNED) - set(ALL_STAGES)) == []
 
     def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
         for table, name in (

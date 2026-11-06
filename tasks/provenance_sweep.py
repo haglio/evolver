@@ -9,6 +9,7 @@ from pathlib import Path
 import config
 from tasks import origenerator_metadata
 from util import ffprobe, lanes, provenance, sidecar, topaz
+from util.stage_result import StageResult
 from util.versions import is_upscaled_stem
 
 log = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ class _Filled:
 
 
 @dataclass
-class ProvenanceResult:
+class ProvenanceResult(StageResult):
     looked_up: int = 0
     from_notes: int = 0
     unknown: int = 0

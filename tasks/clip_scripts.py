@@ -9,12 +9,13 @@ from app_support import funscript
 import config
 from util import ffprobe, provenance, script_library, sidecar
 from util.media_files import library_videos
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
-class ClipScriptsResult:
+class ClipScriptsResult(StageResult):
     written: int = 0
     already_scripted: int = 0
     no_scene_script: int = 0

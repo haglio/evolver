@@ -18,15 +18,20 @@ from util.media_files import (
     unique_path,
 )
 from util.sound import save_as_mp3
+from util.stage_result import StageResult
 from util.versions import is_upscaled_stem, sorted_stem_of
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
-class GenauDeliverResult:
+class GenauDeliverResult(StageResult):
     delivered: int = 0
     failed: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return not self.failed
 
 
 def _upscaled_genau_flicks(root: Path, genau_source: str):
