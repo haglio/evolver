@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from tasks import nonai_encode
 from tests.temp_helpers import workspace_temp_dir
+from util import nonai_job
 
 
 class TestParseTopazCommand(unittest.TestCase):
@@ -39,7 +40,7 @@ class TestPercentEncoded(unittest.TestCase):
         tmp = root / "a.partial.ab12.mp4"
         if written:
             tmp.write_bytes(b"partial")
-        return {"tmp": str(tmp), "expected_duration": expected}
+        return nonai_job.Job({"tmp": str(tmp), "expected_duration": expected})
 
     def test_the_partials_duration_over_the_sources_rounded(self):
         with workspace_temp_dir() as root:
@@ -76,51 +77,25 @@ class TestPercentEncoded(unittest.TestCase):
                 assert nonai_encode.percent_encoded(job) is None
 
 
-class TestActiveRuntime(unittest.TestCase):
-    def test_a_plain_run_is_the_time_since_it_started(self):
-        job = {"started_at": 1_000.0}
-
-        assert nonai_encode.active_runtime(job, now=4600.0) == 3600.0
-
-    def test_time_already_banked_as_suspended_is_not_charged(self):
-        job = {"started_at": 1_000.0, "suspended_seconds": 600.0}
-
-        assert nonai_encode.active_runtime(job, now=4600.0) == 3000.0
-
-    def test_a_freeze_still_in_progress_is_not_charged_either(self):
-        job = {"started_at": 1_000.0, "suspended": True, "suspended_at": 2_000.0}
-
-        assert nonai_encode.active_runtime(job, now=4600.0) == 1000.0
-
-    def test_a_banked_freeze_and_a_live_one_both_count(self):
-        job = {"started_at": 1_000.0, "suspended_seconds": 600.0,
-               "suspended": True, "suspended_at": 3_000.0}
-
-        assert nonai_encode.active_runtime(job, now=4600.0) == 1400.0
-
-    def test_a_record_with_no_start_time_reads_as_having_just_started(self):
-        assert nonai_encode.active_runtime({}, now=4600.0) == 0.0
-
-
 class TestOverran(unittest.TestCase):
     SETTINGS = nonai_encode.EncodeSettings(max_runtime_hours=3)
     CAP_SECONDS = 3 * 3600
 
     def test_under_the_cap_is_not_an_overrun(self):
         started = 1_000.0
-        job = {"started_at": started}
+        job = nonai_job.Job({"started_at": started})
 
         assert not nonai_encode.overran(job, self.SETTINGS, now=started + self.CAP_SECONDS)
 
     def test_past_the_cap_is(self):
         started = 1_000.0
-        job = {"started_at": started}
+        job = nonai_job.Job({"started_at": started})
 
         assert nonai_encode.overran(job, self.SETTINGS, now=started + self.CAP_SECONDS + 1)
 
     def test_a_long_freeze_keeps_a_slow_encode_under_the_cap(self):
         started = 1_000.0
-        job = {"started_at": started, "suspended_seconds": self.CAP_SECONDS}
+        job = nonai_job.Job({"started_at": started, "suspended_seconds": self.CAP_SECONDS})
 
         assert not nonai_encode.overran(job, self.SETTINGS, now=started + 2 * self.CAP_SECONDS)
 

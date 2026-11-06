@@ -6,7 +6,7 @@ from tasks import nonai_encode
 from tasks.nonai_files import StageFiles
 from tasks.nonai_queue import collect_queued_videos, listed_videos, relpath
 from tasks.nonai_titles import TITLE_FIELD
-from util import nonai_job, processes, sidecar, video_kind
+from util import nonai_job, sidecar, video_kind
 from util.upscale_queue import (
     ASKED_FOR,
     FINISHING,
@@ -37,10 +37,9 @@ def _first(files: StageFiles, entries: list[Entry],
            pinned: set[str]) -> tuple[Entry | None, Head | None]:
     job = nonai_job.load_job(files.job)
     request = nonai_job.load_request(files.request)
-    if job is not None and job.get("source"):
-        source = Path(job["source"])
-        entry = _known(entries, relpath(source)) or _entry(source, pinned)
-        if job.get("pid") and processes.is_running(job["pid"]):
+    if job is not None:
+        entry = _known(entries, relpath(job.source)) or _entry(job.source, pinned)
+        if job.is_running():
             return entry, Head(_state(job), nonai_encode.percent_encoded(job))
         if request is None:
             return entry, Head(FINISHING)
@@ -51,10 +50,10 @@ def _first(files: StageFiles, entries: list[Entry],
     return None, None
 
 
-def _state(job: dict) -> str:
-    if job.get("on_request"):
+def _state(job: nonai_job.Job) -> str:
+    if job.on_request:
         return ASKED_FOR
-    return PAUSED if job.get("suspended") else UPSCALING
+    return PAUSED if job.suspended else UPSCALING
 
 
 def _known(entries: list[Entry], video: str) -> Entry | None:

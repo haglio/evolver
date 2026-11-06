@@ -1239,7 +1239,7 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
 
             assert result.started == ""
             mocks["popen"].assert_not_called()
-            assert nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"])["source"] == str(source)
+            assert nonai_job.load_job(overrides["NONAI_JOB_STATE_FILE"]).source == source
 
     def test_the_first_run_that_can_reach_the_archive_promotes_it(self):
         with workspace_temp_dir() as root:
