@@ -52,7 +52,7 @@ def topaz_pids() -> list[int]:
     return processes.pids_of_image(config.FFMPEG)
 
 
-def adopt_orphan(job_file: Path) -> dict | None:
+def adopt_orphan(job_file: Path) -> nonai_job.Job | None:
     pids = topaz_pids()
     if len(pids) != 1:
         return None
@@ -63,18 +63,11 @@ def adopt_orphan(job_file: Path) -> dict | None:
         tmp.relative_to(config.NON_AI_DIR)
     except ValueError:
         return None
-    job = {
-        "pid": pids[0],
-        "source": str(source),
-        "tmp": str(tmp),
-        "out": str(tmp.with_name(f"{partial_stem(tmp)}{config.NONAI_OUTPUT_SUFFIX}.mp4")),
-        "expected_duration": ffprobe.duration_seconds(source) or 0.0,
-        "started_at": time.time(),
-        "suspended": False,
-        "suspended_at": 0.0,
-        "suspended_seconds": 0.0,
-        "provenance": unrecorded_start(),
-    }
+    job = nonai_job.Job.adopted(
+        pid=pids[0], source=source, tmp=tmp,
+        out=tmp.with_name(f"{partial_stem(tmp)}{config.NONAI_OUTPUT_SUFFIX}.mp4"),
+        expected_duration=ffprobe.duration_seconds(source) or 0.0,
+        started_at=time.time(), provenance=unrecorded_start())
     processes.resume(pids[0])
     nonai_job.save_job(job_file, job)
     log.warning(
@@ -95,43 +88,32 @@ def _parse_topaz_command(cmdline: str) -> tuple[Path | None, Path | None]:
     return Path(source), Path(output)
 
 
-def suspend_job(job: dict, job_file: Path, *, because: str) -> None:
-    if job.get("suspended"):
+def suspend_job(job: nonai_job.Job, job_file: Path, *, because: str) -> None:
+    if job.suspended:
         return
-    processes.suspend(job.get("pid", 0))
-    job["suspended"] = True
-    job["suspended_at"] = time.time()
+    processes.suspend(job.pid)
+    job.suspend(now=time.time())
     nonai_job.save_job(job_file, job)
-    log.info("Suspended the non-AI encode of %s; %s.", job.get("source"), because)
+    log.info("Suspended the non-AI encode of %s; %s.", job.source, because)
 
 
-def resume_job(job: dict, job_file: Path, *, because: str) -> None:
-    if not job.get("suspended"):
+def resume_job(job: nonai_job.Job, job_file: Path, *, because: str) -> None:
+    if not job.suspended:
         return
-    processes.resume(job.get("pid", 0))
-    paused_for = time.time() - job.get("suspended_at", time.time())
-    job["suspended_seconds"] = job.get("suspended_seconds", 0.0) + paused_for
-    job["suspended"] = False
-    job["suspended_at"] = 0.0
+    processes.resume(job.pid)
+    job.resume(now=time.time())
     nonai_job.save_job(job_file, job)
-    log.info("Resumed the non-AI encode of %s; %s.", job.get("source"), because)
+    log.info("Resumed the non-AI encode of %s; %s.", job.source, because)
 
 
-def overran(job: dict, settings: EncodeSettings, *, now: float | None = None) -> bool:
-    return active_runtime(job, now=now) > settings.max_runtime_hours * 3600
+def overran(job: nonai_job.Job, settings: EncodeSettings, *, now: float | None = None) -> bool:
+    runtime = job.active_runtime(now=time.time() if now is None else now)
+    return runtime > settings.max_runtime_hours * 3600
 
 
-def active_runtime(job: dict, *, now: float | None = None) -> float:
-    now = time.time() if now is None else now
-    suspended = job.get("suspended_seconds", 0.0)
-    if job.get("suspended") and job.get("suspended_at"):
-        suspended += now - job["suspended_at"]
-    return now - job.get("started_at", now) - suspended
-
-
-def percent_encoded(job: dict) -> int | None:
-    tmp = Path(job.get("tmp", ""))
-    expected = job.get("expected_duration") or 0.0
+def percent_encoded(job: nonai_job.Job) -> int | None:
+    tmp = job.tmp
+    expected = job.expected_duration
     encoded = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
     if not encoded or not expected:
         return None
@@ -185,18 +167,12 @@ def start(queued_video: QueuedVideo, files: StageFiles, *, on_request: bool = Fa
     tmp = partial_path(out, source.stem)
     nonai_job.bump_attempts(files.attempts, relpath(source))
     pid = launch(source, tmp, orient)
-    job = {
-        "pid": pid,
-        "source": str(source),
-        "tmp": str(tmp),
-        "out": str(out),
-        "expected_duration": expected_duration,
-        "started_at": time.time(),
-        "provenance": provenance.by_evolver(method=topaz.NON_AI_UPSCALE.name,
-                                            method_version=topaz.NON_AI_UPSCALE.version),
-    }
-    if on_request:
-        job["on_request"] = True
+    job = nonai_job.Job.started(
+        pid=pid, source=source, tmp=tmp, out=out, expected_duration=expected_duration,
+        started_at=time.time(),
+        provenance=provenance.by_evolver(method=topaz.NON_AI_UPSCALE.name,
+                                         method_version=topaz.NON_AI_UPSCALE.version),
+        on_request=on_request)
     nonai_job.save_job(files.job, job)
     log.info("Started detached non-AI upscale (pid %d%s): %s -> %s",
              pid, ", asked for" if on_request else "", source, out)
@@ -213,10 +189,10 @@ def _output_path(queued_video: QueuedVideo) -> Path:
     return done_dir / config.NONAI_PROCESSED_DIR_NAME / f"{stem}{config.NONAI_OUTPUT_SUFFIX}.mp4"
 
 
-def stop_in_flight(job: dict, reason: str, files: StageFiles) -> str:
-    source = Path(job.get("source", ""))
-    terminate_ffmpeg(job.get("pid", 0), reason)
-    delete_tmp(Path(job.get("tmp", "")))
+def stop_in_flight(job: nonai_job.Job, reason: str, files: StageFiles) -> str:
+    source = job.source
+    terminate_ffmpeg(job.pid, reason)
+    delete_tmp(job.tmp)
     nonai_job.clear_attempts(files.attempts, relpath(source))
     nonai_job.clear_job(files.job)
     log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from tasks import nonai_encode, nonai_queue
 from tasks.nonai_encode import EncodeSettings, StartAttempt
 from tasks.nonai_files import StageFiles, stage_lock
 from tasks.nonai_queue import relpath
-from util import nonai_job, processes
+from util import nonai_job
 
 log = logging.getLogger(__name__)
 
@@ -36,16 +35,17 @@ def withdraw_request() -> None:
     with stage_lock:
         nonai_job.clear_request(files.request)
         job = nonai_job.load_job(files.job)
-        if job is not None and job.pop("on_request", None):
+        if job is not None and job.withdraw_the_ask():
             nonai_job.save_job(files.job, job)
             log.info("The encode of %s is no longer asked for; it pauses again "
-                     "while you are at the computer.", job.get("source"))
+                     "while you are at the computer.", job.source)
 
 
-def make_way_for(video: str, job: dict, files: StageFiles) -> tuple[dict | None, str]:
-    if not (job.get("pid") and processes.is_running(job["pid"])):
+def make_way_for(video: str, job: nonai_job.Job,
+                 files: StageFiles) -> tuple[nonai_job.Job | None, str]:
+    if not job.is_running():
         return job, ""
-    if relpath(Path(job["source"])) == video:
+    if relpath(job.source) == video:
         _take_over(job, files)
         nonai_job.clear_request(files.request)
         return job, ""
@@ -69,18 +69,18 @@ def start_requested(request: nonai_job.Request, files: StageFiles,
     return StartAttempt(started=request.video)
 
 
-def _take_over(job: dict, files: StageFiles) -> None:
+def _take_over(job: nonai_job.Job, files: StageFiles) -> None:
     nonai_encode.resume_job(job, files.job, because=nonai_encode.ASKED_FOR)
-    job["on_request"] = True
+    job.ask_for()
     nonai_job.save_job(files.job, job)
-    log.info("The encode of %s runs on: it is the one asked for.", job.get("source"))
+    log.info("The encode of %s runs on: it is the one asked for.", job.source)
 
 
-def _put_ahead(video: str, files: StageFiles, why: str) -> dict | None:
+def _put_ahead(video: str, files: StageFiles, why: str) -> nonai_job.Job | None:
     job = nonai_job.load_job(files.job)
-    running = bool(job and job.get("pid") and processes.is_running(job["pid"]))
+    running = job is not None and job.is_running()
     next_after = []
-    if running and relpath(Path(job["source"])) != video:
+    if running and relpath(job.source) != video:
         next_after.append(nonai_encode.stop_in_flight(job, why, files))
         running = False
     waiting = nonai_job.load_request(files.request)

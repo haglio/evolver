@@ -14,7 +14,6 @@ from tasks.nonai_queue import add_to_skip_list, relpath
 from util import (
     ffprobe,
     nonai_job,
-    processes,
     provenance,
     sidecar,
 )
@@ -96,7 +95,7 @@ def run(mode: RunMode | None = None, files: StageFiles | None = None,
         job = nonai_job.load_job(files.job)
         if job is None:
             job = nonai_encode.adopt_orphan(files.job)
-        _sweep_orphaned_partials(keep=Path(job["tmp"]) if job and "tmp" in job else None)
+        _sweep_orphaned_partials(keep=job.tmp if job is not None else None)
         request = nonai_job.load_request(files.request) if mode.take_requests else None
         if job is not None and request is not None:
             job, result.stopped = nonai_request.make_way_for(request.video, job, files)
@@ -111,7 +110,7 @@ def run(mode: RunMode | None = None, files: StageFiles | None = None,
             result.failed = supervised.failed
             result.deferred_low_disk = supervised.deferred_low_disk
             result.unreachable_archive = supervised.unreachable_archive
-            result.on_request = bool(result.in_flight and job.get("on_request"))
+            result.on_request = bool(result.in_flight and job.on_request)
 
         attempt = None
         if not result.in_flight and request is not None:
@@ -162,24 +161,22 @@ def throttle_to_presence(*, job_file: Path | None = None,
 
 def _match_presence(job_file: Path, settings: EncodeSettings) -> str:
     job = nonai_job.load_job(job_file)
-    if job is None:
-        return ""
-    pid = job.get("pid", 0)
-    if not pid or not processes.is_running(pid) or job.get("on_request"):
+    if job is None or not job.is_running() or job.on_request:
         return ""
     present = nonai_encode.user_present(settings)
-    if present and not job.get("suspended"):
+    if present and not job.suspended:
         nonai_encode.suspend_job(job, job_file, because=_USER_IS_BACK)
         return "suspended"
-    if not present and job.get("suspended"):
+    if not present and job.suspended:
         nonai_encode.resume_job(job, job_file, because=_COMPUTER_IS_IDLE)
         return "resumed"
     return ""
 
 
 def foreign_topaz_running(*, job_file: Path | None = None) -> bool:
-    job = nonai_job.load_job(StageFiles.configured(job=job_file).job) or {}
-    return any(pid != job.get("pid") for pid in nonai_encode.topaz_pids())
+    job = nonai_job.load_job(StageFiles.configured(job=job_file).job)
+    own = job.pid if job is not None else None
+    return any(pid != own for pid in nonai_encode.topaz_pids())
 
 
 @contextmanager
@@ -187,8 +184,7 @@ def frozen_for_ai_videos(*, job_file: Path | None = None) -> Iterator[None]:
     job_file = StageFiles.configured(job=job_file).job
     with stage_lock:
         job = nonai_job.load_job(job_file)
-        was_running = (job is not None and not job.get("suspended")
-                       and processes.is_running(job.get("pid", 0)))
+        was_running = job is not None and not job.suspended and job.is_running()
         if was_running:
             nonai_encode.suspend_job(job, job_file, because="AI videos are upscaling first")
         try:
@@ -198,12 +194,11 @@ def frozen_for_ai_videos(*, job_file: Path | None = None) -> Iterator[None]:
                 nonai_encode.resume_job(job, job_file, because="the AI videos are done")
 
 
-def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
+def _supervise(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings, *,
                stop: bool = False, presence_managed: bool = False) -> Supervision:
-    pid = job.get("pid", 0)
-    source = Path(job.get("source", ""))
-    if pid and processes.is_running(pid):
-        on_request = bool(job.get("on_request"))
+    source = job.source
+    if job.is_running():
+        on_request = job.on_request
         if stop and not on_request:
             return Supervision(
                 stopped=nonai_encode.stop_in_flight(job, "the non-AI upscale toggle is off", files))
@@ -224,7 +219,7 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
             return Supervision(in_flight=relpath(source),
                                in_flight_percent=nonai_encode.percent_encoded(job))
         nonai_encode.terminate_ffmpeg(
-            pid, f"it exceeded the {settings.max_runtime_hours}h runtime cap")
+            job.pid, f"it exceeded the {settings.max_runtime_hours}h runtime cap")
     conclusion = _conclude(job, files, settings)
     if conclusion.unreachable_archive:
         return Supervision(in_flight=relpath(source),
@@ -233,11 +228,11 @@ def _supervise(job: dict, files: StageFiles, settings: EncodeSettings, *,
     return Supervision(promoted=conclusion.promoted, failed=conclusion.failed)
 
 
-def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclusion:
-    source = Path(job.get("source", ""))
-    tmp = Path(job.get("tmp", ""))
-    out = Path(job.get("out", ""))
-    expected = job.get("expected_duration") or 0.0
+def _conclude(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings) -> Conclusion:
+    source = job.source
+    tmp = job.tmp
+    out = job.out
+    expected = job.expected_duration
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
     finished = actual and expected and actual >= settings.complete_duration_fraction * expected
     archive = config.NONAI_RETIRED_ROOT
@@ -251,7 +246,7 @@ def _conclude(job: dict, files: StageFiles, settings: EncodeSettings) -> Conclus
         tmp.replace(out)
         carry_metadata(source, out)
         carry_funscript(source, out)
-        stamp = job.get("provenance") or nonai_encode.unrecorded_start()
+        stamp = job.provenance or nonai_encode.unrecorded_start()
         sidecar.update(sidecar.sidecar_path(out), lambda current: provenance.recorded(
             current, provenance.UPSCALE_NON_AI, stamp))
         retire_original(source, archive_root=archive)
