@@ -13,6 +13,7 @@ import config
 from util import lanes, sidecar, warm_gun, watch
 from util.json_reads import read_dict
 from util.media_files import reachable
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ _CURSOR_FIELD = "applied_through"
 
 
 @dataclass
-class WatchWeightsResult:
+class WatchWeightsResult(StageResult):
     stamped: int = 0
     favorites_added: int = 0
     favorites_removed: int = 0

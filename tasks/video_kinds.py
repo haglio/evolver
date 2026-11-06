@@ -8,6 +8,7 @@ from pathlib import Path
 import config
 from util import lanes, orientation, sidecar, video_kind
 from util.ffprobe import duration_seconds, orientation_of
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class _Measurements:
 
 
 @dataclass
-class VideoKindsResult:
+class VideoKindsResult(StageResult):
     recorded: int = 0
     already: int = 0
     skipped: int = 0

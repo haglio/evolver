@@ -10,12 +10,13 @@ from util import sidecar
 from util.library_records import TITLE_KEY as TITLE_FIELD
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
-class NonAiTitleResult:
+class NonAiTitleResult(StageResult):
     titled: int = 0
     videos: int = 0
     written: int = 0

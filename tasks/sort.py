@@ -12,12 +12,13 @@ from util import lanes, orientation, origenerator_gallery, provenance, script_li
 from util.ffprobe import orientation_of
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
 from util.sidecar import upscaled_video_path
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
-class SortResult:
+class SortResult(StageResult):
     moved: int = 0
     deleted_collisions: int = 0
     made_again: int = 0

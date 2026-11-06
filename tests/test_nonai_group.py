@@ -4,7 +4,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import evolver
 from tasks import nonai_group
 from tests.temp_helpers import LaneLibrary, override_config, workspace_temp_dir, write_sidecar
 from util import sidecar
@@ -326,9 +325,11 @@ class TestOneVideoByItsFrames(unittest.TestCase):
 
 
 class TestGroupingCannotFail(unittest.TestCase):
-    def test_the_verdict_rule_lives_in_the_table_and_nowhere_else(self):
-        assert "group_non_ai" not in evolver._STAGE_FAILED
-        assert not hasattr(nonai_group.NonAiGroupResult(), "ok")
+    def test_grouping_is_bookkeeping_that_never_fails_a_run_whatever_it_counted(self):
+        counted = nonai_group.NonAiGroupResult(grouped=3, families=2, written=2, pruned=4,
+                                               joined=1, measured=3)
+
+        assert (counted.ok, counted.needs_an_eye) == (True, False)
 
 
 if __name__ == "__main__":

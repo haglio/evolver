@@ -7,6 +7,7 @@ from pathlib import Path
 import config
 from util import lanes, script_library
 from util.media_files import is_partial_path, library_files
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
@@ -17,14 +18,14 @@ _OS_NOISE = frozenset({"desktop.ini", "thumbs.db", ".ds_store"})
 
 
 @dataclass
-class StrayFilesResult:
+class StrayFilesResult(StageResult):
     renamed: int = 0
     rehomed_scripts: int = 0
     reported: list[str] = field(default_factory=list)
 
     @property
-    def ok(self) -> bool:
-        return not self.reported
+    def needs_an_eye(self) -> bool:
+        return bool(self.reported)
 
 
 @dataclass(frozen=True)

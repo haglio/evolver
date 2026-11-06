@@ -24,6 +24,7 @@ from util.html_query import (
 )
 from util.media_files import child_dirs, library_videos
 from util.sidecar import sidecar_path, upscaled_video_path
+from util.stage_result import StageResult
 from util.versions import source_stem
 
 log = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ _CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.
 
 
 @dataclass
-class PromptScrapeResult:
+class PromptScrapeResult(StageResult):
     newly_scraped: int = 0
     already_scraped: int = 0
     skipped_failed: int = 0

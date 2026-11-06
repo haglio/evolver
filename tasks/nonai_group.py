@@ -12,6 +12,7 @@ import config
 from util import same_footage, sidecar, trash_folders
 from util.media_files import file_size, is_finalized_video_file
 from util.nonai_library import buckets
+from util.stage_result import StageResult
 from util.version_groups import group_ids
 from util.versions import is_processed_stem
 from util.video_kind import duration_of
@@ -24,7 +25,7 @@ Fingerprint = Callable[[Path, float], list[str] | None]
 
 
 @dataclass
-class NonAiGroupResult:
+class NonAiGroupResult(StageResult):
     grouped: int = 0
     families: int = 0
     written: int = 0

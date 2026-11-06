@@ -7,12 +7,13 @@ from pathlib import Path
 import config
 from util import reference_stores, video_locator
 from util.media_files import reachable
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
-class ReferenceSyncResult:
+class ReferenceSyncResult(StageResult):
     checked: int = 0
     relocated: int = 0
     unresolved: int = 0

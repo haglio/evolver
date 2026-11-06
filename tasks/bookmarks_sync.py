@@ -14,6 +14,7 @@ from app_support.file_channel import write_whole
 
 import config
 from util import sidecar
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ _BOOKMARKS_BAR_KEY = "bookmark_bar"
 
 
 @dataclass
-class BookmarksSyncResult:
+class BookmarksSyncResult(StageResult):
     synced: int = 0
     no_url: int = 0
     bad_url: int = 0

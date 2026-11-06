@@ -9,16 +9,21 @@ import config
 from util import lanes, origenerator_gallery, script_library
 from util.media_files import child_dirs, library_videos
 from util.origenerator_gallery import is_video_name, origin_stem, output_entries
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
-class TakenBackResult:
+class TakenBackResult(StageResult):
     deleted: int = 0
     deleted_metadata: int = 0
     deleted_scripts: int = 0
     failed: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return not self.failed
 
     def __add__(self, other: TakenBackResult) -> TakenBackResult:
         return TakenBackResult(

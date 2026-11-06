@@ -31,12 +31,13 @@ from util.script_library import (
     remove_empty_mark_folders,
     script_path_for_video,
 )
+from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
 
 @dataclass
-class ScriptsSyncResult:
+class ScriptsSyncResult(StageResult):
     moved: int = 0
     already_aligned: int = 0
     unmatched: int = 0
@@ -58,6 +59,10 @@ class ScriptsSyncResult:
     @property
     def ok(self) -> bool:
         return not (self.unmatched or self.ambiguous or self.collisions or self.variant_copy_errors)
+
+    @property
+    def needs_an_eye(self) -> bool:
+        return bool(self.not_checked)
 
 
 class _Duplicate(Enum):

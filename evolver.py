@@ -39,6 +39,7 @@ from tasks import (
 )
 from util import run_lock, run_log, system_resources, topaz
 from util import upscale_queue as upscale_queue_shape
+from util.stage_result import StageResult
 
 
 @dataclass
@@ -50,38 +51,10 @@ class StageRecord:
     skip_reason: str | None = None
 
 
-_STAGE_FAILED: dict[str, Callable[[object], bool]] = {
-    "metadata": lambda r: not r.ok,
-    "upscale": lambda r: bool(r.failed),
-    "upscale_non_ai": lambda r: bool(r.failed),
-    "genau_deliver": lambda r: bool(r.failed),
-    "withdrawn": lambda r: bool(r.failed),
-    "origenerator_downtime": lambda r: r.failed,
-    "verify": lambda r: not r.ok,
-    "references": lambda r: not r.ok,
-    "watch_weights": lambda r: not r.ok,
-    "bookmarks": lambda r: not r.ok,
-    "scripts": lambda r: not r.ok,
-    "dupes": lambda r: not r.ok,
-}
-
-_STAGE_WARNED: dict[str, Callable[[object], bool]] = {
-    "strays": lambda r: not r.ok,
-    "scripts": lambda r: bool(r.not_checked),
-    "references": lambda r: r.needs_an_eye,
-    "upscale": lambda r: r.deferred_low_disk,
-    "upscale_non_ai": lambda r: r.deferred_low_disk or bool(r.unreachable_archive),
-}
-
-
-def _stage_status(name: str, result: object) -> str:
-    failed = _STAGE_FAILED.get(name)
-    if failed is not None and failed(result):
+def _status_of(result: StageResult) -> str:
+    if not result.ok:
         return "error"
-    warned = _STAGE_WARNED.get(name)
-    if warned is not None and warned(result):
-        return "warning"
-    return "completed"
+    return "warning" if result.needs_an_eye else "completed"
 
 
 @dataclass
@@ -180,7 +153,7 @@ def _run_stage(stages: _Stages, name, fn, **kwargs):
     t0 = time.monotonic()
     result = fn(**kwargs)
     elapsed = time.monotonic() - t0
-    status = _stage_status(name, result)
+    status = _status_of(result)
     stages.records.append(StageRecord(name, status, elapsed, result))
     if stages.on_complete:
         stages.on_complete(name, result, elapsed, status)
