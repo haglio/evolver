@@ -5,10 +5,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support import processes
 from app_support.file_channel import write_whole
-
-from util import processes
-from util.json_reads import read_dict
+from app_support.json_store import read_json_or_empty
 
 
 class Job:
@@ -96,7 +95,7 @@ class Job:
 
 
 def load_job(path: Path) -> Job | None:
-    fields = read_dict(path)
+    fields = read_json_or_empty(path)
     return Job(fields) if fields else None
 
 
@@ -109,23 +108,23 @@ def clear_job(path: Path) -> None:
 
 
 def attempts_of(path: Path, key: str) -> int:
-    return read_dict(path).get(key, 0)
+    return read_json_or_empty(path).get(key, 0)
 
 
 def bump_attempts(path: Path, key: str) -> None:
-    attempts = read_dict(path)
+    attempts = read_json_or_empty(path)
     attempts[key] = attempts.get(key, 0) + 1
     write_whole(path, json.dumps(attempts, indent=2))
 
 
 def clear_attempts(path: Path, key: str) -> None:
-    attempts = read_dict(path)
+    attempts = read_json_or_empty(path)
     if attempts.pop(key, None) is not None:
         write_whole(path, json.dumps(attempts, indent=2))
 
 
 def last_encode_ended_at(path: Path) -> float:
-    ended_at = read_dict(path).get("ended_at", 0.0)
+    ended_at = read_json_or_empty(path).get("ended_at", 0.0)
     return ended_at if isinstance(ended_at, (int, float)) else 0.0
 
 
@@ -140,7 +139,7 @@ class Request:
 
 
 def load_request(path: Path) -> Request | None:
-    payload = read_dict(path)
+    payload = read_json_or_empty(path)
     video, held_back = payload.get("video"), payload.get("held_back")
     if not isinstance(video, str) or not video:
         return None

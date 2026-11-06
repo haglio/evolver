@@ -4,6 +4,8 @@ import unittest
 from contextlib import ExitStack, contextmanager
 from unittest.mock import patch
 
+from app_support.testing import process_alive
+
 from tasks import nonai_upscale_queue
 from tests.temp_helpers import (
     make_video,
@@ -19,7 +21,7 @@ from util import nonai_job, sidecar, upscale_queue
 @contextmanager
 def running_encode(*, alive=True, percent=50):
     with ExitStack() as stack:
-        stack.enter_context(patch("util.processes.is_running", return_value=alive))
+        stack.enter_context(process_alive(return_value=alive))
         stack.enter_context(patch("tasks.nonai_encode.percent_encoded",
                                   return_value=percent))
         yield

@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from app_support.testing import process_terminated
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 from gui import single_instance
@@ -267,7 +268,7 @@ class TestTakingOver(unittest.TestCase):
 
     def test_an_evolver_that_steps_aside_is_waited_out_and_replaced(self):
         mutex = _unique("AsideMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("AsidePipe")),              patch("util.processes.terminate") as terminate,              held_mutex(mutex) as holder:
+        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("AsidePipe")),              process_terminated() as terminate,              held_mutex(mutex) as holder:
             running = Listening(steps_aside_for=lambda launch: True)
             running.stepped_aside = _Calls(holder.let_go)
             try:
@@ -293,7 +294,7 @@ class TestTakingOver(unittest.TestCase):
         def gone():
             return bool(answered_at) and time.monotonic() - answered_at[0] >= 0.6
 
-        with patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              patch.object(gateway, "ask", side_effect=ask),              patch.object(gateway, "claim", side_effect=gone),              patch("util.processes.terminate") as terminate:
+        with patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              patch.object(gateway, "ask", side_effect=ask),              patch.object(gateway, "claim", side_effect=gone),              process_terminated() as terminate:
             outcome = gateway.take_over(single_instance.PREVIEW, end_the_unanswering=True)
 
         assert outcome == single_instance.Outcome.CLAIMED
@@ -311,7 +312,7 @@ class TestTakingOver(unittest.TestCase):
                 return True
 
             try:
-                with patch("util.processes.terminate", side_effect=terminate):
+                with process_terminated(side_effect=terminate):
                     outcome = in_the_background(
                         lambda: single_instance.InstanceGateway().take_over(
                             single_instance.PREVIEW, end_the_unanswering=True))
@@ -338,7 +339,7 @@ class TestTakingOver(unittest.TestCase):
         def gone():
             return bool(ended_at) and time.monotonic() - ended_at[0] >= 0.3
 
-        with patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              patch.object(gateway, "ask", side_effect=ask),              patch.object(gateway, "claim", side_effect=gone),              patch("util.processes.terminate", side_effect=end):
+        with patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              patch.object(gateway, "ask", side_effect=ask),              patch.object(gateway, "claim", side_effect=gone),              process_terminated(side_effect=end):
             outcome = gateway.take_over(single_instance.PREVIEW, end_the_unanswering=True)
 
         assert outcome == single_instance.Outcome.CLAIMED
@@ -348,7 +349,7 @@ class TestTakingOver(unittest.TestCase):
         with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("OldPipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 0.5),              held_mutex(mutex):
             mute = Unanswering()
             try:
-                with patch("util.processes.terminate") as terminate:
+                with process_terminated() as terminate:
                     outcome = in_the_background(
                         lambda: single_instance.InstanceGateway().take_over(
                             single_instance.USUAL, end_the_unanswering=False))

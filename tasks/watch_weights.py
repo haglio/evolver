@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.file_channel import write_whole
+from app_support.json_store import read_json_or_empty
 
 import config
 from util import lanes, sidecar, warm_gun, watch
-from util.json_reads import read_dict
 from util.media_files import reachable
 from util.stage_result import StageResult
 
@@ -67,7 +67,7 @@ def _records_brought_up_to_what_was_watched() -> WatchWeightsResult:
     result.write_errors = phone_favorites.write_errors
     result.acts_named = _apply_picked_acts(journals, videos)
     phone_counts = _phone_counts(events, videos)
-    fun_time_counts = read_dict(config.FUN_TIME_WATCH_STATS_FILE)
+    fun_time_counts = read_json_or_empty(config.FUN_TIME_WATCH_STATS_FILE)
     for video in _played_videos():
         key = _key(video)
         counts = watch.add_counts(fun_time_counts.get(key), phone_counts.get(key))
@@ -169,7 +169,7 @@ def _applied_once(
 
 
 def _cursors(cursor_file: Path) -> dict[str, int]:
-    stored = read_dict(cursor_file).get(_CURSOR_FIELD)
+    stored = read_json_or_empty(cursor_file).get(_CURSOR_FIELD)
     if isinstance(stored, dict):
         return {name: int(t) for name, t in stored.items()}
     if isinstance(stored, int | float) and not isinstance(stored, bool):

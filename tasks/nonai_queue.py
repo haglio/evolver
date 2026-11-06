@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.file_channel import write_whole
+from app_support.json_store import read_json_or_empty
 from app_support.video_names import strip_processing_suffixes
 
 import config
 from util import script_library
-from util.json_reads import read_dict
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets, stage_dirs
 from util.versions import is_processed_stem
@@ -103,7 +103,7 @@ def _processed_stems(bucket: Path) -> set[str]:
 def _watch_scores(path: Path) -> dict[str, float]:
     return {
         key: entry.get("completions", 0) + 3 * entry.get("locks", 0) - entry.get("skips", 0)
-        for key, entry in read_dict(path).items()
+        for key, entry in read_json_or_empty(path).items()
         if isinstance(entry, dict)
     }
 

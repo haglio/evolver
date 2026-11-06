@@ -4,7 +4,8 @@ import json
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+
+from app_support.testing import process_alive
 
 from tests.temp_helpers import workspace_temp_dir
 from util import nonai_job
@@ -115,17 +116,17 @@ class TestAJobsFields(unittest.TestCase):
 
 class TestWhetherAJobIsRunning(unittest.TestCase):
     def test_a_job_whose_process_is_alive_is_running(self):
-        with patch("util.processes.is_running", return_value=True) as alive:
+        with process_alive(return_value=True) as alive:
             assert _started().is_running()
 
         alive.assert_called_once_with(4242)
 
     def test_a_job_whose_process_has_ended_is_not(self):
-        with patch("util.processes.is_running", return_value=False):
+        with process_alive(return_value=False):
             assert not _started().is_running()
 
     def test_a_job_with_no_process_is_not_and_asks_nothing(self):
-        with patch("util.processes.is_running", return_value=True) as alive:
+        with process_alive(return_value=True) as alive:
             assert not nonai_job.Job({"pid": None}).is_running()
 
         alive.assert_not_called()

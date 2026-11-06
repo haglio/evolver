@@ -73,7 +73,6 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `check_correspondence.py` - integrity verification and one-time manual check
   - `util/ffprobe.py` - what ffprobe can say about a video, one process per question at most
   - `util/media_files.py` - what counts as a video here, how the tree is walked, and how a name collision is uniquified
-  - `util/json_store.py` - reading the app's small JSON files, and writing them atomically
   - `util/orientation.py` - the two shapes the library files a video under, and the third answer
   - `util/sidecar.py` - where a video's metadata JSON lives, and what the upscale stage names its output
   - `util/video_type.py` - the four kinds a video can be, which one a video is, and how long it runs
@@ -83,7 +82,6 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `util/html_query.py` - a small HTML parse-and-query library
   - `util/headless_browser.py` - driving an installed Chrome or Edge to dump a page's rendered DOM
   - `util/relative_dates.py` - turning "2d ago" into a date
-  - `util/processes.py` - liveness, identity, and termination of detached encodes
   - `backfill_app.py` - voice-driven metadata backfill tool (see below), launched from the tray
   - `backfill/vocabulary.py` - the spoken phrases, and the `video.action` each one records
   - `backfill/queue.py` - the videos still missing an action, shuffled

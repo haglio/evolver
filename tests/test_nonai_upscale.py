@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import threading
 import time
 import unittest
@@ -483,10 +482,10 @@ class TestTheJobFilesKeys(unittest.TestCase):
             tmp = (non_ai / "lagoon" / "3_good_to_go" / "processed"
                    / "busy.partial.deadbeefcafe.mp4")
             make_video(tmp)
-            cmdline = subprocess.list2cmdline(topaz.command(
-                source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orientation.LANDSCAPE)))
+            arguments = topaz.command(
+                source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orientation.LANDSCAPE))
 
-            stack, _ = probes(topaz_pids=(31337,), cmdline=cmdline, duration=581.0)
+            stack, _ = probes(topaz_pids=(31337,), arguments=arguments, duration=581.0)
             with override_config(**overrides), stack:
                 nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
@@ -557,10 +556,10 @@ class TestOrphanAdoption(unittest.TestCase):
             processed = non_ai / "lagoon" / "3_good_to_go" / "processed"
             tmp = processed / "busy.partial.deadbeefcafe.mp4"
             make_video(tmp)
-            cmdline = subprocess.list2cmdline(topaz.command(
-                source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orientation.LANDSCAPE)))
+            arguments = topaz.command(
+                source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orientation.LANDSCAPE))
 
-            stack, mocks = probes(topaz_pids=(31337,), cmdline=cmdline, duration=581.0)
+            stack, mocks = probes(topaz_pids=(31337,), arguments=arguments, duration=581.0)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
@@ -592,7 +591,8 @@ class TestOrphanAdoption(unittest.TestCase):
 
             stack, mocks = probes(
                 topaz_pids=(31337,),
-                cmdline=r'"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe" -i "D:\gui\in.mp4" "D:\gui\out.mp4"',
+                arguments=(r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe", "-i",
+                           r"D:\gui\in.mp4", r"D:\gui\out.mp4"),
             )
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
