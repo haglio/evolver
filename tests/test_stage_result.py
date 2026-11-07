@@ -21,6 +21,7 @@ from tasks.stray_files import StrayFilesResult
 from tasks.taken_back import TakenBackResult
 from tasks.upscale import UpscaleResult
 from tasks.video_kinds import VideoKindsResult
+from tasks.video_labels import VideoLabelsResult
 from tasks.watch_weights import WatchWeightsResult
 
 WENT_WELL = (True, False)
@@ -40,6 +41,7 @@ WENT_WRONG_AND_WANTS_AN_EYE = (False, True)
     pytest.param(PromptScrapeResult(newly_scraped=4), WENT_WELL, id="prompts scraped"),
     pytest.param(PromptScrapeResult(newly_scraped=1, errors=1), WENT_WRONG,
                  id="a prompt scrape that errored"),
+    pytest.param(VideoLabelsResult(copied=2, already=5), WENT_WELL, id="labels copied"),
     pytest.param(SortResult(moved=5), WENT_WELL, id="the inbox sorted"),
     pytest.param(DowntimeResult(did="trained a fix", holds_the_graphics_card=True), WENT_WELL,
                  id="origenerator's downtime work started"),
