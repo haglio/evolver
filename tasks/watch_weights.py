@@ -26,7 +26,6 @@ class WatchWeightsResult(StageResult):
     stamped: int = 0
     favorites_added: int = 0
     favorites_removed: int = 0
-    acts_named: int = 0
     unmapped: int = 0
     write_errors: int = 0
     gallery_untold: bool = False
@@ -65,7 +64,6 @@ def _records_brought_up_to_what_was_watched() -> WatchWeightsResult:
     result.favorites_added = phone_favorites.added
     result.favorites_removed = phone_favorites.removed
     result.write_errors = phone_favorites.write_errors
-    result.acts_named = _apply_picked_acts(journals, videos)
     phone_counts = _phone_counts(events, videos)
     fun_time_counts = read_json_or_empty(config.FUN_TIME_WATCH_STATS_FILE)
     for video in _played_videos():
@@ -80,9 +78,8 @@ def _records_brought_up_to_what_was_watched() -> WatchWeightsResult:
             result.stamped += 1
     log.info(
         "Watch weights: stamped %d sidecar(s); phone favorites added %d, removed %d; "
-        "%d picked act(s) written into records; %d journal line(s) named no video here.",
-        result.stamped, result.favorites_added, result.favorites_removed, result.acts_named,
-        result.unmapped,
+        "%d journal line(s) named no video here.",
+        result.stamped, result.favorites_added, result.favorites_removed, result.unmapped,
     )
     return result
 
@@ -127,22 +124,6 @@ def _apply_phone_favorites(
         log.exception("Could not mark the phone's favorites")
         return _PhoneFavorites(carried[True], carried[False], 1)
     return _PhoneFavorites(carried[True], carried[False])
-
-
-def _apply_picked_acts(
-    journals: dict[str, list[warm_gun.Event]], videos: dict[str, Path | None]
-) -> int:
-    named = []
-
-    def name_the_act(event: warm_gun.Event) -> bool:
-        video = videos[event.path]
-        if video is not None and video.exists():
-            sidecar.record_action(video, event.action)
-            named.append(video)
-        return True
-
-    _applied_once(journals, config.PICKED_ACTS_CURSOR_FILE, (warm_gun.ACT_EVENT,), name_the_act)
-    return len(named)
 
 
 def _applied_once(
