@@ -15,6 +15,7 @@ from gui.main_window import EvolverMainWindow
 from gui.run_history import RunHistory
 from gui.run_record import RunRecord
 from gui.stats_window import (
+    PLOT_LEFT,
     STAGE_COLORS,
     StackedAreaChart,
     StatsWindow,
@@ -57,6 +58,10 @@ def _render(chart, w: int = 800, h: int = 400) -> QImage:
     image.fill(0xFFFF00FF)
     chart.render(image)
     return image
+
+
+def _middle_of_the_plot(width: int = 800) -> int:
+    return (PLOT_LEFT + width - chart_right_margin()) // 2
 
 
 def _rgb(image: QImage, x: int, y: int) -> tuple[int, int, int]:
@@ -159,9 +164,10 @@ class TestStackedAreaChartPainting:
         )
         image = _render(chart)
 
-        assert _is_band_fill(_rgb(image, 380, 300), lower)
-        assert _is_band_fill(_rgb(image, 380, 230), upper)
-        assert _rgb(image, 380, 120) == _WHITE
+        middle = _middle_of_the_plot()
+        assert _is_band_fill(_rgb(image, middle, 300), lower)
+        assert _is_band_fill(_rgb(image, middle, 230), upper)
+        assert _rgb(image, middle, 120) == _WHITE
 
     def test_a_history_of_one_run_still_gets_its_axes_dated(self):
         image = _render(StackedAreaChart(RunHistory.of([_make_record({"sort": 300.0})])))
@@ -177,8 +183,9 @@ class TestStackedAreaChartPainting:
         fitted_chart = StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0}))
         fitted_chart.set_fit(True)
         fitted = _render(fitted_chart)
-        assert _rgb(historical, 380, 185) == _WHITE
-        assert _is_band_fill(_rgb(fitted, 380, 185), "sort")
+        middle = _middle_of_the_plot()
+        assert _rgb(historical, middle, 185) == _WHITE
+        assert _is_band_fill(_rgb(fitted, middle, 185), "sort")
 
     def test_averages_mode_charts_the_running_mean_not_the_raw_run(self):
         historical = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
