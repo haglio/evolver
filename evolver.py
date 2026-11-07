@@ -160,7 +160,7 @@ STAGES: tuple[Stage, ...] = (
     Stage("metadata", "Metadata Scrape",
           "Scrape AI prompt metadata into mirrored JSON files",
           (0x14, 0x7D, 0x3C), run=lambda _: prompt_scrape.run()),
-    Stage("labels", "Actions",
+    Stage("labels", "Copy Actions from Origenerator to Sidecars",
           "Copy onto each AI video's sidecar the actions Origenerator labels it with -- its image's, "
           "then its own, then the boxes checked on it -- which Fun Time filters and groups by",
           (0xEE, 0x22, 0x00), run=lambda _: video_labels.run()),
