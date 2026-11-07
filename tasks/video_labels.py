@@ -12,6 +12,7 @@ from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
 
+
 @dataclass
 class VideoLabelsResult(StageResult):
     copied: int = 0
@@ -19,12 +20,12 @@ class VideoLabelsResult(StageResult):
 
 
 def run() -> VideoLabelsResult:
-    log.info("=== Stage: copy each video's labels from Origenerator ===")
+    log.info("=== Stage: copy each video's actions from Origenerator ===")
     result = VideoLabelsResult()
     try:
         labels_of = origenerator_metadata.published_labels()
     except (FileNotFoundError, sqlite3.Error):
-        log.warning("Could not read Origenerator's gallery; the videos' labels wait for a run "
+        log.warning("Could not read Origenerator's gallery; the videos' actions wait for a run "
                     "that can.", exc_info=True)
         return result
     for clip in lanes.ai_videos():
@@ -35,6 +36,6 @@ def run() -> VideoLabelsResult:
             result.already += 1
         else:
             result.copied += 1
-    log.info("Labels: copied onto %d record(s); %d already carried them.",
+    log.info("Actions: copied onto %d sidecar(s); %d already had them.",
              result.copied, result.already)
     return result
