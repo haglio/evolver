@@ -297,6 +297,19 @@
       ],
       "code_word": null,
       "status": "kept"
+    },
+    {
+      "id": "actions_stage",
+      "thing": "the stage that copies onto each AI video's sidecar what Origenerator labels it with: its image's actions, its own, and the boxes checked on it",
+      "screen": [
+        "Actions"
+      ],
+      "his_word": null,
+      "code_today": [
+        "labels"
+      ],
+      "code_word": null,
+      "status": "unruled"
     }
   ]
 }

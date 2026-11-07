@@ -6,15 +6,16 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from util import origenerator_gallery, provenance, sidecar
+from util import lanes, origenerator_gallery, provenance, sidecar
 from util.ffprobe import video_dimensions
 from util.library_records import FRAME_OF_VIDEO_BLOCK, SOURCE_IMAGE_BLOCK
-from util.media_files import strip_uniquifier
+from util.media_files import path_key, strip_uniquifier
 
 COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
             "negative_prompt", "seed", "params_json", "output_files", "created_at")
 
 OWN_PROVENANCE = "provenance"
+PUBLISHED_LABELS = "combined_labels"
 
 MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
 _MODEL_EXT_RE = re.compile(r"\.(safetensors|ckpt|pt|pth|gguf|sft|bin)$", re.IGNORECASE)
@@ -91,8 +92,21 @@ def generation_records(db_path=None) -> Callable[[Path], dict]:
     return generation_of
 
 
+def published_labels(db_path=None) -> Callable[[lanes.AiVideo], tuple[str, ...] | None]:
+    rows = load_rows(db_path)
+    brought_in = {path_key(path): row for row in rows for path in _library_paths_of(row)}
+
+    def labels_of(clip: lanes.AiVideo) -> tuple[str, ...] | None:
+        row = (_match_video_row(clip.video, rows) if clip.source == lanes.ORIGENERATOR_SOURCE
+               else brought_in.get(path_key(clip.upscale)))
+        published = None if row is None else row.get(PUBLISHED_LABELS)
+        return None if published is None else tuple(_decoded(published, list))
+
+    return labels_of
+
+
 def load_rows(db_path) -> list[dict]:
-    return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE,),
+    return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE, PUBLISHED_LABELS),
                                      db_path=db_path)
 
 
