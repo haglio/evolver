@@ -29,7 +29,7 @@ class PublishedDocument(unittest.TestCase):
     def test_each_folder_it_names_is_the_one_this_repo_uses(self):
         document = _document()
 
-        assert {name: config.LIBRARY_ROOT / Path(value) for name, value in document["library_relative"].items()} == {"inbox_dir": config.INBOX_DIR, "upscaled_dir": config.OUT_UPSCALED_DIR}
+        assert {name: config.LIBRARY_ROOT / Path(value) for name, value in document["library_relative"].items()} == {"inbox_dir": config.INBOX_DIR, "upscaled_dir": config.OUT_UPSCALED_DIR, "trash_dir": config.TRASH_DIR}
 
     def test_a_videos_record_is_where_the_mirrored_tree_puts_it_under_the_named_folder(self):
         metadata = config.LIBRARY_ROOT / Path(_document()["library_record"]["folder"])
