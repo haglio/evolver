@@ -12,7 +12,7 @@ from app_support.json_store import read_json_or_empty
 
 import config
 from util import lanes, sidecar, warm_gun, watch
-from util.media_files import reachable
+from util.media_files import path_key, reachable
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def _records_brought_up_to_what_was_watched() -> WatchWeightsResult:
     phone_counts = _phone_counts(events, videos)
     fun_time_counts = read_json_or_empty(config.FUN_TIME_WATCH_STATS_FILE)
     for video in _played_videos():
-        key = _key(video)
+        key = path_key(video)
         counts = watch.add_counts(fun_time_counts.get(key), phone_counts.get(key))
 
         def stamp_the_watching(payload: dict, counts=counts) -> dict | None:
@@ -94,10 +94,6 @@ def _played_videos() -> Iterator[Path]:
     yield from lanes.non_ai_videos()
 
 
-def _key(video: Path) -> str:
-    return str(video).lower()
-
-
 def _phone_counts(
     events: list[warm_gun.Event], videos: dict[str, Path | None]
 ) -> dict[str, dict[str, int]]:
@@ -105,7 +101,7 @@ def _phone_counts(
     for event in events:
         video, field = videos[event.path], _COUNTED_EVENTS.get(event.event)
         if video is not None and field is not None:
-            counts[_key(video)][field] += 1
+            counts[path_key(video)][field] += 1
     return counts
 
 

@@ -124,6 +124,10 @@ def strip_uniquifier(stem: str) -> str:
     return _UNIQUIFIER_RE.sub("", stem)
 
 
+def path_key(path: str | Path) -> str:
+    return str(path).strip().lower()
+
+
 def child_dirs(root: Path):
     if not root.is_dir():
         return
