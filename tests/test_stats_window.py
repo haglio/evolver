@@ -202,7 +202,7 @@ class TestStackedAreaChartPainting:
         margin_pixels = {
             _rgb(image, x, y)
             for x in range(800 - chart_right_margin(), 800)
-            for y in range(20, 350)
+            for y in range(20, image.height())
         }
         for stage_key in ALL_STAGES:
             color = STAGE_COLORS[stage_key]
