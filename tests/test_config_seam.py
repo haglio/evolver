@@ -50,7 +50,7 @@ CONFIG_REFERENCE_CEILINGS = {
     "tasks/stray_files.py": 9,
     "tasks/upscale.py": 14,
     "tasks/video_kinds.py": 6,
-    "tasks/watch_weights.py": 5,
+    "tasks/watch_weights.py": 4,
     "tasks/taken_back.py": 7,
     "util/lanes.py": 9,
     "util/origenerator_gallery.py": 2,

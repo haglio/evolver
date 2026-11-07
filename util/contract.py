@@ -30,8 +30,7 @@ def declaration() -> dict:
         "library_record": {"folder": _under_library(config.METADATA_DIR),
                            **library_records.declaration()},
         "journals": {"fields": list(warm_gun.FIELDS),
-                     "favorite_events": list(warm_gun.FAVORITE_EVENTS),
-                     "act_event": warm_gun.ACT_EVENT, "act_field": warm_gun.ACT_FIELD},
+                     "favorite_events": list(warm_gun.FAVORITE_EVENTS)},
     }
 
 

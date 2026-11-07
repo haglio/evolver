@@ -12,7 +12,6 @@ from util.sidecar import upscaled_video_path
 JOURNAL_PATTERN = "*.jsonl"
 FIELDS = ("t", "event", "path")
 FAVORITE_EVENTS = {"favorite": True, "unfavorite": False}
-ACT_EVENT = ACT_FIELD = "action"
 PHONE_JOURNAL = "warm-gun-journal.jsonl"
 PHONES_NAME_FOR_GENAUS_FLICKS_FOLDER = "clips"
 
@@ -22,7 +21,6 @@ class Event:
     t: int
     event: str
     path: str
-    action: str = ""
 
 
 def read_journals(directories: Iterable[Path]) -> dict[str, list[Event]]:
@@ -51,8 +49,7 @@ def _event(line: str) -> Event | None:
         return None
     if not (isinstance(event, str) and event and isinstance(path, str) and path):
         return None
-    action = record.get(ACT_FIELD)
-    return Event(int(t), event, path, action if isinstance(action, str) else "")
+    return Event(int(t), event, path)
 
 
 def library_video(journal_path: str) -> Path | None:
