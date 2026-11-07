@@ -10,6 +10,7 @@ from pathlib import Path
 import config
 from util import lanes, origenerator_gallery, provenance, sidecar, video_kind
 from util.ffprobe import has_sound
+from util.library_moves import move_with_its_records
 from util.media_files import (
     child_dirs,
     library_videos,
@@ -53,15 +54,29 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
     return None
 
 
-def _deliver(upscaled: Path, delivery_dir: Path, made_again: Callable[[], set[str]]) -> Path:
+def _deliver(upscaled: Path, delivery_dir: Path, audio_dir: Path,
+             made_again: Callable[[], set[str]]) -> Path:
     delivery_dir.mkdir(parents=True, exist_ok=True)
     played = delivery_dir / upscaled.name
-    if played.exists() and origenerator_gallery.origin_stem(upscaled.stem) in made_again():
+    remade = (origenerator_gallery.the_one_version_in(delivery_dir, upscaled.name)
+              if origenerator_gallery.generation_stem(upscaled.stem) in made_again() else None)
+    if remade is not None:
+        if remade != played:
+            _rename_to_the_remakes_name(remade, played, audio_dir)
         take_its_place(upscaled, played)
         return played
     destination = unique_path(played)
     upscaled.replace(destination)
     return destination
+
+
+def _rename_to_the_remakes_name(flick: Path, played: Path, audio_dir: Path) -> None:
+    log.info("MADE AGAIN UNDER A NEW NAME (renaming the flick Genau plays): %s  ->  %s",
+             flick.name, played.name)
+    move_with_its_records(flick, played)
+    sound = audio_dir / f"{flick.stem}.mp3"
+    if sound.is_file():
+        sound.replace(audio_dir / f"{played.stem}.mp3")
 
 
 def _move_sidecar(upscaled: Path, destination: Path) -> None:
@@ -115,7 +130,7 @@ def run(
 
     for upscaled in _upscaled_genau_flicks(outbox_dir, genau_source):
         try:
-            destination = _deliver(upscaled, delivery_dir, made_again)
+            destination = _deliver(upscaled, delivery_dir, genau_audio_dir, made_again)
             _move_sidecar(upscaled, destination)
             _save_its_sound(destination, genau_audio_dir)
             _retire_source(upscaled, genau_sorted_dir)

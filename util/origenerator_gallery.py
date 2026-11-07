@@ -76,6 +76,14 @@ def generation_stem(stem: str) -> str:
     return origin_stem(stem).removesuffix(SOUND_COPY_SUFFIX).rstrip("_")
 
 
+def the_one_version_in(folder: Path, name: str) -> Path | None:
+    made_from = generation_stem(Path(name).stem)
+    versions = [video for video in folder.iterdir()
+                if video.is_file() and is_video_name(video.name)
+                and generation_stem(video.stem) == made_from] if folder.is_dir() else []
+    return versions[0] if len(versions) == 1 else None
+
+
 def output_names(row: dict) -> list[str]:
     entries = output_entries(row)
     if entries is None:
