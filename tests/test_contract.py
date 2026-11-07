@@ -101,17 +101,3 @@ class TheJournals(unittest.TestCase):
 
         assert event.event in self.journals["favorite_events"]
         assert warm_gun.library_video(event.path) == upscale
-
-    def test_a_line_naming_a_picked_act_is_one_the_stage_writes_into_the_record(self):
-        upscale = (config.OUT_UPSCALED_DIR / "portrait" / "a-source" / "clip_topaz.mp4")
-        line = {**dict(zip(self.journals["fields"],
-                           (5, self.journals["act_event"],
-                            upscale.relative_to(config.LIBRARY_ROOT).as_posix()),
-                           strict=True)),
-                self.journals["act_field"]: "Act Beta"}
-
-        with workspace_temp_dir() as root:
-            (root / "another-app.jsonl").write_text(f"{json.dumps(line)}\n", encoding="utf-8")
-            [[event]] = warm_gun.read_journals([root]).values()
-
-        assert (event.event, event.action) == (warm_gun.ACT_EVENT, "Act Beta")

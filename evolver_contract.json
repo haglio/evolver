@@ -95,8 +95,6 @@
     "favorite_events": [
       "favorite",
       "unfavorite"
-    ],
-    "act_event": "action",
-    "act_field": "action"
+    ]
   }
 }
