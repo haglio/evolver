@@ -1,7 +1,8 @@
 {
   "library_relative": {
     "inbox_dir": "videos/videos/2D/AI/0_inbox",
-    "upscaled_dir": "videos/videos/2D/AI/2_outbox/upscaled_by_orientation"
+    "upscaled_dir": "videos/videos/2D/AI/2_outbox/upscaled_by_orientation",
+    "trash_dir": "videos/videos/2D/AI/2_outbox/trash"
   },
   "partial_marker": ".partial.",
   "library_record": {
