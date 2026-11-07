@@ -302,14 +302,14 @@
       "id": "actions_stage",
       "thing": "the stage that copies onto each AI video's sidecar what Origenerator labels it with: its image's actions, its own, and the boxes checked on it",
       "screen": [
-        "Actions"
+        "Copy Actions from Origenerator to Sidecars"
       ],
-      "his_word": null,
+      "his_word": "Copy Actions from Origenerator to Sidecars (2026-11-07)",
       "code_today": [
         "labels"
       ],
-      "code_word": null,
-      "status": "unruled"
+      "code_word": "labels",
+      "status": "his_word"
     }
   ]
 }

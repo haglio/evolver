@@ -30,7 +30,7 @@ _LIMIT_SECONDS = 600.0
 _FEWEST_TICKS = 3
 _MOST_TICKS = 7
 _SECONDS_PER_MINUTE = 60
-_MARGIN_LEFT = 70
+PLOT_LEFT = 70
 _MARGIN_TOP = 20
 _MARGIN_LOWER = 50
 
@@ -230,14 +230,14 @@ class StackedAreaChart(QWidget):
         painter.end()
 
     def _plot(self) -> _Plot | None:
-        chart_w = self.width() - _MARGIN_LEFT - chart_right_margin()
+        chart_w = self.width() - PLOT_LEFT - chart_right_margin()
         chart_h = self.height() - _MARGIN_TOP - _MARGIN_LOWER
         if chart_w <= 0 or chart_h <= 0:
             return None
 
         series = self._compute_series()
         return _Plot(
-            left=_MARGIN_LEFT,
+            left=PLOT_LEFT,
             top=_MARGIN_TOP,
             width=chart_w,
             height=chart_h,
