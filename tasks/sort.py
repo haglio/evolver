@@ -10,6 +10,7 @@ from pathlib import Path
 import config
 from util import lanes, orientation, origenerator_gallery, provenance, script_library, sidecar
 from util.ffprobe import orientation_of
+from util.library_moves import move_with_its_records
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
 from util.sidecar import upscaled_video_path
 from util.stage_result import StageResult
@@ -60,8 +61,13 @@ def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> Sor
             dest.parent.mkdir(parents=True, exist_ok=True)
 
             log.info("MOVE  [%s/%s] %s", source, orient, rel)
-            if _a_remake_of(dest, src, source, made_again):
-                _take_the_remake(src, dest, upscaled_video_path(source, orient, dest.stem))
+            remade = _the_copy_it_remakes(dest, src, source, made_again)
+            if remade is not None:
+                upscale = upscaled_video_path(source, orient, dest.stem)
+                if remade != dest:
+                    _rename_to_the_remakes_name(
+                        remade, dest, upscaled_video_path(source, orient, remade.stem), upscale)
+                _take_the_remake(src, dest, upscale)
                 result.made_again += 1
                 result.moved_files.append(dest)
             elif _move_unique(src, dest):
@@ -79,11 +85,26 @@ def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> Sor
     return result
 
 
-def _a_remake_of(sorted_copy: Path, handed_over: Path, source: str,
-                 made_again: Callable[[], set[str]]) -> bool:
-    return (sorted_copy.exists() and lanes.sent_by_origenerator(source)
-            and origenerator_gallery.origin_stem(handed_over.stem) in made_again()
-            and not filecmp.cmp(handed_over, sorted_copy, shallow=False))
+def _the_copy_it_remakes(dest: Path, handed_over: Path, source: str,
+                         made_again: Callable[[], set[str]]) -> Path | None:
+    if not lanes.sent_by_origenerator(source):
+        return None
+    made_from = origenerator_gallery.generation_stem(handed_over.stem)
+    if made_from not in made_again():
+        return None
+    copies = [video for video in dest.parent.iterdir()
+              if video.is_file() and origenerator_gallery.is_video_name(video.name)
+              and origenerator_gallery.generation_stem(video.stem) == made_from]
+    if len(copies) != 1 or filecmp.cmp(handed_over, copies[0], shallow=False):
+        return None
+    return copies[0]
+
+
+def _rename_to_the_remakes_name(old_copy: Path, dest: Path, old_upscale: Path, upscale: Path) -> None:
+    log.info("MADE AGAIN UNDER A NEW NAME (renaming its copies): %s  ->  %s", old_copy, dest)
+    move_with_its_records(old_copy, dest)
+    if old_upscale.exists() and not upscale.exists():
+        move_with_its_records(old_upscale, upscale)
 
 
 def _take_the_remake(src: Path, dest: Path, upscale: Path) -> None:

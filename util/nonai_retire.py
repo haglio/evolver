@@ -6,11 +6,10 @@ from pathlib import Path
 
 import config
 from util import script_library, sidecar
+from util.library_moves import MIRRORS, move_its_records
 from util.nonai_library import bucket_of, stage_dirs
 
 log = logging.getLogger(__name__)
-
-_MIRRORS = (sidecar.sidecar_path, script_library.script_path_for_video)
 
 _FILE_SCOPED_SIDECAR_KEYS = frozenset({"version"})
 
@@ -56,29 +55,17 @@ def retire_original(source: Path, *, archive_root: Path | None) -> None:
         log.warning("Original collides with %s; leaving it at %s.", dest, source)
         return
     source.replace(dest)
-    _move_mirrored_files(source, dest)
+    move_its_records(source, dest)
     log.info("Retired original: %s -> %s", source, dest)
 
 
 def _archive_original(source: Path, archive_root: Path) -> None:
     dest = archive_root / source.relative_to(config.NON_AI_DIR)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    for mirror in _MIRRORS:
+    for mirror in MIRRORS:
         src = mirror(source)
         if src.exists():
             shutil.move(str(src), str(dest.with_suffix(src.suffix)))
     script_library.drop_mark(script_library.script_path_for_video(source))
     shutil.move(str(source), str(dest))
     log.info("Archived original: %s -> %s", source, dest)
-
-
-def _move_mirrored_files(source: Path, dest: Path) -> None:
-    for mirror in _MIRRORS:
-        src = mirror(source)
-        if not src.exists():
-            continue
-        dst = mirror(dest)
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        src.replace(dst)
-    script_library.carry_mark(script_library.script_path_for_video(source),
-                              script_library.script_path_for_video(dest))
