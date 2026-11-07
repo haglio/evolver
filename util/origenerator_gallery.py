@@ -53,7 +53,7 @@ def stems_made_again() -> set[str]:
         made = rows(("output_files",), optional=(REMADE_AT,))
     except FileNotFoundError:
         return set()
-    return video_stems(made, lambda row: row.get(REMADE_AT))
+    return {generation_stem(stem) for stem in video_stems(made, lambda row: row.get(REMADE_AT))}
 
 
 def video_stems(made: Iterable[dict], where: Callable[[dict], object]) -> set[str]:
@@ -67,6 +67,13 @@ def origin_stem(stem: str) -> str:
         if reduced == stem:
             return stem
         stem = reduced
+
+
+SOUND_COPY_SUFFIX = "-audio"
+
+
+def generation_stem(stem: str) -> str:
+    return origin_stem(stem).removesuffix(SOUND_COPY_SUFFIX).rstrip("_")
 
 
 def output_names(row: dict) -> list[str]:

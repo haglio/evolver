@@ -14,7 +14,7 @@ from tests.temp_helpers import (
     workspace_temp_dir,
     write_sidecar,
 )
-from util import lanes, provenance, sidecar, topaz
+from util import lanes, provenance, script_library, sidecar, topaz
 from util.sidecar import upscaled_video_path
 
 
@@ -134,6 +134,30 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
                 assert sorted_copy.read_bytes() == b"made again"
                 assert upscale.collect_queued_videos() == [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")]
                 assert sidecar.read(sidecar.sidecar_path(upscaled))["favorite"]
+
+    def test_made_again_under_its_new_name_takes_the_place_of_the_copy_under_the_old(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            gallery = gallery_of_videos_made_again(
+                root / "gallery.db", ["made_00001-audio.mp4", "made_00001.mp4"])
+            with lib.config(ORIGENERATOR_DB_PATH=gallery):
+                old_copy, old_upscale = self._sent_before(lib, "made_00001_.mp4")
+                old_script = script_library.script_path_for_video(old_upscale)
+                old_script.parent.mkdir(parents=True)
+                old_script.write_text("{}", encoding="utf-8")
+
+                self._sent_again(lib, "made_00001-audio.mp4", b"made again")
+
+                remake = old_copy.with_name("made_00001-audio.mp4")
+                its_upscale = upscaled_video_path(lanes.ORIGENERATOR_SOURCE, "portrait", remake.stem)
+                assert not old_copy.exists()
+                assert not old_upscale.exists()
+                assert remake.read_bytes() == b"made again"
+                assert upscale.collect_queued_videos() == [(remake, lanes.ORIGENERATOR_SOURCE, "portrait")]
+                assert sidecar.read(sidecar.sidecar_path(its_upscale))["favorite"]
+                assert not sidecar.sidecar_path(old_upscale).exists()
+                assert script_library.script_path_for_video(its_upscale).is_file()
+                assert not old_script.exists()
 
     def test_sent_again_as_it_already_is_leaves_its_upscale_alone(self):
         with workspace_temp_dir() as root:
