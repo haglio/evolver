@@ -89,15 +89,12 @@ def _the_copy_it_remakes(dest: Path, handed_over: Path, source: str,
                          made_again: Callable[[], set[str]]) -> Path | None:
     if not lanes.sent_by_origenerator(source):
         return None
-    made_from = origenerator_gallery.generation_stem(handed_over.stem)
-    if made_from not in made_again():
+    if origenerator_gallery.generation_stem(handed_over.stem) not in made_again():
         return None
-    copies = [video for video in dest.parent.iterdir()
-              if video.is_file() and origenerator_gallery.is_video_name(video.name)
-              and origenerator_gallery.generation_stem(video.stem) == made_from]
-    if len(copies) != 1 or filecmp.cmp(handed_over, copies[0], shallow=False):
+    copy = origenerator_gallery.the_one_version_in(dest.parent, dest.name)
+    if copy is None or filecmp.cmp(handed_over, copy, shallow=False):
         return None
-    return copies[0]
+    return copy
 
 
 def _rename_to_the_remakes_name(old_copy: Path, dest: Path, old_upscale: Path, upscale: Path) -> None:

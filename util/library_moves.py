@@ -15,11 +15,12 @@ def move_with_its_records(video: Path, dest: Path) -> None:
 
 def move_its_records(video: Path, dest: Path) -> None:
     for mirror in MIRRORS:
-        src = mirror(video)
-        if not src.exists():
+        try:
+            src, dst = mirror(video), mirror(dest)
+        except ValueError:
             continue
-        dst = mirror(dest)
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        src.replace(dst)
-    script_library.carry_mark(script_library.script_path_for_video(video),
-                              script_library.script_path_for_video(dest))
+        if src.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            src.replace(dst)
+            if mirror is script_library.script_path_for_video:
+                script_library.carry_mark(src, dst)

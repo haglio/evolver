@@ -223,6 +223,33 @@ class TestGenauDeliver(unittest.TestCase):
             assert (record["favorite"], record["genau"], record["video"]["seed"]) == (True, {"flipped": True}, "2")
             assert not original.exists()
 
+    def test_a_flick_made_again_under_a_new_name_takes_the_place_of_the_one_under_the_old(self):
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, flicks = _lane(root)
+            upscaled, _original = _stage_flick(outbox, sorted_dir, stem="loop_1-audio")
+            played = flicks / "2D" / "AI" / "loop_1__topaz.mp4"
+            played.parent.mkdir(parents=True)
+            played.write_text("the flick first made", encoding="utf-8")
+            its_sound = root / "audio" / "loop_1__topaz.mp3"
+            its_sound.parent.mkdir()
+            its_sound.write_text("its sound", encoding="utf-8")
+            gallery = gallery_of_videos_made_again(root / "gallery.db", ["loop_1-audio.mp4"])
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
+                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
+                                 METADATA_DIR=root / "metadata", ORIGENERATOR_DB_PATH=gallery,
+                                 GENAU_AUDIO_DIR=its_sound.parent):
+                write_sidecar(sidecar.sidecar_path(played), {"favorite": True})
+
+                genau_deliver.run()
+
+                remade = played.with_name(upscaled.name)
+                record = sidecar.read(sidecar.sidecar_path(remade))
+            assert sorted(path.name for path in played.parent.iterdir()) == [remade.name]
+            assert remade.read_text(encoding="utf-8") == "upscaled"
+            assert record["favorite"]
+            assert sorted(path.name for path in its_sound.parent.iterdir()) == ["loop_1-audio_topaz.mp3"]
+
     def test_a_flick_that_cannot_be_moved_is_left_whole_for_the_next_run(self):
         with workspace_temp_dir() as root:
             outbox, sorted_dir, flicks = _lane(root)
