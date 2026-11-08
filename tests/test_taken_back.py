@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -173,7 +174,39 @@ class TestTheEvolverLane(unittest.TestCase):
                 assert not record.exists()
         assert result.deleted_metadata == 1
 
-    def test_an_outbox_copy_that_will_not_go_keeps_its_source_beside_it(self):
+    def test_a_record_left_where_the_video_used_to_be_filed_goes_too(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            source = lanes.ORIGENERATOR_SOURCE
+            db = _gallery(root / "gallery.db", [("p1", "made_00009.mp4", "evolver_unsent_at")])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                touch_video(lib.outbox / "portrait" / source / "made_00009_topaz.mp4")
+                left_behind = _sidecar(lib, "2D", "AI", "2_outbox", "upscaled_by_orientation",
+                                       "landscape", source, "made_00009_topaz.json")
+
+                taken_back.run()
+
+                assert not left_behind.exists()
+
+    def test_the_take_back_stands_so_a_copy_that_reappears_goes_again(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            db = _gallery(root / "gallery.db", [("p1", "made_00010.mp4", "evolver_unsent_at")])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                copy = lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE / "made_00010_topaz.mp4"
+                touch_video(copy)
+                taken_back.run()
+                touch_video(copy)
+
+                again = taken_back.run()
+
+                assert not copy.exists()
+            with closing(sqlite3.connect(db)) as gallery:
+                stamps = gallery.execute("SELECT evolver_unsent_at FROM generations").fetchall()
+        assert again.deleted == 1
+        assert stamps == [("2026-01-02 03:04:05",)]
+
+    def test_an_outbox_copy_that_will_not_go_keeps_its_source_so_no_source_is_ever_left_without_its_upscale(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             source = lanes.ORIGENERATOR_SOURCE
