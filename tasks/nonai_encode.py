@@ -30,11 +30,11 @@ ASKED_FOR = "it is the video asked for now"
 class EncodeSettings:
     max_runtime_hours: float = 24
     max_attempts: int = 2
-    died_partway_if_covering_less_than: float = 0.98
+    died_partway_below: float = 0.98
     min_available_ram_gb: float = 8.0
     min_free_disk_gb: float = 250.0
     cooldown_minutes: int = 30
-    away_once_idle_past_a_reading_pause_seconds: float = 300.0
+    reading_pause_seconds: float = 300.0
 
 
 @dataclass(frozen=True)
@@ -238,4 +238,4 @@ def user_present(settings: EncodeSettings, *, idle_seconds=None) -> bool:
         idle = (idle_seconds or seconds_since_input)()
     except OSError:
         return True
-    return idle < settings.away_once_idle_past_a_reading_pause_seconds
+    return idle < settings.reading_pause_seconds

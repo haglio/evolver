@@ -301,12 +301,12 @@ class TestOneVideoByItsFrames(unittest.TestCase):
                 assert measured == [new.name]
                 assert _group(upscale) == _group(new)
 
-    def test_a_folder_of_same_length_videos_arriving_at_once_is_measured_a_few_a_run(self):
+    def test_a_folder_arriving_at_once_costs_only_a_few_videos_of_decoding_a_run(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
-            ), patch.object(nonai_group, "MEASURED_PER_RUN_THE_REST_WAITING_FOR_THE_NEXT", 3):
+            ), patch.object(nonai_group, "MEASURED_PER_RUN", 3):
                 unsorted = non_ai / "lagoon" / "0 unsorted"
                 for scene, seconds in ((1, 100.0), (2, 200.0), (3, 300.0)):
                     _scene(unsorted / f"Jane Doe - Scene {scene}.mp4", seconds)

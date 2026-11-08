@@ -210,7 +210,7 @@ class TestStartGuards(unittest.TestCase):
             self._one_candidate(overrides)
 
             stack, _mocks = probes(
-                idle_seconds=nonai_encode.EncodeSettings().away_once_idle_past_a_reading_pause_seconds + 60)
+                idle_seconds=nonai_encode.EncodeSettings().reading_pause_seconds + 60)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
@@ -570,7 +570,7 @@ class TestOrphanAdoption(unittest.TestCase):
             assert job["tmp"] == str(tmp)
             assert job["out"] == str(processed / "busy_apo8_iris2.mp4")
 
-    def test_an_adopted_encode_is_thawed_since_a_crash_may_have_left_it_frozen(self):
+    def test_an_adopted_encode_left_frozen_by_a_crash_is_thawed(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             stack, mocks = self._adopting(overrides)
@@ -1136,7 +1136,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             assert out.exists()
             assert source.exists()
 
-    def test_short_output_counts_as_failure_and_is_retried(self):
+    def test_an_output_short_of_its_source_died_partway_and_is_retried(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             source, tmp, out = write_job(root, overrides, expected=100.0)

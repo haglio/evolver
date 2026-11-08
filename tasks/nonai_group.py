@@ -20,7 +20,7 @@ from util.video_kind import duration_of
 
 log = logging.getLogger(__name__)
 
-MEASURED_PER_RUN_THE_REST_WAITING_FOR_THE_NEXT = 8
+MEASURED_PER_RUN = 8
 
 Fingerprint = Callable[[Path, float], list[str] | None]
 
@@ -38,7 +38,7 @@ class NonAiGroupResult(StageResult):
 def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupResult:
     log.info("=== Stage: group non-AI versions ===")
     result = NonAiGroupResult()
-    measure = _Allowance(fingerprint, MEASURED_PER_RUN_THE_REST_WAITING_FOR_THE_NEXT)
+    measure = _Allowance(fingerprint, MEASURED_PER_RUN)
     expected: set[Path] = set()
 
     for bucket in buckets():

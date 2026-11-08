@@ -234,7 +234,7 @@ def _conclude(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings) -
     out = job.out
     expected = job.expected_duration
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
-    finished = actual and expected and actual >= settings.died_partway_if_covering_less_than * expected
+    finished = actual and expected and actual >= settings.died_partway_below * expected
     archive = config.NONAI_RETIRED_ROOT
     if finished and archive is not None and not reachable(archive):
         log.warning("The upscale of %s is finished and waits until %s can be reached to take "
