@@ -257,5 +257,5 @@ def _chrome_timestamp() -> str:
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
-    # Chrome writes this file with indent=3, and reads it back that way.
+    # Chrome writes this file with indent=3 and bare "\n" line endings, and reads it back that way.
     write_whole(path, json.dumps(data, indent=3) + "\n", newline="\n")
