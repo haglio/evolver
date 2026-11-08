@@ -6,7 +6,7 @@ import time
 import pytest
 
 from gui.background import BackgroundQueue
-from tasks.nonai_files import stage_lock
+from tasks.nonai_files import run_poll_and_window_lock
 from tests.gui_support import QAPP
 
 
@@ -43,12 +43,12 @@ def test_work_waiting_on_the_non_ai_stage_leaves_this_thread_free(queue):
     answers = []
 
     def through_the_non_ai_stage():
-        if not stage_lock.acquire(timeout=30):
+        if not run_poll_and_window_lock.acquire(timeout=30):
             return "never let through"
-        stage_lock.release()
+        run_poll_and_window_lock.release()
         return "through"
 
-    with stage_lock:
+    with run_poll_and_window_lock:
         queue.run(through_the_non_ai_stage, then=answers.append)
         QAPP.processEvents()
         assert answers == [], "a run holds the non-AI stage for as long as starting an encode takes"
