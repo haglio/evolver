@@ -12,7 +12,7 @@ def group_key_tokens(stem: str) -> tuple[str, ...]:
     return tuple(token for token in SEPARATORS.split(base) if token)
 
 
-def _is_its_name_and_then_only_marks_added_by_hand(anchor: tuple[str, ...], stem: tuple[str, ...]) -> bool:
+def _is_name_plus_version_markers(anchor: tuple[str, ...], stem: tuple[str, ...]) -> bool:
     if len(anchor) > len(stem) or stem[: len(anchor)] != anchor:
         return False
     return all(is_version_marker(token) for token in stem[len(anchor):])
@@ -38,7 +38,7 @@ def _families_by_name(stems: list[str]) -> dict[str, str]:
         joined: str | None = None
         if toks:
             for anchor, atoks in zip(anchors, anchor_tokens, strict=True):
-                if atoks and _is_its_name_and_then_only_marks_added_by_hand(atoks, toks):
+                if atoks and _is_name_plus_version_markers(atoks, toks):
                     joined = anchor
                     break
         if joined is None:
