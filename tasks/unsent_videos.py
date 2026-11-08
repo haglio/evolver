@@ -7,7 +7,7 @@ from pathlib import Path
 
 import config
 from util import lanes, origenerator_gallery, script_library
-from util.media_files import child_dirs, library_videos
+from util.media_files import library_videos
 from util.origenerator_gallery import is_video_name, origin_stem, output_entries
 from util.stage_result import StageResult
 
@@ -99,14 +99,7 @@ def _reachable_copies(lane: lanes.SentLane, stems: set[str]) -> list[Path]:
 
 
 def _reachable_roots(lane: lanes.SentLane) -> list[Path]:
-    roots = [*_outbox_dirs(lane), config.TRASH_DIR]
-    if lane.delivered_dir is not None:
-        roots += [lane.delivered_dir, config.GENAU_TRASH_DIR]
-    return roots
-
-
-def _outbox_dirs(lane: lanes.SentLane) -> list[Path]:
-    return [orient / lane.source for orient in child_dirs(config.OUT_UPSCALED_DIR)]
+    return [*lane.upscales, lane.trash]
 
 
 def _matches(roots, stems: set[str]) -> list[Path]:

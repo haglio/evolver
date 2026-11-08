@@ -42,11 +42,10 @@ class TestPromptScrape(unittest.TestCase):
         sorted_dir, metadata_dir = self._dirs(root)
         return override_config(VIDEO_LIBRARY_DIR=root / "videos" / "videos",
                                AI_DIR=ai, SORTED_DIR=sorted_dir, METADATA_DIR=metadata_dir,
-                               OUT_UPSCALED_DIR=ai / "2_outbox" / "upscaled_by_orientation")
+                               KINO_DIR=root / "videos" / "videos" / "kino")
 
     def _mirror_path(self, metadata_dir, orient, source, stem):
-        return (metadata_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation"
-                / orient / source / f"{stem}_topaz.json")
+        return metadata_dir / "kino" / "2D" / "AI" / orient / source / f"{stem}_topaz.json"
 
     def _marker_path(self, metadata_dir, orient, source, stem):
         p = self._mirror_path(metadata_dir, orient, source, stem)
@@ -165,7 +164,7 @@ class TestPromptScrape(unittest.TestCase):
             ):
                 result = prompt_scrape.run()
                 read_as_text_to_video = upscale._is_t2v_provider(
-                    config.PROVIDER_SOURCE, "landscape", "fail", config.OUT_UPSCALED_DIR)
+                    config.PROVIDER_SOURCE, "landscape", "fail")
 
             assert result.errors == 1
             assert not read_as_text_to_video, "a failure kept in the record reads to the upscale stage as a text-to-video clip"
@@ -535,7 +534,7 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
         return override_config(
             VIDEO_LIBRARY_DIR=root / "videos" / "videos", AI_DIR=ai,
             SORTED_DIR=ai / "1_sorted", METADATA_DIR=root / "videos" / "metadata",
-            OUT_UPSCALED_DIR=ai / "2_outbox" / "upscaled_by_orientation")
+            KINO_DIR=root / "videos" / "videos" / "kino")
 
     def test_the_tree_walked_is_the_one_the_parameter_names(self):
         with workspace_temp_dir() as root:

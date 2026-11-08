@@ -3,350 +3,256 @@ from __future__ import annotations
 import dataclasses
 import os
 import unittest
+from contextlib import contextmanager
 from unittest.mock import patch
 
-from app_support.flick_folder import flat_flicks_in
-
 import check_correspondence
-from tasks import genau_deliver, upscale
+from tasks import genau_deliver, sort, upscale
 from tests.temp_helpers import (
+    LaneLibrary,
     gallery_of_videos_made_again,
-    override_config,
+    touch_video,
     workspace_temp_dir,
     write_sidecar,
 )
-from util import provenance, sidecar, video_kind
-from util.sidecar import upscaled_video_path
+from util import lanes, provenance, sidecar, topaz, video_kind
 
 GENAU_SOURCE = "example-loop-clips"
 
 
-def _lane(root):
-    outbox = root / "2_outbox" / "upscaled_by_orientation"
-    sorted_dir = root / "1_sorted"
-    flicks = root / "genau" / "flicks"
-    flat_flicks_in(flicks).mkdir(parents=True)
-    return outbox, sorted_dir, flicks
+@contextmanager
+def _genau_lane(**extra):
+    with workspace_temp_dir() as root:
+        lib = LaneLibrary(root)
+        with lib.config(genau_source=GENAU_SOURCE, ORIGENERATOR_DB_PATH=root / "no gallery.db",
+                        **extra):
+            yield lib
 
 
-def _stage_flick(outbox, sorted_dir, stem="loop_1", orient="landscape"):
-    upscaled = upscaled_video_path(GENAU_SOURCE, orient, stem, outbox)
-    upscaled.parent.mkdir(parents=True, exist_ok=True)
-    upscaled.write_text("upscaled", encoding="utf-8")
-    original = sorted_dir / GENAU_SOURCE / orient / f"{stem}.mp4"
-    original.parent.mkdir(parents=True, exist_ok=True)
-    original.write_text("original", encoding="utf-8")
-    return upscaled, original
+def _upscaled(lib: LaneLibrary, stem="loop_1", orient="landscape", contents="upscaled"):
+    original = touch_video(lib.sorted_dir / GENAU_SOURCE / orient / f"{stem}.mp4")
+    flick = lanes.upscale_of(GENAU_SOURCE, orient, stem)
+    flick.parent.mkdir(parents=True, exist_ok=True)
+    flick.write_text(contents, encoding="utf-8")
+    stamp = provenance.by_evolver(method=topaz.AI_UPSCALE_ORIGENERATOR.name,
+                                  method_version=topaz.AI_UPSCALE_ORIGENERATOR.version)
+    sidecar.update(sidecar.sidecar_path(flick),
+                   lambda record: provenance.recorded(record, provenance.UPSCALE, stamp))
+    return flick, original
 
 
-class TestGenauDeliver(unittest.TestCase):
-    def test_a_finished_flick_moves_to_genaus_folder(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            upscaled, original = _stage_flick(outbox, sorted_dir)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                result = genau_deliver.run()
+class TestFinishingAGenauUpscale(unittest.TestCase):
+    def test_the_upscale_stays_where_genau_plays_it_and_its_sorted_copy_is_retired(self):
+        with _genau_lane() as lib:
+            flick, original = _upscaled(lib)
+
+            result = genau_deliver.run()
 
             assert result.delivered == 1
-            delivered = flicks / "2D" / "AI" / "loop_1_topaz.mp4"
-            assert delivered.is_file()
-            assert delivered.read_text(encoding="utf-8") == "upscaled"
-            assert not upscaled.exists()
+            assert flick == lib.genau_flicks / "2D" / "AI" / "loop_1_topaz.mp4"
+            assert flick.read_text(encoding="utf-8") == "upscaled"
             assert not original.exists()
 
-    def test_a_delivered_flick_takes_its_sorted_copy_or_the_correspondence_check_reports_it(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _stage_flick(outbox, sorted_dir)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                genau_deliver.run()
+    def test_a_finished_flick_leaves_the_correspondence_check_satisfied(self):
+        with _genau_lane() as lib:
+            _upscaled(lib)
 
-            assert check_correspondence.run(sorted_dir=sorted_dir, outbox_dir=outbox).ok
+            genau_deliver.run()
 
-    def test_a_delivered_flick_takes_its_sorted_copy_or_the_upscale_stage_would_redo_it(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _stage_flick(outbox, sorted_dir)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                genau_deliver.run()
+            assert check_correspondence.run().ok
 
-            assert upscale.collect_queued_videos(upscale.UpscaleFolders(
-                sorted=sorted_dir, outbox=outbox, trash=root / "trash",
-                origenerator=root / "origenerator")) == []
+    def test_a_finished_flick_is_not_upscaled_again(self):
+        with _genau_lane() as lib:
+            _upscaled(lib)
 
-    def test_a_record_that_cannot_be_written_never_undoes_the_delivery(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _upscaled, original = _stage_flick(outbox, sorted_dir)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
-                                 METADATA_DIR=root / "metadata"), \
-                 patch.object(genau_deliver.sidecar, "update", side_effect=OSError("read-only")):
+            genau_deliver.run()
+
+            assert upscale.collect_queued_videos(upscale.UpscaleFolders.configured()) == []
+
+    def test_a_record_that_cannot_be_written_never_holds_the_flick_back(self):
+        with _genau_lane() as lib:
+            _flick, original = _upscaled(lib)
+            with patch.object(genau_deliver.sidecar, "update", side_effect=OSError("read-only")):
                 result = genau_deliver.run()
 
             assert (result.delivered, result.failed) == (1, 0)
-            assert (flicks / "2D" / "AI" / "loop_1_topaz.mp4").is_file()
             assert not original.exists()
 
-    def test_the_flicks_metadata_travels_with_it_and_says_what_it_is(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            upscaled, _original = _stage_flick(outbox, sorted_dir)
-            metadata = root / "metadata"
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
-                                 METADATA_DIR=metadata):
-                write_sidecar(sidecar.sidecar_path(upscaled),
-                              {"video": {"prompt": "a prompt", "seed": "1"}})
+    def test_the_flicks_record_says_what_it_is_and_keeps_what_it_held(self):
+        with _genau_lane() as lib:
+            flick, _original = _upscaled(lib)
+            sidecar.update(sidecar.sidecar_path(flick),
+                           lambda record: {**record, "video": {"prompt": "a prompt", "seed": "1"}})
 
+            genau_deliver.run()
+
+            record = sidecar.read(sidecar.sidecar_path(flick))
+            assert record["video"]["prompt"] == "a prompt"
+            assert video_kind.kind_of(record) == video_kind.GENAU_FLICK
+
+    def test_finishing_adds_nothing_to_what_made_the_flick(self):
+        with _genau_lane() as lib:
+            flick, _original = _upscaled(lib)
+            stamps = sidecar.read(sidecar.sidecar_path(flick))[provenance.BLOCK]
+
+            genau_deliver.run()
+
+            assert sidecar.read(sidecar.sidecar_path(flick))[provenance.BLOCK] == stamps
+
+    def test_a_flick_without_any_record_still_gets_one(self):
+        with _genau_lane() as lib:
+            flick, _original = _upscaled(lib)
+            sidecar.sidecar_path(flick).unlink()
+            with patch.object(upscale, "awaits_its_upscale", return_value=False):
                 genau_deliver.run()
 
-                delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
-            assert delivered["video"]["prompt"] == "a prompt"
-            assert video_kind.kind_of(delivered) == video_kind.GENAU_FLICK
-            assert not (metadata / "landscape" / GENAU_SOURCE / "loop_1_topaz.json").exists()
-
-    def test_delivery_carries_what_made_the_flick_and_adds_nothing_to_it(self):
-        stamps = {
-            provenance.GENERATION: provenance.reconstructed("origenerator", method="loop"),
-            provenance.UPSCALE: provenance.reconstructed("evolver", method="ai_upscale"),
-        }
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            upscaled, _original = _stage_flick(outbox, sorted_dir)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
-                                 METADATA_DIR=root / "metadata"):
-                write_sidecar(sidecar.sidecar_path(upscaled), {provenance.BLOCK: stamps})
-
-                genau_deliver.run()
-
-                delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
-            assert delivered[provenance.BLOCK] == stamps
-
-    def test_a_flick_delivered_without_any_metadata_still_gets_a_record(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _stage_flick(outbox, sorted_dir)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
-                                 METADATA_DIR=root / "metadata"):
-                genau_deliver.run()
-
-                delivered = sidecar.read(sidecar.sidecar_path(flicks / "2D" / "AI" / "loop_1_topaz.mp4"))
-            assert video_kind.kind_of(delivered) == video_kind.GENAU_FLICK
+            assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(flick))) == video_kind.GENAU_FLICK
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _stage_flick(outbox, sorted_dir)
-            audio = root / "genau" / "audio"
-            saved = []
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_AUDIO_DIR=audio,
-                                 GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
-                 patch("tasks.genau_deliver.has_sound", return_value=True), \
-                 patch("tasks.genau_deliver.save_as_mp3",
-                       side_effect=lambda video, mp3: saved.append((video, mp3))):
-                genau_deliver.run()
+        saved = []
+        with _genau_lane() as lib, \
+             patch("tasks.genau_deliver.has_sound", return_value=True), \
+             patch("tasks.genau_deliver.save_as_mp3",
+                   side_effect=lambda video, mp3: saved.append((video, mp3))):
+            flick, _original = _upscaled(lib)
 
-            assert saved == [(flicks / "2D" / "AI" / "loop_1_topaz.mp4", audio / "loop_1_topaz.mp3")]
+            genau_deliver.run()
+
+            assert saved == [(flick, lib.genau_audio / "loop_1_topaz.mp3")]
 
     def test_a_silent_loop_leaves_no_sound_behind(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _stage_flick(outbox, sorted_dir)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_AUDIO_DIR=root / "audio",
-                                 GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
-                 patch("tasks.genau_deliver.has_sound", return_value=False), \
-                 patch("tasks.genau_deliver.save_as_mp3") as save:
-                result = genau_deliver.run()
+        with _genau_lane() as lib, \
+             patch("tasks.genau_deliver.has_sound", return_value=False), \
+             patch("tasks.genau_deliver.save_as_mp3") as save:
+            _upscaled(lib)
+
+            result = genau_deliver.run()
 
             assert result.delivered == 1
             save.assert_not_called()
 
-    def test_a_sound_that_cannot_be_saved_leaves_the_loop_delivered(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _upscaled, original = _stage_flick(outbox, sorted_dir)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_AUDIO_DIR=root / "audio",
-                                 GENAU_SOURCE=GENAU_SOURCE, METADATA_DIR=root / "metadata"), \
-                 patch("tasks.genau_deliver.has_sound", return_value=True), \
-                 patch("tasks.genau_deliver.save_as_mp3", side_effect=OSError("disk full")), \
-                 self.assertLogs("tasks.genau_deliver", level="WARNING"):
-                result = genau_deliver.run()
+    def test_a_sound_that_cannot_be_saved_leaves_the_loop_finished(self):
+        with _genau_lane() as lib, \
+             patch("tasks.genau_deliver.has_sound", return_value=True), \
+             patch("tasks.genau_deliver.save_as_mp3", side_effect=OSError("disk full")), \
+             self.assertLogs("tasks.genau_deliver", level="WARNING"):
+            flick, original = _upscaled(lib)
+
+            result = genau_deliver.run()
 
             assert (result.delivered, result.failed) == (1, 0)
-            assert (flicks / "2D" / "AI" / "loop_1_topaz.mp4").is_file()
+            assert flick.is_file()
             assert not original.exists()
 
-    def test_only_the_genau_source_is_delivered(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _stage_flick(outbox, sorted_dir)
-            other = outbox / "landscape" / "origenerator" / "video_1_topaz.mp4"
-            other.parent.mkdir(parents=True, exist_ok=True)
-            other.write_text("a library video", encoding="utf-8")
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                result = genau_deliver.run()
+    def test_kinos_upscales_are_left_as_they_are(self):
+        with _genau_lane() as lib:
+            _upscaled(lib)
+            kino_original = touch_video(lib.sorted_dir / "origenerator" / "landscape" / "video_1.mp4")
+            kino = touch_video(lanes.upscale_of("origenerator", "landscape", "video_1"))
+
+            result = genau_deliver.run()
 
             assert result.delivered == 1
-            assert other.is_file()
-            assert not (flicks / "2D" / "AI" / "video_1_topaz.mp4").exists()
+            assert kino.is_file()
+            assert kino_original.is_file()
 
-    def test_flicks_are_found_under_every_orientation(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _stage_flick(outbox, sorted_dir, stem="wide", orient="landscape")
-            _stage_flick(outbox, sorted_dir, stem="tall", orient="portrait")
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                result = genau_deliver.run()
+    def test_flicks_sorted_under_either_orientation_are_finished(self):
+        with _genau_lane() as lib:
+            _wide, wide_original = _upscaled(lib, stem="wide", orient="landscape")
+            _tall, tall_original = _upscaled(lib, stem="tall", orient="portrait")
+
+            result = genau_deliver.run()
 
             assert result.delivered == 2
-            assert (flicks / "2D" / "AI" / "wide_topaz.mp4").is_file()
-            assert (flicks / "2D" / "AI" / "tall_topaz.mp4").is_file()
+            assert not wide_original.exists()
+            assert not tall_original.exists()
 
-    def test_a_name_already_in_genaus_folder_is_not_overwritten(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            _stage_flick(outbox, sorted_dir)
-            (flicks / "2D" / "AI").mkdir(parents=True)
-            existing = flicks / "2D" / "AI" / "loop_1_topaz.mp4"
-            existing.write_text("a flick already being played", encoding="utf-8")
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                genau_deliver.run()
+    def test_a_flick_still_waiting_for_its_upscale_keeps_its_sorted_copy(self):
+        with _genau_lane() as lib:
+            flick, original = _upscaled(lib)
+            sidecar.update(sidecar.sidecar_path(flick), lambda record: provenance.recorded(
+                record, provenance.UPSCALE, provenance.reconstructed(None)))
 
-            assert existing.read_text(encoding="utf-8") == "a flick already being played"
-            assert (flicks / "2D" / "AI" / "loop_1_topaz (2).mp4").is_file()
+            result = genau_deliver.run()
 
-    def test_a_flick_origenerator_made_again_takes_the_place_of_the_one_genau_plays(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            upscaled, original = _stage_flick(outbox, sorted_dir)
-            played = flicks / "2D" / "AI" / "loop_1_topaz.mp4"
-            played.parent.mkdir(parents=True)
-            played.write_text("the flick first made", encoding="utf-8")
-            os.utime(played, (1_700_000_000, 1_700_000_000))
-            gallery = gallery_of_videos_made_again(root / "gallery.db", ["loop_1.mp4"])
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
-                                 METADATA_DIR=root / "metadata", ORIGENERATOR_DB_PATH=gallery):
-                write_sidecar(sidecar.sidecar_path(played),
-                              {"favorite": True, "genau": {"flipped": True}})
-                write_sidecar(sidecar.sidecar_path(upscaled), {"video": {"seed": "2"}})
+            assert result.delivered == 0
+            assert original.is_file()
 
-                result = genau_deliver.run()
+    def test_a_sorted_copy_that_cannot_be_retired_is_left_for_the_next_run(self):
+        with _genau_lane() as lib:
+            flick, original = _upscaled(lib)
 
-                record = sidecar.read(sidecar.sidecar_path(played))
-            assert result.delivered == 1
-            assert sorted(path.name for path in played.parent.iterdir()) == [played.name]
-            assert played.read_text(encoding="utf-8") == "upscaled"
-            assert played.stat().st_mtime == 1700000001
-            assert (record["favorite"], record["genau"], record["video"]["seed"]) == (True, {"flipped": True}, "2")
-            assert not original.exists()
-
-    def test_a_flick_made_again_under_a_new_name_takes_the_place_of_the_one_under_the_old(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            upscaled, _original = _stage_flick(outbox, sorted_dir, stem="loop_1-audio")
-            played = flicks / "2D" / "AI" / "loop_1__topaz.mp4"
-            played.parent.mkdir(parents=True)
-            played.write_text("the flick first made", encoding="utf-8")
-            its_sound = root / "audio" / "loop_1__topaz.mp3"
-            its_sound.parent.mkdir()
-            its_sound.write_text("its sound", encoding="utf-8")
-            gallery = gallery_of_videos_made_again(root / "gallery.db", ["loop_1-audio.mp4"])
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
-                                 METADATA_DIR=root / "metadata", ORIGENERATOR_DB_PATH=gallery,
-                                 GENAU_AUDIO_DIR=its_sound.parent):
-                write_sidecar(sidecar.sidecar_path(played), {"favorite": True})
-
-                genau_deliver.run()
-
-                remade = played.with_name(upscaled.name)
-                record = sidecar.read(sidecar.sidecar_path(remade))
-            assert sorted(path.name for path in played.parent.iterdir()) == [remade.name]
-            assert remade.read_text(encoding="utf-8") == "upscaled"
-            assert record["favorite"]
-            assert sorted(path.name for path in its_sound.parent.iterdir()) == ["loop_1-audio_topaz.mp3"]
-
-    def test_a_flick_that_cannot_be_moved_is_left_whole_for_the_next_run(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            upscaled, original = _stage_flick(outbox, sorted_dir)
-
-            def _locked(self, target):
+            def _locked(self, missing_ok=False):
                 raise OSError("the file is in use")
 
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"), \
-                 patch.object(type(upscaled), "replace", _locked):
-                # CPython's patch.object deletes what it set: a hand-rolled save and restore of
-                # `replace`, inherited by the concrete Path class, leaves an own attribute there
-                # that silently disarms any later patch("pathlib.Path.replace").
+            with patch.object(type(original), "unlink", _locked):
                 result = genau_deliver.run()
 
             assert (result.delivered, result.failed) == (0, 1)
-            assert upscaled.is_file()
+            assert flick.is_file()
             assert original.is_file()
 
     def test_an_empty_lane_is_a_no_op(self):
-        with workspace_temp_dir() as root:
-            outbox, sorted_dir, flicks = _lane(root)
-            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
-                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                                 METADATA_DIR=root / "metadata"):
-                result = genau_deliver.run()
+        with _genau_lane():
+            result = genau_deliver.run()
 
             assert (result.delivered, result.failed) == (0, 0)
-            assert not (flicks / "2D" / "AI").exists()
 
-    def test_the_lane_runs_between_the_four_places_it_is_given(self):
+
+class TestAFlickMadeAgain(unittest.TestCase):
+    def _remade(self, lib: LaneLibrary, handed_over: str) -> None:
+        touch_video(lib.inbox / GENAU_SOURCE / handed_over).write_text("remade", encoding="utf-8")
+
+        def encode(_in_file, tmp, _env, _settings=None, **kwargs):
+            tmp.write_text("upscaled again", encoding="utf-8")
+            return True
+
+        with patch("tasks.sort.orientation_of", return_value="landscape"), \
+             patch("tasks.upscale._run_ffmpeg", side_effect=encode), \
+             patch("tasks.upscale.ffprobe.frame_rate", return_value=None), \
+             patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+            sort.run()
+            upscale.run(max_items=5, low_disk=upscale.LowDiskWarning.configured(floor_gb=1))
+            genau_deliver.run()
+
+    def test_it_takes_the_place_of_the_one_genau_plays_and_keeps_its_record(self):
         with workspace_temp_dir() as root:
-            given_outbox, given_sorted, given_flicks = _lane(root / "given")
-            _stage_flick(given_outbox, given_sorted, stem="loop_given")
+            gallery = gallery_of_videos_made_again(root / "gallery.db", ["loop_1.mp4"])
+            lib = LaneLibrary(root)
+            with lib.config(genau_source=GENAU_SOURCE, ORIGENERATOR_DB_PATH=gallery):
+                played = lanes.upscale_of(GENAU_SOURCE, "landscape", "loop_1")
+                touch_video(played).write_text("the flick first made", encoding="utf-8")
+                os.utime(played, (1_700_000_000, 1_700_000_000))
+                write_sidecar(sidecar.sidecar_path(played), {"favorite": True, "genau": {"flipped": True}})
 
-            ambient_outbox, ambient_sorted, ambient_flicks = _lane(root / "ambient")
-            _stage_flick(ambient_outbox, ambient_sorted, stem="loop_ambient")
+                self._remade(lib, "loop_1.mp4")
 
-            with override_config(
-                OUT_UPSCALED_DIR=ambient_outbox, SORTED_DIR=ambient_sorted,
-                GENAU_DIR=ambient_flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
-                METADATA_DIR=root / "metadata",
-            ):
-                result = genau_deliver.run(
-                    outbox_dir=given_outbox,
-                    sorted_dir=given_sorted,
-                    genau_source=GENAU_SOURCE,
-                    delivery_dir=given_flicks / "2D" / "AI",
-                )
+                record = sidecar.read(sidecar.sidecar_path(played))
+            assert sorted(path.name for path in played.parent.iterdir()) == [played.name]
+            assert played.read_text(encoding="utf-8") == "upscaled again"
+            assert played.stat().st_mtime == 1700000001
+            assert (record["favorite"], record["genau"]) == (True, {"flipped": True})
+            assert not list((lib.sorted_dir / GENAU_SOURCE).rglob("*.mp4"))
 
-            assert result.delivered == 1
-            assert (given_flicks / "2D" / "AI" / "loop_given_topaz.mp4").is_file()
-            assert not (ambient_flicks / "2D" / "AI").exists()
-            assert (ambient_outbox / "landscape" / GENAU_SOURCE / "loop_ambient_topaz.mp4").is_file()
+    def test_under_a_new_name_it_takes_the_place_of_the_one_under_the_old(self):
+        with workspace_temp_dir() as root:
+            gallery = gallery_of_videos_made_again(root / "gallery.db", ["loop_1-audio.mp4"])
+            lib = LaneLibrary(root)
+            with lib.config(genau_source=GENAU_SOURCE, ORIGENERATOR_DB_PATH=gallery):
+                played = lib.genau_flicks / "2D" / "AI" / "loop_1__topaz.mp4"
+                touch_video(played).write_text("the flick first made", encoding="utf-8")
+                its_sound = touch_video(lib.genau_audio / "loop_1__topaz.mp3")
+                write_sidecar(sidecar.sidecar_path(played), {"favorite": True})
+
+                self._remade(lib, "loop_1-audio.mp4")
+
+                remade = played.with_name("loop_1-audio_topaz.mp4")
+                record = sidecar.read(sidecar.sidecar_path(remade))
+            assert sorted(path.name for path in played.parent.iterdir()) == [remade.name]
+            assert remade.read_text(encoding="utf-8") == "upscaled again"
+            assert record["favorite"]
+            assert sorted(path.name for path in its_sound.parent.iterdir()) == ["loop_1-audio_topaz.mp3"]
+
 
 class TestGenauDeliverResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):

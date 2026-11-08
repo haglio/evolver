@@ -69,9 +69,10 @@ class LaneLibrary:
         self.ai = self.library / "2D" / "AI"
         self.inbox = self.ai / "0_inbox"
         self.sorted_dir = self.ai / "1_sorted"
-        self.outbox = self.ai / "2_outbox" / "upscaled_by_orientation"
+        self.kino = self.library / "kino"
+        self.kino_upscales = self.kino / "2D" / "AI"
         self.non_ai = self.library / "2D" / "non_AI"
-        self.trash = self.ai / "2_outbox" / "trash"
+        self.trash = self.kino / "trash"
         self.genau = self.library / "genau"
         self.genau_flicks = self.genau / "flicks"
         self.genau_trash = self.genau / "trash"
@@ -90,8 +91,7 @@ class LaneLibrary:
             "SCRIPT_LIBRARY_DIR": self.scripts, "UNMATCHED_SCRIPTS_DIR": self.unmatched,
             "GENERATED_SCRIPTS_DIR": self.generated,
             "SORTED_DIR": self.sorted_dir,
-            "OUT_UPSCALED_DIR": self.outbox, "NON_AI_DIR": self.non_ai,
-            "TRASH_DIR": self.trash,
+            "KINO_DIR": self.kino, "NON_AI_DIR": self.non_ai,
             "GENAU_DIR": self.genau, "GENAU_SOURCE": genau_source,
             "ORIGENERATOR_VIDEOS_DIR": self.origenerator,
             "GENAU_TRASH_DIR": self.genau_trash, "GENAU_AUDIO_DIR": self.genau_audio,

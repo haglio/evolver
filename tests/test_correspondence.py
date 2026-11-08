@@ -1,15 +1,39 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 import check_correspondence
-from tests.temp_helpers import override_config, workspace_temp_dir
+from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
+from util import lanes, sidecar
+
+GENAU_SOURCE = "example-loop-clips"
 
 
-class TestSortedToOutboxName:
+@contextmanager
+def _library():
+    with workspace_temp_dir() as root:
+        lib = LaneLibrary(root)
+        with lib.config(genau_source=GENAU_SOURCE, LIBRARY_ROOT=root):
+            yield lib
+
+
+def _sorted(lib: LaneLibrary, source: str, orient: str, name: str) -> Path:
+    return touch_video(lib.sorted_dir / source / orient / name)
+
+
+def _kino(lib: LaneLibrary, source: str, orient: str, name: str) -> Path:
+    return touch_video(lib.kino_upscales / orient / source / name)
+
+
+def _flick(lib: LaneLibrary, name: str) -> Path:
+    return touch_video(lib.genau_flicks / "2D" / "AI" / name)
+
+
+class TestTheUpscalesName:
     @pytest.mark.parametrize(
         ("sorted_file", "expected"),
         [
@@ -19,181 +43,159 @@ class TestSortedToOutboxName:
         ],
     )
     def test_appends_topaz_before_extension(self, sorted_file, expected):
-        assert check_correspondence.sorted_to_outbox_name(sorted_file) == expected
+        assert check_correspondence.upscale_name(sorted_file) == expected
 
 
 class TestCorrespondenceResult:
-    def test_ok_requires_matching_counts_and_no_orphans(self):
-        result = check_correspondence.CorrespondenceResult(sorted_count=5, outbox_count=5)
-        assert result.ok
+    def test_ok_with_nothing_unmatched(self):
+        assert check_correspondence.CorrespondenceResult(sorted_count=5, upscale_count=7).ok
 
-    def test_not_ok_on_count_mismatch(self):
-        result = check_correspondence.CorrespondenceResult(sorted_count=5, outbox_count=3)
-        assert not result.ok
-
-    def test_not_ok_on_orphan_outbox(self):
+    def test_not_ok_on_an_upscale_without_its_sorted_video(self):
         result = check_correspondence.CorrespondenceResult(
-            sorted_count=1, outbox_count=1, orphan_outbox=["stray.mp4"],
-        )
+            sorted_count=1, upscale_count=1, orphan_upscales=["stray.mp4"])
         assert not result.ok
 
     def test_not_ok_on_duplicates(self):
         result = check_correspondence.CorrespondenceResult(
-            sorted_count=2, outbox_count=2, duplicates={"clip_topaz.mp4": ["a", "b"]},
-        )
+            sorted_count=2, upscale_count=2, duplicates={"clip_topaz.mp4": ["a", "b"]})
+        assert not result.ok
+
+    def test_not_ok_on_a_missing_flick(self):
+        result = check_correspondence.CorrespondenceResult(
+            sorted_count=0, upscale_count=0, missing_flicks=["loop_topaz.mp4"])
         assert not result.ok
 
 
-class TestCorrespondence:
-    def test_run_accepts_outbox_names_as_sorted_plus_topaz(self):
-        with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            outbox_dir = root / "outbox"
+class TestTheKinoLane:
+    def test_each_sorted_video_has_its_upscale_in_kinos_folder(self):
+        with _library() as lib:
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            _sorted(lib, "sourceB", "portrait", "clip-b_apo8_gcg5.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-a_topaz.mp4")
+            _kino(lib, "sourceB", "portrait", "clip-b_apo8_gcg5_topaz.mp4")
 
-            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
-            (sorted_dir / "sourceB" / "portrait").mkdir(parents=True)
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA").mkdir(parents=True)
-            (outbox_dir / "upscaled_by_orientation" / "portrait" / "sourceB").mkdir(parents=True)
-
-            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"a")
-            (sorted_dir / "sourceB" / "portrait" / "clip-b_apo8_gcg5.mp4").write_bytes(b"b")
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-a_topaz.mp4").write_bytes(b"a")
-            (outbox_dir / "upscaled_by_orientation" / "portrait" / "sourceB" / "clip-b_apo8_gcg5_topaz.mp4").write_bytes(b"b")
-
-            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
-                result = check_correspondence.run(show_popup=False)
+            result = check_correspondence.run(show_popup=False)
 
             assert result.ok
-            assert result.sorted_count == 2
-            assert result.outbox_count == 2
+            assert (result.sorted_count, result.upscale_count) == (2, 2)
 
-    def test_run_reports_mismatches_and_can_show_popup(self):
-        with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            outbox_dir = root / "outbox"
+    def test_an_upscale_missing_from_kinos_folder_is_reported_and_can_show_the_popup(self):
+        with _library() as lib, patch("check_correspondence.show_error") as show_error:
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-b_topaz.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-b_topaz_cfr.mp4")
 
-            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA").mkdir(parents=True)
-
-            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"a")
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-b_topaz.mp4").write_bytes(b"b")
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-b_topaz_cfr.mp4").write_bytes(b"c")
-
-            with (
-                override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir),
-                patch("check_correspondence.show_error") as show_error,
-            ):
-                result = check_correspondence.run(show_popup=True)
+            result = check_correspondence.run(show_popup=True)
 
             assert not result.ok
-            assert result.sorted_count == 1
-            assert result.outbox_count == 2
-            assert len(result.orphan_outbox) == 2
-            assert len(result.orphan_sorted) == 1
-            assert result.duplicates == {}
+            assert len(result.orphan_upscales) == 2
+            assert result.orphan_sorted == [str(Path("sourceA") / "landscape" / "clip-a.mp4")]
             show_error.assert_called_once()
 
-    def test_run_detects_two_outbox_files_sharing_a_basename(self):
-        with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            outbox_dir = root / "outbox"
+    def test_an_upscale_in_kinos_trash_still_counts_as_made(self):
+        with _library() as lib:
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            touch_video(lib.trash / "clip-a_topaz.mp4")
 
+            assert check_correspondence.run().ok
+
+    def test_two_upscales_sharing_a_name_are_reported(self):
+        with _library() as lib:
             for orient in ("landscape", "portrait"):
-                (sorted_dir / "sourceA" / orient).mkdir(parents=True)
-                (outbox_dir / "upscaled_by_orientation" / orient / "sourceA").mkdir(parents=True)
-                (sorted_dir / "sourceA" / orient / "clip-a.mp4").write_bytes(b"a")
-                (outbox_dir / "upscaled_by_orientation" / orient / "sourceA" / "clip-a_topaz.mp4").write_bytes(b"a")
+                _sorted(lib, "sourceA", orient, "clip-a.mp4")
+                _kino(lib, "sourceA", orient, "clip-a_topaz.mp4")
 
-            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
-                result = check_correspondence.run(show_popup=False)
+            result = check_correspondence.run(show_popup=False)
 
             assert not result.ok
-            assert list(result.duplicates) == ["clip-a_topaz.mp4"]
             paths = result.duplicates["clip-a_topaz.mp4"]
-            assert len(paths) == 2
             assert any("landscape" in p for p in paths)
             assert any("portrait" in p for p in paths)
-            assert result.orphan_outbox == []
-            assert result.orphan_sorted == []
+            assert (result.orphan_upscales, result.orphan_sorted) == ([], [])
 
-    def test_run_ignores_partial_outbox_files(self):
-        with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            outbox_dir = root / "outbox"
+    def test_a_partial_upscale_is_not_counted(self):
+        with _library() as lib:
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-a_topaz.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-a.partial.deadbeef.mp4")
 
-            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA").mkdir(parents=True)
-
-            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"a")
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-a_topaz.mp4").write_bytes(b"a")
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-a.partial.deadbeef.mp4").write_bytes(b"partial")
-
-            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
-                result = check_correspondence.run(show_popup=False)
+            result = check_correspondence.run(show_popup=False)
 
             assert result.ok
-            assert result.sorted_count == 1
-            assert result.outbox_count == 1
+            assert result.upscale_count == 1
 
-    def test_run_checks_the_two_trees_it_is_given(self):
-        with workspace_temp_dir() as root:
-            given_sorted = root / "given" / "sorted"
-            given_outbox = root / "given" / "outbox"
-            (given_sorted / "examplesource" / "landscape").mkdir(parents=True)
-            (given_outbox / "landscape").mkdir(parents=True)
-            (given_sorted / "examplesource" / "landscape" / "clip one.mp4").write_bytes(b"a")
-            (given_outbox / "landscape" / "clip one_topaz.mp4").write_bytes(b"a")
 
-            ambient_sorted = root / "ambient" / "sorted"
-            ambient_outbox = root / "ambient" / "outbox"
-            (ambient_sorted / "examplesource").mkdir(parents=True)
-            ambient_outbox.mkdir(parents=True)
-            (ambient_sorted / "examplesource" / "orphan.mp4").write_bytes(b"a")
+class TestTheGenauLane:
+    def test_a_flick_whose_sorted_copy_was_retired_is_no_orphan(self):
+        with _library() as lib:
+            _flick(lib, "loop_1_topaz.mp4")
 
-            with override_config(SORTED_DIR=ambient_sorted, OUTBOX_DIR=ambient_outbox):
-                result = check_correspondence.run(
-                    show_popup=False, sorted_dir=given_sorted, outbox_dir=given_outbox,
-                )
+            assert check_correspondence.run().ok
 
-            assert result.ok
-            assert result.sorted_count == 1
-            assert result.outbox_count == 1
+    def test_a_sorted_flicks_upscale_counts_only_where_genau_plays_it(self):
+        with _library() as lib:
+            _sorted(lib, GENAU_SOURCE, "landscape", "loop_1.mp4")
+            _kino(lib, GENAU_SOURCE, "landscape", "loop_1_topaz.mp4")
+
+            result = check_correspondence.run()
+
+            assert result.orphan_sorted == [str(Path(GENAU_SOURCE) / "landscape" / "loop_1.mp4")]
+            assert result.orphan_upscales == [
+                str(Path("videos") / "videos" / "kino" / "2D" / "AI" / "landscape" / GENAU_SOURCE / "loop_1_topaz.mp4")]
+
+    def test_a_flick_gone_from_genaus_folder_is_reported_by_the_record_it_left(self):
+        with _library() as lib:
+            flick = _flick(lib, "loop_1_topaz.mp4")
+            write_sidecar(sidecar.sidecar_path(flick), {"video": {"seed": "1"}})
+            flick.unlink()
+
+            result = check_correspondence.run()
+
+            assert not result.ok
+            assert result.missing_flicks == [
+                str(Path("videos") / "videos" / "genau" / "flicks" / "2D" / "AI" / "loop_1_topaz.mp4")]
+
+    def test_a_flick_sent_to_genaus_trash_is_not_missing(self):
+        with _library() as lib:
+            flick = _flick(lib, "loop_1_topaz.mp4")
+            write_sidecar(sidecar.sidecar_path(flick), {"video": {"seed": "1"}})
+            flick.replace(touch_video(lanes.in_trash(flick)))
+
+            assert check_correspondence.run().ok
+
+    def test_a_record_written_before_its_flick_was_upscaled_is_not_missing(self):
+        with _library() as lib:
+            _sorted(lib, GENAU_SOURCE, "landscape", "loop_1.mp4")
+            write_sidecar(sidecar.sidecar_path(lanes.upscale_of(GENAU_SOURCE, "landscape", "loop_1")),
+                          {"video": {"seed": "1"}})
+
+            result = check_correspondence.run()
+
+            assert result.missing_flicks == []
 
 
 class TestTheExitCodeAShellOrScheduledTaskReads:
     def test_a_clean_tree_reports_ok_and_exits_zero(self, capsys):
-        with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            outbox_dir = root / "outbox"
-            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA").mkdir(parents=True)
-            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"a")
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-a_topaz.mp4").write_bytes(b"a")
+        with _library() as lib:
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-a_topaz.mp4")
 
-            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
-                exit_code = check_correspondence.main()
+            exit_code = check_correspondence.main()
 
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "[OK] Counts match: 1 files each" in out
-        assert "perfect 1-to-1 correspondence" in out
+        assert "[OK]" in out
 
-    def test_a_mismatched_tree_names_the_orphans_and_exits_one(self, capsys):
-        with workspace_temp_dir() as root:
-            sorted_dir = root / "sorted"
-            outbox_dir = root / "outbox"
-            (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA").mkdir(parents=True)
-            (sorted_dir / "sourceA" / "landscape" / "clip-a.mp4").write_bytes(b"a")
-            (outbox_dir / "upscaled_by_orientation" / "landscape" / "sourceA" / "clip-b_topaz.mp4").write_bytes(b"b")
+    def test_a_mismatched_tree_names_the_unmatched_and_exits_one(self, capsys):
+        with _library() as lib:
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-b_topaz.mp4")
 
-            with override_config(SORTED_DIR=sorted_dir, OUTBOX_DIR=outbox_dir):
-                exit_code = check_correspondence.main()
+            exit_code = check_correspondence.main()
 
         out = capsys.readouterr().out
         assert exit_code == 1
-        assert "[MISMATCH]" not in out
-        assert "[ORPHAN-OUTBOX]" in out
+        assert "Upscales without their 1_sorted video: 1" in out
         assert "clip-b_topaz.mp4" in out
-        assert "[ORPHAN-SORTED]" in out
+        assert "1_sorted videos without their upscale: 1" in out
         assert "[FAIL]" in out

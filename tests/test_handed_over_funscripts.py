@@ -12,7 +12,6 @@ from tests.temp_helpers import (
     workspace_temp_dir,
 )
 from util import lanes, script_library
-from util.sidecar import upscaled_video_path
 
 
 def _where_fun_time_looks(video: Path, tree: str, suffix: str) -> Path:
@@ -34,7 +33,7 @@ class TestAFunscriptHandedOverWithItsClip(unittest.TestCase):
                 stray_files.run()
                 with patch("tasks.sort.orientation_of", return_value="portrait"):
                     sort.run()
-                upscale = touch_video(upscaled_video_path(
+                upscale = touch_video(lanes.upscale_of(
                     lanes.ORIGENERATOR_SOURCE, "portrait", "made_00001"))
                 scripts_sync.run()
 
@@ -51,7 +50,7 @@ class TestAFunscriptHandedOverWithItsClip(unittest.TestCase):
                             NONAI_RETIRED_ROOT=None, VR_VIDEO_DIR=None):
                 sorted_copy = touch_video(
                     lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "made_00001.mp4")
-                upscale = touch_video(upscaled_video_path(
+                upscale = touch_video(lanes.upscale_of(
                     lanes.ORIGENERATOR_SOURCE, "portrait", "made_00001"))
                 for copy in (sorted_copy, upscale):
                     script = script_library.script_path_for_video(copy)

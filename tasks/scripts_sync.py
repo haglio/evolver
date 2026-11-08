@@ -399,6 +399,8 @@ def _filed_2d_kind(script_path: Path, trees: Trees) -> str | None:
 
 
 def _ai_or_non_ai(rel: Path) -> str | None:
+    if lanes.filed_in_kino(rel) is not None:
+        return "AI"
     match rel.parts:
         case ("2D", "AI" | "non_AI" as kind, *_):
             return kind

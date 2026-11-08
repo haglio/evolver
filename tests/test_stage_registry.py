@@ -106,8 +106,7 @@ class TestStageRegistry(unittest.TestCase):
 
     def test_genau_delivery_comes_before_the_correspondence_check(self):
         assert _place("genau_deliver") < _place("verify"), (
-            "the check would otherwise find the delivered video's source in 1_sorted with nothing "
-            "beside it in 2_outbox")
+            "a flick made this run is finished before the check reads Genau's folder")
 
     def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
         assert _place("upscale_non_ai") == _place("genau_deliver") + 1

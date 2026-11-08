@@ -12,6 +12,7 @@ from tests.temp_helpers import a_drive_that_is_not_there, override_config, works
 
 def _places_pointed_away(video_root, script_root) -> dict:
     return {"VIDEO_LIBRARY_DIR": video_root, "SCRIPT_LIBRARY_DIR": script_root,
+            "KINO_DIR": video_root / "kino",
             "NONAI_RETIRED_ROOT": None, "VR_VIDEO_DIR": None,
             "UNMATCHED_SCRIPTS_DIR": script_root.parent / "unmatched_scripts",
             "GENERATED_SCRIPTS_DIR": script_root.parent / "generated"}
@@ -68,7 +69,7 @@ class TestTheMarkSayingNoPersonWroteAScript(unittest.TestCase):
         with workspace_temp_dir() as root:
             video_root, script_root, generated = root / "videos", root / "scripts", root / "generated"
             filed = Path("2D", "AI", "1_sorted", "src", "portrait")
-            upscaled = Path("2D", "AI", "2_outbox", "upscaled_by_orientation", "portrait", "src")
+            upscaled = Path("kino", "2D", "AI", "portrait", "src")
             _write(video_root / filed / "clip.mp4", video_root / upscaled / "clip_topaz.mp4",
                    script_root / filed / "clip.funscript", generated / filed / "clip.generated")
 
@@ -435,9 +436,9 @@ class TestScriptsSync(unittest.TestCase):
         with workspace_temp_dir() as root:
             video_root = root / "videos"
             script_root = root / "scripts"
-            ai_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
+            ai_video = video_root / "kino" / "2D" / "AI" / "portrait" / "provider3" / "clip_topaz.mp4"
             non_ai_duplicate = video_root / "2D" / "non_AI" / "parked" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.mp4"
-            script_path = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider3" / "clip_topaz.funscript"
+            script_path = script_root / "kino" / "2D" / "AI" / "portrait" / "provider3" / "clip_topaz.funscript"
             ai_video.parent.mkdir(parents=True, exist_ok=True)
             non_ai_duplicate.parent.mkdir(parents=True, exist_ok=True)
             script_path.parent.mkdir(parents=True, exist_ok=True)
@@ -548,7 +549,7 @@ class TestScriptsSync(unittest.TestCase):
             video_root = root / "videos"
             script_root = root / "scripts"
             sorted_video = video_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.mp4"
-            outbox_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
+            outbox_video = video_root / "kino" / "2D" / "AI" / "portrait" / "src" / "clip_topaz.mp4"
             sorted_script = script_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.funscript"
             sorted_video.parent.mkdir(parents=True, exist_ok=True)
             outbox_video.parent.mkdir(parents=True, exist_ok=True)
@@ -560,7 +561,7 @@ class TestScriptsSync(unittest.TestCase):
             with library_overrides(video_root, script_root):
                 result = scripts_sync.run()
 
-            outbox_script = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.funscript"
+            outbox_script = script_root / "kino" / "2D" / "AI" / "portrait" / "src" / "clip_topaz.funscript"
             assert result.copied_variants == 1
             assert outbox_script.exists()
             assert outbox_script.read_text(encoding="utf-8") == sorted_script.read_text(encoding="utf-8")
@@ -570,8 +571,8 @@ class TestScriptsSync(unittest.TestCase):
             video_root = root / "videos"
             script_root = root / "scripts"
             sorted_video = video_root / "2D" / "AI" / "1_sorted" / "src" / "landscape" / "clip.mp4"
-            outbox_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "src" / "clip_topaz.mp4"
-            outbox_script = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "src" / "clip_topaz.funscript"
+            outbox_video = video_root / "kino" / "2D" / "AI" / "landscape" / "src" / "clip_topaz.mp4"
+            outbox_script = script_root / "kino" / "2D" / "AI" / "landscape" / "src" / "clip_topaz.funscript"
             sorted_video.parent.mkdir(parents=True, exist_ok=True)
             outbox_video.parent.mkdir(parents=True, exist_ok=True)
             outbox_script.parent.mkdir(parents=True, exist_ok=True)
@@ -669,7 +670,7 @@ class TestScriptsSync(unittest.TestCase):
             video_root = root / "videos"
             script_root = root / "scripts"
             sorted_video = video_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.mp4"
-            outbox_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
+            outbox_video = video_root / "kino" / "2D" / "AI" / "portrait" / "src" / "clip_topaz.mp4"
             sorted_script = script_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.funscript"
             sorted_video.parent.mkdir(parents=True, exist_ok=True)
             outbox_video.parent.mkdir(parents=True, exist_ok=True)
@@ -684,7 +685,7 @@ class TestScriptsSync(unittest.TestCase):
             ):
                 result = scripts_sync.run()
 
-            outbox_script = script_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.funscript"
+            outbox_script = script_root / "kino" / "2D" / "AI" / "portrait" / "src" / "clip_topaz.funscript"
             assert result.variant_copy_errors == 1
             assert result.copied_variants == 0
             assert not result.ok
@@ -695,7 +696,7 @@ class TestScriptsSync(unittest.TestCase):
             video_root = root / "videos"
             script_root = root / "scripts"
             sorted_video = video_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.mp4"
-            outbox_video = video_root / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "src" / "clip_topaz.mp4"
+            outbox_video = video_root / "kino" / "2D" / "AI" / "portrait" / "src" / "clip_topaz.mp4"
             sorted_script = script_root / "2D" / "AI" / "1_sorted" / "src" / "portrait" / "clip.funscript"
             for path in (sorted_video, outbox_video, sorted_script):
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -736,7 +737,7 @@ class TestOneVideoSentDownTwoLanes(unittest.TestCase):
     def test_the_script_its_upscale_was_given_stays_with_that_lanes_upscale(self):
         with workspace_temp_dir() as root:
             video_root, script_root = root / "videos", root / "scripts"
-            upscaled = self.AI / "2_outbox" / "upscaled_by_orientation" / "landscape"
+            upscaled = Path("kino", "2D", "AI", "landscape")
             given = script_root / upscaled / "lane_a" / "clip_topaz.funscript"
             _write(video_root / upscaled / "lane_a" / "clip_topaz.mp4",
                    video_root / upscaled / "lane_b" / "clip_topaz.mp4",

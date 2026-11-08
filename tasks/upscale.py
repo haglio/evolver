@@ -31,7 +31,7 @@ from util.media_files import (
     retry_while_in_use,
     take_its_place,
 )
-from util.sidecar import sidecar_path, upscaled_video_path
+from util.sidecar import sidecar_path
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -59,16 +59,12 @@ class UpscaleResult(StageResult):
 @dataclass(frozen=True)
 class UpscaleFolders:
     sorted: Path
-    outbox: Path
-    trash: Path
     origenerator: Path
 
     @classmethod
     def configured(cls, **given: Path | None) -> UpscaleFolders:
         defaults = {
             "sorted": config.SORTED_DIR,
-            "outbox": config.OUT_UPSCALED_DIR,
-            "trash": config.TRASH_DIR,
             "origenerator": config.ORIGENERATOR_PROJECT_DIR,
         }
         return cls(**_given_or_configured(given, defaults))
@@ -148,7 +144,7 @@ def run(
     max_items = config.UPSCALE_BATCH_LIMIT if max_items is None else max_items
     budget = _Budget.starting_now()
 
-    _prepare_outbox(folders, low_disk)
+    _prepare_the_lane_folders(low_disk)
 
     env = topaz.environment()
     candidates = collect_queued_videos(folders, priority_files=priority_files)
@@ -173,10 +169,10 @@ def run(
             )
             break
 
-        if system_resources.free_gb(folders.outbox) < low_disk.floor_gb:
+        if system_resources.free_gb(lanes.kino_upscales_dir()) < low_disk.floor_gb:
             result.deferred_low_disk = True
             result.pending_after_run = total_pending - result.processed - result.failed
-            _show_low_disk_warning(folders.outbox, low_disk.floor_gb, low_disk.dismissed_file)
+            _show_low_disk_warning(lanes.kino_upscales_dir(), low_disk.floor_gb, low_disk.dismissed_file)
             log.warning("Stopping the upscale stage early due to low free disk space.")
             break
 
@@ -204,32 +200,32 @@ def run(
     return result
 
 
-def _prepare_outbox(folders: UpscaleFolders, low_disk: LowDiskWarning):
+def _prepare_the_lane_folders(low_disk: LowDiskWarning):
+    kino = lanes.kino_upscales_dir()
     for orient in orientation.SORTED:
-        (folders.outbox / orient).mkdir(parents=True, exist_ok=True)
-    folders.trash.mkdir(parents=True, exist_ok=True)
-    removed_partial_outputs = remove_partial_files(folders.outbox, logger=log)
-    if system_resources.free_gb(folders.outbox) >= low_disk.floor_gb:
+        (kino / orient).mkdir(parents=True, exist_ok=True)
+    lanes.kino_lane().trash.mkdir(parents=True, exist_ok=True)
+    removed_partial_outputs = sum(remove_partial_files(folder, logger=log)
+                                  for folder in lanes.upscale_folders())
+    if system_resources.free_gb(kino) >= low_disk.floor_gb:
         _bring_back_the_low_disk_warning(low_disk.dismissed_file)
 
     log.info("=== Stage: upscale from 1_sorted ===")
-    log.info("OUT: %s/{landscape,portrait}/<source>/", folders.outbox)
-    log.info("Also skip if exists in: %s", folders.trash)
+    log.info("OUT: %s", ", ".join(str(folder) for folder in lanes.upscale_folders()))
     if removed_partial_outputs:
-        log.info("Removed %d stale partial output file(s) from %s",
-                 removed_partial_outputs, folders.outbox)
+        log.info("Removed %d stale partial output file(s)", removed_partial_outputs)
 
 
 def _upscale_one(candidate: tuple[Path, str, str], env: dict,
                  folders: UpscaleFolders, budget: _Budget) -> _Outcome:
     in_file, source, orient = candidate
-    out = upscaled_video_path(source, orient, in_file.stem, folders.outbox)
+    out = lanes.upscale_of(source, orient, in_file.stem)
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = partial_path(out, in_file.stem)
 
     log.info("Process: %s -> %s  [%s/%s]", in_file.name, out.name, orient, source)
 
-    settings = _settings_for(in_file, source, orient, folders.outbox, folders.origenerator)
+    settings = _settings_for(in_file, source, orient, folders.origenerator)
 
     ffmpeg_ok = False
     try:
@@ -280,7 +276,7 @@ def collect_queued_videos(
     priority_files: list[Path] | None = None,
     limit: int | None = None,
 ) -> list[tuple[Path, str, str]]:
-    sorted_dir, outbox_dir, trash_dir = folders.sorted, folders.outbox, folders.trash
+    sorted_dir = folders.sorted
 
     candidates: list[tuple[Path, str, str]] = []
     remakes: list[tuple[Path, str, str]] = []
@@ -290,13 +286,12 @@ def collect_queued_videos(
         if in_file in seen or not in_file.exists():
             return False
         seen.add(in_file)
-        out = upscaled_video_path(source, orient, in_file.stem, outbox_dir)
-        if _already_processed(source, out.name, outbox_dir, trash_dir):
-            if out.is_file() and _made_by_superseded_settings(source, out):
-                remakes.append((in_file, source, orient))
-            return False
-        candidates.append((in_file, source, orient))
-        return True
+        due = _due(source, orient, in_file.stem)
+        if due is _Due.REMADE:
+            remakes.append((in_file, source, orient))
+        elif due is _Due.MADE:
+            candidates.append((in_file, source, orient))
+        return due is _Due.MADE
 
     for in_file in priority_files or []:
         try:
@@ -349,13 +344,13 @@ def _made_by_superseded_settings(source: str, upscaled: Path) -> bool:
     return (made_by.get(provenance.METHOD), made_by.get(provenance.METHOD_VERSION)) != (current.name, current.version)
 
 
-def _settings_for(in_file: Path, source: str, orient: str, outbox_dir: Path,
-                origenerator_dir: Path) -> topaz.Settings:
+def _settings_for(in_file: Path, source: str, orient: str,
+                  origenerator_dir: Path) -> topaz.Settings:
     if lanes.sent_by_origenerator(source):
         return topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orient,
                             video_fps=ffprobe.frame_rate(in_file),
                             generated_fps=origenerator_gallery.generated_fps(origenerator_dir))
-    if _is_t2v_provider(source, orient, in_file.stem, outbox_dir):
+    if _is_t2v_provider(source, orient, in_file.stem):
         return topaz.AI_UPSCALE_T2V
     return topaz.AI_UPSCALE
 
@@ -369,11 +364,11 @@ def _record_the_upscale(out: Path, settings: topaz.Settings) -> None:
     sidecar.update(path, lambda current: provenance.recorded(current, provenance.UPSCALE, stamp))
 
 
-def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> bool:
+def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:
     if source != config.PROVIDER_SOURCE:
         return False
     try:
-        meta_path = sidecar_path(upscaled_video_path(source, orient, stem, outbox_dir))
+        meta_path = sidecar_path(lanes.upscale_of(source, orient, stem))
     except ValueError:
         return False
     payload = sidecar.read(meta_path)
@@ -382,24 +377,42 @@ def _is_t2v_provider(source: str, orient: str, stem: str, outbox_dir: Path) -> b
     return "source_image" not in payload
 
 
-def _already_processed(source: str, fname: str, outbox_dir: Path, trash_dir: Path) -> bool:
-    for orient in orientation.SORTED:
-        p = outbox_dir / orient / source / fname
-        if p.exists() and p.stat().st_size > 0:
-            return True
-    trash = trash_dir / fname
-    return trash.exists() and trash.stat().st_size > 0
+class _Due(Enum):
+    NOTHING = auto()
+    MADE = auto()
+    REMADE = auto()
 
 
-def _show_low_disk_warning(outbox_dir: Path, floor_gb: float, dismissed: Path) -> None:
+def _due(source: str, orient: str, sorted_stem: str) -> _Due:
+    out = lanes.upscale_of(source, orient, sorted_stem)
+    if out is None:
+        return _Due.NOTHING
+    if not _already_made(source, out):
+        return _Due.MADE
+    if out.is_file() and _made_by_superseded_settings(source, out):
+        return _Due.REMADE
+    return _Due.NOTHING
+
+
+def awaits_its_upscale(sorted_copy: Path, source: str, orient: str) -> bool:
+    return _due(source, orient, sorted_copy.stem) is not _Due.NOTHING
+
+
+def _already_made(source: str, out: Path) -> bool:
+    made = ([out] if lanes.is_genau_lane(source)
+            else [lanes.kino_upscales_dir() / orient / source / out.name for orient in orientation.SORTED])
+    return any(spot.exists() and spot.stat().st_size > 0 for spot in (*made, lanes.in_trash(out)))
+
+
+def _show_low_disk_warning(upscales_dir: Path, floor_gb: float, dismissed: Path) -> None:
     if dismissed.exists():
         return
-    free_gb = system_resources.free_gb(outbox_dir)
+    free_gb = system_resources.free_gb(upscales_dir)
     clicked_dismiss = show_error(
         "Evolver - Low Disk Space",
         (
             "Evolver paused the upscale stage because free disk space is below the configured safety floor.\n\n"
-            f"Target outbox: {outbox_dir}\n"
+            f"Upscales folder: {upscales_dir}\n"
             f"Free space: {free_gb:.1f} GiB\n"
             f"Required floor: {floor_gb:.1f} GiB\n\n"
             f"Check the log for details:\n{config.LOG_FILE}"

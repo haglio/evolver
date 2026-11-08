@@ -15,7 +15,6 @@ from tests.temp_helpers import (
     write_sidecar,
 )
 from util import lanes, provenance, script_library, sidecar, topaz
-from util.sidecar import upscaled_video_path
 
 
 class TestSortHelpers(unittest.TestCase):
@@ -105,7 +104,7 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
         sorted_copy = lib.sorted_dir / source / "portrait" / name
         sorted_copy.parent.mkdir(parents=True)
         sorted_copy.write_bytes(b"first made")
-        upscaled = touch_video(upscaled_video_path(source, "portrait", sorted_copy.stem))
+        upscaled = touch_video(lanes.upscale_of(source, "portrait", sorted_copy.stem))
         current = topaz.AI_UPSCALE_ORIGENERATOR
         write_sidecar(sidecar.sidecar_path(upscaled), provenance.recorded(
             {"favorite": True}, provenance.UPSCALE,
@@ -153,7 +152,7 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
                 self._sent_again(lib, "made_00001-audio.mp4", b"made again")
 
                 remake = old_copy.with_name("made_00001-audio.mp4")
-                its_upscale = upscaled_video_path(lanes.ORIGENERATOR_SOURCE, "portrait", remake.stem)
+                its_upscale = lanes.upscale_of(lanes.ORIGENERATOR_SOURCE, "portrait", remake.stem)
                 assert not old_copy.exists()
                 assert not old_upscale.exists()
                 assert remake.read_bytes() == b"made again"

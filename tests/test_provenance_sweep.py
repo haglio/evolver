@@ -36,7 +36,7 @@ class TestAnOrigeneratorClip(unittest.TestCase):
                 provenance_sweep.run(read_note=_refuses_to_be_called)
 
                 recorded = sidecar.read(sidecar.sidecar_path(
-                    lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4"))
+                    lib.kino_upscales / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4"))
 
         assert recorded[provenance.BLOCK] == {provenance.GENERATION: provenance.reconstructed("origenerator", method="wan22_i2v", method_version="v007")}
 
@@ -51,7 +51,7 @@ class TestAnOrigeneratorClip(unittest.TestCase):
                 provenance_sweep.run(read_note=_refuses_to_be_called)
 
                 recorded = sidecar.read(sidecar.sidecar_path(
-                    lib.outbox / "landscape" / "origenerator" / "wan22_i2v_00002__topaz.mp4"))
+                    lib.kino_upscales / "landscape" / "origenerator" / "wan22_i2v_00002__topaz.mp4"))
 
         assert recorded[provenance.BLOCK] == {provenance.GENERATION: provenance.reconstructed("origenerator")}
 
@@ -61,7 +61,7 @@ class TestAnOrigeneratorClip(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=root / "moved-away.db"):
                 touch_video(lib.sorted_dir / "origenerator" / "portrait" / "wan22_i2v_00003_.mp4")
                 upscaled = touch_video(
-                    lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00003__topaz.mp4")
+                    lib.kino_upscales / "portrait" / "origenerator" / "wan22_i2v_00003__topaz.mp4")
 
                 result = provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
 
@@ -76,7 +76,7 @@ class TestAnOrigeneratorClip(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=root / "moved-away.db"):
                 touch_video(lib.sorted_dir / "origenerator" / "portrait" / "wan22_i2v_00004_.mp4")
                 write_sidecar(
-                    sidecar.sidecar_path(lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00004__topaz.mp4"),
+                    sidecar.sidecar_path(lib.kino_upscales / "portrait" / "origenerator" / "wan22_i2v_00004__topaz.mp4"),
                     {provenance.BLOCK: {provenance.GENERATION: provenance.reconstructed("origenerator")}})
 
                 result = provenance_sweep.run(read_note=_refuses_to_be_called)
@@ -90,7 +90,7 @@ class TestAnAiUpscale(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 touch_video(lib.sorted_dir / "examplesource" / "portrait" / "clip_one.mp4")
-                upscaled = touch_video(lib.outbox / "portrait" / "examplesource" / "clip_one_topaz.mp4")
+                upscaled = touch_video(lib.kino_upscales / "portrait" / "examplesource" / "clip_one_topaz.mp4")
 
                 provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
 
@@ -103,7 +103,7 @@ class TestAnAiUpscale(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 touch_video(lib.sorted_dir / "examplesource" / "portrait" / "clip_four.mp4")
-                upscaled = touch_video(lib.outbox / "portrait" / "examplesource" / "clip_four_topaz.mp4")
+                upscaled = touch_video(lib.kino_upscales / "portrait" / "examplesource" / "clip_four_topaz.mp4")
 
                 provenance_sweep.run(read_note=_noting(_TOPAZS_OWN_WORDS))
 
@@ -116,7 +116,7 @@ class TestAnAiUpscale(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 touch_video(lib.sorted_dir / "examplesource" / "portrait" / "clip_two.mp4")
-                upscaled = touch_video(lib.outbox / "portrait" / "examplesource" / "clip_two_topaz.mp4")
+                upscaled = touch_video(lib.kino_upscales / "portrait" / "examplesource" / "clip_two_topaz.mp4")
                 write_sidecar(sidecar.sidecar_path(upscaled),
                               {provenance.BLOCK: {provenance.UPSCALE: _A_STAMP_TAKEN_WHEN_THE_UPSCALE_WAS_MADE}})
 
@@ -131,7 +131,7 @@ class TestAnAiUpscale(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 touch_video(lib.sorted_dir / "examplesource" / "portrait" / "clip_three.mp4")
-                upscaled = touch_video(lib.outbox / "portrait" / "examplesource" / "clip_three_topaz.mp4")
+                upscaled = touch_video(lib.kino_upscales / "portrait" / "examplesource" / "clip_three_topaz.mp4")
                 record = sidecar.sidecar_path(upscaled)
 
                 def the_upscale_lands_while_its_note_is_read(_video):
@@ -182,7 +182,7 @@ class TestWhatARunSays(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 for name in ("clip_six", "clip_seven"):
                     touch_video(lib.sorted_dir / "examplesource" / "portrait" / f"{name}.mp4")
-                    touch_video(lib.outbox / "portrait" / "examplesource" / f"{name}_topaz.mp4")
+                    touch_video(lib.kino_upscales / "portrait" / "examplesource" / f"{name}_topaz.mp4")
                 notes = {"clip_six_topaz": topaz.AI_UPSCALE.videoai_tag,
                          "clip_seven_topaz": _TOPAZS_OWN_WORDS}
 
@@ -198,7 +198,7 @@ class TestNotHoldingUpTheRun(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 for index in range(3):
                     touch_video(lib.sorted_dir / "examplesource" / "portrait" / f"clip_{index}.mp4")
-                    touch_video(lib.outbox / "portrait" / "examplesource" / f"clip_{index}_topaz.mp4")
+                    touch_video(lib.kino_upscales / "portrait" / "examplesource" / f"clip_{index}_topaz.mp4")
                 read = []
 
                 def reading(video):
@@ -219,7 +219,7 @@ class TestRunningItAgain(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 touch_video(lib.sorted_dir / "examplesource" / "portrait" / "clip_three.mp4")
-                touch_video(lib.outbox / "portrait" / "examplesource" / "clip_three_topaz.mp4")
+                touch_video(lib.kino_upscales / "portrait" / "examplesource" / "clip_three_topaz.mp4")
 
                 provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
                 again = provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
@@ -231,7 +231,7 @@ class TestRunningItAgain(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 touch_video(lib.sorted_dir / "examplesource" / "portrait" / "clip_five.mp4")
-                touch_video(lib.outbox / "portrait" / "examplesource" / "clip_five_topaz.mp4")
+                touch_video(lib.kino_upscales / "portrait" / "examplesource" / "clip_five_topaz.mp4")
 
                 provenance_sweep.run(read_note=_noting(topaz.AI_UPSCALE.videoai_tag))
                 again = provenance_sweep.run(read_note=_refuses_to_be_called)

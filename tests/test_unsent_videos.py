@@ -52,7 +52,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 sorted_copy = touch_video(
                     lib.sorted_dir / source / "portrait" / "made_00001.mp4")
                 upscale = touch_video(
-                    lib.outbox / "portrait" / source / "made_00001_topaz.mp4")
+                    lib.kino_upscales / "portrait" / source / "made_00001_topaz.mp4")
 
                 result = unsent_videos.run()
 
@@ -67,7 +67,7 @@ class TestTheEvolverLane(unittest.TestCase):
             db = _gallery(root / "gallery.db", [("p1", "made_00006.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 copies = (touch_video(lib.sorted_dir / source / "portrait" / "made_00006.mp4"),
-                          touch_video(lib.outbox / "portrait" / source / "made_00006_topaz.mp4"))
+                          touch_video(lib.kino_upscales / "portrait" / source / "made_00006_topaz.mp4"))
                 scripts = [script_library.script_path_for_video(copy) for copy in copies]
                 for script in scripts:
                     touch_video(script)
@@ -89,7 +89,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 touch_video(lib.trash / "made_00007_topaz.mp4")
                 touch_video(lib.sorted_dir / source / "portrait" / "made_00007.mp4")
                 left_behind = touch_video(script_library.script_path_for_video(
-                    lib.outbox / "portrait" / source / "made_00007_topaz.mp4"))
+                    lib.kino_upscales / "portrait" / source / "made_00007_topaz.mp4"))
 
                 unsent_videos.run()
 
@@ -129,7 +129,7 @@ class TestTheEvolverLane(unittest.TestCase):
             db = _gallery(root / "gallery.db", [("p1", "made_00003.mp4", None)])
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 kept = touch_video(
-                    lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE
+                    lib.kino_upscales / "portrait" / lanes.ORIGENERATOR_SOURCE
                     / "made_00003_topaz.mp4")
 
                 result = unsent_videos.run()
@@ -152,7 +152,7 @@ class TestTheEvolverLane(unittest.TestCase):
             db = _gallery(root / "gallery.db", [("p1", "made_00005.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 second = touch_video(
-                    lib.outbox / "landscape" / lanes.ORIGENERATOR_SOURCE
+                    lib.kino_upscales / "landscape" / lanes.ORIGENERATOR_SOURCE
                     / "made_00005 (2)_topaz.mp4")
 
                 unsent_videos.run()
@@ -165,8 +165,8 @@ class TestTheEvolverLane(unittest.TestCase):
             source = lanes.ORIGENERATOR_SOURCE
             db = _gallery(root / "gallery.db", [("p1", "made_00006.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                touch_video(lib.outbox / "portrait" / source / "made_00006_topaz.mp4")
-                record = _sidecar(lib, "2D", "AI", "2_outbox", "upscaled_by_orientation",
+                touch_video(lib.kino_upscales / "portrait" / source / "made_00006_topaz.mp4")
+                record = _sidecar(lib, "kino", "2D", "AI",
                                   "portrait", source, "made_00006_topaz.json")
 
                 result = unsent_videos.run()
@@ -180,7 +180,7 @@ class TestTheEvolverLane(unittest.TestCase):
             source = lanes.ORIGENERATOR_SOURCE
             db = _gallery(root / "gallery.db", [("p1", "made_00009.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                touch_video(lib.outbox / "portrait" / source / "made_00009_topaz.mp4")
+                touch_video(lib.kino_upscales / "portrait" / source / "made_00009_topaz.mp4")
                 left_behind = _sidecar(lib, "2D", "AI", "2_outbox", "upscaled_by_orientation",
                                        "landscape", source, "made_00009_topaz.json")
 
@@ -193,7 +193,7 @@ class TestTheEvolverLane(unittest.TestCase):
             lib = LaneLibrary(root)
             db = _gallery(root / "gallery.db", [("p1", "made_00010.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                copy = lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE / "made_00010_topaz.mp4"
+                copy = lib.kino_upscales / "portrait" / lanes.ORIGENERATOR_SOURCE / "made_00010_topaz.mp4"
                 touch_video(copy)
                 unsent_videos.run()
                 touch_video(copy)
@@ -215,7 +215,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 sorted_copy = touch_video(
                     lib.sorted_dir / source / "portrait" / "made_00007.mp4")
                 locked = touch_video(
-                    lib.outbox / "portrait" / source / "made_00007_topaz.mp4")
+                    lib.kino_upscales / "portrait" / source / "made_00007_topaz.mp4")
                 with locked.open("a"):
                     result = unsent_videos.run()
 
@@ -241,7 +241,7 @@ class TestTheGenauLane(unittest.TestCase):
             db = _gallery(root / "gallery.db", [("p3", "both_00001.mp4", "genau_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 kept = touch_video(
-                    lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE
+                    lib.kino_upscales / "portrait" / lanes.ORIGENERATOR_SOURCE
                     / "both_00001_topaz.mp4")
                 delivered = touch_video(lib.genau_flicks / "2D" / "AI" / "both_00001_topaz.mp4")
 
@@ -296,8 +296,8 @@ class TestASoundlessCopy(unittest.TestCase):
             source = lanes.ORIGENERATOR_SOURCE
             db = _gallery_of_videos_with_sound(root / "gallery.db", ["made_00011"])
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                sounded = touch_video(lib.outbox / "landscape" / source / "made_00011-audio_topaz.mp4")
-                soundless = (touch_video(lib.outbox / "landscape" / source / "made_00011_topaz.mp4"),
+                sounded = touch_video(lib.kino_upscales / "landscape" / source / "made_00011-audio_topaz.mp4")
+                soundless = (touch_video(lib.kino_upscales / "landscape" / source / "made_00011_topaz.mp4"),
                              touch_video(lib.sorted_dir / source / "landscape" / "made_00011.mp4"))
 
                 result = unsent_videos.run()
@@ -327,7 +327,7 @@ class TestAGalleryThisCannotRead(unittest.TestCase):
             conn.close()
             with lib.config(ORIGENERATOR_DB_PATH=path):
                 kept = touch_video(
-                    lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE / "old_topaz.mp4")
+                    lib.kino_upscales / "portrait" / lanes.ORIGENERATOR_SOURCE / "old_topaz.mp4")
 
                 result = unsent_videos.run()
 

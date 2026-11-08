@@ -43,7 +43,7 @@ class TestWhereAVideoMarkedTrashCameFrom(_InALibrary):
         [found] = trash_folders.in_trash()
 
         assert found.video == marked
-        assert found.restores_to == self.lib.outbox / "portrait" / "example-source" / "scene one_topaz.mp4"
+        assert found.restores_to == self.lib.kino_upscales / "portrait" / "example-source" / "scene one_topaz.mp4"
 
     def test_a_second_video_marked_under_a_taken_name_goes_back_under_its_own(self):
         touch_video(self.lib.sorted_dir / "example-source" / "landscape" / "scene two.mp4")
@@ -51,18 +51,18 @@ class TestWhereAVideoMarkedTrashCameFrom(_InALibrary):
 
         [found] = trash_folders.in_trash()
 
-        assert found.restores_to == self.lib.outbox / "landscape" / "example-source" / "scene two_topaz.mp4"
+        assert found.restores_to == self.lib.kino_upscales / "landscape" / "example-source" / "scene two_topaz.mp4"
 
     def test_of_two_sources_sharing_a_name_it_restores_to_the_one_missing_its_upscale(self):
-        for source in ("example-source", "example-loop-clips"):
+        for source in ("example-source", "example-source-two"):
             touch_video(self.lib.sorted_dir / source / "portrait" / "loop_3.mkv")
-        touch_video(self.lib.outbox / "portrait" / "example-source" / "loop_3_topaz.mp4")
+        touch_video(self.lib.kino_upscales / "portrait" / "example-source" / "loop_3_topaz.mp4")
         touch_video(self.lib.trash / "loop_3_topaz.mp4")
 
         [found] = trash_folders.in_trash()
 
-        assert found.restores_to == self.lib.outbox / "portrait" / "example-loop-clips" / "loop_3_topaz.mp4"
-        assert found.upscaled_from == self.lib.sorted_dir / "example-loop-clips" / "portrait" / "loop_3.mkv"
+        assert found.restores_to == self.lib.kino_upscales / "portrait" / "example-source-two" / "loop_3_topaz.mp4"
+        assert found.upscaled_from == self.lib.sorted_dir / "example-source-two" / "portrait" / "loop_3.mkv"
 
     def test_a_copy_left_outside_the_orientation_folders_is_no_upscale_s_source(self):
         touch_video(self.lib.sorted_dir / "example-source" / "loop_4.mp4")
@@ -190,7 +190,7 @@ class TestDeletingPermanently(_InALibrary):
         [found] = trash_folders.in_trash()
         own = _a_record_for(found.restores_to)
         namesakes = [
-            _a_record_for(touch_video(self.lib.outbox / "landscape" / "example-source" / "scene nine_topaz.mp4")),
+            _a_record_for(touch_video(self.lib.kino_upscales / "landscape" / "example-source" / "scene nine_topaz.mp4")),
             _a_record_for(touch_video(self.lib.non_ai / "example-bucket" / "0 unsorted" / "scene nine_topaz.mp4")),
         ]
 
