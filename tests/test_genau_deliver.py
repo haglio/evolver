@@ -76,8 +76,9 @@ class TestGenauDeliver(unittest.TestCase):
                                  METADATA_DIR=root / "metadata"):
                 genau_deliver.run()
 
-            assert upscale.collect_queued_videos(
-                sorted_dir=sorted_dir, outbox_dir=outbox, trash_dir=root / "trash") == []
+            assert upscale.collect_queued_videos(upscale.UpscaleFolders(
+                sorted=sorted_dir, outbox=outbox, trash=root / "trash",
+                origenerator=root / "origenerator")) == []
 
     def test_a_record_that_cannot_be_written_never_undoes_the_delivery(self):
         with workspace_temp_dir() as root:
