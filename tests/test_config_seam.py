@@ -56,7 +56,6 @@ CONFIG_REFERENCE_CEILINGS = {
     "util/nonai_library.py": 4,
     "util/contract.py": 3,
     "util/nonai_retire.py": 1,
-    "util/retired_outbox.py": 6,
     "util/sidecar.py": 4,
     "util/topaz.py": 3,
     "util/warm_gun.py": 3,
