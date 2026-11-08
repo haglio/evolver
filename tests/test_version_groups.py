@@ -51,6 +51,14 @@ class TestGroupIds:
 
             assert set(ids.values()) == {"Petra-Vance_540-xq3k9v2w"}, stems
 
+    def test_three_versions_make_one_family_when_each_is_declared_against_the_same_stem(self):
+        stems = ["jane-doe_540-Qv3Tn8Rd", "Jane Doe Scene Two 4k 60fps", "Jane Doe Scene Two Alt Take"]
+
+        ids = group_ids(stems, {"Jane Doe Scene Two Alt Take": "jane-doe_540-Qv3Tn8Rd",
+                                "Jane Doe Scene Two 4k 60fps": "jane-doe_540-Qv3Tn8Rd"})
+
+        assert set(ids.values()) == {"jane-doe_540-Qv3Tn8Rd"}
+
     def test_a_scene_named_past_another_is_not_a_version_of_it(self):
         stems = ["Jane Doe", "Jane Doe - Cut to Length", "Jane-Doe-&-Ada-Roe-b4t7k1qz"]
 
