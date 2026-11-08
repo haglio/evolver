@@ -155,6 +155,15 @@ class TestTheGenauLane:
             assert result.missing_flicks == [
                 str(Path("videos") / "videos" / "genau" / "flicks" / "2D" / "AI" / "loop_1_topaz.mp4")]
 
+    def test_a_copy_pcloud_made_of_a_flicks_record_is_no_flick_of_its_own(self):
+        with _library() as lib:
+            flick = _flick(lib, "loop_1_topaz.mp4")
+            record = write_sidecar(sidecar.sidecar_path(flick), {"video": {"seed": "1"}})
+            conflicted = sidecar.sidecar_path(flick).with_name("loop_1_topaz [conflicted].json")
+            write_sidecar(conflicted, record)
+
+            assert check_correspondence.run().missing_flicks == []
+
     def test_a_flick_sent_to_genaus_trash_is_not_missing(self):
         with _library() as lib:
             flick = _flick(lib, "loop_1_topaz.mp4")
