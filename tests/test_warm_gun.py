@@ -31,7 +31,7 @@ def _journal(path: Path, lines: list) -> Path:
 
 
 class TestReadJournals(unittest.TestCase):
-    def test_reads_every_journal_by_name_each_in_time_order(self):
+    def test_each_computers_journal_is_kept_apart_in_time_order_as_it_uploads_whole_in_its_own_order(self):
         with workspace_temp_dir() as root:
             _journal(root / "a.jsonl", [
                 {"t": 20, "event": "skip", "path": "1_sorted/provider2/portrait/b.mp4"},
@@ -41,7 +41,7 @@ class TestReadJournals(unittest.TestCase):
 
             assert warm_gun.read_journals([root]) == {"a.jsonl": [Event(10, "completion", "1_sorted/provider2/portrait/a.mp4"), Event(20, "skip", "1_sorted/provider2/portrait/b.mp4")], "b.jsonl": [Event(15, "lock", "genau/clips/loop.mp4")]}
 
-    def test_a_line_twice_in_a_journal_counts_once(self):
+    def test_a_line_twice_in_a_journal_counts_once_so_the_phone_reuploading_its_whole_history_doubles_nothing(self):
         with workspace_temp_dir() as root:
             line = {"t": 10, "event": "completion", "path": "1_sorted/provider2/portrait/a.mp4"}
             _journal(root / "phone.jsonl", [line, line])
