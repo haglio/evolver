@@ -65,6 +65,21 @@ def run(
     families = _clip_families(clips, payloads)
 
     result = ClipMatchResult(scenes=len(scenes), clips=len(clips))
+    hashed = _hashed_once(sampler, fps)
+    matched = _best_scene_per_clip(_match_every_scene(scenes, clips, payloads, hashed, fps))
+    for scene, match in matched.items():
+        record(match.clip, scene, offset=match.offset)
+        _measure_the_winners_family(match.clip, scene, families[match.clip], hashed, fps)
+    result.matched = len(matched)
+
+    log.info("Clip match done. Scenes: %d, clips: %d, matched: %d",
+             result.scenes, result.clips, result.matched)
+    return result
+
+
+def _hashed_once(
+    sampler: Callable[[Path, float], np.ndarray], fps: float,
+) -> Callable[[Path], np.ndarray]:
     hashes: dict[Path, np.ndarray] = {}
 
     def hashed(video: Path) -> np.ndarray:
@@ -72,11 +87,18 @@ def run(
             hashes[video] = frame_hashes(sampler(video, fps))
         return hashes[video]
 
+    return hashed
+
+
+def _match_every_scene(
+    scenes: list[_SceneCut], clips: list[Path], payloads: dict[Path, dict],
+    hashed: Callable[[Path], np.ndarray], fps: float,
+) -> dict[Path, Match]:
     matched: dict[Path, Match] = {}
     for cut in scenes:
         candidates = [
             clip for clip in clips
-            if could_be_cut_from(payloads[clip]["clip"], cut.named_by)
+            if could_be_cut_from(payloads[clip]["clip"], cut.best_named)
         ]
         if not candidates:
             continue
@@ -85,19 +107,10 @@ def run(
             matched[cut.cheapest] = found
             log.info("%4.0f%% %s @%.1fs <- %s",
                      found.score * 100, cut.cheapest.name, found.offset, found.clip.name)
-
-    matched = _best_scene_per_clip(matched)
-    for scene, match in matched.items():
-        record(match.clip, scene, offset=match.offset)
-        _tell_the_family(match.clip, scene, families[match.clip], hashed, fps)
-    result.matched = len(matched)
-
-    log.info("Clip match done. Scenes: %d, clips: %d, matched: %d",
-             result.scenes, result.clips, result.matched)
-    return result
+    return matched
 
 
-def _tell_the_family(
+def _measure_the_winners_family(
     winner: Path, scene: Path, family: tuple[Path, ...],
     hashed: Callable[[Path], np.ndarray], fps: float,
 ) -> None:
@@ -113,7 +126,7 @@ def _tell_the_family(
 
 @dataclass(frozen=True)
 class _SceneCut:
-    named_by: Path
+    best_named: Path
     cheapest: Path
 
 
@@ -123,7 +136,7 @@ def _scene_cuts(scenes: list[Path]) -> list[_SceneCut]:
         title = stable_title(scene.stem)
         families.setdefault(title or f"\0{scene}", []).append(scene)
     return [
-        _SceneCut(named_by=ordered[0], cheapest=ordered[-1])
+        _SceneCut(best_named=ordered[0], cheapest=ordered[-1])
         for ordered in (_largest_first(family) for family in families.values())
     ]
 
