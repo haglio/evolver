@@ -44,6 +44,8 @@ class Outcome(Enum):
 
 class InstanceGateway:
     def __init__(self):
+        # Windows lets a named mutex go when its last handle closes, the holder dying included,
+        # and a collected QLocalServer closes its pipe: both are held for as long as this is.
         self._mutex_handle: int | None = None
         self._launches: QLocalServer | None = None
 

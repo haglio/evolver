@@ -452,7 +452,7 @@ app.exec()
 """
 
 
-class TestAcrossProcesses(unittest.TestCase):
+class TestAcrossProcessesSinceTheClaimPassesWhenItsHolderExits(unittest.TestCase):
     def _running_evolver(self, mutex: str, pipe: str, manner: str):
         running = subprocess.Popen(
             [sys.executable, "-c", _RUNNING_EVOLVER, mutex, pipe, manner, str(_STARVED_SECONDS)],
