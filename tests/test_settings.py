@@ -4,7 +4,7 @@ import json
 import unittest
 
 from gui.settings import EvolverSettings
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir
 
 
 class TestEvolverSettings(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestEvolverSettings(unittest.TestCase):
             assert loaded.interval_minutes == 5
             assert loaded.enable_toasts
 
-    def test_a_hand_edited_interval_below_one_loads_as_one(self):
+    def test_a_hand_edited_interval_below_one_loads_as_one_since_the_schedulers_clock_alignment_divides_by_it(self):
         with workspace_temp_dir() as tmp:
             path = tmp / "settings.json"
             path.write_text(json.dumps({"interval_minutes": 0}))
@@ -44,7 +44,8 @@ class TestEvolverSettings(unittest.TestCase):
             assert EvolverSettings.load(path).interval_minutes == 7
 
     def test_settings_that_were_never_saved_come_up_at_the_defaults(self):
-        s = EvolverSettings.load(path=None)
+        with workspace_temp_dir() as tmp, override_config(GUI_SETTINGS_FILE=tmp / "never saved.json"):
+            s = EvolverSettings.load(path=None)
         assert s.interval_minutes == 10
 
     def test_load_ignores_unknown_fields(self):
@@ -75,7 +76,7 @@ class TestEvolverSettings(unittest.TestCase):
         s = EvolverSettings()
         assert not s.enable_toasts
 
-    def test_nonai_upscale_defaults_to_off(self):
+    def test_nonai_upscale_defaults_to_off_since_an_encode_holds_the_graphics_card_for_hours(self):
         s = EvolverSettings()
         assert not s.nonai_upscale_enabled
 
