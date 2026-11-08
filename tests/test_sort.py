@@ -132,7 +132,7 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
 
                 assert not handed_over.exists()
                 assert sorted_copy.read_bytes() == b"made again"
-                assert upscale.collect_queued_videos() == [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")]
+                assert upscale.collect_queued_videos(upscale.UpscaleFolders.configured()) == [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")]
                 assert sidecar.read(sidecar.sidecar_path(upscaled))["favorite"]
 
     def test_made_again_under_its_new_name_takes_the_place_of_the_copy_under_the_old(self):
@@ -153,7 +153,7 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
                 assert not old_copy.exists()
                 assert not old_upscale.exists()
                 assert remake.read_bytes() == b"made again"
-                assert upscale.collect_queued_videos() == [(remake, lanes.ORIGENERATOR_SOURCE, "portrait")]
+                assert upscale.collect_queued_videos(upscale.UpscaleFolders.configured()) == [(remake, lanes.ORIGENERATOR_SOURCE, "portrait")]
                 assert sidecar.read(sidecar.sidecar_path(its_upscale))["favorite"]
                 assert not sidecar.sidecar_path(old_upscale).exists()
                 assert script_library.script_path_for_video(its_upscale).is_file()
@@ -170,7 +170,7 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
 
                 assert not handed_over.exists()
                 assert sorted_copy.read_bytes() == b"first made"
-                assert upscale.collect_queued_videos() == []
+                assert upscale.collect_queued_videos(upscale.UpscaleFolders.configured()) == []
 
 
 if __name__ == "__main__":

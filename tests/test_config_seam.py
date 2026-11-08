@@ -49,7 +49,7 @@ CONFIG_REFERENCE_CEILINGS = {
     "tasks/scripts_sync.py": 8,
     "tasks/sort.py": 3,
     "tasks/stray_files.py": 9,
-    "tasks/upscale.py": 14,
+    "tasks/upscale.py": 11,
     "tasks/video_kinds.py": 6,
     "tasks/watch_weights.py": 4,
     "tasks/taken_back.py": 7,
