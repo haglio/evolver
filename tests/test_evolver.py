@@ -732,6 +732,16 @@ class TestWhatIsMarkedTrash:
             assert landscape_copy.exists()
 
 
+class TestTheRetiredOutbox:
+    def test_every_run_first_moves_what_it_holds_before_any_stage_reads_the_lane_folders(self):
+        happened = []
+        with patch("evolver.retired_outbox.move_into_the_lane_folders",
+                   side_effect=lambda: happened.append("moved")):
+            _run(_made_up("first", run=lambda _: happened.append("first") or _Done()))
+
+        assert happened == ["moved", "first"]
+
+
 class TestOneRunAtATime:
     def test_while_another_evolver_holds_the_turn_no_stage_runs(self):
         with workspace_temp_dir() as root:
