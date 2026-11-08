@@ -6,20 +6,20 @@ from unittest.mock import patch
 
 from util import relative_dates
 
-TODAY = datetime.date(2026, 3, 28)
+A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO = datetime.date(2026, 3, 28)
 
 
 class TestAsIsoDate(unittest.TestCase):
     def test_days_ago(self):
-        with patch("util.relative_dates.today", return_value=TODAY):
+        with patch("util.relative_dates.today", return_value=A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO):
             assert relative_dates.as_iso_date("2d ago") == "2026-03-26"
 
     def test_weeks_ago(self):
-        with patch("util.relative_dates.today", return_value=TODAY):
+        with patch("util.relative_dates.today", return_value=A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO):
             assert relative_dates.as_iso_date("2w ago") == "2026-03-14"
 
     def test_months_ago(self):
-        with patch("util.relative_dates.today", return_value=TODAY):
+        with patch("util.relative_dates.today", return_value=A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO):
             assert relative_dates.as_iso_date("3mo ago") == "2025-12-28"
 
     def test_months_ago_clamps_to_the_shorter_months_last_day(self):
@@ -31,15 +31,15 @@ class TestAsIsoDate(unittest.TestCase):
             assert relative_dates.as_iso_date("1mo ago") == "2025-12-31"
 
     def test_minutes_ago(self):
-        with patch("util.relative_dates.today", return_value=TODAY):
+        with patch("util.relative_dates.today", return_value=A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO):
             assert relative_dates.as_iso_date("5m ago") == "2026-03-28"
 
     def test_hours_ago(self):
-        with patch("util.relative_dates.today", return_value=TODAY):
+        with patch("util.relative_dates.today", return_value=A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO):
             assert relative_dates.as_iso_date("5h ago") == "2026-03-28"
 
     def test_a_bare_month_letter_is_not_read_as_months(self):
-        with patch("util.relative_dates.today", return_value=TODAY):
+        with patch("util.relative_dates.today", return_value=A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO):
             assert relative_dates.as_iso_date("3m ago") == "2026-03-28"
             assert relative_dates.as_iso_date("3mo ago") == "2025-12-28"
 
@@ -53,8 +53,8 @@ class TestAsIsoDate(unittest.TestCase):
         assert relative_dates.as_iso_date("2y ago") == "2y ago"
 
     def test_the_day_is_read_without_a_clock_so_today_is_the_answer(self):
-        with patch("util.relative_dates.today", return_value=TODAY):
-            assert relative_dates.as_iso_date("23h ago") == TODAY.isoformat()
+        with patch("util.relative_dates.today", return_value=A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO):
+            assert relative_dates.as_iso_date("23h ago") == A_28TH_SO_EVERY_MONTH_HAS_THE_DAY_COUNTED_BACK_TO.isoformat()
 
 
 if __name__ == "__main__":

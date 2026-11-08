@@ -4,6 +4,9 @@ import math
 
 from gui.stats_window import BAND_ALPHA
 
+CIE76_DELTA_E_OF_TWO_COLORS_NOT_TWO_SHADES = 10.0
+CIE76_DELTA_E_OF_COLORS_OBVIOUSLY_DIFFERENT = 2 * CIE76_DELTA_E_OF_TWO_COLORS_NOT_TWO_SHADES
+
 
 def band_fill(color) -> tuple[int, int, int]:
     red, green, blue = color.getRgb()[:3] if hasattr(color, "getRgb") else color

@@ -17,7 +17,7 @@ def _fills(**fields):
 
 
 class TestCpuBusyPercentSurface:
-    def test_the_sample_window_has_to_be_named_by_the_caller(self):
+    def test_the_sample_window_has_to_be_named_by_the_caller_so_configs_value_has_no_second_copy(self):
         assert (
             inspect.signature(
                 system_resources.measure_cpu_busy_percent
@@ -38,7 +38,7 @@ class TestAvailableRamConversion:
         )
         assert system_resources.available_ram_gb() == 6.0
 
-    def test_the_conversion_is_binary_gb_not_a_rounded_guess(self, monkeypatch):
+    def test_the_conversion_is_binary_gb_since_it_decides_whether_an_hours_long_encode_starts(self, monkeypatch):
         monkeypatch.setattr(
             system_resources.ctypes.windll.kernel32, "GlobalMemoryStatusEx",
             _fills(ullAvailPhys=3 * 1024**3 + 512 * 1024**2),
