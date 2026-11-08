@@ -29,7 +29,7 @@ class TestAppStartup:
 
 
 class TestRetiringAnApp:
-    def test_its_windows_are_gone_when_the_teardown_returns(self):
+    def test_its_windows_are_gone_when_the_teardown_returns_so_none_dies_later_closing_another_tests_menu(self):
         app = build_evolver_app(SimpleNamespace(addfinalizer=lambda _finalizer: None))
         with patch("gui.app.run_log.read_run", return_value=""):
             app._show_run_log(make_run_record())
@@ -70,7 +70,7 @@ class TestBuildingIsNotStarting:
 
 class TestCommandWiring:
 
-    def test_a_command_a_view_offers_with_no_slot_is_refused(self):
+    def test_a_command_a_view_offers_with_no_slot_is_refused_since_qt_lets_an_unconnected_click_do_nothing(self):
         view = SimpleNamespace(commands=lambda: {"run_now": MagicMock(), "quit": MagicMock()})
 
         with pytest.raises(ValueError, match="quit"):
@@ -231,7 +231,7 @@ class TestStatsWindowLifetime:
 
         assert app._stats.current._chart is None
 
-    def test_a_second_stats_window_takes_the_first_one_down(self, request):
+    def test_a_second_stats_window_takes_the_first_down_since_one_parented_to_the_main_window_lives_as_long_as_the_app(self, request):
         app = build_evolver_app(request)
         app._background = MagicMock()
         with patch("gui.app.StatsWindow") as stats_cls:
@@ -382,7 +382,7 @@ class TestNonAiUpscaleToggle:
         assert app._tray.nonai_switch.isChecked()
         assert app._window.nonai_switch.isChecked()
 
-    def test_worker_receives_the_toggle_state(self, request):
+    def test_each_run_reads_the_non_ai_switch_as_it_starts_since_it_can_change_between_runs(self, request):
         app = self._app_with_fresh_settings(request)
         app._settings.nonai_upscale_enabled = True
         with patch("gui.run_controller.PipelineWorker") as mock_worker:
@@ -428,8 +428,10 @@ class TestPresenceMonitor:
 
 class TestSessionManagement:
 
-    def test_connects_to_commit_data_request(self, request):
+    def test_session_end_is_connected_to_commit_data_request(self, request):
         app = build_evolver_app(request)
+        # Qt's QSessionManager cannot be constructed, so commitDataRequest cannot be emitted from a
+        # test; disconnect names the receiver and raises TypeError when it was never connected.
         try:
             app._app.commitDataRequest.disconnect(app._on_session_end)
         except TypeError:
@@ -472,7 +474,7 @@ class TestRestart:
             app._restart()
         return start_again, quit_this_copy, allow
 
-    def test_the_next_copy_starts_through_the_launcher_after_this_one_has_quit(self, request):
+    def test_the_next_copy_starts_through_the_launcher_after_this_one_has_quit_so_an_update_can_land_in_between(self, request):
         start_again, quit_this_copy, _ = self._restarted(request)
 
         start_again.assert_called_once_with(os.getpid(), config.PROJECT_DIR / "launch_evolver.vbs")
@@ -549,7 +551,7 @@ class TestTakingAnUpdate:
         start_again.assert_not_called()
         quit_this_copy.assert_not_called()
 
-    def test_a_preview_never_starts_again_for_an_update(self, request, monkeypatch):
+    def test_a_preview_never_starts_again_for_an_update_since_it_runs_on_the_production_venv_and_hands_back_within_the_hour(self, request, monkeypatch):
         start_again, quit_this_copy = self._ticked(request, branch_session=True)
 
         start_again.assert_not_called()
@@ -610,7 +612,7 @@ class TestALaunchThatFindsEvolverUp:
         assert launch.exit_code == 0
         launch.alert.assert_not_called()
 
-    def test_a_handoff_the_running_instance_never_answered_is_visible(self, request):
+    def test_a_launch_a_wedged_evolver_never_answered_shows_an_alert_since_silence_looks_like_a_dead_shortcut(self, request):
         launch = self._launch(request, Outcome.UNANSWERED)
 
         launch.alert.assert_called_once()
@@ -702,7 +704,7 @@ class TestAnsweringLaunches:
 
         mock_show.assert_called_once()
 
-    def test_stepping_aside_quits_without_standing_evolver_down(self, request):
+    def test_stepping_aside_quits_without_standing_evolver_down_since_the_evolver_asking_takes_the_work_over(self, request):
         app, served = self._run_as_first_instance(request)
 
         with patch.object(app._app, "quit") as quit_the_application, \
