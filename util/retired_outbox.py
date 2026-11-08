@@ -19,29 +19,52 @@ class MovedOut:
     failed: int = 0
 
 
+@dataclass(frozen=True)
+class _Library:
+    root: Path
+    videos: Path
+    mirrors: tuple[Path, ...]
+    kino: Path
+
+    @classmethod
+    def configured(cls) -> _Library:
+        return cls(config.LIBRARY_ROOT, config.VIDEO_LIBRARY_DIR,
+                   (config.METADATA_DIR, config.SCRIPT_LIBRARY_DIR, config.GENERATED_SCRIPTS_DIR),
+                   config.KINO_DIR)
+
+    @property
+    def outbox(self) -> Path:
+        return kino_folder.retired_outbox_in(self.root)
+
+    def where_it_went(self, video: Path) -> Path | None:
+        match video.relative_to(self.outbox).parts:
+            case ("upscaled_by_orientation", _orient, source, *rest) if rest and lanes.is_genau_lane(source):
+                genau = lanes.genau_delivery_dir()
+                return None if genau is None else genau.joinpath(*rest)
+        return kino_folder.where_it_went(video, self.root, self.kino)
+
+
 def move_into_the_lane_folders() -> MovedOut:
-    outbox = kino_folder.retired_outbox_in(config.LIBRARY_ROOT)
-    if not outbox.is_dir():
+    library = _Library.configured()
+    if not library.outbox.is_dir():
         return MovedOut()
-    log.info("=== Moving what the retired %s holds into Kino's and Genau's folders ===", outbox)
-    remove_partial_files(outbox, logger=log)
-    inside = outbox.relative_to(config.VIDEO_LIBRARY_DIR)
-    videos = MovedOut()
-    for tree in (config.VIDEO_LIBRARY_DIR, config.METADATA_DIR,
-                 config.SCRIPT_LIBRARY_DIR, config.GENERATED_SCRIPTS_DIR):
-        moved = _move_everything_under(tree, tree / inside)
-        videos = moved if tree == config.VIDEO_LIBRARY_DIR else videos
+    log.info("=== Moving what the retired %s holds into Kino's and Genau's folders ===", library.outbox)
+    remove_partial_files(library.outbox, logger=log)
+    inside = library.outbox.relative_to(library.videos)
+    videos = _move_everything_under(library, library.videos, library.outbox)
+    for tree in library.mirrors:
+        _move_everything_under(library, tree, tree / inside)
     log.info("Moved out of the retired outbox: %d, left there: %d", videos.moved, videos.failed)
     return videos
 
 
-def _move_everything_under(tree: Path, retired: Path) -> MovedOut:
+def _move_everything_under(library: _Library, tree: Path, retired: Path) -> MovedOut:
     if not retired.is_dir():
         return MovedOut()
     moved = failed = 0
     for held in sorted(path for path in retired.rglob("*") if path.is_file()):
-        went = _where_it_went(config.VIDEO_LIBRARY_DIR / held.relative_to(tree))
-        destination = None if went is None else tree / went.relative_to(config.VIDEO_LIBRARY_DIR)
+        went = library.where_it_went(library.videos / held.relative_to(tree))
+        destination = None if went is None else tree / went.relative_to(library.videos)
         if _move(held, destination):
             moved += 1
         else:
@@ -50,15 +73,6 @@ def _move_everything_under(tree: Path, retired: Path) -> MovedOut:
     if retired.is_dir() and not any(retired.iterdir()):
         retired.rmdir()
     return MovedOut(moved, failed)
-
-
-def _where_it_went(video: Path) -> Path | None:
-    outbox = kino_folder.retired_outbox_in(config.LIBRARY_ROOT)
-    match video.relative_to(outbox).parts:
-        case ("upscaled_by_orientation", _orient, source, *rest) if rest and lanes.is_genau_lane(source):
-            genau = lanes.genau_delivery_dir()
-            return None if genau is None else genau.joinpath(*rest)
-    return kino_folder.where_it_went(video, config.LIBRARY_ROOT, config.KINO_DIR)
 
 
 def _move(held: Path, destination: Path | None) -> bool:

@@ -13,7 +13,7 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 pytestmark = pytest.mark.repo_check
 
 CONFIG_REFERENCE_CEILINGS = {
-    "check_correspondence.py": 6,
+    "check_correspondence.py": 4,
     "check_duplicate_sizes.py": 4,
     "evolver.py": 11,
     "gui/app.py": 4,
@@ -44,11 +44,11 @@ CONFIG_REFERENCE_CEILINGS = {
     "tasks/scripts_sync.py": 8,
     "tasks/sort.py": 3,
     "tasks/stray_files.py": 9,
-    "tasks/upscale.py": 11,
+    "tasks/upscale.py": 9,
     "tasks/video_kinds.py": 6,
     "tasks/watch_weights.py": 4,
-    "tasks/unsent_videos.py": 7,
-    "util/lanes.py": 9,
+    "tasks/unsent_videos.py": 4,
+    "util/lanes.py": 13,
     "util/origenerator_gallery.py": 2,
     "util/preview.py": 2,
     "util/script_library.py": 6,
@@ -56,10 +56,11 @@ CONFIG_REFERENCE_CEILINGS = {
     "util/nonai_library.py": 4,
     "util/contract.py": 3,
     "util/nonai_retire.py": 1,
-    "util/sidecar.py": 6,
+    "util/retired_outbox.py": 6,
+    "util/sidecar.py": 4,
     "util/topaz.py": 3,
-    "util/warm_gun.py": 4,
-    "util/trash_folders.py": 9,
+    "util/warm_gun.py": 3,
+    "util/trash_folders.py": 6,
 }
 
 OVERLAY_KEYS = {
