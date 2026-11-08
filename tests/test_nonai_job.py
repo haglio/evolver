@@ -4,6 +4,7 @@ import json
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from app_support.testing import process_alive
 
@@ -12,7 +13,7 @@ from util import nonai_job
 
 
 class TestJobRecord(unittest.TestCase):
-    def test_a_saved_job_reads_back_with_the_keys_it_was_given(self):
+    def test_the_record_a_running_encode_is_known_by_reads_back_exactly_as_saved(self):
         with workspace_temp_dir() as root:
             path = root / "state" / "job.json"
             fields = {"pid": 4242, "source": "lagoon/0 unsorted/a.mp4", "suspended": False}
@@ -30,11 +31,11 @@ class TestJobRecord(unittest.TestCase):
 
             assert path.is_file()
 
-    def test_no_file_means_no_job(self):
+    def test_a_job_file_the_sync_renamed_away_mid_encode_means_no_job(self):
         with workspace_temp_dir() as root:
             assert nonai_job.load_job(root / "job.json") is None
 
-    def test_an_unreadable_job_file_means_no_job(self):
+    def test_a_job_file_the_sync_cut_short_mid_encode_means_no_job(self):
         with workspace_temp_dir() as root:
             path = root / "job.json"
             path.write_text('{"pid": 42', encoding="utf-8")
@@ -226,7 +227,7 @@ class TestAttempts(unittest.TestCase):
             assert nonai_job.attempts_of(path, "lagoon/a.mp4") == 0
             assert nonai_job.attempts_of(path, "other/b.mp4") == 1
 
-    def test_clearing_a_key_that_was_never_counted_writes_nothing(self):
+    def test_the_clearing_every_stop_does_writes_nothing_for_a_video_never_counted(self):
         with workspace_temp_dir() as root:
             path = root / "attempts.json"
 
@@ -311,6 +312,17 @@ class TestRequest(unittest.TestCase):
 
             assert nonai_job.load_request(path) is None
             assert not path.exists()
+
+
+class TestWhatTheQueueWindowReads(unittest.TestCase):
+    def test_the_record_and_the_request_are_landed_whole_while_the_window_reads_them(self):
+        landed = []
+        with workspace_temp_dir() as root, \
+                patch.object(nonai_job, "write_whole", lambda path, text: landed.append(path)):
+            nonai_job.save_job(root / "job.json", nonai_job.Job({"pid": 1}))
+            nonai_job.save_request(root / "request.json", nonai_job.Request("example/scene one.mp4"))
+
+        assert landed == [root / "job.json", root / "request.json"]
 
 
 if __name__ == "__main__":
