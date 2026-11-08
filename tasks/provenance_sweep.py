@@ -14,7 +14,7 @@ from util.versions import is_upscaled_stem
 
 log = logging.getLogger(__name__)
 
-NOTES_READ_PER_RUN = 400
+FFPROBE_READS_OF_TOPAZ_NOTES_PER_RUN = 400
 
 StampFor = Callable[[], "dict | None"]
 
@@ -78,7 +78,7 @@ class _Notes:
 
 
 def run(read_note: Callable[[Path], str] = ffprobe.videoai_tag,
-        notes_per_run: int = NOTES_READ_PER_RUN) -> ProvenanceResult:
+        notes_per_run: int = FFPROBE_READS_OF_TOPAZ_NOTES_PER_RUN) -> ProvenanceResult:
     log.info("=== Stage: record what made each video ===")
     result = ProvenanceResult()
     notes = _Notes(read_note, notes_per_run)
