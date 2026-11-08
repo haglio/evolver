@@ -65,7 +65,8 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
-            with override_config(**overrides),                  patch("util.ffprobe.duration_seconds", side_effect=AssertionError("probed")):
+            with override_config(**overrides), \
+                 patch("util.ffprobe.duration_seconds", side_effect=AssertionError("probed")):
                 make_video(non_ai / "alpha" / "3_good_to_go" / "processed"
                            / "Jane Doe scene 2_apo8_iris2.mp4")
                 queued = make_video(non_ai / "alpha" / "0 unsorted" / "Jane Doe scene 1.mp4")
