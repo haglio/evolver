@@ -69,7 +69,7 @@ def run() -> GenauDeliverResult:
 
     result = GenauDeliverResult()
     if delivery_dir is None:
-        log.warning("=== Genau lane: no folder is laid out as Genau's flicks are; nothing delivered ===")
+        log.warning("=== Genau lane: no folder is laid out the way Genau's folder is; nothing delivered ===")
         return result
     log.info("=== Genau lane: finishing the upscales in %s ===", delivery_dir)
 
