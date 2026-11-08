@@ -4,7 +4,7 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 
-from app_support.video_action import labeled
+from app_support.video_action import with_actions
 
 from tasks import origenerator_metadata
 from util import lanes, sidecar
@@ -32,7 +32,7 @@ def run() -> VideoActionsResult:
         actions, record = actions_of(clip), sidecar.sidecar_path(clip.upscale)
         if actions is None or not record.exists():
             continue
-        if sidecar.update(record, lambda current, actions=actions: labeled(current, actions)) is None:
+        if sidecar.update(record, lambda current, actions=actions: with_actions(current, actions)) is None:
             result.already += 1
         else:
             result.copied += 1
