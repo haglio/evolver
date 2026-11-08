@@ -34,6 +34,7 @@ class EvolverTray(QSystemTrayIcon):
         self._name = name
 
         self._menu = MenuWithSwitches()
+        # Qt cascades a style sheet down from a parent widget, and a tray menu has none.
         self._menu.setStyleSheet(menu_rules())
 
         self._status_action = QAction("", self._menu)

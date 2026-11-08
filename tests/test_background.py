@@ -26,7 +26,7 @@ def queue():
     made.stop()
 
 
-def test_the_work_is_done_off_this_thread_and_its_answer_comes_back_on_it(queue):
+def test_the_work_waits_off_the_windows_thread_for_a_non_ai_stage_a_run_holds_and_answers_back_on_it(queue):
     answers = []
 
     queue.run(threading.current_thread,
@@ -38,7 +38,7 @@ def test_the_work_is_done_off_this_thread_and_its_answer_comes_back_on_it(queue)
     assert answered_on is threading.main_thread()
 
 
-def test_work_is_done_in_the_order_it_was_asked_for(queue):
+def test_work_is_done_in_the_order_asked_so_the_queue_windows_arrow_clicked_on_and_straight_off_ends_off(queue):
     done = []
 
     for step in range(5):
