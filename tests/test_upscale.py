@@ -419,7 +419,7 @@ class TestIsT2vProvider(unittest.TestCase):
             with override_config(METADATA_DIR=meta_dir):
                 assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
-    def test_false_when_the_sidecar_holds_only_the_video_kind_so_no_t2v_model_is_baked_into_an_encode_nobody_redoes(self):
+    def test_false_when_the_sidecar_holds_only_the_video_kind(self):
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
@@ -429,7 +429,7 @@ class TestIsT2vProvider(unittest.TestCase):
             )
 
             with override_config(METADATA_DIR=meta_dir):
-                assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
+                assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR), "a wrong answer bakes the text-to-video model into an encode nobody redoes"
 
     def test_false_when_metadata_missing(self):
         with workspace_temp_dir() as root:
