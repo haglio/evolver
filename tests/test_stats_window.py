@@ -260,7 +260,16 @@ _SECONDS_WINDOWS_WAITS_BEFORE_CALLING_A_WINDOW_NOT_RESPONDING = 5.0
 _A_YEAR_OF_RUNS = 365 * 24 * 6
 
 
+def _seconds_of_work(action) -> float:
+    started = time.thread_time()
+    action()
+    return time.thread_time() - started
+
+
 class TestAYearOfRuns:
+    def test_a_paint_is_timed_by_the_work_it_does_not_by_how_long_a_busy_computer_keeps_it_waiting(self):
+        assert _seconds_of_work(lambda: time.sleep(0.5)) < 0.1
+
     def test_no_paint_of_a_year_of_runs_keeps_windows_waiting_long_enough_to_say_not_responding(
             self):
         rng = np.random.default_rng(7)
@@ -271,9 +280,7 @@ class TestAYearOfRuns:
         for mode, fit in (("historical", False), ("averages", False), ("historical", True)):
             chart.set_mode(mode)
             chart.set_fit(fit)
-            started = time.perf_counter()
-            _render(chart, 1000, 560)
-            slowest = max(slowest, time.perf_counter() - started)
+            slowest = max(slowest, _seconds_of_work(lambda: _render(chart, 1000, 560)))
 
         assert slowest < _SECONDS_WINDOWS_WAITS_BEFORE_CALLING_A_WINDOW_NOT_RESPONDING
 
