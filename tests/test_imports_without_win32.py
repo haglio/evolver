@@ -50,14 +50,20 @@ def run_without_the_win32_ctypes_surface(body):
     )
 
 
+_COLLECT_EVERY_TEST_MODULE = ["--collect-only", "-q", "--no-cov", "--assert=plain"]
+
+
 class TestCollectingTheWholeSuiteNotAListOfModules(unittest.TestCase):
     def test_no_test_module_drops_out_where_ctypes_has_no_windll(self):
         result = run_without_the_win32_ctypes_surface(
             "import sys, pytest\n"
-            "sys.exit(pytest.main(['--collect-only', '-q', '--no-cov']))\n"
+            f"sys.exit(pytest.main({_COLLECT_EVERY_TEST_MODULE!r}))\n"
         )
 
         assert result.returncode == 0, result.stdout[-4000:]
+
+    def test_its_asserts_are_left_unrewritten_since_it_runs_none_and_rewriting_was_most_of_its_time(self):
+        assert "--assert=plain" in _COLLECT_EVERY_TEST_MODULE
 
 
 if __name__ == "__main__":
