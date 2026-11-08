@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from util.versions import upscaled_stem
 log = logging.getLogger(__name__)
 
 _LISTED = 10
+_PCLOUD_CONFLICT_COPY = re.compile(r" \[conflicted( \d+)?\]$")
 
 
 @dataclass
@@ -102,7 +104,8 @@ def _flicks_whose_record_outlived_them(present: set[str], awaited: set[str]) -> 
     if records is None or not records.is_dir():
         return []
     return sorted(_shown(genau / f"{record.stem}.mp4") for record in records.glob("*.json")
-                  if f"{record.stem}.mp4" not in present | awaited)
+                  if not _PCLOUD_CONFLICT_COPY.search(record.stem)
+                  and f"{record.stem}.mp4" not in present | awaited)
 
 
 def _log_result(result: CorrespondenceResult) -> None:
