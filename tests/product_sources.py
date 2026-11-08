@@ -29,6 +29,20 @@ def product_sources(root: Path) -> list[str]:
     return sorted(found)
 
 
+def config_names_read(*modules: str) -> set[str]:
+    found: set[str] = set()
+    for name in modules:
+        tree = ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
+        found |= {
+            node.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "config"
+        }
+    return found
+
+
 def strings_outside_docstrings(tree: ast.AST) -> Iterator[ast.Constant]:
     docstrings = {
         id(scope.body[0].value)

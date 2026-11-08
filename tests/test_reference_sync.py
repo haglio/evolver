@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import reference_sync
+from tests.product_sources import config_names_read
 from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
 from util import reference_stores
 
@@ -24,23 +25,32 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
+def _every_store_pointed_away_from_its_real_place(temp: Path) -> dict:
+    unused = temp / "no-such-store"
+    return {
+        "VIDEO_SEARCH_ROOT": temp / "videos",
+        "GENAUMACHER_SESSIONS_DIR": unused,
+        "SCRIPTURE_SESSIONS_DIR": unused,
+        "FUN_TIME_WATCH_STATS_FILE": unused / "watch_stats.json",
+        "NON_AI_DIR": unused / "non_AI",
+        "METADATA_DIR": unused / "metadata",
+        "VR_VIDEO_DIR": None,
+        "NONAI_RETIRED_ROOT": None,
+    }
+
+
 @contextmanager
 def _stores_under(temp: Path, **used):
-    unused = temp / "no-such-store"
-    with override_config(
-        VIDEO_SEARCH_ROOT=temp / "videos",
-        **{
-            "GENAUMACHER_SESSIONS_DIR": unused,
-            "SCRIPTURE_SESSIONS_DIR": unused,
-            "FUN_TIME_WATCH_STATS_FILE": unused / "watch_stats.json",
-            "NON_AI_DIR": unused / "non_AI",
-            "METADATA_DIR": unused / "metadata",
-            "VR_VIDEO_DIR": None,
-            "NONAI_RETIRED_ROOT": None,
-            **used,
-        },
-    ):
+    with override_config(**{**_every_store_pointed_away_from_its_real_place(temp), **used}):
         yield
+
+
+class TestTheStoresTheseTestsRead(unittest.TestCase):
+    def test_every_store_this_stage_reads_is_pointed_away_from_another_app_s_real_file(self):
+        read = config_names_read("util/reference_stores.py", "tasks/reference_sync.py")
+        pointed_away = set(_every_store_pointed_away_from_its_real_place(Path("anywhere")))
+
+        assert read - pointed_away == set()
 
 
 @contextmanager
@@ -340,8 +350,8 @@ class TestReferenceStoreSurface(unittest.TestCase):
         assert store.fingerprint() is None
 
 
-class TestAShapeThisStageWasNotWrittenFor(unittest.TestCase):
-    def test_a_session_stamped_with_a_version_this_stage_does_not_know_is_left_alone(self):
+class TestAShapeThisStageWasNotWrittenForStillParses(unittest.TestCase):
+    def test_a_session_in_a_version_this_stage_does_not_know_is_left_for_a_person_not_rewritten_blind_and_not_failed(self):
         with workspace_temp_dir() as temp:
             _write_video(temp / "videos" / "2D" / "other" / "moved" / "clip.mp4")
             was_at = str(temp / "videos" / "2D" / "other" / "clip.mp4")
