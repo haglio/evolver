@@ -5,10 +5,11 @@ from unittest.mock import patch
 
 import pytest
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QFontMetrics
 from PyQt6.QtWidgets import QLabel, QMainWindow, QProgressBar
 
 from evolver import ALL_STAGES, STAGE_LABELS
-from gui.progress_popup import BAR_WIDTH, ProgressPopup
+from gui.progress_popup import BAR_WIDTH, ProgressPopup, _caption_width
 
 
 class TestPopupConstruction(unittest.TestCase):
@@ -41,6 +42,13 @@ class TestPopupConstruction(unittest.TestCase):
             with self.subTest(stage=key):
                 assert bar.width() >= BAR_WIDTH
                 assert bar.x() >= widest_caption
+
+    def test_the_caption_column_widens_with_a_wider_font_where_a_fixed_width_would_clip(self):
+        wider = QFont(self.popup.font())
+        wider.setPointSizeF(wider.pointSizeF() * 2)
+        widest = max(QFontMetrics(wider).horizontalAdvance(label) for label in STAGE_LABELS.values())
+
+        assert _caption_width(wider) > widest
 
     def test_has_total_bar(self):
         assert isinstance(self.popup._total_bar, QProgressBar)
