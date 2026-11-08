@@ -59,7 +59,7 @@ def run() -> SceneScriptsResult:
             continue
 
         placed = script_library.place(funscript.read(clip_script), offset, the_scene_s_own_runtime)
-        funscript.write(destination, script_library.stamped(placed, provenance.SCENE_SCRIPTS))
+        funscript.write(destination, script_library.stamped_in_its_own_metadata(placed, provenance.SCENE_SCRIPTS))
         result.written += 1
         log.info("PLACE SCRIPT  %s  ->  %s", clip_script, destination)
 

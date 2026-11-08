@@ -120,7 +120,7 @@ def place(script: dict, start_seconds: float, duration_seconds: float) -> dict:
     return placed
 
 
-def stamped(script: dict, act: str) -> dict:
+def stamped_in_its_own_metadata(script: dict, act: str) -> dict:
     metadata = script.get("metadata")
     metadata = metadata if isinstance(metadata, dict) else {}
     return {**script, "metadata": provenance.recorded(metadata, act, provenance.by_evolver())}
