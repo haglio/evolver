@@ -136,15 +136,15 @@ def _find_source_image_row(video_row: dict, rows: list[dict]) -> dict | None:
 
 def _video_block(row: dict, video_path: Path) -> dict:
     block: dict = {}
-    _put(block, "prompt", row.get("positive_prompt"))
-    _put(block, "model", _model_label(_parse_params(row)))
+    _put_if_present(block, "prompt", row.get("positive_prompt"))
+    _put_if_present(block, "model", _model_label(_parse_params(row)))
     dims = video_dimensions(video_path)
     if dims is not None:
         width, height = dims
-        _put(block, "resolution", f"{width}x{height}")
-        _put(block, "aspect_ratio", _aspect_ratio(width, height))
-    _put(block, "seed", _seed_str(row))
-    _put(block, "created", _created_date(row))
+        _put_if_present(block, "resolution", f"{width}x{height}")
+        _put_if_present(block, "aspect_ratio", _aspect_ratio(width, height))
+    _put_if_present(block, "seed", _seed_str(row))
+    _put_if_present(block, "created", _created_date(row))
     return block
 
 
@@ -167,15 +167,15 @@ def _named(column: str | None) -> str | None:
 
 def _source_image_block(row: dict) -> dict:
     block: dict = {}
-    _put(block, "positive_prompt", row.get("positive_prompt"))
-    _put(block, "negative_prompt", row.get("negative_prompt"))
-    _put(block, "model", _model_label(_parse_params(row)))
-    _put(block, "seed", _seed_str(row))
-    _put(block, "created", _created_date(row))
+    _put_if_present(block, "positive_prompt", row.get("positive_prompt"))
+    _put_if_present(block, "negative_prompt", row.get("negative_prompt"))
+    _put_if_present(block, "model", _model_label(_parse_params(row)))
+    _put_if_present(block, "seed", _seed_str(row))
+    _put_if_present(block, "created", _created_date(row))
     return block
 
 
-def _put(block: dict, key: str, value) -> None:
+def _put_if_present(block: dict, key: str, value) -> None:
     if value:
         block[key] = value
 
