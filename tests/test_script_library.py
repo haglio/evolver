@@ -25,7 +25,7 @@ class TestTrim(unittest.TestCase):
 
         assert trimmed["actions"] == [{"at": 0, "pos": 20}, {"at": 1000, "pos": 80}, {"at": 2000, "pos": 30}]
 
-    def test_carries_the_preceding_action_to_zero_so_t0_has_a_position(self):
+    def test_carries_the_preceding_action_to_zero_so_the_device_does_not_lurch_at_the_clips_first_motion(self):
         script = {
             "actions": [
                 {"at": 9_400, "pos": 15},
@@ -86,7 +86,7 @@ class TestScriptPathForVideo(unittest.TestCase):
 
 
 class TestPlace(unittest.TestCase):
-    def test_moves_every_action_to_where_the_clip_sits_in_the_scene(self):
+    def test_moves_every_action_to_where_the_clip_sits_and_scripts_nothing_else_so_the_device_stays_still_there(self):
         script = {"actions": [{"at": 500, "pos": 80}, {"at": 0, "pos": 15}]}
 
         placed = script_library.place(script, start_seconds=10.0, duration_seconds=126.5)
@@ -106,12 +106,12 @@ class TestPlace(unittest.TestCase):
 
 
 class TestScriptPathOutsideTheLibrary(unittest.TestCase):
-    def test_a_video_outside_the_library_has_no_script_here(self):
+    def test_a_video_outside_the_library_like_an_archived_original_that_keeps_its_own_beside_it_has_no_script_here(self):
         with (
             override_config(VIDEO_LIBRARY_DIR=Path("C:/lib/videos"), SCRIPT_LIBRARY_DIR=Path("C:/lib/scripts")),
             pytest.raises(ValueError, match="not in the video library"),
         ):
-            script_library.script_path_for_video(Path("C:/elsewhere/clip.mkv"))
+            script_library.script_path_for_video(Path("C:/archive/clip.mkv"))
 
 
 class TestTheMarkSayingNoPersonWroteAScript(unittest.TestCase):
@@ -161,12 +161,12 @@ class TestStampingAScript:
     def test_the_script_given_is_not_written_on(self):
         script = {"actions": [], "metadata": {"title": "scene one"}}
 
-        script_library.stamped(script, "trim")
+        script_library.stamped_in_its_own_metadata(script, "trim")
 
         assert script == {"actions": [], "metadata": {"title": "scene one"}}
 
     def test_a_script_with_no_metadata_gets_the_stamp_alone(self):
-        stamped = script_library.stamped({"actions": []}, "trim")
+        stamped = script_library.stamped_in_its_own_metadata({"actions": []}, "trim")
 
         assert list(stamped["metadata"]["provenance"]) == ["trim"]
 

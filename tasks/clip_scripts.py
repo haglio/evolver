@@ -61,7 +61,7 @@ def run() -> ClipScriptsResult:
             log.info("NO MOTION for clip window, leaving unscripted: %s", video)
             continue
 
-        funscript.write(destination, script_library.stamped(trimmed, provenance.CLIP_SCRIPTS))
+        funscript.write(destination, script_library.stamped_in_its_own_metadata(trimmed, provenance.CLIP_SCRIPTS))
         result.written += 1
         log.info("TRIM SCRIPT  %s  ->  %s", scene_script, destination)
 
