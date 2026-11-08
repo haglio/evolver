@@ -243,7 +243,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
     def test_measuring_a_free_kind_still_counts_against_the_batch_limit(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(VIDEO_KIND_PROBES_A_RUN_WHILE_THE_LIBRARY_IS_FIRST_MEASURED=1):
+            with lib.config(VIDEO_KIND_PROBES_PER_RUN=1):
                 for index in (1, 2):
                     touch_video(lib.genau_flicks / f"loop_{index}_topaz.mp4")
                 measured = []
@@ -313,7 +313,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
     def test_a_generated_clip_s_orientation_costs_no_measurement(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(GENAU_SOURCE, VIDEO_KIND_PROBES_A_RUN_WHILE_THE_LIBRARY_IS_FIRST_MEASURED=0):
+            with lib.config(GENAU_SOURCE, VIDEO_KIND_PROBES_PER_RUN=0):
                 touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_k.mp4")
                 path = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "provider2" / "clip_k_topaz.mp4"
@@ -361,7 +361,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
     def test_measuring_an_orientation_counts_against_the_batch_limit(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(GENAU_SOURCE, VIDEO_KIND_PROBES_A_RUN_WHILE_THE_LIBRARY_IS_FIRST_MEASURED=1):
+            with lib.config(GENAU_SOURCE, VIDEO_KIND_PROBES_PER_RUN=1):
                 for index in range(3):
                     video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / f"scene-{index}.mp4")
                     write_sidecar(sidecar.sidecar_path(video), video_kind.timed(
@@ -450,14 +450,14 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
 
             assert result == video_kinds.VideoKindsResult()
 
-    def test_a_run_asks_the_cloud_drive_about_only_so_many_vr_videos(self):
+    def test_a_run_asks_the_cloud_drive_about_only_so_many_vr_videos_while_the_headset_may_stream_from_it(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             vr_root = root / "cloud" / "VR"
             for index in range(5):
                 touch_video(vr_root / "finished" / f"scene {index}.mp4")
             measured = []
-            with lib.config(VR_VIDEO_DIR=vr_root, VR_PROBES_A_RUN_ON_THE_CLOUD_DRIVE_THE_HEADSET_STREAMS_FROM=2):
+            with lib.config(VR_VIDEO_DIR=vr_root, CLOUD_DRIVE_PROBES_PER_RUN=2):
                 result = video_kinds.run(probe=lambda video: measured.append(video) or 1800.0,
                                          orientation_probe=_refuses_to_be_called)
 
@@ -482,7 +482,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
     def test_a_run_measures_no_more_than_the_batch_limit(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(VIDEO_KIND_PROBES_A_RUN_WHILE_THE_LIBRARY_IS_FIRST_MEASURED=2):
+            with lib.config(VIDEO_KIND_PROBES_PER_RUN=2):
                 for index in range(5):
                     touch_video(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
                 measured = []
@@ -500,7 +500,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
     def test_the_ones_it_did_not_reach_are_not_counted_as_known(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(VIDEO_KIND_PROBES_A_RUN_WHILE_THE_LIBRARY_IS_FIRST_MEASURED=1):
+            with lib.config(VIDEO_KIND_PROBES_PER_RUN=1):
                 for index in range(3):
                     touch_video(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
 
@@ -512,7 +512,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
     def test_the_free_answers_are_not_held_back_by_it(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config(VIDEO_KIND_PROBES_A_RUN_WHILE_THE_LIBRARY_IS_FIRST_MEASURED=0):
+            with lib.config(VIDEO_KIND_PROBES_PER_RUN=0):
                 clip = touch_video(lib.genau_flicks / "loop_3_topaz.mp4")
                 touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_g.mp4")
 

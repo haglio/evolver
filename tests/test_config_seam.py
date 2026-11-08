@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import unittest
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -209,11 +210,21 @@ class _OverlayKeysThroughBoundNamesNotComprehensionTargets(ast.NodeVisitor):
 _NAMES_ONLY_CONFIG_BINDS_TO_THE_OVERLAY = {"_CONTENT": "", "content": ""}
 
 
-def _stage_bindings_read_off_config(tree: ast.AST) -> list[int]:
+def _run_at_import(statements: list[ast.stmt]) -> Iterator[ast.AST]:
+    for statement in statements:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            yield from statement.decorator_list
+        elif isinstance(statement, ast.ClassDef):
+            yield from (*statement.decorator_list, *statement.bases, *statement.keywords)
+            yield from _run_at_import(statement.body)
+        else:
+            yield statement
+
+
+def _stage_bindings_read_off_config(tree: ast.Module) -> list[int]:
     return [
-        statement.lineno
-        for statement in tree.body
-        if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        inner.lineno
+        for statement in _run_at_import(tree.body)
         for inner in ast.walk(statement)
         if isinstance(inner, ast.Name) and inner.id == "config" and isinstance(inner.ctx, ast.Load)
     ]

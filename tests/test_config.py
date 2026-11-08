@@ -243,6 +243,11 @@ class TestWarmGunJournalDirs(unittest.TestCase):
         assert config.warm_gun_outbox({"warm_gun_outbox": ""}) is None
 
 
+class TestWhereALostVideoIsHuntedFor(unittest.TestCase):
+    def test_a_video_parked_in_a_folder_beside_the_library_is_still_inside_the_search(self):
+        assert (config.VIDEO_LIBRARY_DIR.parent / "compilations").is_relative_to(config.VIDEO_SEARCH_ROOT)
+
+
 class TestTheOverlayPath(unittest.TestCase):
     def test_is_read_at_each_call_so_the_suite_can_point_every_reader_at_the_example(self):
         with workspace_temp_dir() as root:
