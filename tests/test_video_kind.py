@@ -117,11 +117,11 @@ def _the_writers_video_kind_has() -> set[str]:
 
 
 class TestTellingABareSidecarApart(unittest.TestCase):
-    def test_whatever_this_module_writes_still_leaves_a_record_holding_nothing_else(self):
+    def test_every_writer_here_leaves_a_record_bare(self):
         assert _the_writers_video_kind_has() == set(_A_VALUE_EACH_WRITER_TAKES), "a new writer: give it a value here and list its field among _OWN_FIELDS"
         for writer, value in _A_VALUE_EACH_WRITER_TAKES.items():
             with self.subTest(writer=writer):
-                assert video_kind.only_the_video_itself(getattr(video_kind, writer)({}, value))
+                assert video_kind.only_the_video_itself(getattr(video_kind, writer)({}, value)), "a field this module writes must not turn a bare record into evidence"
 
     def test_a_sidecar_holding_only_a_kind_records_nothing_else(self):
         assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}})
@@ -141,7 +141,7 @@ class TestTellingABareSidecarApart(unittest.TestCase):
     def test_a_record_of_what_made_the_file_beside_them_is_still_nothing_else(self):
         assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}}), "a scrape that took the stamp for its own work would never fetch the clip's prompts"
 
-    def test_a_record_of_what_made_the_file_alone_is_nothing_else(self):
+    def test_a_provenance_stamp_alone_is_nothing_else(self):
         assert video_kind.only_the_video_itself({provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}}), "an upscale is stamped as it is written, before its scrape or its kind lands"
 
     def test_an_empty_record_is_something_else(self):

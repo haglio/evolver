@@ -198,7 +198,7 @@ class TestRunningItAgain(unittest.TestCase):
                 again = video_kinds.run(probe=_refuses_to_be_called,
                                         orientation_probe=_refuses_to_be_called)
 
-            assert (again.recorded, again.already) == (0, 1)
+            assert (again.recorded, again.already) == (0, 1), "a probe starts a process, and a video never changes length"
 
 
 def _unmeasurable(_video):
@@ -568,7 +568,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
 
                 assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.FULL_LENGTH
 
-    def test_a_video_once_measured_is_never_probed_again_as_its_running_time_never_changes(self):
+    def test_a_measured_video_is_never_probed_again(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):

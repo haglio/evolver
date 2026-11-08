@@ -78,7 +78,7 @@ class TestGroupIds:
 
         assert len(set(ids.values())) == 2, "each hand-added version word is one two real titles can no longer differ by"
 
-    def test_a_declared_pair_whose_original_is_in_another_bucket_joins_nothing(self):
+    def test_a_pair_declared_across_buckets_joins_nothing(self):
         assert group_ids(["beta cut"], {"beta cut": "video one"}) == {"beta cut": "beta cut"}
 
     def test_a_second_download_of_one_video_keeps_its_family(self):
