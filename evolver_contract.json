@@ -24,6 +24,16 @@
         ],
         "written_by_the_reader": [
           "wrong_action"
+        ],
+        "missing_from_older_records": [
+          "prompt",
+          "model",
+          "resolution",
+          "aspect_ratio",
+          "quality",
+          "style",
+          "seed",
+          "created"
         ]
       },
       "source_image": {

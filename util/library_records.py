@@ -59,6 +59,7 @@ def promised_to_fun_time() -> dict:
                     *VIDEO_GENERATION_FIELDS,
                 ],
                 "written_by_the_reader": list(VIDEO_FIELDS_FUN_TIME_WRITES),
+                "missing_from_older_records": list(VIDEO_GENERATION_FIELDS),
             },
             SOURCE_IMAGE_BLOCK: {"fields": list(SOURCE_IMAGE_FIELDS)},
             CLIP_BLOCK: {"fields": [*CLIP_FIELDS_WRITTEN_WHEN_A_CLIP_IS_CUT, *CLIP_FIELDS_THE_CLIP_MATCH_ADDS]},
