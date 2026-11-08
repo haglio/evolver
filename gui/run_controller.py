@@ -11,6 +11,8 @@ from gui.worker import PipelineWorker
 
 log = logging.getLogger(__name__)
 
+STAGE_GRACE_SECONDS = 5.0
+
 
 class RunController(QObject):
     run_started = pyqtSignal()
@@ -67,9 +69,9 @@ class RunController(QObject):
         if trigger:
             self.start(trigger)
 
-    def wait_for_exit(self, msecs: int) -> None:
+    def wait_for_exit(self) -> None:
         if self.is_running:
-            self._worker.wait(msecs)
+            self._worker.wait(int(STAGE_GRACE_SECONDS * 1000))
 
     def _end_run(self) -> None:
         self._watchdog.stop()
