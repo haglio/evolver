@@ -303,7 +303,7 @@ class TestCooperativeStop:
 class TestEachStagesWork:
     @pytest.mark.parametrize(("key", "work", "settings"), [
         pytest.param("strays", "evolver.stray_files.run", {}, id="strays"),
-        pytest.param("withdrawn", "evolver.taken_back.run", {}, id="withdrawn"),
+        pytest.param("withdrawn", "evolver.unsent_videos.run", {}, id="withdrawn"),
         pytest.param("metadata", "evolver.prompt_scrape.run", {}, id="metadata"),
         pytest.param("labels", "evolver.video_labels.run", {}, id="labels"),
         pytest.param("sort", "evolver.sort.run", {}, id="sort"),

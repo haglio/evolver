@@ -18,7 +18,7 @@ from tasks.scene_scripts import SceneScriptsResult
 from tasks.scripts_sync import ScriptsSyncResult
 from tasks.sort import SortResult
 from tasks.stray_files import StrayFilesResult
-from tasks.taken_back import TakenBackResult
+from tasks.unsent_videos import UnsentVideosResult
 from tasks.upscale import UpscaleResult
 from tasks.video_kinds import VideoKindsResult
 from tasks.video_labels import VideoLabelsResult
@@ -35,9 +35,9 @@ WENT_WRONG_AND_WANTS_AN_EYE = (False, True)
                  id="stray files put right"),
     pytest.param(StrayFilesResult(reported=["example/notes one.txt"]), WANTS_AN_EYE,
                  id="a stray file only reported"),
-    pytest.param(TakenBackResult(deleted=3), WENT_WELL, id="videos taken back"),
-    pytest.param(TakenBackResult(deleted=1, failed=1), WENT_WRONG,
-                 id="a copy taken back that could not be deleted"),
+    pytest.param(UnsentVideosResult(deleted=3), WENT_WELL, id="videos unsent"),
+    pytest.param(UnsentVideosResult(deleted=1, failed=1), WENT_WRONG,
+                 id="a copy of an unsent video that could not be deleted"),
     pytest.param(PromptScrapeResult(newly_scraped=4), WENT_WELL, id="prompts scraped"),
     pytest.param(PromptScrapeResult(newly_scraped=1, errors=1), WENT_WRONG,
                  id="a prompt scrape that errored"),

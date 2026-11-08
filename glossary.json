@@ -123,7 +123,7 @@
       "id": "scene",
       "thing": "the full video a carved clip came from",
       "screen": [
-        "Scene Scripts"
+        "Transfer Clip Funscripts to Scenes"
       ],
       "his_word": "scene (2026-11-05: 'scene is fine in this context')",
       "code_today": [
@@ -137,8 +137,8 @@
       "id": "clip",
       "thing": "a short piece cut from a full scene",
       "screen": [
-        "Clip Scripts",
-        "Cut each carved clip's funscript out of its source scene's"
+        "Transfer Scene Funscripts to Clips",
+        "Cut each clip's funscript out of its scene's"
       ],
       "his_word": "clip (2026-11-02: clip stays for short vs full)",
       "code_today": [
@@ -175,17 +175,21 @@
       ]
     },
     {
-      "id": "taken_back",
-      "thing": "the stage that deletes every copy of a video Origenerator took back",
+      "id": "unsent_video",
+      "thing": "a video unsent with Origenerator's Unsend button, whose every copy the Delete Unsent Videos stage deletes",
       "screen": [
-        "Taken Back"
+        "Delete Unsent Videos"
       ],
-      "his_word": null,
+      "his_word": "Delete Unsent Videos (2026-11-07)",
       "code_today": [
-        "taken back"
+        "unsent videos"
       ],
-      "code_word": "taken back",
-      "status": "agreed"
+      "code_word": "unsent video",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words, after Origenerator's Unsend button; the stage's key in the run history stays withdrawn",
+      "retired": [
+        "taken back"
+      ]
     },
     {
       "id": "video_kind",
@@ -291,6 +295,104 @@
       ],
       "code_word": "labels",
       "status": "his_word"
+    },
+    {
+      "id": "stray_files_stage",
+      "thing": "the stage that fixes, moves or reports the files among the videos that are not videos",
+      "screen": [
+        "Handle Stray Files"
+      ],
+      "his_word": "Handle Stray Files (2026-11-07)",
+      "code_today": [
+        "stray files"
+      ],
+      "code_word": "stray files",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
+      "id": "prompts_stage",
+      "thing": "the stage that saves the prompt each AI video was made from on its sidecar",
+      "screen": [
+        "Transfer Prompts"
+      ],
+      "his_word": "Transfer Prompts (2026-11-07)",
+      "code_today": [
+        "prompt scrape"
+      ],
+      "code_word": "prompt scrape",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
+      "id": "upscale_stage",
+      "thing": "the stage that upscales the AI videos in 1_sorted with Topaz",
+      "screen": [
+        "Upscale AI videos"
+      ],
+      "his_word": "Upscale AI videos (2026-11-07)",
+      "code_today": [
+        "upscale"
+      ],
+      "code_word": "upscale",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
+      "id": "upscale_non_ai_stage",
+      "thing": "the stage that upscales the non-AI videos with Topaz while the user is away",
+      "screen": [
+        "Upscale non-AI videos"
+      ],
+      "his_word": "Upscale non-AI videos (2026-11-07)",
+      "code_today": [
+        "nonai upscale"
+      ],
+      "code_word": "nonai upscale",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
+      "id": "weights_stage",
+      "thing": "the stage that adds up Fun Time's and Warm Gun's plays as the weight both apps shuffle by",
+      "screen": [
+        "Update Weights"
+      ],
+      "his_word": "Update Weights (2026-11-07)",
+      "code_today": [
+        "watch weights"
+      ],
+      "code_word": "watch weights",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
+      "id": "clip_scripts_stage",
+      "thing": "the stage that cuts a clip's funscript out of its scene's",
+      "screen": [
+        "Transfer Scene Funscripts to Clips"
+      ],
+      "his_word": "Transfer Scene Funscripts to Clips (2026-11-07)",
+      "code_today": [
+        "clip scripts"
+      ],
+      "code_word": "clip scripts",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
+      "id": "scene_scripts_stage",
+      "thing": "the stage that gives an unscripted scene the funscript of the clip cut from it",
+      "screen": [
+        "Transfer Clip Funscripts to Scenes"
+      ],
+      "his_word": "Transfer Clip Funscripts to Scenes (2026-11-07)",
+      "code_today": [
+        "scene scripts"
+      ],
+      "code_word": "scene scripts",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
     }
   ]
 }
