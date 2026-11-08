@@ -8,11 +8,14 @@ import sys
 import tomllib
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from app_support import haglio_settings
 
 import config
 import content_overlay
+from tasks.nonai_encode import EncodeSettings
 from tests.temp_helpers import workspace_temp_dir
 
 
@@ -238,6 +241,36 @@ class TestWarmGunJournalDirs(unittest.TestCase):
 
     def test_with_none_named_the_phone_has_no_folder_of_its_own(self):
         assert config.warm_gun_outbox({"warm_gun_outbox": ""}) is None
+
+
+class TestTheOverlayPath(unittest.TestCase):
+    def test_is_read_at_each_call_so_the_suite_can_point_every_reader_at_the_example(self):
+        with workspace_temp_dir() as root:
+            elsewhere = root / "content.local.json"
+            elsewhere.write_text(json.dumps({"chrome_profile": "Profile 9"}), encoding="utf-8")
+            with patch.object(content_overlay, "LOCAL_CONTENT", elsewhere):
+                assert content_overlay.load_content()["chrome_profile"] == "Profile 9"
+
+
+class TestDisplayTimezone(unittest.TestCase):
+    def test_unset_leaves_the_zone_to_windows_for_a_computer_in_its_users_own_zone(self):
+        assert config.display_timezone({}) is None
+
+    def test_a_computer_away_from_the_zone_its_user_reads_names_that_zone_in_the_overlay(self):
+        assert config.display_timezone({"display_timezone": "Asia/Tokyo"}) == ZoneInfo("Asia/Tokyo")
+
+
+class TestTheEncodeAndTheRun(unittest.TestCase):
+    def test_what_one_encode_may_cost_the_computer_is_encode_settings_never_config(self):
+        settings = {name.upper() for name in EncodeSettings.__dataclass_fields__}
+
+        assert sorted(name for name in vars(config) if name.removeprefix("NONAI_") in settings) == []
+
+    def test_an_encode_may_outlast_many_runs_so_it_runs_detached_and_is_checked_each_tick(self):
+        assert EncodeSettings().max_runtime_hours * 3600 > 10 * config.PIPELINE_WALL_TIMEOUT_SECONDS
+
+    def test_a_returning_user_parks_the_encode_within_seconds_rather_than_at_the_next_run(self):
+        assert config.NONAI_PRESENCE_POLL_SECONDS < 60
 
 
 if __name__ == "__main__":

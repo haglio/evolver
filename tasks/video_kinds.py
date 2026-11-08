@@ -54,8 +54,9 @@ class VideoKindsResult(StageResult):
 def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsResult:
     log.info("=== Stage: record video kinds ===")
     result = VideoKindsResult()
-    measurements = _Measurements(config.VIDEO_KIND_BATCH_LIMIT,
-                                 config.CLOUD_VIDEO_KIND_BATCH_LIMIT)
+    measurements = _Measurements(
+        config.VIDEO_KIND_PROBES_A_RUN_WHILE_THE_LIBRARY_IS_FIRST_MEASURED,
+        config.VR_PROBES_A_RUN_ON_THE_CLOUD_DRIVE_THE_HEADSET_STREAMS_FROM)
     for listed in _library_videos():
         free = video_kind.free_kind(genau=listed.genau, clip=listed.clip)
         seconds = video_kind.duration_of(listed.payload)

@@ -93,7 +93,7 @@ class TestCollectCandidates(unittest.TestCase):
 
             assert [c.path for c in queued_videos][:2] == [first, second]
 
-    def test_a_pin_re_queues_a_video_that_already_has_a_processed_version(self):
+    def test_a_pin_is_how_a_video_already_processed_is_asked_for_again_under_newer_settings(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]

@@ -402,7 +402,7 @@ class EvolverMainWindow(QMainWindow):
         self.nonai_switch.setChecked(enabled)
 
     def refresh_history(self):
-        self._records = newest_runs(config.RUNS_DIR, config.RUNS_SHOWN)
+        self._records = newest_runs(config.RUNS_DIR, config.RUNS_SHOWN_OF_A_HISTORY_NOTHING_PRUNES)
         self._history_list.clear()
         for record in self._records:
             item = QListWidgetItem(
