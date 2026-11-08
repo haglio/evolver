@@ -39,7 +39,7 @@ class TestWhereTheNamesComeFrom(unittest.TestCase):
 
 
 class TestTheWatchBlock(unittest.TestCase):
-    def test_the_weight_this_repo_stamps_is_the_one_shuffled_playlists_draw_by(self):
+    def test_the_stamped_weight_is_the_one_playlists_draw_by(self):
         stamped = watch.stamped({}, {"completions": 3, "skips": 0, "locks": 0})
 
         drawn_by = watch_weights.weight_of(stamped)
