@@ -10,6 +10,11 @@ from util import provenance, sidecar, topaz
 _TOPAZS_OWN_WORDS = "Processed using apo-8 replacing duplicate frames. Enhanced using gcg-5. 4x upscale"
 
 
+_A_STAMP_TAKEN_WHEN_THE_UPSCALE_WAS_MADE = {
+    **provenance.reconstructed("evolver", method="ai_upscale", method_version="v001"),
+    "app_commit": "0123abc", "app_dirty": False, "stamped_at": "2026-09-01T20:15:00+00:00"}
+
+
 def _noting(note: str):
     return lambda video: note
 
@@ -107,23 +112,38 @@ class TestAnAiUpscale(unittest.TestCase):
         assert recorded[provenance.BLOCK] == {provenance.UPSCALE: provenance.reconstructed(None)}
 
     def test_a_stamp_taken_when_the_upscale_was_made_is_left_as_it_stands(self):
-        taken_at_the_time = {**provenance.reconstructed("evolver", method="ai_upscale",
-                                                        method_version="v001"),
-                             "app_commit": "0123abc", "app_dirty": False,
-                             "stamped_at": "2026-09-01T20:15:00+00:00"}
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
                 touch_video(lib.sorted_dir / "examplesource" / "portrait" / "clip_two.mp4")
                 upscaled = touch_video(lib.outbox / "portrait" / "examplesource" / "clip_two_topaz.mp4")
                 write_sidecar(sidecar.sidecar_path(upscaled),
-                              {provenance.BLOCK: {provenance.UPSCALE: taken_at_the_time}})
+                              {provenance.BLOCK: {provenance.UPSCALE: _A_STAMP_TAKEN_WHEN_THE_UPSCALE_WAS_MADE}})
 
                 provenance_sweep.run(read_note=_refuses_to_be_called)
 
                 recorded = sidecar.read(sidecar.sidecar_path(upscaled))
 
-        assert recorded[provenance.BLOCK] == {provenance.UPSCALE: taken_at_the_time}
+        assert recorded[provenance.BLOCK] == {provenance.UPSCALE: _A_STAMP_TAKEN_WHEN_THE_UPSCALE_WAS_MADE}
+
+    def test_a_stamp_the_upscale_writes_while_the_sweep_reads_its_note_is_never_written_over(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(ORIGENERATOR_DB_PATH=root / "no-gallery.db"):
+                touch_video(lib.sorted_dir / "examplesource" / "portrait" / "clip_three.mp4")
+                upscaled = touch_video(lib.outbox / "portrait" / "examplesource" / "clip_three_topaz.mp4")
+                record = sidecar.sidecar_path(upscaled)
+
+                def the_upscale_lands_while_its_note_is_read(_video):
+                    write_sidecar(record, {provenance.BLOCK: {
+                        provenance.UPSCALE: _A_STAMP_TAKEN_WHEN_THE_UPSCALE_WAS_MADE}})
+                    return _TOPAZS_OWN_WORDS
+
+                provenance_sweep.run(read_note=the_upscale_lands_while_its_note_is_read)
+
+                recorded = sidecar.read(record)
+
+        assert recorded[provenance.BLOCK] == {provenance.UPSCALE: _A_STAMP_TAKEN_WHEN_THE_UPSCALE_WAS_MADE}
 
 
 class TestAGenauFlick(unittest.TestCase):
