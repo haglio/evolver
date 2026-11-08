@@ -21,7 +21,7 @@ class TestLaunch(unittest.TestCase):
     def _app(self):
         return build_evolver_app(self)
 
-    def test_triggering_the_action_spawns_the_backfill_process(self):
+    def test_triggering_the_action_spawns_backfill_apart_so_its_microphone_cannot_take_the_tray_down(self):
         app = self._app()
 
         with patch("gui.app.subprocess.Popen") as popen:
@@ -30,7 +30,7 @@ class TestLaunch(unittest.TestCase):
         popen.assert_called_once()
         assert popen.call_args[0][0] == [sys.executable, str(config.PROJECT_DIR / "backfill_app.py")]
 
-    def test_the_backfill_process_outlives_the_tray_that_spawned_it(self):
+    def test_the_backfill_process_outlives_the_tray_detached_with_no_console_for_a_failure_to_land_in(self):
         app = self._app()
 
         with patch("gui.app.subprocess.Popen") as popen:

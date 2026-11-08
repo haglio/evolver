@@ -145,7 +145,7 @@ class TestReadyThumbnails(unittest.TestCase):
         build.assert_called_once()
         examples.assert_called_once_with(vocabulary, scan)
 
-    def test_the_library_is_walked_once_for_both_of_startup_s_questions(self):
+    def test_the_library_is_walked_once_for_both_of_startup_s_questions_so_its_windowless_wait_is_not_doubled(self):
         with patch("backfill_app.library_scan", return_value=[]) as scan, \
                 patch("backfill_app.unlabeled_videos", return_value=[]), \
                 patch("backfill_app.application"), \
@@ -157,7 +157,7 @@ class TestReadyThumbnails(unittest.TestCase):
         scan.assert_called_once_with()
 
 
-_OVERLAY_READS = """
+_OVERLAY_READS_COUNTED_IN_A_FRESH_PYTHON_AFTER_CONFIG_PAID_ITS_OWN = """
 import json
 from pathlib import Path
 import content_overlay
@@ -181,7 +181,7 @@ class TestTheActTableIsReadWhenMainAsksForIt(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
         env["QT_QPA_PLATFORM"] = "offscreen"
         result = subprocess.run(
-            [sys.executable, "-c", _OVERLAY_READS],
+            [sys.executable, "-c", _OVERLAY_READS_COUNTED_IN_A_FRESH_PYTHON_AFTER_CONFIG_PAID_ITS_OWN],
             cwd=PROJECT_ROOT, env=env, capture_output=True, text=True, check=False,
         )
 
