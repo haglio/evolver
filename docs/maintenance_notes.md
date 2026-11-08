@@ -7,7 +7,7 @@ Evolver writes Topaz output to a temporary file beside its final name, and renam
 - Temporary outputs are named `<stem>.partial.<uuid>`, with no video extension, so Fun Time, Nau, Genau and anything else that lists videos by extension never takes an unfinished encode for a video. A non-AI encode's file sits in the library for hours, frozen while the user is at the computer, which is exactly when the players are open.
 - ffmpeg is told the container with `-f mp4`, since the name gives it nothing to infer one from.
 - Stages that scan for videos must ignore partial files. Any name holding `.partial.` is one, whatever it ends in: Origenerator's exports into the inbox still end in `.mp4` while they copy.
-- The upscale stage (`tasks/upscale.py`) removes any stale partial outputs from the target outbox before starting new work.
+- The upscale stage (`tasks/upscale.py`) removes any stale partial outputs from Kino's and Genau's folders before starting new work.
 - The non-AI stage (`tasks/nonai_upscale.py`) does the same under each bucket's `3*/processed/` folder, sparing only the tmp file its live detached job is still writing.
 
 The shared helpers for this contract live in `util/media_files.py`:

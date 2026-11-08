@@ -10,7 +10,7 @@ from shared_ui.orientation import ORIENTATIONS, PORTRAIT
 
 import config
 from tests.temp_helpers import workspace_temp_dir
-from util import contract, media_files, sidecar, video_kind, warm_gun, watch
+from util import contract, lanes, media_files, sidecar, video_kind, warm_gun, watch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,11 +29,11 @@ class PublishedDocument(unittest.TestCase):
     def test_each_folder_it_names_is_the_one_this_repo_uses(self):
         document = _document()
 
-        assert {name: config.LIBRARY_ROOT / Path(value) for name, value in document["library_relative"].items()} == {"inbox_dir": config.INBOX_DIR, "upscaled_dir": config.OUT_UPSCALED_DIR, "trash_dir": config.TRASH_DIR}
+        assert {name: config.LIBRARY_ROOT / Path(value) for name, value in document["library_relative"].items()} == {"inbox_dir": config.INBOX_DIR}
 
     def test_a_videos_record_is_where_the_mirrored_tree_puts_it_under_the_named_folder(self):
         metadata = config.LIBRARY_ROOT / Path(_document()["library_record"]["folder"])
-        video = config.OUT_UPSCALED_DIR / "portrait" / "a-source" / "clip_topaz.mp4"
+        video = lanes.upscale_of("a-source", "portrait", "clip")
 
         assert mirrored_path(video, roots=library_roots_beside(metadata), mirror_root=metadata, suffix=".json") == sidecar.sidecar_path(video)
 
@@ -90,7 +90,7 @@ class TheJournals(unittest.TestCase):
         self.journals = _document()["journals"]
 
     def test_a_line_in_the_fields_it_names_is_an_event_the_favorites_stage_applies(self):
-        upscale = (config.OUT_UPSCALED_DIR / "portrait" / "a-source" / "clip_topaz.mp4")
+        upscale = (lanes.upscale_of("a-source", "portrait", "clip"))
         line = dict(zip(self.journals["fields"],
                         (5, "favorite", upscale.relative_to(config.LIBRARY_ROOT).as_posix()),
                         strict=True))

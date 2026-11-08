@@ -20,7 +20,7 @@ _DUPLICATE_NUMBER = re.compile(rf"{_DUPLICATE}\d+$")
 
 
 def trash_dirs() -> tuple[Path, Path]:
-    return config.TRASH_DIR, config.GENAU_TRASH_DIR
+    return tuple(lane.trash for lane in lanes.upscale_lanes())
 
 
 
@@ -80,7 +80,7 @@ def _out_of_genau(video: Path, folder: Path, sorted_copies: dict[str, list[Path]
 def _recorded_spots(video: Path) -> list[Path]:
     name = name_it_had(video)
     return [root / record.parent.relative_to(records) / name
-            for root in (config.OUT_UPSCALED_DIR, config.NON_AI_DIR)
+            for root in (lanes.kino_upscales_dir(), config.NON_AI_DIR)
             if (records := sidecar_folder(root)) is not None
             for record in records.rglob(glob.escape(f"{Path(name).stem}.json"))]
 

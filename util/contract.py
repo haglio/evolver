@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import config
-from util import library_records, trash_folders, warm_gun
+from util import library_records, warm_gun
 from util.media_files import PARTIAL_MARKER
 
 CONTRACT_FILE = "evolver_contract.json"
@@ -13,12 +13,7 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 
 
 def library_relative() -> dict[str, str]:
-    kinos_trash, _genaus_trash = trash_folders.trash_dirs()
-    return {
-        "inbox_dir": _under_library(config.INBOX_DIR),
-        "upscaled_dir": _under_library(config.OUT_UPSCALED_DIR),
-        "trash_dir": _under_library(kinos_trash),
-    }
+    return {"inbox_dir": _under_library(config.INBOX_DIR)}
 
 
 def _under_library(path: Path) -> str:

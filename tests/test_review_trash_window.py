@@ -41,7 +41,7 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         window = self._window()
 
         assert window.heading.text() == "2 videos in Trash"
-        assert self._rows(window) == [("scene one_topaz.mp4", r"videos\2D\AI\2_outbox\upscaled_by_orientation\portrait\example-source"), ("loop_1_topaz.mp4", r"videos\genau\flicks\2D\AI")]
+        assert self._rows(window) == [("scene one_topaz.mp4", r"videos\kino\2D\AI\portrait\example-source"), ("loop_1_topaz.mp4", r"videos\genau\flicks\2D\AI")]
 
     def test_the_heading_counts_one_video_as_one(self):
         touch_video(self.lib.genau_trash / "loop_2_topaz.mp4")

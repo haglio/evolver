@@ -76,8 +76,8 @@ class TestReadJournals(unittest.TestCase):
 
 class TestLibraryVideo(unittest.TestCase):
     def test_a_sorted_clip_is_the_upscale_fun_time_plays(self):
-        with override_config(OUT_UPSCALED_DIR=Path("C:/lib/AI/2_outbox/upscaled_by_orientation")):
-            assert warm_gun.library_video("1_sorted/provider2/portrait/clip a.mp4") == Path("C:/lib/AI/2_outbox/upscaled_by_orientation/portrait/provider2/clip a_topaz.mp4")
+        with override_config(KINO_DIR=Path("C:/lib/kino")):
+            assert warm_gun.library_video("1_sorted/provider2/portrait/clip a.mp4") == Path("C:/lib/kino/2D/AI/portrait/provider2/clip a_topaz.mp4")
 
     def test_a_non_ai_video_sits_under_the_non_ai_root(self):
         with override_config(NON_AI_DIR=Path("C:/lib/2D/non_AI")):
@@ -106,9 +106,9 @@ class TestLibraryVideo(unittest.TestCase):
             assert warm_gun.library_video("genau/clips/2D/AI/flick_topaz.mp4") is None
 
     def test_an_upscale_another_app_names_by_its_place_under_the_library_is_that_upscale(self):
-        with override_config(LIBRARY_ROOT=Path("C:/lib"),
-                             OUT_UPSCALED_DIR=Path("C:/lib/AI/2_outbox/upscaled_by_orientation")):
-            assert warm_gun.library_video("AI/2_outbox/upscaled_by_orientation/portrait/provider2/clip a_topaz.mp4") == Path("C:/lib/AI/2_outbox/upscaled_by_orientation/portrait/provider2/clip a_topaz.mp4")
+        with override_config(LIBRARY_ROOT=Path("C:/lib"), KINO_DIR=Path("C:/lib/kino"),
+                             GENAU_DIR=Path("C:/lib/no genau here")):
+            assert warm_gun.library_video("kino/2D/AI/portrait/provider2/clip a_topaz.mp4") == Path("C:/lib/kino/2D/AI/portrait/provider2/clip a_topaz.mp4")
 
     def test_a_lane_this_library_has_no_folder_for_is_nobody_s(self):
         for path in ("VR/finished/scene.mp4", "1_sorted/short.mp4", "genau/audio/track.mp4", "non_AI", ""):

@@ -517,7 +517,7 @@ class TestTheCorrespondenceCheck:
         pytest.param(UpscaleResult(processed=2, pending_after_run=0), id="the upscale drained it"),
     ])
     def test_it_checks_with_its_popup_once_no_upscale_is_left(self, upscaled):
-        checked = CorrespondenceResult(sorted_count=1, outbox_count=1)
+        checked = CorrespondenceResult(sorted_count=1, upscale_count=1)
         with patch("evolver.check_correspondence.run", return_value=checked) as check:
             outcome = _stage("verify").run(_after(upscale=upscaled))
 
@@ -724,7 +724,7 @@ class TestWhatIsMarkedTrash:
                 full_scene = _a_record_for(
                     touch_video(lib.non_ai / "example-bucket" / "full" / "scene one.mp4"))
                 landscape_copy = _a_record_for(
-                    touch_video(lib.outbox / "landscape" / "example-source" / "loop_8_topaz.mp4"))
+                    touch_video(lib.kino_upscales / "landscape" / "example-source" / "loop_8_topaz.mp4"))
 
             _a_run(lib)
 

@@ -8,14 +8,6 @@ from app_support.json_store import locked_update, read_json_or_empty
 from app_support.mirrored_tree import mirrored_path
 
 import config
-from util.versions import upscaled_stem
-
-
-def upscaled_video_path(
-    source: str, orient: str, sorted_stem: str, outbox_dir: Path | None = None,
-) -> Path:
-    outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
-    return outbox_dir / orient / source / f"{upscaled_stem(sorted_stem)}.mp4"
 
 
 def sidecar_path(video: Path) -> Path:

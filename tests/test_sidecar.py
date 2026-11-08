@@ -8,16 +8,7 @@ from app_support.json_store import locked_update
 
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import sidecar
-from util.sidecar import WRONG_ACTION_FIELD, sidecar_path, upscaled_video_path
-
-
-class TestUpscaledVideoPath(unittest.TestCase):
-    def test_names_the_clip_the_upscale_stage_will_write(self):
-        with workspace_temp_dir() as root:
-            upscaled = root / "AI" / "2_outbox" / "upscaled_by_orientation"
-
-            with override_config(OUT_UPSCALED_DIR=upscaled):
-                assert upscaled_video_path("provider2", "portrait", "clip") == upscaled / "portrait" / "provider2" / "clip_topaz.mp4"
+from util.sidecar import WRONG_ACTION_FIELD, sidecar_path
 
 
 class TestSidecarPath(unittest.TestCase):
@@ -26,12 +17,11 @@ class TestSidecarPath(unittest.TestCase):
             video_lib = root / "videos"
             metadata = root / "metadata"
             video = (
-                video_lib / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation"
-                / "portrait" / "provider2" / "clip_topaz.mp4"
+                video_lib / "kino" / "2D" / "AI" / "portrait" / "provider2" / "clip_topaz.mp4"
             )
 
             with override_config(VIDEO_LIBRARY_DIR=video_lib, METADATA_DIR=metadata):
-                assert sidecar_path(video) == metadata / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "portrait" / "provider2" / "clip_topaz.json"
+                assert sidecar_path(video) == metadata / "kino" / "2D" / "AI" / "portrait" / "provider2" / "clip_topaz.json"
 
     def test_also_mirrors_a_non_ai_video_into_the_same_tree(self):
         with workspace_temp_dir() as root:

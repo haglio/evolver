@@ -4,11 +4,11 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app_support.video_names import UPSCALE_SUFFIX
-
 import config
+from util import lanes, trash_folders
 from util.alert import show_error
 from util.media_files import library_videos
+from util.sidecar import sidecar_folder
 from util.stage_result import StageResult
 from util.versions import upscaled_stem
 
@@ -20,63 +20,73 @@ _LISTED = 10
 @dataclass
 class CorrespondenceResult(StageResult):
     sorted_count: int
-    outbox_count: int
-    orphan_outbox: list[str] = field(default_factory=list)
+    upscale_count: int
+    orphan_upscales: list[str] = field(default_factory=list)
     orphan_sorted: list[str] = field(default_factory=list)
     duplicates: dict[str, list[str]] = field(default_factory=dict)
+    missing_flicks: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
-        return not (self.orphan_outbox or self.orphan_sorted or self.duplicates or self.sorted_count != self.outbox_count)
+        return not (self.orphan_upscales or self.orphan_sorted or self.duplicates or self.missing_flicks)
 
 
-def sorted_to_outbox_name(sorted_file: Path) -> str:
+def upscale_name(sorted_file: Path) -> str:
     return f"{upscaled_stem(sorted_file.stem)}{sorted_file.suffix}"
 
 
-def run(
-    show_popup: bool = False,
-    *,
-    sorted_dir: Path | None = None,
-    outbox_dir: Path | None = None,
-) -> CorrespondenceResult:
-    sorted_root = config.SORTED_DIR if sorted_dir is None else sorted_dir
-    outbox_root = config.OUTBOX_DIR if outbox_dir is None else outbox_dir
+@dataclass(frozen=True)
+class _Lane:
+    sorted_copies: list[Path]
+    upscales: list[Path]
+    kept_once_sorted_copy_retired: bool
 
-    sorted_files = sorted(library_videos(sorted_root))
-    outbox_files = sorted(library_videos(outbox_root))
 
-    expected_outbox_names = {sorted_to_outbox_name(p) for p in sorted_files}
-    outbox_name_to_paths: dict[str, list[str]] = {}
+def _lanes(sorted_by_source: dict[Path, str]) -> list[_Lane]:
+    return [_Lane([copy for copy, source in sorted_by_source.items() if lane.is_for(source)],
+                  [] if lane.upscales is None
+                  else [*library_videos(lane.upscales), *library_videos(lane.trash)],
+                  kept_once_sorted_copy_retired=lane.genau)
+            for lane in lanes.upscale_lanes()]
 
-    orphan_outbox: list[str] = []
-    for outbox_file in outbox_files:
-        relative_outbox = str(Path(outbox_root.name) / outbox_file.relative_to(outbox_root))
-        outbox_name = outbox_file.name
-        outbox_name_to_paths.setdefault(outbox_name, []).append(relative_outbox)
-        if outbox_name not in expected_outbox_names:
-            orphan_outbox.append(relative_outbox)
 
+def _shown(path: Path) -> str:
+    try:
+        return str(path.relative_to(config.LIBRARY_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def run(show_popup: bool = False) -> CorrespondenceResult:
+    sorted_root = config.SORTED_DIR
+    sorted_by_source = {copy: copy.relative_to(sorted_root).parts[0]
+                        for copy in sorted(library_videos(sorted_root))}
+    sorted_files = list(sorted_by_source)
+    by_name: dict[str, list[str]] = {}
+    orphan_upscales: list[str] = []
     orphan_sorted: list[str] = []
-    for sorted_file in sorted_files:
-        expected_outbox_name = sorted_to_outbox_name(sorted_file)
-        if expected_outbox_name not in outbox_name_to_paths:
-            orphan_sorted.append(str(sorted_file.relative_to(sorted_root)))
-
-    duplicates = {
-        outbox_name: sorted(paths)
-        for outbox_name, paths in outbox_name_to_paths.items()
-        if len(paths) > 1
-    }
+    for lane in _lanes(sorted_by_source):
+        expected = {upscale_name(p) for p in lane.sorted_copies}
+        made = set()
+        for upscale in sorted(lane.upscales):
+            name = trash_folders.name_it_had(upscale)
+            made.add(name)
+            by_name.setdefault(name, []).append(_shown(upscale))
+            if name not in expected and not lane.kept_once_sorted_copy_retired:
+                orphan_upscales.append(_shown(upscale))
+        orphan_sorted += [str(p.relative_to(sorted_root)) for p in lane.sorted_copies
+                          if upscale_name(p) not in made]
 
     result = CorrespondenceResult(
         sorted_count=len(sorted_files),
-        outbox_count=len(outbox_files),
-        orphan_outbox=sorted(orphan_outbox),
+        upscale_count=sum(len(paths) for paths in by_name.values()),
+        orphan_upscales=sorted(orphan_upscales),
         orphan_sorted=sorted(orphan_sorted),
-        duplicates=duplicates,
+        duplicates={name: sorted(paths) for name, paths in by_name.items() if len(paths) > 1},
+        missing_flicks=_flicks_whose_record_outlived_them(
+            set(by_name), {upscale_name(p) for p in sorted_files}),
     )
-    _log_result(result, sorted_root, outbox_root)
+    _log_result(result)
 
     if show_popup and not result.ok:
         log.info("Showing error popup for correspondence failure")
@@ -86,67 +96,57 @@ def run(
     return result
 
 
-def _log_result(result: CorrespondenceResult, sorted_root: Path, outbox_root: Path) -> None:
+def _flicks_whose_record_outlived_them(present: set[str], awaited: set[str]) -> list[str]:
+    genau = lanes.genau_delivery_dir()
+    records = None if genau is None else sidecar_folder(genau)
+    if records is None or not records.is_dir():
+        return []
+    return sorted(_shown(genau / f"{record.stem}.mp4") for record in records.glob("*.json")
+                  if f"{record.stem}.mp4" not in present | awaited)
+
+
+def _log_result(result: CorrespondenceResult) -> None:
     log.info("=== Stage: correspondence check ===")
-    log.info("1_sorted: %d video file(s) in %s", result.sorted_count, sorted_root)
-    log.info("Outboxes: %d video file(s) across %s", result.outbox_count, outbox_root)
-
-    if result.sorted_count == result.outbox_count:
-        log.info("Count check OK: %d files each", result.sorted_count)
-    else:
-        log.error("Count mismatch: %d sorted vs %d outbox", result.sorted_count, result.outbox_count)
-
-    for orphan in result.orphan_outbox:
-        log.error("ORPHAN OUTBOX: %s", orphan)
-
+    log.info("1_sorted: %d video file(s)", result.sorted_count)
+    log.info("Upscales: %d video file(s) in the Kino and Genau folders and their trash",
+             result.upscale_count)
+    for orphan in result.orphan_upscales:
+        log.error("UPSCALE WITHOUT ITS 1_SORTED VIDEO: %s", orphan)
     for orphan in result.orphan_sorted:
-        log.error("ORPHAN SORTED: %s", orphan)
-
-    for outbox_name, paths in sorted(result.duplicates.items()):
-        log.error("DUPLICATE OUTBOX NAME: %s", outbox_name)
+        log.error("1_SORTED VIDEO WITHOUT ITS UPSCALE: %s", orphan)
+    for name, paths in sorted(result.duplicates.items()):
+        log.error("UPSCALE NAME IN MORE THAN ONE PLACE: %s", name)
         for path in paths:
             log.error("  -> %s", path)
+    for missing in result.missing_flicks:
+        log.error("GENAU FLICK MISSING (its record is still there): %s", missing)
 
     if result.ok:
-        log.info("Correspondence check done. 1_sorted and the active outbox set are in perfect 1-to-1 correspondence.")
+        log.info("Correspondence check done. Every 1_sorted video has its upscale, and no upscale is missing.")
     else:
         log.error("Correspondence check failed. See log entries above for the mismatch details.")
 
 
 def _popup_message(result: CorrespondenceResult) -> str:
     lines = [
-        "Evolver found a 1_sorted / outbox correspondence problem.",
+        "Evolver found 1_sorted videos and upscales that do not match.",
         "",
         "Check the log for full details:",
         str(config.LOG_FILE),
         "",
-        f"1_sorted files: {result.sorted_count}",
-        f"Outbox files: {result.outbox_count}",
+        f"1_sorted videos: {result.sorted_count}",
+        f"Upscales in the Kino and Genau folders: {result.upscale_count}",
     ]
-
-    if result.orphan_outbox:
-        lines.extend([
-            "",
-            f"Outbox files without a matching source: {len(result.orphan_outbox)}",
-            *_truncate(result.orphan_outbox),
-        ])
-
-    if result.orphan_sorted:
-        lines.extend([
-            "",
-            f"Sorted files without a matching outbox file: {len(result.orphan_sorted)}",
-            *_truncate(result.orphan_sorted),
-        ])
-
-    if result.duplicates:
-        duplicate_lines = [f"{outbox_name} -> {', '.join(paths[:2])}"
-                           for outbox_name, paths in sorted(result.duplicates.items())[:_LISTED]]
-        lines.extend([
-            "",
-            f"Duplicate outbox basenames found: {len(result.duplicates)}",
-            *duplicate_lines,
-        ])
-
+    sections = (
+        ("Upscales without their 1_sorted video", result.orphan_upscales),
+        ("1_sorted videos without their upscale", result.orphan_sorted),
+        ("Upscale names in more than one place",
+         [f"{name} -> {', '.join(paths[:2])}" for name, paths in sorted(result.duplicates.items())]),
+        ("Genau flicks missing from Genau's folder", result.missing_flicks),
+    )
+    for heading, items in sections:
+        if items:
+            lines.extend(["", f"{heading}: {len(items)}", *_truncate(items)])
     return "\n".join(lines)
 
 
@@ -157,47 +157,12 @@ def _truncate(items: list[str]) -> list[str]:
 
 
 def main() -> int:
-    sorted_root = config.SORTED_DIR
-    outbox_root = config.OUTBOX_DIR
-    result = run(show_popup=False, sorted_dir=sorted_root, outbox_dir=outbox_root)
-
-    print(f"1_sorted  : {result.sorted_count} video file(s)  in  {sorted_root}")
-    print(f"outboxes  : {result.outbox_count} video file(s)  in  {outbox_root}")
-    print()
-
-    if result.sorted_count == result.outbox_count:
-        print(f"[OK] Counts match: {result.sorted_count} files each")
-    else:
-        print(f"[MISMATCH] Count difference: {result.sorted_count} sorted vs {result.outbox_count} outbox")
-
-    print()
-
-    if result.orphan_outbox:
-        print(f"[ORPHAN-OUTBOX] {len(result.orphan_outbox)} outbox file(s) do not "
-              f"match '<sorted_name>{UPSCALE_SUFFIX}.ext':")
-        for item in result.orphan_outbox:
-            print(f"  {item}")
-        print()
-
-    if result.orphan_sorted:
-        print(f"[ORPHAN-SORTED] {len(result.orphan_sorted)} 1_sorted file(s) have no outbox counterpart:")
-        for item in result.orphan_sorted:
-            print(f"  {item}")
-        print()
-
-    if result.duplicates:
-        print(f"[DUPLICATE] {len(result.duplicates)} duplicate outbox basename(s) found:")
-        for outbox_name, paths in sorted(result.duplicates.items()):
-            print(f"  Outbox name: {outbox_name}")
-            for path in paths:
-                print(f"    -> {path}")
-        print()
-
+    result = run(show_popup=False)
+    print(_popup_message(result))
     if result.ok:
-        print("[OK] 1_sorted and the active outbox set are in perfect 1-to-1 correspondence.")
+        print("\n[OK] Every 1_sorted video has its upscale, and no upscale is missing.")
         return 0
-
-    print(f"[FAIL] Correspondence issues found. See {config.LOG_FILE} for the full log.")
+    print(f"\n[FAIL] Correspondence issues found. See {config.LOG_FILE} for the full log.")
     return 1
 
 

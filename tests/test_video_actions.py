@@ -31,7 +31,7 @@ class TestAVideoOrigeneratorMade(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 touch_video(lib.sorted_dir / "origenerator" / "portrait" / "wan22_i2v_00001_.mp4")
                 record = sidecar.sidecar_path(
-                    lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4")
+                    lib.kino_upscales / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4")
                 write_sidecar(record, {"video": {"action": "Gamma"}})
 
                 video_actions.run()
@@ -46,7 +46,7 @@ class TestAVideoOrigeneratorBroughtInFromAnotherSite(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             db = root / "origenerator.db"
-            upscale = lib.outbox / "landscape" / "example-site" / "video one_topaz.mp4"
+            upscale = lib.kino_upscales / "landscape" / "example-site" / "video one_topaz.mp4"
             brought_in = _row("site-1", outputs=[])
             brought_in["output_files"] = json.dumps([{"filename": upscale.name,
                                                       "library_path": str(upscale)}])
@@ -73,7 +73,7 @@ class TestAVideoWithNoLabelsToCopy(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 touch_video(lib.sorted_dir / "origenerator" / "portrait" / "wan22_i2v_00001_.mp4")
                 touch_video(lib.sorted_dir / "example-site" / "portrait" / "video two.mp4")
-                records = [sidecar.sidecar_path(lib.outbox / "portrait" / source / name)
+                records = [sidecar.sidecar_path(lib.kino_upscales / "portrait" / source / name)
                            for source, name in (("origenerator", "wan22_i2v_00001__topaz.mp4"),
                                                 ("example-site", "video two_topaz.mp4"))]
                 for record in records:
@@ -97,7 +97,7 @@ class TestAVideoWithNoLabelsToCopy(unittest.TestCase):
                 video_actions.run()
 
                 written = sidecar.sidecar_path(
-                    lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4").exists()
+                    lib.kino_upscales / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4").exists()
 
         assert not written
 
@@ -114,7 +114,7 @@ class TestWhatARunSays(unittest.TestCase):
                 for number, actions in (("1", []), ("2", ["beta"])):
                     touch_video(lib.sorted_dir / "origenerator" / "portrait" / f"wan22_i2v_0000{number}_.mp4")
                     write_sidecar(sidecar.sidecar_path(
-                        lib.outbox / "portrait" / "origenerator" / f"wan22_i2v_0000{number}__topaz.mp4"),
+                        lib.kino_upscales / "portrait" / "origenerator" / f"wan22_i2v_0000{number}__topaz.mp4"),
                         {"video": {"labels": actions}})
 
                 result = video_actions.run()
@@ -127,7 +127,7 @@ class TestWhatARunSays(unittest.TestCase):
             with lib.config(ORIGENERATOR_DB_PATH=root / "no gallery here.db"):
                 touch_video(lib.sorted_dir / "origenerator" / "portrait" / "wan22_i2v_00001_.mp4")
                 record = sidecar.sidecar_path(
-                    lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4")
+                    lib.kino_upscales / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4")
                 write_sidecar(record, {"video": {"labels": ["alpha"]}})
 
                 result = video_actions.run()

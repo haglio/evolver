@@ -25,7 +25,7 @@ from util.html_query import (
     text_content,
 )
 from util.media_files import child_dirs, library_videos
-from util.sidecar import sidecar_path, upscaled_video_path
+from util.sidecar import sidecar_path
 from util.stage_result import StageResult
 from util.versions import source_stem
 
@@ -77,7 +77,10 @@ def run(*, sorted_dir: Path | None = None,
             if orient not in orientation.SORTED:
                 continue
 
-            output_path = sidecar_path(upscaled_video_path(source, orient, video.stem))
+            upscale = lanes.upscale_of(source, orient, video.stem)
+            if upscale is None:
+                continue
+            output_path = sidecar_path(upscale)
             if _already_scraped(output_path):
                 result.already_scraped += 1
                 continue

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from app_support.video_names import strip_processing_suffixes
 
+from util import lanes
 from util.script_library import copy_script, script_path_for_video
 
 log = logging.getLogger(__name__)
@@ -27,12 +28,13 @@ class AiFiling:
 
 
 def ai_filing(rel: Path) -> AiFiling:
+    if (in_kino := lanes.filed_in_kino(rel)) is not None:
+        orientation, source = in_kino
+        return AiFiling(source, orientation)
     match rel.parts[:-1]:
         case ("2D", "AI", "0_inbox", source, *_):
             return AiFiling(source)
         case ("2D", "AI", "1_sorted", source, orientation, *_):
-            return AiFiling(source, orientation)
-        case ("2D", "AI", "2_outbox", "upscaled_by_orientation", orientation, source, *_):
             return AiFiling(source, orientation)
     return AiFiling()
 
@@ -121,9 +123,9 @@ def _version_bucket(video_path: Path, videos_root: Path) -> tuple[str, ...]:
 
 def _version_kind(video_path: Path, videos_root: Path) -> str:
     rel = video_path.relative_to(videos_root)
+    if lanes.filed_in_kino(rel) is not None:
+        return "processed"
     match rel.parts:
         case ("2D", "AI", "1_sorted", *_):
             return "original"
-        case ("2D", "AI", "2_outbox", *_):
-            return "processed"
     return "processed" if "processed" in rel.parts else "original"

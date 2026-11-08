@@ -57,7 +57,7 @@ class _Setting(LaneLibrary):
 
     def sorted_clip(self, name: str) -> tuple[Path, Path]:
         video = touch_video(self.sorted_dir / "provider2" / "portrait" / f"{name}.mp4")
-        upscale = touch_video(self.outbox / "portrait" / "provider2" / f"{name}_topaz.mp4")
+        upscale = touch_video(self.kino_upscales / "portrait" / "provider2" / f"{name}_topaz.mp4")
         return video, upscale
 
 
@@ -289,7 +289,7 @@ class TestFavorites(unittest.TestCase):
             s.journal((10, "favorite", "1_sorted/provider2/portrait/clip_a.mp4"))
 
             watch_weights.run()
-            assert not _favorite(s.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4")
+            assert not _favorite(s.kino_upscales / "portrait" / "provider2" / "clip_a_topaz.mp4")
             _, upscale = s.sorted_clip("clip_a")
             watch_weights.run()
 

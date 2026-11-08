@@ -7,7 +7,6 @@ from pathlib import Path
 
 import config
 from util import lanes
-from util.sidecar import upscaled_video_path
 
 JOURNAL_PATTERN = "*.jsonl"
 FIELDS = ("t", "event", "path")
@@ -56,13 +55,13 @@ def library_video(journal_path: str) -> Path | None:
     parts = journal_path.replace("\\", "/").split("/")
     match parts:
         case ["1_sorted", source, orient, name]:
-            return upscaled_video_path(source, orient, Path(name).stem)
+            return lanes.upscale_of(source, orient, Path(name).stem)
         case ["non_AI", *rest] if rest:
             return config.NON_AI_DIR.joinpath(*rest)
         case ["genau", folder_named, *inside] if inside:
             return _genau_flick(lanes.genau_flicks_dir(), folder_named, inside)
     named = config.LIBRARY_ROOT.joinpath(*parts)
-    return named if named.is_relative_to(config.OUT_UPSCALED_DIR) else None
+    return named if any(named.is_relative_to(folder) for folder in lanes.upscale_folders()) else None
 
 
 def _genau_flick(flicks_folder: Path | None, folder_named: str, inside: list[str]) -> Path | None:

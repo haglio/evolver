@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from app_support import haglio_settings, siblings
+from app_support import haglio_settings, kino_folder, siblings
 from app_support.flick_folder import trash_folder_in
 from app_support.overlay import overlay_value
 
@@ -88,10 +88,8 @@ CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
 
 INBOX_DIR    = AI_DIR / "0_inbox"
 SORTED_DIR   = AI_DIR / "1_sorted"
-OUTBOX_DIR   = AI_DIR / "2_outbox"
 
-OUT_UPSCALED_DIR = OUTBOX_DIR / "upscaled_by_orientation"
-TRASH_DIR        = OUTBOX_DIR / "trash"
+KINO_DIR = kino_folder.kino_dir()
 
 GENAU_SOURCE    = haglio_settings.value("genau_source")
 GENAU_FLICK_WORD = haglio_settings.value("genau_flick_words", "one")

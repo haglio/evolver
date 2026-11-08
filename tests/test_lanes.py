@@ -18,11 +18,40 @@ class TestAiVideos(unittest.TestCase):
                 upscales = [clip.upscale for clip in clips]
 
         assert [(c.video, c.source, c.orientation) for c in clips] == [(video, "provider2", "portrait")]
-        assert upscales == [lib.outbox / "portrait" / "provider2" / "clip_a_topaz.mp4"]
+        assert upscales == [lib.kino_upscales / "portrait" / "provider2" / "clip_a_topaz.mp4"]
 
     def test_no_sorted_folder_means_no_clips(self):
         with workspace_temp_dir() as root, LaneLibrary(root).config():
             assert list(lanes.ai_videos()) == []
+
+
+class TestWhereAnUpscaleIsKept(unittest.TestCase):
+    def test_a_kino_upscale_is_kept_in_kinos_folder_by_orientation_then_source(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                assert lanes.upscale_of("provider2", "portrait", "clip") ==                     lib.kino / "2D" / "AI" / "portrait" / "provider2" / "clip_topaz.mp4"
+
+    def test_a_genau_upscale_is_kept_where_genau_plays_its_flicks_from(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                assert lanes.upscale_of("example-loop-clips", "landscape", "loop_1") ==                     lib.genau_flicks / "2D" / "AI" / "loop_1_topaz.mp4"
+
+    def test_a_genau_upscale_has_no_place_while_no_folder_is_laid_out_as_genaus_flicks_are(self):
+        with workspace_temp_dir() as root, override_config(
+                GENAU_DIR=root / "genau", GENAU_SOURCE="example-loop-clips", KINO_DIR=root / "kino"):
+            assert lanes.upscale_of("example-loop-clips", "landscape", "loop_1") is None
+
+    def test_each_lanes_trash_keeps_its_own_upscales(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                kino = lanes.upscale_of("provider2", "portrait", "clip")
+                genau = lanes.upscale_of("example-loop-clips", "landscape", "loop_1")
+
+                assert lanes.in_trash(kino) == lib.trash / "clip_topaz.mp4"
+                assert lanes.in_trash(genau) == lib.genau_trash / "2D" / "AI" / "loop_1_topaz.mp4"
 
 
 class TestGenauFlicks(unittest.TestCase):
@@ -72,14 +101,17 @@ class TestSentLanes(unittest.TestCase):
 
                 assert [(lane.source, lane.unsent_column) for lane in sent] == [("origenerator", "evolver_unsent_at"), ("example-loop-clips", "genau_unsent_at")]
 
-    def test_only_the_genau_lane_delivers_its_clips_out_of_the_library(self):
+    def test_each_lane_keeps_its_upscales_and_its_trash_in_its_own_folder(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():
-                library_lane, genau_lane = lanes.sent_lanes()
+                kino_lane, genau_lane = lanes.sent_lanes()
 
-                assert library_lane.delivered_dir is None
-                assert genau_lane.delivered_dir == lib.genau_flicks / "2D" / "AI"
+                assert (kino_lane.upscales, kino_lane.trash) == (
+                    (lib.kino_upscales / "landscape" / "origenerator",
+                     lib.kino_upscales / "portrait" / "origenerator"), lib.trash)
+                assert (genau_lane.upscales, genau_lane.trash) == (
+                    (lib.genau_flicks / "2D" / "AI",), lib.genau_trash)
 
 
 class TestNonAiVideos(unittest.TestCase):
