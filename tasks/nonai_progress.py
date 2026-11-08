@@ -24,10 +24,10 @@ class Progress:
         return None if total <= 0 else round(self.done_seconds / total * 100)
 
 
-def so_far(queued: Iterable[Path]) -> Progress:
-    done_seconds, unmeasured = _total(_upscaled().values())
+def so_far(queue_already_collected: Iterable[Path]) -> Progress:
+    done_seconds, unmeasured = _total(_originals_running_times_off_their_upscales().values())
     remaining_seconds, still_unmeasured = _total(_recorded_duration(video)
-                                                 for video in queued)
+                                                 for video in queue_already_collected)
     return Progress(done_seconds, remaining_seconds, unmeasured + still_unmeasured)
 
 
@@ -41,7 +41,7 @@ def _total(durations: Iterable[float | None]) -> tuple[float, int]:
     return total, unmeasured
 
 
-def _upscaled() -> dict[str, float | None]:
+def _originals_running_times_off_their_upscales() -> dict[str, float | None]:
     found: dict[str, float | None] = {}
     for bucket in buckets():
         for video in sorted(bucket.rglob("*")):

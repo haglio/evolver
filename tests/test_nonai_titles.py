@@ -32,7 +32,7 @@ def _title_of(video: Path) -> str:
 
 
 class TestNonAiTitles(unittest.TestCase):
-    def test_a_clip_is_titled_by_the_pair_recorded_for_it(self):
+    def test_a_clip_is_titled_by_its_record_which_keeps_the_colon_windows_bars_from_a_filename(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(

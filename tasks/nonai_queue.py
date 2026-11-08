@@ -16,6 +16,8 @@ from util.versions import is_processed_stem
 
 log = logging.getLogger(__name__)
 
+_SUBSTAGES_ALREADY_TRIMMED = (2, 3)
+
 
 @dataclass(frozen=True)
 class QueuedVideo:
@@ -39,7 +41,7 @@ def collect_queued_videos(*, skip_list: Path, pin_list: Path,
                 for video in sorted(scan_dir.iterdir()):
                     if not is_finalized_video_file(video):
                         continue
-                    rel = relpath(video)
+                    rel = queue_key(video)
                     if is_processed_stem(video.stem):
                         continue
                     if video.stem in processed_stems and rel not in pinned:
@@ -57,14 +59,14 @@ def collect_queued_videos(*, skip_list: Path, pin_list: Path,
     return queued_videos
 
 
-def relpath(video: Path) -> str:
+def queue_key(video: Path) -> str:
     return video.relative_to(config.NON_AI_DIR).as_posix()
 
 
 def add_to_skip_list(skip_list: Path, source: Path, reason: str) -> None:
     log.warning("Skipping %s permanently: %s", source, reason)
     with open(skip_list, "a", encoding="utf-8") as handle:
-        handle.write(f"{relpath(source)}\t{reason}\n")
+        handle.write(f"{queue_key(source)}\t{reason}\n")
 
 
 def pin_ahead(pin_list: Path, videos: list[str]) -> None:
@@ -89,7 +91,7 @@ def _list_lines(path: Path) -> list[tuple[str, str]]:
 
 
 def _upscale_ready_dirs(triage_dir: Path) -> list[Path]:
-    return [triage_dir] + [d for _, d in stage_dirs(triage_dir, digits=(2, 3))]
+    return [triage_dir] + [d for _, d in stage_dirs(triage_dir, digits=_SUBSTAGES_ALREADY_TRIMMED)]
 
 
 def _processed_stems(bucket: Path) -> set[str]:
@@ -114,6 +116,6 @@ def _has_funscript(video: Path) -> bool:
 
 def _pin_rank(pinned: list[str], video: Path) -> int:
     try:
-        return pinned.index(relpath(video))
+        return pinned.index(queue_key(video))
     except ValueError:
         return len(pinned)

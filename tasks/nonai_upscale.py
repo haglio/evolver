@@ -10,7 +10,7 @@ import config
 from tasks import nonai_encode, nonai_progress, nonai_request
 from tasks.nonai_encode import EncodeSettings, StartAttempt
 from tasks.nonai_files import StageFiles, run_poll_and_window_lock
-from tasks.nonai_queue import add_to_skip_list, relpath
+from tasks.nonai_queue import add_to_skip_list, queue_key
 from util import (
     ffprobe,
     nonai_job,
@@ -210,19 +210,19 @@ def _supervise(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings, 
             )
         if presence_managed and not on_request and nonai_encode.user_present(settings):
             nonai_encode.suspend_job(job, files.job, because=_USER_IS_BACK)
-            return Supervision(in_flight=relpath(source), suspended=True,
+            return Supervision(in_flight=queue_key(source), suspended=True,
                                in_flight_percent=nonai_encode.percent_encoded(job))
         if presence_managed or on_request:
             nonai_encode.resume_job(job, files.job,
                                     because=nonai_encode.ASKED_FOR if on_request else _COMPUTER_IS_IDLE)
         if not nonai_encode.overran(job, settings):
-            return Supervision(in_flight=relpath(source),
+            return Supervision(in_flight=queue_key(source),
                                in_flight_percent=nonai_encode.percent_encoded(job))
         nonai_encode.terminate_ffmpeg(
             job.pid, f"it exceeded the {settings.max_runtime_hours}h runtime cap")
     conclusion = _conclude(job, files, settings)
     if conclusion.unreachable_archive:
-        return Supervision(in_flight=relpath(source),
+        return Supervision(in_flight=queue_key(source),
                            unreachable_archive=conclusion.unreachable_archive)
     nonai_job.clear_job(files.job)
     return Supervision(promoted=conclusion.promoted, failed=conclusion.failed)
@@ -250,18 +250,18 @@ def _conclude(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings) -
         sidecar.update(sidecar.sidecar_path(out), lambda current: provenance.recorded(
             current, provenance.UPSCALE_NON_AI, stamp))
         retire_original(source, archive_root=archive)
-        nonai_job.clear_attempts(files.attempts, relpath(source))
+        nonai_job.clear_attempts(files.attempts, queue_key(source))
         log.info("Promoted finished non-AI upscale: %s", out)
-        return Conclusion(promoted=relpath(source))
+        return Conclusion(promoted=queue_key(source))
 
     log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
     nonai_encode.delete_tmp(tmp)
-    if nonai_job.attempts_of(files.attempts, relpath(source)) >= settings.max_attempts:
+    if nonai_job.attempts_of(files.attempts, queue_key(source)) >= settings.max_attempts:
         add_to_skip_list(files.skip_list, source,
                              f"failed {settings.max_attempts} attempts")
-        nonai_job.clear_attempts(files.attempts, relpath(source))
-    return Conclusion(failed=relpath(source))
+        nonai_job.clear_attempts(files.attempts, queue_key(source))
+    return Conclusion(failed=queue_key(source))
 
 
 def _sweep_orphaned_partials(keep: Path | None) -> None:
@@ -283,5 +283,5 @@ def _start_next_queued_video(files: StageFiles, settings: EncodeSettings) -> Sta
 
     for queued_video in files.queued_videos():
         if nonai_encode.start(queued_video, files):
-            return StartAttempt(started=relpath(queued_video.path))
+            return StartAttempt(started=queue_key(queued_video.path))
     return StartAttempt()

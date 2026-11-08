@@ -13,7 +13,7 @@ from app_support.win32 import seconds_since_input
 
 import config
 from tasks.nonai_files import StageFiles
-from tasks.nonai_queue import QueuedVideo, add_to_skip_list, relpath
+from tasks.nonai_queue import QueuedVideo, add_to_skip_list, queue_key
 from util import ffprobe, nonai_job, orientation, provenance, system_resources, topaz
 from util.media_files import is_partial_path, partial_path, partial_stem
 from util.nonai_library import stage_dirs
@@ -171,7 +171,7 @@ def start(queued_video: QueuedVideo, files: StageFiles, *, on_request: bool = Fa
     out = _output_path(queued_video)
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = partial_path(out, source.stem)
-    nonai_job.bump_attempts(files.attempts, relpath(source))
+    nonai_job.bump_attempts(files.attempts, queue_key(source))
     pid = launch(source, tmp, orient)
     job = nonai_job.Job.started(
         pid=pid, source=source, tmp=tmp, out=out, expected_duration=expected_duration,
@@ -199,10 +199,10 @@ def stop_in_flight(job: nonai_job.Job, reason: str, files: StageFiles) -> str:
     source = job.source
     terminate_ffmpeg(job.pid, reason)
     delete_tmp(job.tmp)
-    nonai_job.clear_attempts(files.attempts, relpath(source))
+    nonai_job.clear_attempts(files.attempts, queue_key(source))
     nonai_job.clear_job(files.job)
     log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
-    return relpath(source)
+    return queue_key(source)
 
 
 def is_low_disk(settings: EncodeSettings) -> bool:
