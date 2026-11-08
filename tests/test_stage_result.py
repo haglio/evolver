@@ -42,7 +42,7 @@ WENT_WRONG_AND_WANTS_AN_EYE = (False, True)
                  id="a prompt scrape that errored"),
     pytest.param(VideoActionsResult(copied=2, already=5), WENT_WELL, id="labels copied"),
     pytest.param(SortResult(moved=5), WENT_WELL, id="the inbox sorted"),
-    pytest.param(DowntimeResult(did="trained a fix", holds_the_graphics_card=True), WENT_WELL,
+    pytest.param(DowntimeResult(did="took notes on the collection"), WENT_WELL,
                  id="origenerator's downtime work started"),
     pytest.param(DowntimeResult(failed=True), WENT_WRONG,
                  id="origenerator's downtime command unanswered"),

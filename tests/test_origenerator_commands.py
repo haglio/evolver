@@ -38,13 +38,13 @@ def test_origenerators_published_command_runs_from_its_checkout_and_its_answer_i
         tmp_path):
     checkout = _checkout(tmp_path, downtime_command=DOWNTIME)
     ran = []
-    said = json.dumps({"did": "started training the hands fix", "holds_the_graphics_card": True})
+    said = json.dumps({"did": "nothing: a fix is training", "holds_the_graphics_card": True})
 
     result = origenerator_commands.run_downtime(
         checkout, runner=_answering(f"warming up\n{said}\n", ran))
 
     assert (result.did, result.holds_the_graphics_card, result.failed) == (
-        "started training the hands fix", True, False)
+        "nothing: a fix is training", True, False)
     ((args, options),) = ran
     assert args == [str(checkout / ".venv/Scripts/python.exe"), "-m", "origenerator.downtime"]
     assert options["cwd"] == str(checkout)

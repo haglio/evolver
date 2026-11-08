@@ -65,7 +65,7 @@ def run_downtime(checkout: Path | None = None, *, runner=subprocess.run) -> Down
         log.warning("Origenerator's work for while it is closed could not be asked for: %s", e)
         return DowntimeResult(failed=True)
     log.info("Origenerator, while closed: %s%s", result.did,
-             "; a fix's training holds the graphics card" if result.holds_the_graphics_card else "")
+             "; a LoRA's training holds the graphics card" if result.holds_the_graphics_card else "")
     return result
 
 
