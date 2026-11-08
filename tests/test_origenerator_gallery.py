@@ -32,15 +32,21 @@ class TestTheRateOrigeneratorsVideosAreGeneratedAt(unittest.TestCase):
                 assert _generated_fps_published_in(document) is None
 
 
+def _connects_to_sqlite(node: ast.AST) -> bool:
+    if isinstance(node, ast.ImportFrom):
+        return node.module == "sqlite3" and any(alias.name == "connect" for alias in node.names)
+    return (isinstance(node, ast.Attribute) and node.attr == "connect"
+            and isinstance(node.value, ast.Name) and node.value.id == "sqlite3")
+
+
 class TestTheGalleryDatabase(unittest.TestCase):
     @pytest.mark.repo_check
-    def test_only_this_module_opens_the_gallery_so_no_stage_keeps_its_own_copy_of_the_read(self):
+    def test_only_this_module_connects_to_sqlite(self):
         opening = [
             f"{name}:{node.lineno}" for name in product_sources(PROJECT_ROOT)
             if name != "util/origenerator_gallery.py"
             for node in ast.walk(ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8")))
-            if isinstance(node, ast.Attribute) and node.attr == "connect"
-            and isinstance(node.value, ast.Name) and node.value.id == "sqlite3"]
+            if _connects_to_sqlite(node)]
 
         assert opening == []
 
