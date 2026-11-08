@@ -116,6 +116,8 @@ PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-brows
 CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 CLIP_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
 
+# Only Topaz Video's own ffmpeg build has the tvai_* filters both upscale stages use, and the
+# Topaz installer puts its models in a different tree from it.
 _INSTALLED_TOPAZ_FFMPEG = r"C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe"
 _INSTALLED_TOPAZ_MODELS = r"C:\ProgramData\Topaz Labs LLC\Topaz Video\models"
 
@@ -154,6 +156,8 @@ NONAI_OUTPUT_SUFFIX = "_apo8_iris2"
 NONAI_PROCESSED_DIR_NAME = "processed"
 NONAI_FALLBACK_DONE_DIR_NAME = "3_good_to_go"
 NONAI_RETIRED_ROOT = retired_root(_CONTENT)
+# pCloud renamed a job file it saw rewritten mid-run ("[conflicted N]"), orphaning live encodes
+# until the computer crashed; Windows' LOCALAPPDATA is never synced, so such files live under it.
 LOCAL_STATE_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver"
 NONAI_JOB_STATE_FILE = LOCAL_STATE_DIR / "nonai_upscale_job.json"
 NONAI_ATTEMPTS_FILE = LOCAL_STATE_DIR / "nonai_upscale_attempts.json"
@@ -163,6 +167,7 @@ LOW_DISK_WARNING_DISMISSED_FILE = LOCAL_STATE_DIR / "low_disk_warning_dismissed"
 PIPELINE_LOCK_FILE = LOCAL_STATE_DIR / "pipeline.lock"
 NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
 WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
+BACKFILL_THUMBNAIL_DIR = LOCAL_STATE_DIR / "backfill_thumbnails"
 NONAI_SKIP_LIST = LIVE_DIR / ".nonai-upscale-skip.txt"
 NONAI_PIN_LIST = LIVE_DIR / ".nonai-upscale-next.txt"
 NONAI_PRESENCE_POLL_SECONDS = 20.0
@@ -174,5 +179,3 @@ GUI_SETTINGS_FILE = LIVE_DIR / "gui_settings.json"
 
 VOICE_SAMPLE_RATE = 16000
 VOICE_CONFIDENCE_THRESHOLD = 0.7
-
-BACKFILL_THUMBNAIL_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver" / "backfill_thumbnails"
