@@ -16,7 +16,7 @@ class SceneScriptsCase(CarvedClipLibraryCase):
             return scene_scripts.run()
 
 
-class TestSceneScripts(SceneScriptsCase):
+class TestAClipsScriptIsTheOnlyMotionAnUnscriptedSceneHas(SceneScriptsCase):
     def test_writes_the_clip_script_where_the_clip_sits_in_the_scene(self):
         scene = self.make_scene()
         self.make_clip(scene, scene_offset=493.25, actions=[
@@ -40,6 +40,24 @@ class TestSceneScripts(SceneScriptsCase):
         written = json.loads(self.scene_script().read_text(encoding="utf-8"))
         stamp = written["metadata"][provenance.BLOCK][provenance.SCENE_SCRIPTS]
         assert (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("evolver", None, None)
+
+    def test_the_placed_script_is_timed_to_the_whole_scene_it_is_for_not_the_clip(self):
+        scene = self.make_scene()
+        self.make_clip(scene, scene_offset=300.0)
+        self.clip_script().parent.mkdir(parents=True, exist_ok=True)
+        self.clip_script().write_text(json.dumps({
+            "actions": [{"at": 0, "pos": 0}, {"at": 900, "pos": 90}],
+            "metadata": {"duration": 40},
+        }), encoding="utf-8")
+        runtimes = {scene.stem: 3_600.0, "clip": 40.0}
+
+        with self.library_overrides(), patch.object(
+                scene_scripts.ffprobe, "duration_seconds",
+                side_effect=lambda video: runtimes[video.stem]):
+            scene_scripts.run()
+
+        written = json.loads(self.scene_script().read_text(encoding="utf-8"))
+        assert written["metadata"]["duration"] == 3_600
 
     def test_the_rest_of_the_scene_is_left_unscripted(self):
         scene = self.make_scene()

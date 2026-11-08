@@ -53,13 +53,13 @@ def run() -> SceneScriptsResult:
             result.no_clip_script += 1
             continue
 
-        duration = ffprobe.duration_seconds(scene)
-        if duration is None:
+        the_scene_s_own_runtime = ffprobe.duration_seconds(scene)
+        if the_scene_s_own_runtime is None:
             result.unprobeable += 1
             log.warning("UNPROBEABLE scene, cannot time its script: %s", scene)
             continue
 
-        placed = script_library.place(funscript.read(clip_script), offset, duration)
+        placed = script_library.place(funscript.read(clip_script), offset, the_scene_s_own_runtime)
         funscript.write(destination, script_library.stamped(placed, provenance.SCENE_SCRIPTS))
         result.written += 1
         log.info("PLACE SCRIPT  %s  ->  %s", clip_script, destination)
