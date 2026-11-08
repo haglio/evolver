@@ -14,25 +14,25 @@ log = logging.getLogger(__name__)
 
 
 @dataclass
-class VideoLabelsResult(StageResult):
+class VideoActionsResult(StageResult):
     copied: int = 0
     already: int = 0
 
 
-def run() -> VideoLabelsResult:
+def run() -> VideoActionsResult:
     log.info("=== Stage: copy each video's actions from Origenerator ===")
-    result = VideoLabelsResult()
+    result = VideoActionsResult()
     try:
-        labels_of = origenerator_metadata.published_labels()
+        actions_of = origenerator_metadata.published_actions()
     except (FileNotFoundError, sqlite3.Error):
         log.warning("Could not read Origenerator's gallery; the videos' actions wait for a run "
                     "that can.", exc_info=True)
         return result
     for clip in lanes.ai_videos():
-        labels, record = labels_of(clip), sidecar.sidecar_path(clip.upscale)
-        if labels is None or not record.exists():
+        actions, record = actions_of(clip), sidecar.sidecar_path(clip.upscale)
+        if actions is None or not record.exists():
             continue
-        if sidecar.update(record, lambda current, labels=labels: labeled(current, labels)) is None:
+        if sidecar.update(record, lambda current, actions=actions: labeled(current, actions)) is None:
             result.already += 1
         else:
             result.copied += 1

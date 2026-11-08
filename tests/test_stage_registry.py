@@ -22,8 +22,8 @@ from tasks.scene_scripts import SceneScriptsResult
 from tasks.scripts_sync import ScriptsSyncResult
 from tasks.sort import SortResult
 from tasks.stray_files import StrayFilesResult
+from tasks.video_actions import VideoActionsResult
 from tasks.video_kinds import VideoKindsResult
-from tasks.video_labels import VideoLabelsResult
 from tests.color_support import CIE76_DELTA_E_OF_COLORS_OBVIOUSLY_DIFFERENT, band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
 from util.stage_result import StageResult
@@ -55,7 +55,7 @@ WHY_IT_CANNOT_FAIL = {
                       "videos for a later run",
     StrayFilesResult: "what it cannot repair it reports, for a person to judge",
     VideoKindsResult: "a video it cannot measure is left for the next run",
-    VideoLabelsResult: "copies actions onto sidecars already there; a gallery it cannot read "
+    VideoActionsResult: "copies actions onto sidecars already there; a gallery it cannot read "
                        "leaves the actions for a later run",
 }
 

@@ -285,15 +285,15 @@
     },
     {
       "id": "actions_stage",
-      "thing": "the stage that copies onto each AI video's sidecar what Origenerator labels it with: its image's actions, its own, and the boxes checked on it",
+      "thing": "the stage that copies onto each AI video's sidecar the actions Origenerator gives it: its image's actions, its own, and the boxes checked on it",
       "screen": [
         "Transfer actions"
       ],
       "his_word": "Transfer actions (2026-11-07)",
       "code_today": [
-        "labels"
+        "actions"
       ],
-      "code_word": "labels",
+      "code_word": "actions",
       "status": "his_word"
     },
     {

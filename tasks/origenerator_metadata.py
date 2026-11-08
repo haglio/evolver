@@ -15,7 +15,7 @@ COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
             "negative_prompt", "seed", "params_json", "output_files", "created_at")
 
 OWN_PROVENANCE = "provenance"
-PUBLISHED_LABELS = "combined_labels"
+PUBLISHED_ACTIONS = "combined_labels"
 
 MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
 _MODEL_EXT_RE = re.compile(r"\.(safetensors|ckpt|pt|pth|gguf|sft|bin)$", re.IGNORECASE)
@@ -92,21 +92,21 @@ def generation_records(db_path=None) -> Callable[[Path], dict]:
     return generation_of
 
 
-def published_labels(db_path=None) -> Callable[[lanes.AiVideo], tuple[str, ...] | None]:
+def published_actions(db_path=None) -> Callable[[lanes.AiVideo], tuple[str, ...] | None]:
     rows = load_rows(db_path)
     brought_in = {path_key(path): row for row in rows for path in _library_paths_of(row)}
 
-    def labels_of(clip: lanes.AiVideo) -> tuple[str, ...] | None:
+    def actions_of(clip: lanes.AiVideo) -> tuple[str, ...] | None:
         row = (_match_video_row(clip.video, rows) if clip.source == lanes.ORIGENERATOR_SOURCE
                else brought_in.get(path_key(clip.upscale)))
-        published = None if row is None else row.get(PUBLISHED_LABELS)
+        published = None if row is None else row.get(PUBLISHED_ACTIONS)
         return None if published is None else tuple(_decoded(published, list))
 
-    return labels_of
+    return actions_of
 
 
 def load_rows(db_path) -> list[dict]:
-    return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE, PUBLISHED_LABELS),
+    return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE, PUBLISHED_ACTIONS),
                                      db_path=db_path)
 
 
