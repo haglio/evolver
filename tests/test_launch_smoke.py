@@ -16,7 +16,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_OF_A_SCRIPT_BESIDE_THE_PACKAGES = ""
 
 _TOOLS_THE_TRAY_STARTS_DETACHED = (
-    REPO_ROOT / "backfill_app.py",
     REPO_ROOT / "review_trash_app.py",
 )
 

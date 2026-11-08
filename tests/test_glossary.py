@@ -11,7 +11,7 @@ GLOSSARY = ROOT / "glossary.json"
 
 @pytest.fixture(scope="module")
 def source():
-    return glossary.source_lines(tuple(ROOT / folder for folder in ("backfill", "gui", "review_trash", "tasks", "util", "tools")))
+    return glossary.source_lines(tuple(ROOT / folder for folder in ("gui", "review_trash", "tasks", "util", "tools")))
 
 
 def test_every_row_names_its_thing_and_stands_in_one_of_the_known_states():

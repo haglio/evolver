@@ -10,7 +10,6 @@ from unittest.mock import patch
 import pytest
 
 import config
-from backfill.vocabulary import load_vocabulary
 from tasks import prompt_scrape, upscale
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import (
@@ -643,14 +642,6 @@ class TestTitlecaseAction(unittest.TestCase):
         with override_config(CAMERA_PREFIXES=("North", "QRS")):
             assert prompt_scrape._titlecase_action("qrs_beta") == "QRS Beta"
             assert prompt_scrape._titlecase_action("north_qrs_gamma") == "North QRS Gamma"
-
-    def test_a_scraped_action_reads_as_backfill_metadata_records_the_same_camera_and_act(self):
-        vocabulary = load_vocabulary()
-        for camera in vocabulary.cameras:
-            for act in vocabulary.acts:
-                as_the_provider_writes_it = f"{camera.prefix}_{act.action}".lower()
-                with self.subTest(camera=camera.prefix, act=act.action):
-                    assert prompt_scrape._titlecase_action(as_the_provider_writes_it) == f"{camera.prefix} {act.action}"
 
 
 class TestCssSelector(unittest.TestCase):

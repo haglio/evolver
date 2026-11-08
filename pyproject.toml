@@ -21,11 +21,6 @@ requires-python = ">=3.14"
 dependencies = [
     "app-support @ git+https://github.com/haglio/app_support@v0.1.452",
     "shared-ui @ git+https://github.com/haglio/shared_ui@v0.1.397",
-    # The family's listener, for the backfill tool: it brings vosk and sounddevice.
-    "voice-core @ git+https://github.com/haglio/voice_core@v0.1.167",
-    # What voice_core reads each command with a second time; it imports it, this repo
-    # installs it.
-    "faster-whisper>=1,<2",
     "numpy>=2.4,<3",
     "PyQt6>=6,<7",
     "tzdata",
@@ -56,7 +51,7 @@ testpaths = ["tests"]
 # [project.dependencies]; the family's dependency gate holds this list against
 # the tree instead.
 [tool.haglio]
-siblings = ["app_support", "shared_ui", "voice_core"]
+siblings = ["app_support", "shared_ui"]
 
 # What the family's gates (app_support.gates) let stand here, each for the
 # reason beside it. An entry nothing is reported for any more fails the gate.

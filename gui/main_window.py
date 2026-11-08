@@ -31,7 +31,6 @@ from shared_ui.toggle_switch import ToggleSwitch
 import config
 from evolver import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
 from gui.commands import (
-    BACKFILL,
     NONAI,
     PAUSE,
     QUEUE,
@@ -365,9 +364,6 @@ class EvolverMainWindow(QMainWindow):
         self.queue_action = QUEUE.action(self)
         toolbar.addAction(self.queue_action)
 
-        self.backfill_action = BACKFILL.action(self)
-        toolbar.addAction(self.backfill_action)
-
         self.review_trash_action = REVIEW_TRASH.action(self)
         toolbar.addAction(self.review_trash_action)
 
@@ -392,7 +388,6 @@ class EvolverMainWindow(QMainWindow):
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
-            "backfill": self.backfill_action.triggered,
             "review_trash": self.review_trash_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,

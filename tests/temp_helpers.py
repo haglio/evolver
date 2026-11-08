@@ -51,28 +51,6 @@ def override_config(**overrides):
         yield
 
 
-class _LibraryTree:
-    def __init__(self, root: Path):
-        self.root = root
-        self.ai = root / "AI"
-        self.upscaled = self.ai / "2_outbox" / "upscaled_by_orientation"
-        self.metadata = root / "metadata"
-        self.trash = root / "trash"
-
-    def video(self, orient="portrait", source="provider2", name="a_topaz.mp4") -> Path:
-        video = self.upscaled / orient / source / name
-        video.parent.mkdir(parents=True, exist_ok=True)
-        video.write_bytes(b"video")
-        return video
-
-    def sidecar(self, orient, source, stem, payload) -> Path:
-        path = (self.metadata / "AI" / "2_outbox" / "upscaled_by_orientation"
-                / orient / source / f"{stem}.json")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload), encoding="utf-8")
-        return path
-
-
 def a_drive_that_is_not_there() -> Path:
     return next(drive for drive in (Path(f"{letter}:/") for letter in reversed(string.ascii_uppercase))
                 if not drive.exists())
@@ -82,22 +60,6 @@ def write_sidecar(path: Path, payload: dict) -> dict:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return payload
-
-
-@contextmanager
-def library_tree(**config_extra):
-    with workspace_temp_dir() as root:
-        tree = _LibraryTree(root)
-        overrides = {
-            "VIDEO_LIBRARY_DIR": tree.root,
-            "AI_DIR": tree.ai,
-            "OUT_UPSCALED_DIR": tree.upscaled,
-            "METADATA_DIR": tree.metadata,
-            "TRASH_DIR": tree.trash,
-        }
-        overrides.update(config_extra)
-        with override_config(**overrides):
-            yield tree
 
 
 class LaneLibrary:

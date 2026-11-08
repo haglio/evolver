@@ -15,6 +15,8 @@ _.drawFocus
 # is over, and startDrag when a row is picked up (gui/queue_window.py).
 _.dropEvent
 _.startDrag
+# Qt calls closeEvent on a window the user closes (gui/main_window.py).
+_.closeEvent
 # Qt hands every event of the application to a filter installed on it
 # (gui/process_identity.py).
 _.eventFilter
@@ -31,10 +33,3 @@ _.dwLength
 # -- Dataclass fields consumed via dataclasses.asdict() --
 _.stopped_at_budget
 
-# -- BackfillWindow's read surface: reached from the tests, which the vulture
-#    scan deliberately excludes. The accessors exist so assertions about the
-#    window go through a public seam instead of six private attributes. --
-_.status_text
-_.hearing_text
-_.last_text
-_.button_for
