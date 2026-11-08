@@ -219,3 +219,15 @@ class TestTheExitCodeAShellOrScheduledTaskReads:
         assert "clip-b_topaz.mp4" in out
         assert "1_sorted videos without their upscale: 1" in out
         assert "[FAIL]" in out
+
+    def test_a_missing_flick_is_named_in_the_word_genau_shows(self, capsys):
+        with _library() as lib, patch("config.GENAU_FLICKS_WORD", "loopies"):
+            flick = _flick(lib, "loop_1_topaz.mp4")
+            write_sidecar(sidecar.sidecar_path(flick), {"video": {"seed": "1"}})
+            flick.unlink()
+
+            check_correspondence.main()
+
+        out = capsys.readouterr().out
+        assert "Genau loopies missing from Genau's folder: 1" in out
+        assert "Genau flicks" not in out

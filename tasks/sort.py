@@ -112,7 +112,7 @@ def _the_flick_it_remakes(handed_over: Path, source: str, orient: str, dest: Pat
 
 
 def _make_way_for_the_remake(played: Path, upscale: Path) -> None:
-    log.info("MADE AGAIN (to be upscaled in place of the flick Genau plays): %s", played)
+    log.info("MADE AGAIN (to be upscaled in place of the one Genau plays): %s", played)
     if played != upscale:
         move_with_its_records(played, upscale)
         sound = lanes.genau_sound_of(played)

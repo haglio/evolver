@@ -126,7 +126,7 @@ def _log_result(result: CorrespondenceResult) -> None:
         for path in paths:
             log.error("  -> %s", path)
     for missing in result.missing_flicks:
-        log.error("GENAU FLICK MISSING (its record is still there): %s", missing)
+        log.error("MISSING FROM GENAU'S FOLDER (its record is still there): %s", missing)
 
     if result.ok:
         log.info("Correspondence check done. Every 1_sorted video has its upscale, and no upscale is missing.")
@@ -149,7 +149,7 @@ def _popup_message(result: CorrespondenceResult) -> str:
         ("1_sorted videos without their upscale", result.orphan_sorted),
         ("Upscale names in more than one place",
          [f"{name} -> {', '.join(paths[:2])}" for name, paths in sorted(result.duplicates.items())]),
-        ("Genau flicks missing from Genau's folder", result.missing_flicks),
+        (f"Genau {config.GENAU_FLICKS_WORD} missing from Genau's folder", result.missing_flicks),
     )
     for heading, items in sections:
         if items:
@@ -169,7 +169,7 @@ def main() -> int:
     if result.ok:
         print("\n[OK] Every 1_sorted video has its upscale, and no upscale is missing.")
         return 0
-    print(f"\n[FAIL] Correspondence issues found. See {config.LOG_FILE} for the full log.")
+    print("\n[FAIL] Correspondence issues found.")
     return 1
 
 
