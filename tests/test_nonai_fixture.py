@@ -84,6 +84,16 @@ class TestTheNonAiFixture(unittest.TestCase):
                     if value is not None:
                         assert Path(value).is_relative_to(root)
 
+    def test_an_archive_a_case_parks_beside_the_library_is_outside_its_search_root(self):
+        with workspace_temp_dir() as root:
+            overrides = nonai_library_overrides(root)
+
+            assert not (root / "archive").is_relative_to(overrides["VIDEO_SEARCH_ROOT"])
+
+    def test_a_cases_folder_is_outside_the_checkout_it_tests(self):
+        with workspace_temp_dir() as root:
+            assert not root.resolve().is_relative_to(PROJECT_ROOT)
+
 
 if __name__ == "__main__":
     unittest.main()
