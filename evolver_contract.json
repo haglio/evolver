@@ -80,7 +80,6 @@
     "video_kinds": [
       "genau_flick",
       "excerpt",
-      "short",
       "full_length"
     ],
     "video_orientations": [

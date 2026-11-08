@@ -16,6 +16,7 @@ from shared_ui.spacing import MARGIN_DIALOG
 from evolver import ALL_STAGES, STAGE_LABELS
 
 _CAPTION_GUTTER = 12
+BAR_WIDTH = 200
 
 
 def _caption_width(font) -> int:
@@ -31,8 +32,6 @@ class ProgressPopup(QWidget):
             Qt.WindowType.Tool
             | Qt.WindowType.WindowCloseButtonHint
         )
-        self.setFixedWidth(400)
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)
 
@@ -57,6 +56,7 @@ class ProgressPopup(QWidget):
             bar.setRange(0, 100)
             bar.setValue(0)
             bar.setFixedHeight(18)
+            bar.setMinimumWidth(BAR_WIDTH)
             bar.setTextVisible(True)
             row_layout.addWidget(bar, stretch=1)
 
@@ -71,7 +71,7 @@ class ProgressPopup(QWidget):
 
         total_layout = QHBoxLayout()
         total_label = QLabel("Total")
-        total_label.setFixedWidth(160)
+        total_label.setFixedWidth(caption_width)
         total_font = total_label.font()
         total_font.setBold(True)
         total_label.setFont(total_font)
@@ -81,6 +81,7 @@ class ProgressPopup(QWidget):
         self._total_bar.setRange(0, 100 * len(ALL_STAGES))
         self._total_bar.setValue(0)
         self._total_bar.setFixedHeight(20)
+        self._total_bar.setMinimumWidth(BAR_WIDTH)
         self._total_bar.setTextVisible(True)
         self._total_bar.setFormat("%p%")
         total_layout.addWidget(self._total_bar, stretch=1)

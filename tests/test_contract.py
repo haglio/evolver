@@ -77,7 +77,7 @@ class TheLibraryRecord(unittest.TestCase):
 
     def test_the_kind_the_running_time_and_the_orientation_sit_where_it_says(self):
         stamped = video_kind.oriented(
-            video_kind.timed(video_kind.stamped({}, video_kind.SHORT), 12.5), PORTRAIT)
+            video_kind.timed(video_kind.stamped({}, video_kind.CLIP), 12.5), PORTRAIT)
         own = {video_kind.FIELD, video_kind.DURATION_FIELD, video_kind.ORIENTATION_FIELD}
 
         assert set(stamped[video_kind.BLOCK]) == own

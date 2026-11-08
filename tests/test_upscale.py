@@ -425,7 +425,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
             json_path.parent.mkdir(parents=True)
             json_path.write_text(
-                json.dumps({"video": {"type": video_kind.SHORT}}), encoding="utf-8",
+                json.dumps({"video": {"type": video_kind.CLIP}}), encoding="utf-8",
             )
 
             with override_config(METADATA_DIR=meta_dir):

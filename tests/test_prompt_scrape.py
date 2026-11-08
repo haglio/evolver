@@ -198,7 +198,7 @@ class TestPromptScrape(unittest.TestCase):
             existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             existing.parent.mkdir(parents=True, exist_ok=True)
             existing.write_text(
-                json.dumps({"video": {"type": video_kind.SHORT}}), encoding="utf-8",
+                json.dumps({"video": {"type": video_kind.CLIP}}), encoding="utf-8",
             )
 
             with (
@@ -209,7 +209,7 @@ class TestPromptScrape(unittest.TestCase):
                 result = prompt_scrape.run()
 
             assert (result.newly_scraped, result.already_scraped) == (1, 0)
-            assert video_kind.kind_of(sidecar.read(existing)) == video_kind.SHORT, "the kind already recorded would cost another ffprobe to learn again"
+            assert video_kind.kind_of(sidecar.read(existing)) == video_kind.CLIP, "the kind already recorded would cost another ffprobe to learn again"
 
     def test_the_id_the_video_was_given_before_its_scrape_survives_it(self):
         with workspace_temp_dir() as root:
@@ -236,7 +236,7 @@ class TestPromptScrape(unittest.TestCase):
             existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
             existing.parent.mkdir(parents=True, exist_ok=True)
             existing.write_text(json.dumps({
-                "video": {"type": video_kind.SHORT},
+                "video": {"type": video_kind.CLIP},
                 provenance.BLOCK: {"upscale": upscaled},
             }), encoding="utf-8")
 

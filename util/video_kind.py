@@ -7,12 +7,11 @@ from util import provenance, watch
 
 GENAU_FLICK = "genau_flick"
 CLIP = "excerpt"
-SHORT = "short"
 FULL_LENGTH = "full_length"
 
-TYPES = (GENAU_FLICK, CLIP, SHORT, FULL_LENGTH)
+TYPES = (GENAU_FLICK, CLIP, FULL_LENGTH)
 
-SHORT_MAX_SECONDS = 10.0
+CLIP_MAX_SECONDS = 10.0
 
 BLOCK = "video"
 FIELD = "type"
@@ -39,8 +38,8 @@ def classify(*, genau: bool, clip: bool, duration_seconds: float | None) -> str:
     free = free_kind(genau=genau, clip=clip)
     if free:
         return free
-    if duration_seconds is not None and duration_seconds <= SHORT_MAX_SECONDS:
-        return SHORT
+    if duration_seconds is not None and duration_seconds <= CLIP_MAX_SECONDS:
+        return CLIP
     return FULL_LENGTH
 
 
