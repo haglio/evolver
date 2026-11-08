@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 import check_duplicate_sizes
@@ -48,7 +49,7 @@ class TestDuplicateSizes:
             ]
             show_error.assert_called_once()
 
-    def test_zero_byte_files_are_not_duplicates_of_each_other(self):
+    def test_the_empty_files_a_crashed_download_leaves_are_not_duplicates_of_each_other(self):
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"
             (sorted_dir / "sourceA" / "landscape").mkdir(parents=True)
@@ -78,6 +79,19 @@ class TestDuplicateSizes:
 
             assert result.ok
             assert result.scanned_count == 1
+
+    def test_a_duplicate_is_named_relative_to_the_same_folder_that_was_scanned(self):
+        with workspace_temp_dir() as root:
+            given = root / "given"
+            (given / "examplebucket").mkdir(parents=True)
+            (given / "examplebucket" / "clip two.mp4").write_bytes(b"same-size")
+            (given / "examplebucket" / "clip three.mp4").write_bytes(b"same-size")
+
+            with override_config(NON_AI_DIR=root):
+                result = check_duplicate_sizes.run(show_popup=False, non_ai_dir=given)
+
+            assert result.duplicate_groups == {
+                9: [str(Path("examplebucket") / "clip three.mp4"), str(Path("examplebucket") / "clip two.mp4")]}
 
 
 class TestMain:

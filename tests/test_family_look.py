@@ -9,10 +9,10 @@ pytestmark = pytest.mark.repo_check
 
 _CHECKOUT = Path(__file__).resolve().parents[1]
 _PACKAGES = ("gui", "backfill", "review_trash", "tasks", "util", "tools")
-_WHERE_THE_STAGES_COLORS_ARE = _CHECKOUT / "evolver.py"
+_THE_STATS_CHARTS_OWN_STAGE_COLORS_HE_CHOSE_TO_KEEP = _CHECKOUT / "evolver.py"
 
 
 def test_everything_evolver_draws_with_comes_from_shared_ui():
     modules = [*sorted(_CHECKOUT.glob("*.py")),
                *(path for package in _PACKAGES for path in sorted((_CHECKOUT / package).rglob("*.py")))]
-    assert_the_look_is_shared_uis(_CHECKOUT, [path for path in modules if path != _WHERE_THE_STAGES_COLORS_ARE])
+    assert_the_look_is_shared_uis(_CHECKOUT, [path for path in modules if path != _THE_STATS_CHARTS_OWN_STAGE_COLORS_HE_CHOSE_TO_KEEP])

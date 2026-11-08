@@ -18,7 +18,7 @@ from util import alert
 
 class TestTheOnlyWayToAModalDialog(unittest.TestCase):
     @pytest.mark.repo_check
-    def test_no_other_module_opens_a_dialog_for_itself(self):
+    def test_no_other_module_opens_a_dialog_the_suites_stubs_would_leave_waiting_on_a_person(self):
         openers = [
             name
             for name in product_sources(PROJECT_ROOT)

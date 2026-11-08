@@ -72,7 +72,7 @@ def _edges() -> tuple[dict[str, set[str]], list[str]]:
 
 
 class TestLayering(unittest.TestCase):
-    def test_no_package_imports_one_it_is_not_allowed_to(self):
+    def test_no_package_imports_one_it_is_not_allowed_to_so_only_the_pipeline_touches_the_library(self):
         _used, unlisted = _edges()
 
         assert sorted(unlisted) == [], "an import across a layer boundary that nothing declares -- either it belongs in ALLOWED with a reason, or it is the wrong way round"

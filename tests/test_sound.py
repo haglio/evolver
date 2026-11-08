@@ -31,6 +31,7 @@ class TestSaveAsMp3(unittest.TestCase):
         assert ".partial." in argv[-1]
         assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
 
+    # ComfyUI writes the prompt into a video's tags, so a copy of them would carry it into the sound file.
     def test_the_sound_takes_no_tags_from_the_video(self):
         calls = []
         with workspace_temp_dir() as root, \

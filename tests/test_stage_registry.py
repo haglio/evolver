@@ -15,7 +15,7 @@ from gui import main_window
 from gui.stats_window import STAGE_COLORS
 from tasks.nonai_upscale import NonAiUpscaleResult
 from tasks.scripts_sync import ScriptsSyncResult
-from tests.color_support import band_fill, delta_e
+from tests.color_support import CIE76_DELTA_E_OF_COLORS_OBVIOUSLY_DIFFERENT, band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
 
 
@@ -118,7 +118,7 @@ class TestStageRegistry(unittest.TestCase):
             for one, other in itertools.combinations(ALL_STAGES, 2)
         )
 
-        assert worst >= 20.0, f"{pair[0]} and {pair[1]} differ by only {worst:.1f}"
+        assert worst >= CIE76_DELTA_E_OF_COLORS_OBVIOUSLY_DIFFERENT, f"{pair[0]} and {pair[1]} differ by only {worst:.1f}"
 
 
 if __name__ == "__main__":

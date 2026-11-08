@@ -160,7 +160,7 @@ class TestCorrespondence:
             assert result.outbox_count == 1
 
 
-class TestMain:
+class TestTheExitCodeAShellOrScheduledTaskReads:
     def test_a_clean_tree_reports_ok_and_exits_zero(self, capsys):
         with workspace_temp_dir() as root:
             sorted_dir = root / "sorted"

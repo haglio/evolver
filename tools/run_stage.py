@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 def main(argv: list[str]) -> int:
     if len(argv) != 1:
-        print("usage: python tools/run_stage.py <tasks module name>", file=sys.stderr)
+        print("usage: python tools/run_stage.py <tasks module name>  (a real run, on the real library)", file=sys.stderr)
         return 2
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
     stage = importlib.import_module(f"tasks.{argv[0]}")
