@@ -16,7 +16,7 @@ from tests.temp_helpers import (
     touch_video,
     workspace_temp_dir,
 )
-from util import media_files, script_library, sidecar, video_locator
+from util import media_files, script_library, sidecar
 
 
 @contextmanager
@@ -138,17 +138,6 @@ class TestCarvedClipScripts(CarvedClipLibraryCase):
 
                 assert result.written == 0
                 assert not self.scene_script(scene.stem).exists()
-
-
-class TestFollowingVideosThatMoved(unittest.TestCase):
-    def test_a_reference_is_followed_into_genau_s_folder_but_not_into_origenerator_s(self):
-        with a_library() as lib:
-            flick = _flick_in(lib)
-            _made_by_origenerator(lib)
-            index = video_locator.build_index()
-
-            assert video_locator.relocate(Path("gone") / "loop_1.mp4", index) == flick
-            assert video_locator.relocate(Path("gone") / "video_1.mp4", index) is None
 
 
 class TestTheMirrors(unittest.TestCase):

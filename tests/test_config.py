@@ -216,8 +216,6 @@ class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
         for name, path in (
             ("FUN_TIME_PROJECT_DIR", config.FUN_TIME_PROJECT_DIR),
             ("ORIGENERATOR_DB_PATH", config.ORIGENERATOR_DB_PATH),
-            ("GENAUMACHER_SESSIONS_DIR", config.GENAUMACHER_SESSIONS_DIR),
-            ("SCRIPTURE_SESSIONS_DIR", config.SCRIPTURE_SESSIONS_DIR),
         ):
             with self.subTest(name):
                 assert any(path.is_relative_to(root) for root in config.PROJECT_ROOTS), f"{name} ({path}) is under none of {config.PROJECT_ROOTS}"

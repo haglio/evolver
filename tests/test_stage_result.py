@@ -13,7 +13,6 @@ from tasks.nonai_upscale import NonAiUpscaleResult
 from tasks.origenerator_commands import DowntimeResult
 from tasks.prompt_scrape import PromptScrapeResult
 from tasks.provenance_sweep import ProvenanceResult
-from tasks.reference_sync import ReferenceSyncResult
 from tasks.scene_scripts import SceneScriptsResult
 from tasks.scripts_sync import ScriptsSyncResult
 from tasks.sort import SortResult
@@ -67,11 +66,6 @@ WENT_WRONG_AND_WANTS_AN_EYE = (False, True)
     pytest.param(CorrespondenceResult(sorted_count=2, outbox_count=1,
                                       orphan_sorted=["example/video one.mp4"]), WENT_WRONG,
                  id="a sorted video with no upscale"),
-    pytest.param(ReferenceSyncResult(checked=4, relocated=1), WENT_WELL, id="moved videos followed"),
-    pytest.param(ReferenceSyncResult(refused=1), WANTS_AN_EYE,
-                 id="a saved file in a shape this stage does not know"),
-    pytest.param(ReferenceSyncResult(write_errors=1, refused=1), WENT_WRONG_AND_WANTS_AN_EYE,
-                 id="a saved file that could not be rewritten"),
     pytest.param(WatchWeightsResult(stamped=3), WENT_WELL, id="watching summed"),
     pytest.param(WatchWeightsResult(write_errors=1), WENT_WRONG, id="a sidecar that could not be written"),
     pytest.param(WatchWeightsResult(gallery_untold=True), WENT_WRONG,
