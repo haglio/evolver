@@ -19,9 +19,12 @@ import evolver
 from check_correspondence import CorrespondenceResult
 from gui.run_record import RunRecord
 from tasks import nonai_upscale
+from tasks.genau_deliver import GenauDeliverResult
 from tasks.nonai_upscale import NonAiUpscaleResult
 from tasks.origenerator_commands import DowntimeResult
 from tasks.sort import SortResult
+from tasks.stray_files import StrayFilesResult
+from tasks.taken_back import TakenBackResult
 from tasks.upscale import UpscaleResult
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
 from util import run_lock, run_log, topaz
@@ -178,6 +181,36 @@ class TestTheListOfStagesRunsItself:
         result = _run(_made_up("first", run=lambda _: _Done(went_wrong=True, wants_an_eye=True)))
 
         assert _statuses(result) == {"first": "error"}
+
+    def test_a_video_genau_holds_open_fails_the_run_since_a_folder_it_cannot_write_looks_the_same(self):
+        result = _run(replace(_stage("genau_deliver"), run=lambda _: GenauDeliverResult(failed=1)))
+
+        assert _statuses(result) == {"genau_deliver": "error"}
+
+    def test_a_taken_back_video_left_undeleted_fails_the_run_since_he_was_told_it_was_going(self):
+        result = _run(replace(_stage("withdrawn"), run=lambda _: TakenBackResult(failed=1)))
+
+        assert _statuses(result) == {"withdrawn": "error"}
+
+    def test_origenerator_not_answering_fails_the_run_or_its_downtime_work_would_stop_unseen(self):
+        result = _run(replace(_stage("origenerator_downtime"),
+                              run=lambda _: DowntimeResult(failed=True)))
+
+        assert _statuses(result) == {"origenerator_downtime": "error"}
+
+    def test_a_stray_file_only_reported_warns_since_reporting_it_is_the_stage_doing_its_job(self):
+        result = _run(replace(_stage("strays"),
+                              run=lambda _: StrayFilesResult(reported=["notes.txt"])))
+
+        assert _statuses(result) == {"strays": "warning"}
+        assert not result.has_errors
+
+    def test_upscales_held_back_for_disk_space_warn_since_they_resume_once_room_frees_up(self):
+        result = _run(replace(_stage("upscale"),
+                              run=lambda _: UpscaleResult(deferred_low_disk=True)))
+
+        assert _statuses(result) == {"upscale": "warning"}
+        assert not result.has_errors
 
     def test_skips_alone_do_not_make_a_run_a_failure(self):
         result = _run(_made_up("first", run=lambda _: evolver.Skipped("cpu_busy")),
