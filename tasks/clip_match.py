@@ -11,6 +11,7 @@ from app_support.video_names import stable_title
 
 from util import lanes, sidecar
 from util.frame_hashes import SAMPLE_FPS, Match, align, frame_hashes, locate, sample_frames
+from util.library_records import VERSION_BLOCK, VERSION_GROUP_FIELD
 from util.media_files import file_size
 
 log = logging.getLogger(__name__)
@@ -144,8 +145,8 @@ def _scene_cuts(scenes: list[Path]) -> list[_SceneCut]:
 def _clip_families(clips: list[Path], payloads: dict[Path, dict]) -> dict[Path, tuple[Path, ...]]:
     grouped: dict[str, list[Path]] = {}
     for clip in clips:
-        version = payloads[clip].get("version")
-        group = version.get("group") if isinstance(version, dict) else None
+        version = payloads[clip].get(VERSION_BLOCK)
+        group = version.get(VERSION_GROUP_FIELD) if isinstance(version, dict) else None
         grouped.setdefault(str(group) if group else f"\0{clip}", []).append(clip)
     return {clip: tuple(family) for family in grouped.values() for clip in family}
 

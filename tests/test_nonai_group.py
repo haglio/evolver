@@ -130,6 +130,21 @@ class TestNonAiGroup(unittest.TestCase):
 
                 assert sidecar.read(sidecar.sidecar_path(upscale))["version"]["group"] == sidecar.read(sidecar.sidecar_path(original))["version"]["group"]
 
+    def test_a_family_edited_by_hand_in_a_record_is_written_over_so_an_override_is_the_way(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai,
+                                 METADATA_DIR=metadata):
+                video = _touch(non_ai / "lagoon" / "0 unsorted" / "jane-doe_540-Qv3Tn8Rd.mp4")
+                nonai_group.run()
+                record = sidecar.sidecar_path(video)
+                grouped = sidecar.read(record)["version"]["group"]
+                write_sidecar(record, {"version": {"group": "edited by hand", "processed": False}})
+
+                nonai_group.run()
+
+                assert sidecar.read(record)["version"]["group"] == grouped
+
     def test_is_idempotent_then_prunes_a_removed_clips_sidecar(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
@@ -286,12 +301,12 @@ class TestOneVideoByItsFrames(unittest.TestCase):
                 assert measured == [new.name]
                 assert _group(upscale) == _group(new)
 
-    def test_a_run_measures_no_more_videos_than_its_allowance(self):
+    def test_a_folder_of_same_length_videos_arriving_at_once_is_measured_a_few_a_run(self):
         with workspace_temp_dir() as root:
             video_lib, non_ai, metadata = _library(root)
             with override_config(
                 VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
-            ), patch.object(nonai_group, "MEASURED_PER_RUN", 3):
+            ), patch.object(nonai_group, "MEASURED_PER_RUN_THE_REST_WAITING_FOR_THE_NEXT", 3):
                 unsorted = non_ai / "lagoon" / "0 unsorted"
                 for scene, seconds in ((1, 100.0), (2, 200.0), (3, 300.0)):
                     _scene(unsorted / f"Jane Doe - Scene {scene}.mp4", seconds)
