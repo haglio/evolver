@@ -15,7 +15,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 _TREES = (_ROOT / "gui", _ROOT / "evolver", _ROOT / "backfill", _ROOT / "review_trash", _ROOT / "tasks",
           _ROOT / "util", _ROOT / "tools", _ROOT / "tests")
 
-_HEX_NOT_TRIPLES_WHICH_PLAIN_FIXTURE_PIXELS_SHARE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b")
+_HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b")
 
 
 def _family_hex() -> dict[str, str]:
@@ -35,14 +35,26 @@ def _sources() -> list[Path]:
     return files
 
 
+def _hand_copies(source: str, family: dict[str, str]) -> list[tuple[int, str]]:
+    return [(node.lineno, found)
+            for node in strings_outside_docstrings(ast.parse(source))
+            for found in _HEX.findall(node.value) if found.lower() in family]
+
+
+def test_a_family_color_written_as_a_triple_is_a_plain_pixel_not_a_hand_copy():
+    family = _family_hex()
+
+    assert _hand_copies(f"PIXEL = {palette.WHITE}\n", family) == []
+    assert _hand_copies(f"INK = {palette.as_hex(palette.WHITE)!r}\n", family) != []
+
+
 def test_no_color_here_or_in_the_tests_is_a_hand_copy_that_drifts_from_its_family_token():
     family = _family_hex()
     offenders = []
     for path in _sources():
-        for node in strings_outside_docstrings(ast.parse(path.read_text(encoding="utf-8"))):
-            offenders.extend(
-                f"{path.name}:{node.lineno} {found} is shared_ui.palette.{family[found.lower()]}"
-                for found in _HEX_NOT_TRIPLES_WHICH_PLAIN_FIXTURE_PIXELS_SHARE.findall(node.value) if found.lower() in family)
+        offenders.extend(
+            f"{path.name}:{line} {found} is shared_ui.palette.{family[found.lower()]}"
+            for line, found in _hand_copies(path.read_text(encoding="utf-8"), family))
     assert not offenders, (
         "a family color written out by hand instead of read from a shared_ui "
         "token: " + ", ".join(offenders))

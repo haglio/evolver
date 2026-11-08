@@ -37,14 +37,15 @@ for _name in {_WIN32_CTYPES_NAMES!r}:
 """
 
 
-def _without_a_pythonpath_that_could_shim_win32_back_in(environ):
+# A shim on PYTHONPATH can put ctypes' Windows half back in, the way a non-Windows developer's run does.
+def _environ_without_pythonpath(environ):
     return {name: value for name, value in environ.items() if name != "PYTHONPATH"}
 
 
 def run_without_the_win32_ctypes_surface(body):
     return subprocess.run(
         [sys.executable, "-c", _STRIP_WIN32_FROM_CTYPES + body],
-        cwd=str(REPO_DIR), env=_without_a_pythonpath_that_could_shim_win32_back_in(os.environ),
+        cwd=str(REPO_DIR), env=_environ_without_pythonpath(os.environ),
         capture_output=True, text=True, timeout=180, check=False,
     )
 
