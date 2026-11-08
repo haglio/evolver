@@ -86,7 +86,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
 
         assert payload["provenance"] == {"generation": {"schema": provenance.SCHEMA, "app": "origenerator", "app_commit": None, "app_dirty": None, METHOD: "wan22_i2v", METHOD_VERSION: "v007", "stamped_at": None}}
 
-    def test_the_importer_s_placeholders_are_recorded_as_unknown_so_no_sweep_reads_imported_as_a_version(self):
+    def test_the_importer_s_placeholders_are_recorded_as_unknown(self):
         with workspace_temp_dir() as root:
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", workflow="unknown", version="imported",
@@ -95,7 +95,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
 
         generation = payload["provenance"]["generation"]
-        assert (generation[METHOD], generation[METHOD_VERSION]) == (None, None)
+        assert (generation[METHOD], generation[METHOD_VERSION]) == (None, None), "carried as it stands, \"imported\" reads to a sweep comparing versions as a version"
 
     def test_a_record_the_gallery_keeps_of_its_own_is_carried_as_it_stands(self):
         its_own = {
@@ -187,13 +187,13 @@ class TestBuildMetadata(unittest.TestCase):
         assert payload["video"]["resolution"] == "832x480"
         assert payload["video"]["aspect_ratio"] == "16:9"
 
-    def test_a_field_with_no_value_is_left_out_so_it_never_groups_two_equal_records_apart(self):
+    def test_a_field_with_no_value_is_left_out(self):
         with workspace_temp_dir() as root:
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", outputs=["wan22_i2v_00001_.mp4"])])
             with _no_probe():
                 payload = om.build_metadata(Path("wan22_i2v_00001_.mp4"), db_path=db)
-        assert payload["video"] == {}
+        assert payload["video"] == {}, "a field written empty would group this record apart from an equal one without it"
 
 
 class TestModelLabel(unittest.TestCase):

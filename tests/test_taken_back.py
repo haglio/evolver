@@ -188,7 +188,7 @@ class TestTheEvolverLane(unittest.TestCase):
 
                 assert not left_behind.exists()
 
-    def test_the_take_back_stands_so_a_copy_that_reappears_goes_again(self):
+    def test_a_copy_that_reappears_is_taken_back_again(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             db = _gallery(root / "gallery.db", [("p1", "made_00010.mp4", "evolver_unsent_at")])
@@ -204,9 +204,9 @@ class TestTheEvolverLane(unittest.TestCase):
             with closing(sqlite3.connect(db)) as gallery:
                 stamps = gallery.execute("SELECT evolver_unsent_at FROM generations").fetchall()
         assert again.deleted == 1
-        assert stamps == [("2026-01-02 03:04:05",)]
+        assert stamps == [("2026-01-02 03:04:05",)], "a take-back is a standing mark on the row, never cleared from this side"
 
-    def test_an_outbox_copy_that_will_not_go_keeps_its_source_so_no_source_is_ever_left_without_its_upscale(self):
+    def test_a_source_stays_while_its_upscale_will_not_go(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             source = lanes.ORIGENERATOR_SOURCE
@@ -219,7 +219,7 @@ class TestTheEvolverLane(unittest.TestCase):
                 with locked.open("a"):
                     result = taken_back.run()
 
-                assert sorted_copy.exists()
+                assert sorted_copy.exists(), "a source deleted first is a source the correspondence check finds with no upscale"
         assert result.failed == 1
 
 

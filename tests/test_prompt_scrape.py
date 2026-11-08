@@ -191,7 +191,7 @@ class TestPromptScrape(unittest.TestCase):
             assert result.newly_scraped == 0
             fetch_dom.assert_not_called()
 
-    def test_a_sidecar_holding_only_the_video_kind_is_scraped_and_keeps_the_kind_it_cost_a_probe_to_learn(self):
+    def test_a_sidecar_holding_only_the_video_kind_is_not_a_scrape(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
@@ -209,9 +209,9 @@ class TestPromptScrape(unittest.TestCase):
                 result = prompt_scrape.run()
 
             assert (result.newly_scraped, result.already_scraped) == (1, 0)
-            assert video_kind.kind_of(sidecar.read(existing)) == video_kind.SHORT
+            assert video_kind.kind_of(sidecar.read(existing)) == video_kind.SHORT, "the kind already recorded would cost another ffprobe to learn again"
 
-    def test_an_upscale_stamped_before_a_failed_scrape_was_retried_keeps_its_stamp_which_nothing_could_learn_again(self):
+    def test_an_upscale_stamp_survives_a_retried_scrape(self):
         upscaled = provenance.reconstructed("evolver", method="ai_upscale")
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
@@ -231,7 +231,7 @@ class TestPromptScrape(unittest.TestCase):
                 result = prompt_scrape.run()
 
             assert result.newly_scraped == 1
-            assert sidecar.read(existing)[provenance.BLOCK] == {"upscale": upscaled}
+            assert sidecar.read(existing)[provenance.BLOCK] == {"upscale": upscaled}, "a failed scrape let retry lands after its clip was upscaled, and nothing could learn the stamp again"
 
     def test_the_stamp_a_scrape_brings_joins_the_ones_already_there(self):
         upscaled = provenance.reconstructed("evolver", method="ai_upscale")
