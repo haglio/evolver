@@ -30,11 +30,11 @@ ASKED_FOR = "it is the video asked for now"
 class EncodeSettings:
     max_runtime_hours: float = 24
     max_attempts: int = 2
-    complete_duration_fraction: float = 0.98
+    died_partway_if_covering_less_than: float = 0.98
     min_available_ram_gb: float = 8.0
     min_free_disk_gb: float = 250.0
     cooldown_minutes: int = 30
-    user_idle_threshold_seconds: float = 300.0
+    away_once_idle_past_a_reading_pause_seconds: float = 300.0
 
 
 @dataclass(frozen=True)
@@ -69,11 +69,12 @@ def adopt_orphan(job_file: Path) -> nonai_job.Job | None:
         tmp.relative_to(config.NON_AI_DIR)
     except ValueError:
         return None
+    adopted_at = time.time()
     job = nonai_job.Job.adopted(
         pid=pid, source=source, tmp=tmp,
         out=tmp.with_name(f"{partial_stem(tmp)}{config.NONAI_OUTPUT_SUFFIX}.mp4"),
         expected_duration=ffprobe.duration_seconds(source) or 0.0,
-        started_at=time.time(), provenance=unrecorded_start())
+        started_at=adopted_at, provenance=unrecorded_start())
     processes.resume(pid)
     nonai_job.save_job(job_file, job)
     log.warning(
@@ -117,6 +118,7 @@ def overran(job: nonai_job.Job, settings: EncodeSettings, *, now: float | None =
 def percent_encoded(job: nonai_job.Job) -> int | None:
     tmp = job.tmp
     expected = job.expected_duration
+    # ffmpeg writes fragmented mp4 (topaz.command's -movflags), so the partial probes mid-write.
     encoded = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
     if not encoded or not expected:
         return None
@@ -136,6 +138,7 @@ def delete_tmp(tmp: Path) -> None:
     try:
         tmp.unlink(missing_ok=True)
     except OSError:
+        # Windows refuses while a just-ended ffmpeg still holds the file; a later sweep takes it.
         log.exception("Could not delete partial output %s yet.", tmp)
 
 
@@ -216,6 +219,7 @@ def busy_checks(cooldown_file: Path, settings: EncodeSettings, *, asked_for: boo
                 ai_waiting: bool) -> tuple[tuple[str, Callable[[], object]], ...]:
     return (
         ("user_present", lambda: not asked_for and user_present(settings)),
+        # A live Topaz ffmpeg owns the graphics card, which the CPU reading never sees.
         ("topaz_busy", topaz_pids),
         ("low_ram", lambda: system_resources.available_ram_gb() < settings.min_available_ram_gb),
         ("ai_clips_waiting", lambda: ai_waiting),
@@ -234,4 +238,4 @@ def user_present(settings: EncodeSettings, *, idle_seconds=None) -> bool:
         idle = (idle_seconds or seconds_since_input)()
     except OSError:
         return True
-    return idle < settings.user_idle_threshold_seconds
+    return idle < settings.away_once_idle_past_a_reading_pause_seconds

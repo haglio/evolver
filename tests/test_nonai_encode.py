@@ -10,7 +10,7 @@ from util import nonai_job
 
 
 class TestParseTopazArguments(unittest.TestCase):
-    def test_reads_the_input_and_the_output_whatever_spaces_they_hold(self):
+    def test_reads_the_input_and_the_output_through_the_spaces_library_folder_names_hold(self):
         source, out = nonai_encode._parse_topaz_arguments((
             "ffmpeg.exe", "-i", "C:/lib/0 unsorted/scene one.mp4", "-vf", "x",
             "C:/lib/3 done/scene one.partial.ab12.mp4"))
@@ -133,6 +133,6 @@ class TestUserPresent(unittest.TestCase):
 
         assert nonai_encode.user_present(self.SETTINGS, idle_seconds=unreadable)
 
-    def test_input_older_than_the_threshold_means_the_user_is_away(self):
-        away = self.SETTINGS.user_idle_threshold_seconds + 1
+    def test_input_older_than_a_reading_pause_means_the_user_is_away(self):
+        away = self.SETTINGS.away_once_idle_past_a_reading_pause_seconds + 1
         assert not nonai_encode.user_present(self.SETTINGS, idle_seconds=lambda: away)

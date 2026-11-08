@@ -7,7 +7,7 @@ from pathlib import Path
 import config
 from tasks import nonai_queue
 
-stage_lock = threading.Lock()
+run_poll_and_window_lock = threading.Lock()
 
 
 @dataclass(frozen=True)

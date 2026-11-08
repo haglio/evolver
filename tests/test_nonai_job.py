@@ -152,7 +152,7 @@ class TestAJobsTime(unittest.TestCase):
 
         assert job.active_runtime(now=4600.0) == 1400.0
 
-    def test_a_record_with_no_start_time_reads_as_having_just_started(self):
+    def test_a_known_defect_a_record_missing_its_start_can_never_overrun(self):
         assert nonai_job.Job({}).active_runtime(now=4600.0) == 0.0
 
     def test_suspending_marks_the_moment_and_resuming_banks_the_pause(self):

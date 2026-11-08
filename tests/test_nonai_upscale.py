@@ -210,7 +210,7 @@ class TestStartGuards(unittest.TestCase):
             self._one_candidate(overrides)
 
             stack, _mocks = probes(
-                idle_seconds=nonai_encode.EncodeSettings().user_idle_threshold_seconds + 60)
+                idle_seconds=nonai_encode.EncodeSettings().away_once_idle_past_a_reading_pause_seconds + 60)
             with override_config(**overrides), stack:
                 result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
@@ -440,12 +440,11 @@ class TestRunStopsAJob(unittest.TestCase):
 
 JOB_KEYS_AT_START = {"pid", "source", "tmp", "out", "expected_duration", "started_at",
                      "provenance"}
-JOB_KEYS_ON_ADOPTION = JOB_KEYS_AT_START | {
-    "suspended", "suspended_at", "suspended_seconds",
-}
+FREEZE_KEYS = {"suspended", "suspended_at", "suspended_seconds"}
+JOB_KEYS_ON_ADOPTION = JOB_KEYS_AT_START | FREEZE_KEYS
 
 
-class TestTheJobFilesKeys(unittest.TestCase):
+class TestAJobFileARunningEncodeWroteIsReadBackByTheseKeys(unittest.TestCase):
     def test_a_started_encode_writes_exactly_these_keys(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -570,6 +569,36 @@ class TestOrphanAdoption(unittest.TestCase):
             assert job["source"] == str(source)
             assert job["tmp"] == str(tmp)
             assert job["out"] == str(processed / "busy_apo8_iris2.mp4")
+
+    def test_an_adopted_encode_is_thawed_since_a_crash_may_have_left_it_frozen(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            stack, mocks = self._adopting(overrides)
+            with override_config(**overrides), stack:
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
+
+            mocks["resume"].assert_called_once_with(31337)
+
+    def test_an_adopted_encodes_runtime_is_counted_from_its_adoption(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            stack, _ = self._adopting(overrides)
+            before = time.time()
+            with override_config(**overrides), stack:
+                nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
+
+            job = json.loads(overrides["NONAI_JOB_STATE_FILE"].read_text(encoding="utf-8"))
+            assert before <= job["started_at"] <= time.time()
+
+    @staticmethod
+    def _adopting(overrides):
+        non_ai = overrides["NON_AI_DIR"]
+        source = make_video(non_ai / "lagoon" / "0 unsorted" / "busy.mp4")
+        tmp = make_video(non_ai / "lagoon" / "3_good_to_go" / "processed"
+                         / "busy.partial.deadbeefcafe.mp4")
+        arguments = topaz.command(
+            source, tmp, topaz.framed(topaz.NON_AI_UPSCALE, orientation.LANDSCAPE))
+        return probes(topaz_pids=(31337,), arguments=arguments, duration=581.0)
 
     def test_multiple_topaz_processes_are_not_adopted(self):
         with workspace_temp_dir() as root:
@@ -744,7 +773,7 @@ class TestThrottleToPresence(unittest.TestCase):
             assert changed == ""
             mocks["suspend"].assert_not_called()
 
-    def test_a_poll_while_a_run_has_the_encode_in_hand_passes_at_once(self):
+    def test_a_poll_on_the_windows_thread_passes_at_once_while_a_run_has_the_encode_in_hand(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             write_job(root, overrides)
@@ -755,13 +784,13 @@ class TestThrottleToPresence(unittest.TestCase):
 
             stack, mocks = probes(is_running=True, idle_seconds=5.0)
             with override_config(**overrides), stack:
-                nonai_files.stage_lock.acquire()
+                nonai_files.run_poll_and_window_lock.acquire()
                 try:
                     poll.start()
                     poll.join(timeout=2)
                     passed_while_held = not poll.is_alive()
                 finally:
-                    nonai_files.stage_lock.release()
+                    nonai_files.run_poll_and_window_lock.release()
                     poll.join(timeout=10)
 
             assert passed_while_held
