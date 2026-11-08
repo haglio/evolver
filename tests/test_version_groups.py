@@ -59,12 +59,21 @@ class TestGroupIds:
 
         assert set(ids.values()) == {"jane-doe_540-Qv3Tn8Rd"}
 
-    def test_a_scene_named_past_another_is_not_a_version_of_it(self):
+    def test_scenes_that_only_start_with_one_name_keep_their_own_families_and_rotation_slots(self):
         stems = ["Jane Doe", "Jane Doe - Cut to Length", "Jane-Doe-&-Ada-Roe-b4t7k1qz"]
 
         ids = group_ids(stems)
 
         assert len(set(ids.values())) == 3
+
+    def test_a_chain_of_declared_versions_is_not_followed_back_to_the_original(self):
+        ids = group_ids(["video one", "beta cut", "gamma cut"],
+                        {"gamma cut": "beta cut", "beta cut": "video one"})
+
+        assert ids["gamma cut"] != ids["video one"]
+
+    def test_a_declared_pair_whose_original_is_in_another_bucket_joins_nothing(self):
+        assert group_ids(["beta cut"], {"beta cut": "video one"}) == {"beta cut": "beta cut"}
 
     def test_a_second_download_of_one_video_keeps_its_family(self):
         stems = ["Jane Doe - Scene Two", "Jane Doe - Scene Two (2)",
