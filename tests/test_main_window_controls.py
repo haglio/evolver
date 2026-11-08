@@ -15,9 +15,11 @@ from evolver import STAGE_LABELS, STAGE_TOOLTIPS
 from gui.main_window import EvolverMainWindow, RunDetailWidget, _summarize_result
 from gui.schedule_state import ScheduleStatus
 from gui.tray import EvolverTray
+from tasks.scripts_sync import ScriptsSyncResult
 from tests.gui_support import QAPP, build_evolver_app
 from tests.temp_helpers import make_run_record, override_config
 
+_A_ZONE_PINNED_SINCE_AN_UNSET_ONE_IS_THE_COMPUTERS_OWN = ZoneInfo("America/Los_Angeles")
 
 class TestRunDetailRendering:
     def _record(self):
@@ -79,7 +81,7 @@ class TestRunHistoryMarks:
             self.window.refresh_history()
         return self.window._history_list.item(0)
 
-    def test_a_failed_run_leaves_its_timestamp_the_default_color(self):
+    def test_a_failed_run_leaves_its_timestamp_the_default_color_so_its_verdict_is_told_from_a_failed_stage(self):
         item = self._item("error")
         assert item.foreground().style() == Qt.BrushStyle.NoBrush
 
@@ -87,7 +89,7 @@ class TestRunHistoryMarks:
         assert not self._item("error").icon().isNull()
 
     def test_the_label_itself_is_just_the_time_and_duration(self):
-        with override_config(DISPLAY_TIMEZONE=ZoneInfo("America/Los_Angeles")):
+        with override_config(DISPLAY_TIMEZONE=_A_ZONE_PINNED_SINCE_AN_UNSET_ONE_IS_THE_COMPUTERS_OWN):
             assert self._item("success").text() == "2026/07/25 08:20 (12s)"
 
     def test_refreshing_selects_the_newest_run_and_shows_its_detail(self):
@@ -121,6 +123,7 @@ class TestStageStatusColumn:
             stages=[{"name": "upscale_non_ai", "status": status,
                      "duration_seconds": 1.0, "result": None}],
         )
+        # Held on self: PyQt deletes the table's C++ items with a widget collected as a local.
         self.widget = RunDetailWidget()
         self.widget.show_record(record)
         return self.widget._table.item(0, 2)
@@ -184,7 +187,7 @@ class TestRunVerdictInDetailPane:
 
 
 class TestSummarizeResult:
-    def test_metadata_shows_scraped_and_errors_even_when_zero(self):
+    def test_metadata_shows_scraped_and_errors_even_at_zero_so_a_total_failure_never_reads_as_a_partial_one(self):
         result = {"newly_scraped": 0, "no_scrape_strat": 0,
                   "skipped_unknown_orient": 0, "errors": 58}
         summary = _summarize_result(result, None, "metadata")
@@ -217,6 +220,12 @@ class TestScriptsSyncSummary:
         summary = self._result(already_aligned=53, unmatched=15)
         assert "15 match no video" in summary
         assert "unmatched=15" not in summary
+
+    def test_version_groups_whose_scripts_differ_are_named_as_trouble_while_the_stage_alone_says_they_fail_nothing(self):
+        summary = self._result(ambiguous_variant_groups=2)
+
+        assert summary == "2 version groups whose scripts differ — none copied"
+        assert ScriptsSyncResult(ambiguous_variant_groups=2).ok
 
     def test_names_the_scripts_that_matched_no_video(self):
         summary = self._result(
@@ -327,7 +336,7 @@ class TestNonAiUpscaleSummary:
         assert "started" in summary
         assert "lagoon/1 clips/Scene Three 9.mp4" in summary
 
-    def test_an_encode_you_asked_for_says_so_beside_its_progress(self):
+    def test_an_encode_you_asked_for_says_so_or_it_would_look_like_a_presence_check_that_failed(self):
         summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4",
                                in_flight_percent=12, on_request=True)
         assert "encoding lagoon/1 clips/Delia Moss.mp4 (12%, at your request)" in summary
@@ -346,7 +355,7 @@ class TestNonAiUpscaleSummary:
             in_flight="lagoon/1 clips/Delia Moss.mp4", in_flight_percent=72,
         )
 
-    def test_says_how_far_along_the_project_is_and_not_only_the_count(self):
+    def test_says_how_far_along_the_project_is_by_running_time_since_the_short_videos_went_first_and_a_count_runs_ahead(self):
         summary = self._result(pending=180, percent_complete=29,
                                remaining_seconds=149_400.0)
         assert "180 queued" in summary
@@ -367,6 +376,11 @@ class TestNonAiUpscaleSummary:
         assert "stopped" in summary
         assert "lagoon/1 clips/Scene Four 4.mp4" in summary
         assert "still queued" in summary
+
+    def test_an_encode_finishing_and_the_next_start_held_back_in_one_run_read_as_a_list(self):
+        summary = self._result(promoted="lagoon/1 clips/scene one.mp4", start_deferred="topaz_busy")
+
+        assert summary.startswith("finished lagoon/1 clips/scene one.mp4, waiting (topaz_busy), ")
 
     def test_a_low_disk_hold_is_called_out(self):
         summary = self._result(deferred_low_disk=True, start_deferred="")
@@ -525,7 +539,7 @@ class TestToolbarStateUpdates:
         window.show_schedule(ScheduleStatus(next_run_at=next_run))
         assert "14:30" in window._next_run_label.text()
 
-    def test_inactive_message_when_paused(self, window):
+    def test_a_paused_schedule_reads_as_the_toolbars_longer_sentence_the_one_wording_meant_to_differ_from_the_tray(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
         assert "inactive" in window._next_run_label.text().lower()
 
@@ -556,7 +570,7 @@ class TestToolbarStateUpdates:
         assert window.pause_action.iconText() == "Pause Scheduling"
 
 
-class TestToolbarAppWiring:
+class TestEachToolbarButtonDoesItsJobSinceCountingReceiversPassedWithEveryButtonMiswired:
     @pytest.fixture
     def app(self, request):
         return build_evolver_app(request)

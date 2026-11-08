@@ -27,6 +27,8 @@ def symbol_for(status: str) -> tuple[str, QColor]:
     return _MARKS.get(status, _NO_MARK)
 
 
+# A QListWidgetItem's text takes one color for the whole string, so the run history carries
+# its mark as the item's icon, where the color lands on the mark alone.
 def status_icon(status: str) -> QIcon:
     mark, color = symbol_for(status)
     if not mark:

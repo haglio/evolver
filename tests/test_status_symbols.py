@@ -21,7 +21,7 @@ class TestMarkFor(unittest.TestCase):
         assert symbol == "circle"
         assert color.name() == TEXT_MUTED.name()
 
-    def test_a_held_back_stage_is_an_empty_gray_circle(self):
+    def test_a_held_back_stage_shares_the_skipped_gray_circle_not_a_red_cross_since_neither_needs_you(self):
         symbol, color = symbol_for("warning")
         assert symbol == "circle"
         assert color.name() == TEXT_MUTED.name()
