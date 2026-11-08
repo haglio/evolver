@@ -13,13 +13,22 @@ from PyQt6.QtGui import QColor
 from evolver import ALL_STAGES, STAGE_LABELS, STAGES
 from gui import main_window
 from gui.stats_window import STAGE_COLORS
+from tasks.clip_scripts import ClipScriptsResult
+from tasks.nonai_group import NonAiGroupResult
+from tasks.nonai_titles import NonAiTitleResult
 from tasks.nonai_upscale import NonAiUpscaleResult
+from tasks.provenance_sweep import ProvenanceResult
+from tasks.scene_scripts import SceneScriptsResult
 from tasks.scripts_sync import ScriptsSyncResult
+from tasks.sort import SortResult
+from tasks.stray_files import StrayFilesResult
+from tasks.video_kinds import VideoKindsResult
 from tests.color_support import CIE76_DELTA_E_OF_COLORS_OBVIOUSLY_DIFFERENT, band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
+from util.stage_result import StageResult
 
 
-def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
+def _keys_read_in_any_branch_of(function_names: tuple[str, ...]) -> set[str]:
     tree = ast.parse(Path(PROJECT_ROOT, "gui", "main_window.py").read_text(encoding="utf-8"))
     keys: set[str] = set()
     for node in ast.walk(tree):
@@ -34,6 +43,18 @@ def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
                 keys.add(inner.args[0].value)
     return {key for key in keys if isinstance(key, str)}
 
+
+WHY_IT_CANNOT_FAIL = {
+    SortResult: "moves what it can identify and leaves the rest in the inbox",
+    ClipScriptsResult: "writes a funscript where one is missing and leaves every existing one alone",
+    SceneScriptsResult: "writes a funscript where one is missing and leaves every existing one alone",
+    NonAiGroupResult: "bookkeeping over whatever files happen to be there",
+    NonAiTitleResult: "bookkeeping over whatever files happen to be there",
+    ProvenanceResult: "only fills in a record where none is; a gallery it cannot read leaves its "
+                      "videos for a later run",
+    StrayFilesResult: "what it cannot repair it reports, for a person to judge",
+    VideoKindsResult: "a video it cannot measure is left for the next run",
+}
 
 _STAGES_THAT_MAKE_OR_MOVE_A_VIDEO = ("strays", "withdrawn", "sort", "upscale", "genau_deliver", "upscale_non_ai")
 
@@ -64,7 +85,7 @@ class TestStageRegistry(unittest.TestCase):
              set()),
         ):
             with self.subTest(result=result_type.__name__):
-                shown = _result_keys_read(functions) | table_keys
+                shown = _keys_read_in_any_branch_of(functions) | table_keys
                 assert sorted(shown) == sorted(field.name for field in dataclasses.fields(result_type))
 
     def test_stray_files_run_first_since_the_rest_cannot_see_a_misnamed_video_or_a_misplaced_script(self):
@@ -133,11 +154,25 @@ class TestStageRegistry(unittest.TestCase):
 
         assert offenders == []
 
-    def test_every_declared_color_is_one_qt_can_paint(self):
+    def test_every_declared_color_is_valid_since_the_band_check_cannot_see_an_invalid_one(self):
+        # Qt paints an invalid QColor, such as QColor(300, 0, 0), as black.
         for stage in STAGES:
             with self.subTest(stage=stage.key):
-                assert len(stage.color) == 3
                 assert QColor(*stage.color).isValid()
+
+    def test_every_declared_color_leaves_the_bands_opacity_to_the_painter(self):
+        for stage in STAGES:
+            with self.subTest(stage=stage.key):
+                assert len(stage.color) == len("rgb")
+
+    def test_every_stage_result_that_can_never_fail_says_why(self):
+        never_fail = {
+            result_type for result_type in StageResult.__subclasses__()
+            if not result_type.__module__.startswith("tests")
+            and result_type.ok is StageResult.ok
+        }
+
+        assert never_fail == set(WHY_IT_CANNOT_FAIL)
 
     def test_no_two_stage_bands_are_hard_to_tell_apart(self):
         worst, pair = min(
