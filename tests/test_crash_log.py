@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import re
+import subprocess
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
@@ -74,7 +76,7 @@ class TestWriteCrash(unittest.TestCase):
             assert "some detail" in text
             assert re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]", text)
 
-    def test_appends_to_existing_content(self):
+    def test_a_crash_is_appended_so_no_earlier_evidence_is_lost(self):
         with workspace_temp_dir() as tmp_dir:
             tmp = tmp_dir / "tray_crash.log"
             tmp.write_text("[2026-03-31 10:00:00] Previous entry\n", encoding="utf-8")
@@ -91,7 +93,7 @@ class TestAtexitHandler(unittest.TestCase):
     def setUp(self):
         crash_log._Logged.crash = False
 
-    def test_atexit_writes_when_no_crash(self):
+    def test_a_clean_exit_is_written_so_a_log_without_one_shows_a_kill_from_outside(self):
         mock_path = MagicMock()
         mock_path.open = unittest.mock.mock_open()
         with patch.object(crash_log, "CRASH_LOG", mock_path):
@@ -102,7 +104,7 @@ class TestAtexitHandler(unittest.TestCase):
         written = "".join(c.args[0] for c in handle.write.call_args_list)
         assert "Clean exit" in written
 
-    def test_atexit_includes_stack_trace(self):
+    def test_a_clean_exit_carries_the_stack_that_ended_the_program(self):
         with workspace_temp_dir() as tmp_dir:
             tmp = tmp_dir / "tray_crash.log"
             with patch.object(crash_log, "CRASH_LOG", tmp):
@@ -147,6 +149,50 @@ class TestWriteInfo(unittest.TestCase):
             text = tmp.read_text(encoding="utf-8")
             assert "Session end:" in text
             assert re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]", text)
+
+
+class TestWarningsUnderPythonw(unittest.TestCase):
+    def test_with_no_stderr_under_pythonw_a_warning_from_any_library_lands_in_the_crash_log(self):
+        handler = crash_log.record_warnings()
+        try:
+            with patch.object(crash_log, "write_info") as write_info:
+                logging.getLogger("example.library").warning("could not do the thing")
+        finally:
+            logging.getLogger().removeHandler(handler)
+
+        write_info.assert_called_once_with("WARNING from example.library:", "could not do the thing\n")
+
+    def test_the_handler_it_installs_is_handed_back_to_take_off_again(self):
+        handler = crash_log.record_warnings()
+        try:
+            assert handler in logging.getLogger().handlers
+        finally:
+            logging.getLogger().removeHandler(handler)
+
+        assert handler not in logging.getLogger().handlers
+
+
+_SCRIPT_AND_IMPORT_SHARE_ONE_FLAG = """
+import runpy, tempfile
+from pathlib import Path
+run_as_a_script = runpy.run_path("tray_app.py", run_name="tray_script")
+import tray_app
+from util import crash_log
+crash_log.CRASH_LOG = Path(tempfile.mkdtemp()) / "tray_crash.log"
+tray_app.crash_log.write_crash("Crash:", "recorded through the imported copy")
+print(run_as_a_script["crash_log"]._Logged.crash)
+"""
+
+
+class TestOneCrashFlagPerProcess(unittest.TestCase):
+    def test_a_crash_recorded_through_an_import_is_the_one_the_tray_script_reads_at_exit(self):
+        said = subprocess.run(
+            [sys.executable, "-c", _SCRIPT_AND_IMPORT_SHARE_ONE_FLAG],
+            cwd=PROJECT_ROOT, capture_output=True, text=True, check=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        ).stdout.split()
+
+        assert said[-1:] == ["True"]
 
 
 class TestStartupCrashIsVisible(unittest.TestCase):
