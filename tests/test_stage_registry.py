@@ -35,6 +35,13 @@ def _result_keys_read(function_names: tuple[str, ...]) -> set[str]:
     return {key for key in keys if isinstance(key, str)}
 
 
+_STAGES_THAT_MAKE_OR_MOVE_A_VIDEO = ("strays", "withdrawn", "sort", "upscale", "genau_deliver", "upscale_non_ai")
+
+
+def _place(key: str) -> int:
+    return ALL_STAGES.index(key)
+
+
 class TestStageRegistry(unittest.TestCase):
     def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
         for table, name in (
@@ -60,12 +67,32 @@ class TestStageRegistry(unittest.TestCase):
                 shown = _result_keys_read(functions) | table_keys
                 assert sorted(shown) == sorted(field.name for field in dataclasses.fields(result_type))
 
+    def test_stray_files_run_first_since_the_rest_cannot_see_a_misnamed_video_or_a_misplaced_script(self):
+        assert ALL_STAGES[0] == "strays"
+
+    def test_taken_back_runs_before_the_scrape_and_the_sort_so_a_video_on_its_way_out_is_neither_recorded_nor_filed(self):
+        assert _place("withdrawn") < min(_place("metadata"), _place("sort"))
+
+    def test_genau_delivery_comes_straight_after_the_upscale_so_a_video_made_this_run_reaches_genau_this_run(self):
+        assert _place("genau_deliver") == _place("upscale") + 1
+
+    def test_genau_delivery_comes_before_the_correspondence_check_which_would_call_its_source_unmatched(self):
+        assert _place("genau_deliver") < _place("verify")
+
     def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
-        assert "genau_deliver" in ALL_STAGES
-        assert "upscale_non_ai" in ALL_STAGES
-        assert ALL_STAGES.index("genau_deliver") == ALL_STAGES.index("upscale") + 1
-        assert ALL_STAGES.index("upscale_non_ai") == ALL_STAGES.index("genau_deliver") + 1
-        assert ALL_STAGES.index("genau_deliver") < ALL_STAGES.index("verify")
+        assert _place("upscale_non_ai") == _place("genau_deliver") + 1
+
+    def test_moved_videos_are_followed_after_every_stage_that_makes_or_moves_one_so_nothing_counts_them_lost_first(self):
+        assert _place("references") > max(map(_place, _STAGES_THAT_MAKE_OR_MOVE_A_VIDEO))
+
+    def test_titles_come_after_the_grouping_whose_version_families_carry_a_clips_name_to_its_scene(self):
+        assert _place("title_non_ai") > _place("group_non_ai")
+
+    def test_kinds_come_after_the_grouping_so_they_join_the_sidecar_it_made_rather_than_making_a_second(self):
+        assert _place("video_types") > _place("group_non_ai")
+
+    def test_provenance_comes_after_every_stage_that_makes_or_moves_a_video_and_after_the_kinds_sidecar(self):
+        assert _place("provenance") > max(map(_place, (*_STAGES_THAT_MAKE_OR_MOVE_A_VIDEO, "video_types")))
 
     def test_the_stages_name_genaus_flicks_in_the_overlays_word(self):
         tips = {stage.key: stage.tooltip for stage in STAGES}
