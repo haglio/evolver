@@ -181,8 +181,7 @@ class TestTheEvolverLane(unittest.TestCase):
             db = _gallery(root / "gallery.db", [("p1", "made_00009.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 touch_video(lib.kino_upscales / "portrait" / source / "made_00009_topaz.mp4")
-                left_behind = _sidecar(lib, "2D", "AI", "2_outbox", "upscaled_by_orientation",
-                                       "landscape", source, "made_00009_topaz.json")
+                left_behind = _sidecar(lib, "kino", "2D", "AI", "landscape", source, "made_00009_topaz.json")
 
                 unsent_videos.run()
 
