@@ -49,6 +49,7 @@ def _holder(lock: Path) -> int:
         return 0
 
 
+# Windows gives a dead process's number to the next process it starts, so past this age a live number names somebody else.
 def _still_held(lock: Path) -> bool:
     try:
         age = time.time() - lock.stat().st_mtime
