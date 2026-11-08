@@ -223,6 +223,10 @@ STAGES: tuple[Stage, ...] = (
 )
 
 ALL_STAGES = tuple(stage.key for stage in STAGES)
+TAKEN_OUT_STAGE_LABELS = MappingProxyType({
+    "purge": "Purge Trash",
+    "references": "Follow moved videos",
+})
 STAGE_LABELS = MappingProxyType({stage.key: stage.label for stage in STAGES})
 STAGE_TOOLTIPS = MappingProxyType({stage.key: stage.tooltip for stage in STAGES})
 STAGE_NUMBER = MappingProxyType({stage.key: number for number, stage in enumerate(STAGES, start=1)})

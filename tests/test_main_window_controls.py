@@ -52,24 +52,23 @@ class TestRunDetailRendering:
         assert widget._table.item(0, 1).text() == STAGE_LABELS["metadata"]
         assert widget._table.item(0, 1).toolTip() == STAGE_TOOLTIPS["metadata"]
 
-    def test_a_stage_the_registry_does_not_list_still_shows_its_key(self):
+    def test_a_stage_since_taken_out_shows_the_name_it_last_had(self):
         widget = RunDetailWidget()
         widget.show_record(make_run_record(
-            id="x", started_at="2026-06-27T22:18:46", finished_at="2026-06-27T22:18:46",
-            duration_seconds=1.0, trigger="manual", status="success",
-            stages=[{"name": "regen_cutover", "status": "completed", "duration_seconds": 1.0}],
+            stages=[{"name": "references", "status": "completed", "duration_seconds": 1.0},
+                    {"name": "purge", "status": "completed", "duration_seconds": 1.0}],
         ))
 
-        assert widget._table.item(0, 1).text() == "regen_cutover"
+        assert [widget._table.item(row, 1).text() for row in (0, 1)] == [
+            "Follow moved videos", "Purge Trash"]
 
-    def test_a_stage_the_registry_does_not_list_has_no_number_in_the_stage_column(self):
+    def test_a_stage_since_taken_out_has_no_number_in_the_stage_column(self):
         widget = RunDetailWidget()
         widget.show_record(make_run_record(
-            stages=[{"name": "regen_cutover", "status": "completed", "duration_seconds": 1.0}],
+            stages=[{"name": "references", "status": "completed", "duration_seconds": 1.0}],
         ))
 
         assert widget._table.item(0, 0).text() == "—"
-        assert widget._table.item(0, 0).text() == "\u2014"
 
 
 class TestRunHistoryMarks:

@@ -29,7 +29,7 @@ from shared_ui.spacing import BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
-from evolver import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS
+from evolver import STAGE_LABELS, STAGE_NUMBER, STAGE_TOOLTIPS, TAKEN_OUT_STAGE_LABELS
 from gui.commands import (
     NONAI,
     PAUSE,
@@ -129,7 +129,8 @@ class RunDetailWidget(QWidget):
             num_item.setFlags(no_edit)
             self._table.setItem(i, 0, num_item)
 
-            name_item = QTableWidgetItem(STAGE_LABELS.get(stage_key, stage_key))
+            name_item = QTableWidgetItem(
+                STAGE_LABELS.get(stage_key) or TAKEN_OUT_STAGE_LABELS.get(stage_key, stage_key))
             name_item.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
             name_item.setFlags(no_edit)
             self._table.setItem(i, 1, name_item)
