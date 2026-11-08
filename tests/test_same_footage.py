@@ -4,11 +4,20 @@ from pathlib import Path
 
 import numpy as np
 
-from util import same_footage
+from tests.temp_helpers import (
+    make_video,
+    nonai_library_overrides,
+    override_config,
+    workspace_temp_dir,
+    write_sidecar,
+)
+from util import nonai_retire, same_footage, sidecar
 from util.frame_hashes import SAMPLE_HEIGHT, SAMPLE_WIDTH, frame_hashes
 
 MASK = (1 << 64) - 1
 MOMENTS = [(0x9E3779B97F4A7C15 * (moment + 1)) & MASK for moment in range(16)]
+MEASURED_2026_09_16_TWO_ENCODES_OF_ONE_SCENE_AGREED_AT = 13
+MEASURED_2026_09_16_SAME_LENGTH_OTHER_SCENES_AGREED_AT = 0
 
 
 def _written(values: list[int]) -> list[str]:
@@ -26,6 +35,12 @@ class TestSameFootage:
 
     def test_agreeing_at_only_some_moments_is_other_footage(self):
         assert not same_footage.same_footage(_written(MOMENTS), _written(_reencoded(9)))
+
+    def test_the_line_falls_between_the_real_pair_measured_and_the_other_scenes_beside_it(self):
+        assert same_footage.same_footage(
+            _written(MOMENTS), _written(_reencoded(MEASURED_2026_09_16_TWO_ENCODES_OF_ONE_SCENE_AGREED_AT)))
+        assert not same_footage.same_footage(
+            _written(MOMENTS), _written(_reencoded(MEASURED_2026_09_16_SAME_LENGTH_OTHER_SCENES_AGREED_AT)))
 
 
 def _frames(count: int) -> np.ndarray:
@@ -81,6 +96,19 @@ class TestFingerprinted:
 
         assert recorded == {"title": "scene one", same_footage.BLOCK: {"other": 1, same_footage.FIELD: ["00"] * 16}}
         assert payload == {"title": "scene one", same_footage.BLOCK: {"other": 1}}
+
+    def test_an_upscale_is_handed_its_originals_moments_which_describe_the_footage_not_the_file(self):
+        with workspace_temp_dir() as root:
+            overrides = nonai_library_overrides(root)
+            source = make_video(overrides["NON_AI_DIR"] / "alpha" / "1 clips to upscale" / "scene one.mp4")
+            out = make_video(overrides["NON_AI_DIR"] / "alpha" / "3_good_to_go" / "scene one_iris2.mp4")
+
+            with override_config(**overrides):
+                write_sidecar(sidecar.sidecar_path(source), same_footage.fingerprinted({}, ["0a"] * 16))
+                nonai_retire.carry_metadata(source, out)
+                handed = sidecar.read(sidecar.sidecar_path(out))
+
+        assert same_footage.fingerprint_of(handed) == ["0a"] * 16
 
     def test_a_record_with_no_block_gets_one(self):
         assert same_footage.fingerprinted({}, ["00"] * 16) == {same_footage.BLOCK: {same_footage.FIELD: ["00"] * 16}}
