@@ -283,19 +283,25 @@ class _ProviderEmbeddedMetadata:
     creativity: str = ""
 
 
-_JSON_WINDOW_CHARS = 5000
+_CHARS_OF_ONE_RECORD_EITHER_SIDE_OF_ITS_ID = 5000
+
 
 def _extract_provider_embedded_metadata(html: str, page_id: str) -> _ProviderEmbeddedMetadata:
     found: dict[str, str] = {}
+    reach = _CHARS_OF_ONE_RECORD_EITHER_SIDE_OF_ITS_ID
     for index in _all_indices(html, page_id):
-        window = html[max(0, index - _JSON_WINDOW_CHARS): index + _JSON_WINDOW_CHARS]
-        for candidate in (window, window.replace('\\"', '"')):
+        one_record_on_a_page_with_no_line_breaks = html[max(0, index - reach): index + reach]
+        for candidate in _as_json_and_as_a_json_string(one_record_on_a_page_with_no_line_breaks):
             for attribute, extract in _EMBEDDED_FIELDS:
                 if not found.get(attribute):
                     found[attribute] = extract(candidate)
         if found.get("prompt"):
             break
     return _ProviderEmbeddedMetadata(**found)
+
+
+def _as_json_and_as_a_json_string(window: str) -> tuple[str, str]:
+    return window, window.replace('\\"', '"')
 
 
 def _int_field_as_text(blob: str, field_name: str) -> str:
