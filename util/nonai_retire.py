@@ -45,7 +45,7 @@ def carry_funscript(source: Path, out: Path) -> None:
 
 def retire_original(source: Path, *, archive_root: Path | None) -> None:
     if archive_root is not None:
-        _archive_original(source, archive_root)
+        _archive_off_the_synced_drive_the_encodes_fill(source, archive_root)
         return
     bucket = bucket_of(source)
     retire_dirs = stage_dirs(bucket, digits=(2,)) if bucket else []
@@ -61,7 +61,7 @@ def retire_original(source: Path, *, archive_root: Path | None) -> None:
     log.info("Retired original: %s -> %s", source, dest)
 
 
-def _archive_original(source: Path, archive_root: Path) -> None:
+def _archive_off_the_synced_drive_the_encodes_fill(source: Path, archive_root: Path) -> None:
     dest = archive_root / source.relative_to(config.NON_AI_DIR)
     dest.parent.mkdir(parents=True, exist_ok=True)
     for mirror in MIRRORS:

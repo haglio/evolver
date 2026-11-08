@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import unittest
 
@@ -18,6 +19,11 @@ from util import nonai_retire, script_library, sidecar
 
 
 class TestRetireIntoTheBucket(unittest.TestCase):
+    def test_none_is_a_real_answer_so_where_the_original_goes_has_no_default(self):
+        archive_root = inspect.signature(nonai_retire.retire_original).parameters["archive_root"]
+
+        assert archive_root.default is inspect.Parameter.empty
+
     def test_an_unset_archive_keeps_the_user_s_own_retire_folder(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -31,7 +37,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
             assert (non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4").exists()
             assert not source.exists()
 
-    def test_carries_the_sidecar_to_the_retire_folder(self):
+    def test_the_sidecar_goes_along_or_the_clip_record_the_main_funestra_navigates_by_is_pruned(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -52,7 +58,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
                 assert not sidecar.sidecar_path(source).exists()
                 assert sidecar.read(sidecar.sidecar_path(dest))["clip"] == {"compilation": "Vol6", "index": 1}
 
-    def test_carries_the_funscript_to_the_retire_folder(self):
+    def test_the_funscript_goes_along_or_the_scripts_sync_fails_the_run_on_a_collision(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -156,7 +162,7 @@ class TestRetireToAnArchive(unittest.TestCase):
 
 
 class TestCarryMetadata(unittest.TestCase):
-    def test_the_footage_keys_cross_and_the_file_scoped_one_does_not(self):
+    def test_the_footage_keys_cross_and_the_version_the_grouping_stage_stamps_does_not(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
