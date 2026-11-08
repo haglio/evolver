@@ -77,7 +77,7 @@ class TestMalformedExtensions(unittest.TestCase):
 
 
 class TestStrayFunscripts(unittest.TestCase):
-    def test_a_funscript_in_the_video_tree_moves_to_its_mirror_path(self):
+    def test_a_funscript_naming_no_video_still_moves_to_its_mirror_path_for_the_scripts_sync_to_report(self):
         with workspace_temp_dir() as root:
             videos = root / "videos"
             scripts = root / "scripts"
@@ -174,7 +174,7 @@ class TestEverythingElse(unittest.TestCase):
             assert result.reported == [str(Path("2D") / "non_AI" / "example" / "cover.jpg")]
             assert (bucket / "cover.jpg").is_file()
 
-    def test_the_files_windows_writes_by_itself_are_not_reported(self):
+    def test_the_files_windows_writes_by_itself_are_never_reported_so_the_report_can_empty(self):
         with workspace_temp_dir() as root:
             videos = root / "videos"
             videos.mkdir()
@@ -186,6 +186,23 @@ class TestEverythingElse(unittest.TestCase):
 
             assert result.reported == []
             assert (videos / "desktop.ini").is_file()
+
+    def test_a_funscript_beside_an_archived_original_is_not_a_stray(self):
+        with workspace_temp_dir() as root:
+            videos = root / "videos"
+            videos.mkdir()
+            archived = root / "archive" / "2D" / "non_AI" / "example" / "scene one.mp4"
+            archived.parent.mkdir(parents=True)
+            archived.write_bytes(b"video")
+            beside_it = archived.with_suffix(".funscript")
+            beside_it.write_text("{}", encoding="utf-8")
+
+            with override_config(VIDEO_LIBRARY_DIR=videos, SCRIPT_LIBRARY_DIR=root / "scripts",
+                                 NONAI_RETIRED_ROOT=root / "archive"):
+                result = stray_files.run()
+
+            assert (result.rehomed_scripts, result.reported) == (0, [])
+            assert beside_it.is_file()
 
     def test_a_partial_upscale_output_is_left_alone(self):
         with workspace_temp_dir() as root:
