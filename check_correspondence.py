@@ -64,29 +64,33 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     sorted_by_source = {copy: copy.relative_to(sorted_root).parts[0]
                         for copy in sorted(library_videos(sorted_root))}
     sorted_files = list(sorted_by_source)
-    by_name: dict[str, list[str]] = {}
+    made: set[str] = set()
+    upscale_count = 0
+    duplicates: dict[str, list[str]] = {}
     orphan_upscales: list[str] = []
     orphan_sorted: list[str] = []
     for lane in _lanes(sorted_by_source):
         expected = {upscale_name(p) for p in lane.sorted_copies}
-        made = set()
+        by_name: dict[str, list[str]] = {}
         for upscale in sorted(lane.upscales):
             name = trash_folders.name_it_had(upscale)
-            made.add(name)
             by_name.setdefault(name, []).append(_shown(upscale))
             if name not in expected and not lane.kept_once_sorted_copy_retired:
                 orphan_upscales.append(_shown(upscale))
         orphan_sorted += [str(p.relative_to(sorted_root)) for p in lane.sorted_copies
-                          if upscale_name(p) not in made]
+                          if upscale_name(p) not in by_name]
+        made |= set(by_name)
+        upscale_count += len(lane.upscales)
+        duplicates |= {name: sorted(paths) for name, paths in by_name.items() if len(paths) > 1}
 
     result = CorrespondenceResult(
         sorted_count=len(sorted_files),
-        upscale_count=sum(len(paths) for paths in by_name.values()),
+        upscale_count=upscale_count,
         orphan_upscales=sorted(orphan_upscales),
         orphan_sorted=sorted(orphan_sorted),
-        duplicates={name: sorted(paths) for name, paths in by_name.items() if len(paths) > 1},
+        duplicates=duplicates,
         missing_flicks=_flicks_whose_record_outlived_them(
-            set(by_name), {upscale_name(p) for p in sorted_files}),
+            made, {upscale_name(p) for p in sorted_files}),
     )
     _log_result(result)
 
