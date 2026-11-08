@@ -85,7 +85,7 @@ class TestWhatTheWindowIsTold(unittest.TestCase):
         assert told.heard == ["side beta"]
 
 
-class TestWhenListeningStopsTheWindowSaysSoAndKeepsItsWorkingButtons(unittest.TestCase):
+class TestWhatTheListenerSaysWhenListeningCannotGoOn(unittest.TestCase):
     def test_an_audio_stack_that_is_not_installed_is_a_crash_with_its_reason(self):
         with patch.dict(sys.modules, {"vosk": None}),                 self.assertLogs("backfill.voice", level="ERROR") as logged:
             told = _told_by(VoiceListener(PHRASES))

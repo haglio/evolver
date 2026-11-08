@@ -29,7 +29,7 @@ from util.media_files import partial_path
 
 
 class TestRunStartsAJob(unittest.TestCase):
-    def test_launches_detached_ffmpeg_for_the_top_candidate(self):
+    def test_launches_detached_ffmpeg_for_the_top_candidate_and_returns_without_waiting_out_its_hours(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -40,6 +40,7 @@ class TestRunStartsAJob(unittest.TestCase):
                 result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
 
             assert result.started == "lagoon/0 unsorted/a.mp4"
+            assert mocks["popen"].return_value.method_calls == []
             cmd = mocks["popen"].call_args.args[0]
             assert str(video) in cmd
             assert "-an" not in cmd

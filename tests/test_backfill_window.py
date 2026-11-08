@@ -89,14 +89,20 @@ class TestBackfillWindow(unittest.TestCase):
 
         assert window.hearing_text() == ""
 
-    def test_a_dead_recognizer_says_so_where_the_live_guess_was(self):
-        window = self._window(FakeSession([Path("a_topaz.mp4")]))
+    def test_a_dead_recognizer_says_so_where_the_live_guess_was_and_leaves_the_buttons_working(self):
+        session = FakeSession(
+            [Path("a_topaz.mp4"), Path("b_topaz.mp4")],
+            [("a_topaz.mp4 → skipped", None)],
+        )
+        window = self._window(session)
         window.on_hearing("side eta")
 
         window.on_voice_failed("no input device")
 
         assert "stopped" in window.hearing_text().lower()
         assert "no input device" in window.hearing_text()
+        window.button_for("skip").click()
+        assert session.applied == ["skip"]
 
     def test_a_landed_phrase_clears_the_stale_hearing_line(self):
         session = FakeSession(
