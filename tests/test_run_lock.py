@@ -28,7 +28,7 @@ class TestTheTurn:
 
             assert not lock.exists()
 
-    def test_a_turn_a_live_process_holds_is_refused(self):
+    def test_a_run_started_from_the_command_line_while_the_trays_holds_the_turn_is_refused_so_two_sorts_never_overlap(self):
         with workspace_temp_dir() as root:
             lock = root / "pipeline.lock"
             lock.write_text(str(os.getpid()), encoding="utf-8")
