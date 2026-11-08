@@ -7,6 +7,7 @@ import time
 
 import pytest
 
+import config
 from tests.temp_helpers import workspace_temp_dir
 from util import run_lock
 
@@ -55,6 +56,9 @@ class TestTheTurn:
 
             with run_lock.held(lock):
                 assert lock.exists()
+
+    def test_a_turn_is_trusted_far_past_the_longest_run_the_trays_watchdog_allows(self):
+        assert run_lock.LONGEST_RUN_SECONDS >= 5 * config.PIPELINE_WALL_TIMEOUT_SECONDS
 
     def test_an_unreadable_turn_is_taken_over(self):
         with workspace_temp_dir() as root:
