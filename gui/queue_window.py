@@ -25,11 +25,10 @@ if TYPE_CHECKING:
 
 VIDEO_MIME = "application/x-evolver-video"
 
-# Windows colors this window, where the family's secondary text, a near-white for dark chrome,
-# would not show.
+# Windows colors this window.
 _THE_RUN_HISTORYS_GRAY = GRAY.name()
 
-ASK_AGAIN_SECONDS_WHILE_THE_ENCODE_MOVES_BETWEEN_RUNS = 15.0
+ASK_AGAIN_SECONDS = 15.0
 
 _STATE_WORDS = {
     upscale_queue.NEXT: "Next, once you're away from the computer",
@@ -187,7 +186,7 @@ class UpscaleQueueWindow(QDialog):
         self._held: UpscaleQueue | None = None
 
         self._clock = QTimer(self)
-        self._clock.setInterval(int(ASK_AGAIN_SECONDS_WHILE_THE_ENCODE_MOVES_BETWEEN_RUNS * 1000))
+        self._clock.setInterval(int(ASK_AGAIN_SECONDS * 1000))
         self._clock.timeout.connect(self.refresh_wanted)
 
     def show_queue(self, queue: UpscaleQueue) -> None:

@@ -83,12 +83,13 @@ def _ink_count(image: QImage, xs: range, ys: range) -> int:
     )
 
 
-_THE_STEP_QTS_BLEND_AND_THIS_ARITHMETIC_MAY_ROUND_APART = 1
+# Qt's alpha blend and this file's arithmetic can round a channel one step apart.
+_ONE_ROUNDING_STEP_PER_CHANNEL = 1
 
 
 def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
     expected = band_fill(STAGE_COLORS[stage_key])
-    return all(abs(p - e) <= _THE_STEP_QTS_BLEND_AND_THIS_ARITHMETIC_MAY_ROUND_APART
+    return all(abs(p - e) <= _ONE_ROUNDING_STEP_PER_CHANNEL
                for p, e in zip(pixel, expected, strict=True))
 
 
@@ -254,7 +255,7 @@ class TestStackedAreaChartPainting:
 
         assert legend_width() >= widest + 22
 
-    def test_the_legend_widens_with_a_wider_font_where_a_fixed_width_would_clip(self):
+    def test_the_legend_widens_with_the_font(self):
         wider = _legend_font()
         wider.setPointSize(wider.pointSize() * 2)
         widest = max(QFontMetrics(wider).horizontalAdvance(label) for label in STAGE_LABELS.values())
@@ -357,9 +358,10 @@ class TestStatsWindow:
         assert not window._averages_btn.isChecked()
         assert window._chart._mode == "historical"
 
-    def test_10m_button_starts_checked_so_a_band_the_same_height_is_the_same_seconds_on_any_chart(self):
+    def test_10m_button_starts_checked(self):
         window = StatsWindow()
-        assert window._10m_btn.isChecked()
+        assert window._10m_btn.isChecked(), (
+            "on the fixed scale a band the same height is the same seconds on any chart")
         assert not window._fit_btn.isChecked()
 
     def test_toggle_to_fit(self):
@@ -480,7 +482,7 @@ class TestStatsActionExists:
 
 
 class TestTheStageRegistry:
-    def test_holds_plain_rgb_so_the_pipeline_reads_it_without_qt(self):
+    def test_imports_without_qt_and_holds_plain_rgb(self):
         driver = ("import sys, content_overlay as c; c.LOCAL_CONTENT = c.EXAMPLE_CONTENT; import evolver;"
                   "print([m for m in sys.modules if m.startswith('PyQt')]);"
                   "print(all(isinstance(s.color, tuple) and all(isinstance(v, int) for v in s.color)"

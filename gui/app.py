@@ -289,6 +289,7 @@ class EvolverApp:
             8000,
         )
 
+    # Windows may cancel the shutdown it announces here, so quitting on it leaves no stand-down.
     def _on_session_end(self, manager):
         crash_log.write_info(
             "Windows session end requested:",

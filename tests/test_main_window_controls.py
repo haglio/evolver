@@ -19,7 +19,7 @@ from tasks.scripts_sync import ScriptsSyncResult
 from tests.gui_support import QAPP, build_evolver_app
 from tests.temp_helpers import make_run_record, override_config
 
-_A_ZONE_PINNED_SINCE_AN_UNSET_ONE_IS_THE_COMPUTERS_OWN = ZoneInfo("America/Los_Angeles")
+_A_ZONE_PINNED_AGAINST_THE_COMPUTERS_OWN = ZoneInfo("America/Los_Angeles")
 
 class TestRunDetailRendering:
     def _record(self):
@@ -81,15 +81,16 @@ class TestRunHistoryMarks:
             self.window.refresh_history()
         return self.window._history_list.item(0)
 
-    def test_a_failed_run_leaves_its_timestamp_the_default_color_so_its_verdict_is_told_from_a_failed_stage(self):
+    def test_a_failed_run_leaves_its_timestamp_the_default_color(self):
         item = self._item("error")
-        assert item.foreground().style() == Qt.BrushStyle.NoBrush
+        assert item.foreground().style() == Qt.BrushStyle.NoBrush, (
+            "a whole red row could not be told from a run one of whose stages failed")
 
     def test_a_failed_run_carries_the_cross_as_its_icon(self):
         assert not self._item("error").icon().isNull()
 
     def test_the_label_itself_is_just_the_time_and_duration(self):
-        with override_config(DISPLAY_TIMEZONE=_A_ZONE_PINNED_SINCE_AN_UNSET_ONE_IS_THE_COMPUTERS_OWN):
+        with override_config(DISPLAY_TIMEZONE=_A_ZONE_PINNED_AGAINST_THE_COMPUTERS_OWN):
             assert self._item("success").text() == "2026/07/25 08:20 (12s)"
 
     def test_refreshing_selects_the_newest_run_and_shows_its_detail(self):
@@ -187,11 +188,11 @@ class TestRunVerdictInDetailPane:
 
 
 class TestSummarizeResult:
-    def test_metadata_shows_scraped_and_errors_even_at_zero_so_a_total_failure_never_reads_as_a_partial_one(self):
+    def test_metadata_shows_scraped_and_errors_even_at_zero(self):
         result = {"newly_scraped": 0, "no_scrape_strat": 0,
                   "skipped_unknown_orient": 0, "errors": 58}
         summary = _summarize_result(result, None, "metadata")
-        assert "newly_scraped=0" in summary
+        assert "newly_scraped=0" in summary, "a hidden zero makes a total failure read as a partial one"
         assert "errors=58" in summary
 
     def test_other_stages_still_hide_zero_fields(self):
@@ -221,11 +222,14 @@ class TestScriptsSyncSummary:
         assert "15 match no video" in summary
         assert "unmatched=15" not in summary
 
-    def test_version_groups_whose_scripts_differ_are_named_as_trouble_while_the_stage_alone_says_they_fail_nothing(self):
+    def test_differing_version_groups_are_named_as_trouble(self):
         summary = self._result(ambiguous_variant_groups=2)
 
         assert summary == "2 version groups whose scripts differ — none copied"
-        assert ScriptsSyncResult(ambiguous_variant_groups=2).ok
+
+    def test_differing_version_groups_leave_the_stage_ok(self):
+        assert ScriptsSyncResult(ambiguous_variant_groups=2).ok, (
+            "whether they fail the stage is the stage's call, not the window's")
 
     def test_names_the_scripts_that_matched_no_video(self):
         summary = self._result(
@@ -336,10 +340,11 @@ class TestNonAiUpscaleSummary:
         assert "started" in summary
         assert "lagoon/1 clips/Scene Three 9.mp4" in summary
 
-    def test_an_encode_you_asked_for_says_so_or_it_would_look_like_a_presence_check_that_failed(self):
+    def test_an_encode_you_asked_for_says_so_beside_its_progress(self):
         summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4",
                                in_flight_percent=12, on_request=True)
-        assert "encoding lagoon/1 clips/Delia Moss.mp4 (12%, at your request)" in summary
+        assert "encoding lagoon/1 clips/Delia Moss.mp4 (12%, at your request)" in summary, (
+            "the one encode running while you are at the computer would look like a failed presence check")
 
     def test_a_start_you_asked_for_says_so(self):
         summary = self._result(started="lagoon/1 clips/Scene Three 9.mp4", on_request=True)
@@ -355,11 +360,11 @@ class TestNonAiUpscaleSummary:
             in_flight="lagoon/1 clips/Delia Moss.mp4", in_flight_percent=72,
         )
 
-    def test_says_how_far_along_the_project_is_by_running_time_since_the_short_videos_went_first_and_a_count_runs_ahead(self):
+    def test_says_how_far_along_by_running_time(self):
         summary = self._result(pending=180, percent_complete=29,
                                remaining_seconds=149_400.0)
         assert "180 queued" in summary
-        assert "29% done" in summary
+        assert "29% done" in summary, "the short videos went first, so a count runs ahead of the work"
         assert "41.5h left" in summary
 
     def test_a_library_nothing_has_measured_yet_still_says_the_count(self):
@@ -377,7 +382,7 @@ class TestNonAiUpscaleSummary:
         assert "lagoon/1 clips/Scene Four 4.mp4" in summary
         assert "still queued" in summary
 
-    def test_an_encode_finishing_and_the_next_start_held_back_in_one_run_read_as_a_list(self):
+    def test_two_outcomes_of_one_run_read_as_a_list(self):
         summary = self._result(promoted="lagoon/1 clips/scene one.mp4", start_deferred="topaz_busy")
 
         assert summary.startswith("finished lagoon/1 clips/scene one.mp4, waiting (topaz_busy), ")
@@ -539,9 +544,10 @@ class TestToolbarStateUpdates:
         window.show_schedule(ScheduleStatus(next_run_at=next_run))
         assert "14:30" in window._next_run_label.text()
 
-    def test_a_paused_schedule_reads_as_the_toolbars_longer_sentence_the_one_wording_meant_to_differ_from_the_tray(self, window):
+    def test_the_toolbar_alone_says_paused_as_a_sentence(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
-        assert "inactive" in window._next_run_label.text().lower()
+        assert "inactive" in window._next_run_label.text().lower(), (
+            "the one wording that differs from the tray's on purpose: the toolbar has room for it")
 
     def test_running_message_when_running(self, window):
         window.show_schedule(ScheduleStatus(is_running=True))
@@ -570,7 +576,7 @@ class TestToolbarStateUpdates:
         assert window.pause_action.iconText() == "Pause Scheduling"
 
 
-class TestEachToolbarButtonDoesItsJobSinceCountingReceiversPassedWithEveryButtonMiswired:
+class TestEachToolbarButtonDoesItsJob:
     @pytest.fixture
     def app(self, request):
         return build_evolver_app(request)
@@ -590,7 +596,8 @@ class TestEachToolbarButtonDoesItsJobSinceCountingReceiversPassedWithEveryButton
                 app._window.quit_action.trigger()
         finally:
             patcher.stop()
-        mock_alert.question.assert_called_once()
+        assert mock_alert.question.call_count == 1, (
+            "fired and checked by what it does: a count of receivers passed with Quit wired to the wrong slot")
         mock_quit.assert_called_once()
 
     def test_a_no_to_the_quit_confirmation_changes_nothing(self, app):

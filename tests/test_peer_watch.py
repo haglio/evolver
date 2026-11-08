@@ -18,12 +18,12 @@ class TestIsTheBrokerUp:
     def test_a_free_tray_mutex_is_a_broker_that_is_gone(self):
         assert peer_watch.broker_tray_is_up(is_held=lambda name: False) is False
 
-    def test_it_asks_after_the_tray_rather_than_the_broker_process_which_the_tray_may_have_paused_on_purpose(self):
+    def test_it_asks_after_the_tray_rather_than_the_broker_process(self):
         asked: list[str] = []
 
         peer_watch.broker_tray_is_up(is_held=lambda name: asked.append(name) or True)
 
-        assert asked == ["Global\\OSR2Broker.Tray"]
+        assert asked == ["Global\\OSR2Broker.Tray"], "the tray may have paused the broker on purpose"
 
 
 class TestStartingTheBroker:
@@ -80,7 +80,7 @@ class TestStartingTheBroker:
         assert config.BROKER_TRAY_LAUNCHER.parent.name == "broker"
 
 
-class TestWhatOnlyEvolverCanGetWrongInAWatchWhosePolicyAppSupportTests:
+class TestEvolversHalfOfTheWatch:
     def test_a_broker_that_is_up_is_left_alone(self):
         with patch("gui.peer_watch.broker_tray_is_up", return_value=True), \
              patch("gui.peer_watch.launch_broker_tray") as launch:
@@ -88,13 +88,13 @@ class TestWhatOnlyEvolverCanGetWrongInAWatchWhosePolicyAppSupportTests:
 
         launch.assert_not_called()
 
-    def test_a_broker_that_is_gone_is_started_since_evolver_revives_it_when_its_scheduled_task_is_off(self):
+    def test_a_broker_that_is_gone_is_started(self):
         with patch("gui.peer_watch.broker_tray_is_up", return_value=False), \
              patch("gui.peer_watch.launch_broker_tray") as launch, \
              stood_down(False):
             peer_watch.watch_the_broker().tick()
 
-        launch.assert_called_once()
+        assert launch.call_count == 1, "with the broker's scheduled task switched off, Evolver is its only reviver"
 
     def test_a_broker_the_user_closed_is_left_closed(self):
         with patch("gui.peer_watch.broker_tray_is_up", return_value=False), \
@@ -128,7 +128,7 @@ class TestTheAppKeepsTheWatch:
 
         tick.assert_called_once()
 
-    def test_the_app_keeps_checking_on_a_timer_beating_at_the_watchs_own_throttle(self, request):
+    def test_the_timer_beats_at_the_watchs_throttle(self, request):
         app = build_evolver_app(request)
 
         with patch.object(app._peer, "tick"), patch("gui.app.process_identity.claim"):
@@ -155,7 +155,7 @@ class TestTheAppKeepsTheWatch:
 
         stand_down.assert_called_once()
 
-    def test_windows_ending_the_session_leaves_no_stand_down_since_windows_may_cancel_that_shutdown(self, request):
+    def test_windows_ending_the_session_leaves_no_stand_down(self, request):
         app = build_evolver_app(request)
 
         with patch("gui.app.peer_watch.stand_evolver_down") as stand_down, \
