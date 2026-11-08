@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-BLOCK = "watch"
+from app_support import watch_weights
+
+BLOCK = watch_weights.WATCH_BLOCK
+WEIGHT_FIELD = watch_weights.WEIGHT_KEY
 COUNT_FIELDS = ("completions", "skips", "locks")
 
 _LOCK_SCORE = 3.0
@@ -32,5 +35,5 @@ def stamped(payload: dict, counts: dict[str, int]) -> dict:
     result = {key: value for key, value in payload.items() if key != BLOCK}
     counts = add_counts(counts)
     if any(counts.values()):
-        result[BLOCK] = {**counts, "weight": weight_for(counts)}
+        result[BLOCK] = {**counts, WEIGHT_FIELD: weight_for(counts)}
     return result
