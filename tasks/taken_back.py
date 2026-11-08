@@ -78,11 +78,11 @@ def _soundless_copies_beside_their_sound(rows: list[dict], lane: lanes.SentLane)
 
 
 def _empty_lane(lane: lanes.SentLane, stems: set[str]) -> TakenBackResult:
-    reachable, sources, waiting = _copy_groups(lane, stems)
-    result = _delete_all(reachable)
+    copies_a_viewer_can_reach, sorted_sources, still_in_the_inbox = _copy_groups(lane, stems)
+    result = _delete_all(copies_a_viewer_can_reach)
     if not result.failed:
-        result = result + _delete_all(sources)
-    return result + _delete_all(waiting)
+        result = result + _delete_all(sorted_sources)
+    return result + _delete_all(still_in_the_inbox)
 
 
 def _copy_groups(lane: lanes.SentLane,
@@ -130,7 +130,7 @@ def _delete_all(videos: list[Path]) -> TakenBackResult:
             continue
         log.info("WITHDRAWN %s", video)
         result.deleted += 1
-        result.deleted_metadata += _delete_metadata(video)
+        result.deleted_metadata += _delete_every_record_of_its_name(video)
         result = result + _delete_scripts(video)
     return result
 
@@ -150,7 +150,7 @@ def _delete_scripts(video: Path) -> TakenBackResult:
     return result
 
 
-def _delete_metadata(video: Path) -> int:
+def _delete_every_record_of_its_name(video: Path) -> int:
     if not config.METADATA_DIR.is_dir():
         return 0
     removed = 0
