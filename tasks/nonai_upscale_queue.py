@@ -4,7 +4,7 @@ from pathlib import Path
 
 from tasks import nonai_encode
 from tasks.nonai_files import StageFiles
-from tasks.nonai_queue import collect_queued_videos, listed_videos, relpath
+from tasks.nonai_queue import collect_queued_videos, listed_videos, queue_key
 from tasks.nonai_titles import TITLE_FIELD
 from util import nonai_job, sidecar, video_kind
 from util.upscale_queue import (
@@ -38,7 +38,7 @@ def _first(files: StageFiles, entries: list[Entry],
     job = nonai_job.load_job(files.job)
     request = nonai_job.load_request(files.request)
     if job is not None:
-        entry = _known(entries, relpath(job.source)) or _entry(job.source, pinned)
+        entry = _known(entries, queue_key(job.source)) or _entry(job.source, pinned)
         if job.is_running():
             return entry, Head(_state(job), nonai_encode.percent_encoded(job))
         if request is None:
@@ -63,8 +63,8 @@ def _known(entries: list[Entry], video: str) -> Entry | None:
 def _entry(video: Path, pinned: set[str]) -> Entry:
     payload = sidecar.read(sidecar.sidecar_path(video))
     return Entry(
-        video=relpath(video),
+        video=queue_key(video),
         name=str(payload.get(TITLE_FIELD) or video.stem),
         seconds=video_kind.duration_of(payload),
-        pinned=relpath(video) in pinned,
+        pinned=queue_key(video) in pinned,
     )

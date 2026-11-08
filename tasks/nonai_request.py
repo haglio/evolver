@@ -5,7 +5,7 @@ import logging
 from tasks import nonai_encode, nonai_queue
 from tasks.nonai_encode import EncodeSettings, StartAttempt
 from tasks.nonai_files import StageFiles, run_poll_and_window_lock
-from tasks.nonai_queue import relpath
+from tasks.nonai_queue import queue_key
 from util import nonai_job
 
 log = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def make_way_for(video: str, job: nonai_job.Job,
                  files: StageFiles) -> tuple[nonai_job.Job | None, str]:
     if not job.is_running():
         return job, ""
-    if relpath(job.source) == video:
+    if queue_key(job.source) == video:
         _take_over(job, files)
         nonai_job.clear_request(files.request)
         return job, ""
@@ -62,7 +62,7 @@ def start_requested(request: nonai_job.Request, files: StageFiles,
         nonai_job.save_request(files.request, nonai_job.Request(request.video, held_back=busy))
         return StartAttempt(deferred="" if low_disk else busy, deferred_low_disk=low_disk)
     queued_video = next((queued_video for queued_video in files.queued_videos()
-                      if relpath(queued_video.path) == request.video), None)
+                      if queue_key(queued_video.path) == request.video), None)
     nonai_job.clear_request(files.request)
     if queued_video is None or not nonai_encode.start(queued_video, files, on_request=True):
         return StartAttempt()
@@ -80,7 +80,7 @@ def _put_ahead(video: str, files: StageFiles, why: str) -> nonai_job.Job | None:
     job = nonai_job.load_job(files.job)
     running = job is not None and job.is_running()
     next_after = []
-    if running and relpath(job.source) != video:
+    if running and queue_key(job.source) != video:
         next_after.append(nonai_encode.stop_in_flight(job, why, files))
         running = False
     waiting = nonai_job.load_request(files.request)

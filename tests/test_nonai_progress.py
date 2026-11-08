@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from tasks import nonai_progress
 from tests.temp_helpers import (
@@ -59,6 +60,19 @@ class TestWhatIsDoneAndAhead(unittest.TestCase):
                 progress = nonai_progress.so_far([queued])
 
             assert progress.percent == 25
+
+    def test_it_reads_running_times_off_the_records_and_never_probes_a_video(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            with override_config(**overrides),                  patch("util.ffprobe.duration_seconds", side_effect=AssertionError("probed")):
+                make_video(non_ai / "alpha" / "3_good_to_go" / "processed"
+                           / "Jane Doe scene 2_apo8_iris2.mp4")
+                queued = make_video(non_ai / "alpha" / "0 unsorted" / "Jane Doe scene 1.mp4")
+
+                progress = nonai_progress.so_far([queued])
+
+            assert progress.unmeasured == 2
 
     def test_an_empty_project_has_no_percentage_rather_than_zero(self):
         with workspace_temp_dir() as root:

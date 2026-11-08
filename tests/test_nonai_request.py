@@ -30,7 +30,7 @@ class TestAskingForOneNow(unittest.TestCase):
             assert nonai_queue.listed_videos(overrides["NONAI_PIN_LIST"]) == ["lagoon/0 unsorted/b.mp4"]
             assert request_of(overrides) == nonai_job.Request("lagoon/0 unsorted/b.mp4")
 
-    def test_it_stops_the_encode_in_flight_and_queues_that_video_next(self):
+    def test_it_stops_the_encode_in_flight_at_once_lest_topaz_hold_back_the_ai_videos(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _busy, tmp, _out = write_job(root, overrides)

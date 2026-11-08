@@ -36,9 +36,9 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            assert sorted(c.path for c in queued_videos) == sorted([flagged_video, unsorted_video])
+            assert {c.path for c in queued_videos} == {flagged_video, unsorted_video}
 
-    def test_ignores_videos_in_a_triage_dirs_manual_pre_work_substage(self):
+    def test_a_video_still_to_be_trimmed_by_hand_is_kept_from_an_encode_that_would_bake_it_in(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -142,7 +142,7 @@ class TestCollectCandidates(unittest.TestCase):
 
             assert [c.path for c in queued_videos] == [fresh]
 
-    def test_watched_videos_outrank_funscripted_ones(self):
+    def test_watch_scores_outrank_a_funscript_the_librarys_own_only_sign_of_interest(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -227,7 +227,7 @@ class TestPinAhead(unittest.TestCase):
 
             assert pins.read_text(encoding="utf-8").splitlines() == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/c.mp4\tredo under v2", "lagoon/0 unsorted/a.mp4\tfor the weekend"]
 
-    def test_a_pin_whose_video_has_left_the_library_is_dropped(self):
+    def test_a_pin_whose_video_has_left_is_dropped_before_it_pins_whatever_comes_by_that_name(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
