@@ -92,7 +92,7 @@ OPTIONAL_OVERLAY_KEYS = {
 }
 
 
-def _config_references(tree: ast.AST) -> int:
+def _loads_of_the_name_config_however_spelled(tree: ast.AST) -> int:
     return sum(
         1
         for node in ast.walk(tree)
@@ -126,7 +126,7 @@ def _import_time_config_defaults(tree: ast.AST) -> list[int]:
     return lines
 
 
-class _OverlayKeys(ast.NodeVisitor):
+class _OverlayKeysThroughBoundNamesNotComprehensionTargets(ast.NodeVisitor):
     def __init__(self, prebound: dict[str, str] | None = None):
         self.paths: dict[str, str] = dict(prebound or {})
         self.keys: set[str] = set()
@@ -206,6 +206,19 @@ class _OverlayKeys(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+_NAMES_ONLY_CONFIG_BINDS_TO_THE_OVERLAY = {"_CONTENT": "", "content": ""}
+
+
+def _stage_bindings_read_off_config(tree: ast.AST) -> list[int]:
+    return [
+        statement.lineno
+        for statement in tree.body
+        if not isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        for inner in ast.walk(statement)
+        if isinstance(inner, ast.Name) and inner.id == "config" and isinstance(inner.ctx, ast.Load)
+    ]
+
+
 def _trees() -> dict[str, ast.AST]:
     return {
         name: ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
@@ -219,7 +232,7 @@ class TestConfigSeam(unittest.TestCase):
             name: f"{references} reads, ceiling {CONFIG_REFERENCE_CEILINGS.get(name, 0)}"
             for name, tree in _trees().items()
             if name != "config.py"
-            and (references := _config_references(tree)) > CONFIG_REFERENCE_CEILINGS.get(name, 0)
+            and (references := _loads_of_the_name_config_however_spelled(tree)) > CONFIG_REFERENCE_CEILINGS.get(name, 0)
         }
 
         assert over == {}, "a new ambient read: hand the module the value as a parameter from where it is already read, rather than raising its ceiling. A ceiling only comes down, in the commit that takes a module's reads out"
@@ -245,12 +258,12 @@ class TestConfigSeam(unittest.TestCase):
 
         assert offenders == [], "a default is evaluated at import and freezes the value past override_config; resolve it in the body instead"
 
-    def test_the_overlay_keys_are_the_ones_the_contract_names(self):
+    def test_the_overlay_keys_kept_out_of_this_public_repo_are_the_ones_the_contract_names(self):
         found: set[str] = set()
         unreadable: list[str] = []
         for name, tree in _trees().items():
-            visitor = _OverlayKeys(
-                {"_CONTENT": "", "content": ""} if name == "config.py" else None
+            visitor = _OverlayKeysThroughBoundNamesNotComprehensionTargets(
+                _NAMES_ONLY_CONFIG_BINDS_TO_THE_OVERLAY if name == "config.py" else None
             )
             visitor.visit(tree)
             found |= visitor.keys
@@ -259,7 +272,7 @@ class TestConfigSeam(unittest.TestCase):
         assert sorted(unreadable) == [], "an overlay key spelled as anything but a literal is a key this gate cannot record; spell it out"
         assert found == OVERLAY_KEYS
 
-    def test_the_committed_example_carries_every_required_key(self):
+    def test_the_committed_example_carries_every_key_a_public_checkout_imports_config_with(self):
         example = json.loads(
             Path(PROJECT_ROOT, "content.example.json").read_text(encoding="utf-8")
         )
@@ -270,6 +283,23 @@ class TestConfigSeam(unittest.TestCase):
                 for part in key.split("."):
                     assert part in value
                     value = value[part]
+
+    def test_the_example_leaves_every_optional_key_to_its_fallback_rather_than_one_computers_answer(self):
+        example = json.loads(
+            Path(PROJECT_ROOT, "content.example.json").read_text(encoding="utf-8")
+        )
+
+        assert sorted(OPTIONAL_OVERLAY_KEYS & set(example)) == []
+
+    def test_no_stage_binds_a_config_value_at_its_own_import_where_override_config_cannot_reach_it(self):
+        offenders = sorted(
+            f"{name}:{line}"
+            for name, tree in _trees().items()
+            if name.startswith("tasks/")
+            for line in _stage_bindings_read_off_config(tree)
+        )
+
+        assert offenders == []
 
 
 if __name__ == "__main__":
