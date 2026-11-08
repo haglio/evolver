@@ -107,9 +107,15 @@ class TestBuildingIsNotStarting:
 
 
 class TestStartingInOrder:
-    def _started(self, request, order, *extra):
+    def _started(self, request, order):
         app = build_evolver_app(request)
-        with patch("gui.app.process_identity.claim", order.claim),              patch.object(app._tray, "show", order.tray_shows),              patch.object(app._window, "show", order.window_shows),              patch("gui.app.peer_watch.clear_evolver_stand_down", order.stand_down_cleared),              patch.object(app._peer, "tick", order.broker_looked_at),              patch("gui.main_window.newest_runs", return_value=[]),              patch("gui.app.sys") as mock_sys:
+        with patch("gui.app.process_identity.claim", order.claim), \
+             patch.object(app._tray, "show", order.tray_shows), \
+             patch.object(app._window, "show", order.window_shows), \
+             patch("gui.app.peer_watch.clear_evolver_stand_down", order.stand_down_cleared), \
+             patch.object(app._peer, "tick", order.broker_looked_at), \
+             patch("gui.main_window.newest_runs", return_value=[]), \
+             patch("gui.app.sys") as mock_sys:
             mock_sys.argv = ["tray_app.py", "--show-window"]
             app.start()
         return [name for name, _args, _kwargs in order.mock_calls]
@@ -472,7 +478,6 @@ class TestNonAiUpscaleToggle:
             app._runs.start("manual")
         assert mock_worker.call_args.kwargs["nonai_enabled"]
 
-
     def test_showing_the_saved_switch_state_sends_nothing_back_as_a_change(self, request):
         app = self._app_with_fresh_settings(request)
         with patch("gui.app.EvolverSettings.save") as saved:
@@ -546,7 +551,8 @@ class TestSessionManagement:
     def test_session_end_leaves_the_detached_encode_running_since_it_is_detached_to_outlive_evolver(
             self, request):
         app = build_evolver_app(request)
-        with patch("tasks.nonai_encode.terminate_ffmpeg") as terminate,              patch.object(app._app, "quit"), patch("gui.app.crash_log.write_info"):
+        with patch("tasks.nonai_encode.terminate_ffmpeg") as terminate, \
+             patch.object(app._app, "quit"), patch("gui.app.crash_log.write_info"):
             app._on_session_end(MagicMock())
 
         terminate.assert_not_called()

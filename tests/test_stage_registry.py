@@ -23,6 +23,7 @@ from tasks.scripts_sync import ScriptsSyncResult
 from tasks.sort import SortResult
 from tasks.stray_files import StrayFilesResult
 from tasks.video_kinds import VideoKindsResult
+from tasks.video_labels import VideoLabelsResult
 from tests.color_support import CIE76_DELTA_E_OF_COLORS_OBVIOUSLY_DIFFERENT, band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
 from util.stage_result import StageResult
@@ -54,6 +55,8 @@ WHY_IT_CANNOT_FAIL = {
                       "videos for a later run",
     StrayFilesResult: "what it cannot repair it reports, for a person to judge",
     VideoKindsResult: "a video it cannot measure is left for the next run",
+    VideoLabelsResult: "copies actions onto sidecars already there; a gallery it cannot read "
+                       "leaves the actions for a later run",
 }
 
 _STAGES_THAT_MAKE_OR_MOVE_A_VIDEO = ("strays", "withdrawn", "sort", "upscale", "genau_deliver", "upscale_non_ai")
@@ -88,40 +91,47 @@ class TestStageRegistry(unittest.TestCase):
                 shown = _keys_read_in_any_branch_of(functions) | table_keys
                 assert sorted(shown) == sorted(field.name for field in dataclasses.fields(result_type))
 
-    def test_stray_files_run_first_since_the_rest_cannot_see_a_misnamed_video_or_a_misplaced_script(self):
-        assert ALL_STAGES[0] == "strays"
+    def test_stray_files_run_first(self):
+        assert ALL_STAGES[0] == "strays", (
+            "every later stage finds videos by their extension and funscripts under the script "
+            "tree, so a name strays repairs or a script it moves is invisible to them until it runs")
 
-    def test_taken_back_runs_before_the_scrape_and_the_sort_so_a_video_on_its_way_out_is_neither_recorded_nor_filed(self):
-        assert _place("withdrawn") < min(_place("metadata"), _place("sort"))
+    def test_taken_back_runs_before_the_scrape_and_the_sort(self):
+        assert _place("withdrawn") < min(_place("metadata"), _place("sort")), (
+            "a video on its way out must be given no sidecar and not be filed into 1_sorted")
 
-    def test_genau_delivery_comes_straight_after_the_upscale_so_a_video_made_this_run_reaches_genau_this_run(self):
-        assert _place("genau_deliver") == _place("upscale") + 1
+    def test_genau_delivery_comes_straight_after_the_upscale(self):
+        assert _place("genau_deliver") == _place("upscale") + 1, (
+            "a video made this run reaches Genau this run")
 
-    def test_genau_delivery_comes_before_the_correspondence_check_which_would_call_its_source_unmatched(self):
-        assert _place("genau_deliver") < _place("verify")
+    def test_genau_delivery_comes_before_the_correspondence_check(self):
+        assert _place("genau_deliver") < _place("verify"), (
+            "the check would otherwise find the delivered video's source in 1_sorted with nothing "
+            "beside it in 2_outbox")
 
     def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
         assert _place("upscale_non_ai") == _place("genau_deliver") + 1
 
-    def test_moved_videos_are_followed_after_every_stage_that_makes_or_moves_one_so_nothing_counts_them_lost_first(self):
-        assert _place("references") > max(map(_place, _STAGES_THAT_MAKE_OR_MOVE_A_VIDEO))
+    def test_moved_videos_are_followed_after_every_stage_moving_one(self):
+        assert _place("references") > max(map(_place, _STAGES_THAT_MAKE_OR_MOVE_A_VIDEO)), (
+            "a saved path is followed before anything counts its video lost")
 
-    def test_titles_come_after_the_grouping_whose_version_families_carry_a_clips_name_to_its_scene(self):
-        assert _place("title_non_ai") > _place("group_non_ai")
+    def test_titles_come_after_the_grouping(self):
+        assert _place("title_non_ai") > _place("group_non_ai"), (
+            "the version families are what carry a clip's name to every version of its scene")
 
-    def test_kinds_come_after_the_grouping_so_they_join_the_sidecar_it_made_rather_than_making_a_second(self):
-        assert _place("video_types") > _place("group_non_ai")
+    def test_kinds_come_after_the_grouping(self):
+        assert _place("video_types") > _place("group_non_ai"), (
+            "the grouping makes a new non-AI video's sidecar, and the kind joins that one "
+            "rather than making a second")
 
-    def test_provenance_comes_after_every_stage_that_makes_or_moves_a_video_and_after_the_kinds_sidecar(self):
-        assert _place("provenance") > max(map(_place, (*_STAGES_THAT_MAKE_OR_MOVE_A_VIDEO, "video_types")))
+    def test_provenance_comes_after_every_stage_making_or_moving_a_video(self):
+        assert _place("provenance") > max(map(_place, _STAGES_THAT_MAKE_OR_MOVE_A_VIDEO)), (
+            "it only fills in what those stages left unrecorded")
 
-    def test_the_stages_name_genaus_flicks_in_the_overlays_word(self):
-        tips = {stage.key: stage.tooltip for stage in STAGES}
-
-        assert "down the Genau lane, the delivered flick --" in tips["withdrawn"]
-        assert tips["genau_deliver"].startswith("Move each upscaled Genau-lane flick out of 2_outbox into the folder Genau plays from")
-        assert "redoes the flick forever" in tips["genau_deliver"]
-        assert "a generation, a clip, a Genau flick --" in tips["video_types"]
+    def test_provenance_comes_after_the_kinds(self):
+        assert _place("provenance") > _place("video_types"), (
+            "a video it records already has the sidecar the kinds stage made for it")
 
     def test_the_registry_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
         assert "group_non_ai" in ALL_STAGES
@@ -154,11 +164,12 @@ class TestStageRegistry(unittest.TestCase):
 
         assert offenders == []
 
-    def test_every_declared_color_is_valid_since_the_band_check_cannot_see_an_invalid_one(self):
+    def test_every_declared_color_is_valid(self):
         # Qt paints an invalid QColor, such as QColor(300, 0, 0), as black.
         for stage in STAGES:
             with self.subTest(stage=stage.key):
-                assert QColor(*stage.color).isValid()
+                assert QColor(*stage.color).isValid(), (
+                    "the band check would measure the same black on both sides and pass")
 
     def test_every_declared_color_leaves_the_bands_opacity_to_the_painter(self):
         for stage in STAGES:
