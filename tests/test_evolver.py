@@ -369,7 +369,7 @@ class TestTheUpscaleStage:
         assert outcome == evolver.Skipped("no_pending_work")
         computer.upscale.assert_not_called()
 
-    def test_waits_while_origenerator_trains_a_fix_on_the_graphics_card(self):
+    def test_waits_while_origenerator_trains_a_lora_on_the_graphics_card(self):
         with _the_computer() as computer:
             outcome = _stage("upscale").run(_after(
                 **_newly_sorted("f"),

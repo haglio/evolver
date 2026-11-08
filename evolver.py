@@ -93,7 +93,7 @@ def _upscale(this_run: ThisRun) -> StageResult | Skipped:
         return Skipped(_NO_PENDING_WORK)
     downtime = this_run.outcome_of("origenerator_downtime")
     if isinstance(downtime, DowntimeResult) and downtime.holds_the_graphics_card:
-        log.info("Skipping upscale: Origenerator is training a fix on the graphics card.")
+        log.info("Skipping upscale: Origenerator is training a LoRA on the graphics card.")
         return Skipped("origenerator_training")
     if nonai_upscale.foreign_topaz_running():
         log.info("Skipping upscale: a Topaz encode Evolver did not start is running.")
@@ -168,9 +168,10 @@ STAGES: tuple[Stage, ...] = (
           "Move AI videos from 0_inbox into 1_sorted, filed by where they came from and by portrait or landscape",
           (0x38, 0x6A, 0x9C), run=lambda _: sort.run()),
     Stage("origenerator_downtime", "Origenerator downtime tasks",
-          "While Origenerator is closed, start the work it leaves for then: training a fix whose "
-          "photos have changed, and the experiments and other runs it used to hand ComfyUI as it "
-          "closed. The upscale waits while a fix trains, since the training needs the graphics card",
+          "While Origenerator is closed, start the work it leaves for then: the experiments and "
+          "other runs it used to hand ComfyUI as it closed. The upscale waits while a LoRA "
+          "started with Origenerator's Train button is still training, since the training needs "
+          "the graphics card",
           (0x30, 0xD0, 0x40), run=lambda _: origenerator_commands.run_downtime()),
     Stage("upscale", "Upscale AI videos",
           "Make each AI video in 1_sorted into a 60fps video four times larger with Topaz, and put it in 2_outbox",
