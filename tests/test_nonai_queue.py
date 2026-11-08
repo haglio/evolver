@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from collections import Counter
 
 from tasks import nonai_queue
 from tests.temp_helpers import (
@@ -36,7 +37,7 @@ class TestCollectCandidates(unittest.TestCase):
             with override_config(**overrides):
                 queued_videos = nonai_queue.collect_queued_videos(**queue_files(root, overrides))
 
-            assert {c.path for c in queued_videos} == {flagged_video, unsorted_video}
+            assert Counter(c.path for c in queued_videos) == Counter([flagged_video, unsorted_video])
 
     def test_a_video_still_to_be_trimmed_by_hand_is_kept_from_an_encode_that_would_bake_it_in(self):
         with workspace_temp_dir() as root:
