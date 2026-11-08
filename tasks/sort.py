@@ -112,9 +112,12 @@ def _take_the_remake(src: Path, dest: Path, upscale: Path) -> None:
         record = sidecar.sidecar_path(upscale)
     except ValueError:
         return
-    sidecar.update(record, lambda current: provenance.recorded(
-        provenance.without(current, provenance.GENERATION),
-        provenance.UPSCALE, provenance.reconstructed(None)))
+    sidecar.update(record, _forget_what_made_the_copy_it_replaces)
+
+
+def _forget_what_made_the_copy_it_replaces(current: dict) -> dict:
+    return provenance.recorded(provenance.without(current, provenance.GENERATION),
+                               provenance.UPSCALE, provenance.reconstructed(None))
 
 
 def _carry_its_script(handed_over: Path, copies: tuple[Path, ...]) -> None:
