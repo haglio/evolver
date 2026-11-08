@@ -233,6 +233,17 @@ class TestLoadingOnlyTheNewest:
 
 
 class TestReadingEveryRun:
+    def test_reading_the_history_rewrites_no_record(self):
+        with workspace_temp_dir() as root:
+            _write_run(root, "2026-01-01T00-00-00")
+            before = (root / "2026-01-01T00-00-00.json").read_bytes()
+
+            list(every_run(root))
+            newest_runs(root, 10)
+
+            assert (root / "2026-01-01T00-00-00.json").read_bytes() == before, (
+                "an old record is repaired by hand: a migration on the schedule walks the whole history forever")
+
     def test_every_run_on_record_is_read(self):
         with workspace_temp_dir() as root:
             for run_id in ("2026-01-01T00-00-00", "2026-01-02T00-00-00"):
