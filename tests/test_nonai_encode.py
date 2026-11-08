@@ -134,5 +134,5 @@ class TestUserPresent(unittest.TestCase):
         assert nonai_encode.user_present(self.SETTINGS, idle_seconds=unreadable)
 
     def test_input_older_than_a_reading_pause_means_the_user_is_away(self):
-        away = self.SETTINGS.away_once_idle_past_a_reading_pause_seconds + 1
+        away = self.SETTINGS.reading_pause_seconds + 1
         assert not nonai_encode.user_present(self.SETTINGS, idle_seconds=lambda: away)
