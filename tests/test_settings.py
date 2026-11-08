@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import unittest
+from datetime import UTC, datetime
 
+from gui.scheduler import PipelineScheduler
 from gui.settings import EvolverSettings
 from tests.temp_helpers import override_config, workspace_temp_dir
 
@@ -27,7 +29,21 @@ class TestEvolverSettings(unittest.TestCase):
             assert loaded.interval_minutes == 5
             assert loaded.enable_toasts
 
-    def test_a_hand_edited_interval_below_one_loads_as_one_since_the_schedulers_clock_alignment_divides_by_it(self):
+    def test_a_hand_edited_zero_still_lets_the_schedule_align(self):
+        with workspace_temp_dir() as tmp:
+            path = tmp / "settings.json"
+            path.write_text(json.dumps({"interval_minutes": 0}))
+            settings = EvolverSettings.load(path)
+        scheduler = PipelineScheduler(interval_minutes=settings.interval_minutes,
+                                      now=lambda: datetime(2026, 1, 1, 8, 3, tzinfo=UTC))
+
+        scheduler.start()
+        slot = scheduler.next_run_at
+        scheduler.stop()
+
+        assert slot == datetime(2026, 1, 1, 8, 4, tzinfo=UTC)
+
+    def test_a_hand_edited_interval_below_one_loads_as_one(self):
         with workspace_temp_dir() as tmp:
             path = tmp / "settings.json"
             path.write_text(json.dumps({"interval_minutes": 0}))

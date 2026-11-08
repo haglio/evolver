@@ -53,9 +53,9 @@ class QueueController(QObject):
 
     def _ask_for_now(self, video: str) -> None:
         self._background.run(partial(evolver.upscale_now, video),
-                             then=self._bring_the_run_forward_since_only_a_run_starts_an_encode)
+                             then=self._bring_the_run_forward)
 
-    def _bring_the_run_forward_since_only_a_run_starts_an_encode(self, _) -> None:
+    def _bring_the_run_forward(self, _) -> None:
         self.refresh()
         self.run_wanted.emit("manual")
 
