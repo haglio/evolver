@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 
 class PipelineWorker(QThread):
-
+    # Qt queues a signal emitted on this thread to slots of objects living on the window's thread.
     stage_started = pyqtSignal(str)
     stage_completed = pyqtSignal(str)
     stage_progress = pyqtSignal(str, int, int)
