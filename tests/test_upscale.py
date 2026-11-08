@@ -35,7 +35,7 @@ def fake_run_ffmpeg(_in_file, tmp, _env, _settings=None, **kwargs):
 
 
 class TestUpscaleHelpers(unittest.TestCase):
-    def test_already_processed_checks_all_locations(self):
+    def test_an_upscale_in_either_orientation_or_the_trash_counts_on_its_own_in_the_folders_given(self):
         with workspace_temp_dir() as root:
             out = root / "out"
             trash = root / "trash"
@@ -43,22 +43,21 @@ class TestUpscaleHelpers(unittest.TestCase):
             (out / "portrait" / "provider").mkdir(parents=True)
             trash.mkdir(parents=True)
 
-            with override_config(OUT_UPSCALED_DIR=out, TRASH_DIR=trash):
-                assert not upscale._already_processed("provider", "a_topaz.mp4", out, trash)
+            assert not upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
-                p1 = out / "landscape" / "provider" / "a_topaz.mp4"
-                p1.write_bytes(b"1")
-                assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
+            p1 = out / "landscape" / "provider" / "a_topaz.mp4"
+            p1.write_bytes(b"1")
+            assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
-                p1.unlink()
-                p2 = out / "portrait" / "provider" / "a_topaz.mp4"
-                p2.write_bytes(b"1")
-                assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
+            p1.unlink()
+            p2 = out / "portrait" / "provider" / "a_topaz.mp4"
+            p2.write_bytes(b"1")
+            assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
-                p2.unlink()
-                p3 = trash / "a_topaz.mp4"
-                p3.write_bytes(b"1")
-                assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
+            p2.unlink()
+            p3 = trash / "a_topaz.mp4"
+            p3.write_bytes(b"1")
+            assert upscale._already_processed("provider", "a_topaz.mp4", out, trash)
 
     def test_run_processes_dynamic_source_and_creates_out_dir(self):
         with workspace_temp_dir() as root:
@@ -106,7 +105,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             assert not ambient_out.exists()
             assert ambient_in.exists()
 
-    def test_a_given_outbox_outside_the_library_still_upscales(self):
+    def test_the_provider_s_own_clip_given_an_outbox_outside_the_library_still_upscales(self):
         with workspace_temp_dir() as root, override_config(PROVIDER_SOURCE="provider"):
             sorted_dir, out_dir, trash_dir = library_dirs(root)
             in_file = sorted_dir / config.PROVIDER_SOURCE / "landscape" / "clip one.mp4"
@@ -137,7 +136,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             backlog.write_bytes(b"video")
 
             with override_config(SORTED_DIR=sorted_dir, OUT_UPSCALED_DIR=out_dir, TRASH_DIR=trash_dir):
-                candidates = upscale.collect_queued_videos(priority_files=[priority])
+                candidates = upscale.collect_queued_videos(upscale.UpscaleFolders.configured(), priority_files=[priority])
 
             assert candidates[0][0] == priority
             assert candidates[1][0] == backlog
@@ -375,7 +374,7 @@ class TestIsT2vProvider(unittest.TestCase):
             with override_config(METADATA_DIR=meta_dir):
                 assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
-    def test_false_for_non_provider_source(self):
+    def test_false_for_another_source_beside_a_record_that_would_say_t2v(self):
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider2" / "clip_topaz.json"
@@ -420,7 +419,7 @@ class TestIsT2vProvider(unittest.TestCase):
             with override_config(METADATA_DIR=meta_dir):
                 assert not upscale._is_t2v_provider("provider", "landscape", "clip", config.OUT_UPSCALED_DIR)
 
-    def test_false_when_the_sidecar_holds_only_the_video_kind(self):
+    def test_false_when_the_sidecar_holds_only_the_video_kind_so_no_t2v_model_is_baked_into_an_encode_nobody_redoes(self):
         with workspace_temp_dir() as root:
             meta_dir = root / "meta"
             json_path = meta_dir / "2D" / "AI" / "2_outbox" / "upscaled_by_orientation" / "landscape" / "provider" / "clip_topaz.json"
@@ -703,7 +702,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
                 touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "a scene.mp4")
                 fresh = touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "b scene.mp4")
 
-                assert upscale.collect_queued_videos(limit=1) == [(fresh, lanes.ORIGENERATOR_SOURCE, "portrait")]
+                assert upscale.collect_queued_videos(upscale.UpscaleFolders.configured(), limit=1) == [(fresh, lanes.ORIGENERATOR_SOURCE, "portrait")]
 
     def test_one_a_player_holds_keeps_its_old_upscale_until_a_later_run(self):
         with workspace_temp_dir() as root:

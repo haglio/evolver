@@ -151,10 +151,7 @@ def run(
     _prepare_outbox(folders, low_disk)
 
     env = topaz.environment()
-    candidates = collect_queued_videos(
-        priority_files=priority_files,
-        sorted_dir=folders.sorted, outbox_dir=folders.outbox, trash_dir=folders.trash,
-    )
+    candidates = collect_queued_videos(folders, priority_files=priority_files)
     total_pending = len(candidates)
     if max_items is not None:
         candidates = candidates[:max_items]
@@ -274,20 +271,16 @@ def _promote_the_output(in_file: Path, tmp: Path, out: Path,
 
 
 def has_pending_work(priority_files: list[Path] | None = None) -> bool:
-    return bool(collect_queued_videos(priority_files=priority_files, limit=1))
+    return bool(collect_queued_videos(UpscaleFolders.configured(),
+                                      priority_files=priority_files, limit=1))
 
 
 def collect_queued_videos(
+    folders: UpscaleFolders,
     priority_files: list[Path] | None = None,
     limit: int | None = None,
-    *,
-    sorted_dir: Path | None = None,
-    outbox_dir: Path | None = None,
-    trash_dir: Path | None = None,
 ) -> list[tuple[Path, str, str]]:
-    sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
-    outbox_dir = config.OUT_UPSCALED_DIR if outbox_dir is None else outbox_dir
-    trash_dir = config.TRASH_DIR if trash_dir is None else trash_dir
+    sorted_dir, outbox_dir, trash_dir = folders.sorted, folders.outbox, folders.trash
 
     candidates: list[tuple[Path, str, str]] = []
     remakes: list[tuple[Path, str, str]] = []
