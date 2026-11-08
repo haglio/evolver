@@ -132,6 +132,17 @@ class TestTheGenauLane:
 
             assert check_correspondence.run().ok
 
+    def test_a_flick_sharing_its_name_with_a_kino_upscale_is_no_duplicate(self):
+        with _library() as lib:
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-a_topaz.mp4")
+            _flick(lib, "clip-a_topaz.mp4")
+
+            result = check_correspondence.run()
+
+            assert result.ok
+            assert result.upscale_count == 2
+
     def test_a_sorted_flicks_upscale_counts_only_where_genau_plays_it(self):
         with _library() as lib:
             _sorted(lib, GENAU_SOURCE, "landscape", "loop_1.mp4")
