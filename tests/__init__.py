@@ -20,6 +20,7 @@ from util import crash_log  # noqa: E402
 _run_state = tempfile.TemporaryDirectory(prefix="evolver-tests-", ignore_cleanup_errors=True)
 RUN_STATE = Path(_run_state.name)
 
+# A Qt or Windows modal dialog blocks until a person clicks it, so one a test reached would hang an unattended run.
 alert_shown(return_value=False).start()
 error_popup().start()
 

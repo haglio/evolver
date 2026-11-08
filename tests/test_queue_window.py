@@ -8,7 +8,7 @@ from shared_ui.colors import BLUE
 
 from gui import queue_window
 from gui.queue_window import VIDEO_MIME, UpscaleQueueWindow, dropped_video, running_time
-from tests.gui_support import row_ground
+from tests.gui_support import row_ground_past_its_text
 from util.upscale_queue import (
     ASKED_FOR,
     FINISHING,
@@ -111,8 +111,8 @@ class TestWhatItShows:
         window.show()
         window._tree.setCurrentItem(window._tree.topLevelItem(1))
 
-        assert row_ground(window._tree, 1) == BLUE.name()
-        assert row_ground(window._tree, 0) != BLUE.name()
+        assert row_ground_past_its_text(window._tree, 1) == BLUE.name()
+        assert row_ground_past_its_text(window._tree, 0) != BLUE.name()
 
 
 class TestTheArrow:

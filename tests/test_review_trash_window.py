@@ -8,7 +8,7 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 from shared_ui.colors import BLUE
 
 from review_trash.window import ReviewTrashWindow
-from tests.gui_support import QAPP, row_ground
+from tests.gui_support import QAPP, row_ground_past_its_text
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
 
 
@@ -155,7 +155,7 @@ class TestPickedRows(_ReviewingALibrary):
         window.videos.topLevelItem(0).setSelected(True)
         window.videos.topLevelItem(2).setSelected(True)
 
-        grounds = [row_ground(window.videos, row) for row in range(3)]
+        grounds = [row_ground_past_its_text(window.videos, row) for row in range(3)]
 
         assert grounds[0] == BLUE.name()
         assert grounds[2] == BLUE.name()
