@@ -19,8 +19,9 @@ def _drawn_exactly_as_shared_ui_draws(icon: QIcon, symbol: str, ink: str = "#ddd
 
 class TestRestartIcon:
 
-    def test_it_is_the_familys_restart_mark_the_power_marks_relative_since_a_redo_arrow_reads_as_undo(self):
-        assert _drawn_exactly_as_shared_ui_draws(restart_icon("#ddd"), "restart")
+    def test_it_is_the_familys_restart_mark(self):
+        assert _drawn_exactly_as_shared_ui_draws(restart_icon("#ddd"), "restart"), (
+            "the power mark's relative beside Quit; a redo arrow reads as an undo")
 
     def test_it_takes_the_ink_the_chrome_it_sits_on_needs(self):
         assert _rendered(restart_icon("#ddd")) != _rendered(restart_icon("#333"))
@@ -29,8 +30,9 @@ class TestRestartIcon:
 
 class TestQuitIcon:
 
-    def test_it_is_the_power_mark_fun_time_paints_on_its_bar_beside_it(self):
-        assert _drawn_exactly_as_shared_ui_draws(quit_icon("#ddd"), "power")
+    def test_it_is_fun_times_power_mark(self):
+        assert _drawn_exactly_as_shared_ui_draws(quit_icon("#ddd"), "power"), (
+            "Fun Time paints this mark on its bar, and the two apps are open together")
 
 
 class TestRunNowIcon:
@@ -41,11 +43,13 @@ class TestRunNowIcon:
 
 class TestPauseIcon:
 
-    def test_it_is_the_pause_bars_the_brokers_tray_menu_pauses_with_beside_it(self):
-        assert _drawn_exactly_as_shared_ui_draws(pause_icon("#ddd"), "pause")
+    def test_it_is_the_brokers_pause_mark(self):
+        assert _drawn_exactly_as_shared_ui_draws(pause_icon("#ddd"), "pause"), (
+            "the Broker's tray menu pauses with this mark, beside Evolver's in the tray")
 
 
 class TestReviewTrashIcon:
 
-    def test_it_is_the_trash_can_the_funestras_send_to_trash_button_wears(self):
-        assert _drawn_exactly_as_shared_ui_draws(review_trash_icon("#ddd"), "trash")
+    def test_it_is_the_funestras_trash_mark(self):
+        assert _drawn_exactly_as_shared_ui_draws(review_trash_icon("#ddd"), "trash"), (
+            "the Funestras' Send to Trash button wears this mark")

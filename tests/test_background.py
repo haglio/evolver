@@ -6,6 +6,7 @@ import time
 import pytest
 
 from gui.background import BackgroundQueue
+from tasks.nonai_files import stage_lock
 from tests.gui_support import QAPP
 
 
@@ -26,7 +27,7 @@ def queue():
     made.stop()
 
 
-def test_the_work_waits_off_the_windows_thread_for_a_non_ai_stage_a_run_holds_and_answers_back_on_it(queue):
+def test_the_work_is_done_off_this_thread_and_its_answer_comes_back_on_it(queue):
     answers = []
 
     queue.run(threading.current_thread,
@@ -38,7 +39,25 @@ def test_the_work_waits_off_the_windows_thread_for_a_non_ai_stage_a_run_holds_an
     assert answered_on is threading.main_thread()
 
 
-def test_work_is_done_in_the_order_asked_so_the_queue_windows_arrow_clicked_on_and_straight_off_ends_off(queue):
+def test_work_waiting_on_the_non_ai_stage_leaves_this_thread_free(queue):
+    answers = []
+
+    def through_the_non_ai_stage():
+        if not stage_lock.acquire(timeout=30):
+            return "never let through"
+        stage_lock.release()
+        return "through"
+
+    with stage_lock:
+        queue.run(through_the_non_ai_stage, then=answers.append)
+        QAPP.processEvents()
+        assert answers == [], "a run holds the non-AI stage for as long as starting an encode takes"
+
+    assert pump_until(lambda: answers)
+    assert answers == ["through"]
+
+
+def test_work_is_done_in_the_order_it_was_asked_for(queue):
     done = []
 
     for step in range(5):
@@ -46,7 +65,8 @@ def test_work_is_done_in_the_order_asked_so_the_queue_windows_arrow_clicked_on_a
     queue.run(lambda: None, then=lambda _: done.append("answered"))
 
     assert pump_until(lambda: "answered" in done)
-    assert done == [0, 1, 2, 3, 4, "answered"]
+    assert done == [0, 1, 2, 3, 4, "answered"], (
+        "the queue window's arrow turned on and straight off again must end off")
 
 
 def test_work_that_fails_is_logged_and_what_follows_still_runs(queue, caplog):

@@ -4,7 +4,7 @@ import ast
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 from app_support import haglio_settings
@@ -37,24 +37,31 @@ def _calls_named(tree: ast.AST, name: str) -> bool:
 
 
 class TestTheSuiteItself:
-    def test_no_test_touches_the_marker_that_tells_the_broker_evolver_was_closed_on_purpose(self):
-        assert isinstance(peer_watch.stand_evolver_down, Mock)
-        assert isinstance(peer_watch.clear_evolver_stand_down, Mock)
+    def test_the_stand_down_marker_is_never_touched(self):
+        why = ("the real marker tells the Broker his Evolver was closed on purpose; a run that "
+               "cleared it would bring the app back up half an hour after he closed it")
+        assert isinstance(peer_watch.stand_evolver_down, Mock), why
+        assert isinstance(peer_watch.clear_evolver_stand_down, Mock), why
 
-    def test_the_suite_cannot_start_the_broker_since_the_example_overlay_names_no_real_broker_folder(self):
-        assert not config.BROKER_TRAY_LAUNCHER.is_file()
+    def test_the_suite_cannot_start_the_broker(self):
+        assert not config.BROKER_TRAY_LAUNCHER.is_file(), (
+            "the example overlay names a broker folder that does not exist, which is why starting "
+            "the Broker needs no stub")
 
-    def test_the_suite_reads_the_committed_examples_and_never_the_developers_own_overlay_or_settings(self):
-        assert content_overlay.LOCAL_CONTENT == content_overlay.EXAMPLE_CONTENT
-        assert os.environ[haglio_settings.SETTINGS_ENV] == haglio_settings.THE_EXAMPLE
+    def test_the_suite_reads_the_committed_examples(self):
+        why = "a run here must match a public checkout, never the developer's own files"
+        assert content_overlay.LOCAL_CONTENT == content_overlay.EXAMPLE_CONTENT, why
+        assert os.environ[haglio_settings.SETTINGS_ENV] == haglio_settings.THE_EXAMPLE, why
 
-    def test_no_test_builds_an_evolver_app_but_through_build_evolver_app_which_takes_it_down(self):
+    def test_tests_build_evolver_apps_only_through_build_evolver_app(self):
         builders = sorted(
             path.name for path in Path(PROJECT_ROOT, "tests").glob("*.py")
             if path.name != "gui_support.py"
             and _calls_named(ast.parse(path.read_text(encoding="utf-8")), "EvolverApp"))
 
-        assert builders == []
+        assert builders == [], (
+            "build_evolver_app takes each app down; one built another way keeps its session-end "
+            "receiver and its changes to the shared application for the rest of the run")
 
 
 class TestAppStartup:
@@ -67,7 +74,7 @@ class TestAppStartup:
 
 
 class TestRetiringAnApp:
-    def test_its_windows_are_gone_when_the_teardown_returns_so_none_dies_later_closing_another_tests_menu(self):
+    def test_its_windows_are_gone_when_the_teardown_returns(self):
         app = build_evolver_app(SimpleNamespace(addfinalizer=lambda _finalizer: None))
         with patch("gui.app.run_log.read_run", return_value=""):
             app._show_run_log(make_run_record())
@@ -75,7 +82,8 @@ class TestRetiringAnApp:
 
         retire_without_quitting_the_shared_application(app)
 
-        assert windows.isdisjoint(QAPP.topLevelWidgets())
+        assert windows.isdisjoint(QAPP.topLevelWidgets()), (
+            "a window left to die later closes whatever menu the next test has popped up")
 
 
 class TestBuildingIsNotStarting:
@@ -120,21 +128,21 @@ class TestStartingInOrder:
             app.start()
         return [name for name, _args, _kwargs in order.mock_calls]
 
-    def test_the_identity_is_claimed_before_any_window_shows_since_the_taskbar_reads_it_from_the_first(
-            self, request):
+    def test_the_identity_is_claimed_before_any_window_shows(self, request):
         steps = self._started(request, Mock())
 
-        assert steps.index("claim") < min(steps.index("tray_shows"), steps.index("window_shows"))
+        assert steps.index("claim") < min(steps.index("tray_shows"), steps.index("window_shows")), (
+            "the taskbar reads the identity as the first window appears")
 
-    def test_starting_clears_an_earlier_stand_down_before_the_first_look_at_the_broker(self, request):
+    def test_an_earlier_stand_down_is_cleared_before_the_first_broker_check(self, request):
         steps = self._started(request, Mock())
 
-        assert steps.index("stand_down_cleared") < steps.index("broker_looked_at")
+        assert steps.index("stand_down_cleared") < steps.index("broker_looked_at"), (
+            "starting Evolver is him wanting it up now, whatever he wanted when he last closed it")
 
 
 class TestQuitting:
-    def test_only_the_window_asks_before_quitting_since_the_window_is_where_a_stray_click_lands(
-            self, request):
+    def test_only_the_window_asks_before_quitting(self, request):
         with patch("gui.app.branch_session.BranchSession.quit") as quit_evolver:
             app = build_evolver_app(request)
             with patch("gui.app.QMessageBox.question",
@@ -142,24 +150,25 @@ class TestQuitting:
                 app._tray.quit_action.trigger()
                 app._window.quit_action.trigger()
 
-        assert (asked.call_count, quit_evolver.call_count) == (1, 1)
+        assert (asked.call_count, quit_evolver.call_count) == (1, 1), (
+            "the window is where a stray click lands")
 
 
 class TestTheRunLogWindow:
-    def test_a_second_runs_log_closes_the_first_so_windows_cannot_pile_up_under_the_main_one(
-            self, request):
+    def test_a_second_runs_log_closes_the_first(self, request):
         app = build_evolver_app(request)
         with patch("gui.app.run_log.read_run", return_value=""):
             app._show_run_log(make_run_record())
             first = app._log_window
             app._show_run_log(make_run_record())
 
-        assert not first.isVisible()
+        assert not first.isVisible(), "a window per click would pile up under the main one"
 
 
 class TestCommandWiring:
 
-    def test_a_command_a_view_offers_with_no_slot_is_refused_since_qt_lets_an_unconnected_click_do_nothing(self):
+    def test_a_command_a_view_offers_with_no_slot_is_refused(self):
+        # Qt raises nothing when a QAction with no connection is triggered.
         view = SimpleNamespace(commands=lambda: {"run_now": MagicMock(), "quit": MagicMock()})
 
         with pytest.raises(ValueError, match="quit"):
@@ -320,7 +329,7 @@ class TestStatsWindowLifetime:
 
         assert app._stats.current._chart is None
 
-    def test_a_second_stats_window_takes_the_first_down_since_one_parented_to_the_main_window_lives_as_long_as_the_app(self, request):
+    def test_a_second_stats_window_takes_the_first_one_down(self, request):
         app = build_evolver_app(request)
         app._background = MagicMock()
         with patch("gui.app.StatsWindow") as stats_cls:
@@ -329,8 +338,9 @@ class TestStatsWindowLifetime:
             app._show_stats()
             app._show_stats()
 
-        first.close.assert_called_once_with()
-        first.deleteLater.assert_called_once_with()
+        why = "a dialog parented to the main window otherwise lives as long as the app"
+        assert first.close.call_args_list == [call()], why
+        assert first.deleteLater.call_args_list == [call()], why
 
     def test_a_stats_window_still_open_is_raised_rather_than_replaced(self, request):
         app = build_evolver_app(request)
@@ -471,12 +481,12 @@ class TestNonAiUpscaleToggle:
         assert app._tray.nonai_switch.isChecked()
         assert app._window.nonai_switch.isChecked()
 
-    def test_each_run_reads_the_non_ai_switch_as_it_starts_since_it_can_change_between_runs(self, request):
+    def test_each_run_reads_the_non_ai_switch_as_it_starts(self, request):
         app = self._app_with_fresh_settings(request)
         app._settings.nonai_upscale_enabled = True
         with patch("gui.run_controller.PipelineWorker") as mock_worker:
             app._runs.start("manual")
-        assert mock_worker.call_args.kwargs["nonai_enabled"]
+        assert mock_worker.call_args.kwargs["nonai_enabled"], "the switch can change between runs"
 
     def test_showing_the_saved_switch_state_sends_nothing_back_as_a_change(self, request):
         app = self._app_with_fresh_settings(request)
@@ -548,14 +558,13 @@ class TestSessionManagement:
         header = mock_write.call_args[0][0]
         assert "session" in header.lower()
 
-    def test_session_end_leaves_the_detached_encode_running_since_it_is_detached_to_outlive_evolver(
-            self, request):
+    def test_session_end_leaves_the_detached_encode_running(self, request):
         app = build_evolver_app(request)
         with patch("tasks.nonai_encode.terminate_ffmpeg") as terminate, \
              patch.object(app._app, "quit"), patch("gui.app.crash_log.write_info"):
             app._on_session_end(MagicMock())
 
-        terminate.assert_not_called()
+        assert terminate.call_args_list == [], "the encode is detached precisely to outlive Evolver"
 
     def test_session_end_quits_app(self, request):
         app = build_evolver_app(request)
@@ -580,11 +589,13 @@ class TestRestart:
             app._restart()
         return start_again, quit_this_copy, allow
 
-    def test_the_next_copy_starts_through_the_launcher_after_this_one_has_quit_so_an_update_can_land_in_between(self, request):
+    def test_the_next_copy_starts_through_the_launcher_after_this_one_quits(self, request):
         start_again, quit_this_copy, _ = self._restarted(request)
 
-        start_again.assert_called_once_with(os.getpid(), config.PROJECT_DIR / "launch_evolver.vbs")
-        quit_this_copy.assert_called_once()
+        why = "that gap is when the production updater brings the checkout up to date"
+        assert start_again.call_args_list == [
+            call(os.getpid(), config.PROJECT_DIR / "launch_evolver.vbs")], why
+        assert quit_this_copy.call_count == 1, why
 
     def test_a_restart_from_the_window_comes_back_showing_it(self, request):
         start_again, _, allow = self._restarted(request, window_visible=True)
@@ -657,11 +668,11 @@ class TestTakingAnUpdate:
         start_again.assert_not_called()
         quit_this_copy.assert_not_called()
 
-    def test_a_preview_never_starts_again_for_an_update_since_it_runs_on_the_production_venv_and_hands_back_within_the_hour(self, request, monkeypatch):
+    def test_a_preview_never_starts_again_for_an_update(self, request, monkeypatch):
         start_again, quit_this_copy = self._ticked(request, branch_session=True)
 
-        start_again.assert_not_called()
-        quit_this_copy.assert_not_called()
+        why = "a preview runs on the production venv and hands the work back within the hour"
+        assert (start_again.call_count, quit_this_copy.call_count) == (0, 0), why
 
     def test_the_running_evolver_looks_for_an_update_every_minute(self, request):
         with patch("gui.app.production_update.UpdateWatch.tick") as looked:
@@ -718,10 +729,11 @@ class TestALaunchThatFindsEvolverUp:
         assert launch.exit_code == 0
         launch.alert.assert_not_called()
 
-    def test_a_launch_a_wedged_evolver_never_answered_shows_an_alert_since_silence_looks_like_a_dead_shortcut(self, request):
+    def test_a_launch_evolver_never_answered_shows_an_alert(self, request):
         launch = self._launch(request, Outcome.UNANSWERED)
 
-        launch.alert.assert_called_once()
+        assert launch.alert.call_count == 1, (
+            "a wedged Evolver holds the claim; a silent exit looks like a shortcut that does nothing")
         assert "evolver" in " ".join(launch.alert.call_args[0]).lower()
         assert launch.exit_code == 0
 
@@ -810,7 +822,7 @@ class TestAnsweringLaunches:
 
         mock_show.assert_called_once()
 
-    def test_stepping_aside_quits_without_standing_evolver_down_since_the_evolver_asking_takes_the_work_over(self, request):
+    def test_stepping_aside_quits_without_standing_evolver_down(self, request):
         app, served = self._run_as_first_instance(request)
 
         with patch.object(app._app, "quit") as quit_the_application, \
@@ -818,7 +830,8 @@ class TestAnsweringLaunches:
             served["on_step_aside"]()
 
         quit_the_application.assert_called_once_with()
-        stood_down.assert_not_called()
+        assert stood_down.call_args_list == [], (
+            "the Evolver taking over must still be revived by the Broker if it dies")
 
     def test_an_evolver_on_its_way_out_answers_no_more_launches(self, request):
         app = build_evolver_app(request)

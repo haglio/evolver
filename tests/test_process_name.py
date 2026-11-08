@@ -14,17 +14,18 @@ from util import crash_log
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 APP_NAME = "Evolver"
 ROLE = "Evolver"
+THE_INTERPRETER_ITS_SHORTCUT_STARTS = "pythonw.exe"
+THE_ROW_OF_AN_APP_WITH_ONE_WINDOW = APP_NAME
 
 
-def test_the_copy_is_of_the_windowed_interpreter_the_shortcut_starts_and_its_row_is_the_one_apps_name(
-        tmp_path: Path):
+def test_the_app_prepares_the_copy_for_next_time(tmp_path: Path):
     assert_the_process_is_named(
         tray_app._name_this_process, tmp_path,
         ProcessName(
             app_name=APP_NAME,
             role=ROLE,
-            interpreter="pythonw.exe",
-            row=APP_NAME,
+            interpreter=THE_INTERPRETER_ITS_SHORTCUT_STARTS,
+            row=THE_ROW_OF_AN_APP_WITH_ONE_WINDOW,
             icon=PROJECT_DIR / "icon.ico",
         ),
     )
