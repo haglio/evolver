@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import unittest
 
 import pytest
@@ -106,7 +107,22 @@ class TestTheOrientation(unittest.TestCase):
             video_kind.oriented({}, orientation.UNKNOWN)
 
 
+_A_VALUE_EACH_WRITER_TAKES = {"stamped": video_kind.CLIP, "timed": 4.0, "oriented": orientation.PORTRAIT}
+
+
+def _the_writers_video_kind_has() -> set[str]:
+    return {name for name, function in inspect.getmembers(video_kind, inspect.isfunction)
+            if function.__module__ == video_kind.__name__ and not name.startswith("_")
+            and inspect.signature(function).return_annotation == "dict"}
+
+
 class TestTellingABareSidecarApart(unittest.TestCase):
+    def test_whatever_this_module_writes_still_leaves_a_record_holding_nothing_else(self):
+        assert _the_writers_video_kind_has() == set(_A_VALUE_EACH_WRITER_TAKES), "a new writer: give it a value here and list its field among _OWN_FIELDS"
+        for writer, value in _A_VALUE_EACH_WRITER_TAKES.items():
+            with self.subTest(writer=writer):
+                assert video_kind.only_the_video_itself(getattr(video_kind, writer)({}, value))
+
     def test_a_sidecar_holding_only_a_kind_records_nothing_else(self):
         assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}})
 
@@ -125,8 +141,11 @@ class TestTellingABareSidecarApart(unittest.TestCase):
     def test_a_record_of_what_made_the_file_beside_them_is_still_nothing_else(self):
         assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}})
 
-    def test_a_record_of_what_made_the_file_on_its_own_is_nothing_else_either(self):
+    def test_an_upscale_stamped_before_its_scrape_or_kind_landed_is_nothing_else_either(self):
         assert video_kind.only_the_video_itself({provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}})
+
+    def test_an_empty_record_is_something_else_as_an_unreadable_one_reads_empty_too(self):
+        assert not video_kind.only_the_video_itself({})
 
     def test_a_generation_beside_them_is_something_else(self):
         assert not video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP, "prompt": "a prompt"}})
