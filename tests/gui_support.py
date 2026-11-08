@@ -5,16 +5,19 @@ import os
 # Qt's offscreen platform: no window or tray icon appears on the computer the suite runs on.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import atexit
 import contextlib
 
 from PyQt6.QtCore import QEvent
 from PyQt6.QtWidgets import QApplication
+from shared_ui.application import delete_what_python_still_owns
 
 from gui.app import EvolverApp
 from util.upscale_queue import UpscaleQueue
 
 # A QApplication has to exist before the first GUI module is imported.
 QAPP = QApplication.instance() or QApplication([])
+atexit.register(delete_what_python_still_owns, QAPP)
 
 EMPTY_QUEUE = UpscaleQueue(rows=(), head=None)
 
