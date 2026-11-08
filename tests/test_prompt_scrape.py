@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 import config
+from backfill.vocabulary import load_vocabulary
 from tasks import prompt_scrape
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import (
@@ -19,6 +20,8 @@ from util import (
     video_kind,
 )
 from util.html_query import parse_document
+
+_A_REAL_PAGE_WITH_NO_PROMPT = "<html></html>"
 
 
 class TestPromptScrape(unittest.TestCase):
@@ -68,7 +71,7 @@ class TestPromptScrape(unittest.TestCase):
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             assert payload == {"video": {"prompt": "video prompt text", "model": "Video v3", "seed": "123", "created": "2026-03-21"}, "source_image": {"positive_prompt": "positive prompt text", "negative_prompt": "negative prompt text", "model": "X Dream", "seed": "999", "created": "2026-03-26", "style": "Realistic", "creativity": "Balance"}}
 
-    def test_a_video_outside_an_orientation_folder_is_never_scraped(self):
+    def test_a_video_outside_an_orientation_folder_has_no_place_for_its_record_and_is_never_scraped(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "extras", "stray.mp4")
@@ -76,7 +79,7 @@ class TestPromptScrape(unittest.TestCase):
             with (
                 self._override(root),
                 patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom,
+                patch("tasks.prompt_scrape.fetch_dom", return_value=_A_REAL_PAGE_WITH_NO_PROMPT) as fetch_dom,
             ):
                 result = prompt_scrape.run()
 
@@ -185,7 +188,7 @@ class TestPromptScrape(unittest.TestCase):
             assert result.newly_scraped == 0
             fetch_dom.assert_not_called()
 
-    def test_a_sidecar_holding_only_the_video_kind_is_not_a_scrape(self):
+    def test_a_sidecar_holding_only_the_video_kind_is_scraped_and_keeps_the_kind_it_cost_a_probe_to_learn(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
@@ -205,7 +208,7 @@ class TestPromptScrape(unittest.TestCase):
             assert (result.newly_scraped, result.already_scraped) == (1, 0)
             assert video_kind.kind_of(sidecar.read(existing)) == video_kind.SHORT
 
-    def test_a_record_of_what_made_the_clip_that_landed_first_survives_the_scrape(self):
+    def test_an_upscale_stamped_before_a_failed_scrape_was_retried_keeps_its_stamp_which_nothing_could_learn_again(self):
         upscaled = provenance.reconstructed("evolver", method="ai_upscale")
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
@@ -619,6 +622,10 @@ class TestParseProviderCreatedAt(unittest.TestCase):
     def test_a_date_that_parses_but_cannot_exist_comes_back_as_it_was(self):
         assert prompt_scrape._parse_provider_created_at("Fri, 32 Mar 2026 09:45:26 GMT") == "Fri, 32 Mar 2026 09:45:26 GMT"
 
+    def test_anything_but_text_is_a_caller_s_mistake_and_is_not_swallowed(self):
+        with pytest.raises(AttributeError):
+            prompt_scrape._parse_provider_created_at(20260313)
+
     def test_a_year_outside_the_calendar_comes_back_as_it_was(self):
         assert prompt_scrape._parse_provider_created_at("Fri, 13 Mar 99999 09:45:26 GMT") == "Fri, 13 Mar 99999 09:45:26 GMT"
 
@@ -631,6 +638,14 @@ class TestTitlecaseAction(unittest.TestCase):
         with override_config(CAMERA_PREFIXES=("North", "QRS")):
             assert prompt_scrape._titlecase_action("qrs_beta") == "QRS Beta"
             assert prompt_scrape._titlecase_action("north_qrs_gamma") == "North QRS Gamma"
+
+    def test_a_scraped_action_reads_as_backfill_metadata_records_the_same_camera_and_act(self):
+        vocabulary = load_vocabulary()
+        for camera in vocabulary.cameras:
+            for act in vocabulary.acts:
+                as_the_provider_writes_it = f"{camera.prefix}_{act.action}".lower()
+                with self.subTest(camera=camera.prefix, act=act.action):
+                    assert prompt_scrape._titlecase_action(as_the_provider_writes_it) == f"{camera.prefix} {act.action}"
 
 
 class TestCssSelector(unittest.TestCase):
@@ -786,6 +801,11 @@ class TestTheRecordAPageEmbeds:
         html = '{"id":"abc","prompt":"first"}' + padding + '{"id":"abc","prompt":"second"}'
 
         assert prompt_scrape._extract_provider_embedded_metadata(html, "abc").prompt == "first"
+
+    def test_a_record_the_page_holds_only_as_a_json_string_is_read_too(self):
+        html = '"{\\"id\\":\\"abc\\",\\"prompt\\":\\"only escaped\\"}"'
+
+        assert prompt_scrape._extract_provider_embedded_metadata(html, "abc").prompt == "only escaped"
 
     def test_a_prompt_far_enough_away_belongs_to_the_next_item_and_is_not_read(self):
         html = '{"id":"abc"}' + " " * 6_000 + '{"id":"next","prompt":"not mine"}'
