@@ -623,7 +623,7 @@ def _isolated_root_logger():
 
 
 class TestSetupLogging:
-    def test_writes_the_log_even_when_something_configured_logging_first(self):
+    def test_writes_the_log_the_error_popups_point_to_even_when_something_configured_logging_first(self):
         with workspace_temp_dir() as folder, _isolated_root_logger() as root:
             root.addHandler(logging.NullHandler())
             log_file = folder / "evolver.log"
