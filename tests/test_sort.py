@@ -127,13 +127,17 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
             gallery = gallery_of_videos_made_again(root / "gallery.db", ["made_00001.mp4"])
             with lib.config(ORIGENERATOR_DB_PATH=gallery):
                 sorted_copy, upscaled = self._sent_before(lib, "made_00001.mp4")
+                sidecar.update(sidecar.sidecar_path(upscaled), lambda current: provenance.recorded(
+                    current, provenance.GENERATION, provenance.reconstructed("origenerator")))
 
                 handed_over = self._sent_again(lib, "made_00001.mp4", b"made again")
 
                 assert not handed_over.exists()
                 assert sorted_copy.read_bytes() == b"made again"
                 assert upscale.collect_queued_videos(upscale.UpscaleFolders.configured()) == [(sorted_copy, lanes.ORIGENERATOR_SOURCE, "portrait")]
-                assert sidecar.read(sidecar.sidecar_path(upscaled))["favorite"]
+                record = sidecar.read(sidecar.sidecar_path(upscaled))
+                assert record["favorite"]
+                assert record[provenance.BLOCK] == {provenance.UPSCALE: provenance.reconstructed(None)}
 
     def test_made_again_under_its_new_name_takes_the_place_of_the_copy_under_the_old(self):
         with workspace_temp_dir() as root:
