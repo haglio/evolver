@@ -7,7 +7,7 @@ import numpy as np
 
 from util.frame_hashes import TOLERANCE, frame_hashes, frames_at
 
-LENGTH_TWO_ENCODES_OF_ONE_VIDEO_DIFFER_BY_SECONDS = 0.5
+SAME_LENGTH_TOLERANCE_SECONDS = 0.5
 
 MOMENTS = 16
 AGREEING_MOMENTS = 10
@@ -38,7 +38,7 @@ def fingerprinted(payload: dict, moments: list[str]) -> dict:
 
 
 def same_length(a: float, b: float) -> bool:
-    return abs(a - b) <= LENGTH_TWO_ENCODES_OF_ONE_VIDEO_DIFFER_BY_SECONDS
+    return abs(a - b) <= SAME_LENGTH_TOLERANCE_SECONDS
 
 
 def same_footage(a: Sequence[str], b: Sequence[str]) -> bool:
