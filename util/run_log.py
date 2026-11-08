@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-MAX_BYTES = 4 << 20
+BYTES_ONLY_A_RUN_GONE_WRONG_REACHES = 4 << 20
 
 TRUNCATION_NOTE = "... (this excerpt hit its size limit; the rest is in the log file)"
 
@@ -29,7 +29,7 @@ def read_run(
     start: int | None,
     end: int | None,
     *,
-    max_bytes: int = MAX_BYTES,
+    max_bytes: int = BYTES_ONLY_A_RUN_GONE_WRONG_REACHES,
 ) -> str | None:
     if start is None or end is None or end < start or not log_path.is_file():
         return None
