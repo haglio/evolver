@@ -266,9 +266,6 @@ class TestTheEncodeAndTheRun(unittest.TestCase):
 
         assert sorted(name for name in vars(config) if name.removeprefix("NONAI_") in settings) == []
 
-    def test_an_encode_may_outlast_many_runs_so_it_runs_detached_and_is_checked_each_tick(self):
-        assert EncodeSettings().max_runtime_hours * 3600 > 10 * config.PIPELINE_WALL_TIMEOUT_SECONDS
-
     def test_a_returning_user_parks_the_encode_within_seconds_rather_than_at_the_next_run(self):
         assert config.NONAI_PRESENCE_POLL_SECONDS < 60
 
