@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from app_support.testing import start_again_stand_in, update_waiting_for
 from PyQt6.QtCore import QEvent
+from PyQt6.QtWidgets import QMessageBox
 
 import config
 from gui import single_instance
@@ -66,6 +67,51 @@ class TestBuildingIsNotStarting:
         load.assert_called_once()
         assert app._presence.is_running
         assert app._scheduler.next_run_at is not None
+
+
+class TestStartingInOrder:
+    def _started(self, request, order, *extra):
+        app = build_evolver_app(request)
+        with patch("gui.app.process_identity.claim", order.claim),              patch.object(app._tray, "show", order.tray_shows),              patch.object(app._window, "show", order.window_shows),              patch("gui.app.peer_watch.clear_evolver_stand_down", order.stand_down_cleared),              patch.object(app._peer, "tick", order.broker_looked_at),              patch("gui.main_window.newest_runs", return_value=[]),              patch("gui.app.sys") as mock_sys:
+            mock_sys.argv = ["tray_app.py", "--show-window"]
+            app.start()
+        return [name for name, _args, _kwargs in order.mock_calls]
+
+    def test_the_identity_is_claimed_before_any_window_shows_since_the_taskbar_reads_it_from_the_first(
+            self, request):
+        steps = self._started(request, Mock())
+
+        assert steps.index("claim") < min(steps.index("tray_shows"), steps.index("window_shows"))
+
+    def test_starting_clears_an_earlier_stand_down_before_the_first_look_at_the_broker(self, request):
+        steps = self._started(request, Mock())
+
+        assert steps.index("stand_down_cleared") < steps.index("broker_looked_at")
+
+
+class TestQuitting:
+    def test_only_the_window_asks_before_quitting_since_the_window_is_where_a_stray_click_lands(
+            self, request):
+        with patch("gui.app.branch_session.BranchSession.quit") as quit_evolver:
+            app = build_evolver_app(request)
+            with patch("gui.app.QMessageBox.question",
+                       return_value=QMessageBox.StandardButton.No) as asked:
+                app._tray.quit_action.trigger()
+                app._window.quit_action.trigger()
+
+        assert (asked.call_count, quit_evolver.call_count) == (1, 1)
+
+
+class TestTheRunLogWindow:
+    def test_a_second_runs_log_closes_the_first_so_windows_cannot_pile_up_under_the_main_one(
+            self, request):
+        app = build_evolver_app(request)
+        with patch("gui.app.run_log.read_run", return_value=""):
+            app._show_run_log(make_run_record())
+            first = app._log_window
+            app._show_run_log(make_run_record())
+
+        assert not first.isVisible()
 
 
 class TestCommandWiring:
@@ -390,6 +436,15 @@ class TestNonAiUpscaleToggle:
         assert mock_worker.call_args.kwargs["nonai_enabled"]
 
 
+    def test_showing_the_saved_switch_state_sends_nothing_back_as_a_change(self, request):
+        app = self._app_with_fresh_settings(request)
+        with patch("gui.app.EvolverSettings.save") as saved:
+            app._tray.set_nonai_enabled(True)
+            app._window.set_nonai_enabled(True)
+
+        saved.assert_not_called()
+
+
 class TestPresenceMonitor:
     def _app_with_toggle(self, request, enabled):
         settings = EvolverSettings()
@@ -450,6 +505,14 @@ class TestSessionManagement:
         mock_write.assert_called_once()
         header = mock_write.call_args[0][0]
         assert "session" in header.lower()
+
+    def test_session_end_leaves_the_detached_encode_running_since_it_is_detached_to_outlive_evolver(
+            self, request):
+        app = build_evolver_app(request)
+        with patch("tasks.nonai_encode.terminate_ffmpeg") as terminate,              patch.object(app._app, "quit"), patch("gui.app.crash_log.write_info"):
+            app._on_session_end(MagicMock())
+
+        terminate.assert_not_called()
 
     def test_session_end_quits_app(self, request):
         app = build_evolver_app(request)
