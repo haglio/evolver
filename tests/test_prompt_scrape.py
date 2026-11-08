@@ -150,7 +150,7 @@ class TestPromptScrape(unittest.TestCase):
             assert result.errors == 1
             assert result.newly_scraped == 0
 
-    def test_failed_scrape_writes_failure_marker(self):
+    def test_a_failed_scrape_leaves_its_marker_beside_the_record_never_in_it(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
@@ -164,6 +164,7 @@ class TestPromptScrape(unittest.TestCase):
 
             assert result.errors == 1
             assert self._marker_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists()
+            assert not self._mirror_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists()
 
     def test_skips_video_that_already_has_json(self):
         with workspace_temp_dir() as root:
@@ -246,7 +247,7 @@ class TestPromptScrape(unittest.TestCase):
 
             assert sidecar.read(existing)[provenance.BLOCK] == {"upscale": upscaled, provenance.GENERATION: generated}
 
-    def test_skips_video_with_failure_marker(self):
+    def test_a_failure_marker_holds_its_video_back_until_someone_deletes_it(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
