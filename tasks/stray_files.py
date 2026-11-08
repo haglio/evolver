@@ -13,8 +13,7 @@ log = logging.getLogger(__name__)
 
 _EXTENSION_SEPARATORS = (" ", "_", "-")
 
-# Files Windows writes by itself.
-_OS_NOISE = frozenset({"desktop.ini", "thumbs.db", ".ds_store"})
+_FILES_WINDOWS_WRITES_INTO_A_FOLDER_BY_ITSELF = frozenset({"desktop.ini", "thumbs.db", ".ds_store"})
 
 
 @dataclass
@@ -37,14 +36,14 @@ class _Handled:
 
 def run() -> StrayFilesResult:
     result = StrayFilesResult()
-    root = config.VIDEO_LIBRARY_DIR
-    if not root.is_dir():
+    library_and_never_the_archive = config.VIDEO_LIBRARY_DIR
+    if not library_and_never_the_archive.is_dir():
         return result
 
     log.info("=== Stray files: non-videos in the video tree ===")
-    log.info("VIDEOS: %s", root)
+    log.info("VIDEOS: %s", library_and_never_the_archive)
 
-    for path in sorted(library_files(root)):
+    for path in sorted(library_files(library_and_never_the_archive)):
         handled = _handle(path)
         if handled.renamed:
             result.renamed += 1
@@ -61,7 +60,7 @@ def run() -> StrayFilesResult:
 
 
 def _handle(path: Path) -> _Handled:
-    if _is_video(path) or is_partial_path(path) or path.name.lower() in _OS_NOISE:
+    if _is_video(path) or is_partial_path(path) or path.name.lower() in _FILES_WINDOWS_WRITES_INTO_A_FOLDER_BY_ITSELF:
         return _Handled()
 
     repaired, renamed = _repair_extension(path)
