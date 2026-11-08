@@ -82,7 +82,11 @@ class RunDetailWidget(QWidget):
         font.setPointSize(SIZE_BODY)
         font.setBold(True)
         self._header.setFont(font)
+        # Qt's AutoText guesses the format from the string and can draw a <span> or an <a> as
+        # literal markup, so both labels here say RichText outright.
         self._header.setTextFormat(Qt.TextFormat.RichText)
+        # QLabel emits linkActivated only while its interaction flags let the mouse reach links;
+        # setting other flags (selectable text, say) replaces the default that does.
         self._header.linkActivated.connect(self._on_title_clicked)
         layout.addWidget(self._header)
 
