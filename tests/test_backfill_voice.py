@@ -30,6 +30,7 @@ class _Told:
         self.timeline: list[tuple[str, str]] = []
         self._until_heard = until_heard
         self._done = threading.Event()
+        # Qt would queue a signal sent from the listener's thread, and no Qt event loop runs here to deliver it.
         listener.heard.connect(self._on_heard, Qt.ConnectionType.DirectConnection)
         listener.hearing.connect(self._on_hearing, Qt.ConnectionType.DirectConnection)
         listener.failed.connect(self._on_failed, Qt.ConnectionType.DirectConnection)
@@ -84,7 +85,7 @@ class TestWhatTheWindowIsTold(unittest.TestCase):
         assert told.heard == ["side beta"]
 
 
-class TestWhenListeningCannotGoOn(unittest.TestCase):
+class TestWhenListeningStopsTheWindowSaysSoAndKeepsItsWorkingButtons(unittest.TestCase):
     def test_an_audio_stack_that_is_not_installed_is_a_crash_with_its_reason(self):
         with patch.dict(sys.modules, {"vosk": None}),                 self.assertLogs("backfill.voice", level="ERROR") as logged:
             told = _told_by(VoiceListener(PHRASES))
@@ -126,7 +127,7 @@ class TestWhenListeningCannotGoOn(unittest.TestCase):
 
 
 class TestStoppingAndRestarting(unittest.TestCase):
-    def test_stop_returns_only_once_the_microphone_is_closed(self):
+    def test_stop_returns_only_once_the_microphone_is_closed_so_no_portaudio_callback_outlives_python(self):
         engines = scripted_engines([said("side beta")])
         _told_by(VoiceListener(PHRASES, engines=engines), until_heard="side beta")
 
