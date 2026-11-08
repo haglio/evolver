@@ -19,7 +19,7 @@ from util import nonai_job, sidecar, upscale_queue
 
 
 @contextmanager
-def running_encode(*, alive=True, percent=50):
+def running_encode_with_a_canned_percent(*, alive=True, percent=50):
     with ExitStack() as stack:
         stack.enter_context(process_alive(return_value=alive))
         stack.enter_context(patch("tasks.nonai_encode.percent_encoded",
@@ -90,7 +90,7 @@ class TestRowOne(unittest.TestCase):
             make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
             write_job(root, overrides)
 
-            with override_config(**overrides), running_encode(percent=41):
+            with override_config(**overrides), running_encode_with_a_canned_percent(percent=41):
                 queue = nonai_upscale_queue.current()
 
             assert videos(queue) == ["lagoon/0 unsorted/busy.mp4", "lagoon/0 unsorted/a.mp4"]
@@ -102,7 +102,7 @@ class TestRowOne(unittest.TestCase):
             overrides = library_overrides(root)
             write_job(root, overrides, suspended=True)
 
-            with override_config(**overrides), running_encode():
+            with override_config(**overrides), running_encode_with_a_canned_percent():
                 queue = nonai_upscale_queue.current()
 
             assert queue.head.state == upscale_queue.PAUSED
@@ -112,7 +112,7 @@ class TestRowOne(unittest.TestCase):
             overrides = library_overrides(root)
             write_job(root, overrides, on_request=True)
 
-            with override_config(**overrides), running_encode():
+            with override_config(**overrides), running_encode_with_a_canned_percent():
                 queue = nonai_upscale_queue.current()
 
             assert queue.head.state == upscale_queue.ASKED_FOR
@@ -123,7 +123,7 @@ class TestRowOne(unittest.TestCase):
             overrides = library_overrides(root)
             write_job(root, overrides)
 
-            with override_config(**overrides), running_encode(alive=False):
+            with override_config(**overrides), running_encode_with_a_canned_percent(alive=False):
                 queue = nonai_upscale_queue.current()
 
             assert queue.head.state == upscale_queue.FINISHING
@@ -138,7 +138,7 @@ class TestRowOne(unittest.TestCase):
                                    nonai_job.Request("lagoon/0 unsorted/b.mp4",
                                                      held_back="low_ram"))
 
-            with override_config(**overrides), running_encode():
+            with override_config(**overrides), running_encode_with_a_canned_percent():
                 queue = nonai_upscale_queue.current()
 
             assert videos(queue) == ["lagoon/0 unsorted/b.mp4", "lagoon/0 unsorted/a.mp4"]

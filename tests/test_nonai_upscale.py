@@ -267,7 +267,7 @@ class TestRunStartsWhatYouAskedFor(unittest.TestCase):
             mocks["popen"].assert_called_once()
             assert request_of(overrides) is None
 
-    def test_an_encode_of_another_video_is_stopped_to_make_way(self):
+    def test_a_run_too_stops_another_videos_encode_adopted_or_started_after_the_ask(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _busy, tmp, _out = write_job(root, overrides)
@@ -632,7 +632,7 @@ class TestOrphanAdoption(unittest.TestCase):
 
 
 class TestPresenceThrottle(unittest.TestCase):
-    def test_a_present_user_suspends_the_in_flight_encode(self):
+    def test_a_present_user_freezes_the_in_flight_encode_rather_than_ending_it(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             _source, tmp, _ = write_job(root, overrides)
@@ -760,6 +760,18 @@ class TestThrottleToPresence(unittest.TestCase):
 
             assert changed == ""
             mocks["suspend"].assert_not_called()
+
+    def test_a_poll_never_starts_an_encode_though_a_video_waits_and_the_user_is_away(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / "a.mp4")
+
+            stack, mocks = probes(idle_seconds=10_000.0)
+            with override_config(**overrides), stack:
+                nonai_upscale.throttle_to_presence()
+
+            mocks["popen"].assert_not_called()
+            assert not overrides["NONAI_JOB_STATE_FILE"].exists()
 
     def test_ignores_a_job_whose_process_has_died(self):
         with workspace_temp_dir() as root:
@@ -902,7 +914,7 @@ class TestMakingWayForAiVideos(unittest.TestCase):
             assert "the machine is idle" not in said
 
 
-class TestEveryFileIsAParameter(unittest.TestCase):
+class TestEachFileIsTheParameterGivenAndTheConfiguredOneIsLeftUntouched(unittest.TestCase):
     def test_a_start_writes_its_record_and_attempt_where_the_parameters_point(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
@@ -973,10 +985,10 @@ class TestEveryFileIsAParameter(unittest.TestCase):
             elsewhere = root / "elsewhere"
             elsewhere.mkdir()
             non_ai = overrides["NON_AI_DIR"]
-            make_video(non_ai / "lagoon" / "0 unsorted" / "a.mp4")
-            make_video(non_ai / "lagoon" / "0 unsorted" / "z.mp4")
+            make_video(non_ai / "lagoon" / "0 unsorted" / "first alphabetically.mp4")
+            make_video(non_ai / "lagoon" / "0 unsorted" / "last alphabetically.mp4")
             (elsewhere / "next.txt").write_text(
-                "lagoon/0 unsorted/z.mp4\n", encoding="utf-8")
+                "lagoon/0 unsorted/last alphabetically.mp4\n", encoding="utf-8")
 
             stack, _ = probes()
             with override_config(**overrides), stack:
@@ -990,7 +1002,7 @@ class TestEveryFileIsAParameter(unittest.TestCase):
                         pin_list=elsewhere / "next.txt",
                         watch_stats=elsewhere / "watch.json"))
 
-            assert result.started == "lagoon/0 unsorted/z.mp4"
+            assert result.started == "lagoon/0 unsorted/last alphabetically.mp4"
 
     def test_the_watch_stats_file_it_is_given_decides_which_clip_starts(self):
         with workspace_temp_dir() as root:
@@ -1091,7 +1103,7 @@ class TestRunSupervisesAJob(unittest.TestCase):
             assert result.in_flight == "lagoon/0 unsorted/busy.mp4"
             assert result.in_flight_percent is None
 
-    def test_finished_job_is_promoted_and_the_original_retired(self):
+    def test_a_finished_job_is_filed_as_he_files_his_own_topaz_gui_upscales(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -1341,7 +1353,7 @@ class TestPromotionCarriesTheRecord(unittest.TestCase):
             assert carried["clip"] == {"compilation": "Volume One", "index": 1, "count": 4}
             assert carried["video"] == {"action": "alpha"}
 
-    def test_the_carried_sidecar_leaves_the_version_block_alone(self):
+    def test_the_carried_sidecar_leaves_the_version_block_to_the_grouping_stage(self):
         with workspace_temp_dir() as root:
             archive = root / "archive"
             overrides = library_overrides(root, NONAI_RETIRED_ROOT=archive)
