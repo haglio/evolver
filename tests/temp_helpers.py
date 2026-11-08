@@ -28,13 +28,13 @@ from gui.run_record import RunRecord
 from util import nonai_job, provenance
 from util.media_files import partial_path
 
-ROOT = Path(tempfile.gettempdir()) / "evolver-tests" / "unittest"
+CASES_OUTSIDE_THE_CHECKOUT = Path(tempfile.gettempdir()) / "evolver-tests" / "unittest"
 
 
 @contextmanager
 def workspace_temp_dir():
-    ROOT.mkdir(parents=True, exist_ok=True)
-    path = ROOT / f"case_{uuid.uuid4().hex}"
+    CASES_OUTSIDE_THE_CHECKOUT.mkdir(parents=True, exist_ok=True)
+    path = CASES_OUTSIDE_THE_CHECKOUT / f"case_{uuid.uuid4().hex}"
     path.mkdir()
     try:
         yield path
@@ -305,10 +305,13 @@ def make_run_record(**overrides):
     return RunRecord(**fields)
 
 
+IDLE_LONG_ENOUGH_THAT_ENCODES_MAY_START = 10_000.0
+
 _PROBE_DEFAULTS = {
     "videoai": "", "orientation": "landscape", "duration": 100.0, "free_bytes": 10**15,
     "popen": None, "is_running": True, "image": "ffmpeg.exe", "terminate": True,
-    "topaz_pids": (), "arguments": (), "available_ram": 64.0, "idle_seconds": 10_000.0,
+    "topaz_pids": (), "arguments": (), "available_ram": 64.0,
+    "idle_seconds": IDLE_LONG_ENOUGH_THAT_ENCODES_MAY_START,
 }
 
 
@@ -322,6 +325,8 @@ def _topaz_encodes(pids, arguments) -> list[processes.Process]:
 def probes(**given):
     options = _given_over(_PROBE_DEFAULTS, given)
     stack = ExitStack()
+    # CPython's patch() resolves a dotted path through an importing module to the owner's
+    # attribute anyway, so each outside call is patched on the module that owns it.
     mocks = {
         "idle_seconds": stack.enter_context(
             patch("tasks.nonai_encode.seconds_since_input",
