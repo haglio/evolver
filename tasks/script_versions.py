@@ -45,9 +45,7 @@ def copy_missing_version_scripts(video_index: dict[str, list[Path]], videos_root
     groups: dict[tuple[tuple[str, ...], str], list[Path]] = defaultdict(list)
     for matches in video_index.values():
         for video_path in matches:
-            key = (version_bucket(video_path, videos_root),
-                   strip_processing_suffixes(video_path.stem))
-            groups[key].append(video_path)
+            groups[version_key(video_path, videos_root)].append(video_path)
 
     for (_, normalized_stem), videos in sorted(groups.items()):
         if len(videos) <= 1:
@@ -106,7 +104,11 @@ def _pick_version_source(target_video: Path, existing_sources: list[Path],
     return ordered[0]
 
 
-def version_bucket(video_path: Path, videos_root: Path) -> tuple[str, ...]:
+def version_key(video_path: Path, videos_root: Path) -> tuple[tuple[str, ...], str]:
+    return _version_bucket(video_path, videos_root), strip_processing_suffixes(video_path.stem)
+
+
+def _version_bucket(video_path: Path, videos_root: Path) -> tuple[str, ...]:
     rel = video_path.relative_to(videos_root)
     filing = ai_filing(rel)
     if filing.source and filing.orientation:
