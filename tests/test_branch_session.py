@@ -23,7 +23,7 @@ _PATHS = ("PROJECT_DIR", "LIVE_DIR", "LOG_FILE", "RUNS_DIR", "GUI_SETTINGS_FILE"
           "NONAI_SKIP_LIST", "NONAI_PIN_LIST")
 
 
-def config_paths(branch_session: bool) -> dict[str, Path]:
+def config_paths_from_a_fresh_import(branch_session: bool) -> dict[str, Path]:
     env = {key: value for key, value in os.environ.items()
            if key not in ("PYTHONPATH", "EVOLVER_BRANCH_SESSION")}
     if branch_session:
@@ -44,11 +44,11 @@ def config_paths(branch_session: bool) -> dict[str, Path]:
 class TestWhatABranchSessionShares:
     @pytest.fixture(scope="class")
     def preview(self):
-        return config_paths(branch_session=True)
+        return config_paths_from_a_fresh_import(branch_session=True)
 
     @pytest.fixture(scope="class")
     def ordinary(self):
-        return config_paths(branch_session=False)
+        return config_paths_from_a_fresh_import(branch_session=False)
 
     def test_a_preview_reads_and_writes_the_live_checkouts_files(self, preview):
         live = preview["LIVE_DIR"]
@@ -118,7 +118,7 @@ class TestHandingTheWorkBack:
             app.start()
         return app
 
-    def test_once_it_has_had_its_time_it_makes_way_for_the_usual_evolver(self):
+    def test_a_forgotten_preview_makes_way_for_the_usual_evolver_after_its_hour(self):
         session, steps = _session(preview=True)
         session.take_the_work()
 
@@ -130,7 +130,7 @@ class TestHandingTheWorkBack:
         assert steps.mock_calls == [call.gateway.let_go(), call.start_the_usual_evolver(),
                                     call.leaving()]
 
-    def test_a_run_in_flight_is_let_finish_first(self):
+    def test_a_run_in_flight_is_let_finish_rather_than_cut_to_the_five_seconds_a_quit_gives_its_stage(self):
         session, steps = _session(preview=True, a_run_is_going=True)
         session.take_the_work()
 
@@ -148,7 +148,7 @@ class TestHandingTheWorkBack:
 
         assert not session._hand_back.isActive()
 
-    def test_quitting_a_preview_hands_the_work_back_at_once(self):
+    def test_a_quit_preview_lets_go_of_the_claim_before_the_usual_evolver_starts_or_that_one_would_open_the_previews_window(self):
         session, steps = _session(preview=True)
 
         with patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver), \
@@ -216,7 +216,7 @@ class TestHandingTheWorkBack:
         assert "EVOLVER_BRANCH_SESSION" not in popen.call_args.kwargs["env"]
         assert popen.call_args.kwargs["env"]["PATH"] == os.environ["PATH"]
 
-    def test_the_usual_evolver_is_started_only_if_none_is_running(self):
+    def test_the_usual_evolver_comes_back_hidden_in_the_tray_and_only_if_none_is_running(self):
         with override_config(LIVE_DIR=Path("C:/live/evolver")), \
              patch("gui.branch_session.subprocess.Popen") as popen:
             branch_session.start_the_usual_evolver()
@@ -270,9 +270,15 @@ class TestWhenAPreviewHandsTheWorkBack:
         assert branch_session.until(datetime(2026, 1, 1, 12, 15, tzinfo=UTC)) == "1:15 PM"
 
 
-class TestRelaunchingAPreview:
+class TestRelaunching:
     def test_a_preview_is_started_again_through_its_own_launcher(self):
         with override_config(BRANCH_SESSION=True, PROJECT_DIR=Path("checkout")):
             command = branch_session.relaunch_command()
 
         assert command == f'wscript.exe "{Path("checkout") / "launch_preview_branch.vbs"}"'
+
+    def test_the_usual_evolvers_pin_opens_the_running_evolvers_window(self):
+        with override_config(BRANCH_SESSION=False, PROJECT_DIR=Path("checkout")):
+            command = branch_session.relaunch_command()
+
+        assert command.endswith(f'"{Path("checkout") / "tray_app.py"}" --show-window')

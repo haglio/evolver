@@ -19,7 +19,7 @@ HAND_BACK_AFTER_MINUTES = 60
 HAND_BACK_RETRY_MS = 60_000
 
 
-def is_one() -> bool:
+def launched_as_a_preview() -> bool:
     return config.BRANCH_SESSION
 
 
@@ -36,8 +36,9 @@ def model_id(live: str) -> str:
     return taskbar_identity(live, shown_as())
 
 
+# Windows re-runs a taskbar pin's relaunch command exactly as stored.
 def relaunch_command() -> str:
-    if is_one():
+    if launched_as_a_preview():
         return f'wscript.exe "{config.PROJECT_DIR / "launch_preview_branch.vbs"}"'
     return f'"{sys.executable}" "{config.PROJECT_DIR / "tray_app.py"}" --show-window'
 
@@ -48,7 +49,7 @@ class BranchSession(QObject):
     def __init__(self, instance: single_instance.InstanceGateway,
                  a_run_is_going: Callable[[], bool], parent=None):
         super().__init__(parent)
-        self.is_preview = is_one()
+        self.is_preview = launched_as_a_preview()
         self.name = app_name()
         self._instance = instance
         self._a_run_is_going = a_run_is_going

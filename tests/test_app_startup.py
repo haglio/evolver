@@ -822,7 +822,7 @@ class TestAnsweringLaunches:
         assert served["steps_aside_for"](single_instance.USUAL)
         assert served["steps_aside_for"](single_instance.PREVIEW)
 
-    def test_a_preview_opens_its_window_for_a_launcher_that_says_nothing(self, request):
+    def test_a_preview_opens_its_window_for_a_launcher_that_says_nothing_since_that_launcher_exits_on_the_connection(self, request):
         _, served = self._run_as_first_instance(request, preview=True)
 
         assert not served["steps_aside_for"](b"")
