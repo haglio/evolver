@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from tasks import clip_scripts
 from tests.temp_helpers import CarvedClipLibraryCase
-from util import provenance
+from util import provenance, sidecar
 
 
 class ClipScriptsCase(CarvedClipLibraryCase):
@@ -32,17 +32,19 @@ class TestClipScripts(ClipScriptsCase):
         written = json.loads(self.clip_script().read_text(encoding="utf-8"))
         assert written["actions"] == [{"at": 0, "pos": 0}, {"at": 500, "pos": 90}, {"at": 1500, "pos": 10}]
 
-    def test_a_trimmed_script_says_in_itself_that_this_stage_cut_it(self):
+    def test_the_mark_that_this_stage_cut_a_script_is_in_the_script_never_on_the_clips_record(self):
         scene = self.make_scene(actions=[{"at": 10_000, "pos": 0}, {"at": 10_500, "pos": 90}])
-        self.make_clip(scene, scene_offset=10.0)
+        clip = self.make_clip(scene, scene_offset=10.0)
 
         self.run_stage(duration=2.0)
 
         written = json.loads(self.clip_script().read_text(encoding="utf-8"))
         stamp = written["metadata"][provenance.BLOCK][provenance.CLIP_SCRIPTS]
         assert (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("evolver", None, None)
+        with self.library_overrides():
+            assert set(sidecar.read(sidecar.sidecar_path(clip))) == {"clip"}
 
-    def test_what_made_the_scene_script_comes_along_into_the_clips(self):
+    def test_a_clip_script_carries_its_scene_scripts_stamp_for_a_sweep_to_find_it_by(self):
         placed = provenance.reconstructed("evolver")
         scene = self.make_scene()
         self.write_scene_script(
@@ -89,7 +91,7 @@ class TestClipScripts(ClipScriptsCase):
         assert result.no_motion_in_window == 1
         assert not self.clip_script().exists()
 
-    def test_a_window_holding_a_single_position_leaves_the_clip_unscripted(self):
+    def test_a_window_holding_a_single_position_leaves_the_clip_free_to_be_scripted_properly(self):
         scene = self.make_scene(actions=[{"at": 10_500, "pos": 90}])
         self.make_clip(scene, scene_offset=10.0)
 
@@ -99,7 +101,7 @@ class TestClipScripts(ClipScriptsCase):
         assert result.no_motion_in_window == 1
         assert not self.clip_script().exists()
 
-    def test_skips_a_clip_whose_duration_will_not_probe(self):
+    def test_skips_a_clip_whose_own_length_will_not_probe(self):
         scene = self.make_scene(actions=[{"at": 10_500, "pos": 90}, {"at": 11_000, "pos": 10}])
         self.make_clip(scene)
 

@@ -48,14 +48,14 @@ def run() -> ClipScriptsResult:
             result.no_scene_script += 1
             continue
 
-        duration = ffprobe.duration_seconds(video)
-        if duration is None:
+        clips_own_length = ffprobe.duration_seconds(video)
+        if clips_own_length is None:
             result.unprobeable += 1
             log.warning("UNPROBEABLE clip, cannot size its script window: %s", video)
             continue
 
-        trimmed = script_library.trim(funscript.read(scene_script), offset, duration)
-        if len(trimmed["actions"]) <= 1:
+        trimmed = script_library.trim(funscript.read(scene_script), offset, clips_own_length)
+        if _drives_nothing(trimmed):
             result.no_motion_in_window += 1
             log.info("NO MOTION for clip window, leaving unscripted: %s", video)
             continue
@@ -75,3 +75,7 @@ def run() -> ClipScriptsResult:
         result.unmatched_clip,
     )
     return result
+
+
+def _drives_nothing(script: dict) -> bool:
+    return len(script["actions"]) <= 1
