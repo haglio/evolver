@@ -16,8 +16,8 @@ from util.frame_hashes import SAMPLE_HEIGHT, SAMPLE_WIDTH, frame_hashes
 
 MASK = (1 << 64) - 1
 MOMENTS = [(0x9E3779B97F4A7C15 * (moment + 1)) & MASK for moment in range(16)]
-MEASURED_2026_09_16_TWO_ENCODES_OF_ONE_SCENE_AGREED_AT = 13
-MEASURED_2026_09_16_SAME_LENGTH_OTHER_SCENES_AGREED_AT = 0
+MEASURED_SAME_SCENE = 13
+MEASURED_OTHER_SCENES = 0
 
 
 def _written(values: list[int]) -> list[str]:
@@ -36,16 +36,23 @@ class TestSameFootage:
     def test_agreeing_at_only_some_moments_is_other_footage(self):
         assert not same_footage.same_footage(_written(MOMENTS), _written(_reencoded(9)))
 
-    def test_the_line_falls_between_the_real_pair_measured_and_the_other_scenes_beside_it(self):
+    def test_the_line_sits_between_the_2026_09_16_measurements(self):
         assert same_footage.same_footage(
-            _written(MOMENTS), _written(_reencoded(MEASURED_2026_09_16_TWO_ENCODES_OF_ONE_SCENE_AGREED_AT)))
+            _written(MOMENTS), _written(_reencoded(MEASURED_SAME_SCENE)))
         assert not same_footage.same_footage(
-            _written(MOMENTS), _written(_reencoded(MEASURED_2026_09_16_SAME_LENGTH_OTHER_SCENES_AGREED_AT)))
+            _written(MOMENTS), _written(_reencoded(MEASURED_OTHER_SCENES)))
 
 
 def _frames(count: int) -> np.ndarray:
     rng = np.random.default_rng(count)
     return rng.integers(0, 256, size=(count, SAMPLE_HEIGHT, SAMPLE_WIDTH), dtype=np.uint8)
+
+
+class TestSameLength:
+    def test_lengths_two_frames_apart_count_as_the_same(self):
+        two_frames_at_30_fps = 2 / 30
+
+        assert same_footage.same_length(60.0, 60.0 + two_frames_at_30_fps), "two encodes of one video disagree on its length by a frame or two"
 
 
 class TestFingerprint:
