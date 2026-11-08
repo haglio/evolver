@@ -8,7 +8,7 @@ from shared_ui.look_guard import assert_the_look_is_shared_uis
 pytestmark = pytest.mark.repo_check
 
 _CHECKOUT = Path(__file__).resolve().parents[1]
-_PACKAGES = ("gui", "backfill", "review_trash", "tasks", "util", "tools")
+_PACKAGES = ("gui", "review_trash", "tasks", "util", "tools")
 _STATS_CHART_STAGE_COLORS_KEPT_BY_CHOICE = _CHECKOUT / "evolver.py"
 
 

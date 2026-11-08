@@ -113,7 +113,6 @@ CAMERA_PREFIXES = tuple(
     camera["prefix"] for camera in overlay_value(_CONTENT, "cameras", path=LOCAL_CONTENT))
 PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-browser-profile"
 
-CURATED_EXAMPLES = _CONTENT.get("curated_examples", {})
 CLIP_FOLDERS = tuple(_CONTENT.get("excerpt_folders") or ())
 
 # Only Topaz Video's own ffmpeg build has the tvai_* filters both upscale stages use, and the
@@ -167,7 +166,6 @@ LOW_DISK_WARNING_DISMISSED_FILE = LOCAL_STATE_DIR / "low_disk_warning_dismissed"
 PIPELINE_LOCK_FILE = LOCAL_STATE_DIR / "pipeline.lock"
 NONAI_FFMPEG_LOG = LOCAL_STATE_DIR / "nonai_upscale_ffmpeg.log"
 WARM_GUN_FAVORITES_CURSOR_FILE = LOCAL_STATE_DIR / "warm_gun_favorites.json"
-BACKFILL_THUMBNAIL_DIR = LOCAL_STATE_DIR / "backfill_thumbnails"
 _LISTS_EDITED_BY_HAND_DIR = LIVE_DIR
 NONAI_SKIP_LIST = _LISTS_EDITED_BY_HAND_DIR / ".nonai-upscale-skip.txt"
 NONAI_PIN_LIST = _LISTS_EDITED_BY_HAND_DIR / ".nonai-upscale-next.txt"
@@ -178,5 +176,4 @@ RUNS_DIR = LIVE_DIR / "runs"
 RUNS_SHOWN = 1000
 GUI_SETTINGS_FILE = LIVE_DIR / "gui_settings.json"
 
-VOICE_SAMPLE_RATE = 16000
-VOICE_CONFIDENCE_THRESHOLD = 0.7
+

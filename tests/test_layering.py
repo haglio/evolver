@@ -11,14 +11,12 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 pytestmark = pytest.mark.repo_check
 
 _OURS = (
-    "backfill", "backfill_app", "check_correspondence", "check_duplicate_sizes",
+    "check_correspondence", "check_duplicate_sizes",
     "config", "content_overlay", "evolver", "gui", "review_trash", "review_trash_app", "tasks",
     "tray_app", "util", "vulture_whitelist",
 )
 
 ALLOWED = {
-    "backfill": {"config", "content_overlay", "util"},
-    "backfill_app": {"backfill", "evolver", "gui"},
     "check_correspondence": {"config", "util"},
     "check_duplicate_sizes": {"config", "util"},
     "config": {"content_overlay"},

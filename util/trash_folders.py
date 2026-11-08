@@ -23,14 +23,6 @@ def trash_dirs() -> tuple[Path, Path]:
     return config.TRASH_DIR, config.GENAU_TRASH_DIR
 
 
-def free_spot_in(folder: Path, name: str) -> Path:
-    spot = folder / name
-    number = 1
-    while spot.exists():
-        spot = folder / f"{Path(name).stem}{_DUPLICATE}{number}{Path(name).suffix}"
-        number += 1
-    return spot
-
 
 def name_it_had(video: Path) -> str:
     return f"{_DUPLICATE_NUMBER.sub('', video.stem)}{video.suffix}"

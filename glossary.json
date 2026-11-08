@@ -86,25 +86,6 @@
       ]
     },
     {
-      "id": "backfill_button",
-      "thing": "in Backfill Metadata, a square with a picture and an action's name under it",
-      "screen": null,
-      "his_word": "buttons (2026-11-02: 'why not just call those \"buttons\" instead')",
-      "code_today": [
-        "button"
-      ],
-      "code_word": "button",
-      "status": "ruled",
-      "ruled": "2026-11-02, his words; tile is Origenerator's gallery's",
-      "retired": [
-        "tile",
-        "command panel"
-      ],
-      "keep": [
-        "tiles, the name"
-      ]
-    },
-    {
       "id": "band",
       "thing": "one colored layer of the Run Statistics chart, one per stage",
       "screen": null,
@@ -118,7 +99,7 @@
     },
     {
       "id": "video",
-      "thing": "a video in the library, an AI one included; what Backfill Metadata labels",
+      "thing": "a video in the library, an AI one included",
       "screen": [
         "Every video already has an action.",
         "the newly downloaded AI videos"
@@ -222,7 +203,7 @@
     },
     {
       "id": "action",
-      "thing": "what a video shows, the name on a Backfill Metadata button",
+      "thing": "what a video shows",
       "screen": [
         "Every video already has an action."
       ],

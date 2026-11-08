@@ -9,7 +9,6 @@ from shared_ui.toggle_switch import ToggleSwitch
 
 import config
 from gui.commands import (
-    BACKFILL,
     NONAI,
     OPEN,
     PAUSE,
@@ -74,9 +73,6 @@ class EvolverTray(QSystemTrayIcon):
         self.queue_action = QUEUE.action(self._menu)
         self._menu.addAction(self.queue_action)
 
-        self.backfill_action = BACKFILL.action(self._menu)
-        self._menu.addAction(self.backfill_action)
-
         self.review_trash_action = REVIEW_TRASH.action(self._menu)
         self._menu.addAction(self.review_trash_action)
 
@@ -103,7 +99,6 @@ class EvolverTray(QSystemTrayIcon):
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
-            "backfill": self.backfill_action.triggered,
             "review_trash": self.review_trash_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,

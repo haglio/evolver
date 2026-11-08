@@ -26,7 +26,7 @@ If a future change adds a new stage that scans video trees, prefer `library_vide
 
 - `tests/test_media_files.py` covers the name, and the sweep.
 - `tests/test_upscale.py` and `tests/test_nonai_upscale.py` cover what each stage writes and what it sweeps.
-- `tests/test_stray_files.py`, `tests/test_correspondence.py`, `tests/test_prompt_scrape.py`, `tests/test_lanes.py` and `tests/test_backfill_queue.py` cover scans that must pass partial files by.
+- `tests/test_stray_files.py`, `tests/test_correspondence.py`, `tests/test_prompt_scrape.py` and `tests/test_lanes.py` cover scans that must pass partial files by.
 
 When modifying temp-file naming, output promotion, or library scans, run:
 

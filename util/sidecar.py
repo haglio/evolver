@@ -54,29 +54,4 @@ def update(path: Path, change: Callable[[dict], dict | None]) -> dict | None:
     return locked_update(path, change)
 
 
-def _video_field(payload: dict, field: str) -> str:
-    video = payload.get("video")
-    if not isinstance(video, dict):
-        return ""
-    return str(video.get(field) or "")
-
-
-def action_of(payload: dict) -> str:
-    return _video_field(payload, "action")
-
-
 WRONG_ACTION_FIELD = "wrong_action"
-
-
-def wrong_action_of(payload: dict) -> str:
-    return _video_field(payload, WRONG_ACTION_FIELD)
-
-
-def record_action(clip: Path, action: str) -> None:
-    def name_the_act(payload: dict) -> dict:
-        block = payload.setdefault("video", {})
-        block["action"] = action
-        block.pop(WRONG_ACTION_FIELD, None)
-        return payload
-
-    update(sidecar_path(clip), name_the_act)

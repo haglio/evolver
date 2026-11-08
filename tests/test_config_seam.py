@@ -13,10 +13,6 @@ from tests.product_sources import PROJECT_ROOT, product_sources
 pytestmark = pytest.mark.repo_check
 
 CONFIG_REFERENCE_CEILINGS = {
-    "backfill/decisions.py": 2,
-    "backfill/queue.py": 2,
-    "backfill/thumbnails.py": 3,
-    "backfill/voice.py": 4,
     "check_correspondence.py": 6,
     "check_duplicate_sizes.py": 4,
     "evolver.py": 11,
@@ -70,10 +66,8 @@ CONFIG_REFERENCE_CEILINGS = {
 }
 
 OVERLAY_KEYS = {
-    "acts",
     "cameras",
     "chrome_profile",
-    "curated_examples",
     "display_timezone",
     "excerpt_folders",
     "retired_root",

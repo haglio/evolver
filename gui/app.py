@@ -146,7 +146,6 @@ class EvolverApp:
             "settings": self._show_settings,
             "stats": self._show_stats,
             "queue": self._queue.show,
-            "backfill": partial(self._launch_tool, "backfill_app.py"),
             "review_trash": partial(self._launch_tool, "review_trash_app.py"),
             "restart": self._restart,
         }

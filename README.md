@@ -83,14 +83,6 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `util/html_query.py` - a small HTML parse-and-query library
   - `util/headless_browser.py` - driving an installed Chrome or Edge to dump a page's rendered DOM
   - `util/relative_dates.py` - turning "2d ago" into a date
-  - `backfill_app.py` - voice-driven metadata backfill tool (see below), launched from the tray
-  - `backfill/vocabulary.py` - the spoken phrases, and the `video.action` each one records
-  - `backfill/queue.py` - the videos still missing an action, shuffled
-  - `backfill/decisions.py` - writing a video's action or discarding it as trash, and taking either back
-  - `backfill/session.py` - what a heard phrase does to the queue, and the history "undo" walks back through
-  - `backfill/work.py` - the single thread the file work runs on, in the order it was spoken
-  - `backfill/voice.py` - hands the window what `voice_core`, the family's listener, hears
-  - `backfill/window.py` - the looping player, the remaining count, and the last decision
   - `review_trash_app.py` - the tool that reviews what is sent to Trash (see below), launched from the tray
   - `review_trash/window.py` - every video sent to Trash, the one picked playing, and Restore and Delete Permanently
   - `util/player_readout.py` - keeping what the two tools' players read out of a video, its tags among it, out of every log
@@ -128,7 +120,6 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
 - Topaz ffmpeg at `C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe`
 - Topaz model directory at `C:\ProgramData\Topaz Labs LLC\Topaz Video\models`
 - PyQt6 (`pip install PyQt6`)
-- `voice_core`, the family's listener, for the backfill tool's voice commands. It brings `vosk` and `sounddevice`, and `faster-whisper` reads each command a second time before it acts. Both speech models are downloaded and cached on first use.
 
 ## Run as tray app (recommended)
 
@@ -136,7 +127,7 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
 pythonw.exe tray_app.py
 ```
 
-This starts a system tray icon. Right-click for the context menu (Open, Run Now, Pause/Resume Scheduling, Upscale Non-AI When Idle, Settings, Stats, Upscale Queue, Backfill Metadata, Review Trash, Restart, Quit) or double-click to open the main window with run history and live progress. The window's toolbar offers the same commands under the same names, Open aside, and on both Upscale Non-AI When Idle wears a switch that shows whether it is on. The menu's first line is the schedule's status: Scheduled with the time of the next run, Running, or Paused. Configure the run interval and Windows startup registration from Settings.
+This starts a system tray icon. Right-click for the context menu (Open, Run Now, Pause/Resume Scheduling, Upscale Non-AI When Idle, Settings, Stats, Upscale Queue, Review Trash, Restart, Quit) or double-click to open the main window with run history and live progress. The window's toolbar offers the same commands under the same names, Open aside, and on both Upscale Non-AI When Idle wears a switch that shows whether it is on. The menu's first line is the schedule's status: Scheduled with the time of the next run, Running, or Paused. Configure the run interval and Windows startup registration from Settings.
 
 Run history is stored as JSON files in `runs/` (gitignored). Settings are persisted to `gui_settings.json` (gitignored).
 
@@ -160,56 +151,14 @@ The OSR2 broker next door already had one: a scheduled task relaunching its tray
 
 **Quit means quit.** Quitting Evolver from its tray or its toolbar leaves a stand-down marker under `LOCALAPPDATA` and the broker leaves it down; starting Evolver again clears it. Every other way Evolver goes down leaves no marker and it comes back inside the quarter hour. `launch_evolver_if_not_running.vbs` is what the broker runs — the launcher exists for callers that have a path and no way to work out which interpreter to use.
 
-## Metadata backfill tool
-
-Most sources publish nothing about what a video actually shows. Provider exposes an action on its site and Origenerator has its gallery database, so the metadata scrape fills those in on its own; a video from Provider2, Provider3, Provider5, ComfyUI or Provider4 arrives with no `video.action` at all, and Fun Time cannot group or filter it.
-
-**Backfill Metadata...**, in the tray menu or on the main window's toolbar, opens a separate window that plays every such video — looping and muted, in the stable order it found them so a reopened session resumes where the last left off — until you say what it is. The video changes the instant you speak, and the sidecar is written after it.
-
-Videos whose action was **rejected** jump that order and are asked about first. Fun Time's "wrong action" command empties a mislabeled video's `video.action` and leaves `video.wrong_action` holding what it said, which is how this tool tells a video someone just looked at and corrected from one nobody ever labeled — and why a rejection also overrides the scraped-source skip above, since re-scraping would only assert the wrong action again. Naming the action retires the marker along with the question it stands for.
-
-Say an action, always prefixed with a camera word. The camera words are content, like the actions, so they come from the content overlay's `cameras` key; the committed example ships `side` and a placeholder initialism, `XYZ`. Every video is tagged with one of them; no action has a bare, camera-less form:
-
-| Say (action) | Action recorded |
-| --- | --- |
-| `alpha form` / `alpha` | `Alpha` |
-| `beta` | `Beta` |
-| `gamma` | `Gamma` |
-| `delta` | `Delta` |
-| `epsilon` | `Epsilon` |
-| `eta` | `Eta` |
-| `zeta` | `Zeta` |
-| `dance` / `dancing` | `Dancing` |
-| `other` | `Other` |
-
-So "side beta" records `Side Beta`, and "X-Y-Z zeta" records `XYZ Zeta` — matching the `XYZ Gamma` form the prompt scraper writes, which cases a camera word the way the overlay prefixes it, so one Fun Time filter query reaches both. Even `dance` and `other` take a camera word: "side dance" records `Side Dancing`. A camera word that is an initialism lists its spelled-out letters as an alias (`x y z ...`), and that is the form the recognizer catches, because the vosk lexicon prices each letter as its name while the one-word form is a guess at a single syllable; both are accepted, whichever way you happen to say it.
-
-Four more phrases:
-
-- `same` — record the last action again on the video now on screen, for a run that all share one action. It reaches past any intervening `skip` to the last action actually spoken, and says "nothing to repeat" if you have not named one yet
-- `skip` — not now; the video goes to the back of the queue and comes round again
-- `trash` / `trash` — move the video to `trash/`, exactly as Fun Time's "send to Trash" does. No metadata is written, and nothing deletes it: it waits there, with its `1_sorted` source, until you review it (see "Reviewing what is in Trash" below)
-- `undo` — take the last decision back, and keep saying it to walk back through the whole run
-
-Undo restores the video to the screen and reverses what the decision did on disk: a sidecar it wrote is deleted (or, if the video arrived carrying prompts, only the action is removed), and a video sent to `trash/` is reclaimed from where it landed. Undoing every decision rewinds the queue to the order it had. It works after the last video too, so a mislabeled final video is still recoverable.
-
-Three lines sit beneath the video: what is on screen now and how many videos are left; what the recognizer is hearing this moment; and what your last phrase did — the last naming its own video, which by then is not the one you are watching. The middle "hearing" line fills in as it recognizes on-script words and stays blank when what you said is not a command, so a phrase that never lands shows as a visible nothing rather than a silent one — the way to tell listening-but-unmatched from not-listening. `Esc` closes the window; whatever you have labeled is already on disk, and reopening picks up where you left off.
-
-The right of the window lists every command as a clickable button, laid out the way the vocabulary is: every action as a row with a column per camera word, then the controls. It is both the on-screen reference — no need to remember what the phrases are — and a fallback that never depends on the microphone: clicking a button drives the exact same path a spoken phrase would, so a mishearing mic or a quiet room never leaves you unable to label. Each button shows the action it records, names its spoken phrase on hover, and carries an example frame so the grid reads as a gallery you recognize at a glance. Most buttons take that frame from the first video the library already labels with the action — a compound tag like `Side Gamma, Alpha` counts for either part — while the actions the library never tags in a camera-scoped form (a side beta, say) are pinned to a hand-picked video by the content overlay's optional `curated_examples`
-(button label -> video id), read as `config.CURATED_EXAMPLES` — it names videos inside the library, so it
-lives there rather than in source, and leaving it out simply means every button takes the automatic
-match. Frames are sampled a little way into the video (past the intro, with the action actually in view), extracted once, and cached under `config.BACKFILL_THUMBNAIL_DIR`, then composited onto a fixed square so they keep their aspect ratio instead of stretching to fit. The window loads only those ready files — nothing extracts on open — and opens maximized so the whole grid fits.
-
-Actions are voiced in plain-English words because the vosk lexicon lacks most of the compounds — the same trick Fun Time uses. A spoken command acts once a second recognizer (Whisper) has read the same audio and agrees, about half a second later; a phrase the two read differently is dropped, so say it again or click its button. Audio is muted while you label, since the microphone is open the whole time. The window runs as its own process, so it can never take the tray down with it. The recognizer does not open the system default input — Windows often makes a dead virtual mic the default (a VR headset the Pimax update repointed to), which feeds vosk silence — so it briefly probes the real inputs and listens on the liveliest, logging which device it settled on. The `microphone` in `~/.haglio/settings.json`, which every app that listens reads, is a substring of the mic's name (from `python -m sounddevice`) and pins that one.
-
 ## Reviewing what is sent to Trash
 
-A video sent to Trash — by Fun Time's Funestras, by the backfill tool's `trash`, or by Genau — waits in `2_outbox/trash/` or in the `trash` folder beside Genau's flicks folder, and nothing Evolver runs deletes it. **Review Trash...**, in the tray menu or on the main window's toolbar, opens a window that lists every one of them with the folder it restores to, and plays the one you pick, looping and muted. A video sent to Trash while the window is open joins the list within a couple of seconds.
+A video sent to Trash — by Fun Time's Funestras or by Genau — waits in `2_outbox/trash/` or in the `trash` folder beside Genau's flicks folder, and nothing Evolver runs deletes it. **Review Trash...**, in the tray menu or on the main window's toolbar, opens a window that lists every one of them with the folder it restores to, and plays the one you pick, looping and muted. A video sent to Trash while the window is open joins the list within a couple of seconds.
 
 - **Restore** puts the picked videos back in the folders they were sent to Trash in, under the names they had there, each with the funscript that followed it into Trash. An upscale goes back where the upscale stage filed it, a Genau flick to its own place in Genau's flicks folder, and any other video to the folder its metadata is still filed under. A video nothing says the place of reads "can't tell", and can only be deleted.
 - **Delete Permanently** deletes the picked videos at once, without asking, and what is theirs: the `1_sorted` copy each was upscaled from, its own metadata — never the metadata of another video that shares its name — its funscripts, and a Genau flick's sound, unless another flick of that name still plays it. The `Delete` key does the same.
 
-Both say in `evolver.log` what they moved or deleted. The window runs as its own process, as the backfill tool's does.
+Both say in `evolver.log` what they moved or deleted. The window runs as its own process, so it can never take the tray down with it.
 
 ## Topaz sign-in
 
