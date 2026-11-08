@@ -568,7 +568,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
 
                 assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.FULL_LENGTH
 
-    def test_a_measured_kind_is_still_never_measured_twice(self):
+    def test_a_video_once_measured_is_never_probed_again_as_its_running_time_never_changes(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
