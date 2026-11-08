@@ -9,8 +9,10 @@ from unittest.mock import MagicMock, Mock, call, patch
 import pytest
 from app_support import haglio_settings
 from app_support.testing import start_again_stand_in, update_waiting_for
-from PyQt6.QtCore import QEvent
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QEvent, QPoint
+from PyQt6.QtGui import QHelpEvent
+from PyQt6.QtWidgets import QLabel, QMessageBox, QToolTip
+from shared_ui.tooltip_shape import shaped
 
 import config
 import content_overlay
@@ -71,6 +73,19 @@ class TestAppStartup:
         assert app._tray is not None
         assert app._window is not None
         assert app._scheduler is not None
+
+    def test_a_long_tooltip_shows_as_a_block_of_lines(self, request):
+        build_evolver_app(request)
+        label = QLabel("a stage")
+        label.setToolTip("word " * 40)
+        label.show()
+        request.addfinalizer(label.deleteLater)
+        request.addfinalizer(label.close)
+        request.addfinalizer(QToolTip.hideText)
+
+        QAPP.sendEvent(label, QHelpEvent(QEvent.Type.ToolTip, QPoint(2, 2), label.mapToGlobal(QPoint(2, 2))))
+
+        assert QToolTip.text() == shaped("word " * 40)
 
 
 class TestRetiringAnApp:
