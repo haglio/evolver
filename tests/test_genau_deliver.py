@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from app_support.flick_folder import flat_flicks_in
 
+import check_correspondence
 from tasks import genau_deliver
 from tests.temp_helpers import (
     gallery_of_videos_made_again,
@@ -15,6 +16,7 @@ from tests.temp_helpers import (
     write_sidecar,
 )
 from util import provenance, sidecar, video_kind
+from util.sidecar import upscaled_video_path
 
 GENAU_SOURCE = "example-loop-clips"
 
@@ -28,7 +30,7 @@ def _lane(root):
 
 
 def _stage_flick(outbox, sorted_dir, stem="loop_1", orient="landscape"):
-    upscaled = outbox / orient / GENAU_SOURCE / f"{stem}_topaz.mp4"
+    upscaled = upscaled_video_path(GENAU_SOURCE, orient, stem, outbox)
     upscaled.parent.mkdir(parents=True, exist_ok=True)
     upscaled.write_text("upscaled", encoding="utf-8")
     original = sorted_dir / GENAU_SOURCE / orient / f"{stem}.mp4"
@@ -52,6 +54,31 @@ class TestGenauDeliver(unittest.TestCase):
             assert delivered.is_file()
             assert delivered.read_text(encoding="utf-8") == "upscaled"
             assert not upscaled.exists()
+            assert not original.exists()
+
+    def test_a_delivered_flick_takes_its_sorted_copy_or_the_correspondence_check_reports_it(self):
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, flicks = _lane(root)
+            _stage_flick(outbox, sorted_dir)
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
+                                 METADATA_DIR=root / "metadata"):
+                genau_deliver.run()
+
+            assert check_correspondence.run(sorted_dir=sorted_dir, outbox_dir=outbox).ok
+
+    def test_a_record_that_cannot_be_written_never_undoes_the_delivery(self):
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, flicks = _lane(root)
+            _upscaled, original = _stage_flick(outbox, sorted_dir)
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
+                                 VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
+                                 METADATA_DIR=root / "metadata"),                  patch.object(genau_deliver.sidecar, "update", side_effect=OSError("read-only")):
+                result = genau_deliver.run()
+
+            assert (result.delivered, result.failed) == (1, 0)
+            assert (flicks / "2D" / "AI" / "loop_1_topaz.mp4").is_file()
             assert not original.exists()
 
     def test_the_flicks_metadata_travels_with_it_and_says_what_it_is(self):
@@ -262,6 +289,9 @@ class TestGenauDeliver(unittest.TestCase):
                                  GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  METADATA_DIR=root / "metadata"), \
                  patch.object(type(upscaled), "replace", _locked):
+                # CPython's patch.object deletes what it set: a hand-rolled save and restore of
+                # `replace`, inherited by the concrete Path class, leaves an own attribute there
+                # that silently disarms any later patch("pathlib.Path.replace").
                 result = genau_deliver.run()
 
             assert (result.delivered, result.failed) == (0, 1)
