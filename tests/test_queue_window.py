@@ -8,6 +8,7 @@ from shared_ui.colors import BLUE
 
 from gui import queue_window
 from gui.queue_window import VIDEO_MIME, UpscaleQueueWindow, dropped_video, running_time
+from tasks import nonai_encode
 from tests.gui_support import row_ground_past_its_text
 from util.upscale_queue import (
     ASKED_FOR,
@@ -115,7 +116,7 @@ class TestWhatItShows:
         assert row_ground_past_its_text(window._tree, 0) != BLUE.name()
 
 
-class TestTheArrow:
+class TestTheArrowIsTheFirstRowsAloneSinceOneVideoIsAskedForAtATime:
     def test_it_is_filled_while_the_first_row_runs_whoever_is_here(self, window):
         window.show_queue(queue(Head(ASKED_FOR, percent=2),
                                   entry("lagoon/0 unsorted/a.mp4"),
@@ -303,8 +304,42 @@ class TestADragCarryingNoVideo:
     def test_it_reads_as_an_empty_name(self):
         assert dropped_video(QMimeData()) == ""
 
+    def test_a_dragged_row_carries_its_own_video_whatever_row_is_selected(self, window):
+        window.show_queue(queue(None, *(entry(f"lagoon/0 unsorted/{name}.mp4") for name in "abc")))
+        window._tree.setCurrentItem(window._tree.topLevelItem(0))
+
+        carried = window._tree.mimeData([window._tree.topLevelItem(2)])
+
+        assert dropped_video(carried) == "lagoon/0 unsorted/c.mp4"
+
     def test_a_dragged_video_is_read_back_by_name(self):
         carried = QMimeData()
         carried.setData(VIDEO_MIME, b"lagoon/b.mp4")
 
         assert dropped_video(carried) == "lagoon/b.mp4"
+
+
+class TestAnOpenWindow:
+    def test_asks_again_on_its_own_clock_since_the_encode_moves_between_runs(self, window):
+        asked = []
+        window.refresh_wanted.connect(lambda: asked.append(True))
+
+        window.show()
+        running = window._clock.isActive()
+        window._clock.timeout.emit()
+        window.hide()
+
+        assert running
+        assert window._clock.interval() == int(
+            queue_window.ASK_AGAIN_SECONDS_WHILE_THE_ENCODE_MOVES_BETWEEN_RUNS * 1000)
+        assert asked == [True]
+        assert not window._clock.isActive()
+
+    def test_has_words_for_every_hold_that_can_keep_a_video_asked_for_waiting(self, tmp_path):
+        checks = dict(nonai_encode.busy_checks(tmp_path / "cooldown", nonai_encode.EncodeSettings(),
+                                               asked_for=True, ai_waiting=False))
+        never_hold_one_asked_for = {"user_present", "cooldown"}
+
+        assert not any(checks[hold]() for hold in never_hold_one_asked_for)
+        assert set(queue_window._HELD_BACK_WORDS) == (
+            set(checks) - never_hold_one_asked_for | {nonai_encode.LOW_DISK})

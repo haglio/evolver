@@ -12,10 +12,11 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
 )
-from shared_ui.colors import BLUE, TEXT_MUTED
+from shared_ui.colors import BLUE
 from shared_ui.icons import qt_icon
 from shared_ui.spacing import MARGIN_STANDARD
 
+from gui.status_symbols import GRAY
 from util import upscale_queue
 from util.selection_highlight import SELECTION_HIGHLIGHT
 
@@ -24,9 +25,11 @@ if TYPE_CHECKING:
 
 VIDEO_MIME = "application/x-evolver-video"
 
-_MUTED = TEXT_MUTED.name()
+# Windows colors this window, where the family's secondary text, a near-white for dark chrome,
+# would not show.
+_THE_RUN_HISTORYS_GRAY = GRAY.name()
 
-REFRESH_SECONDS = 15.0
+ASK_AGAIN_SECONDS_WHILE_THE_ENCODE_MOVES_BETWEEN_RUNS = 15.0
 
 _STATE_WORDS = {
     upscale_queue.NEXT: "Next, once you're away from the computer",
@@ -119,6 +122,8 @@ class _QueueTree(QTreeWidget):
         drag.setPixmap(self.viewport().grab(rect))
         drag.setHotSpot(QPoint(rect.width() // 10, rect.height() // 2))
         self._dragging = True
+        # QDrag.exec runs an event loop of its own, so the refresh clock goes on firing while the
+        # row is held in the air.
         try:
             drag.exec(Qt.DropAction.MoveAction)
         finally:
@@ -167,7 +172,7 @@ class UpscaleQueueWindow(QDialog):
 
         hint = QLabel("Drag to reorder; the top video is the next one upscaled. Its "
                       "arrow upscales it right away, even while you're at the computer.")
-        hint.setStyleSheet(f"color: {_MUTED}")
+        hint.setStyleSheet(f"color: {_THE_RUN_HISTORYS_GRAY}")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
@@ -182,7 +187,7 @@ class UpscaleQueueWindow(QDialog):
         self._held: UpscaleQueue | None = None
 
         self._clock = QTimer(self)
-        self._clock.setInterval(int(REFRESH_SECONDS * 1000))
+        self._clock.setInterval(int(ASK_AGAIN_SECONDS_WHILE_THE_ENCODE_MOVES_BETWEEN_RUNS * 1000))
         self._clock.timeout.connect(self.refresh_wanted)
 
     def show_queue(self, queue: UpscaleQueue) -> None:
@@ -261,7 +266,7 @@ class UpscaleQueueWindow(QDialog):
 def _arrow(head: Head | None):
     if head is None or head.state == upscale_queue.FINISHING:
         return qt_icon("play", color=Qt.GlobalColor.transparent)
-    return qt_icon("play", color=BLUE if head.runs_now else TEXT_MUTED)
+    return qt_icon("play", color=BLUE if head.runs_now else GRAY)
 
 
 def _arrow_tip(head: Head | None) -> str:
