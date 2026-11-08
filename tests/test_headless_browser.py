@@ -29,7 +29,7 @@ class TestFindBrowserExecutable(unittest.TestCase):
         assert found == second
 
 
-    def test_no_browser_installed_is_no_answer_rather_than_an_error(self):
+    def test_no_browser_installed_skips_the_scrape_rather_than_stopping_the_pipeline_run(self):
         with workspace_temp_dir() as root, patch.object(headless_browser, "_BROWSER_CANDIDATES",
                           (root / "chrome.exe",)):
             assert headless_browser.find_browser_executable() is None
