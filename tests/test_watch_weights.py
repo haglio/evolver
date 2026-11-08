@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+from app_support import video_ids
 from app_support.favorites import is_favorite, mark
 
 from tasks import watch_weights
@@ -86,6 +87,18 @@ class TestCounts(unittest.TestCase):
 
             assert _watch(upscale) == {"completions": 3, "skips": 0, "locks": 0, "weight": 2.0}
         assert result.stamped == 1
+
+    def test_fun_time_s_counts_kept_under_the_video_s_id_land_on_its_sidecar(self):
+        with _setting() as s:
+            _, upscale = s.sorted_clip("clip_a")
+            s.stats.parent.mkdir(parents=True)
+            s.stats.write_text(json.dumps({
+                video_ids.id_of(sidecar.sidecar_path(upscale)): {"completions": 3, "skips": 0, "locks": 0},
+            }), encoding="utf-8")
+
+            watch_weights.run()
+
+            assert _watch(upscale) == {"completions": 3, "skips": 0, "locks": 0, "weight": 2.0}
 
     def test_the_phone_s_viewing_is_added_to_fun_time_s(self):
         with _setting() as s:

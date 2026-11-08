@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from app_support.video_names import stable_title
 
-from util import lanes, sidecar
+from util import lanes, scene_links, sidecar
 from util.frame_hashes import SAMPLE_FPS, Match, align, frame_hashes, locate, sample_frames
 from util.library_records import VERSION_BLOCK, VERSION_GROUP_FIELD
 from util.media_files import file_size
@@ -34,7 +34,8 @@ def could_be_cut_from(clip_record: dict, scene: Path) -> bool:
 
 def record(clip: Path, scene: Path, *, offset: float) -> None:
     def record_the_scene(payload: dict) -> dict:
-        payload.setdefault("clip", {}).update(full_video=str(scene), scene_offset=offset)
+        payload["clip"] = {**scene_links.without_a_scene(payload.get("clip", {})),
+                           **scene_links.link_to(scene), "scene_offset": offset}
         return payload
 
     sidecar.update(sidecar.sidecar_path(clip), record_the_scene)
@@ -43,9 +44,9 @@ def record(clip: Path, scene: Path, *, offset: float) -> None:
 def forget(clip: Path, scene: Path) -> None:
     def drop_the_match(payload: dict) -> dict | None:
         recorded = payload.get("clip")
-        if not isinstance(recorded, dict) or recorded.get("full_video") != str(scene):
+        if not isinstance(recorded, dict) or not scene_links.names(recorded, scene):
             return None
-        recorded.pop("full_video", None)
+        recorded.pop(scene_links.SCENE_ID, None)
         recorded.pop("scene_offset", None)
         return payload
 

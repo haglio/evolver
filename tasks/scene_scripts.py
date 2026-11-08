@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 from app_support import funscript
 
 import config
-from util import ffprobe, provenance, script_library, sidecar
+from util import ffprobe, provenance, scene_links, script_library, sidecar
 from util.media_files import library_videos
 from util.stage_result import StageResult
 
@@ -28,18 +27,18 @@ def run() -> SceneScriptsResult:
     result = SceneScriptsResult()
 
     log.info("=== Stage: carved clip funscripts -> their source scenes ===")
+    videos_by_id = scene_links.videos_by_id()
     for video in library_videos(config.VIDEO_LIBRARY_DIR):
         clip = sidecar.read(sidecar.sidecar_path(video)).get("clip")
         if not isinstance(clip, dict):
             continue
 
-        scene, offset = clip.get("full_video"), clip.get("scene_offset")
-        if not scene or offset is None:
+        scene, offset = scene_links.scene_of(clip, videos_by_id), clip.get("scene_offset")
+        if scene_links.scene_id(clip) is None or offset is None:
             result.unmatched_clip += 1
             continue
 
-        scene = Path(scene)
-        if not scene.is_file():
+        if scene is None or not scene.is_file():
             result.scene_gone += 1
             continue
 

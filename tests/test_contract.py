@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
-from app_support import favorites
+from app_support import favorites, video_ids
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
 from shared_ui.orientation import ORIENTATIONS, PORTRAIT
 
@@ -69,11 +69,11 @@ class TheLibraryRecord(unittest.TestCase):
 
         assert sorted(stamped[watch.BLOCK]) == sorted(self.record["blocks"][watch.BLOCK]["fields"])
 
-    def test_a_favorite_and_its_page_are_the_ones_the_apps_that_mark_them_write(self):
-        both = [favorites.FAVORITE_KEY, favorites.PAGE_KEY]
+    def test_a_favorite_its_page_and_the_videos_id_are_the_ones_the_other_apps_write(self):
+        written = [favorites.FAVORITE_KEY, favorites.PAGE_KEY, video_ids.ID_KEY]
 
-        assert set(both) <= set(self.record["top_level_keys"])
-        assert self.record["top_level_written_by_the_reader"] == both
+        assert set(written) <= set(self.record["top_level_keys"])
+        assert self.record["top_level_written_by_the_reader"] == written
 
     def test_the_kind_the_running_time_and_the_orientation_sit_where_it_says(self):
         stamped = video_kind.oriented(

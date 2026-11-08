@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from tasks import clip_scripts
 from tests.temp_helpers import CarvedClipLibraryCase
-from util import provenance, sidecar
+from util import provenance, scene_links, sidecar
 
 
 class ClipScriptsCase(CarvedClipLibraryCase):
@@ -132,3 +132,16 @@ class TestClipScripts(ClipScriptsCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAClipStillNamingItsSceneByPath(ClipScriptsCase):
+    def test_is_moved_to_its_scenes_id_and_scripted_from_it(self):
+        scene = self.make_scene(actions=[{"at": 10_000, "pos": 0}, {"at": 10_500, "pos": 90}])
+        clip = self.make_clip(scene, clip={"full_video": str(scene), "scene_offset": 10.0})
+
+        result = self.run_stage(duration=2.0)
+
+        with self.library_overrides():
+            assert sidecar.read(sidecar.sidecar_path(clip))["clip"] == {
+                **scene_links.link_to(scene), "scene_offset": 10.0}
+        assert result.written == 1

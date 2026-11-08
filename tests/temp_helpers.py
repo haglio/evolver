@@ -25,7 +25,7 @@ from app_support.testing import (
 
 import config
 from gui.run_record import RunRecord
-from util import nonai_job, provenance
+from util import nonai_job, provenance, scene_links
 from util.media_files import partial_path
 
 CASES_OUTSIDE_THE_CHECKOUT = Path(tempfile.gettempdir()) / "evolver-tests" / "unittest"
@@ -229,7 +229,8 @@ class CarvedClipLibraryCase(unittest.TestCase):
         sidecar = self.metadata / LAGOON / "clips" / f"{name}.json"
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         if clip is None:
-            clip = {"full_video": str(scene), "scene_offset": scene_offset}
+            with self.library_overrides():
+                clip = {**scene_links.link_to(scene), "scene_offset": scene_offset}
         sidecar.write_text(json.dumps({"clip": clip}), encoding="utf-8")
         if actions is not None:
             script = self.clip_script(name)

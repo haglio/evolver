@@ -48,7 +48,7 @@
         "fields": [
           "performer",
           "source",
-          "full_video",
+          "full_video_id",
           "scene_offset"
         ]
       },
@@ -69,11 +69,13 @@
     "top_level_keys": [
       "title",
       "favorite",
-      "web_url"
+      "web_url",
+      "id"
     ],
     "top_level_written_by_the_reader": [
       "favorite",
-      "web_url"
+      "web_url",
+      "id"
     ],
     "video_kinds": [
       "genau_flick",

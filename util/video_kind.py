@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app_support import favorites
+from app_support import favorites, video_ids
 from shared_ui.orientation import ORIENTATIONS
 
 from util import provenance, watch
@@ -24,6 +24,7 @@ ORIENTATION_FIELD = "orientation"
 _OWN_FIELDS = frozenset({FIELD, DURATION_FIELD, ORIENTATION_FIELD})
 
 _STAMPS = frozenset({watch.BLOCK, provenance.BLOCK, favorites.FAVORITE_KEY, favorites.PAGE_KEY})
+_ABOUT_THE_FILE = frozenset({provenance.BLOCK, video_ids.ID_KEY})
 
 
 def free_kind(*, genau: bool, clip: bool) -> str:
@@ -67,9 +68,9 @@ def _block(payload: dict) -> dict:
 
 
 def only_the_video_itself(payload: dict) -> bool:
-    besides_the_stamps = set(payload) - _STAMPS
+    besides_the_stamps = set(payload) - _STAMPS - {video_ids.ID_KEY}
     if not besides_the_stamps:
-        return provenance.BLOCK in payload
+        return bool(_ABOUT_THE_FILE & set(payload))
     if besides_the_stamps != {BLOCK}:
         return False
     block = payload[BLOCK]

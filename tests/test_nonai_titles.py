@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tasks import nonai_titles
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util import sidecar
+from util import scene_links, sidecar
 
 
 def _touch(path: Path, body: str = "x") -> Path:
@@ -59,7 +59,7 @@ class TestNonAiTitles(unittest.TestCase):
                               / "Jane Doe - Alpha Study 3.mp4")
                 _record(clip, {"version": {"group": "Jane Doe - Alpha Study 3"},
                                "clip": {"performer": "Jane Doe", "source": "Alpha Study 3",
-                                        "full_video": str(scene)}})
+                                        **scene_links.link_to(scene)}})
 
                 nonai_titles.run()
 
@@ -80,7 +80,7 @@ class TestNonAiTitles(unittest.TestCase):
                               / "Jane Doe - Alpha Study 3.mp4")
                 _record(clip, {"version": {"group": "Jane Doe - Alpha Study 3"},
                                "clip": {"performer": "Jane Doe", "source": "Alpha Study 3",
-                                        "full_video": str(matched)}})
+                                        **scene_links.link_to(matched)}})
 
                 nonai_titles.run()
 

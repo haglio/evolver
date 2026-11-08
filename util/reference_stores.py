@@ -11,8 +11,7 @@ from app_support.json_store import read_json
 import config
 from util import lanes, sidecar
 
-GENAUMACHER_SESSION_VERSION = 1
-SCRIPTURE_PROJECT_VERSION = 1
+SESSION_VERSIONS = (1, 2)
 
 _WATCH_COUNTS = frozenset({"completions", "skips", "locks"})
 
@@ -50,13 +49,12 @@ class ReferenceStore:
 
 def discover() -> Iterator[ReferenceStore]:
     yield from _session_files(
-        config.GENAUMACHER_SESSIONS_DIR, "*.json", "Genaumacher session", GENAUMACHER_SESSION_VERSION
+        config.GENAUMACHER_SESSIONS_DIR, "*.json", "Genaumacher session"
     )
     yield from _session_files(
         config.SCRIPTURE_SESSIONS_DIR,
         "*.scripture",
         "scripture project",
-        SCRIPTURE_PROJECT_VERSION,
     )
     if config.FUN_TIME_WATCH_STATS_FILE.is_file():
         yield ReferenceStore(
@@ -101,7 +99,7 @@ def _pairing(payload: dict) -> dict:
 
 
 def _session_files(
-    directory: Path, pattern: str, label: str, version: int
+    directory: Path, pattern: str, label: str
 ) -> Iterator[ReferenceStore]:
     if not directory.is_dir():
         return
@@ -112,16 +110,13 @@ def _session_files(
             _read_video_path_field,
             _rewrite_video_path_field,
             _session_fingerprint,
-            _stamped(version),
+            _is_a_version_this_stage_reads,
         )
 
 
-def _stamped(version: int) -> Callable[[Path], str | None]:
-    def complaint(path: Path) -> str | None:
-        found = _load_json(path).get("version", version)
-        return None if found == version else f"says version {found!r}, not {version}"
-
-    return complaint
+def _is_a_version_this_stage_reads(path: Path) -> str | None:
+    found = _load_json(path).get("version", SESSION_VERSIONS[0])
+    return None if found in SESSION_VERSIONS else f"says version {found!r}, not one of {SESSION_VERSIONS}"
 
 
 def _is_counts_by_path(path: Path) -> str | None:
@@ -155,7 +150,7 @@ def _session_fingerprint(path: Path) -> tuple[float, int] | None:
 
 
 def _read_json_object_keys(path: Path) -> list[str]:
-    return list(_load_json(path))
+    return [key for key in _load_json(path) if Path(key).is_absolute()]
 
 
 def _rewrite_json_object_keys(path: Path, moves: dict[str, str]) -> None:

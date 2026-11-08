@@ -10,6 +10,8 @@ from email.utils import parsedate
 from pathlib import Path
 from urllib.parse import urlparse
 
+from app_support import video_ids
+
 import config
 from tasks import origenerator_metadata
 from util import lanes, orientation, provenance, relative_dates, sidecar, video_kind
@@ -94,7 +96,7 @@ def run(*, sorted_dir: Path | None = None,
             def keep_what_landed_first(current: dict, payload=payload) -> dict:
                 recorded = video_kind.kind_of(current)
                 kept = video_kind.stamped(payload, recorded) if recorded else payload
-                return provenance.carried_forward(current, kept)
+                return video_ids.carried_forward(current, provenance.carried_forward(current, kept))
 
             sidecar.update(output_path, keep_what_landed_first)
             result.newly_scraped += 1

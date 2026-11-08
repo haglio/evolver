@@ -7,6 +7,7 @@ from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support import video_ids
 from app_support.file_channel import write_whole
 from app_support.json_store import read_json_or_empty
 
@@ -68,10 +69,10 @@ def _records_brought_up_to_what_was_watched() -> WatchWeightsResult:
     fun_time_counts = read_json_or_empty(config.FUN_TIME_WATCH_STATS_FILE)
     for video in _played_videos():
         key = path_key(video)
-        counts = watch.add_counts(fun_time_counts.get(key), phone_counts.get(key))
 
-        def stamp_the_watching(payload: dict, counts=counts) -> dict | None:
-            stamped = watch.stamped(payload, counts)
+        def stamp_the_watching(payload: dict, key=key) -> dict | None:
+            fun_times = fun_time_counts.get(video_ids.recorded_id(payload), fun_time_counts.get(key))
+            stamped = watch.stamped(payload, watch.add_counts(fun_times, phone_counts.get(key)))
             return stamped if stamped != payload else None
 
         if sidecar.update(sidecar.sidecar_path(video), stamp_the_watching) is not None:
