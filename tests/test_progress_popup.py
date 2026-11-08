@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QMainWindow, QProgressBar
 
 from evolver import ALL_STAGES, STAGE_LABELS
-from gui.progress_popup import ProgressPopup
+from gui.progress_popup import BAR_WIDTH, ProgressPopup
 
 
 class TestPopupConstruction(unittest.TestCase):
@@ -32,6 +32,15 @@ class TestPopupConstruction(unittest.TestCase):
             if label.text() in set(STAGE_LABELS.values()):
                 with self.subTest(caption=label.text()):
                     assert label.width() >= label.fontMetrics().horizontalAdvance(label.text())
+
+    def test_the_window_is_wide_enough_that_no_caption_runs_into_its_bar(self):
+        self.popup.show()
+        widest_caption = max(self.popup.fontMetrics().horizontalAdvance(label)
+                             for label in STAGE_LABELS.values())
+        for key, bar in self.popup._bars.items():
+            with self.subTest(stage=key):
+                assert bar.width() >= BAR_WIDTH
+                assert bar.x() >= widest_caption
 
     def test_has_total_bar(self):
         assert isinstance(self.popup._total_bar, QProgressBar)
