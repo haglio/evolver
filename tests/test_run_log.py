@@ -118,6 +118,11 @@ class TestReadRun(unittest.TestCase):
     def test_the_banner_opens_what_comes_back_so_the_window_says_which_run_it_shows(self):
         assert self._read().splitlines()[0].endswith(run_log.banner(self.run_id))
 
+    def test_the_ceiling_sits_far_above_a_runs_few_kilobytes(self):
+        a_runs_usual_bytes = 4 << 10
+
+        assert 100 * a_runs_usual_bytes <= run_log.RUN_GONE_WRONG_CEILING_BYTES, "only a run gone wrong may reach the ceiling"
+
     def test_a_stretch_past_the_ceiling_says_so_instead_of_running_on(self):
         text = self._read(max_bytes=60)
 
