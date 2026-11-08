@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 import time
 from datetime import UTC, datetime
 from itertools import pairwise
+from pathlib import Path
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -52,6 +56,8 @@ _UNPAINTED = (255, 0, 255)
 _WHITE = (255, 255, 255)
 
 
+# On Qt's offscreen platform repaint() of a widget never shown sends no paint event, so the
+# chart is rendered into an image filled with _UNPAINTED, which no paint leaves behind.
 def _render(chart, w: int = 800, h: int = 400) -> QImage:
     chart.resize(w, h)
     image = QImage(w, h, QImage.Format.Format_ARGB32)
@@ -77,9 +83,13 @@ def _ink_count(image: QImage, xs: range, ys: range) -> int:
     )
 
 
+_THE_STEP_QTS_BLEND_AND_THIS_ARITHMETIC_MAY_ROUND_APART = 1
+
+
 def _is_band_fill(pixel: tuple[int, int, int], stage_key: str) -> bool:
     expected = band_fill(STAGE_COLORS[stage_key])
-    return all(abs(p - e) <= 1 for p, e in zip(pixel, expected, strict=True))
+    return all(abs(p - e) <= _THE_STEP_QTS_BLEND_AND_THIS_ARITHMETIC_MAY_ROUND_APART
+               for p, e in zip(pixel, expected, strict=True))
 
 
 class TestStackedAreaChartSeries:
@@ -143,17 +153,25 @@ def _every_ten_minutes(**seconds_by_stage: np.ndarray) -> RunHistory:
     return RunHistory(started=first_start + 600.0 * np.arange(runs), durations=durations)
 
 
+_ROWS_AROUND_THE_10_MINUTE_LINE_AT_THE_FIXED_SCALE = range(55, 81)
+_A_RUN_OF_GRAY_NO_BAND_CAN_MAKE = 60
+
+
 def _limit_line_rows(image: QImage) -> list[int]:
     rows = []
-    for y in range(55, 81):
+    for y in _ROWS_AROUND_THE_10_MINUTE_LINE_AT_THE_FIXED_SCALE:
         grays = sum(
             1
             for x in range(100, 640)
             if (c := _rgb(image, x, y))[0] == c[1] == c[2] and 150 <= c[0] <= 235
         )
-        if grays >= 60:
+        if grays >= _A_RUN_OF_GRAY_NO_BAND_CAN_MAKE:
             rows.append(y)
     return rows
+
+
+_A_SLIVER_AT_THE_FIXED_SCALE = ({"sort": 50.0}, {"sort": 50.0})
+_RAW_300_S_AT_THE_END_BUT_A_MEAN_OF_200 = ({"sort": 100.0}, {"sort": 300.0})
 
 
 class TestStackedAreaChartPainting:
@@ -179,8 +197,8 @@ class TestStackedAreaChartPainting:
         assert _ink_count(image, range(71, 690, 2), range(21, 350, 2)) > 20
 
     def test_fit_mode_rescales_the_bands_to_fill_the_chart(self):
-        historical = _render(StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0})))
-        fitted_chart = StackedAreaChart(_two_runs({"sort": 50.0}, {"sort": 50.0}))
+        historical = _render(StackedAreaChart(_two_runs(*_A_SLIVER_AT_THE_FIXED_SCALE)))
+        fitted_chart = StackedAreaChart(_two_runs(*_A_SLIVER_AT_THE_FIXED_SCALE))
         fitted_chart.set_fit(True)
         fitted = _render(fitted_chart)
         middle = _middle_of_the_plot()
@@ -188,13 +206,13 @@ class TestStackedAreaChartPainting:
         assert _is_band_fill(_rgb(fitted, middle, 185), "sort")
 
     def test_averages_mode_charts_the_running_mean_not_the_raw_run(self):
-        historical = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
-        averaged_chart = StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0}))
+        historical = _render(StackedAreaChart(_two_runs(*_RAW_300_S_AT_THE_END_BUT_A_MEAN_OF_200)))
+        averaged_chart = StackedAreaChart(_two_runs(*_RAW_300_S_AT_THE_END_BUT_A_MEAN_OF_200))
         averaged_chart.set_mode("averages")
         averaged = _render(averaged_chart)
-        newest = 800 - chart_right_margin() - 10
-        assert _is_band_fill(_rgb(historical, newest, 230), "sort")
-        assert _rgb(averaged, newest, 230) == _WHITE
+        newest_inside_the_font_measured_margin = 800 - chart_right_margin() - 10
+        assert _is_band_fill(_rgb(historical, newest_inside_the_font_measured_margin, 230), "sort")
+        assert _rgb(averaged, newest_inside_the_font_measured_margin, 230) == _WHITE
 
     def test_the_10_minute_line_appears_only_when_the_scale_reaches_it(self):
         tall = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
@@ -235,6 +253,14 @@ class TestStackedAreaChartPainting:
         widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())
 
         assert legend_width() >= widest + 22
+
+    def test_the_legend_widens_with_a_wider_font_where_a_fixed_width_would_clip(self):
+        wider = _legend_font()
+        wider.setPointSize(wider.pointSize() * 2)
+        widest = max(QFontMetrics(wider).horizontalAdvance(label) for label in STAGE_LABELS.values())
+
+        with patch("gui.stats_window._legend_font", return_value=wider):
+            assert legend_width() >= widest + 22
 
     def test_the_runs_are_dated_along_the_x_axis(self):
         image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
@@ -331,7 +357,7 @@ class TestStatsWindow:
         assert not window._averages_btn.isChecked()
         assert window._chart._mode == "historical"
 
-    def test_10m_button_starts_checked(self):
+    def test_10m_button_starts_checked_so_a_band_the_same_height_is_the_same_seconds_on_any_chart(self):
         window = StatsWindow()
         assert window._10m_btn.isChecked()
         assert not window._fit_btn.isChecked()
@@ -451,3 +477,17 @@ class TestStatsActionExists:
     def test_window_has_stats_action(self):
         window = EvolverMainWindow()
         assert window.stats_action is not None
+
+
+class TestTheStageRegistry:
+    def test_holds_plain_rgb_so_the_pipeline_reads_it_without_qt(self):
+        driver = ("import sys, content_overlay as c; c.LOCAL_CONTENT = c.EXAMPLE_CONTENT; import evolver;"
+                  "print([m for m in sys.modules if m.startswith('PyQt')]);"
+                  "print(all(isinstance(s.color, tuple) and all(isinstance(v, int) for v in s.color)"
+                  " for s in evolver.STAGES))")
+        env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+        done = subprocess.run([sys.executable, "-c", driver], cwd=Path(__file__).resolve().parents[1],
+                              env=env, capture_output=True, text=True, check=False)
+
+        assert done.returncode == 0, done.stderr
+        assert done.stdout.split() == ["[]", "True"]

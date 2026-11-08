@@ -25,8 +25,9 @@ from gui.run_record import in_display_zone
 
 STAGE_COLORS = {stage.key: QColor(*stage.color) for stage in STAGES}
 
-_Y_MAX = 700.0
 _LIMIT_SECONDS = 600.0
+_ROOM_ABOVE_THE_10_MINUTE_LINE = 100.0
+_Y_MAX = _LIMIT_SECONDS + _ROOM_ABOVE_THE_10_MINUTE_LINE
 _FEWEST_TICKS = 3
 _MOST_TICKS = 7
 _SECONDS_PER_MINUTE = 60
