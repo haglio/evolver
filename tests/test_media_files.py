@@ -47,7 +47,7 @@ class TestLibraryVideos(unittest.TestCase):
         assert found == [good]
         assert is_partial_path(partial)
 
-    def test_what_counts_as_a_video_is_read_when_it_is_asked_not_at_import(self):
+    def test_what_counts_as_a_video_is_the_repos_one_answer_read_from_config_at_the_call(self):
         with workspace_temp_dir() as root:
             mp4 = root / "clip.mp4"
             mkv = root / "clip.mkv"
