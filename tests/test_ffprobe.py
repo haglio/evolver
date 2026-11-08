@@ -19,7 +19,7 @@ from util.ffprobe import (
 )
 
 
-def _stand_in_ffprobe_process_answering_by_selector(answers: dict[str, str], calls: list | None = None):
+def _selector_answering_ffprobe(answers: dict[str, str], calls: list | None = None):
     def popen(argv, **kwargs):
         if calls is not None:
             calls.append(argv)
@@ -36,7 +36,7 @@ def _selectors(calls: list) -> list[str]:
 class TestFrameRate(unittest.TestCase):
     def test_the_first_video_streams_rate_is_read_exactly(self):
         calls = []
-        fake = _stand_in_ffprobe_process_answering_by_selector({"stream=r_frame_rate": "30000/1001"}, calls)
+        fake = _selector_answering_ffprobe({"stream=r_frame_rate": "30000/1001"}, calls)
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert frame_rate(Path("x.mp4")) == Fraction(30000, 1001)
         assert _selectors(calls) == ["stream=r_frame_rate"]
@@ -44,7 +44,7 @@ class TestFrameRate(unittest.TestCase):
 
     def test_a_rate_ffprobe_cannot_read_is_unknown(self):
         for said in ("", "N/A", "0/0"):
-            fake = _stand_in_ffprobe_process_answering_by_selector({"stream=r_frame_rate": said})
+            fake = _selector_answering_ffprobe({"stream=r_frame_rate": said})
             with self.subTest(said=said), patch("util.ffprobe.subprocess.Popen", side_effect=fake):
                 assert frame_rate(Path("x.mp4")) is None
 
@@ -52,13 +52,13 @@ class TestFrameRate(unittest.TestCase):
 class TestDurationSeconds(unittest.TestCase):
     def test_the_containers_duration_is_read_in_seconds(self):
         calls = []
-        fake = _stand_in_ffprobe_process_answering_by_selector({"format=duration": "1434.877098"}, calls)
+        fake = _selector_answering_ffprobe({"format=duration": "1434.877098"}, calls)
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert duration_seconds(Path("x.mp4")) == pytest.approx(1434.877098, abs=5e-8)
         assert _selectors(calls) == ["format=duration"]
 
     def test_a_duration_ffprobe_cannot_read_is_unknown(self):
-        fake = _stand_in_ffprobe_process_answering_by_selector({"format=duration": "N/A"})
+        fake = _selector_answering_ffprobe({"format=duration": "N/A"})
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert duration_seconds(Path("x.mp4")) is None
 
@@ -97,14 +97,14 @@ class TestAProbeGivenNoAnswer(unittest.TestCase):
 class TestVideoaiTag(unittest.TestCase):
     def test_the_topaz_tag_names_the_models_used(self):
         calls = []
-        fake = _stand_in_ffprobe_process_answering_by_selector({"format_tags=videoai": "Enhanced using iris-2"}, calls)
+        fake = _selector_answering_ffprobe({"format_tags=videoai": "Enhanced using iris-2"}, calls)
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert videoai_tag(Path("x.mp4")) == "Enhanced using iris-2"
         assert _selectors(calls) == ["format_tags=videoai"]
         assert "-select_streams" not in calls[0]
 
     def test_an_untagged_video_reads_as_empty(self):
-        fake = _stand_in_ffprobe_process_answering_by_selector({})
+        fake = _selector_answering_ffprobe({})
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert videoai_tag(Path("x.mp4")) == ""
 
@@ -112,14 +112,14 @@ class TestVideoaiTag(unittest.TestCase):
 GEOMETRY = "stream=width,height:stream_tags=rotate"
 
 
-def _geometry_csv_as_ffprobe_9_writes_it(width, height, rotate=""):
+def _ffprobe_9_geometry_csv(width, height, rotate=""):
     fields = [width, height] + ([rotate] if rotate else [])
     return ",".join(fields)
 
 
 class TestFfprobeOrientation(unittest.TestCase):
     def _orientation(self, width, height, rotate="", calls=None):
-        fake = _stand_in_ffprobe_process_answering_by_selector({GEOMETRY: _geometry_csv_as_ffprobe_9_writes_it(width, height, rotate)}, calls)
+        fake = _selector_answering_ffprobe({GEOMETRY: _ffprobe_9_geometry_csv(width, height, rotate)}, calls)
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             return orientation_of(Path("x.mp4"))
 
@@ -150,15 +150,16 @@ class TestFfprobeOrientation(unittest.TestCase):
 
 class TestVideoDimensions(unittest.TestCase):
     def _dimensions(self, width, height, rotate=""):
-        fake = _stand_in_ffprobe_process_answering_by_selector({GEOMETRY: _geometry_csv_as_ffprobe_9_writes_it(width, height, rotate)})
+        fake = _selector_answering_ffprobe({GEOMETRY: _ffprobe_9_geometry_csv(width, height, rotate)})
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             return video_dimensions(Path("x.mp4"))
 
     def test_reads_the_streams_stored_width_and_height(self):
         assert self._dimensions("1920", "1080") == (1920, 1080)
 
-    def test_a_rotated_clip_is_measured_as_stored_leaving_the_rotate_tag_to_the_caller(self):
-        assert self._dimensions("1920", "1080", rotate="90") == (1920, 1080)
+    def test_a_rotated_clip_is_measured_as_stored(self):
+        assert self._dimensions("1920", "1080", rotate="90") == (1920, 1080), (
+            "a caller that needs what the viewer sees applies the rotate tag itself")
 
     def test_none_when_a_dimension_is_missing(self):
         assert self._dimensions("", "1080") is None
@@ -170,13 +171,13 @@ class TestVideoDimensions(unittest.TestCase):
 class TestHasSound(unittest.TestCase):
     def test_a_file_with_an_audio_stream_has_sound(self):
         calls = []
-        fake = _stand_in_ffprobe_process_answering_by_selector({"stream=codec_type": "audio"}, calls)
+        fake = _selector_answering_ffprobe({"stream=codec_type": "audio"}, calls)
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             assert has_sound(Path("x.mp4"))
         assert calls[0][calls[0].index("-select_streams") + 1] == "a"
 
     def test_a_file_with_no_audio_stream_or_no_answer_has_none(self):
-        with patch("util.ffprobe.subprocess.Popen", side_effect=_stand_in_ffprobe_process_answering_by_selector({})):
+        with patch("util.ffprobe.subprocess.Popen", side_effect=_selector_answering_ffprobe({})):
             assert not has_sound(Path("x.mp4"))
         with patch("util.ffprobe.subprocess.Popen", side_effect=FileNotFoundError("ffprobe")):
             assert not has_sound(Path("x.mp4"))
@@ -185,25 +186,25 @@ class TestHasSound(unittest.TestCase):
 class TestFfprobeInvocation(unittest.TestCase):
     def test_every_probe_is_framed_for_bare_csv_output(self):
         calls = []
-        fake = _stand_in_ffprobe_process_answering_by_selector({"format=duration": "1.0"}, calls)
+        fake = _selector_answering_ffprobe({"format=duration": "1.0"}, calls)
         with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
             duration_seconds(Path("x.mp4"))
         assert calls[0][:5] == ["ffprobe", "-v", "error", "-of", "csv=p=0"]
 
-    def test_a_missing_ffprobe_is_no_answer_rather_than_a_crash_no_windowless_tool_could_show(self):
+    def test_a_missing_ffprobe_is_no_answer_not_a_crash(self):
         with patch("util.ffprobe.subprocess.Popen",
                    side_effect=FileNotFoundError("ffprobe")):
-            assert duration_seconds(Path("x.mp4")) is None
+            assert duration_seconds(Path("x.mp4")) is None, "Backfill Metadata has no console to show a crash in"
             assert video_dimensions(Path("x.mp4")) is None
             assert orientation_of(Path("x.mp4")) == "unknown"
             assert videoai_tag(Path("x.mp4")) == ""
 
-    def test_an_exit_ffprobe_calls_a_failure_is_the_same_silence_as_no_answer(self):
+    def test_a_failing_exit_is_silence_like_any_other(self):
         def failing(argv, **kwargs):
             return SimpleNamespace(communicate=lambda timeout=None: ("", None), returncode=1)
 
         with patch("util.ffprobe.subprocess.Popen", side_effect=failing):
-            assert duration_seconds(Path("x.mp4")) is None
+            assert duration_seconds(Path("x.mp4")) is None, "a non-zero exit only means it had nothing to say"
             assert videoai_tag(Path("x.mp4")) == ""
 
     def test_ffprobe_never_flashes_a_console_window(self):
