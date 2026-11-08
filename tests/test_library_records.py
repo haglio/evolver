@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 from app_support import watch_weights
 
-from tests.product_sources import PROJECT_ROOT, product_sources, strings_outside_docstrings
+from tests.product_sources import PROJECT_ROOT, literals_in, product_sources
 from util import library_records, watch
 
 _OWNER = "util/library_records.py"
 
-_SAME_WORD_ELSEWHERE = {("util/warm_gun.py", "action")}
+_THE_JOURNAL_LINES_ACT_FIELD = ("util/warm_gun.py", "action")
 
 
 def _module_level_strings(name: str) -> set[str]:
@@ -24,16 +24,15 @@ def _module_level_strings(name: str) -> set[str]:
 
 class TestWhereTheNamesComeFrom(unittest.TestCase):
     @pytest.mark.repo_check
-    def test_a_name_another_module_already_declares_is_read_from_it_never_spelled_again(self):
+    def test_names_are_read_from_their_declaring_module(self):
         declared_elsewhere = {(name, value) for name in product_sources(PROJECT_ROOT) if name != _OWNER
                               for value in _module_level_strings(name)}
-        tree = ast.parse(Path(PROJECT_ROOT, _OWNER).read_text(encoding="utf-8"))
 
         spelled_again = sorted(
             f"{_OWNER}:{node.lineno} {node.value!r}, declared in {name}"
-            for node in strings_outside_docstrings(tree)
+            for node in literals_in(_OWNER)
             for name, value in declared_elsewhere
-            if value == node.value and (name, value) not in _SAME_WORD_ELSEWHERE)
+            if value == node.value and (name, value) != _THE_JOURNAL_LINES_ACT_FIELD)
 
         assert spelled_again == []
 
