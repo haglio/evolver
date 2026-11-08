@@ -157,7 +157,7 @@ class TestReadyThumbnails(unittest.TestCase):
         scan.assert_called_once_with()
 
 
-_OVERLAY_READS_COUNTED_IN_A_FRESH_PYTHON_AFTER_CONFIG_PAID_ITS_OWN = """
+_COUNT_OVERLAY_READS = """
 import json
 from pathlib import Path
 import content_overlay
@@ -177,11 +177,11 @@ print(json.dumps({"at_import": at_import, "when_asked": when_asked}))
 
 
 class TestTheActTableIsReadWhenMainAsksForIt(unittest.TestCase):
-    def test_importing_the_tool_reads_no_overlay_and_loading_its_vocabulary_reads_one(self):
+    def test_in_a_fresh_python_after_config_the_tools_import_reads_no_overlay_and_its_vocabulary_one(self):
         env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
         env["QT_QPA_PLATFORM"] = "offscreen"
         result = subprocess.run(
-            [sys.executable, "-c", _OVERLAY_READS_COUNTED_IN_A_FRESH_PYTHON_AFTER_CONFIG_PAID_ITS_OWN],
+            [sys.executable, "-c", _COUNT_OVERLAY_READS],
             cwd=PROJECT_ROOT, env=env, capture_output=True, text=True, check=False,
         )
 

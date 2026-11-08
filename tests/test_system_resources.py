@@ -38,7 +38,7 @@ class TestAvailableRamConversion:
         )
         assert system_resources.available_ram_gb() == 6.0
 
-    def test_the_conversion_is_binary_gb_since_it_decides_whether_an_hours_long_encode_starts(self, monkeypatch):
+    def test_the_conversion_is_exactly_binary_gb_for_the_encode_start_decision(self, monkeypatch):
         monkeypatch.setattr(
             system_resources.ctypes.windll.kernel32, "GlobalMemoryStatusEx",
             _fills(ullAvailPhys=3 * 1024**3 + 512 * 1024**2),

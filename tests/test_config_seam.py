@@ -127,7 +127,7 @@ def _import_time_config_defaults(tree: ast.AST) -> list[int]:
     return lines
 
 
-class _OverlayKeysThroughBoundNamesNotComprehensionTargets(ast.NodeVisitor):
+class _OverlayKeys(ast.NodeVisitor):
     def __init__(self, prebound: dict[str, str] | None = None):
         self.paths: dict[str, str] = dict(prebound or {})
         self.keys: set[str] = set()
@@ -207,7 +207,13 @@ class _OverlayKeysThroughBoundNamesNotComprehensionTargets(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-_NAMES_ONLY_CONFIG_BINDS_TO_THE_OVERLAY = {"_CONTENT": "", "content": ""}
+_CONFIGS_OVERLAY_NAMES = {"_CONTENT": "", "content": ""}
+
+
+def _overlay_keys_of(name: str, tree: ast.AST) -> _OverlayKeys:
+    visitor = _OverlayKeys(_CONFIGS_OVERLAY_NAMES if name == "config.py" else None)
+    visitor.visit(tree)
+    return visitor
 
 
 def _run_at_import(statements: list[ast.stmt]) -> Iterator[ast.AST]:
@@ -273,10 +279,7 @@ class TestConfigSeam(unittest.TestCase):
         found: set[str] = set()
         unreadable: list[str] = []
         for name, tree in _trees().items():
-            visitor = _OverlayKeysThroughBoundNamesNotComprehensionTargets(
-                _NAMES_ONLY_CONFIG_BINDS_TO_THE_OVERLAY if name == "config.py" else None
-            )
-            visitor.visit(tree)
+            visitor = _overlay_keys_of(name, tree)
             found |= visitor.keys
             unreadable += [f"{name}:{line}" for line in visitor.unreadable]
 
@@ -294,6 +297,16 @@ class TestConfigSeam(unittest.TestCase):
                 for part in key.split("."):
                     assert part in value
                     value = value[part]
+
+    def test_a_dict_named_content_outside_config_is_not_taken_for_the_overlay(self):
+        tree = ast.parse('content = {"alpha": 1}\ncontent["alpha"]\ncontent.get("beta")\n')
+
+        assert _overlay_keys_of("tasks/alpha.py", tree).keys == set()
+
+    def test_an_acts_entrys_own_fields_are_not_taken_for_overlay_keys(self):
+        tree = ast.parse('spoken = [act["spoken"] for act in load_content()["acts"]]\n')
+
+        assert _overlay_keys_of("config.py", tree).keys == {"acts"}
 
     def test_the_example_leaves_every_optional_key_to_its_fallback_rather_than_one_computers_answer(self):
         example = json.loads(

@@ -8,11 +8,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-_TESTS_THAT_NAME_EVERYTHING_THE_PRODUCT_EXPORTS = "tests"
-_TOOLING_THE_APP_NEVER_REACHES = "tools"
+_NOT_THE_PRODUCT = ("tests", "tools")
 
 
-def _hidden_or_generated_such_as_claudes_whole_worktree_copies(name: str) -> bool:
+def _hidden_or_generated(name: str) -> bool:
     return name.startswith((".", "__"))
 
 
@@ -21,8 +20,7 @@ def product_sources(root: Path) -> list[str]:
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [
             name for name in dirnames
-            if name not in (_TESTS_THAT_NAME_EVERYTHING_THE_PRODUCT_EXPORTS, _TOOLING_THE_APP_NEVER_REACHES)
-            and not _hidden_or_generated_such_as_claudes_whole_worktree_copies(name)
+            if name not in _NOT_THE_PRODUCT and not _hidden_or_generated(name)
         ]
         found += [
             Path(dirpath, name).relative_to(root).as_posix()
