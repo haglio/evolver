@@ -159,12 +159,13 @@ def _scrape_provider_video(
     return payload
 
 
-def _candidate_urls(image_url: str, image_id: str, base_url: str) -> list[str]:
+_VIDEO_PATHS_BY_HOW_IT_WAS_MADE = ("video", "text-to-video", "image-to-video")
+
+
+def _candidate_urls(page_its_name_maps_to: str, image_id: str, base_url: str) -> list[str]:
     return [
-        image_url,
-        f"{base_url}/video/{image_id}",
-        f"{base_url}/text-to-video/{image_id}",
-        f"{base_url}/image-to-video/{image_id}",
+        page_its_name_maps_to,
+        *(f"{base_url}/{path}/{image_id}" for path in _VIDEO_PATHS_BY_HOW_IT_WAS_MADE),
     ]
 
 
