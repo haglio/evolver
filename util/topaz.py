@@ -50,6 +50,9 @@ AI_UPSCALE_T2V = Settings(
                  "keeping the soundtrack (t2v provider)"),
     keep_audio=True,
 )
+# What the non-AI videos upscaled by hand in Topaz's own window carry in their videoai tags. Where the AI
+# settings ask Topaz for vram=1 and instances=1, an unattended encode of hours beside whatever else runs takes
+# vram=0.5 and instances=0: slower, and far harder to push the computer out of memory.
 NON_AI_UPSCALE = Settings(
     name="non_ai_upscale",
     version="v001",
@@ -64,6 +67,7 @@ NON_AI_UPSCALE = Settings(
     frame=(3840, 2160),
 )
 
+# download=0: otherwise Topaz stops to fetch model files it does not need, which on a slow connection has outlasted the stage's run budget.
 AI_UPSCALE_ORIGENERATOR = Settings(
     name="ai_upscale_origenerator",
     version="v001",
@@ -88,10 +92,12 @@ RETIRED_SETTINGS = (
                          "upscale (t2v provider)")),
 )
 
-_CLOSING_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
+_REWORDED_CLOSING_PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
 
 SIGN_IN_EXPIRED = "topaz_sign_in_expired"
 
+# Topaz's ffmpeg prints these at its verbose log level only, once the sign-in the Topaz Video app saved for it has
+# run out; the last says renewing it failed and Topaz will watermark everything it makes.
 _EXPIRED_SIGN_IN_MESSAGES = (
     "Authentication token expired",
     "Authentication Failure",
@@ -101,9 +107,9 @@ _SIGN_IN_CHECK_TIMEOUT_SECONDS = 90
 
 
 def settings_noted(note: str) -> Settings | None:
-    said = _CLOSING_PARENTHETICAL.sub("", note)
+    said = _REWORDED_CLOSING_PARENTHETICAL.sub("", note)
     return next((settings for settings in (*ALL_SETTINGS, *RETIRED_SETTINGS)
-                 if _CLOSING_PARENTHETICAL.sub("", settings.videoai_tag) == said), None)
+                 if _REWORDED_CLOSING_PARENTHETICAL.sub("", settings.videoai_tag) == said), None)
 
 
 def framed(settings: Settings, orient: str, video_fps: Fraction | None = None,

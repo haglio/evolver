@@ -52,7 +52,7 @@ class TestCommand(unittest.TestCase):
             topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.NON_AI_UPSCALE)
 
 
-_THE_TRIALS_CHAIN = (
+_THE_CHAIN_A_SIDE_BY_SIDE_TRIAL_CHOSE = (
     "select='not(mod(n,7))',fps=16,"
     "tvai_up=model=rxl-1:scale=4:estimate=20:preblur=-0.4:noise=0:details=0.7:halo=0:blur=0.8:"
     "compression=0.8:blend=0:download=0:device=0:vram=1:instances=1,"
@@ -70,7 +70,7 @@ class TestTheOrigeneratorSettings(unittest.TestCase):
         turned = topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orientation.PORTRAIT,
                               video_fps=Fraction(112), generated_fps=Fraction(16))
 
-        assert turned.filter_complex == _THE_TRIALS_CHAIN
+        assert turned.filter_complex == _THE_CHAIN_A_SIDE_BY_SIDE_TRIAL_CHOSE
 
     def test_a_video_written_at_no_whole_multiple_of_its_generated_rate_keeps_every_frame(self):
         assert _frames_given_to_topaz(video_fps=Fraction(24), generated_fps=Fraction(16)) == "select='not(mod(n,1))',fps=24"
@@ -96,19 +96,25 @@ SHIPPED = {
 }
 
 
+_FILES_EVERY_COMPUTER_NAMES_ALIKE = (Path("in"), Path("out"))
+
+
+def _what_the_settings_ask_of_topaz(settings: topaz.Settings, orient: str) -> list[str]:
+    argv = topaz.command(*_FILES_EVERY_COMPUTER_NAMES_ALIKE, _turned_to_an_example_video(settings, orient))
+    return argv[argv.index("-hide_banner"):]
+
+
 def _fingerprint(settings: topaz.Settings) -> str:
-    argvs = [
-        topaz.command(Path("in"), Path("out"), _turned_to_an_example_video(settings, orient))[1:]
-        for orient in orientation.SORTED
-    ]
+    argvs = [_what_the_settings_ask_of_topaz(settings, orient) for orient in orientation.SORTED]
     return hashlib.sha256(json.dumps(argvs).encode("utf-8")).hexdigest()[:16]
 
 
 class TestRetunedSettingsOweANewVersion(unittest.TestCase):
     def test_each_settings_run_the_filters_their_version_shipped_with(self):
-        running = {(settings.name, settings.version): _fingerprint(settings) for settings in topaz.ALL_SETTINGS}
+        running = {(settings.name, settings.version): _fingerprint(settings)
+                   for settings in (*topaz.ALL_SETTINGS, *topaz.RETIRED_SETTINGS)}
 
-        assert {key: SHIPPED.get(key) for key in running} == running, "a set of settings changed under a version outputs already record: bump its version in util/topaz.py, then add the new version's fingerprint to SHIPPED"
+        assert running == SHIPPED, "a set of settings changed under a version outputs already record: bump its version in util/topaz.py, then add the new version's fingerprint to SHIPPED, and never edit a line already there, since files on disk name that version"
 
 
 class TestWhatAFilesNoteSaysMadeIt(unittest.TestCase):
@@ -124,14 +130,14 @@ class TestWhatAFilesNoteSaysMadeIt(unittest.TestCase):
 
                 assert (noted.name, noted.version, noted.keep_audio) == (retired.name, "v001", False)
 
-    def test_a_note_differing_only_in_the_name_in_parentheses_at_its_end_names_it_too(self):
+    def test_a_file_written_under_an_earlier_wording_of_the_name_in_parentheses_still_names_its_settings(self):
         note = topaz.AI_UPSCALE_T2V.videoai_tag
         written_then = note[:note.rindex("(")] + "(t2v examplesite)"
 
         assert written_then != note
         assert topaz.settings_noted(written_then) is topaz.AI_UPSCALE_T2V
 
-    def test_a_note_in_topazs_own_words_or_no_note_at_all_names_no_settings(self):
+    def test_the_note_topaz_writes_on_an_export_made_by_hand_or_no_note_at_all_names_no_settings(self):
         for note in (("Processed using apo-8 replacing duplicate frames. Enhanced using gcg-5. "
                       "4x upscale"), ""):
             with self.subTest(note=note):
