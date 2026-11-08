@@ -15,6 +15,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 from shared_ui.colors import family_palette
 from shared_ui.loading_window import Loading, LoadingCanceled
+from shared_ui.tooltip_shape import shape_long_tooltips
 
 import config
 from gui import branch_session, peer_watch, process_identity, single_instance
@@ -92,6 +93,7 @@ class EvolverApp:
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("Evolver")
         app.setPalette(family_palette(app.palette()))
+        shape_long_tooltips(app)
 
         self._checkout = config.PROJECT_DIR
         self._settings = EvolverSettings.load()
