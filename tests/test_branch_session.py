@@ -62,7 +62,7 @@ class TestWhatABranchSessionShares:
         assert [name for name in _PATHS[2:] if ordinary[name].parent != ordinary["PROJECT_DIR"]] == []
 
 
-class TestWhatABranchSessionTakesOver:
+class TestAPreviewIsTheWholeAppSinceAChangeIsJudgedByUsingIt:
     def _preview(self, request):
         with override_config(BRANCH_SESSION=True):
             return build_evolver_app(request)
