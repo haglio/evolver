@@ -52,7 +52,7 @@ class TestCommand(unittest.TestCase):
             topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.NON_AI_UPSCALE)
 
 
-_THE_CHAIN_A_SIDE_BY_SIDE_TRIAL_CHOSE = (
+_TRIAL_CHAIN = (
     "select='not(mod(n,7))',fps=16,"
     "tvai_up=model=rxl-1:scale=4:estimate=20:preblur=-0.4:noise=0:details=0.7:halo=0:blur=0.8:"
     "compression=0.8:blend=0:download=0:device=0:vram=1:instances=1,"
@@ -70,7 +70,7 @@ class TestTheOrigeneratorSettings(unittest.TestCase):
         turned = topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orientation.PORTRAIT,
                               video_fps=Fraction(112), generated_fps=Fraction(16))
 
-        assert turned.filter_complex == _THE_CHAIN_A_SIDE_BY_SIDE_TRIAL_CHOSE
+        assert turned.filter_complex == _TRIAL_CHAIN, "the chain a trial chose by comparing versions side by side; a change to it wants another such trial"
 
     def test_a_video_written_at_no_whole_multiple_of_its_generated_rate_keeps_every_frame(self):
         assert _frames_given_to_topaz(video_fps=Fraction(24), generated_fps=Fraction(16)) == "select='not(mod(n,1))',fps=24"
@@ -96,16 +96,16 @@ SHIPPED = {
 }
 
 
-_FILES_EVERY_COMPUTER_NAMES_ALIKE = (Path("in"), Path("out"))
+_PLACEHOLDER_FILES = (Path("in"), Path("out"))
 
 
-def _what_the_settings_ask_of_topaz(settings: topaz.Settings, orient: str) -> list[str]:
-    argv = topaz.command(*_FILES_EVERY_COMPUTER_NAMES_ALIKE, _turned_to_an_example_video(settings, orient))
-    return argv[argv.index("-hide_banner"):]
+def _argv_without_the_computers_paths(settings: topaz.Settings, orient: str) -> list[str]:
+    _path_to_topaz, *settings_argv = topaz.command(*_PLACEHOLDER_FILES, _turned_to_an_example_video(settings, orient))
+    return settings_argv
 
 
 def _fingerprint(settings: topaz.Settings) -> str:
-    argvs = [_what_the_settings_ask_of_topaz(settings, orient) for orient in orientation.SORTED]
+    argvs = [_argv_without_the_computers_paths(settings, orient) for orient in orientation.SORTED]
     return hashlib.sha256(json.dumps(argvs).encode("utf-8")).hexdigest()[:16]
 
 
