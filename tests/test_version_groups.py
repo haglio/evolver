@@ -59,18 +59,24 @@ class TestGroupIds:
 
         assert set(ids.values()) == {"jane-doe_540-Qv3Tn8Rd"}
 
-    def test_scenes_that_only_start_with_one_name_keep_their_own_families_and_rotation_slots(self):
+    def test_scenes_sharing_only_a_name_stay_separate_families(self):
         stems = ["Jane Doe", "Jane Doe - Cut to Length", "Jane-Doe-&-Ada-Roe-b4t7k1qz"]
 
         ids = group_ids(stems)
 
-        assert len(set(ids.values())) == 3
+        assert len(set(ids.values())) == 3, "one family is one rotation slot and one answer to which scene a clip was cut from"
 
-    def test_a_chain_of_declared_versions_is_not_followed_back_to_the_original(self):
-        ids = group_ids(["video one", "beta cut", "gamma cut"],
-                        {"gamma cut": "beta cut", "beta cut": "video one"})
+    def test_three_versions_declared_against_one_original_share_its_family(self):
+        declared = dict.fromkeys(("beta cut", "gamma cut", "delta cut"), "video one")
 
-        assert ids["gamma cut"] != ids["video one"]
+        ids = group_ids(["video one", *declared], declared)
+
+        assert set(ids.values()) == {"video one"}
+
+    def test_a_word_off_the_hand_added_list_keeps_titles_apart(self):
+        ids = group_ids(["Jane Doe Scene", "Jane Doe Scene extended"])
+
+        assert len(set(ids.values())) == 2, "each hand-added version word is one two real titles can no longer differ by"
 
     def test_a_declared_pair_whose_original_is_in_another_bucket_joins_nothing(self):
         assert group_ids(["beta cut"], {"beta cut": "video one"}) == {"beta cut": "beta cut"}

@@ -24,11 +24,11 @@ def source_stem(stem: str) -> str:
     return re.sub(r"_apo8_gcg5(?:_.*)?$", "", stem)
 
 
-_HAND_ADDED_WORDS_TWO_TITLES_CAN_NO_LONGER_DIFFER_BY = frozenset({"trimmed"})
+_HAND_ADDED_VERSION_WORDS = frozenset({"trimmed"})
 
 
 def is_version_marker(token: str) -> bool:
-    return token.strip("()").isdigit() or token in _HAND_ADDED_WORDS_TWO_TITLES_CAN_NO_LONGER_DIFFER_BY
+    return token.strip("()").isdigit() or token in _HAND_ADDED_VERSION_WORDS
 
 
 def is_processed_stem(stem: str) -> bool:
