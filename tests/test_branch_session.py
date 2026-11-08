@@ -62,7 +62,7 @@ class TestWhatABranchSessionShares:
         assert [name for name in _PATHS[2:] if ordinary[name].parent != ordinary["PROJECT_DIR"]] == []
 
 
-class TestAPreviewIsTheWholeAppSinceAChangeIsJudgedByUsingIt:
+class TestAPreviewIsTheWholeApp:
     def _preview(self, request):
         with override_config(BRANCH_SESSION=True):
             return build_evolver_app(request)
@@ -118,7 +118,7 @@ class TestHandingTheWorkBack:
             app.start()
         return app
 
-    def test_a_forgotten_preview_makes_way_for_the_usual_evolver_after_its_hour(self):
+    def test_a_forgotten_preview_hands_back_after_its_hour(self):
         session, steps = _session(preview=True)
         session.take_the_work()
 
@@ -130,14 +130,15 @@ class TestHandingTheWorkBack:
         assert steps.mock_calls == [call.gateway.let_go(), call.start_the_usual_evolver(),
                                     call.leaving()]
 
-    def test_a_run_in_flight_is_let_finish_rather_than_cut_to_the_five_seconds_a_quit_gives_its_stage(self):
+    def test_a_run_in_flight_is_let_finish(self):
         session, steps = _session(preview=True, a_run_is_going=True)
         session.take_the_work()
 
         with patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver):
             session._hand_back.timeout.emit()
 
-        assert steps.mock_calls == []
+        assert steps.mock_calls == [], (
+            "quitting gives the stage in flight only five seconds, and the run is the branch's own work")
         assert session._hand_back.isActive()
         assert session._hand_back.interval() == branch_session.HAND_BACK_RETRY_MS
 
@@ -148,7 +149,7 @@ class TestHandingTheWorkBack:
 
         assert not session._hand_back.isActive()
 
-    def test_a_quit_preview_lets_go_of_the_claim_before_the_usual_evolver_starts_or_that_one_would_open_the_previews_window(self):
+    def test_a_quit_preview_lets_go_before_starting_the_usual_evolver(self):
         session, steps = _session(preview=True)
 
         with patch("gui.branch_session.start_the_usual_evolver", steps.start_the_usual_evolver), \
@@ -156,7 +157,9 @@ class TestHandingTheWorkBack:
             session.quit()
 
         assert steps.mock_calls == [call.gateway.let_go(), call.start_the_usual_evolver(),
-                                    call.leaving()]
+                                    call.leaving()], (
+            "an Evolver from before launches spoke hands its launch to whoever holds the claim, "
+            "so a claim still held would open the preview's window")
         stood_down.assert_not_called()
 
     def test_quitting_the_usual_evolver_stands_it_down_and_leaves(self):
@@ -216,7 +219,7 @@ class TestHandingTheWorkBack:
         assert "EVOLVER_BRANCH_SESSION" not in popen.call_args.kwargs["env"]
         assert popen.call_args.kwargs["env"]["PATH"] == os.environ["PATH"]
 
-    def test_the_usual_evolver_comes_back_hidden_in_the_tray_and_only_if_none_is_running(self):
+    def test_the_usual_evolver_comes_back_hidden_in_the_tray(self):
         with override_config(LIVE_DIR=Path("C:/live/evolver")), \
              patch("gui.branch_session.subprocess.Popen") as popen:
             branch_session.start_the_usual_evolver()

@@ -822,10 +822,11 @@ class TestAnsweringLaunches:
         assert served["steps_aside_for"](single_instance.USUAL)
         assert served["steps_aside_for"](single_instance.PREVIEW)
 
-    def test_a_preview_opens_its_window_for_a_launcher_that_says_nothing_since_that_launcher_exits_on_the_connection(self, request):
+    def test_a_preview_opens_its_window_for_a_silent_launcher(self, request):
         _, served = self._run_as_first_instance(request, preview=True)
 
-        assert not served["steps_aside_for"](b"")
+        assert not served["steps_aside_for"](b""), (
+            "a silent launcher exits on the connection, so stepping aside for it leaves no Evolver")
 
     def test_what_it_registered_opens_the_window(self, request):
         app, served = self._run_as_first_instance(request)
