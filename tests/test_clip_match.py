@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+import evolver
 from tasks import clip_match
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import sidecar
@@ -84,7 +85,7 @@ def _two_cuts_sampler():
 
 
 class TestClipMatch(unittest.TestCase):
-    def test_records_the_scene_each_clip_was_cut_from(self):
+    def test_of_two_clips_naming_the_scenes_performer_only_the_one_in_its_frames_is_matched(self):
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, ONE_SCENE_TWO_CLIPS)
             scene_frames = _frames(400, seed=1)
@@ -205,7 +206,7 @@ class TestClipMatch(unittest.TestCase):
                 assert _recorded(clip)["full_video"] == str(scene)
                 assert _recorded(clip)["scene_offset"] == 10.0
 
-    def test_a_family_entry_is_measured_rather_than_told(self):
+    def test_a_family_holding_two_cuts_has_each_entry_measured_rather_than_told(self):
         with workspace_temp_dir() as root:
             non_ai, settings = _library(root, TWO_CUTS_IN_ONE_FAMILY)
 
@@ -291,6 +292,44 @@ class TestClipMatch(unittest.TestCase):
                 assert "scene_offset" not in recorded
                 assert recorded["compilation"] == "Vol3"
 
+    def test_a_clip_compared_with_every_scene_of_its_performer_is_decoded_once(self):
+        with workspace_temp_dir() as root:
+            _, settings = _library(root, TWO_SCENES_ONE_CLIP)
+            sampled = []
+
+            def sampler(video, fps):
+                sampled.append(video.name)
+                return _frames(4, seed=5)
+
+            with settings:
+                clip_match.run(fps=8.0, sampler=sampler)
+
+            assert sampled.count("Petra Vance - Scene Three 8.mp4") == 1
+
+    def test_a_clip_with_no_family_recorded_yet_is_nobodys_other_version(self):
+        with workspace_temp_dir() as root:
+            non_ai, settings = _library(root, (
+                ("scenes/Nora-Quill_540-izb4ykfa.mp4", 100, {}),
+                ("clips/Nora Quill - Brink.mp4", 60, {"clip": _clip_record(NORA)}),
+                ("clips/Nora Quill - Brink_apo8_iris2.mp4", 50, {"clip": _clip_record(NORA)}),
+            ))
+            scene = non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4"
+            alike_by_name = non_ai / "clips" / "Nora Quill - Brink_apo8_iris2.mp4"
+            scene_frames = _frames(400, seed=21)
+
+            def sampler(video, fps):
+                if video.parent.name == "scenes":
+                    return scene_frames
+                if video.name == "Nora Quill - Brink.mp4":
+                    return scene_frames[80:120]
+                return _frames(40, seed=31)
+
+            with settings:
+                clip_match.record(alike_by_name, scene, offset=99.0)
+                clip_match.run(fps=8.0, sampler=sampler)
+
+                assert _recorded(alike_by_name)["scene_offset"] == 99.0
+
     def test_a_library_with_no_clips_records_nothing(self):
         with workspace_temp_dir() as root:
             _, settings = _library(root, (("scenes/Nora-Quill_540-izb4ykfa.mp4", 100, {}),))
@@ -303,8 +342,14 @@ class TestClipMatch(unittest.TestCase):
             assert sampled == []
 
 
+class TestNotAPipelineStage(unittest.TestCase):
+    def test_it_reads_every_video_end_to_end_so_it_is_run_by_hand_and_never_by_the_pipeline(self):
+        assert "clip_match" not in evolver.ALL_STAGES
+        assert clip_match not in vars(evolver).values()
+
+
 class TestCouldBeCutFrom(unittest.TestCase):
-    def test_a_scene_naming_every_performer_is_a_candidate(self):
+    def test_a_scene_named_for_every_performer_and_a_hash_is_a_candidate(self):
         assert clip_match.could_be_cut_from(
             _clip_record(JANE_AND_ADA), Path("Jane-Doe-&-Ada-Roe-b4t7k1qz.mp4"),
         )
