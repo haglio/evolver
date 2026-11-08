@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
-from util import lanes
+from util import contract, lanes
 
 
 class TestAiVideos(unittest.TestCase):
@@ -112,6 +112,12 @@ class TestSentLanes(unittest.TestCase):
                      lib.kino_upscales / "portrait" / "origenerator"), lib.trash)
                 assert (genau_lane.upscales, genau_lane.trash) == (
                     (lib.genau_flicks / "2D" / "AI",), lib.genau_trash)
+
+    def test_the_lanes_inbox_folders_stay_out_of_the_contract_as_library_words(self):
+        with override_config(GENAU_SOURCE="example-loop-clips"):
+            published = contract.published_text()
+
+            assert [lane.source for lane in lanes.sent_lanes() if f'"{lane.source}"' in published] == []
 
 
 class TestNonAiVideos(unittest.TestCase):
