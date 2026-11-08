@@ -137,7 +137,7 @@ class TestTheUniquifier(unittest.TestCase):
         with workspace_temp_dir() as root:
             assert unique_path(root / "clip.mp4") == root / "clip.mp4"
 
-    def test_a_taken_name_gets_the_next_free_number(self):
+    def test_a_name_a_file_put_there_by_hand_already_took_gets_the_next_free_number(self):
         with workspace_temp_dir() as root:
             (root / "clip.mp4").write_bytes(b"one")
             (root / "clip (2).mp4").write_bytes(b"two")
@@ -182,8 +182,10 @@ class TestRemoveEmptyDirs(unittest.TestCase):
 
 
 class TestRemovePartialFiles(unittest.TestCase):
-    def test_takes_the_partials_and_leaves_the_rest(self):
+    def test_every_caller_hands_it_a_logger_so_it_has_no_default_for_none(self):
         assert inspect.signature(remove_partial_files).parameters["logger"].default is inspect.Parameter.empty
+
+    def test_takes_the_partials_and_leaves_the_rest(self):
         with workspace_temp_dir() as root:
             partial = partial_path(root / "clip_topaz.mp4", "clip")
             finished = root / "clip.mp4"
@@ -209,7 +211,7 @@ class TestRemovePartialFiles(unittest.TestCase):
 
 
 class TestTakeItsPlace(unittest.TestCase):
-    def test_the_replacement_is_dated_a_second_after_the_file_it_replaces(self):
+    def test_the_replacement_keeps_its_place_by_date_yet_reads_to_the_players_as_a_changed_file(self):
         with workspace_temp_dir() as root:
             old, new = root / "clip.mp4", root / "clip_new.mp4"
             old.write_bytes(b"old")
