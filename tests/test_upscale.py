@@ -25,7 +25,7 @@ from util.media_files import partial_path
 
 
 def library_dirs(root):
-    return root / "sorted", root / "kino" / "2D" / "AI", root / "kino" / "trash"
+    return root / "sorted", root / "kino" / "2D" / "AI"
 
 
 def kino_folders(out_dir):
@@ -40,7 +40,8 @@ def fake_run_ffmpeg(_in_file, tmp, _env, _settings=None, **kwargs):
 class TestUpscaleHelpers(unittest.TestCase):
     def test_an_upscale_is_made_once_it_is_in_either_orientations_folder_or_kinos_trash(self):
         with workspace_temp_dir() as root:
-            _sorted, out, trash = library_dirs(root)
+            _sorted, out = library_dirs(root)
+            trash = root / "kino" / "trash"
             (out / "landscape" / "provider").mkdir(parents=True)
             (out / "portrait" / "provider").mkdir(parents=True)
             trash.mkdir(parents=True)
@@ -79,7 +80,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_processes_dynamic_source_and_creates_out_dir(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             source = "brandnew"
             in_file = sorted_dir / source / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
@@ -96,12 +97,12 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_upscales_the_sorted_tree_it_is_given_into_the_kino_folder(self):
         with workspace_temp_dir() as root:
-            given_sorted, _, _ = library_dirs(root / "given")
+            given_sorted, _ = library_dirs(root / "given")
             given_in = given_sorted / "examplesource" / "landscape" / "clip one.mp4"
             given_in.parent.mkdir(parents=True)
             given_in.write_bytes(b"video")
 
-            ambient_sorted, ambient_out, ambient_trash = library_dirs(root / "ambient")
+            ambient_sorted, ambient_out = library_dirs(root / "ambient")
             ambient_in = ambient_sorted / "examplesource" / "landscape" / "clip two.mp4"
             ambient_in.parent.mkdir(parents=True)
             ambient_in.write_bytes(b"video")
@@ -124,7 +125,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_a_kino_folder_outside_the_library_still_upscales(self):
         with workspace_temp_dir() as root, override_config(PROVIDER_SOURCE="provider"):
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             in_file = sorted_dir / config.PROVIDER_SOURCE / "landscape" / "clip one.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -142,7 +143,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_collect_queued_videos_prioritizes_newly_sorted_files(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
 
             priority = sorted_dir / "sourceB" / "portrait" / "priority.mp4"
             backlog = sorted_dir / "sourceA" / "landscape" / "backlog.mp4"
@@ -159,7 +160,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_removes_stale_partial_outputs_before_processing(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             source = "provider2"
             in_file = sorted_dir / source / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
@@ -179,7 +180,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_the_file_an_encode_writes_until_promotion_carries_no_video_extension(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             in_file = sorted_dir / "examplesource" / "landscape" / "clip one.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -196,7 +197,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_an_encode_ffmpeg_refused_is_recorded_as_a_failure(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -210,7 +211,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_stops_early_when_budget_exceeded(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -228,7 +229,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_stops_early_on_low_disk(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -244,7 +245,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
     def test_run_records_failure_when_output_is_empty(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -268,7 +269,7 @@ ROOMY_DRIVE = 10**15
 class TestTheLowDiskWarning(unittest.TestCase):
     def runs(self, *free_bytes_each_run: int, clicked_dismiss: bool = False) -> MagicMock:
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             touch_video(sorted_dir / "src" / "landscape" / "clip.mp4")
 
             with override_config(**kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", return_value=False), \
@@ -290,7 +291,7 @@ class TestTheLowDiskWarning(unittest.TestCase):
 
     def test_a_drive_with_30_gb_free_still_upscales_a_send(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             touch_video(sorted_dir / "src" / "landscape" / "clip.mp4")
 
             with override_config(**kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
@@ -452,7 +453,7 @@ class TestIsT2vProvider(unittest.TestCase):
 class TestListeners(unittest.TestCase):
     def test_each_item_is_said_with_its_source_the_moment_it_is_filed_and_counted(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             for name in ("a", "b", "c"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -479,7 +480,7 @@ class TestListeners(unittest.TestCase):
 
     def test_a_failed_encode_is_counted_and_never_said_to_be_filed(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -499,7 +500,7 @@ class TestListeners(unittest.TestCase):
 
     def test_on_progress_not_required(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             f = sorted_dir / "src" / "landscape" / "clip.mp4"
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(b"video")
@@ -514,7 +515,7 @@ class TestListeners(unittest.TestCase):
 class TestSubprocessTimeout(unittest.TestCase):
     def test_an_encode_the_budget_stopped_is_not_counted_a_failure(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
@@ -530,7 +531,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
     def test_run_breaks_loop_after_timeout(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -547,7 +548,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
     def test_the_video_the_budget_cut_off_is_still_pending(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             for name in ("a", "b"):
                 f = sorted_dir / "src" / "landscape" / f"{name}.mp4"
                 f.parent.mkdir(parents=True, exist_ok=True)
@@ -574,7 +575,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
     def test_on_progress_reports_where_the_run_stopped(self):
         with workspace_temp_dir() as root:
-            sorted_dir, out_dir, trash_dir = library_dirs(root)
+            sorted_dir, out_dir = library_dirs(root)
             in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
             in_file.parent.mkdir(parents=True)
             in_file.write_bytes(b"video")
