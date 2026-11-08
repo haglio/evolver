@@ -34,7 +34,7 @@ class TestIsFirstInstance(unittest.TestCase):
 
             assert single_instance.InstanceGateway().claim()
 
-    def test_a_second_evolver_is_refused_while_the_first_holds_the_claim(self):
+    def test_a_second_evolver_is_refused_since_two_would_run_two_pipelines_over_one_library_and_two_presence_polls(self):
         unique = f"TestMutex_Dup_{os.getpid()}"
         with patch.object(single_instance, "_MUTEX_NAME", unique), held_mutex(unique):
             assert not single_instance.InstanceGateway().claim()
