@@ -812,10 +812,10 @@ class TestTheRecordAPageEmbeds:
 
         assert prompt_scrape._extract_provider_embedded_metadata(html, "abc").prompt == "only escaped"
 
-    def test_a_prompt_far_enough_away_belongs_to_the_next_item_and_is_not_read(self):
-        html = '{"id":"abc"}' + " " * 6_000 + '{"id":"next","prompt":"not mine"}'
+    def test_a_prompt_past_the_record_reach_is_not_read(self):
+        one_line_page = '{"id":"abc"}' + " " * 6_000 + '{"id":"next","prompt":"not mine"}'
 
-        assert prompt_scrape._extract_provider_embedded_metadata(html, "abc").prompt == ""
+        assert prompt_scrape._extract_provider_embedded_metadata(one_line_page, "abc").prompt == "", "the page's JSON has no line breaks, so only a width keeps one record from the next"
 
 
 if __name__ == "__main__":
