@@ -41,7 +41,7 @@ from tasks import (
 from tasks.origenerator_commands import DowntimeResult
 from tasks.sort import SortResult
 from tasks.upscale import UpscaleResult
-from util import run_lock, run_log, system_resources, topaz
+from util import retired_outbox, run_lock, run_log, system_resources, topaz
 from util import upscale_queue as upscale_queue_shape
 from util.stage_result import StageResult
 
@@ -335,6 +335,7 @@ def _run_stages(stages: Sequence[Stage], this_run: ThisRun, watchers: _Watchers)
     log_path = config.LOG_FILE
     log_start = run_log.size(log_path)
     log.info(run_log.banner(run_log.run_id(started_at)))
+    retired_outbox.move_into_the_lane_folders()
 
     records: list[StageRecord] = []
     try:

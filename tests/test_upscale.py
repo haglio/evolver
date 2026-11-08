@@ -608,7 +608,6 @@ class TestSettingsSelection(unittest.TestCase):
         ai_dir = video_lib / "2D" / "AI"
         sorted_dir = ai_dir / "1_sorted"
         kino = video_lib / "kino"
-        trash_dir = kino / "trash"
         meta_dir = root / "meta"
 
         in_file = sorted_dir / "provider" / "landscape" / "clip.mp4"
