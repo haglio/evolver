@@ -8,7 +8,7 @@ from unittest.mock import patch
 from app_support.flick_folder import flat_flicks_in
 
 import check_correspondence
-from tasks import genau_deliver
+from tasks import genau_deliver, upscale
 from tests.temp_helpers import (
     gallery_of_videos_made_again,
     override_config,
@@ -67,6 +67,18 @@ class TestGenauDeliver(unittest.TestCase):
 
             assert check_correspondence.run(sorted_dir=sorted_dir, outbox_dir=outbox).ok
 
+    def test_a_delivered_flick_takes_its_sorted_copy_or_the_upscale_stage_would_redo_it(self):
+        with workspace_temp_dir() as root:
+            outbox, sorted_dir, flicks = _lane(root)
+            _stage_flick(outbox, sorted_dir)
+            with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
+                                 GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
+                                 METADATA_DIR=root / "metadata"):
+                genau_deliver.run()
+
+            assert upscale.collect_queued_videos(
+                sorted_dir=sorted_dir, outbox_dir=outbox, trash_dir=root / "trash") == []
+
     def test_a_record_that_cannot_be_written_never_undoes_the_delivery(self):
         with workspace_temp_dir() as root:
             outbox, sorted_dir, flicks = _lane(root)
@@ -74,7 +86,8 @@ class TestGenauDeliver(unittest.TestCase):
             with override_config(OUT_UPSCALED_DIR=outbox, SORTED_DIR=sorted_dir,
                                  GENAU_DIR=flicks.parent, GENAU_SOURCE=GENAU_SOURCE,
                                  VIDEO_LIBRARY_DIR=root, VIDEO_SEARCH_ROOT=root,
-                                 METADATA_DIR=root / "metadata"),                  patch.object(genau_deliver.sidecar, "update", side_effect=OSError("read-only")):
+                                 METADATA_DIR=root / "metadata"), \
+                 patch.object(genau_deliver.sidecar, "update", side_effect=OSError("read-only")):
                 result = genau_deliver.run()
 
             assert (result.delivered, result.failed) == (1, 0)
