@@ -47,7 +47,7 @@ class TestLibraryVideos(unittest.TestCase):
         assert found == [good]
         assert is_partial_path(partial)
 
-    def test_what_counts_as_a_video_is_the_repos_one_answer_read_from_config_at_the_call(self):
+    def test_video_extensions_are_read_from_config_at_each_call(self):
         with workspace_temp_dir() as root:
             mp4 = root / "clip.mp4"
             mkv = root / "clip.mkv"
@@ -137,7 +137,7 @@ class TestTheUniquifier(unittest.TestCase):
         with workspace_temp_dir() as root:
             assert unique_path(root / "clip.mp4") == root / "clip.mp4"
 
-    def test_a_name_a_file_put_there_by_hand_already_took_gets_the_next_free_number(self):
+    def test_a_file_put_there_by_hand_is_never_overwritten(self):
         with workspace_temp_dir() as root:
             (root / "clip.mp4").write_bytes(b"one")
             (root / "clip (2).mp4").write_bytes(b"two")
@@ -182,7 +182,7 @@ class TestRemoveEmptyDirs(unittest.TestCase):
 
 
 class TestRemovePartialFiles(unittest.TestCase):
-    def test_every_caller_hands_it_a_logger_so_it_has_no_default_for_none(self):
+    def test_the_logger_has_no_default(self):
         assert inspect.signature(remove_partial_files).parameters["logger"].default is inspect.Parameter.empty
 
     def test_takes_the_partials_and_leaves_the_rest(self):
@@ -210,19 +210,32 @@ class TestRemovePartialFiles(unittest.TestCase):
             assert removed == 0
 
 
+_THE_OLD_FILES_DATE = 1_000_000
+
+
+def _replaced_over_a_file_of_the_old_date(root: Path) -> Path:
+    old, new = root / "clip.mp4", root / "clip_new.mp4"
+    old.write_bytes(b"old")
+    new.write_bytes(b"new")
+    os.utime(old, (_THE_OLD_FILES_DATE, _THE_OLD_FILES_DATE))
+    take_its_place(new, old)
+    assert not new.exists()
+    return old
+
+
 class TestTakeItsPlace(unittest.TestCase):
-    def test_the_replacement_keeps_its_place_by_date_yet_reads_to_the_players_as_a_changed_file(self):
+    def test_a_replacement_keeps_its_place_by_date(self):
         with workspace_temp_dir() as root:
-            old, new = root / "clip.mp4", root / "clip_new.mp4"
-            old.write_bytes(b"old")
-            new.write_bytes(b"new")
-            os.utime(old, (1_000_000, 1_000_000))
+            dated = _replaced_over_a_file_of_the_old_date(root).stat().st_mtime
 
-            take_its_place(new, old)
+        assert _THE_OLD_FILES_DATE < dated <= _THE_OLD_FILES_DATE + 1
 
-            assert old.read_bytes() == b"new"
-            assert old.stat().st_mtime == 1_000_001
-            assert not new.exists()
+    def test_a_replacement_reads_as_a_changed_file(self):
+        with workspace_temp_dir() as root:
+            replaced = _replaced_over_a_file_of_the_old_date(root)
+
+            assert replaced.read_bytes() == b"new"
+            assert replaced.stat().st_mtime != _THE_OLD_FILES_DATE
 
     def test_with_nothing_to_replace_it_keeps_its_own_date(self):
         with workspace_temp_dir() as root:
