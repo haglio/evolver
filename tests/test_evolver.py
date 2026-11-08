@@ -525,15 +525,18 @@ class TestEvolverMain:
         assert code == 1
         assert ran == []
 
-    def test_a_dependency_failure_is_logged_with_its_traceback(self, caplog):
+    def test_a_dependency_failure_is_logged_with_the_traceback_naming_the_check_that_raised(self, caplog):
+        def the_ffmpeg_check():
+            raise RuntimeError("not found")
+
         with caplog.at_level(logging.ERROR):
-            self._main(_made_up("first"),
-                       dependencies=Mock(side_effect=RuntimeError("ffprobe not found")))
+            self._main(_made_up("first"), dependencies=the_ffmpeg_check)
 
         failures = [record for record in caplog.records
                     if "Dependency check failed" in record.getMessage()]
-        assert failures
-        assert all(record.exc_info for record in failures)
+        assert len(failures) == 1
+        assert failures[0].exc_info
+        assert "the_ffmpeg_check" in logging.Formatter().formatException(failures[0].exc_info)
 
     def test_exits_zero_when_every_stage_went_well(self):
         assert self._main(_made_up("first"), _made_up("second")) == 0
@@ -546,7 +549,13 @@ class TestEvolverMain:
                           _made_up("second", run=lambda _: evolver.Skipped("cpu_busy"))) == 0
 
 
-class TestCheckDependenciesWindowSuppression:
+class TestCheckDependencies:
+    def test_an_ffprobe_that_exits_nonzero_raises_the_error_every_missing_dependency_raises(self):
+        with patch("evolver.subprocess.run", return_value=Mock(returncode=1)), \
+             patch("evolver.config.FFMPEG", Mock(is_file=Mock(return_value=True))), \
+             pytest.raises(RuntimeError, match="ffprobe"):
+            evolver.check_dependencies()
+
     def test_ffprobe_check_passes_create_no_window(self):
         with patch("evolver.subprocess.run") as mock_run, \
              patch("evolver.config.FFMPEG", Mock(is_file=Mock(return_value=True))):
