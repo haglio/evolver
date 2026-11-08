@@ -4,19 +4,19 @@ import json
 import sqlite3
 import unittest
 
-from tasks import video_labels
-from tasks.origenerator_metadata import PUBLISHED_LABELS
+from tasks import video_actions
+from tasks.origenerator_metadata import PUBLISHED_ACTIONS
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
 from tests.test_origenerator_metadata import _make_db, _row
 from util import sidecar
 
 
-def _publish_labels(db, labels_of_each_video):
+def _publish_actions(db, actions_of_each_video):
     conn = sqlite3.connect(db)
-    conn.execute(f"ALTER TABLE generations ADD COLUMN {PUBLISHED_LABELS} TEXT")
-    conn.executemany(f"UPDATE generations SET {PUBLISHED_LABELS} = ? WHERE prompt_id = ?",
-                     [(json.dumps(labels), prompt_id)
-                      for prompt_id, labels in labels_of_each_video.items()])
+    conn.execute(f"ALTER TABLE generations ADD COLUMN {PUBLISHED_ACTIONS} TEXT")
+    conn.executemany(f"UPDATE generations SET {PUBLISHED_ACTIONS} = ? WHERE prompt_id = ?",
+                     [(json.dumps(actions), prompt_id)
+                      for prompt_id, actions in actions_of_each_video.items()])
     conn.commit()
     conn.close()
 
@@ -27,14 +27,14 @@ class TestAVideoOrigeneratorMade(unittest.TestCase):
             lib = LaneLibrary(root)
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", outputs=["wan22_i2v_00001_.mp4"])])
-            _publish_labels(db, {"vid-1": ["alpha", "beta"]})
+            _publish_actions(db, {"vid-1": ["alpha", "beta"]})
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 touch_video(lib.sorted_dir / "origenerator" / "portrait" / "wan22_i2v_00001_.mp4")
                 record = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4")
                 write_sidecar(record, {"video": {"action": "Gamma"}})
 
-                video_labels.run()
+                video_actions.run()
 
                 recorded = sidecar.read(record)
 
@@ -51,13 +51,13 @@ class TestAVideoOrigeneratorBroughtInFromAnotherSite(unittest.TestCase):
             brought_in["output_files"] = json.dumps([{"filename": upscale.name,
                                                       "library_path": str(upscale)}])
             _make_db(db, [brought_in])
-            _publish_labels(db, {"site-1": ["beta"]})
+            _publish_actions(db, {"site-1": ["beta"]})
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 touch_video(lib.sorted_dir / "example-site" / "landscape" / "video one.mp4")
                 record = sidecar.sidecar_path(upscale)
                 write_sidecar(record, {"video": {"action": "Gamma"}})
 
-                video_labels.run()
+                video_actions.run()
 
                 recorded = sidecar.read(record)
 
@@ -79,7 +79,7 @@ class TestAVideoWithNoLabelsToCopy(unittest.TestCase):
                 for record in records:
                     write_sidecar(record, {"video": {"action": "Gamma", "labels": ["alpha"]}})
 
-                video_labels.run()
+                video_actions.run()
 
                 recorded = [sidecar.read(record) for record in records]
 
@@ -90,11 +90,11 @@ class TestAVideoWithNoLabelsToCopy(unittest.TestCase):
             lib = LaneLibrary(root)
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", outputs=["wan22_i2v_00001_.mp4"])])
-            _publish_labels(db, {"vid-1": ["alpha"]})
+            _publish_actions(db, {"vid-1": ["alpha"]})
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 touch_video(lib.sorted_dir / "origenerator" / "portrait" / "wan22_i2v_00001_.mp4")
 
-                video_labels.run()
+                video_actions.run()
 
                 written = sidecar.sidecar_path(
                     lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4").exists()
@@ -103,21 +103,21 @@ class TestAVideoWithNoLabelsToCopy(unittest.TestCase):
 
 
 class TestWhatARunSays(unittest.TestCase):
-    def test_it_counts_the_records_it_labeled_apart_from_those_already_carrying_their_labels(self):
+    def test_it_counts_the_records_it_gave_actions_apart_from_those_already_carrying_them(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", outputs=["wan22_i2v_00001_.mp4"]),
                           _row("vid-2", outputs=["wan22_i2v_00002_.mp4"])])
-            _publish_labels(db, {"vid-1": ["alpha"], "vid-2": ["beta"]})
+            _publish_actions(db, {"vid-1": ["alpha"], "vid-2": ["beta"]})
             with lib.config(ORIGENERATOR_DB_PATH=db):
-                for number, labels in (("1", []), ("2", ["beta"])):
+                for number, actions in (("1", []), ("2", ["beta"])):
                     touch_video(lib.sorted_dir / "origenerator" / "portrait" / f"wan22_i2v_0000{number}_.mp4")
                     write_sidecar(sidecar.sidecar_path(
                         lib.outbox / "portrait" / "origenerator" / f"wan22_i2v_0000{number}__topaz.mp4"),
-                        {"video": {"labels": labels}})
+                        {"video": {"labels": actions}})
 
-                result = video_labels.run()
+                result = video_actions.run()
 
         assert (result.copied, result.already) == (1, 1)
 
@@ -130,7 +130,7 @@ class TestWhatARunSays(unittest.TestCase):
                     lib.outbox / "portrait" / "origenerator" / "wan22_i2v_00001__topaz.mp4")
                 write_sidecar(record, {"video": {"labels": ["alpha"]}})
 
-                result = video_labels.run()
+                result = video_actions.run()
 
                 recorded = sidecar.read(record)
 

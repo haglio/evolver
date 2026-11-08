@@ -35,8 +35,8 @@ from tasks import (
     stray_files,
     unsent_videos,
     upscale,
+    video_actions,
     video_kinds,
-    video_labels,
     watch_weights,
 )
 from tasks.origenerator_commands import DowntimeResult
@@ -164,7 +164,7 @@ STAGES: tuple[Stage, ...] = (
           "Copy the actions Origenerator gives each AI video from Origenerator onto that video's sidecar "
           "-- its image's actions, then its own, then the boxes checked on it -- which Fun Time and "
           "Warm Gun filter and group by",
-          (0xEE, 0x22, 0x00), run=lambda _: video_labels.run()),
+          (0xEE, 0x22, 0x00), run=lambda _: video_actions.run()),
     Stage("sort", "Sort inbox",
           "Move AI videos from 0_inbox into 1_sorted, filed by where they came from and by portrait or landscape",
           (0x38, 0x6A, 0x9C), run=lambda _: sort.run()),
