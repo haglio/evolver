@@ -11,7 +11,7 @@ import pytest
 
 import config
 from backfill.vocabulary import load_vocabulary
-from tasks import prompt_scrape
+from tasks import prompt_scrape, upscale
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import (
     html_query,
@@ -153,7 +153,7 @@ class TestPromptScrape(unittest.TestCase):
             assert result.errors == 1
             assert result.newly_scraped == 0
 
-    def test_a_failed_scrape_leaves_its_marker_beside_the_record_never_in_it(self):
+    def test_a_failed_scrape_leaves_a_marker_beside_the_record(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
@@ -164,8 +164,11 @@ class TestPromptScrape(unittest.TestCase):
                 patch("tasks.prompt_scrape.fetch_dom", side_effect=RuntimeError("source gone")),
             ):
                 result = prompt_scrape.run()
+                read_as_text_to_video = upscale._is_t2v_provider(
+                    config.PROVIDER_SOURCE, "landscape", "fail", config.OUT_UPSCALED_DIR)
 
             assert result.errors == 1
+            assert not read_as_text_to_video, "a failure kept in the record reads to the upscale stage as a text-to-video clip"
             assert self._marker_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists()
             assert not self._mirror_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists()
 
@@ -250,7 +253,7 @@ class TestPromptScrape(unittest.TestCase):
 
             assert sidecar.read(existing)[provenance.BLOCK] == {"upscale": upscaled, provenance.GENERATION: generated}
 
-    def test_a_failure_marker_holds_its_video_back_until_someone_deletes_it(self):
+    def test_deleting_a_failure_marker_lets_the_scrape_retry(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
@@ -261,13 +264,15 @@ class TestPromptScrape(unittest.TestCase):
             with (
                 self._override(root),
                 patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom,
+                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only) as fetch_dom,
             ):
-                result = prompt_scrape.run()
+                held_back = prompt_scrape.run()
+                asked_while_marked = fetch_dom.call_count
+                marker.unlink()
+                retried = prompt_scrape.run()
 
-            assert result.skipped_failed == 1
-            assert result.newly_scraped == 0
-            fetch_dom.assert_not_called()
+            assert (held_back.skipped_failed, asked_while_marked) == (1, 0)
+            assert retried.newly_scraped == 1
 
     def test_run_scans_sorted_and_writes_metadata_at_outbox_mirror_path(self):
         with workspace_temp_dir() as root:
