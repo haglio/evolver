@@ -810,7 +810,7 @@ class TestFollowRetiredVideos(unittest.TestCase):
             assert version_script.read_text(encoding="utf-8") == '{"actions":[7]}'
             assert not orphan.exists()
 
-    def test_moves_script_beside_its_archived_video(self):
+    def test_a_script_follows_a_video_someone_archived_by_hand_rather_than_failing_every_run(self):
         with workspace_temp_dir() as root:
             video_root, script_root, archive_root = self._tree(root)
             archived_video = archive_root / "2D" / "non_AI" / "studio" / "2 retired" / "scene one.mp4"

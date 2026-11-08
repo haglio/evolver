@@ -8,14 +8,12 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 
-from app_support.video_names import strip_processing_suffixes
-
 import config
 from tasks.script_versions import (
     VersionCopies,
     ai_filing,
     copy_missing_version_scripts,
-    version_bucket,
+    version_key,
 )
 from util import lanes
 from util.alert import show_error
@@ -260,6 +258,7 @@ def _follow_retired_videos(orphans: list[Path], video_index: dict[str, list[Path
             continue
 
         try:
+            # Windows cannot rename a file across drives, and the archive is on another one.
             shutil.move(str(script_path), str(dest))
         except OSError:
             log.exception("FAILED TO FOLLOW SCRIPT TO ARCHIVE  %s  ->  %s", script_path, dest)
@@ -299,15 +298,13 @@ def _park(script_path: Path, trees: Trees) -> str:
 def _rehome_to_library_version(script_path: Path, video_index: dict[str, list[Path]],
                                archived: dict[str, list[Path]],
                                trees: Trees) -> _VersionRehome:
-    script_bucket = version_bucket(
+    the_script_s_versions = version_key(
         trees.videos / script_path.relative_to(trees.scripts), trees.videos)
-    normalized = strip_processing_suffixes(script_path.stem)
     siblings = [
         video_path
         for matches in video_index.values()
         for video_path in matches
-        if strip_processing_suffixes(video_path.stem) == normalized
-        and version_bucket(video_path, trees.videos) == script_bucket
+        if version_key(video_path, trees.videos) == the_script_s_versions
         and not script_path_for_video(video_path).exists()
     ]
     if not siblings:
