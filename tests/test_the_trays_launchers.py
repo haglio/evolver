@@ -48,7 +48,7 @@ def test_a_restart_from_the_window_is_the_same_tray_showing_it():
 
 
 @on_windows
-def test_a_preview_is_the_same_tray_as_a_branch_session_with_the_primarys_overlay():
+def test_a_preview_is_the_same_tray_as_a_branch_session_with_the_primarys_untracked_overlay_copied_in_at_every_start():
     report = dry_run(PREVIEW_LAUNCHER)
 
     primary = REPO_ROOT.parents[2]
@@ -56,3 +56,10 @@ def test_a_preview_is_the_same_tray_as_a_branch_session_with_the_primarys_overla
     assert report.values("environment") == ["EVOLVER_BRANCH_SESSION=1"]
     assert report.value("copy") == (
         f"{primary / 'content.local.json'} > {REPO_ROOT / 'content.local.json'}")
+
+
+@on_windows
+def test_every_launcher_runs_pythonw_so_no_console_window_opens_beside_the_tray():
+    launchers = (TRAY_LAUNCHER, SHORTCUT_LAUNCHER, IF_NOT_RUNNING_LAUNCHER, SHOWING_LAUNCHER, PREVIEW_LAUNCHER)
+
+    assert {Path(dry_run(launcher).value("interpreter")).name for launcher in launchers} == {"pythonw.exe"}
