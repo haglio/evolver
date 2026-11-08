@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from app_support import favorites
+from app_support import favorites, video_ids
 from shared_ui.orientation import ORIENTATIONS
 
-from util import video_kind, watch
+from util import scene_links, video_kind, watch
 from util.sidecar import WRONG_ACTION_FIELD
 
 VIDEO_BLOCK = video_kind.BLOCK
@@ -29,7 +29,7 @@ SOURCE_IMAGE_FIELDS = (
 )
 
 CLIP_BLOCK = "clip"
-CLIP_FIELDS = ("performer", "source", "full_video", "scene_offset")
+CLIP_FIELDS = ("performer", "source", scene_links.SCENE_ID, "scene_offset")
 
 VERSION_BLOCK = "version"
 VERSION_GROUP_FIELD = "group"
@@ -41,6 +41,7 @@ WATCH_WEIGHT_FIELD = "weight"
 TITLE_KEY = "title"
 FAVORITE_KEY = favorites.FAVORITE_KEY
 PAGE_KEY = favorites.PAGE_KEY
+ID_KEY = video_ids.ID_KEY
 
 
 def declaration() -> dict:
@@ -64,8 +65,8 @@ def declaration() -> dict:
                 "fields": [*WATCH_COUNT_FIELDS, WATCH_WEIGHT_FIELD],
             },
         },
-        "top_level_keys": [TITLE_KEY, FAVORITE_KEY, PAGE_KEY],
-        "top_level_written_by_the_reader": [FAVORITE_KEY, PAGE_KEY],
+        "top_level_keys": [TITLE_KEY, FAVORITE_KEY, PAGE_KEY, ID_KEY],
+        "top_level_written_by_the_reader": [FAVORITE_KEY, PAGE_KEY, ID_KEY],
         "video_kinds": list(VIDEO_KINDS),
         "video_orientations": list(ORIENTATIONS),
     }

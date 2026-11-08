@@ -4,11 +4,12 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support import video_ids
 from app_support.video_names import clip_title, version_group_of
 
-from util import sidecar
+from util import scene_links, sidecar
 from util.library_records import TITLE_KEY as TITLE_FIELD
-from util.media_files import is_finalized_video_file, path_key
+from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
 from util.stage_result import StageResult
 
@@ -22,22 +23,20 @@ class NonAiTitleResult(StageResult):
     written: int = 0
 
 
-def _scene_matched(payload: dict) -> str:
+def _scene_matched(payload: dict) -> str | None:
     clip = payload.get("clip")
-    if not isinstance(clip, dict):
-        return ""
-    return str(clip.get("full_video", "") or "")
+    return scene_links.scene_id(clip) if isinstance(clip, dict) else None
 
 
 def titles_by_family(payloads: dict[Path, dict]) -> dict[str, str]:
-    family_by_path = {path_key(video): version_group_of(payload)
-                      for video, payload in payloads.items()}
+    family_by_id = {given: version_group_of(payload) for payload in payloads.values()
+                    if (given := video_ids.recorded_id(payload)) is not None}
     titles: dict[str, str] = {}
     for payload in payloads.values():
         title = clip_title(payload)
         if not title:
             continue
-        for family in (version_group_of(payload), family_by_path.get(path_key(_scene_matched(payload)))):
+        for family in (version_group_of(payload), family_by_id.get(_scene_matched(payload))):
             if family:
                 titles[family] = title
     return titles

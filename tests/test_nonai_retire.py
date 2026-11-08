@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from app_support import funscript
+from app_support import funscript, video_ids
 
 from tests.temp_helpers import (
     make_video,
@@ -179,6 +179,25 @@ class TestCarryMetadata(unittest.TestCase):
             assert carried["video"] == {"action": "alpha"}
             assert carried["clip"] == {"compilation": "Volume One", "index": 1}
             assert "version" not in carried
+
+    def test_the_upscale_keeps_its_own_id_since_it_is_another_file(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "scene one.mp4")
+            out = make_video(
+                non_ai / "lagoon" / "3_good_to_go" / "processed" / "scene one_apo8_iris2.mp4"
+            )
+
+            with override_config(**overrides):
+                write_sidecar(sidecar.sidecar_path(source), {"video": {"action": "alpha"}})
+                originals = video_ids.id_of(sidecar.sidecar_path(source))
+                upscales = video_ids.id_of(sidecar.sidecar_path(out))
+
+                nonai_retire.carry_metadata(source, out)
+
+                assert video_ids.recorded_id(sidecar.read(sidecar.sidecar_path(out))) == upscales
+            assert upscales != originals
 
     def test_carrying_the_same_record_twice_writes_nothing_the_second_time(self):
         with workspace_temp_dir() as root:

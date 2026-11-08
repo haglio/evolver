@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from app_support import video_ids
 
 import config
 from tasks import prompt_scrape, upscale
@@ -209,6 +210,23 @@ class TestPromptScrape(unittest.TestCase):
 
             assert (result.newly_scraped, result.already_scraped) == (1, 0)
             assert video_kind.kind_of(sidecar.read(existing)) == video_kind.SHORT, "the kind already recorded would cost another ffprobe to learn again"
+
+    def test_the_id_the_video_was_given_before_its_scrape_survives_it(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
+            given = video_ids.id_of(existing)
+
+            with (
+                self._override(root),
+                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
+                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only),
+            ):
+                result = prompt_scrape.run()
+
+            assert result.newly_scraped == 1
+            assert video_ids.recorded_id(sidecar.read(existing)) == given
 
     def test_an_upscale_stamp_survives_a_retried_scrape(self):
         upscaled = provenance.reconstructed("evolver", method="ai_upscale")

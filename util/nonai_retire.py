@@ -4,6 +4,8 @@ import logging
 import shutil
 from pathlib import Path
 
+from app_support import video_ids
+
 import config
 from util import script_library, sidecar
 from util.library_moves import MIRRORS, move_its_records
@@ -11,7 +13,7 @@ from util.nonai_library import bucket_of, stage_dirs
 
 log = logging.getLogger(__name__)
 
-_FILE_SCOPED_SIDECAR_KEYS = frozenset({"version"})
+_FILE_SCOPED_SIDECAR_KEYS = frozenset({"version", video_ids.ID_KEY})
 
 
 def carry_metadata(source: Path, out: Path) -> bool:

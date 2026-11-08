@@ -357,7 +357,7 @@ class TestAShapeThisStageWasNotWrittenForStillParses(unittest.TestCase):
             was_at = str(temp / "videos" / "2D" / "other" / "clip.mp4")
             session = _write_json(
                 temp / "sessions" / "Clip.json",
-                {"version": 2, "session_name": "Clip", "video_path": was_at},
+                {"version": 3, "session_name": "Clip", "video_path": was_at},
             )
 
             with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions"):
@@ -383,6 +383,23 @@ class TestAShapeThisStageWasNotWrittenForStillParses(unittest.TestCase):
 
             assert json.loads(session.read_text(encoding="utf-8"))["video_path"] == str(moved_to)
             assert result.refused == 0
+
+    def test_a_session_naming_its_video_by_id_is_neither_refused_nor_rewritten(self):
+        with workspace_temp_dir() as temp:
+            named = {"version": 2, "session_name": "Clip", "video_id": "an id"}
+            session = _write_json(temp / "sessions" / "Clip.json", named)
+            project = _write_json(temp / "projects" / "Clip.scripture", {"version": 2, **named})
+            stats = _write_json(temp / "state" / "watch_stats.json",
+                                {"an id": {"completions": 1, "skips": 0, "locks": 0}})
+
+            with _stores_under(temp, GENAUMACHER_SESSIONS_DIR=temp / "sessions",
+                               SCRIPTURE_SESSIONS_DIR=temp / "projects",
+                               FUN_TIME_WATCH_STATS_FILE=stats):
+                result = reference_sync.run()
+
+            assert json.loads(session.read_text(encoding="utf-8")) == named
+            assert json.loads(project.read_text(encoding="utf-8")) == {"version": 2, **named}
+            assert (result.refused, result.checked, result.unresolved) == (0, 0, 0)
 
     def test_a_project_stamped_with_a_version_this_stage_does_not_know_is_left_alone(self):
         with workspace_temp_dir() as temp:

@@ -5,15 +5,20 @@ import unittest
 from pathlib import Path
 
 import numpy as np
+from app_support import video_ids
 
 import evolver
 from tasks import clip_match
 from tests.temp_helpers import override_config, workspace_temp_dir
-from util import sidecar
+from util import scene_links, sidecar
 from util.frame_hashes import SAMPLE_HEIGHT, SAMPLE_WIDTH
 
 NORA = "Nora Quill"
 JANE_AND_ADA = "Jane Doe, Ada Roe"
+
+
+def _id(video: Path) -> str:
+    return video_ids.id_of(sidecar.sidecar_path(video))
 
 
 def _frames(count: int, seed: int) -> np.ndarray:
@@ -103,10 +108,10 @@ class TestClipMatch(unittest.TestCase):
                 scene = non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4"
                 cut_from_it = non_ai / "clips" / "Nora Quill - Nights of Nonsense 8.mp4"
                 assert result.matched == 1
-                assert _recorded(cut_from_it)["full_video"] == str(scene)
+                assert scene_links.scene_id(_recorded(cut_from_it)) == _id(scene)
                 assert _recorded(cut_from_it)["scene_offset"] == 10.0
                 other = non_ai / "clips" / "Nora Quill - Scene Three 3.mp4"
-                assert "full_video" not in _recorded(other)
+                assert scene_links.SCENE_ID not in _recorded(other)
 
     def test_the_clips_own_record_survives_the_answer(self):
         with workspace_temp_dir() as root:
@@ -175,7 +180,7 @@ class TestClipMatch(unittest.TestCase):
                 scene = non_ai / "scenes" / "Petra-Vance_540-paci21ck.mp4"
                 clip = non_ai / "clips" / "Petra Vance - Scene Three 8.mp4"
                 assert result.matched == 1
-                assert _recorded(clip)["full_video"] == str(scene)
+                assert scene_links.scene_id(_recorded(clip)) == _id(scene)
                 assert _recorded(clip)["scene_offset"] == 10.0
 
     def test_matches_a_scene_bucketed_under_a_shared_version_group(self):
@@ -203,7 +208,7 @@ class TestClipMatch(unittest.TestCase):
                 scene = non_ai / "scenes" / "Jane-Doe-&-Ada-Roe-b4t7k1qz-old_iris2.mp4"
                 clip = non_ai / "clips" / "Jane Doe, Ada Roe - Load Bearing 2.mp4"
                 assert result.matched == 1
-                assert _recorded(clip)["full_video"] == str(scene)
+                assert scene_links.scene_id(_recorded(clip)) == _id(scene)
                 assert _recorded(clip)["scene_offset"] == 10.0
 
     def test_a_family_holding_two_cuts_has_each_entry_measured_rather_than_told(self):
@@ -215,9 +220,9 @@ class TestClipMatch(unittest.TestCase):
 
                 bigger = _recorded(non_ai / "clips" / "Nora Quill - Brink.mp4")
                 smaller = _recorded(non_ai / "clips" / "Nora Quill - Brink (2).mp4")
-                assert bigger["full_video"] == str(non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4")
+                assert scene_links.scene_id(bigger) == _id(non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4")
                 assert bigger["scene_offset"] == 10.0
-                assert smaller["full_video"] == str(non_ai / "scenes" / "Nora-Quill-2_720-qq7mnbet.mp4")
+                assert scene_links.scene_id(smaller) == _id(non_ai / "scenes" / "Nora-Quill-2_720-qq7mnbet.mp4")
                 assert smaller["scene_offset"] == 25.0
 
     def test_a_family_entry_that_is_another_encode_still_gets_the_answer(self):
@@ -239,7 +244,7 @@ class TestClipMatch(unittest.TestCase):
 
                 scene = non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4"
                 for name in ("Nora Quill - Brink.mp4", "Nora Quill - Brink_apo8_iris2.mp4"):
-                    assert _recorded(non_ai / "clips" / name)["full_video"] == str(scene)
+                    assert scene_links.scene_id(_recorded(non_ai / "clips" / name)) == _id(scene)
 
     def test_a_wrong_match_an_earlier_run_wrote_is_dropped(self):
         with workspace_temp_dir() as root:
@@ -247,17 +252,16 @@ class TestClipMatch(unittest.TestCase):
             stale = (root / "metadata" / "2D" / "non_AI" / "clips"
                      / "Nora Quill - Brink (2).json")
             payload = json.loads(stale.read_text(encoding="utf-8"))
-            payload["clip"].update(
-                full_video=str(non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4"),
-                scene_offset=10.0,
-            )
+            payload["clip"].update(full_video_id=video_ids.id_of(
+                root / "metadata" / "2D" / "non_AI" / "scenes" / "Nora-Quill_540-izb4ykfa.json"),
+                scene_offset=10.0)
             stale.write_text(json.dumps(payload), encoding="utf-8")
 
             with settings:
                 clip_match.run(fps=8.0, sampler=_two_cuts_sampler())
 
                 recorded = _recorded(non_ai / "clips" / "Nora Quill - Brink (2).mp4")
-                assert recorded["full_video"] == str(non_ai / "scenes" / "Nora-Quill-2_720-qq7mnbet.mp4")
+                assert scene_links.scene_id(recorded) == _id(non_ai / "scenes" / "Nora-Quill-2_720-qq7mnbet.mp4")
                 assert recorded["compilation"] == "Vol3"
 
     def test_a_family_entry_in_no_scene_at_all_is_left_with_nothing(self):
@@ -269,11 +273,12 @@ class TestClipMatch(unittest.TestCase):
                 ("clips/Nora Quill - Brink (2).mp4", 50,
                  {"clip": _clip_record(NORA), "version": {"group": "Nora Quill - Brink"}}),
             ))
-            scene = non_ai / "scenes" / "Nora-Quill_540-izb4ykfa.mp4"
             stale = (root / "metadata" / "2D" / "non_AI" / "clips"
                      / "Nora Quill - Brink (2).json")
             payload = json.loads(stale.read_text(encoding="utf-8"))
-            payload["clip"].update(full_video=str(scene), scene_offset=99.0)
+            payload["clip"].update(full_video_id=video_ids.id_of(
+                root / "metadata" / "2D" / "non_AI" / "scenes" / "Nora-Quill_540-izb4ykfa.json"),
+                scene_offset=99.0)
             stale.write_text(json.dumps(payload), encoding="utf-8")
             scene_frames = _frames(400, seed=21)
 
@@ -288,7 +293,7 @@ class TestClipMatch(unittest.TestCase):
                 clip_match.run(fps=8.0, sampler=sampler)
 
                 recorded = _recorded(non_ai / "clips" / "Nora Quill - Brink (2).mp4")
-                assert "full_video" not in recorded
+                assert scene_links.SCENE_ID not in recorded
                 assert "scene_offset" not in recorded
                 assert recorded["compilation"] == "Vol3"
 
@@ -386,7 +391,7 @@ class TestRecordAndForget(unittest.TestCase):
                 clip_match.record(clip, scene, offset=808.25)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
-                assert payload["clip"] == {"compilation": "Vol3", "index": 5, "performer": NORA, "full_video": str(scene), "scene_offset": 808.25}
+                assert payload["clip"] == {"compilation": "Vol3", "index": 5, "performer": NORA, **scene_links.link_to(scene), "scene_offset": 808.25}
                 assert payload["video"] == {"action": "Alpha"}
 
     def test_forget_leaves_a_match_to_another_scene_alone(self):
@@ -402,7 +407,7 @@ class TestRecordAndForget(unittest.TestCase):
                 clip_match.record(clip, one, offset=4.0)
                 clip_match.forget(clip, another)
 
-                assert _recorded(clip)["full_video"] == str(one)
+                assert scene_links.scene_id(_recorded(clip)) == _id(one)
 
     def test_neither_leaves_anything_beside_the_sidecar(self):
         with workspace_temp_dir() as root:
