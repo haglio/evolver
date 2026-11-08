@@ -30,7 +30,8 @@ SOURCE_IMAGE_FIELDS = (
 )
 
 CLIP_BLOCK = "clip"
-CLIP_FIELDS = ("performer", "source", scene_links.SCENE_ID, "scene_offset")
+CLIP_FIELDS_WRITTEN_WHEN_A_CLIP_IS_CUT = ("performer", "source")
+CLIP_FIELDS_THE_CLIP_MATCH_ADDS = (scene_links.SCENE_ID, "scene_offset")
 
 VERSION_BLOCK = "version"
 VERSION_GROUP_FIELD = "group"
@@ -60,7 +61,7 @@ def promised_to_fun_time() -> dict:
                 "written_by_the_reader": list(VIDEO_FIELDS_FUN_TIME_WRITES),
             },
             SOURCE_IMAGE_BLOCK: {"fields": list(SOURCE_IMAGE_FIELDS)},
-            CLIP_BLOCK: {"fields": list(CLIP_FIELDS)},
+            CLIP_BLOCK: {"fields": [*CLIP_FIELDS_WRITTEN_WHEN_A_CLIP_IS_CUT, *CLIP_FIELDS_THE_CLIP_MATCH_ADDS]},
             VERSION_BLOCK: {"fields": [VERSION_GROUP_FIELD]},
             WATCH_BLOCK: {
                 "fields": [*WATCH_COUNT_FIELDS, WATCH_WEIGHT_FIELD],
