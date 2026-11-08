@@ -6,16 +6,27 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import scripts_sync
+from tests.product_sources import config_names_read
 from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
 
 
+def _places_pointed_away(video_root, script_root) -> dict:
+    return {"VIDEO_LIBRARY_DIR": video_root, "SCRIPT_LIBRARY_DIR": script_root,
+            "NONAI_RETIRED_ROOT": None, "VR_VIDEO_DIR": None,
+            "UNMATCHED_SCRIPTS_DIR": script_root.parent / "unmatched_scripts",
+            "GENERATED_SCRIPTS_DIR": script_root.parent / "generated"}
+
+
 def library_overrides(video_root, script_root, **extra):
-    overrides = {"VIDEO_LIBRARY_DIR": video_root, "SCRIPT_LIBRARY_DIR": script_root,
-                     "NONAI_RETIRED_ROOT": None, "VR_VIDEO_DIR": None,
-                     "UNMATCHED_SCRIPTS_DIR": script_root.parent / "unmatched_scripts",
-                     "GENERATED_SCRIPTS_DIR": script_root.parent / "generated"}
-    overrides.update(extra)
-    return override_config(**overrides)
+    return override_config(**{**_places_pointed_away(video_root, script_root), **extra})
+
+
+class TestThePlacesTheseTestsRead(unittest.TestCase):
+    def test_every_place_the_stage_reads_is_pointed_away(self):
+        read = config_names_read("tasks/scripts_sync.py") - {"FUNSCRIPT_EXTENSION"}
+        pointed_away = set(_places_pointed_away(Path("videos"), Path("scripts")))
+
+        assert read - pointed_away == set(), "a place left as configured is the real library or archive, walked by whichever test forgot it"
 
 
 def _write(*paths: Path) -> None:

@@ -25,7 +25,7 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
-def _every_store_pointed_away_from_its_real_place(temp: Path) -> dict:
+def _stores_pointed_away(temp: Path) -> dict:
     unused = temp / "no-such-store"
     return {
         "VIDEO_SEARCH_ROOT": temp / "videos",
@@ -41,16 +41,16 @@ def _every_store_pointed_away_from_its_real_place(temp: Path) -> dict:
 
 @contextmanager
 def _stores_under(temp: Path, **used):
-    with override_config(**{**_every_store_pointed_away_from_its_real_place(temp), **used}):
+    with override_config(**{**_stores_pointed_away(temp), **used}):
         yield
 
 
 class TestTheStoresTheseTestsRead(unittest.TestCase):
-    def test_every_store_this_stage_reads_is_pointed_away_from_another_app_s_real_file(self):
+    def test_every_store_the_stage_reads_is_pointed_away(self):
         read = config_names_read("util/reference_stores.py", "tasks/reference_sync.py")
-        pointed_away = set(_every_store_pointed_away_from_its_real_place(Path("anywhere")))
+        pointed_away = set(_stores_pointed_away(Path("anywhere")))
 
-        assert read - pointed_away == set()
+        assert read - pointed_away == set(), "a store left at its real place is another app's real file, read and rewritten by the suite"
 
 
 @contextmanager
