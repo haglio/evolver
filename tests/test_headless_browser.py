@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+import config
 from tests.temp_helpers import workspace_temp_dir
 from util import headless_browser
 
@@ -29,10 +30,17 @@ class TestFindBrowserExecutable(unittest.TestCase):
         assert found == second
 
 
-    def test_no_browser_installed_skips_the_scrape_rather_than_stopping_the_pipeline_run(self):
+    def test_no_browser_installed_is_no_answer(self):
         with workspace_temp_dir() as root, patch.object(headless_browser, "_BROWSER_CANDIDATES",
                           (root / "chrome.exe",)):
-            assert headless_browser.find_browser_executable() is None
+            assert headless_browser.find_browser_executable() is None, (
+                "the scrape skips this run; an error would stop the whole pipeline run")
+
+
+class TestTheRenderBudget(unittest.TestCase):
+    def test_the_render_budget_sits_well_inside_the_run_limit(self):
+        assert headless_browser._VIRTUAL_TIME_BUDGET_MS / 1000 <= config.PIPELINE_WALL_TIMEOUT_SECONDS / 10, (
+            "a stalled page has to end well inside the pipeline's own ceiling")
 
 
 class TestFetchDom(unittest.TestCase):

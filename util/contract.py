@@ -9,7 +9,7 @@ from util.media_files import PARTIAL_MARKER
 
 CONTRACT_FILE = "evolver_contract.json"
 
-_THE_CHECKOUT_EVERY_READER_ALREADY_FINDS = Path(__file__).resolve().parent.parent
+_EVOLVER_CHECKOUT = Path(__file__).resolve().parent.parent
 
 
 def library_relative() -> dict[str, str]:
@@ -20,7 +20,7 @@ def _relative_to_the_private_library_root(path: Path) -> str:
     return path.relative_to(config.LIBRARY_ROOT).as_posix()
 
 
-def what_origenerator_and_fun_time_read() -> dict:
+def published_for_origenerator_and_fun_time() -> dict:
     return {
         "library_relative": library_relative(),
         "partial_marker": PARTIAL_MARKER,
@@ -32,11 +32,11 @@ def what_origenerator_and_fun_time_read() -> dict:
 
 
 def published_text() -> str:
-    return json.dumps(what_origenerator_and_fun_time_read(), indent=2) + "\n"
+    return json.dumps(published_for_origenerator_and_fun_time(), indent=2) + "\n"
 
 
 def contract_path(root: Path | None = None) -> Path:
-    return (root if root is not None else _THE_CHECKOUT_EVERY_READER_ALREADY_FINDS) / CONTRACT_FILE
+    return (root if root is not None else _EVOLVER_CHECKOUT) / CONTRACT_FILE
 
 
 def publish(root: Path | None = None) -> Path:

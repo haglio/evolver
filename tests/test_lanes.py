@@ -113,11 +113,12 @@ class TestSentLanes(unittest.TestCase):
                 assert (genau_lane.upscales, genau_lane.trash) == (
                     (lib.genau_flicks / "2D" / "AI",), lib.genau_trash)
 
-    def test_the_lanes_inbox_folders_stay_out_of_the_contract_as_library_words(self):
+    def test_no_lane_folder_is_published_in_the_contract(self):
         with override_config(GENAU_SOURCE="example-loop-clips"):
             published = contract.published_text()
 
-            assert [lane.source for lane in lanes.sent_lanes() if f'"{lane.source}"' in published] == []
+            assert [lane.source for lane in lanes.sent_lanes() if f'"{lane.source}"' in published] == [], (
+                "a lane's folder is library vocabulary each app reads from its own settings")
 
 
 class TestNonAiVideos(unittest.TestCase):
