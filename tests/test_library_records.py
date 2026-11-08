@@ -5,8 +5,10 @@ import unittest
 from pathlib import Path
 
 import pytest
+from app_support import watch_weights
 
 from tests.product_sources import PROJECT_ROOT, product_sources, strings_outside_docstrings
+from util import library_records, watch
 
 _OWNER = "util/library_records.py"
 
@@ -34,6 +36,16 @@ class TestWhereTheNamesComeFrom(unittest.TestCase):
             if value == node.value and (name, value) not in _SAME_WORD_ELSEWHERE)
 
         assert spelled_again == []
+
+
+class TestTheWatchBlock(unittest.TestCase):
+    def test_the_weight_this_repo_stamps_is_the_one_shuffled_playlists_draw_by(self):
+        stamped = watch.stamped({}, {"completions": 3, "skips": 0, "locks": 0})
+
+        drawn_by = watch_weights.weight_of(stamped)
+
+        assert drawn_by == stamped[watch.BLOCK][library_records.WATCH_WEIGHT_FIELD]
+        assert drawn_by != watch_weights.NEUTRAL_WEIGHT
 
 
 if __name__ == "__main__":
