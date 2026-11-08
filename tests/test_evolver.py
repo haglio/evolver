@@ -53,13 +53,13 @@ def _made_up(key: str, run=None) -> evolver.Stage:
                          (0x10, 0x20, 0x30), run=run or (lambda _: _Done()))
 
 
-def _a_lock_of_its_own():
+def _a_lock_the_running_evolver_does_not_hold():
     return override_config(PIPELINE_LOCK_FILE=Path(tempfile.gettempdir()) / "evolver-tests"
                            / f"pipeline-{uuid.uuid4().hex}.lock")
 
 
 def _run(*stages: evolver.Stage, **listeners) -> evolver.PipelineResult:
-    with _a_lock_of_its_own():
+    with _a_lock_the_running_evolver_does_not_hold():
         return evolver.run_pipeline(stages=stages, **listeners)
 
 
@@ -236,8 +236,8 @@ class TestTheListOfStagesRunsItself:
         assert not result.has_errors
 
     def test_duration_seconds_is_positive(self):
-        ticks = itertools.count(start=1.0, step=1.0)
-        with patch("evolver.time.monotonic", lambda: next(ticks)):
+        a_clock_finer_than_any_mocked_run = itertools.count(start=1.0, step=1.0)
+        with patch("evolver.time.monotonic", lambda: next(a_clock_finer_than_any_mocked_run)):
             result = _run(_made_up("first"))
 
         assert result.duration_seconds > 0.0
@@ -531,7 +531,7 @@ class TestTheCorrespondenceCheck:
 
 class TestEvolverMain:
     def _main(self, *stages: evolver.Stage, dependencies=None) -> int:
-        with _a_lock_of_its_own(), patch("evolver.setup_logging"), \
+        with _a_lock_the_running_evolver_does_not_hold(), patch("evolver.setup_logging"), \
              patch("evolver.check_dependencies", dependencies or Mock()), \
              pytest.raises(SystemExit) as exited:
             evolver.main(stages=stages)
