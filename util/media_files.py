@@ -69,6 +69,8 @@ def reachable(folder: Path) -> bool:
 
 
 def listed_videos(root: Path):
+    # On pCloud, asking about one file can block for good, while listing its
+    # folder answers at once.
     try:
         entries = list(os.scandir(root))
     except OSError:
@@ -85,7 +87,8 @@ _IN_USE_WAIT_SECONDS = 0.2
 
 
 def retry_while_in_use[T](action: Callable[[], T]) -> T:
-    # Windows refuses to move or delete a file a player still has open.
+    # Windows refuses to move or delete a file a player still has open, and a
+    # player told to let go of one closes it a moment later, on a thread of its own.
     return retried_while_held(action, attempts=_IN_USE_TRIES, delay_s=_IN_USE_WAIT_SECONDS)
 
 
