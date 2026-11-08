@@ -19,6 +19,14 @@ from tests.gui_support import QAPP
 
 
 class TestIsFirstInstance(unittest.TestCase):
+    def test_the_claim_and_the_pipe_keep_the_names_every_evolver_already_running_uses(self):
+        assert (single_instance._MUTEX_NAME, single_instance._PIPE_NAME) == (
+            "EvolverTrayApp_SingleInstance", "EvolverTrayApp_ShowWindow")
+
+    def test_a_mutex_windows_would_not_make_is_a_refusal_to_run(self):
+        with patch("gui.single_instance.try_acquire_mutex", return_value=None):
+            assert not single_instance.InstanceGateway().claim()
+
     def test_the_first_evolver_to_ask_is_given_the_claim(self):
         unique = f"TestMutex_{os.getpid()}"
         with patch.object(single_instance, "_MUTEX_NAME", unique):
@@ -81,7 +89,7 @@ def _ask(launch: bytes) -> Answer | None:
     return single_instance.InstanceGateway().ask(launch, until=time.monotonic() + 10.0)
 
 
-def in_the_background(work):
+def on_a_thread_while_this_one_pumps_the_stand_ins_answers(work):
     done = []
     thread = threading.Thread(target=lambda: done.append(work()), daemon=True)
     thread.start()
@@ -175,7 +183,7 @@ class TestAskingTheRunningOne(unittest.TestCase):
         with patch.object(single_instance, "_PIPE_NAME", _unique("Aside")):
             running = Listening(steps_aside_for=lambda launch: launch == single_instance.PREVIEW)
             try:
-                answer = in_the_background(
+                answer = on_a_thread_while_this_one_pumps_the_stand_ins_answers(
                     lambda: _ask(single_instance.PREVIEW))
                 _pump_until(lambda: running.stepped_aside)
             finally:
@@ -188,7 +196,7 @@ class TestAskingTheRunningOne(unittest.TestCase):
         with patch.object(single_instance, "_PIPE_NAME", _unique("Show")):
             running = Listening()
             try:
-                answer = in_the_background(
+                answer = on_a_thread_while_this_one_pumps_the_stand_ins_answers(
                     lambda: _ask(single_instance.USUAL))
                 _pump_until(lambda: running.shown)
             finally:
@@ -227,7 +235,7 @@ class TestAskingTheRunningOne(unittest.TestCase):
         with patch.object(single_instance, "_PIPE_NAME", _unique("Gone")):
             running = Listening(steps_aside_for=lambda launch: True)
             try:
-                in_the_background(
+                on_a_thread_while_this_one_pumps_the_stand_ins_answers(
                     lambda: _ask(single_instance.PREVIEW))
                 _pump_until(lambda: running.stepped_aside)
                 later = _ask(single_instance.PREVIEW)
@@ -235,6 +243,18 @@ class TestAskingTheRunningOne(unittest.TestCase):
                 running.close()
 
         assert later is None
+
+    def test_a_pipe_that_cannot_listen_is_logged_not_shown_since_this_evolver_still_works(self):
+        never_listening = QLocalServer()
+        gateway = single_instance.InstanceGateway()
+
+        with (patch("gui.single_instance.running_copy.listen", return_value=never_listening),
+              self.assertLogs("gui.single_instance", "ERROR") as logged):
+            gateway.serve_launches(steps_aside_for=lambda launch: False,
+                                   on_show=lambda: None, on_step_aside=lambda: None)
+
+        assert single_instance._PIPE_NAME in logged.output[0]
+        assert gateway._launches is never_listening
 
     def test_the_listener_is_held_past_the_call_that_made_it(self):
         with patch.object(single_instance, "_PIPE_NAME", _unique("Held")):
@@ -246,6 +266,9 @@ class TestAskingTheRunningOne(unittest.TestCase):
 
 
 class TestTakingOver(unittest.TestCase):
+    def test_a_launch_waits_past_the_fifteen_seconds_a_starved_evolver_took_and_the_five_its_stage_is_given(self):
+        assert single_instance._PATIENCE_SECONDS > 15 + 5
+
     def test_with_nobody_running_the_launch_is_evolver(self):
         with patch.object(single_instance, "_MUTEX_NAME", _unique("FreeMutex")),              patch.object(single_instance, "_PIPE_NAME", _unique("FreePipe")):
             outcome = single_instance.InstanceGateway().take_over(
@@ -258,7 +281,7 @@ class TestTakingOver(unittest.TestCase):
         with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("ShowPipe")),              held_mutex(mutex):
             running = Listening()
             try:
-                outcome = in_the_background(lambda: single_instance.InstanceGateway().take_over(
+                outcome = on_a_thread_while_this_one_pumps_the_stand_ins_answers(lambda: single_instance.InstanceGateway().take_over(
                     single_instance.USUAL, end_the_unanswering=False))
             finally:
                 running.close()
@@ -272,7 +295,7 @@ class TestTakingOver(unittest.TestCase):
             running = Listening(steps_aside_for=lambda launch: True)
             running.stepped_aside = _Calls(holder.let_go)
             try:
-                outcome = in_the_background(lambda: single_instance.InstanceGateway().take_over(
+                outcome = on_a_thread_while_this_one_pumps_the_stand_ins_answers(lambda: single_instance.InstanceGateway().take_over(
                     single_instance.PREVIEW, end_the_unanswering=True))
             finally:
                 running.close()
@@ -313,7 +336,7 @@ class TestTakingOver(unittest.TestCase):
 
             try:
                 with process_terminated(side_effect=terminate):
-                    outcome = in_the_background(
+                    outcome = on_a_thread_while_this_one_pumps_the_stand_ins_answers(
                         lambda: single_instance.InstanceGateway().take_over(
                             single_instance.PREVIEW, end_the_unanswering=True))
             finally:
@@ -344,13 +367,13 @@ class TestTakingOver(unittest.TestCase):
 
         assert outcome == single_instance.Outcome.CLAIMED
 
-    def test_the_usual_launch_leaves_an_evolver_that_never_answers_alone(self):
+    def test_the_usual_launch_leaves_an_evolver_that_never_answers_alone_since_one_that_old_opened_its_window_on_the_connection(self):
         mutex = _unique("OldMutex")
         with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("OldPipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 0.5),              held_mutex(mutex):
             mute = Unanswering()
             try:
                 with process_terminated() as terminate:
-                    outcome = in_the_background(
+                    outcome = on_a_thread_while_this_one_pumps_the_stand_ins_answers(
                         lambda: single_instance.InstanceGateway().take_over(
                             single_instance.USUAL, end_the_unanswering=False))
             finally:
