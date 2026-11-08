@@ -53,13 +53,13 @@ class TestProjectRoots(unittest.TestCase):
 
 
 class TestRetiredRoot(unittest.TestCase):
-    def test_unset_means_keep_it_in_the_library(self):
+    def test_unset_keeps_the_original_in_the_buckets_own_2_folder_as_filed_by_hand(self):
         assert config.retired_root({}) is None
 
     def test_an_empty_value_counts_as_unset(self):
         assert config.retired_root({"retired_root": ""}) is None
 
-    def test_reads_the_archive_from_the_overlay(self):
+    def test_an_archive_in_the_overlay_takes_originals_off_the_drive_the_encodes_fill(self):
         assert config.retired_root({"retired_root": "A:/cold storage"}) == Path("A:/cold storage")
 
 
@@ -161,7 +161,7 @@ class TestProjectDir(unittest.TestCase):
 
             assert found == stayed
 
-    def test_a_sibling_that_is_not_installed_still_resolves_to_a_path(self):
+    def test_a_sibling_that_is_not_installed_still_resolves_to_a_path_so_importing_config_never_crashes(self):
         with workspace_temp_dir() as temp:
             found = config.project_dir("gamma_app", (temp / "workspace", temp / "old"))
 
@@ -188,7 +188,7 @@ class TestLiveDir(unittest.TestCase):
 
             assert found == temp / "worktree"
 
-    def test_a_branch_session_uses_the_checkout_the_live_app_runs_from(self):
+    def test_a_branch_session_shows_the_production_checkouts_real_run_history_and_queues(self):
         with workspace_temp_dir() as temp:
             live = temp / "workspace" / "evolver"
             live.mkdir(parents=True)
@@ -223,15 +223,11 @@ class TestSiblingPathsUseTheProjectRoots(unittest.TestCase):
         assert config.FUN_TIME_WATCH_STATS_FILE.is_relative_to(config.FUN_TIME_PROJECT_DIR)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestWarmGunJournalDirs(unittest.TestCase):
-    def test_the_library_holds_the_journal_when_the_overlay_says_nothing(self):
+    def test_the_synced_library_is_the_journals_home_when_the_overlay_says_nothing(self):
         assert config.warm_gun_journal_dirs({}, Path("L:/library/app_data/warm_gun")) == (Path("L:/library/app_data/warm_gun"),)
 
-    def test_the_folder_the_phone_still_writes_to_is_read_as_well(self):
+    def test_the_outbox_the_phone_writes_to_until_it_is_retired_is_read_as_well(self):
         assert config.warm_gun_journal_dirs({"warm_gun_outbox": "S:/WarmGun"}, Path("L:/library/app_data/warm_gun")) == (Path("L:/library/app_data/warm_gun"), Path("S:/WarmGun"))
 
     def test_an_empty_value_counts_as_unset(self):
@@ -242,3 +238,7 @@ class TestWarmGunJournalDirs(unittest.TestCase):
 
     def test_with_none_named_the_phone_has_no_folder_of_its_own(self):
         assert config.warm_gun_outbox({"warm_gun_outbox": ""}) is None
+
+
+if __name__ == "__main__":
+    unittest.main()
