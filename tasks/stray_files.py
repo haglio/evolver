@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 _EXTENSION_SEPARATORS = (" ", "_", "-")
 
-_FILES_WINDOWS_WRITES_INTO_A_FOLDER_BY_ITSELF = frozenset({"desktop.ini", "thumbs.db", ".ds_store"})
+_OS_WRITTEN_FILES = frozenset({"desktop.ini", "thumbs.db", ".ds_store"})
 
 
 @dataclass
@@ -60,7 +60,7 @@ def run() -> StrayFilesResult:
 
 
 def _handle(path: Path) -> _Handled:
-    if _is_video(path) or is_partial_path(path) or path.name.lower() in _FILES_WINDOWS_WRITES_INTO_A_FOLDER_BY_ITSELF:
+    if _is_video(path) or is_partial_path(path) or path.name.lower() in _OS_WRITTEN_FILES:
         return _Handled()
 
     repaired, renamed = _repair_extension(path)
