@@ -9,7 +9,7 @@ from pathlib import Path
 import config
 from tasks import nonai_encode, nonai_progress, nonai_request
 from tasks.nonai_encode import EncodeSettings, StartAttempt
-from tasks.nonai_files import StageFiles, stage_lock
+from tasks.nonai_files import StageFiles, run_poll_and_window_lock
 from tasks.nonai_queue import add_to_skip_list, relpath
 from util import (
     ffprobe,
@@ -91,7 +91,7 @@ def run(mode: RunMode | None = None, files: StageFiles | None = None,
     result = NonAiUpscaleResult()
     log.info("=== Stage: upscale non-AI library ===")
 
-    with stage_lock:
+    with run_poll_and_window_lock:
         job = nonai_job.load_job(files.job)
         if job is None:
             job = nonai_encode.adopt_orphan(files.job)
@@ -151,12 +151,12 @@ def throttle_to_presence(*, job_file: Path | None = None,
                          settings: EncodeSettings | None = None) -> str:
     job_file = StageFiles.configured(job=job_file).job
     settings = EncodeSettings() if settings is None else settings
-    if not stage_lock.acquire(blocking=False):
+    if not run_poll_and_window_lock.acquire(blocking=False):
         return ""
     try:
         return _match_presence(job_file, settings)
     finally:
-        stage_lock.release()
+        run_poll_and_window_lock.release()
 
 
 def _match_presence(job_file: Path, settings: EncodeSettings) -> str:
@@ -182,7 +182,7 @@ def foreign_topaz_running(*, job_file: Path | None = None) -> bool:
 @contextmanager
 def frozen_for_ai_videos(*, job_file: Path | None = None) -> Iterator[None]:
     job_file = StageFiles.configured(job=job_file).job
-    with stage_lock:
+    with run_poll_and_window_lock:
         job = nonai_job.load_job(job_file)
         was_running = job is not None and not job.suspended and job.is_running()
         if was_running:
@@ -234,7 +234,7 @@ def _conclude(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings) -
     out = job.out
     expected = job.expected_duration
     actual = ffprobe.duration_seconds(tmp) if tmp.is_file() else None
-    finished = actual and expected and actual >= settings.complete_duration_fraction * expected
+    finished = actual and expected and actual >= settings.died_partway_if_covering_less_than * expected
     archive = config.NONAI_RETIRED_ROOT
     if finished and archive is not None and not reachable(archive):
         log.warning("The upscale of %s is finished and waits until %s can be reached to take "

@@ -4,7 +4,7 @@ import logging
 
 from tasks import nonai_encode, nonai_queue
 from tasks.nonai_encode import EncodeSettings, StartAttempt
-from tasks.nonai_files import StageFiles, stage_lock
+from tasks.nonai_files import StageFiles, run_poll_and_window_lock
 from tasks.nonai_queue import relpath
 from util import nonai_job
 
@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 def request_now(video: str) -> None:
     files = StageFiles.configured()
-    with stage_lock:
+    with run_poll_and_window_lock:
         own = _put_ahead(video, files, "you asked for another video now")
         if own is not None:
             _take_over(own, files)
@@ -25,14 +25,14 @@ def request_now(video: str) -> None:
 
 def put_first(video: str) -> None:
     files = StageFiles.configured()
-    with stage_lock:
+    with run_poll_and_window_lock:
         _put_ahead(video, files, "you put another video first")
         log.info("Put %s first in the non-AI upscale queue.", video)
 
 
 def withdraw_request() -> None:
     files = StageFiles.configured()
-    with stage_lock:
+    with run_poll_and_window_lock:
         nonai_job.clear_request(files.request)
         job = nonai_job.load_job(files.job)
         if job is not None and job.withdraw_the_ask():
