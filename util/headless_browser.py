@@ -12,7 +12,7 @@ _BROWSER_CANDIDATES = (
 )
 
 # Chrome virtual time, not wall clock: the browser fast-forwards its timers.
-_VIRTUAL_TIME_TO_RENDER_WELL_INSIDE_THE_PIPELINES_LIMIT_MS = 10000
+_VIRTUAL_TIME_BUDGET_MS = 10000
 
 
 def find_browser_executable() -> Path | None:
@@ -24,7 +24,7 @@ def find_browser_executable() -> Path | None:
 
 def fetch_dom(url: str, browser: Path, *, profile_dir: Path) -> str:
     profile_dir.mkdir(parents=True, exist_ok=True)
-    proc = _a_browser_that_exits_with_its_one_page(
+    proc = subprocess.run(
         [
             str(browser),
             "--headless=new",
@@ -33,17 +33,17 @@ def fetch_dom(url: str, browser: Path, *, profile_dir: Path) -> str:
             "--disable-crash-reporter",
             "--no-first-run",
             f"--user-data-dir={profile_dir}",
-            f"--virtual-time-budget={_VIRTUAL_TIME_TO_RENDER_WELL_INSIDE_THE_PIPELINES_LIMIT_MS}",
+            f"--virtual-time-budget={_VIRTUAL_TIME_BUDGET_MS}",
             "--dump-dom",
             url,
         ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
     )
     if proc.returncode != 0:
         stderr = proc.stderr.strip() or f"exit {proc.returncode}"
         raise RuntimeError(f"Browser DOM dump failed for {url}: {stderr}")
     return proc.stdout
-
-
-def _a_browser_that_exits_with_its_one_page(argv: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                          check=False)
