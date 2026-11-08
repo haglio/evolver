@@ -319,7 +319,7 @@ class EvolverApp:
     def _shutdown(self):
         self._instance.stop_serving()
         self._background.stop()
-        self._runs.wait_for_exit(5000)
+        self._runs.wait_for_exit()
         self._scheduler.stop()
         self._peer_timer.stop()
         self._update_timer.stop()

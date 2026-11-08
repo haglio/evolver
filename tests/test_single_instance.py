@@ -13,7 +13,7 @@ from unittest.mock import patch
 from app_support.testing import process_terminated
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
-from gui import single_instance
+from gui import run_controller, single_instance
 from gui.single_instance import Answer
 from tests.gui_support import QAPP
 
@@ -50,6 +50,9 @@ class TestIsFirstInstance(unittest.TestCase):
             assert not single_instance.InstanceGateway().claim(), (
                 "two Evolvers run two pipelines over one library, and two presence polls "
                 "freeze the one encode twice and thaw it once")
+
+
+_A_STARVED_EVOLVERS_SLOWEST_ANSWER_SECONDS = 15.0
 
 
 class held_mutex:
@@ -270,8 +273,9 @@ class TestAskingTheRunningOne(unittest.TestCase):
 
 
 class TestTakingOver(unittest.TestCase):
-    def test_a_launch_waits_past_the_fifteen_seconds_a_starved_evolver_took_and_the_five_its_stage_is_given(self):
-        assert single_instance._PATIENCE_SECONDS > 15 + 5
+    def test_patience_outlasts_a_starved_answer_and_the_stages_grace(self):
+        assert single_instance._PATIENCE_SECONDS > (
+            _A_STARVED_EVOLVERS_SLOWEST_ANSWER_SECONDS + run_controller.STAGE_GRACE_SECONDS)
 
     def test_with_nobody_running_the_launch_is_evolver(self):
         with patch.object(single_instance, "_MUTEX_NAME", _unique("FreeMutex")),              patch.object(single_instance, "_PIPE_NAME", _unique("FreePipe")):
