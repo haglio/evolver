@@ -169,6 +169,7 @@ class EvolverApp:
         return not self._session.is_preview and not self._runs.is_running and not any(on_screen)
 
     def start(self) -> None:
+        # Windows' taskbar reads a process's app identity once, as that process's first window appears.
         process_identity.claim(self._app)
         self._window.refresh_history()
         self._tray.show()
