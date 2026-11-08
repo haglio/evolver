@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import ast
-from pathlib import Path
-
 import pytest
 from app_support.video_names import UPSCALE_SUFFIX, strip_processing_suffixes
 
-from tests.product_sources import PROJECT_ROOT, product_sources, strings_outside_docstrings
+from tests.product_sources import PROJECT_ROOT, literals_in, product_sources
 from util.versions import (
     is_processed_stem,
     is_upscaled_stem,
@@ -64,9 +61,8 @@ class TestOnlyOneModuleSpellsIt:
         for name in product_sources(PROJECT_ROOT):
             if name == "util/versions.py":
                 continue
-            tree = ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
             offenders += [
-                f"{name}:{node.lineno}" for node in strings_outside_docstrings(tree)
+                f"{name}:{node.lineno}" for node in literals_in(name)
                 if UPSCALE_SUFFIX in node.value
             ]
 

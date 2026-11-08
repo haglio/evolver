@@ -61,3 +61,7 @@ def gui_modules_imported_by(module) -> set[str]:
     modules = {node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
     modules |= {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
     return {module for module in modules if module == "gui" or module.startswith("gui.")}
+
+
+def literals_in(name: str) -> Iterator[ast.Constant]:
+    return strings_outside_docstrings(ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8")))
