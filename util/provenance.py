@@ -11,7 +11,12 @@ UPSCALE_NON_AI = "upscale_non_ai"
 CLIP_SCRIPTS = "clip_scripts"
 SCENE_SCRIPTS = "scene_scripts"
 
-app_support.provenance.stamp("evolver", anchor=__file__)
+
+def _pin_every_stamp_to_the_commit_loaded_now() -> None:
+    app_support.provenance.stamp("evolver", anchor=__file__)
+
+
+_pin_every_stamp_to_the_commit_loaded_now()
 
 
 def by_evolver(*, method: str | None = None, method_version: str | None = None) -> dict:
