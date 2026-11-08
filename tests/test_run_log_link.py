@@ -20,7 +20,7 @@ def _log_bytes(lines) -> bytes:
     return body.encode("utf-8")
 
 
-class TestTheRunsTitleLinksToTheLogTheOnlyPlaceWhatTheStagesSaidIsKept(unittest.TestCase):
+class TestTheRunsTitleLinksToItsLog(unittest.TestCase):
     def setUp(self):
         self.widget = RunDetailWidget()
         self.addCleanup(self.widget.deleteLater)
@@ -40,7 +40,7 @@ class TestTheRunsTitleLinksToTheLogTheOnlyPlaceWhatTheStagesSaidIsKept(unittest.
     def test_a_shown_run_puts_a_link_on_its_title(self):
         self.widget.show_record(make_run_record())
 
-        assert self._links() == ["log"]
+        assert self._links() == ["log"], "which file or which error a stage met is written only in the log"
 
     def test_the_link_is_one_the_mouse_can_reach(self):
         self.widget.show_record(make_run_record())
@@ -79,12 +79,12 @@ class TestTheRunsTitleLinksToTheLogTheOnlyPlaceWhatTheStagesSaidIsKept(unittest.
 
         assert asked == []
 
-    def test_the_title_link_wears_the_palettes_link_color_having_none_of_its_own(self):
+    def test_the_title_link_has_no_color_of_its_own(self):
         self.widget.show_record(make_run_record())
 
         assert "color" not in self.widget._header.text().lower()
 
-    def test_the_window_passes_the_request_on_to_the_app_which_owns_every_window_beside_it(self):
+    def test_the_window_passes_the_request_to_the_app(self):
         window = EvolverMainWindow()
         self.addCleanup(window.deleteLater)
         asked = []
@@ -95,7 +95,8 @@ class TestTheRunsTitleLinksToTheLogTheOnlyPlaceWhatTheStagesSaidIsKept(unittest.
         window._detail_widget._on_title_clicked("log")
 
         assert asked == [record]
-        assert gui_modules_imported_by(gui.main_window) & {"gui.log_window", "gui.stats_window"} == set()
+        assert gui_modules_imported_by(gui.main_window) & {"gui.log_window", "gui.stats_window"} == set(), (
+            "the app owns every window opened beside the main one")
 
 
 class TestLogWindowOpens(unittest.TestCase):
@@ -127,7 +128,7 @@ class TestLogWindowOpens(unittest.TestCase):
     def _shown(self):
         return self.app._log_window._view.toPlainText()
 
-    def test_the_window_holds_this_runs_lines_and_not_the_whole_log_which_nothing_rotates(self):
+    def test_the_window_holds_this_runs_lines_not_the_whole_log(self):
         record = self._marked_record()
 
         with override_config(LOG_FILE=self.log):
@@ -135,7 +136,8 @@ class TestLogWindowOpens(unittest.TestCase):
 
         assert "=== Stage 1: strays ===" in self._shown()
         assert "Stage 8 done." in self._shown()
-        assert "2026-07-25T15-10-02" not in self._shown()
+        assert "2026-07-25T15-10-02" not in self._shown(), (
+            "the log is one appending file nothing rotates, months and hundreds of megabytes of it")
         assert "2026-07-25T15-30-02" not in self._shown()
 
     def test_the_title_says_which_run_is_on_screen(self):
@@ -187,11 +189,12 @@ class TestLogWindowOpens(unittest.TestCase):
 
 
 class TestLogWindowWidget(unittest.TestCase):
-    def test_lines_carrying_full_paths_scroll_rather_than_wrap_so_the_timestamps_stay_in_one_column(self):
+    def test_long_lines_scroll_rather_than_wrap(self):
         window = RunLogWindow("2026/07/25 08:20 (12s)", "a line")
         self.addCleanup(window.deleteLater)
 
-        assert window._view.lineWrapMode() == window._view.LineWrapMode.NoWrap
+        assert window._view.lineWrapMode() == window._view.LineWrapMode.NoWrap, (
+            "a line carries a full path, and wrapped it breaks the column of timestamps")
         assert window._view.isReadOnly()
 
 

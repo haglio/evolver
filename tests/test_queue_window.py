@@ -116,7 +116,7 @@ class TestWhatItShows:
         assert row_ground_past_its_text(window._tree, 0) != BLUE.name()
 
 
-class TestTheArrowIsTheFirstRowsAloneSinceOneVideoIsAskedForAtATime:
+class TestOnlyTheFirstRowHasTheArrow:
     def test_it_is_filled_while_the_first_row_runs_whoever_is_here(self, window):
         window.show_queue(queue(Head(ASKED_FOR, percent=2),
                                   entry("lagoon/0 unsorted/a.mp4"),
@@ -178,7 +178,7 @@ class TestTheArrowIsTheFirstRowsAloneSinceOneVideoIsAskedForAtATime:
 
         click(window, 1)
 
-        assert asked == []
+        assert asked == [], "one video is asked for at a time"
 
 
 class TestWhatItSaysTheUserDid:
@@ -320,7 +320,7 @@ class TestADragCarryingNoVideo:
 
 
 class TestAnOpenWindow:
-    def test_asks_again_on_its_own_clock_since_the_encode_moves_between_runs(self, window):
+    def test_asks_again_on_its_own_clock_while_open(self, window):
         asked = []
         window.refresh_wanted.connect(lambda: asked.append(True))
 
@@ -331,11 +331,11 @@ class TestAnOpenWindow:
 
         assert running
         assert window._clock.interval() == int(
-            queue_window.ASK_AGAIN_SECONDS_WHILE_THE_ENCODE_MOVES_BETWEEN_RUNS * 1000)
-        assert asked == [True]
+            queue_window.ASK_AGAIN_SECONDS * 1000)
+        assert asked == [True], "the encode is parked, thawed and climbs between the ten-minute runs"
         assert not window._clock.isActive()
 
-    def test_has_words_for_every_hold_that_can_keep_a_video_asked_for_waiting(self, tmp_path):
+    def test_has_words_for_every_hold_on_an_asked_for_video(self, tmp_path):
         checks = dict(nonai_encode.busy_checks(tmp_path / "cooldown", nonai_encode.EncodeSettings(),
                                                asked_for=True, ai_waiting=False))
         never_hold_one_asked_for = {"user_present", "cooldown"}

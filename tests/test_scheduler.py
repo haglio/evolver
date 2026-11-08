@@ -10,7 +10,7 @@ from gui.scheduler import PipelineScheduler
 
 class TestPipelineScheduler(unittest.TestCase):
 
-    def test_the_one_test_of_the_real_timer_parks_the_clock_a_millisecond_short_of_a_slot(self):
+    def test_the_real_timer_requests_a_run_at_the_slot(self):
         a_millisecond_short_of_a_slot = datetime(2026, 1, 1, 12, 10, tzinfo=UTC) - timedelta(milliseconds=1)
         scheduler = PipelineScheduler(interval_minutes=10, now=lambda: a_millisecond_short_of_a_slot)
 
@@ -32,18 +32,26 @@ class TestPipelineScheduler(unittest.TestCase):
 
         assert len(spy) == 0
 
-    def test_a_tick_mid_run_schedules_nothing_since_the_runs_end_schedules_the_next(self):
+    def test_a_tick_mid_run_schedules_nothing(self):
         scheduler = PipelineScheduler(interval_minutes=10,
                                       now=lambda: datetime(2026, 1, 1, 8, 3, tzinfo=UTC))
         scheduler.mark_running()
 
         scheduler.tick()
         mid_run = scheduler.next_run_at
+        scheduler.stop()
+
+        assert mid_run is None, "the run's end schedules the next tick"
+
+    def test_the_runs_end_schedules_the_next_tick(self):
+        scheduler = PipelineScheduler(interval_minutes=10,
+                                      now=lambda: datetime(2026, 1, 1, 8, 3, tzinfo=UTC))
+        scheduler.mark_running()
+
         scheduler.mark_idle()
         after_the_run = scheduler.next_run_at
         scheduler.stop()
 
-        assert mid_run is None
         assert after_the_run == datetime(2026, 1, 1, 8, 10, tzinfo=UTC)
 
     def test_resumes_after_mark_idle(self):

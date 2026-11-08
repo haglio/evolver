@@ -43,7 +43,7 @@ class TestPopupConstruction(unittest.TestCase):
                 assert bar.width() >= BAR_WIDTH
                 assert bar.x() >= widest_caption
 
-    def test_the_caption_column_widens_with_a_wider_font_where_a_fixed_width_would_clip(self):
+    def test_the_caption_column_widens_with_the_font(self):
         wider = QFont(self.popup.font())
         wider.setPointSizeF(wider.pointSizeF() * 2)
         widest = max(QFontMetrics(wider).horizontalAdvance(label) for label in STAGE_LABELS.values())

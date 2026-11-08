@@ -21,7 +21,8 @@ def test_a_run_started_while_the_window_is_hidden_never_talks_to_the_last_runs_c
     assert last_runs_popup.mock_calls == []
 
 
-def test_it_announces_what_happened_to_a_run_and_leaves_the_reactions_to_the_app():
+def test_it_imports_nothing_that_reacts_to_its_runs():
     the_app_and_what_it_wires = {"gui.app", "gui.tray", "gui.scheduler", "gui.main_window"}
 
-    assert gui_modules_imported_by(gui.run_controller) & the_app_and_what_it_wires == set()
+    assert gui_modules_imported_by(gui.run_controller) & the_app_and_what_it_wires == set(), (
+        "the controller says what happened to a run; the tray, the schedule and the window react in the app")

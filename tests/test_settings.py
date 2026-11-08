@@ -76,9 +76,9 @@ class TestEvolverSettings(unittest.TestCase):
         s = EvolverSettings()
         assert not s.enable_toasts
 
-    def test_nonai_upscale_defaults_to_off_since_an_encode_holds_the_graphics_card_for_hours(self):
+    def test_nonai_upscale_defaults_to_off(self):
         s = EvolverSettings()
-        assert not s.nonai_upscale_enabled
+        assert not s.nonai_upscale_enabled, "a non-AI encode holds the graphics card for hours"
 
     def test_nonai_upscale_round_trip(self):
         with workspace_temp_dir() as tmp:

@@ -26,5 +26,6 @@ def test_no_toolbar_label_runs_longer_than_the_longest(status):
     (False, False, _AT, SCHEDULED),
     (False, False, None, IDLE),
 ])
-def test_the_state_is_decided_in_this_order_a_run_on_screen_outranking_a_pause_that_stops_only_what_follows(running, paused, next_run, expected):
-    assert schedule_state(running, paused, next_run) == expected
+def test_running_outranks_paused_outranks_scheduled(running, paused, next_run, expected):
+    assert schedule_state(running, paused, next_run) == expected, (
+        "a run on screen is the fact being looked at, and a pause stops only the runs after it")

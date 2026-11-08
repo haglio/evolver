@@ -23,8 +23,9 @@ from tests.temp_helpers import override_config, workspace_temp_dir
 from util import run_log
 
 
+# CPython's dataclasses.asdict raises on a MagicMock, so a Mock here would reach only the repr fallback.
 @dataclass
-class _AStageResultDataclassSinceAsdictRaisesOnAMock:
+class _ARealStageResultDataclass:
     moved: int = 0
     moved_files: list[Path] = dataclass_field(default_factory=list)
 
@@ -32,7 +33,7 @@ class _AStageResultDataclassSinceAsdictRaisesOnAMock:
 class TestResultToDict:
 
     def test_converts_a_dataclasss_path_fields_to_strings(self):
-        result = _AStageResultDataclassSinceAsdictRaisesOnAMock(
+        result = _ARealStageResultDataclass(
             moved=2, moved_files=[Path("C:/videos/a.mp4"), Path("C:/videos/b.mp4")],
         )
         d = result_to_dict(result)
@@ -97,7 +98,7 @@ class TestRunRecordRoundTrip:
         pipeline_result = PipelineResult(
             stages=[StageRecord(
                 "sort", "completed", 1.5,
-                _AStageResultDataclassSinceAsdictRaisesOnAMock(moved=1, moved_files=[Path("C:/videos/a.mp4")]),
+                _ARealStageResultDataclass(moved=1, moved_files=[Path("C:/videos/a.mp4")]),
             )],
             has_errors=False,
             duration_seconds=10.0,
@@ -168,7 +169,7 @@ class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
             assert [r.id for r in records] == ["a"]
             assert any("b.json" in record.getMessage() for record in caplog.records)
 
-    def test_a_file_of_valid_json_that_is_not_an_object_is_skipped_and_named(self, caplog):
+    def test_json_that_is_not_an_object_is_skipped(self, caplog):
         with workspace_temp_dir() as root:
             (root / "a.json").write_text(json.dumps(["a", "list"]), encoding="utf-8")
 
