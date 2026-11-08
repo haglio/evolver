@@ -24,7 +24,7 @@ from util import run_log
 
 
 @dataclass
-class _StageOutcome:
+class _AStageResultDataclassSinceAsdictRaisesOnAMock:
     moved: int = 0
     moved_files: list[Path] = dataclass_field(default_factory=list)
 
@@ -32,7 +32,7 @@ class _StageOutcome:
 class TestResultToDict:
 
     def test_converts_a_dataclasss_path_fields_to_strings(self):
-        result = _StageOutcome(
+        result = _AStageResultDataclassSinceAsdictRaisesOnAMock(
             moved=2, moved_files=[Path("C:/videos/a.mp4"), Path("C:/videos/b.mp4")],
         )
         d = result_to_dict(result)
@@ -42,7 +42,8 @@ class TestResultToDict:
         }
 
     def test_an_unconvertible_result_falls_back_to_its_repr(self):
-        d = result_to_dict(object())
+        neither_a_dataclass_nor_carrying_a_dict = object()
+        d = result_to_dict(neither_a_dataclass_nor_carrying_a_dict)
         assert list(d) == ["repr"]
 
     def test_a_stage_with_no_result_is_recorded_as_having_none(self):
@@ -96,7 +97,7 @@ class TestRunRecordRoundTrip:
         pipeline_result = PipelineResult(
             stages=[StageRecord(
                 "sort", "completed", 1.5,
-                _StageOutcome(moved=1, moved_files=[Path("C:/videos/a.mp4")]),
+                _AStageResultDataclassSinceAsdictRaisesOnAMock(moved=1, moved_files=[Path("C:/videos/a.mp4")]),
             )],
             has_errors=False,
             duration_seconds=10.0,
@@ -166,6 +167,16 @@ class TestLoadingRecordsTheDataclassDoesNotFullyDescribe:
 
             assert [r.id for r in records] == ["a"]
             assert any("b.json" in record.getMessage() for record in caplog.records)
+
+    def test_a_file_of_valid_json_that_is_not_an_object_is_skipped_and_named(self, caplog):
+        with workspace_temp_dir() as root:
+            (root / "a.json").write_text(json.dumps(["a", "list"]), encoding="utf-8")
+
+            with caplog.at_level(logging.WARNING):
+                records = list(every_run(root))
+
+            assert records == []
+            assert any("a.json" in record.getMessage() for record in caplog.records)
 
     def test_a_record_missing_a_field_the_dataclass_requires_is_named_too(self, caplog):
         with workspace_temp_dir() as root:

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import ast
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 from PyQt6.QtCore import Qt
@@ -12,6 +10,7 @@ import gui.main_window
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow, RunDetailWidget
 from tests.gui_support import build_evolver_app
+from tests.product_sources import gui_modules_imported_by
 from tests.temp_helpers import make_run_record, override_config, workspace_temp_dir
 from util import run_log
 
@@ -96,13 +95,7 @@ class TestTheRunsTitleLinksToTheLogTheOnlyPlaceWhatTheStagesSaidIsKept(unittest.
         window._detail_widget._on_title_clicked("log")
 
         assert asked == [record]
-        assert _gui_modules_imported_by(gui.main_window) & {"gui.log_window", "gui.stats_window"} == set()
-
-
-def _gui_modules_imported_by(module) -> set[str]:
-    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
-    return {node.module for node in ast.walk(tree)
-            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("gui")}
+        assert gui_modules_imported_by(gui.main_window) & {"gui.log_window", "gui.stats_window"} == set()
 
 
 class TestLogWindowOpens(unittest.TestCase):

@@ -54,3 +54,9 @@ def strings_outside_docstrings(tree: ast.AST) -> Iterator[ast.Constant]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
             yield node
+
+
+def gui_modules_imported_by(module) -> set[str]:
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    return {node.module for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("gui")}
