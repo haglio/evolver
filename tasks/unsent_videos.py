@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 
 @dataclass
-class TakenBackResult(StageResult):
+class UnsentVideosResult(StageResult):
     deleted: int = 0
     deleted_metadata: int = 0
     deleted_scripts: int = 0
@@ -25,22 +25,22 @@ class TakenBackResult(StageResult):
     def ok(self) -> bool:
         return not self.failed
 
-    def __add__(self, other: TakenBackResult) -> TakenBackResult:
-        return TakenBackResult(
+    def __add__(self, other: UnsentVideosResult) -> UnsentVideosResult:
+        return UnsentVideosResult(
             deleted=self.deleted + other.deleted,
             deleted_metadata=self.deleted_metadata + other.deleted_metadata,
             deleted_scripts=self.deleted_scripts + other.deleted_scripts,
             failed=self.failed + other.failed)
 
 
-def run() -> TakenBackResult:
-    result = TakenBackResult()
+def run() -> UnsentVideosResult:
+    result = UnsentVideosResult()
     try:
         rows = _gallery_rows()
     except FileNotFoundError:
         return result
 
-    log.info("=== Stage: videos Origenerator has taken back ===")
+    log.info("=== Stage: videos unsent in Origenerator ===")
     for lane in lanes.sent_lanes():
         result = result + _empty_lane(lane, origenerator_gallery.video_stems(
             rows, lambda row, lane=lane: row.get(lane.unsent_column)))
@@ -77,7 +77,7 @@ def _soundless_copies_beside_their_sound(rows: list[dict], lane: lanes.SentLane)
     return stems
 
 
-def _empty_lane(lane: lanes.SentLane, stems: set[str]) -> TakenBackResult:
+def _empty_lane(lane: lanes.SentLane, stems: set[str]) -> UnsentVideosResult:
     copies_a_viewer_can_reach, sorted_sources, still_in_the_inbox = _copy_groups(lane, stems)
     result = _delete_all(copies_a_viewer_can_reach)
     if not result.failed:
@@ -118,8 +118,8 @@ def _videos_under(roots) -> list[Path]:
             for video in sorted(library_videos(Path(root)))]
 
 
-def _delete_all(videos: list[Path]) -> TakenBackResult:
-    result = TakenBackResult()
+def _delete_all(videos: list[Path]) -> UnsentVideosResult:
+    result = UnsentVideosResult()
     for video in videos:
         try:
             video.unlink()
@@ -135,8 +135,8 @@ def _delete_all(videos: list[Path]) -> TakenBackResult:
     return result
 
 
-def _delete_scripts(video: Path) -> TakenBackResult:
-    result = TakenBackResult()
+def _delete_scripts(video: Path) -> UnsentVideosResult:
+    result = UnsentVideosResult()
     for script in script_library.scripts_held_for(video, lanes.upscale_filed_for(video)):
         try:
             script_library.delete_script(script)
