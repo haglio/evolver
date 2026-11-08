@@ -377,7 +377,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
 
 
 class TestWhatItRefusesToGuess(unittest.TestCase):
-    def test_a_clip_nothing_can_measure_waits_for_a_run_that_can(self):
+    def test_a_clip_nothing_can_measure_waits_for_a_run_that_can_rather_than_record_a_guess_nothing_could_undo(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
@@ -608,6 +608,23 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                     for v in [*carved, unrecorded, *wholes]
                 }
             assert kinds["carved-3.mp4"] == video_kind.CLIP
+            assert kinds["whole-0.mp4"] == video_kind.FULL_LENGTH
+
+    def test_one_carved_scene_stranded_among_the_wholes_does_not_undo_the_batch_s_cut_folder(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config(GENAU_SOURCE):
+                carved = [self._batch(lib, "cuts", f"carved-{i}.mp4", carved=True) for i in range(3)]
+                straggler = self._batch(lib, "wholes", "carved-moved.mp4", carved=True)
+                unrecorded = self._batch(lib, "cuts", "carved-4.mp4")
+                wholes = [self._batch(lib, "wholes", f"whole-{i}.mp4") for i in range(3)]
+                every = [*carved, straggler, unrecorded, *wholes]
+
+                video_kinds.run(probe=_probe({v.stem: 900.0 for v in every}),
+                                orientation_probe=_orientation_unknown)
+
+                kinds = {v.name: video_kind.kind_of(sidecar.read(sidecar.sidecar_path(v))) for v in every}
+            assert kinds["carved-4.mp4"] == video_kind.CLIP
             assert kinds["whole-0.mp4"] == video_kind.FULL_LENGTH
 
     def test_a_batch_that_never_separated_its_cuts_keeps_every_whole_video(self):
