@@ -86,7 +86,7 @@ class TestWhatMadeTheVideo(unittest.TestCase):
 
         assert payload["provenance"] == {"generation": {"schema": provenance.SCHEMA, "app": "origenerator", "app_commit": None, "app_dirty": None, METHOD: "wan22_i2v", METHOD_VERSION: "v007", "stamped_at": None}}
 
-    def test_what_an_import_writes_in_place_of_a_workflow_is_recorded_as_unknown(self):
+    def test_the_importer_s_placeholders_are_recorded_as_unknown_so_no_sweep_reads_imported_as_a_version(self):
         with workspace_temp_dir() as root:
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", workflow="unknown", version="imported",

@@ -148,7 +148,7 @@ def _video_block(row: dict, video_path: Path) -> dict:
     return block
 
 
-_IMPORT_PLACEHOLDERS = frozenset({"unknown", "imported"})
+_ORIGENERATOR_IMPORTER_PLACEHOLDERS = frozenset({"unknown", "imported"})
 
 
 def _generation_provenance(row: dict) -> dict:
@@ -157,12 +157,12 @@ def _generation_provenance(row: dict) -> dict:
         return its_own
     return provenance.reconstructed(
         "origenerator",
-        method=_named(row.get("workflow_name")),
-        method_version=_named(row.get("workflow_version")))
+        method=_workflow_or_none(row.get("workflow_name")),
+        method_version=_workflow_or_none(row.get("workflow_version")))
 
 
-def _named(column: str | None) -> str | None:
-    return None if not column or column in _IMPORT_PLACEHOLDERS else column
+def _workflow_or_none(column: str | None) -> str | None:
+    return None if not column or column in _ORIGENERATOR_IMPORTER_PLACEHOLDERS else column
 
 
 def _source_image_block(row: dict) -> dict:
