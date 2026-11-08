@@ -198,34 +198,40 @@ class TestTheListOfStagesRunsItself:
 
         assert _statuses(result) == {"first": "error"}
 
-    def test_a_video_genau_holds_open_fails_the_run_since_a_folder_it_cannot_write_looks_the_same(self):
+    def test_an_undelivered_genau_video_fails_the_run(self):
         result = _run(replace(_stage("genau_deliver"), run=lambda _: GenauDeliverResult(failed=1)))
 
-        assert _statuses(result) == {"genau_deliver": "error"}
+        assert _statuses(result) == {"genau_deliver": "error"}, (
+            "a video Genau holds open is delivered next run, but a folder that cannot be written "
+            "looks the same from here, and only a failure gets seen")
 
-    def test_a_taken_back_video_left_undeleted_fails_the_run_since_he_was_told_it_was_going(self):
+    def test_a_taken_back_video_left_undeleted_fails_the_run(self):
         result = _run(replace(_stage("withdrawn"), run=lambda _: TakenBackResult(failed=1)))
 
-        assert _statuses(result) == {"withdrawn": "error"}
+        assert _statuses(result) == {"withdrawn": "error"}, (
+            "he was told the video was going; a silent failure would leave it in the library")
 
-    def test_origenerator_not_answering_fails_the_run_or_its_downtime_work_would_stop_unseen(self):
+    def test_origenerator_not_answering_fails_the_run(self):
         result = _run(replace(_stage("origenerator_downtime"),
                               run=lambda _: DowntimeResult(failed=True)))
 
-        assert _statuses(result) == {"origenerator_downtime": "error"}
+        assert _statuses(result) == {"origenerator_downtime": "error"}, (
+            "the work Origenerator leaves for while it is closed would otherwise stop unseen")
 
-    def test_a_stray_file_only_reported_warns_since_reporting_it_is_the_stage_doing_its_job(self):
+    def test_a_stray_file_only_reported_warns(self):
         result = _run(replace(_stage("strays"),
                               run=lambda _: StrayFilesResult(reported=["notes.txt"])))
 
-        assert _statuses(result) == {"strays": "warning"}
+        assert _statuses(result) == {"strays": "warning"}, (
+            "reporting what it cannot repair is the stage doing its job, not failing at it")
         assert not result.has_errors
 
-    def test_upscales_held_back_for_disk_space_warn_since_they_resume_once_room_frees_up(self):
+    def test_upscales_held_back_for_disk_space_warn(self):
         result = _run(replace(_stage("upscale"),
                               run=lambda _: UpscaleResult(deferred_low_disk=True)))
 
-        assert _statuses(result) == {"upscale": "warning"}
+        assert _statuses(result) == {"upscale": "warning"}, (
+            "nothing broke: the queue resumes the moment room frees up")
         assert not result.has_errors
 
     def test_skips_alone_do_not_make_a_run_a_failure(self):
@@ -242,8 +248,7 @@ class TestTheListOfStagesRunsItself:
 
         assert result.duration_seconds > 0.0
 
-    def test_the_run_marks_its_stretch_since_the_log_holding_what_its_stages_said_is_never_rotated(
-            self, tmp_path):
+    def test_the_run_marks_its_own_stretch_of_the_log(self, tmp_path):
         log = tmp_path / "evolver.log"
         log.write_bytes(b"[2026-07-25 08:10:02] an earlier run" + WHAT_LOGGING_ENDS_A_LINE_WITH)
         with _writing_info_lines_like_the_banner_to(log):
@@ -251,7 +256,9 @@ class TestTheListOfStagesRunsItself:
 
         text = run_log.read_run(log, run_log.run_id(result.started_at),
                                 result.log_start, result.log_end)
-        assert text is not None
+        assert text is not None, (
+            "what a run's stages said is only in this log, which is never rotated, so a run has "
+            "to be found in it by its mark")
         assert "an earlier run" not in text
 
     def test_the_runs_stretch_ends_after_the_last_line_its_stages_logged(self, tmp_path):
@@ -277,14 +284,15 @@ class TestTheListOfStagesRunsItself:
 
 
 class TestCooperativeStop:
-    def test_a_stop_asked_mid_stage_lets_that_stage_finish_so_no_video_is_left_half_moved(self):
+    def test_a_stop_asked_mid_stage_lets_that_stage_finish(self):
         asked = []
 
         result = _run(_made_up("first", run=lambda _: asked.append("stop") or _Done()),
                       _made_up("second"), _made_up("third"),
                       should_stop=lambda: bool(asked))
 
-        assert _statuses(result) == {"first": "completed"}
+        assert _statuses(result) == {"first": "completed"}, (
+            "a stage cut off mid-move would leave a video half moved")
 
     def test_a_stop_that_is_never_requested_changes_nothing(self):
         result = _run(_made_up("first"), _made_up("second"), should_stop=lambda: False)
@@ -546,7 +554,7 @@ class TestEvolverMain:
         assert code == 1
         assert ran == []
 
-    def test_a_dependency_failure_is_logged_with_the_traceback_naming_the_check_that_raised(self, caplog):
+    def test_a_dependency_failure_logs_the_failing_checks_traceback(self, caplog):
         def the_ffmpeg_check():
             raise RuntimeError("not found")
 
@@ -557,7 +565,8 @@ class TestEvolverMain:
                     if "Dependency check failed" in record.getMessage()]
         assert len(failures) == 1
         assert failures[0].exc_info
-        assert "the_ffmpeg_check" in logging.Formatter().formatException(failures[0].exc_info)
+        assert "the_ffmpeg_check" in logging.Formatter().formatException(failures[0].exc_info), (
+            "which check raised is the whole of the diagnosis")
 
     def test_exits_zero_when_every_stage_went_well(self):
         assert self._main(_made_up("first"), _made_up("second")) == 0
@@ -571,8 +580,13 @@ class TestEvolverMain:
 
 
 class TestCheckDependencies:
-    def test_an_ffprobe_that_exits_nonzero_raises_the_error_every_missing_dependency_raises(self):
-        with patch("evolver.subprocess.run", return_value=Mock(returncode=1)), \
+    def test_an_ffprobe_exiting_nonzero_raises_runtime_error(self):
+        def ffprobe_exiting_nonzero(args, *, check, **_kwargs):
+            if check:
+                raise subprocess.CalledProcessError(1, args)
+            return Mock(returncode=1)
+
+        with patch("evolver.subprocess.run", ffprobe_exiting_nonzero), \
              patch("evolver.config.FFMPEG", Mock(is_file=Mock(return_value=True))), \
              pytest.raises(RuntimeError, match="ffprobe"):
             evolver.check_dependencies()
@@ -623,7 +637,7 @@ def _isolated_root_logger():
 
 
 class TestSetupLogging:
-    def test_writes_the_log_the_error_popups_point_to_even_when_something_configured_logging_first(self):
+    def test_writes_the_log_when_something_configured_logging_first(self):
         with workspace_temp_dir() as folder, _isolated_root_logger() as root:
             root.addHandler(logging.NullHandler())
             log_file = folder / "evolver.log"
@@ -633,7 +647,8 @@ class TestSetupLogging:
             for handler in root.handlers:
                 handler.flush()
 
-            assert "a line the pipeline wrote" in log_file.read_text(encoding="utf-8")
+            assert "a line the pipeline wrote" in log_file.read_text(encoding="utf-8"), (
+                "the error popups send him to this log")
 
     def test_a_second_run_does_not_write_every_line_twice(self):
         with workspace_temp_dir() as folder, _isolated_root_logger() as root:
