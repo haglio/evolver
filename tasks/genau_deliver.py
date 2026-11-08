@@ -102,6 +102,7 @@ def _save_its_sound(flick: Path, audio_dir: Path) -> None:
 def _retire_source(upscaled: Path, genau_sorted_dir: Path) -> None:
     original = _sorted_original(upscaled, genau_sorted_dir)
     if original is not None:
+        # ComfyUI's output folder and Origenerator's gallery still hold the flick.
         original.unlink(missing_ok=True)
         remove_empty_dirs(genau_sorted_dir)
 
