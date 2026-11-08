@@ -11,7 +11,7 @@ from util import lanes, origenerator_gallery
 CONTRACT = Path("origenerator") / origenerator_gallery.PUBLISHED
 
 
-def _origenerator_beside_this() -> Path | None:
+def _origenerator_on_disk_beside_this_checkout() -> Path | None:
     for parent in Path(__file__).resolve().parents:
         if (parent / CONTRACT).is_file():
             return parent / CONTRACT.parent
@@ -20,7 +20,7 @@ def _origenerator_beside_this() -> Path | None:
 
 class OrigeneratorGalleryContract(unittest.TestCase):
     def setUp(self):
-        self.origenerator = _origenerator_beside_this()
+        self.origenerator = _origenerator_on_disk_beside_this_checkout()
         if self.origenerator is None:
             self.skipTest(f"no {CONTRACT.as_posix()} beside this checkout")
         self.promise = json.loads(
