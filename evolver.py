@@ -168,7 +168,7 @@ STAGES: tuple[Stage, ...] = (
     Stage("sort", "Sort inbox",
           "Move AI videos from 0_inbox into 1_sorted, filed by where they came from and by portrait or landscape",
           (0x38, 0x6A, 0x9C), run=lambda _: sort.run()),
-    Stage("origenerator_downtime", "Origenerator downtime",
+    Stage("origenerator_downtime", "Origenerator downtime tasks",
           "While Origenerator is closed, start the work it leaves for then: training a fix whose "
           "photos have changed, and the experiments and other runs it used to hand ComfyUI as it "
           "closed. The upscale waits while a fix trains, since the training needs the graphics card",
@@ -210,7 +210,7 @@ STAGES: tuple[Stage, ...] = (
           "saved under another name, found by their file names and by comparing their frames -- and write "
           "that group on each file's sidecar, so Fun Time knows which files are versions of one video",
           (0x6F, 0xDB, 0x9A), run=lambda _: nonai_group.run()),
-    Stage("title_non_ai", "Title non-AI",
+    Stage("title_non_ai", "Title non-AI videos",
           "Record what to call each 2D/non_AI video -- the performer and movie its clip record names, carried to the whole scene that clip was cut out of -- so every app reads one name instead of working it out at launch",
           (0xAA, 0x44, 0xCC), run=lambda _: nonai_titles.run()),
     Stage("video_types", "Set video kinds",

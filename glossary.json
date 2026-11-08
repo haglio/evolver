@@ -421,6 +421,34 @@
       "code_word": "provenance",
       "status": "ruled",
       "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
+      "id": "downtime_stage",
+      "thing": "the stage that starts the work Origenerator leaves for while it is closed",
+      "screen": [
+        "Origenerator downtime tasks"
+      ],
+      "his_word": "Origenerator downtime tasks (2026-11-07)",
+      "code_today": [
+        "downtime"
+      ],
+      "code_word": "downtime",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
+      "id": "titles_stage",
+      "thing": "the stage that records a readable name for each non-AI video on its sidecar",
+      "screen": [
+        "Title non-AI videos"
+      ],
+      "his_word": "Title non-AI videos (2026-11-07)",
+      "code_today": [
+        "nonai titles"
+      ],
+      "code_word": "nonai titles",
+      "status": "ruled",
+      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
     }
   ]
 }
