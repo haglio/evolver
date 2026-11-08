@@ -77,6 +77,14 @@ moves the old word from the row's `code_today` to its `retired`, which the test 
 at zero. What is stored on disk keeps its name (a stage's key in the run history, a field on a
 sidecar) unless every reader changes with it.
 
+## Taking a stage out keeps its name on screen
+
+The run history keeps every past run's stages under their keys, and the main
+window shows each one, so a stage taken out of `STAGES` goes into
+`TAKEN_OUT_STAGE_LABELS` in `evolver.py` with the name it last showed, in the same
+commit. Without it his old runs show the code's key ("references") and a dash, which
+he called "leaking of bizarre internals" (2026-11-08).
+
 ## Test fixtures must be fabricated, never copied from the real library
 
 Every fixture value that stands in for library data — a video title, a filename,
