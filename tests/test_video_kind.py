@@ -139,13 +139,13 @@ class TestTellingABareSidecarApart(unittest.TestCase):
         assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, "favorite": True, "web_url": "https://example.com/gallery/101"})
 
     def test_a_record_of_what_made_the_file_beside_them_is_still_nothing_else(self):
-        assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}})
+        assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}}), "a scrape that took the stamp for its own work would never fetch the clip's prompts"
 
-    def test_an_upscale_stamped_before_its_scrape_or_kind_landed_is_nothing_else_either(self):
-        assert video_kind.only_the_video_itself({provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}})
+    def test_a_record_of_what_made_the_file_alone_is_nothing_else(self):
+        assert video_kind.only_the_video_itself({provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}}), "an upscale is stamped as it is written, before its scrape or its kind lands"
 
-    def test_an_empty_record_is_something_else_as_an_unreadable_one_reads_empty_too(self):
-        assert not video_kind.only_the_video_itself({})
+    def test_an_empty_record_is_something_else(self):
+        assert not video_kind.only_the_video_itself({}), "an unreadable record reads empty too"
 
     def test_a_generation_beside_them_is_something_else(self):
         assert not video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP, "prompt": "a prompt"}})
