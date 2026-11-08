@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import ast
 import json
 import sqlite3
 import unittest
 from fractions import Fraction
+from pathlib import Path
 
 import pytest
 
+from tests.product_sources import PROJECT_ROOT, product_sources
 from tests.temp_helpers import workspace_temp_dir
 from util import origenerator_gallery
 
@@ -30,6 +33,17 @@ class TestTheRateOrigeneratorsVideosAreGeneratedAt(unittest.TestCase):
 
 
 class TestTheGalleryDatabase(unittest.TestCase):
+    @pytest.mark.repo_check
+    def test_only_this_module_opens_the_gallery_so_no_stage_keeps_its_own_copy_of_the_read(self):
+        opening = [
+            f"{name}:{node.lineno}" for name in product_sources(PROJECT_ROOT)
+            if name != "util/origenerator_gallery.py"
+            for node in ast.walk(ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8")))
+            if isinstance(node, ast.Attribute) and node.attr == "connect"
+            and isinstance(node.value, ast.Name) and node.value.id == "sqlite3"]
+
+        assert opening == []
+
     def test_a_missing_gallery_is_named_in_the_error(self):
         with workspace_temp_dir() as root, pytest.raises(FileNotFoundError) as raised:
             origenerator_gallery.rows(("output_files",), db_path=root / "gallery.db")
