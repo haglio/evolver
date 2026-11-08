@@ -174,17 +174,18 @@ class TestEverythingElse(unittest.TestCase):
             assert result.reported == [str(Path("2D") / "non_AI" / "example" / "cover.jpg")]
             assert (bucket / "cover.jpg").is_file()
 
-    def test_the_files_windows_writes_by_itself_are_never_reported_so_the_report_can_empty(self):
+    def test_files_the_os_writes_itself_are_never_reported(self):
         with workspace_temp_dir() as root:
             videos = root / "videos"
             videos.mkdir()
             (videos / "desktop.ini").write_text("[.ShellClassInfo]", encoding="utf-8")
             (videos / "Thumbs.db").write_bytes(b"thumbs")
+            (videos / ".DS_Store").write_bytes(b"finder")
 
             with override_config(VIDEO_LIBRARY_DIR=videos):
                 result = stray_files.run()
 
-            assert result.reported == []
+            assert result.reported == [], "a file the OS writes into every folder would keep the report from ever emptying"
             assert (videos / "desktop.ini").is_file()
 
     def test_a_funscript_beside_an_archived_original_is_not_a_stray(self):
