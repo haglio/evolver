@@ -19,7 +19,7 @@ from util import nonai_retire, script_library, sidecar
 
 
 class TestRetireIntoTheBucket(unittest.TestCase):
-    def test_none_is_a_real_answer_so_where_the_original_goes_has_no_default(self):
+    def test_archive_root_has_no_default(self):
         archive_root = inspect.signature(nonai_retire.retire_original).parameters["archive_root"]
 
         assert archive_root.default is inspect.Parameter.empty
@@ -37,7 +37,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
             assert (non_ai / "lagoon" / "2 do not need work" / "Lee-Poe.mp4").exists()
             assert not source.exists()
 
-    def test_the_sidecar_goes_along_or_the_clip_record_the_main_funestra_navigates_by_is_pruned(self):
+    def test_the_sidecar_goes_with_the_retired_original(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -58,7 +58,7 @@ class TestRetireIntoTheBucket(unittest.TestCase):
                 assert not sidecar.sidecar_path(source).exists()
                 assert sidecar.read(sidecar.sidecar_path(dest))["clip"] == {"compilation": "Vol6", "index": 1}
 
-    def test_the_funscript_goes_along_or_the_scripts_sync_fails_the_run_on_a_collision(self):
+    def test_the_funscript_goes_with_the_retired_original(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
@@ -162,7 +162,7 @@ class TestRetireToAnArchive(unittest.TestCase):
 
 
 class TestCarryMetadata(unittest.TestCase):
-    def test_the_footage_keys_cross_and_the_version_the_grouping_stage_stamps_does_not(self):
+    def test_the_footage_crosses_and_the_version_block_stays(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
             non_ai = overrides["NON_AI_DIR"]
