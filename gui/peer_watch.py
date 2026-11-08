@@ -23,6 +23,8 @@ def broker_tray_is_up(*, is_held=is_mutex_held) -> bool:
     return is_held(BROKER_TRAY_MUTEX)
 
 
+# The OSR2 Broker's tray holds Global\OSR2Broker.Tray and refuses a second copy of itself, so a
+# launch that races a tray coming up does nothing.
 def launch_broker_tray(
     *,
     launcher: Path | None = None,

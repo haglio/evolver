@@ -28,6 +28,8 @@ def taskbar_app() -> TaskbarApp:
                       relaunch=branch_session.relaunch_command())
 
 
+# Run by pythonw.exe, a PyQt app is Python to the Windows shell: its taskbar buttons carry
+# Python's icon, and a pin made from one starts bare Python.
 def claim(app: QApplication) -> QObject:
     claimed = identity()
     try:
@@ -47,6 +49,8 @@ class _WindowDresser(QObject):
         self._identity = identity
         self._taskbar_app = taskbar_app
 
+    # Qt sends Show before it maps the window, so before Windows makes the taskbar button out of
+    # what the window wears.
     def eventFilter(self, watched, event):
         if event.type() == QEvent.Type.Show and isinstance(watched, QWidget) and watched.isWindow():
             try:
