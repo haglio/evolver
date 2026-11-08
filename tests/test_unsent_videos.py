@@ -184,21 +184,21 @@ class TestTheEvolverLane(unittest.TestCase):
                 left_behind = _sidecar(lib, "2D", "AI", "2_outbox", "upscaled_by_orientation",
                                        "landscape", source, "made_00009_topaz.json")
 
-                taken_back.run()
+                unsent_videos.run()
 
                 assert not left_behind.exists()
 
-    def test_a_copy_that_reappears_is_taken_back_again(self):
+    def test_a_copy_that_reappears_is_deleted_again(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             db = _gallery(root / "gallery.db", [("p1", "made_00010.mp4", "evolver_unsent_at")])
             with lib.config(ORIGENERATOR_DB_PATH=db):
                 copy = lib.outbox / "portrait" / lanes.ORIGENERATOR_SOURCE / "made_00010_topaz.mp4"
                 touch_video(copy)
-                taken_back.run()
+                unsent_videos.run()
                 touch_video(copy)
 
-                again = taken_back.run()
+                again = unsent_videos.run()
 
                 assert not copy.exists()
             with closing(sqlite3.connect(db)) as gallery:

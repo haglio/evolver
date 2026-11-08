@@ -96,7 +96,7 @@ class TestStageRegistry(unittest.TestCase):
             "every later stage finds videos by their extension and funscripts under the script "
             "tree, so a name strays repairs or a script it moves is invisible to them until it runs")
 
-    def test_taken_back_runs_before_the_scrape_and_the_sort(self):
+    def test_unsent_videos_are_deleted_before_the_scrape_and_the_sort(self):
         assert _place("withdrawn") < min(_place("metadata"), _place("sort")), (
             "a video on its way out must be given no sidecar and not be filed into 1_sorted")
 

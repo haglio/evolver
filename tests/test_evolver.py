@@ -24,7 +24,7 @@ from tasks.nonai_upscale import NonAiUpscaleResult
 from tasks.origenerator_commands import DowntimeResult
 from tasks.sort import SortResult
 from tasks.stray_files import StrayFilesResult
-from tasks.taken_back import TakenBackResult
+from tasks.unsent_videos import UnsentVideosResult
 from tasks.upscale import UpscaleResult
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
 from util import run_lock, run_log, topaz
@@ -205,8 +205,8 @@ class TestTheListOfStagesRunsItself:
             "a video Genau holds open is delivered next run, but a folder that cannot be written "
             "looks the same from here, and only a failure gets seen")
 
-    def test_a_taken_back_video_left_undeleted_fails_the_run(self):
-        result = _run(replace(_stage("withdrawn"), run=lambda _: TakenBackResult(failed=1)))
+    def test_an_unsent_video_left_undeleted_fails_the_run(self):
+        result = _run(replace(_stage("withdrawn"), run=lambda _: UnsentVideosResult(failed=1)))
 
         assert _statuses(result) == {"withdrawn": "error"}, (
             "he was told the video was going; a silent failure would leave it in the library")

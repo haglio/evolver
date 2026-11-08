@@ -43,7 +43,7 @@ class TestAiLane(unittest.TestCase):
                                          orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
-            assert video_kind.kind_of(payload) == video_kind.SHORT
+            assert video_kind.kind_of(payload) == video_kind.CLIP
             assert payload["video"]["prompt"] == "a prompt"
             assert result.recorded == 1
 
@@ -67,7 +67,7 @@ class TestAiLane(unittest.TestCase):
                 payload = sidecar.read(path)
             assert payload["video"]["wrong_action"] == "Alpha"
             assert "action" not in payload["video"]
-            assert video_kind.kind_of(payload) == video_kind.SHORT
+            assert video_kind.kind_of(payload) == video_kind.CLIP
 
     def test_a_long_generated_clip_is_full_length(self):
         with workspace_temp_dir() as root:
@@ -319,7 +319,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
                     lib.outbox / "portrait" / "provider2" / "clip_k_topaz.mp4"
                 )
                 write_sidecar(path, video_kind.timed(
-                    video_kind.stamped({}, video_kind.SHORT), 5.0))
+                    video_kind.stamped({}, video_kind.CLIP), 5.0))
 
                 result = video_kinds.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
@@ -403,7 +403,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 video_kinds.run(probe=_probe({video.stem: 4.0}),
                                 orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.SHORT
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.CLIP
 
     def test_a_vr_video_kept_on_the_cloud_drive_gets_its_running_time_where_the_library_files_it(self):
         with workspace_temp_dir() as root:
