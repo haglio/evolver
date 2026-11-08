@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import ast
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QTextDocument
 
+import gui.main_window
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow, RunDetailWidget
 from tests.gui_support import build_evolver_app
@@ -18,7 +21,7 @@ def _log_bytes(lines) -> bytes:
     return body.encode("utf-8")
 
 
-class TestRunTitleIsALink(unittest.TestCase):
+class TestTheRunsTitleLinksToTheLogTheOnlyPlaceWhatTheStagesSaidIsKept(unittest.TestCase):
     def setUp(self):
         self.widget = RunDetailWidget()
         self.addCleanup(self.widget.deleteLater)
@@ -77,7 +80,12 @@ class TestRunTitleIsALink(unittest.TestCase):
 
         assert asked == []
 
-    def test_the_window_passes_the_request_on(self):
+    def test_the_title_link_wears_the_palettes_link_color_having_none_of_its_own(self):
+        self.widget.show_record(make_run_record())
+
+        assert "color" not in self.widget._header.text().lower()
+
+    def test_the_window_passes_the_request_on_to_the_app_which_owns_every_window_beside_it(self):
         window = EvolverMainWindow()
         self.addCleanup(window.deleteLater)
         asked = []
@@ -88,6 +96,13 @@ class TestRunTitleIsALink(unittest.TestCase):
         window._detail_widget._on_title_clicked("log")
 
         assert asked == [record]
+        assert _gui_modules_imported_by(gui.main_window) & {"gui.log_window", "gui.stats_window"} == set()
+
+
+def _gui_modules_imported_by(module) -> set[str]:
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    return {node.module for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("gui")}
 
 
 class TestLogWindowOpens(unittest.TestCase):
@@ -119,7 +134,7 @@ class TestLogWindowOpens(unittest.TestCase):
     def _shown(self):
         return self.app._log_window._view.toPlainText()
 
-    def test_the_window_holds_this_runs_lines_and_not_its_neighbors(self):
+    def test_the_window_holds_this_runs_lines_and_not_the_whole_log_which_nothing_rotates(self):
         record = self._marked_record()
 
         with override_config(LOG_FILE=self.log):
@@ -179,7 +194,7 @@ class TestLogWindowOpens(unittest.TestCase):
 
 
 class TestLogWindowWidget(unittest.TestCase):
-    def test_long_lines_scroll_rather_than_wrap(self):
+    def test_lines_carrying_full_paths_scroll_rather_than_wrap_so_the_timestamps_stay_in_one_column(self):
         window = RunLogWindow("2026/07/25 08:20 (12s)", "a line")
         self.addCleanup(window.deleteLater)
 
