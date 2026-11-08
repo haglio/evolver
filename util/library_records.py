@@ -13,6 +13,7 @@ VIDEO_DURATION_FIELD = video_kind.DURATION_FIELD
 VIDEO_ORIENTATION_FIELD = video_kind.ORIENTATION_FIELD
 VIDEO_ACTION_FIELD = "action"
 VIDEO_WRONG_ACTION_FIELD = WRONG_ACTION_FIELD
+VIDEO_FIELDS_FUN_TIME_WRITES = (VIDEO_WRONG_ACTION_FIELD,)
 
 VIDEO_KINDS = video_kind.TYPES
 
@@ -44,7 +45,7 @@ PAGE_KEY = favorites.PAGE_KEY
 ID_KEY = video_ids.ID_KEY
 
 
-def declaration() -> dict:
+def promised_to_fun_time() -> dict:
     return {
         "blocks": {
             VIDEO_BLOCK: {
@@ -56,7 +57,7 @@ def declaration() -> dict:
                     VIDEO_WRONG_ACTION_FIELD,
                     *VIDEO_GENERATION_FIELDS,
                 ],
-                "written_by_the_reader": [VIDEO_WRONG_ACTION_FIELD],
+                "written_by_the_reader": list(VIDEO_FIELDS_FUN_TIME_WRITES),
             },
             SOURCE_IMAGE_BLOCK: {"fields": list(SOURCE_IMAGE_FIELDS)},
             CLIP_BLOCK: {"fields": list(CLIP_FIELDS)},
