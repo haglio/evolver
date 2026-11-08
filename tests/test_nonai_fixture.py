@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import ast
 import unittest
 from pathlib import Path
 
-from tests.product_sources import PROJECT_ROOT
+from tests.product_sources import config_names_read
 from tests.temp_helpers import nonai_library_overrides, workspace_temp_dir
 
 MODULES = (
@@ -55,23 +54,9 @@ LEFT_AMBIENT = {
 }
 
 
-def _config_names_read() -> set[str]:
-    found: set[str] = set()
-    for name in MODULES:
-        tree = ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8"))
-        found |= {
-            node.attr
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Attribute)
-            and isinstance(node.value, ast.Name)
-            and node.value.id == "config"
-        }
-    return found
-
-
 class TestTheNonAiFixture(unittest.TestCase):
     def test_every_config_name_the_stage_reads_is_filed_one_way_or_the_other(self):
-        assert _config_names_read() == PLACES_ON_DISK | set(LEFT_AMBIENT), "a new ambient read is either a place the fixture must redirect or one it may leave alone -- say which, and why, above"
+        assert config_names_read(*MODULES) == PLACES_ON_DISK | set(LEFT_AMBIENT), "a new ambient read is either a place the fixture must redirect or one it may leave alone -- say which, and why, above"
 
     def test_the_fixture_redirects_every_place_into_the_cases_own_tree(self):
         with workspace_temp_dir() as root:
