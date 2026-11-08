@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from tests.product_sources import config_names_read
+from tests.product_sources import PROJECT_ROOT, config_names_read
 from tests.temp_helpers import nonai_library_overrides, workspace_temp_dir
 
 MODULES = (
