@@ -105,5 +105,7 @@ def is_video_name(name: str) -> bool:
 
 
 def _connect_ro(db_path: Path) -> sqlite3.Connection:
+    # SQLite handed a plain path that does not exist makes an empty database
+    # there; opened read-only by URI, a wrong path fails instead.
     uri = db_path.resolve().as_uri() + "?mode=ro"
     return sqlite3.connect(uri, uri=True, timeout=5.0)
