@@ -1,23 +1,60 @@
 from __future__ import annotations
 
+import ast
 import os
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from app_support import haglio_settings
 from app_support.testing import start_again_stand_in, update_waiting_for
 from PyQt6.QtCore import QEvent
 from PyQt6.QtWidgets import QMessageBox
 
 import config
-from gui import single_instance
+import content_overlay
+from gui import peer_watch, single_instance
 from gui.app import _wire
 from gui.run_history import RunHistory
 from gui.run_record import RunRecord
 from gui.settings import EvolverSettings
 from gui.single_instance import Outcome
-from tests.gui_support import EMPTY_QUEUE, QAPP, DoneAtOnce, build_evolver_app, retire_evolver_app
+from tests.gui_support import (
+    EMPTY_QUEUE,
+    QAPP,
+    DoneWhileTheTestsPatchesStand,
+    build_evolver_app,
+    retire_without_quitting_the_shared_application,
+)
+from tests.product_sources import PROJECT_ROOT
 from tests.temp_helpers import make_run_record, override_config
+
+
+def _calls_named(tree: ast.AST, name: str) -> bool:
+    return any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == name
+               for node in ast.walk(tree))
+
+
+class TestTheSuiteItself:
+    def test_no_test_touches_the_marker_that_tells_the_broker_evolver_was_closed_on_purpose(self):
+        assert isinstance(peer_watch.stand_evolver_down, Mock)
+        assert isinstance(peer_watch.clear_evolver_stand_down, Mock)
+
+    def test_the_suite_cannot_start_the_broker_since_the_example_overlay_names_no_real_broker_folder(self):
+        assert not config.BROKER_TRAY_LAUNCHER.is_file()
+
+    def test_the_suite_reads_the_committed_examples_and_never_the_developers_own_overlay_or_settings(self):
+        assert content_overlay.LOCAL_CONTENT == content_overlay.EXAMPLE_CONTENT
+        assert os.environ[haglio_settings.SETTINGS_ENV] == haglio_settings.THE_EXAMPLE
+
+    def test_no_test_builds_an_evolver_app_but_through_build_evolver_app_which_takes_it_down(self):
+        builders = sorted(
+            path.name for path in Path(PROJECT_ROOT, "tests").glob("*.py")
+            if path.name != "gui_support.py"
+            and _calls_named(ast.parse(path.read_text(encoding="utf-8")), "EvolverApp"))
+
+        assert builders == []
 
 
 class TestAppStartup:
@@ -36,7 +73,7 @@ class TestRetiringAnApp:
             app._show_run_log(make_run_record())
         windows = {app._window, app._log_window}
 
-        retire_evolver_app(app)
+        retire_without_quitting_the_shared_application(app)
 
         assert windows.isdisjoint(QAPP.topLevelWidgets())
 
@@ -342,7 +379,7 @@ class TestOneRunAfterAnother:
 
 class TestTheUpscaleQueueWindowsWiring:
     def _opened(self, request):
-        with patch("gui.app.BackgroundQueue", DoneAtOnce):
+        with patch("gui.app.BackgroundQueue", DoneWhileTheTestsPatchesStand):
             app = build_evolver_app(request)
         with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE):
             app._tray.queue_action.trigger()
@@ -582,7 +619,7 @@ def _the_log_window(app):
 
 class TestTakingAnUpdate:
     def _ticked(self, request, *, branch_session=False, running=False, open_window=None):
-        with patch("gui.app.BackgroundQueue", DoneAtOnce):
+        with patch("gui.app.BackgroundQueue", DoneWhileTheTestsPatchesStand):
             app = build_evolver_app(request)
         app._session.is_preview = branch_session
         if open_window is not None:

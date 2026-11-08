@@ -19,7 +19,7 @@ QAPP = QApplication.instance() or QApplication([])
 EMPTY_QUEUE = UpscaleQueue(rows=(), head=None)
 
 
-class DoneAtOnce:
+class DoneWhileTheTestsPatchesStand:
     def run(self, work, then=None):
         answer = work()
         if then is not None:
@@ -29,7 +29,7 @@ class DoneAtOnce:
         pass
 
 
-def row_ground(view, row: int) -> str:
+def row_ground_past_its_text(view, row: int) -> str:
     QAPP.processEvents()
     last_cell = view.visualRect(view.model().index(row, view.model().columnCount() - 1))
     painted = view.viewport().grab().toImage()
@@ -39,20 +39,24 @@ def row_ground(view, row: int) -> str:
 def build_evolver_app(owner):
     app = EvolverApp(QAPP)
     if hasattr(owner, "addCleanup"):
-        owner.addCleanup(retire_evolver_app, app)
+        owner.addCleanup(retire_without_quitting_the_shared_application, app)
     else:
-        owner.addfinalizer(lambda: retire_evolver_app(app))
+        owner.addfinalizer(lambda: retire_without_quitting_the_shared_application(app))
     return app
 
 
-def retire_evolver_app(app) -> None:
+def _unhook_session_end_unless_a_test_already_did(app) -> None:
+    with contextlib.suppress(TypeError):
+        app._app.commitDataRequest.disconnect(app._on_session_end)
+
+
+def retire_without_quitting_the_shared_application(app) -> None:
     app._presence.stop()
     app._runs._watchdog.stop()
     app._peer_timer.stop()
     app._update_timer.stop()
     app._scheduler.stop()
-    with contextlib.suppress(TypeError):
-        app._app.commitDataRequest.disconnect(app._on_session_end)
+    _unhook_session_end_unless_a_test_already_did(app)
     app._tray.hide()
     app._tray.setParent(None)
     app._tray.deleteLater()

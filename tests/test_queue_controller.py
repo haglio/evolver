@@ -6,7 +6,7 @@ import pytest
 from PyQt6.QtWidgets import QWidget
 
 from gui.queue_controller import QueueController
-from tests.gui_support import EMPTY_QUEUE, DoneAtOnce
+from tests.gui_support import EMPTY_QUEUE, DoneWhileTheTestsPatchesStand
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def parent():
 
 
 def _opened(parent) -> tuple[QueueController, MagicMock]:
-    controller = QueueController(parent, DoneAtOnce())
+    controller = QueueController(parent, DoneWhileTheTestsPatchesStand())
     with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE) as queue:
         controller.show()
     return controller, queue
@@ -69,7 +69,7 @@ class TestTheQueueWindowsLifetime:
         queue.assert_called_once_with()
 
     def test_with_no_window_up_there_is_nothing_to_redraw(self, parent):
-        controller = QueueController(parent, DoneAtOnce())
+        controller = QueueController(parent, DoneWhileTheTestsPatchesStand())
 
         with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE) as queue:
             controller.refresh()
