@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 # A kill does not end a probe stuck on a stalled pCloud file, so stop waiting after this long.
 ANSWER_WITHIN_S = 60
 
+# One ffprobe for all three: on Windows starting a process costs more than the probe itself.
 _GEOMETRY_ENTRIES = "stream=width,height:stream_tags=rotate"
 _ROTATION_FIELD = 2
 
