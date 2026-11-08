@@ -25,7 +25,7 @@ def published_for_origenerator_and_fun_time() -> dict:
         "library_relative": library_relative(),
         "partial_marker": PARTIAL_MARKER,
         "library_record": {"folder": _relative_to_the_private_library_root(config.METADATA_DIR),
-                           **library_records.declaration()},
+                           **library_records.promised_to_fun_time()},
         "journals": {"fields": list(warm_gun.FIELDS),
                      "favorite_events": list(warm_gun.FAVORITE_EVENTS)},
     }
