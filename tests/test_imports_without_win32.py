@@ -46,7 +46,7 @@ class TestTheWholeSuite(unittest.TestCase):
     def test_it_collects_where_ctypes_has_no_windll(self):
         result = run_without_the_win32_ctypes_surface(
             "import sys, pytest\n"
-            "sys.exit(pytest.main(['--collect-only', '-q']))\n"
+            "sys.exit(pytest.main(['--collect-only', '-q', '--no-cov']))\n"
         )
 
         assert result.returncode == 0, result.stdout[-4000:]
