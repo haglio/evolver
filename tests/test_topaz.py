@@ -130,17 +130,17 @@ class TestWhatAFilesNoteSaysMadeIt(unittest.TestCase):
 
                 assert (noted.name, noted.version, noted.keep_audio) == (retired.name, "v001", False)
 
-    def test_a_file_written_under_an_earlier_wording_of_the_name_in_parentheses_still_names_its_settings(self):
+    def test_an_older_wording_in_parentheses_still_names_its_settings(self):
         note = topaz.AI_UPSCALE_T2V.videoai_tag
         written_then = note[:note.rindex("(")] + "(t2v examplesite)"
 
         assert written_then != note
-        assert topaz.settings_noted(written_then) is topaz.AI_UPSCALE_T2V
+        assert topaz.settings_noted(written_then) is topaz.AI_UPSCALE_T2V, "files written under an earlier wording of the note must still name their settings"
 
-    def test_the_note_topaz_writes_on_an_export_made_by_hand_or_no_note_at_all_names_no_settings(self):
-        for note in (("Processed using apo-8 replacing duplicate frames. Enhanced using gcg-5. "
-                      "4x upscale"), ""):
-            with self.subTest(note=note):
+    def test_a_note_none_of_these_settings_wrote_names_none(self):
+        for written_by, note in (("Topaz, on an export made by hand", "Processed using apo-8 replacing duplicate frames. "
+                                  "Enhanced using gcg-5. 4x upscale"), ("nothing", "")):
+            with self.subTest(written_by=written_by):
                 assert topaz.settings_noted(note) is None
 
 
