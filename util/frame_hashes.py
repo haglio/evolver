@@ -17,23 +17,24 @@ log = logging.getLogger(__name__)
 _ROWS, _COLS = 8, 9
 SAMPLE_HEIGHT, SAMPLE_WIDTH = _ROWS * 4, _COLS * 4
 
-SAMPLE_FPS = 8.0
+_FARTHEST_A_MATCHED_FRAME_LANDS_SECONDS = 0.0625
+SAMPLE_FPS = 1 / (2 * _FARTHEST_A_MATCHED_FRAME_LANDS_SECONDS)
 
 TOLERANCE = 8
 
 JITTER = 1
 
-MIN_SCORE = 0.25
+MIN_SHARE_OF_THE_CLIP_AT_ONE_OFFSET = 0.25
 
 _POPCOUNT = np.array([i.bit_count() for i in range(256)], dtype=np.uint8)
 
 PROBE_POINTS = (0.2, 0.5, 0.8)
 PROBE_SECONDS = 4.0
 
-# ffmpeg's cropdetect: 'black' is anything below 24, rounded to a multiple of 2.
-_CROP_LIMIT, _CROP_ROUND = 24, 2
+# ffmpeg's cropdetect: below 24 is black, rounded to 2, reset 0 grows one box over the window.
+_CROP_LIMIT, _CROP_ROUND, _CROP_KEPT_OVER_THE_WINDOW = 24, 2, 0
 
-MIN_CONTENT_FRACTION = 0.5
+LEAST_CONTENT_A_REAL_LETTERBOX_LEAVES = 0.5
 
 _CROP_REPORT = re.compile(r"crop=(\d+):(\d+):(\d+):(\d+)")
 
@@ -61,7 +62,8 @@ def content_crop_in(
 
     if crop_width >= width and crop_height >= height:
         return None
-    if crop_width < width * MIN_CONTENT_FRACTION or crop_height < height * MIN_CONTENT_FRACTION:
+    if (crop_width < width * LEAST_CONTENT_A_REAL_LETTERBOX_LEAVES
+            or crop_height < height * LEAST_CONTENT_A_REAL_LETTERBOX_LEAVES):
         return None
     return crop_width, crop_height, left, upper
 
@@ -70,7 +72,8 @@ def _cropdetect(video: Path, at: float) -> str:
     command = [
         "ffmpeg", "-nostats", "-ss", f"{at:.3f}", "-t", str(PROBE_SECONDS),
         "-i", str(video), "-an",
-        "-vf", f"cropdetect={_CROP_LIMIT}:{_CROP_ROUND}:0", "-f", "null", "-",
+        "-vf", f"cropdetect={_CROP_LIMIT}:{_CROP_ROUND}:{_CROP_KEPT_OVER_THE_WINDOW}",
+        "-f", "null", "-",
     ]
     try:
         return subprocess.run(
@@ -110,6 +113,7 @@ def frames_at(video: Path, seconds: Iterable[float]) -> np.ndarray:
 
 def _content_filters(crop: tuple[int, int, int, int] | None) -> list[str]:
     bars = [] if crop is None else ["crop={}:{}:{}:{}".format(*crop)]
+    # ffmpeg's area scaler averages whole source blocks: a 4K upscale shrinks like its 540p original.
     return [*bars, f"scale={SAMPLE_WIDTH}:{SAMPLE_HEIGHT}:flags=area"]
 
 
@@ -163,7 +167,7 @@ def align(clip: np.ndarray, scene: np.ndarray, *, fps: float) -> Alignment | Non
     best = _peak(shift)
     backers = np.unique(clip_frame[np.abs(shift - best) <= JITTER])
     score = len(backers) / len(clip)
-    return Alignment(offset=best / fps, score=score) if score >= MIN_SCORE else None
+    return Alignment(offset=best / fps, score=score) if score >= MIN_SHARE_OF_THE_CLIP_AT_ONE_OFFSET else None
 
 
 def _peak(shift: np.ndarray) -> int:
