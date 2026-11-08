@@ -104,7 +104,7 @@ class TestFingerprinted:
         assert recorded == {"title": "scene one", same_footage.BLOCK: {"other": 1, same_footage.FIELD: ["00"] * 16}}
         assert payload == {"title": "scene one", same_footage.BLOCK: {"other": 1}}
 
-    def test_an_upscale_is_handed_its_originals_moments_which_describe_the_footage_not_the_file(self):
+    def test_an_upscale_is_handed_its_originals_moments(self):
         with workspace_temp_dir() as root:
             overrides = nonai_library_overrides(root)
             source = make_video(overrides["NON_AI_DIR"] / "alpha" / "1 clips to upscale" / "scene one.mp4")
@@ -115,7 +115,7 @@ class TestFingerprinted:
                 nonai_retire.carry_metadata(source, out)
                 handed = sidecar.read(sidecar.sidecar_path(out))
 
-        assert same_footage.fingerprint_of(handed) == ["0a"] * 16
+        assert same_footage.fingerprint_of(handed) == ["0a"] * 16, "the moments describe the footage, not the file"
 
     def test_a_record_with_no_block_gets_one(self):
         assert same_footage.fingerprinted({}, ["00"] * 16) == {same_footage.BLOCK: {same_footage.FIELD: ["00"] * 16}}

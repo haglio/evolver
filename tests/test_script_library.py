@@ -25,7 +25,7 @@ class TestTrim(unittest.TestCase):
 
         assert trimmed["actions"] == [{"at": 0, "pos": 20}, {"at": 1000, "pos": 80}, {"at": 2000, "pos": 30}]
 
-    def test_carries_the_preceding_action_to_zero_so_the_device_does_not_lurch_at_the_clips_first_motion(self):
+    def test_a_cut_starts_where_the_scene_had_the_device(self):
         script = {
             "actions": [
                 {"at": 9_400, "pos": 15},
@@ -36,7 +36,7 @@ class TestTrim(unittest.TestCase):
 
         trimmed = script_library.trim(script, start_seconds=10.0, duration_seconds=2.0)
 
-        assert trimmed["actions"] == [{"at": 0, "pos": 15}, {"at": 500, "pos": 80}, {"at": 1000, "pos": 30}]
+        assert trimmed["actions"] == [{"at": 0, "pos": 15}, {"at": 500, "pos": 80}, {"at": 1000, "pos": 30}], "without it the device lurches at the clip's first motion"
 
     def test_keeps_the_scene_fields_but_redates_the_duration_to_the_clip(self):
         script = {
@@ -86,12 +86,12 @@ class TestScriptPathForVideo(unittest.TestCase):
 
 
 class TestPlace(unittest.TestCase):
-    def test_moves_every_action_to_where_the_clip_sits_and_scripts_nothing_else_so_the_device_stays_still_there(self):
+    def test_places_the_clips_actions_and_invents_none(self):
         script = {"actions": [{"at": 500, "pos": 80}, {"at": 0, "pos": 15}]}
 
         placed = script_library.place(script, start_seconds=10.0, duration_seconds=126.5)
 
-        assert placed["actions"] == [{"at": 10_000, "pos": 15}, {"at": 10_500, "pos": 80}]
+        assert placed["actions"] == [{"at": 10_000, "pos": 15}, {"at": 10_500, "pos": 80}], "a stretch nobody scripted leaves the device still"
 
     def test_redates_the_duration_and_drops_annotations_to_the_scene(self):
         script = {
@@ -106,12 +106,12 @@ class TestPlace(unittest.TestCase):
 
 
 class TestScriptPathOutsideTheLibrary(unittest.TestCase):
-    def test_a_video_outside_the_library_like_an_archived_original_that_keeps_its_own_beside_it_has_no_script_here(self):
+    def test_a_video_outside_the_library_has_no_script_here(self):
         with (
             override_config(VIDEO_LIBRARY_DIR=Path("C:/lib/videos"), SCRIPT_LIBRARY_DIR=Path("C:/lib/scripts")),
             pytest.raises(ValueError, match="not in the video library"),
         ):
-            script_library.script_path_for_video(Path("C:/archive/clip.mkv"))
+            script_library.script_path_for_video(Path("C:/archive/an original keeping its own script beside it.mkv"))
 
 
 class TestTheMarkSayingNoPersonWroteAScript(unittest.TestCase):
