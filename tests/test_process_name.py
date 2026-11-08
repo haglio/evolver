@@ -16,7 +16,8 @@ APP_NAME = "Evolver"
 ROLE = "Evolver"
 
 
-def test_the_app_prepares_the_copy_for_next_time(tmp_path: Path):
+def test_the_copy_is_of_the_windowed_interpreter_the_shortcut_starts_and_its_row_is_the_one_apps_name(
+        tmp_path: Path):
     assert_the_process_is_named(
         tray_app._name_this_process, tmp_path,
         ProcessName(

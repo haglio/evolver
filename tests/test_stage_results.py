@@ -88,7 +88,10 @@ class TestStageResults(unittest.TestCase):
             for function in _out_parameters(tree, result_types)
         )
 
-        assert offenders == [], "return what the helper learned and let the caller that owns the result add it up"
+        assert offenders == [], (
+            "return what the helper learned and let the caller that owns the result add it up: "
+            "a helper writing into it hides which counters a call moves, and cannot be tested "
+            "without building the stage's whole result")
 
 
 if __name__ == "__main__":
