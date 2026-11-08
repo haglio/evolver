@@ -10,7 +10,7 @@ import numpy as np
 from tests.product_sources import PROJECT_ROOT
 from util import frame_hashes as fh
 from util.frame_hashes import (
-    LEAST_CONTENT_A_REAL_LETTERBOX_LEAVES,
+    REAL_LETTERBOX_MIN_CONTENT,
     SAMPLE_HEIGHT,
     SAMPLE_WIDTH,
     align,
@@ -26,7 +26,7 @@ def _hashes(n: int, seed: int = 0) -> np.ndarray:
 
 
 class TestFrameHashes:
-    def test_reading_relative_brightness_a_dimmer_copy_of_a_frame_hashes_the_same(self):
+    def test_a_dimmer_copy_of_a_frame_hashes_the_same(self):
         rng = np.random.default_rng(3)
         frames = rng.integers(40, 200, size=(5, SAMPLE_HEIGHT, SAMPLE_WIDTH), dtype=np.uint8)
 
@@ -63,14 +63,15 @@ class TestContentCropIn:
 
         assert content_crop_in([report], 1920, 1080) is None
 
-    def test_a_dark_moment_can_only_shrink_a_window_so_the_widest_wins(self):
+    def test_the_widest_window_wins(self):
         dark = self._report(600, 400, x=660, y=340)
         lit = self._report(1440, 1080, x=240)
 
-        assert content_crop_in([dark, lit, dark], 1920, 1080) == (1440, 1080, 240, 0)
+        assert content_crop_in([dark, lit, dark], 1920, 1080) == (1440, 1080, 240, 0), (
+            "a dark moment can only make bars appear that are not there")
 
     def test_a_video_that_reads_as_nearly_all_black_is_left_alone(self):
-        sliver = int(1080 * LEAST_CONTENT_A_REAL_LETTERBOX_LEAVES) - 20
+        sliver = int(1080 * REAL_LETTERBOX_MIN_CONTENT) - 20
         report = self._report(1920, sliver, y=(1080 - sliver) // 2)
 
         assert content_crop_in([report], 1920, 1080) is None
@@ -84,12 +85,15 @@ class TestContentCropIn:
         assert crop is not None
         assert not any(value % 2 for value in crop)
 
-    def test_an_odd_rectangle_is_rounded_outward_to_stay_the_widest_reading(self):
+    def test_an_odd_rectangle_is_rounded_outward(self):
         crop_width, crop_height, left, upper = content_crop_in(
-            [self._report(1437, 1077, x=241, y=1)], 1920, 1080)
+            [self._report(1436, 1076, x=241, y=1)], 1920, 1080)
 
-        assert (left, upper) <= (241, 1)
-        assert (left + crop_width, upper + crop_height) >= (241 + 1437, 1 + 1077)
+        outward = "rounding inward would make it the tightest reading, not the widest"
+        assert left <= 241, outward
+        assert upper <= 1, outward
+        assert left + crop_width >= 241 + 1436, outward
+        assert upper + crop_height >= 1 + 1076, outward
 
 
 class TestContentCrop:
@@ -135,7 +139,7 @@ class TestSampleFrames:
             frames = fh.sample_frames(Path("scene.mp4"), 8.0)
         return frames, warning
 
-    def test_ffmpeg_decodes_below_normal_priority_so_whatever_he_is_doing_comes_first(self):
+    def test_ffmpeg_decodes_below_normal_priority(self):
         seen = {}
 
         class _Finished:
@@ -144,17 +148,17 @@ class TestSampleFrames:
 
         self._decoded(lambda command, **kwargs: seen.update(kwargs) or _Finished())
 
-        assert seen["creationflags"] & subprocess.BELOW_NORMAL_PRIORITY_CLASS
+        assert seen["creationflags"] & subprocess.BELOW_NORMAL_PRIORITY_CLASS, "whatever he is doing comes first"
 
-    def test_a_file_ffmpeg_cannot_read_gives_no_frames_rather_than_stopping_the_batch(self):
+    def test_an_unreadable_file_gives_no_frames(self):
         def refuses(command, **kwargs):
             raise subprocess.CalledProcessError(1, command, stderr=b"invalid data")
 
         frames, _warning = self._decoded(refuses)
 
-        assert len(frames) == 0
+        assert len(frames) == 0, "that one video matches nothing instead of stopping the batch"
 
-    def test_a_damaged_file_that_still_decodes_keeps_ffmpegs_complaints_out_of_the_log(self):
+    def test_a_damaged_decode_logs_none_of_ffmpegs_complaints(self):
         class _DecodedWhileComplaining:
             stdout = bytes(SAMPLE_HEIGHT * SAMPLE_WIDTH)
             stderr = b"corrupt macroblock"
@@ -162,11 +166,11 @@ class TestSampleFrames:
         frames, warning = self._decoded(lambda command, **kwargs: _DecodedWhileComplaining())
 
         assert len(frames) == 1
-        warning.assert_not_called()
+        assert warning.call_count == 0, "a batch over hundreds of videos would bury the log"
 
 
 class TestWhatItKnows:
-    def test_it_takes_paths_and_returns_numbers_reading_no_library_and_writing_no_record(self):
+    def test_it_imports_none_of_the_library_modules(self):
         tree = ast.parse((PROJECT_ROOT / "util" / "frame_hashes.py").read_text(encoding="utf-8"))
         imported = {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import)
                     for alias in node.names}
@@ -175,7 +179,8 @@ class TestWhatItKnows:
 
         assert {name for name in imported
                 if name.split(".")[0] == "config"
-                or name.startswith(("util.sidecar", "util.library_records", "util.media_files"))} == set()
+                or name.startswith(("util.sidecar", "util.library_records", "util.media_files"))} == set(), (
+            "it takes paths and returns numbers; tasks/clip_match.py walks the library")
 
 
 class TestFramesAt:
@@ -237,16 +242,16 @@ class TestAlign:
         assert found is not None
         assert found.offset == 15.0
 
-    def test_an_excerpt_whose_hashes_reencoding_nudged_a_few_bits_still_aligns(self):
+    def test_an_excerpt_a_few_bits_off_still_aligns(self):
         scene = _hashes(400)
         clip = scene[120:160] ^ np.uint64(0b1011)
 
         found = align(clip, scene, fps=8.0)
 
-        assert found is not None
+        assert found is not None, "re-encoding, rescaling and upscaling nudge a frame's hash"
         assert found.offset == 15.0
 
-    def test_a_still_moment_counts_each_clip_frame_once_not_once_per_offset_it_matches(self):
+    def test_a_still_moment_counts_each_clip_frame_once(self):
         scene = _hashes(400)
         still = scene[300]
         scene[300:340] = still
@@ -255,23 +260,23 @@ class TestAlign:
         found = align(clip, scene, fps=8.0)
 
         assert found is not None
-        assert found.score == 10 / 40
+        assert found.score == 10 / 40, "one still frame matches every offset it spans"
 
-    def test_lookalike_frames_scattered_over_a_scene_never_agree_on_one_offset(self):
+    def test_scattered_lookalikes_never_agree_on_one_offset(self):
         clip, scene = _hashes(40, seed=1), _hashes(400, seed=2)
         for clip_frame, scene_frame in ((3, 17), (11, 250), (12, 88), (30, 301), (37, 130)):
             scene[scene_frame] = clip[clip_frame]
 
-        assert align(clip, scene, fps=8.0) is None
+        assert align(clip, scene, fps=8.0) is None, "unrelated frames collide often on the 72-cell hash"
 
-    def test_an_excerpt_sampled_off_another_frame_rate_spreads_over_neighbor_offsets_yet_counts_whole(self):
+    def test_an_excerpt_jittering_by_a_frame_counts_whole(self):
         scene = _hashes(400)
         clip = np.array([scene[200 + i + (i % 2)] for i in range(40)], dtype=np.uint64)
 
         found = align(clip, scene, fps=8.0)
 
         assert found is not None
-        assert found.score == 1.0
+        assert found.score == 1.0, "clip and scene come off different frame rates"
         assert abs(found.offset - 25.0) <= 1 / 8
 
 
