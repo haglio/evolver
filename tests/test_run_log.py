@@ -23,7 +23,7 @@ class TestRunId(unittest.TestCase):
     def test_the_banner_carries_that_name(self):
         assert "2026-07-15T03-20-02" in run_log.banner("2026-07-15T03-20-02")
 
-    def test_the_record_the_window_reads_finds_the_run_the_pipelines_banner_opened(self):
+    def test_the_record_finds_the_run_its_banner_opened(self):
         started = datetime(2026, 7, 15, 3, 20, 2, tzinfo=UTC)
         lines = _as_logging_writes_them_on_windows(run_log.banner(run_log.run_id(started)), "Stage 8 done.")
         record = RunRecord.from_pipeline_result(PipelineResult(
@@ -34,7 +34,7 @@ class TestRunId(unittest.TestCase):
             log = root / "evolver.log"
             log.write_bytes(lines)
 
-            assert run_log.read_run(log, record.id, record.log_start, record.log_end) is not None
+            assert run_log.read_run(log, record.id, record.log_start, record.log_end) is not None, "the banner and the record must name the run by the one run_id, or the run is never found"
 
 
 class TestSize(unittest.TestCase):
@@ -97,26 +97,26 @@ class TestReadRun(unittest.TestCase):
 
         assert self._read() is None
 
-    def test_a_run_is_read_where_its_mark_points_and_never_searched_for_through_a_log_nothing_rotates(self):
+    def test_a_run_is_read_only_where_its_mark_points(self):
         self.log.write_bytes(self.mine + self.before)
 
-        assert run_log.read_run(self.log, self.run_id, len(self.mine), len(self.mine) + len(self.before)) is None
+        assert run_log.read_run(self.log, self.run_id, len(self.mine), len(self.mine) + len(self.before)) is None, "nothing rotates the log, hundreds of megabytes long, so a run is pointed at and never searched for"
 
-    def test_a_run_that_wrote_nothing_but_its_banner_reads_back_as_that_banner_not_as_nothing_to_show(self):
+    def test_a_run_of_only_its_banner_reads_back_as_that(self):
         banner_alone = _as_logging_writes_them_on_windows(run_log.banner(self.run_id))
         self.log.write_bytes(self.before + banner_alone)
 
         text = run_log.read_run(self.log, self.run_id, len(self.before), len(self.before) + len(banner_alone))
 
-        assert text.endswith(run_log.banner(self.run_id))
+        assert text.endswith(run_log.banner(self.run_id)), "a good mark over nothing written is not the None of a mark that leads nowhere"
 
     def test_a_mark_landing_on_another_runs_lines_is_refused(self):
         self.log.write_bytes(_as_logging_writes_them_on_windows("a fresh log") * 40)
 
         assert self._read() is None
 
-    def test_the_banner_opens_what_comes_back_so_the_window_says_which_run_it_shows(self):
-        assert self._read().splitlines()[0].endswith(run_log.banner(self.run_id))
+    def test_the_banner_opens_what_comes_back(self):
+        assert self._read().splitlines()[0].endswith(run_log.banner(self.run_id)), "the window says which run it shows"
 
     def test_the_ceiling_sits_far_above_a_runs_few_kilobytes(self):
         a_runs_usual_bytes = 4 << 10
