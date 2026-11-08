@@ -256,14 +256,14 @@ class TestTheListOfStagesRunsItself:
 
 
 class TestCooperativeStop:
-    def test_stops_between_stages_once_asked(self):
-        completed: list[str] = []
+    def test_a_stop_asked_mid_stage_lets_that_stage_finish_so_no_video_is_left_half_moved(self):
+        asked = []
 
-        result = _run(_made_up("first"), _made_up("second"), _made_up("third"),
-                      on_stage_complete=lambda key, *_: completed.append(key),
-                      should_stop=lambda: bool(completed))
+        result = _run(_made_up("first", run=lambda _: asked.append("stop") or _Done()),
+                      _made_up("second"), _made_up("third"),
+                      should_stop=lambda: bool(asked))
 
-        assert [record.name for record in result.stages] == ["first"]
+        assert _statuses(result) == {"first": "completed"}
 
     def test_a_stop_that_is_never_requested_changes_nothing(self):
         result = _run(_made_up("first"), _made_up("second"), should_stop=lambda: False)
