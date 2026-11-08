@@ -31,7 +31,7 @@ from util import run_lock, run_log, topaz
 from util.sidecar import sidecar_path
 from util.stage_result import StageResult
 
-CRLF = (chr(13) + chr(10)).encode("ascii")
+WHAT_LOGGING_ENDS_A_LINE_WITH = os.linesep.encode("ascii")
 
 
 @dataclass
@@ -73,6 +73,22 @@ def _stage(key: str) -> evolver.Stage:
 
 def _statuses(result: evolver.PipelineResult) -> dict[str, str]:
     return {record.name: record.status for record in result.stages}
+
+
+@contextmanager
+def _writing_info_lines_like_the_banner_to(log: Path):
+    handler = logging.FileHandler(log, encoding="utf-8")
+    logger = logging.getLogger("evolver")
+    logger.addHandler(handler)
+    previous_level = logger.level
+    logger.setLevel(logging.INFO)
+    try:
+        with patch.object(config, "LOG_FILE", log):
+            yield
+    finally:
+        logger.setLevel(previous_level)
+        logger.removeHandler(handler)
+        handler.close()
 
 
 class TestTheListOfStagesRunsItself:
@@ -226,26 +242,31 @@ class TestTheListOfStagesRunsItself:
 
         assert result.duration_seconds > 0.0
 
-    def test_the_run_marks_where_in_the_log_it_wrote(self, tmp_path):
+    def test_the_run_marks_its_stretch_since_the_log_holding_what_its_stages_said_is_never_rotated(
+            self, tmp_path):
         log = tmp_path / "evolver.log"
-        log.write_bytes(b"[2026-07-25 08:10:02] an earlier run" + CRLF)
-        handler = logging.FileHandler(log, encoding="utf-8")
-        logger = logging.getLogger("evolver")
-        logger.addHandler(handler)
-        previous_level = logger.level
-        logger.setLevel(logging.INFO)
-        try:
-            with patch.object(config, "LOG_FILE", log):
-                result = _run(_made_up("first"))
-        finally:
-            logger.setLevel(previous_level)
-            logger.removeHandler(handler)
-            handler.close()
+        log.write_bytes(b"[2026-07-25 08:10:02] an earlier run" + WHAT_LOGGING_ENDS_A_LINE_WITH)
+        with _writing_info_lines_like_the_banner_to(log):
+            result = _run(_made_up("first"))
 
         text = run_log.read_run(log, run_log.run_id(result.started_at),
                                 result.log_start, result.log_end)
         assert text is not None
         assert "an earlier run" not in text
+
+    def test_the_runs_stretch_ends_after_the_last_line_its_stages_logged(self, tmp_path):
+        log = tmp_path / "evolver.log"
+
+        def says_its_line(_):
+            logging.getLogger("evolver.made_up").info("the last stage's line")
+            return _Done()
+
+        with _writing_info_lines_like_the_banner_to(log):
+            result = _run(_made_up("first"), _made_up("last", run=says_its_line))
+
+        text = run_log.read_run(log, run_log.run_id(result.started_at),
+                                result.log_start, result.log_end)
+        assert "the last stage's line" in text
 
     def test_a_log_it_cannot_measure_leaves_the_mark_unset(self):
         missing = Path("no-such-directory") / "evolver.log"
