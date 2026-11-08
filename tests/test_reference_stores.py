@@ -44,8 +44,20 @@ class TestAStoreOfFrameNumbers(unittest.TestCase):
             ("Genaumacher session", False), ("scripture project", False)]
 
 
+class TestFunTimesWatchCounts(unittest.TestCase):
+    def test_counts_carrying_a_version_key_are_refused(self):
+        with workspace_temp_dir() as temp:
+            counts = temp / "watch_stats.json"
+            counts.write_text(json.dumps({
+                "version": 2,
+                "videos/scene one.mp4": {"completions": 1, "skips": 0, "locks": 0}}), encoding="utf-8")
+            [store] = _only(temp, FUN_TIME_WATCH_STATS_FILE=counts)
+
+            assert "'version'" in (store.shape_complaint() or "")
+
+
 class TestRewritingAnotherAppsStore(unittest.TestCase):
-    def test_a_store_that_cannot_be_read_stops_the_rewrite_rather_than_being_replaced(self):
+    def test_an_unreadable_store_is_never_replaced(self):
         with workspace_temp_dir() as temp:
             counts = temp / "watch_stats.json"
             counts.write_text("{not json", encoding="utf-8")
