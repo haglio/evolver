@@ -187,7 +187,7 @@ class TestBuildMetadata(unittest.TestCase):
         assert payload["video"]["resolution"] == "832x480"
         assert payload["video"]["aspect_ratio"] == "16:9"
 
-    def test_omits_empty_fields(self):
+    def test_a_field_with_no_value_is_left_out_so_it_never_groups_two_equal_records_apart(self):
         with workspace_temp_dir() as root:
             db = root / "origenerator.db"
             _make_db(db, [_row("vid-1", outputs=["wan22_i2v_00001_.mp4"])])
