@@ -57,15 +57,6 @@ def duration_seconds(file: Path) -> float | None:
         return None
 
 
-def frame_fingerprint(file: Path) -> tuple[float, int] | None:
-    match _probe(file, "stream=r_frame_rate,nb_frames").split(","):
-        case [said_rate, frames]:
-            rate = _rate(said_rate)
-            if rate is not None and frames.isdigit():
-                return float(rate), int(frames)
-    return None
-
-
 def frame_rate(file: Path) -> Fraction | None:
     return _rate(_probe(file, "stream=r_frame_rate"))
 

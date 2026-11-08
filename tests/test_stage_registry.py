@@ -112,10 +112,6 @@ class TestStageRegistry(unittest.TestCase):
     def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
         assert _place("upscale_non_ai") == _place("genau_deliver") + 1
 
-    def test_moved_videos_are_followed_after_every_stage_moving_one(self):
-        assert _place("references") > max(map(_place, _STAGES_THAT_MAKE_OR_MOVE_A_VIDEO)), (
-            "a saved path is followed before anything counts its video lost")
-
     def test_titles_come_after_the_grouping(self):
         assert _place("title_non_ai") > _place("group_non_ai"), (
             "the version families are what carry a clip's name to every version of its scene")

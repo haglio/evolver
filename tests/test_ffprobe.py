@@ -11,7 +11,6 @@ import pytest
 
 from util.ffprobe import (
     duration_seconds,
-    frame_fingerprint,
     frame_rate,
     has_sound,
     orientation_of,
@@ -32,26 +31,6 @@ def _ffprobe_answering(answers: dict[str, str], calls: list | None = None):
 
 def _selectors(calls: list) -> list[str]:
     return [argv[argv.index("-show_entries") + 1] for argv in calls]
-
-
-class TestFrameFingerprint(unittest.TestCase):
-    def test_a_rational_frame_rate_is_divided_out(self):
-        calls = []
-        fake = _ffprobe_answering({"stream=r_frame_rate,nb_frames": "30000/1001,40561"}, calls)
-        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
-            assert frame_fingerprint(Path("x.mp4")) == (29.97002997002997, 40561)
-        assert _selectors(calls) == ["stream=r_frame_rate,nb_frames"]
-        assert "-select_streams" in calls[0]
-
-    def test_a_bare_integer_frame_rate_still_fingerprints(self):
-        fake = _ffprobe_answering({"stream=r_frame_rate,nb_frames": "30,100"})
-        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
-            assert frame_fingerprint(Path("x.mp4")) == (30.0, 100)
-
-    def test_a_container_with_no_frame_count_has_no_fingerprint(self):
-        fake = _ffprobe_answering({"stream=r_frame_rate,nb_frames": "19001/317,N/A"})
-        with patch("util.ffprobe.subprocess.Popen", side_effect=fake):
-            assert frame_fingerprint(Path("x.mkv")) is None
 
 
 class TestFrameRate(unittest.TestCase):
@@ -213,7 +192,6 @@ class TestFfprobeInvocation(unittest.TestCase):
                    side_effect=FileNotFoundError("ffprobe")):
             assert duration_seconds(Path("x.mp4")) is None
             assert video_dimensions(Path("x.mp4")) is None
-            assert frame_fingerprint(Path("x.mp4")) is None
             assert orientation_of(Path("x.mp4")) == "unknown"
             assert videoai_tag(Path("x.mp4")) == ""
 

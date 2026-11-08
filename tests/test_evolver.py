@@ -310,7 +310,6 @@ class TestEachStagesWork:
         pytest.param("origenerator_downtime", "evolver.origenerator_commands.run_downtime", {},
                      id="origenerator_downtime"),
         pytest.param("genau_deliver", "evolver.genau_deliver.run", {}, id="genau_deliver"),
-        pytest.param("references", "evolver.reference_sync.run", {}, id="references"),
         pytest.param("watch_weights", "evolver.watch_weights.run",
                      {"tell_the_gallery": evolver.origenerator_commands.write_gallery_entries},
                      id="watch_weights tells origenerator's gallery"),

@@ -40,7 +40,6 @@ CONFIG_REFERENCE_CEILINGS = {
     "tasks/origenerator_commands.py": 1,
     "tasks/prompt_scrape.py": 6,
     "tasks/provenance_sweep.py": 1,
-    "tasks/reference_sync.py": 2,
     "tasks/scene_scripts.py": 1,
     "tasks/scripts_sync.py": 8,
     "tasks/sort.py": 3,
@@ -57,10 +56,8 @@ CONFIG_REFERENCE_CEILINGS = {
     "util/nonai_library.py": 4,
     "util/contract.py": 4,
     "util/nonai_retire.py": 1,
-    "util/reference_stores.py": 4,
     "util/sidecar.py": 6,
     "util/topaz.py": 3,
-    "util/video_locator.py": 2,
     "util/warm_gun.py": 4,
     "util/trash_folders.py": 9,
 }
