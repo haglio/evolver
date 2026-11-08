@@ -67,7 +67,7 @@ class OrigeneratorGalleryContract(unittest.TestCase):
     def test_the_rate_its_videos_are_generated_at_is_read_where_origenerator_publishes_it(self):
         assert origenerator_gallery.generated_fps(self.origenerator) is not None
 
-    def test_the_database_is_where_origenerator_says_it_keeps_it(self):
+    def test_the_database_s_path_inside_origenerator_s_checkout_is_the_one_it_publishes(self):
         relative = Path(self.promise["database_path"])
 
         assert config.ORIGENERATOR_PROJECT_DIR / relative == config.ORIGENERATOR_DB_PATH
