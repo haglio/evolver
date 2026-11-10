@@ -19,6 +19,3 @@ def run_now_icon(color: str) -> QIcon:
 def pause_icon(color: str) -> QIcon:
     return qt_icon("pause", color=color)
 
-
-def review_trash_icon(color: str) -> QIcon:
-    return qt_icon("trash", color=color)

@@ -79,8 +79,7 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
   - `util/html_query.py` - a small HTML parse-and-query library
   - `util/headless_browser.py` - driving an installed Chrome or Edge to dump a page's rendered DOM
   - `util/relative_dates.py` - turning "2d ago" into a date
-  - `review_trash_app.py` - the tool that reviews what is sent to Trash (see below), launched from the tray
-  - `review_trash/window.py` - every video sent to Trash, the one picked playing, and Restore and Delete Permanently
+  - `delete_from_trash.py` - the command Origenerator runs for Delete Permanently on its Trash (see below)
   - `util/player_readout.py` - keeping what the two tools' players read out of a video, its tags among it, out of every log
   - `util/selection_highlight.py` - the family's blue for a picked row, in the lists that would otherwise wear Windows 11's faint gray
   - `gui/app.py` - tray application wiring: builds the parts, then starts them
@@ -123,7 +122,7 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
 pythonw.exe tray_app.py
 ```
 
-This starts a system tray icon. Right-click for the context menu (Open, Run Now, Pause/Resume Scheduling, Upscale Non-AI When Idle, Settings, Stats, Upscale Queue, Review Trash, Restart, Quit) or double-click to open the main window with run history and live progress. The window's toolbar offers the same commands under the same names, Open aside, and on both Upscale Non-AI When Idle wears a switch that shows whether it is on. The menu's first line is the schedule's status: Scheduled with the time of the next run, Running, or Paused. Configure the run interval and Windows startup registration from Settings.
+This starts a system tray icon. Right-click for the context menu (Open, Run Now, Pause/Resume Scheduling, Upscale Non-AI When Idle, Settings, Stats, Upscale Queue, Restart, Quit) or double-click to open the main window with run history and live progress. The window's toolbar offers the same commands under the same names, Open aside, and on both Upscale Non-AI When Idle wears a switch that shows whether it is on. The menu's first line is the schedule's status: Scheduled with the time of the next run, Running, or Paused. Configure the run interval and Windows startup registration from Settings.
 
 Run history is stored as JSON files in `runs/` (gitignored). Settings are persisted to `gui_settings.json` (gitignored).
 
@@ -147,14 +146,11 @@ The OSR2 broker next door already had one: a scheduled task relaunching its tray
 
 **Quit means quit.** Quitting Evolver from its tray or its toolbar leaves a stand-down marker under `LOCALAPPDATA` and the broker leaves it down; starting Evolver again clears it. Every other way Evolver goes down leaves no marker and it comes back inside the quarter hour. `launch_evolver_if_not_running.vbs` is what the broker runs — the launcher exists for callers that have a path and no way to work out which interpreter to use.
 
-## Reviewing what is sent to Trash
+## What is sent to Trash
 
-A video sent to Trash — by Fun Time's Funestras or by Genau — waits in the `trash` folder in Kino's folder or the one beside Genau's flicks folder, and nothing Evolver runs deletes it. **Review Trash...**, in the tray menu or on the main window's toolbar, opens a window that lists every one of them with the folder it restores to, and plays the one you pick, looping and muted. A video sent to Trash while the window is open joins the list within a couple of seconds.
+A video sent to Trash, by Fun Time's Funestras, by Genau or in Origenerator's gallery, waits in the `trash` folder in Kino's folder or the one beside Genau's flicks folder, and goes into Origenerator's Trash with its gallery item, where it is restored or deleted. Nothing Evolver runs on its own deletes it, and the upscale stage does not make a video again while it waits there.
 
-- **Restore** puts the picked videos back in the folders they were sent to Trash in, under the names they had there, each with the funscript that followed it into Trash. An upscale goes back where the upscale stage filed it, a Genau flick to its own place in Genau's flicks folder, and any other video to the folder its metadata is still filed under. A video nothing says the place of reads "can't tell", and can only be deleted.
-- **Delete Permanently** deletes the picked videos at once, without asking, and what is theirs: the `1_sorted` copy each was upscaled from, its own metadata — never the metadata of another video that shares its name — its funscripts, and a Genau flick's sound, unless another flick of that name still plays it. The `Delete` key does the same.
-
-Both say in `evolver.log` what they moved or deleted. The window runs as its own process, so it can never take the tray down with it.
+**Delete Permanently** in Origenerator's Trash runs the command Evolver publishes as `delete_from_trash_command` in `evolver_contract.json` (`delete_from_trash.py`), naming the videos that wait in those folders. It deletes each one and what is theirs: the `1_sorted` copy it was upscaled from, its own metadata (never the metadata of another video that shares its name), its funscripts, and a Genau video's sound, unless another Genau video of that name still plays it. It never deletes a video outside those folders, and says in `evolver.log` what it deleted.
 
 ## Topaz sign-in
 
@@ -314,7 +310,7 @@ For a concise maintainer-oriented summary, see `docs/maintenance_notes.md`.
 
 ## Notes
 
-- Nothing Evolver runs deletes a video sent to Trash: one in the `trash` folder inside Kino's or Genau's own stays there, with its `1_sorted` source, its metadata and its funscripts, until you review it with **Review Trash...** in the tray menu.
+- Nothing Evolver runs deletes a video sent to Trash: one in the `trash` folder inside Kino's or Genau's own stays there, with its `1_sorted` source, its metadata and its funscripts, until Delete Permanently in Origenerator's Trash asks Evolver to delete it.
 - Scripts Sync always runs. It first moves a script when its basename matches exactly one video in the same `AI` or `non_AI` tree within `videos/videos` (or exactly one in the script's own source folder), then fills in missing counterpart funscripts for matching processed/original video versions when it can do so unambiguously.
 - Bookmarks Sync resolves the Chrome profile from Chrome's `Local State` and rewrites the `Fun Time Favs` folder on that profile's bookmarks bar from the `web_url` of every favorite whose video is still there, skipping the run when the library's records cannot be reached.
 - Transfer Prompts writes prompt JSON files under `videos/metadata/kino/2D/AI/.../<video-name>_topaz.json`, skipping any video that already has a JSON. A video whose scrape fails (for example, its source page was deleted) gets a sibling `<video-name>_topaz.json.failed` marker so it is not retried every run; delete the marker to force a retry. The current scraper only extracts Provider prompts.

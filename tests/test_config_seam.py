@@ -28,7 +28,6 @@ CONFIG_REFERENCE_CEILINGS = {
     "gui/startup.py": 1,
     "gui/tray.py": 1,
     "gui/worker.py": 1,
-    "review_trash/window.py": 1,
     "tasks/bookmarks_sync.py": 4,
     "tasks/clip_scripts.py": 1,
     "tasks/genau_deliver.py": 4,

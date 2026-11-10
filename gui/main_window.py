@@ -36,7 +36,6 @@ from gui.commands import (
     QUEUE,
     QUIT,
     RESTART,
-    REVIEW_TRASH,
     RUN_NOW,
     SETTINGS,
     STATS,
@@ -369,9 +368,6 @@ class EvolverMainWindow(QMainWindow):
         self.queue_action = QUEUE.action(self)
         toolbar.addAction(self.queue_action)
 
-        self.review_trash_action = REVIEW_TRASH.action(self)
-        toolbar.addAction(self.review_trash_action)
-
         toolbar.addSeparator()
 
         self.restart_action = RESTART.action(self)
@@ -393,7 +389,6 @@ class EvolverMainWindow(QMainWindow):
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
-            "review_trash": self.review_trash_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,
         }

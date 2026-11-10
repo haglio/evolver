@@ -4,7 +4,7 @@ from PyQt6.QtCore import QSize
 from PyQt6.QtGui import QColor, QIcon, QImage
 from shared_ui.icons import icon_pixmap
 
-from gui.icons import pause_icon, quit_icon, restart_icon, review_trash_icon, run_now_icon
+from gui.icons import pause_icon, quit_icon, restart_icon, run_now_icon
 
 _SIZE = QSize(48, 48)
 
@@ -48,8 +48,3 @@ class TestPauseIcon:
             "the Broker's tray menu pauses with this mark, beside Evolver's in the tray")
 
 
-class TestReviewTrashIcon:
-
-    def test_it_is_the_funestras_trash_mark(self):
-        assert _drawn_exactly_as_shared_ui_draws(review_trash_icon("#ddd"), "trash"), (
-            "the Funestras' Send to Trash button wears this mark")
