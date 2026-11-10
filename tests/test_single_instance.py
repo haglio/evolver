@@ -129,17 +129,34 @@ class Listening:
         self.gateway.stop_serving()
 
 
-class Unanswering:
+class HangsUpUnanswered:
     def __init__(self):
         self._held = []
         self._server = QLocalServer()
         QLocalServer.removeServer(single_instance._PIPE_NAME)
         assert self._server.listen(single_instance._PIPE_NAME), self._server.errorString()
-        self._server.newConnection.connect(
-            lambda: self._held.append(self._server.nextPendingConnection()))
+        self._server.newConnection.connect(self._hear_and_hang_up)
+
+    def _hear_and_hang_up(self):
+        connection = self._server.nextPendingConnection()
+        self._held.append(connection)
+        connection.readyRead.connect(connection.disconnectFromServer)
+        if connection.bytesAvailable():
+            connection.disconnectFromServer()
 
     def close(self):
         self._server.close()
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
 
 
 class AnswersBeforeHearing:
@@ -313,19 +330,24 @@ class TestTakingOver(unittest.TestCase):
 
     def test_an_evolver_that_steps_aside_late_is_still_given_time_to_go(self):
         gateway = single_instance.InstanceGateway()
+        clock = FakeClock()
         answered_at = []
 
         def ask(_launch, **_):
             if answered_at:
                 return None
-            time.sleep(0.7)
-            answered_at.append(time.monotonic())
+            clock.sleep(0.7)
+            answered_at.append(clock.monotonic())
             return single_instance.Answer(single_instance.STEPPING_ASIDE, 0)
 
         def gone():
-            return bool(answered_at) and time.monotonic() - answered_at[0] >= 0.6
+            return bool(answered_at) and clock.monotonic() - answered_at[0] >= 0.6
 
-        with patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              patch.object(gateway, "ask", side_effect=ask),              patch.object(gateway, "claim", side_effect=gone),              process_terminated() as terminate:
+        with patch.object(single_instance, "time", clock), \
+             patch.object(single_instance, "_PATIENCE_SECONDS", 1.0), \
+             patch.object(gateway, "ask", side_effect=ask), \
+             patch.object(gateway, "claim", side_effect=gone), \
+             process_terminated() as terminate:
             outcome = gateway.take_over(single_instance.PREVIEW, end_the_unanswering=True)
 
         assert outcome == single_instance.Outcome.CLAIMED
@@ -333,8 +355,10 @@ class TestTakingOver(unittest.TestCase):
 
     def test_a_preview_ends_an_evolver_that_never_answers(self):
         mutex = _unique("MuteMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("MutePipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 0.5),              held_mutex(mutex) as holder:
-            mute = Unanswering()
+        with patch.object(single_instance, "_MUTEX_NAME", mutex), \
+             patch.object(single_instance, "_PIPE_NAME", _unique("MutePipe")), \
+             held_mutex(mutex) as holder:
+            mute = HangsUpUnanswered()
             ended = []
 
             def terminate(pid):
@@ -355,30 +379,37 @@ class TestTakingOver(unittest.TestCase):
 
     def test_an_evolver_ended_when_the_patience_runs_out_is_still_given_time_to_go(self):
         gateway = single_instance.InstanceGateway()
+        clock = FakeClock()
         ended_at = []
 
         def ask(_launch, *, until):
             if ended_at:
                 return None
-            time.sleep(max(0.0, until - time.monotonic()))
+            clock.sleep(max(0.0, until - clock.monotonic()))
             return single_instance.Answer(b"", 0)
 
         def end(_pid):
-            ended_at.append(time.monotonic())
+            ended_at.append(clock.monotonic())
             return True
 
         def gone():
-            return bool(ended_at) and time.monotonic() - ended_at[0] >= 0.3
+            return bool(ended_at) and clock.monotonic() - ended_at[0] >= 0.3
 
-        with patch.object(single_instance, "_PATIENCE_SECONDS", 1.0),              patch.object(gateway, "ask", side_effect=ask),              patch.object(gateway, "claim", side_effect=gone),              process_terminated(side_effect=end):
+        with patch.object(single_instance, "time", clock), \
+             patch.object(single_instance, "_PATIENCE_SECONDS", 1.0), \
+             patch.object(gateway, "ask", side_effect=ask), \
+             patch.object(gateway, "claim", side_effect=gone), \
+             process_terminated(side_effect=end):
             outcome = gateway.take_over(single_instance.PREVIEW, end_the_unanswering=True)
 
         assert outcome == single_instance.Outcome.CLAIMED
 
     def test_the_usual_launch_leaves_an_evolver_that_never_answers_alone(self):
         mutex = _unique("OldMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("OldPipe")),              patch.object(single_instance, "_PATIENCE_SECONDS", 0.5),              held_mutex(mutex):
-            mute = Unanswering()
+        with patch.object(single_instance, "_MUTEX_NAME", mutex), \
+             patch.object(single_instance, "_PIPE_NAME", _unique("OldPipe")), \
+             held_mutex(mutex):
+            mute = HangsUpUnanswered()
             try:
                 with process_terminated() as terminate:
                     outcome = off_the_thread_the_stand_in_answers_on(
