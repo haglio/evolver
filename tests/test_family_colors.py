@@ -12,7 +12,7 @@ from tests.product_sources import strings_outside_docstrings
 pytestmark = pytest.mark.repo_check
 
 _ROOT = Path(__file__).resolve().parent.parent
-_TREES = (_ROOT / "gui", _ROOT / "evolver", _ROOT / "review_trash", _ROOT / "tasks",
+_TREES = (_ROOT / "gui", _ROOT / "evolver", _ROOT / "tasks",
           _ROOT / "util", _ROOT / "tools", _ROOT / "tests")
 
 _HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b")

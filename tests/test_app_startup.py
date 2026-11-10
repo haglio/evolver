@@ -192,8 +192,8 @@ class TestCommandWiring:
     def test_a_slot_no_view_offers_is_refused_too(self):
         view = SimpleNamespace(commands=lambda: {"run_now": MagicMock()})
 
-        with pytest.raises(ValueError, match="review_trash"):
-            _wire(view, {"run_now": lambda: None, "review_trash": lambda: None})
+        with pytest.raises(ValueError, match="unoffered"):
+            _wire(view, {"run_now": lambda: None, "unoffered": lambda: None})
 
     def test_each_command_reaches_its_own_slot(self):
         signals = {"run_now": MagicMock(), "quit": MagicMock()}

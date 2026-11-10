@@ -3,8 +3,6 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-import pytest
-
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
 from util import trash_folders
 from util.script_library import is_marked_generated, mark_generated, script_path_for_video
@@ -35,48 +33,52 @@ class _InALibrary(unittest.TestCase):
         self.addCleanup(configured.__exit__, None, None, None)
 
 
+def _all_in_trash():
+    return trash_folders.marked_as(trash_folders.videos_in_trash())
+
+
 class TestWhereAVideoMarkedTrashCameFrom(_InALibrary):
-    def test_an_upscale_goes_back_where_the_upscale_stage_filed_it(self):
+    def test_an_upscale_played_where_the_upscale_stage_filed_it(self):
         touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene one.mp4")
         marked = touch_video(self.lib.trash / "scene one_topaz.mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
         assert found.video == marked
-        assert found.restores_to == self.lib.kino_upscales / "portrait" / "example-source" / "scene one_topaz.mp4"
+        assert found.played_at == self.lib.kino_upscales / "portrait" / "example-source" / "scene one_topaz.mp4"
 
-    def test_a_second_video_marked_under_a_taken_name_goes_back_under_its_own(self):
+    def test_a_second_video_marked_under_a_taken_name_played_under_its_own(self):
         touch_video(self.lib.sorted_dir / "example-source" / "landscape" / "scene two.mp4")
         touch_video(self.lib.trash / "scene two_topaz__dup1.mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
-        assert found.restores_to == self.lib.kino_upscales / "landscape" / "example-source" / "scene two_topaz.mp4"
+        assert found.played_at == self.lib.kino_upscales / "landscape" / "example-source" / "scene two_topaz.mp4"
 
-    def test_of_two_sources_sharing_a_name_it_restores_to_the_one_missing_its_upscale(self):
+    def test_of_two_sources_sharing_a_name_it_played_at_the_one_missing_its_upscale(self):
         for source in ("example-source", "example-source-two"):
             touch_video(self.lib.sorted_dir / source / "portrait" / "loop_3.mkv")
         touch_video(self.lib.kino_upscales / "portrait" / "example-source" / "loop_3_topaz.mp4")
         touch_video(self.lib.trash / "loop_3_topaz.mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
-        assert found.restores_to == self.lib.kino_upscales / "portrait" / "example-source-two" / "loop_3_topaz.mp4"
+        assert found.played_at == self.lib.kino_upscales / "portrait" / "example-source-two" / "loop_3_topaz.mp4"
         assert found.upscaled_from == self.lib.sorted_dir / "example-source-two" / "portrait" / "loop_3.mkv"
 
     def test_a_copy_left_outside_the_orientation_folders_is_no_upscale_s_source(self):
         touch_video(self.lib.sorted_dir / "example-source" / "loop_4.mp4")
         touch_video(self.lib.trash / "loop_4_topaz.mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
-        assert found.restores_to is None
+        assert found.played_at is None
 
-    def test_a_genau_clip_restores_to_its_own_place_in_genaus_folder(self):
+    def test_a_genau_clip_played_at_its_own_place_in_genaus_folder(self):
         top = touch_video(self.lib.genau_trash / "loop_5_topaz.mp4")
         inside = touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_6_topaz.mp4")
 
-        found = {marked.video: marked.restores_to for marked in trash_folders.in_trash()}
+        found = {marked.video: marked.played_at for marked in _all_in_trash()}
 
         assert found == {top: self.lib.genau_flicks / "loop_5_topaz.mp4", inside: self.lib.genau_flicks / "2D" / "AI" / "loop_6_topaz.mp4"}
 
@@ -85,99 +87,52 @@ class TestWhereAVideoMarkedTrashCameFrom(_InALibrary):
         touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "loop_8.mp4")
         touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_8_topaz (2).mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
         assert found.upscaled_from == left_behind
 
-    def test_a_clip_whose_place_has_been_taken_since_has_nowhere_to_go_back_to(self):
+    def test_a_clip_whose_place_has_been_taken_since_names_no_place_it_played(self):
         touch_video(self.lib.genau_flicks / "loop_7_topaz.mp4")
         touch_video(self.lib.genau_trash / "loop_7_topaz.mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
-        assert found.restores_to is None
+        assert found.played_at is None
 
-    def test_a_video_no_upscale_explains_goes_back_where_its_record_still_is(self):
+    def test_a_video_no_upscale_explains_played_where_its_record_still_is(self):
         scene = self.lib.non_ai / "example-bucket" / "full" / "scene three.mp4"
         _a_record_for(scene)
         touch_video(self.lib.trash / "scene three.mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
-        assert found.restores_to == scene
+        assert found.played_at == scene
 
-    def test_a_namesake_still_in_its_place_is_not_where_the_video_goes_back(self):
+    def test_a_namesake_still_in_its_place_is_not_where_the_video_played(self):
         scene = self.lib.non_ai / "example-bucket" / "full" / "scene four.mp4"
         _a_record_for(scene)
         _a_record_for(touch_video(self.lib.non_ai / "other-bucket" / "scene four.mp4"))
         touch_video(self.lib.trash / "scene four.mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
-        assert found.restores_to == scene
+        assert found.played_at == scene
 
     def test_two_places_a_video_could_have_left_are_no_answer(self):
         for bucket in ("example-bucket", "other-bucket"):
             _a_record_for(self.lib.non_ai / bucket / "scene five.mp4")
         touch_video(self.lib.trash / "scene five.mp4")
 
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
-        assert found.restores_to is None
-
-
-class TestRestoring(_InALibrary):
-    def test_the_video_is_back_where_it_came_from_and_gone_from_the_pile(self):
-        marked = touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_9_topaz.mp4")
-        [found] = trash_folders.in_trash()
-
-        with self.assertLogs("util.trash_folders", level="INFO") as said:
-            trash_folders.restore(found)
-
-        assert not marked.exists()
-        assert (self.lib.genau_flicks / "2D" / "AI" / "loop_9_topaz.mp4").is_file()
-        assert said.records[0].args == (marked, found.restores_to)
-
-    def test_the_funscript_that_followed_it_into_the_pile_comes_back_with_its_mark(self):
-        touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene six.mp4")
-        marked = touch_video(self.lib.trash / "scene six_topaz__dup2.mp4")
-        _a_script_for(marked, generated=True)
-        [found] = trash_folders.in_trash()
-
-        trash_folders.restore(found)
-
-        script = script_path_for_video(found.restores_to)
-        assert script.is_file()
-        assert is_marked_generated(script)
-        assert not script_path_for_video(marked).exists()
-
-    def test_a_video_with_nowhere_to_go_back_to_stays_in_the_pile(self):
-        marked = touch_video(self.lib.trash / "scene seven.mp4")
-        [found] = trash_folders.in_trash()
-
-        with pytest.raises(ValueError, match="was sent to Trash from"):
-            trash_folders.restore(found)
-
-        assert marked.is_file()
-
-    def test_a_place_taken_since_the_list_was_read_keeps_what_took_it(self):
-        marked = touch_video(self.lib.genau_trash / "loop_10_topaz.mp4")
-        [found] = trash_folders.in_trash()
-        taker = touch_video(self.lib.genau_flicks / "loop_10_topaz.mp4")
-        taker.write_bytes(b"another")
-
-        with pytest.raises(FileExistsError):
-            trash_folders.restore(found)
-
-        assert marked.is_file()
-        assert taker.read_bytes() == b"another"
+        assert found.played_at is None
 
 
 class TestDeletingPermanently(_InALibrary):
     def test_the_video_goes_and_so_does_the_copy_it_was_upscaled_from(self):
         source = touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene eight.mp4")
         marked = touch_video(self.lib.trash / "scene eight_topaz.mp4")
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
         trash_folders.delete_permanently(found)
 
@@ -187,8 +142,8 @@ class TestDeletingPermanently(_InALibrary):
     def test_its_own_record_goes_and_every_namesake_keeps_its_own(self):
         touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene nine.mp4")
         touch_video(self.lib.trash / "scene nine_topaz.mp4")
-        [found] = trash_folders.in_trash()
-        own = _a_record_for(found.restores_to)
+        [found] = _all_in_trash()
+        own = _a_record_for(found.played_at)
         namesakes = [
             _a_record_for(touch_video(self.lib.kino_upscales / "landscape" / "example-source" / "scene nine_topaz.mp4")),
             _a_record_for(touch_video(self.lib.non_ai / "example-bucket" / "0 unsorted" / "scene nine_topaz.mp4")),
@@ -202,8 +157,8 @@ class TestDeletingPermanently(_InALibrary):
     def test_every_funscript_it_and_its_copy_held_goes_with_its_mark(self):
         source = touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene ten.mp4")
         marked = touch_video(self.lib.trash / "scene ten_topaz.mp4")
-        [found] = trash_folders.in_trash()
-        scripts = [_a_script_for(video, generated=True) for video in (marked, found.restores_to, source)]
+        [found] = _all_in_trash()
+        scripts = [_a_script_for(video, generated=True) for video in (marked, found.played_at, source)]
 
         trash_folders.delete_permanently(found)
 
@@ -213,7 +168,7 @@ class TestDeletingPermanently(_InALibrary):
     def test_a_genau_clips_sound_goes_with_it(self):
         touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_11_topaz.mp4")
         sound = touch_video(self.lib.genau_audio / "loop_11_topaz.mp3")
-        [found] = trash_folders.in_trash()
+        [found] = _all_in_trash()
 
         trash_folders.delete_permanently(found)
 
@@ -223,7 +178,7 @@ class TestDeletingPermanently(_InALibrary):
         touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_12_topaz.mp4")
         touch_video(self.lib.genau_trash / "loop_12_topaz.mp4")
         sound = touch_video(self.lib.genau_audio / "loop_12_topaz.mp3")
-        first, _second = trash_folders.in_trash()
+        first, _second = _all_in_trash()
 
         trash_folders.delete_permanently(first)
 
@@ -232,8 +187,8 @@ class TestDeletingPermanently(_InALibrary):
     def test_the_log_names_everything_it_deleted_the_copy_first(self):
         source = touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene eleven.mp4")
         marked = touch_video(self.lib.trash / "scene eleven_topaz.mp4")
-        [found] = trash_folders.in_trash()
-        record = _a_record_for(found.restores_to)
+        [found] = _all_in_trash()
+        record = _a_record_for(found.played_at)
         script = _a_script_for(marked)
 
         with self.assertLogs("util.trash_folders", level="INFO") as said:
