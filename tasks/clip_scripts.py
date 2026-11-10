@@ -7,6 +7,7 @@ from app_support import funscript
 
 import config
 from util import ffprobe, provenance, scene_links, script_library
+from util.library_records import CLIP_BLOCK, CLIP_SCENE_OFFSET_FIELD
 from util.media_files import library_videos
 from util.stage_result import StageResult
 
@@ -27,14 +28,14 @@ def run() -> ClipScriptsResult:
     result = ClipScriptsResult()
 
     log.info("=== Stage: scene funscripts -> carved clips ===")
-    clips = {video: scene_links.moved_to_ids(video).get("clip")
+    clips = {video: scene_links.moved_to_ids(video).get(CLIP_BLOCK)
              for video in library_videos(config.VIDEO_LIBRARY_DIR)}
     videos_by_id = scene_links.videos_by_id()
     for video, clip in clips.items():
         if not isinstance(clip, dict):
             continue
 
-        scene, offset = scene_links.scene_of(clip, videos_by_id), clip.get("scene_offset")
+        scene, offset = scene_links.scene_of(clip, videos_by_id), clip.get(CLIP_SCENE_OFFSET_FIELD)
         if not scene or offset is None:
             result.unmatched_clip += 1
             continue

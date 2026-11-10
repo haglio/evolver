@@ -6,6 +6,7 @@ from app_support import video_ids
 
 from util import sidecar
 
+BLOCK = "clip"
 SCENE_ID = "full_video_id"
 _SCENE_PATH = "full_video"
 
@@ -47,7 +48,7 @@ def moved_to_ids(video: Path) -> dict:
 
 
 def _named_by_id(payload: dict) -> dict | None:
-    clip = payload.get("clip")
+    clip = payload.get(BLOCK)
     named = clip.get(_SCENE_PATH) if isinstance(clip, dict) else None
     if not isinstance(named, str) or not Path(named).is_file():
         return None
@@ -55,4 +56,4 @@ def _named_by_id(payload: dict) -> dict | None:
         link = link_to(Path(named))
     except ValueError:
         return None
-    return {**payload, "clip": {**without_a_scene(clip), **link}}
+    return {**payload, BLOCK: {**without_a_scene(clip), **link}}

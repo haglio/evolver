@@ -8,6 +8,7 @@ from pathlib import Path
 import config
 from util import lanes, orientation, sidecar, video_kind
 from util.ffprobe import duration_seconds, orientation_of
+from util.library_records import CLIP_BLOCK
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -155,7 +156,7 @@ def _vr_videos():
 
 
 def _was_carved(video: Path, payload: dict) -> bool:
-    return isinstance(payload.get("clip"), dict) or _in_a_clip_folder(video)
+    return isinstance(payload.get(CLIP_BLOCK), dict) or _in_a_clip_folder(video)
 
 
 def _below_the_library(video: Path) -> tuple[str, ...]:

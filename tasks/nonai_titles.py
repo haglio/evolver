@@ -8,6 +8,7 @@ from app_support import video_ids
 from app_support.video_names import clip_title, version_group_of
 
 from util import scene_links, sidecar
+from util.library_records import CLIP_BLOCK
 from util.library_records import TITLE_KEY as TITLE_FIELD
 from util.media_files import is_finalized_video_file
 from util.nonai_library import buckets
@@ -24,7 +25,7 @@ class NonAiTitleResult(StageResult):
 
 
 def _scene_matched(payload: dict) -> str | None:
-    clip = payload.get("clip")
+    clip = payload.get(CLIP_BLOCK)
     return scene_links.scene_id(clip) if isinstance(clip, dict) else None
 
 
