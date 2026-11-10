@@ -5,8 +5,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app_support.trash_names import name_before_trash
+
 import config
-from util import lanes, trash_folders
+from util import lanes
 from util.alert import show_error
 from util.media_files import library_videos
 from util.sidecar import sidecar_folder
@@ -73,7 +75,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
         expected = {upscale_name(p) for p in lane.sorted_copies}
         by_name: dict[str, list[str]] = {}
         for upscale in sorted(lane.upscales):
-            name = trash_folders.name_it_had(upscale)
+            name = name_before_trash(upscale.name)
             by_name.setdefault(name, []).append(_shown(upscale))
             if name not in expected and not lane.kept_once_sorted_copy_retired:
                 orphan_upscales.append(_shown(upscale))
