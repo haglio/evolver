@@ -80,4 +80,4 @@ def run() -> ClipScriptsResult:
 
 
 def _drives_nothing(script: dict) -> bool:
-    return len(script["actions"]) <= 1
+    return len(funscript.actions_of(script)) <= 1
