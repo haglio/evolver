@@ -154,7 +154,7 @@ STAGES: tuple[Stage, ...] = (
           (0x0A, 0x12, 0x2C), run=lambda _: stray_files.run()),
     Stage("withdrawn", "Delete unsent videos",
           "Delete every copy this library holds of a video unsent in Origenerator -- the inbox copy, the 1_sorted copy, the upscale and, down the Genau lane, the delivered "
-          f"{_FLICK} -- with their metadata and funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its sound once the video with its sound is there",
+          f"{_FLICK} -- with their metadata and funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its audio once the video with its audio is there",
           (0x00, 0x00, 0x6C), run=lambda _: unsent_videos.run()),
     Stage("metadata", "Transfer prompts",
           "Read the prompt each AI video in 1_sorted was made from and save it in that video's sidecar",
@@ -177,7 +177,7 @@ STAGES: tuple[Stage, ...] = (
           "Make each AI video in 1_sorted into a 60fps video four times larger with Topaz, and put it in its Kino or Genau folder",
           (0xED, 0xC9, 0x48), run=_upscale),
     Stage("genau_deliver", "Genau delivery",
-          f"Finish each Genau-lane {_FLICK} the upscale put in the folder Genau plays from: record what it is, save its sound and retire the 1_sorted copy it was made from",
+          f"Finish each Genau-lane {_FLICK} the upscale put in the folder Genau plays from: record what it is, save its audio and retire the 1_sorted copy it was made from",
           (0x7B, 0x41, 0x73), run=lambda _: genau_deliver.run()),
     Stage("upscale_non_ai", "Upscale non-AI videos",
           "Upscale one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
