@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from app_support.funscript import actions_of
+from app_support.funscript import ACTIONS, AT, BOOKMARKS, CHAPTERS, DURATION, METADATA, actions_of
 from app_support.mirrored_tree import mirrored_path
 
 import config
@@ -90,47 +90,47 @@ def remove_empty_mark_folders() -> None:
 def trim(script: dict, start_seconds: float, duration_seconds: float) -> dict:
     start_ms = round(start_seconds * 1000)
     end_ms = start_ms + round(duration_seconds * 1000)
-    source = sorted(actions_of(script), key=lambda action: action["at"])
+    source = sorted(actions_of(script), key=lambda action: action[AT])
 
-    inside = [action for action in source if start_ms <= action["at"] <= end_ms]
-    before = [action for action in source if action["at"] < start_ms]
-    if before and (not inside or inside[0]["at"] != start_ms):
-        inside.insert(0, {**before[-1], "at": start_ms})
+    inside = [action for action in source if start_ms <= action[AT] <= end_ms]
+    before = [action for action in source if action[AT] < start_ms]
+    if before and (not inside or inside[0][AT] != start_ms):
+        inside.insert(0, {**before[-1], AT: start_ms})
 
-    actions = [{**action, "at": action["at"] - start_ms} for action in inside]
-    trimmed = {**script, "actions": actions}
+    actions = [{**action, AT: action[AT] - start_ms} for action in inside]
+    trimmed = {**script, ACTIONS: actions}
 
-    metadata = script.get("metadata")
+    metadata = script.get(METADATA)
     if isinstance(metadata, dict):
-        trimmed["metadata"] = _retime_metadata(metadata, duration_seconds)
+        trimmed[METADATA] = _retime_metadata(metadata, duration_seconds)
     return trimmed
 
 
 def place(script: dict, start_seconds: float, duration_seconds: float) -> dict:
     start_ms = round(start_seconds * 1000)
     actions = [
-        {**action, "at": action["at"] + start_ms}
-        for action in sorted(actions_of(script), key=lambda action: action["at"])
+        {**action, AT: action[AT] + start_ms}
+        for action in sorted(actions_of(script), key=lambda action: action[AT])
     ]
-    placed = {**script, "actions": actions}
+    placed = {**script, ACTIONS: actions}
 
-    metadata = script.get("metadata")
+    metadata = script.get(METADATA)
     if isinstance(metadata, dict):
-        placed["metadata"] = _retime_metadata(metadata, duration_seconds)
+        placed[METADATA] = _retime_metadata(metadata, duration_seconds)
     return placed
 
 
 def stamped_in_its_own_metadata(script: dict, act: str) -> dict:
-    metadata = script.get("metadata")
+    metadata = script.get(METADATA)
     metadata = metadata if isinstance(metadata, dict) else {}
-    return {**script, "metadata": provenance.recorded(metadata, act, provenance.by_evolver())}
+    return {**script, METADATA: provenance.recorded(metadata, act, provenance.by_evolver())}
 
 
 def _retime_metadata(metadata: dict, duration_seconds: float) -> dict:
     retimed = dict(metadata)
-    if "duration" in retimed:
-        retimed["duration"] = int(duration_seconds)
-    for absolute in ("bookmarks", "chapters"):
+    if DURATION in retimed:
+        retimed[DURATION] = int(duration_seconds)
+    for absolute in (BOOKMARKS, CHAPTERS):
         if absolute in retimed:
             retimed[absolute] = []
     return retimed
