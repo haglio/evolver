@@ -11,7 +11,14 @@ from app_support.video_names import stable_title
 
 from util import lanes, scene_links, sidecar
 from util.frame_hashes import SAMPLE_FPS, Match, align, frame_hashes, locate, sample_frames
-from util.library_records import VERSION_BLOCK, VERSION_GROUP_FIELD
+from util.library_records import (
+    CLIP_BLOCK,
+    CLIP_PERFORMER_FIELD,
+    CLIP_SCENE_ID_FIELD,
+    CLIP_SCENE_OFFSET_FIELD,
+    VERSION_BLOCK,
+    VERSION_GROUP_FIELD,
+)
 from util.media_files import file_size
 
 log = logging.getLogger(__name__)
@@ -28,14 +35,14 @@ class ClipMatchResult:
 
 
 def could_be_cut_from(clip_record: dict, scene: Path) -> bool:
-    performer = _undoubled_tokens(str(clip_record.get("performer", "")))
+    performer = _undoubled_tokens(str(clip_record.get(CLIP_PERFORMER_FIELD, "")))
     return bool(performer) and performer <= _undoubled_tokens(scene.stem)
 
 
 def record(clip: Path, scene: Path, *, offset: float) -> None:
     def record_the_scene(payload: dict) -> dict:
-        payload["clip"] = {**scene_links.without_a_scene(payload.get("clip", {})),
-                           **scene_links.link_to(scene), "scene_offset": offset}
+        payload[CLIP_BLOCK] = {**scene_links.without_a_scene(payload.get(CLIP_BLOCK, {})),
+                             **scene_links.link_to(scene), CLIP_SCENE_OFFSET_FIELD: offset}
         return payload
 
     sidecar.update(sidecar.sidecar_path(clip), record_the_scene)
@@ -43,11 +50,11 @@ def record(clip: Path, scene: Path, *, offset: float) -> None:
 
 def forget(clip: Path, scene: Path) -> None:
     def drop_the_match(payload: dict) -> dict | None:
-        recorded = payload.get("clip")
+        recorded = payload.get(CLIP_BLOCK)
         if not isinstance(recorded, dict) or not scene_links.names(recorded, scene):
             return None
-        recorded.pop(scene_links.SCENE_ID, None)
-        recorded.pop("scene_offset", None)
+        recorded.pop(CLIP_SCENE_ID_FIELD, None)
+        recorded.pop(CLIP_SCENE_OFFSET_FIELD, None)
         return payload
 
     sidecar.update(sidecar.sidecar_path(clip), drop_the_match)
@@ -62,7 +69,7 @@ def run(
     log.info("=== Batch: match carved clips to their scenes ===")
     videos = lanes.non_ai_videos() if videos is None else list(videos)
     payloads = {video: sidecar.read(sidecar.sidecar_path(video)) for video in videos}
-    clips = [video for video in videos if isinstance(payloads[video].get("clip"), dict)]
+    clips = [video for video in videos if isinstance(payloads[video].get(CLIP_BLOCK), dict)]
     scenes = _scene_cuts([video for video in videos if video not in set(clips)])
     families = _clip_families(clips, payloads)
 
@@ -100,7 +107,7 @@ def _match_every_scene(
     for cut in scenes:
         candidates = [
             clip for clip in clips
-            if could_be_cut_from(payloads[clip]["clip"], cut.best_named)
+            if could_be_cut_from(payloads[clip][CLIP_BLOCK], cut.best_named)
         ]
         if not candidates:
             continue
