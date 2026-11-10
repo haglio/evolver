@@ -3,8 +3,17 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from app_support.funscript import ACTIONS, AT, BOOKMARKS, CHAPTERS, DURATION, METADATA, actions_of
-from app_support.mirrored_tree import mirrored_path
+from app_support.funscript import (
+    ACTIONS,
+    AT,
+    BOOKMARKS,
+    CHAPTERS,
+    DURATION,
+    METADATA,
+    actions_of,
+    generated_mark_of,
+    script_of,
+)
 
 import config
 from util import provenance
@@ -12,12 +21,8 @@ from util.media_files import kept_by_another_app, remove_empty_dirs
 
 
 def script_path_for_video(video: Path) -> Path:
-    script = None if kept_by_another_app(video) else mirrored_path(
-        video,
-        roots=(config.VIDEO_LIBRARY_DIR,),
-        mirror_root=config.SCRIPT_LIBRARY_DIR,
-        suffix=config.FUNSCRIPT_EXTENSION,
-    )
+    script = None if kept_by_another_app(video) else script_of(
+        video, library=config.VIDEO_LIBRARY_DIR, scripts_tree=config.SCRIPT_LIBRARY_DIR)
     if script is None:
         raise ValueError(f"{video} is not in the video library")
     return script
@@ -36,12 +41,7 @@ def scripts_held_for(*videos: Path | None) -> list[Path]:
 
 
 def generated_mark(script: Path) -> Path | None:
-    return mirrored_path(
-        script,
-        roots=(config.SCRIPT_LIBRARY_DIR,),
-        mirror_root=config.GENERATED_SCRIPTS_DIR,
-        suffix=".generated",
-    )
+    return generated_mark_of(script, scripts_tree=config.SCRIPT_LIBRARY_DIR, marks_tree=config.GENERATED_SCRIPTS_DIR)
 
 
 def mark_generated(script: Path) -> None:
