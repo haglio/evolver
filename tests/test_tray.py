@@ -22,13 +22,15 @@ class TestTrayMenu:
         assert "queue" in tray.commands()
         assert tray.queue_action.text() == "Upscale Queue..."
 
-    def test_the_upscale_queue_sits_with_a_line_above_and_below(self):
+    def test_the_two_tools_sit_together_with_a_line_above_and_below(self):
         tray = EvolverTray()
         entries = ["---" if action.isSeparator() else action.text()
                    for action in tray.contextMenu().actions()]
         first = entries.index("Upscale Queue...")
 
-        assert entries[first - 1:first + 2] == ["---", "Upscale Queue...", "---"]
+        assert entries[first - 1:first + 3] == [
+            "---", "Upscale Queue...", "Review Non-AI Trash...", "---"]
+        assert tray.commands()["review_trash"] == tray.review_trash_action.triggered
 
 
 def _row_as_drawn(menu, action, *, under_the_pointer=False):

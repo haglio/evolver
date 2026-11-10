@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import logging
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -147,6 +148,7 @@ class EvolverApp:
             "settings": self._show_settings,
             "stats": self._show_stats,
             "queue": self._queue.show,
+            "review_trash": partial(self._launch_tool, "review_trash_app.py"),
             "restart": self._restart,
         }
         _wire(self._tray, {**shared_commands,
@@ -252,6 +254,12 @@ class EvolverApp:
         self._log_window.show()
         self._log_window.raise_()
         self._log_window.activateWindow()
+
+    def _launch_tool(self, script: str):
+        subprocess.Popen(
+            [sys.executable, str(self._checkout / script)],
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
 
     def _notify(self, body: str, icon: QSystemTrayIcon.MessageIcon, msecs: int):
         if not self._settings.enable_toasts:
