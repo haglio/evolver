@@ -47,36 +47,35 @@ class TestUpscaleHelpers(unittest.TestCase):
             trash.mkdir(parents=True)
 
             with override_config(**kino_folders(out)):
-                spot = lanes.upscale_of("provider", "landscape", "a")
-                assert not upscale._already_made("provider", spot)
+                assert not upscale._already_made("provider", "a")
 
                 p1 = out / "landscape" / "provider" / "a_topaz.mp4"
                 p1.write_bytes(b"1")
-                assert upscale._already_made("provider", spot)
+                assert upscale._already_made("provider", "a")
 
                 p1.unlink()
                 p2 = out / "portrait" / "provider" / "a_topaz.mp4"
                 p2.write_bytes(b"1")
-                assert upscale._already_made("provider", spot)
+                assert upscale._already_made("provider", "a")
 
                 p2.unlink()
                 p3 = trash / "a_topaz.mp4"
                 p3.write_bytes(b"1")
-                assert upscale._already_made("provider", spot)
+                assert upscale._already_made("provider", "a")
 
     def test_a_genau_upscale_is_made_once_it_is_where_genau_plays_it_or_in_genaus_trash(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config():
                 spot = lanes.upscale_of("example-loop-clips", "landscape", "loop")
-                assert not upscale._already_made("example-loop-clips", spot)
+                assert not upscale._already_made("example-loop-clips", "loop")
 
                 touch_video(spot)
-                assert upscale._already_made("example-loop-clips", spot)
+                assert upscale._already_made("example-loop-clips", "loop")
 
                 spot.unlink()
                 touch_video(lib.genau_trash / "2D" / "AI" / spot.name)
-                assert upscale._already_made("example-loop-clips", spot)
+                assert upscale._already_made("example-loop-clips", "loop")
 
     def test_run_processes_dynamic_source_and_creates_out_dir(self):
         with workspace_temp_dir() as root:
