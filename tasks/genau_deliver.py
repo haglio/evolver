@@ -60,7 +60,7 @@ def _save_its_sound(flick: Path, audio_dir: Path) -> None:
     try:
         save_as_mp3(flick, audio_dir / f"{flick.stem}.mp3")
     except (OSError, subprocess.CalledProcessError):
-        log.warning("Could not save the sound of %s", flick.name, exc_info=True)
+        log.warning("Could not save the audio of %s", flick.name, exc_info=True)
 
 
 def run() -> GenauDeliverResult:
