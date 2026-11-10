@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from app_support import haglio_settings, kino_folder, siblings
+from app_support import funscript, haglio_settings, kino_folder, siblings
 from app_support.flick_folder import trash_folder_in
 from app_support.overlay import overlay_value
 
@@ -69,9 +69,9 @@ def warm_gun_journal_dirs(content: dict[str, Any], library_dir: Path) -> tuple[P
 
 WARM_GUN_OUTBOX = warm_gun_outbox(_CONTENT)
 WARM_GUN_JOURNAL_DIRS = warm_gun_journal_dirs(_CONTENT, Path(haglio_settings.value("warm_gun_journal_dir")))
-SCRIPT_LIBRARY_DIR = LIBRARY_ROOT / "videos" / "scripts" / "scripts"
+SCRIPT_LIBRARY_DIR = funscript.scripts_tree_in(LIBRARY_ROOT / "videos")
 UNMATCHED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "unmatched_scripts"
-GENERATED_SCRIPTS_DIR = LIBRARY_ROOT / "videos" / "scripts" / "generated"
+GENERATED_SCRIPTS_DIR = funscript.generated_marks_tree_in(LIBRARY_ROOT / "videos")
 
 
 def vr_video_dir(content: dict[str, Any]) -> Path | None:
@@ -135,7 +135,7 @@ def display_timezone(content: dict[str, Any]) -> tzinfo | None:
 DISPLAY_TIMEZONE = display_timezone(_CONTENT)
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".webm", ".m4v"}
-FUNSCRIPT_EXTENSION = ".funscript"
+FUNSCRIPT_EXTENSION = funscript.EXTENSION
 
 UPSCALE_BATCH_LIMIT = 5
 VIDEO_KIND_PROBES_PER_RUN = 400
