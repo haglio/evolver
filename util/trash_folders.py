@@ -45,11 +45,20 @@ class InTrash:
 
 
 def in_trash() -> list[InTrash]:
+    return _marked(videos_in_trash())
+
+
+def marked_as(videos) -> list[InTrash]:
+    held = set(videos_in_trash())
+    return _marked([video for video in map(Path, videos) if video in held])
+
+
+def _marked(videos: list[Path]) -> list[InTrash]:
     _, genau_trash = trash_dirs()
-    sorted_copies = _sorted_copies_by_stem()
+    sorted_copies = _sorted_copies_by_stem() if videos else {}
     return [_out_of_genau(video, genau_trash, sorted_copies) if video.is_relative_to(genau_trash)
             else _out_of_the_outbox(video, sorted_copies)
-            for video in videos_in_trash()]
+            for video in videos]
 
 
 def _sorted_copies_by_stem() -> dict[str, list[Path]]:
