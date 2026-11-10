@@ -48,9 +48,8 @@ for a preview: other sessions' suites run out of it.
 **The preview is part of delivering a user-facing change, not an extra, and it
 comes BEFORE the pull request** — opening one here lands the change hands-off
 within about twenty minutes, so a preview handed over beside an open PR is a
-notice, not a review. Push the branch and open it with `gh pr create --fill
---draft` if it should be visible first, then `gh pr ready` once he says it is
-good. **Never launch the preview yourself** — a window over his work gets closed
+notice, not a review. Open it once he says it is good, never as a draft; push
+the branch if it should be visible first. **Never launch the preview yourself** — a window over his work gets closed
 in irritation and takes whatever else he was running with it. The windowless
 pre-handoff check is `python -m pytest tests/test_launch_smoke.py`, which
 replays the launch's whole import phase.
