@@ -387,7 +387,7 @@ def _due(source: str, orient: str, sorted_stem: str) -> _Due:
     out = lanes.upscale_of(source, orient, sorted_stem)
     if out is None:
         return _Due.NOTHING
-    if not _already_made(source, out):
+    if not _already_made(source, sorted_stem):
         return _Due.MADE
     if out.is_file() and _made_by_superseded_settings(source, out):
         return _Due.REMADE
@@ -398,10 +398,10 @@ def awaits_its_upscale(sorted_copy: Path, source: str, orient: str) -> bool:
     return _due(source, orient, sorted_copy.stem) is not _Due.NOTHING
 
 
-def _already_made(source: str, out: Path) -> bool:
-    made = ([out] if lanes.is_genau_lane(source)
-            else [lanes.kino_upscales_dir() / orient / source / out.name for orient in orientation.SORTED])
-    return any(spot.exists() and spot.stat().st_size > 0 for spot in (*made, lanes.in_trash(out)))
+def _already_made(source: str, sorted_stem: str) -> bool:
+    made = {lanes.upscale_of(source, orient, sorted_stem) for orient in orientation.SORTED} - {None}
+    return any(spot.exists() and spot.stat().st_size > 0
+               for upscale in made for spot in (upscale, lanes.in_trash(upscale)))
 
 
 def _show_low_disk_warning(upscales_dir: Path, floor_gb: float, dismissed: Path) -> None:
