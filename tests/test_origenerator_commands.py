@@ -124,11 +124,11 @@ def test_the_gallery_command_is_given_less_time_than_a_run_keeps_spare_after_its
     assert 0 < options["timeout"] < spare
 
 
-def test_a_video_origenerator_sent_needs_no_entry_written_since_its_gallery_made_it():
+def test_a_video_origenerator_sent_is_told_to_its_gallery_like_any_other_sites():
     told = []
 
     for source in ("origenerator", "a-site"):
         origenerator_commands.write_the_gallery_entry_of_a_video_from(
             source, write=lambda source=source: told.append(source))
 
-    assert told == ["a-site"]
+    assert told == ["origenerator", "a-site"]

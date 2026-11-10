@@ -10,7 +10,6 @@ from pathlib import Path
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 import config
-from util import lanes
 from util.origenerator_gallery import PUBLISHED
 from util.stage_result import StageResult
 
@@ -82,6 +81,5 @@ def write_gallery_entries(checkout: Path | None = None, *, runner=subprocess.run
 
 
 def write_the_gallery_entry_of_a_video_from(
-        source: str, *, write: Callable[[], object] = write_gallery_entries) -> None:
-    if not lanes.sent_by_origenerator(source):
-        write()
+        _source: str, *, write: Callable[[], object] = write_gallery_entries) -> None:
+    write()
