@@ -15,6 +15,7 @@ from gui.commands import (
     QUEUE,
     QUIT,
     RESTART,
+    REVIEW_TRASH,
     RUN_NOW,
     SETTINGS,
     STATS,
@@ -72,6 +73,9 @@ class EvolverTray(QSystemTrayIcon):
         self.queue_action = QUEUE.action(self._menu)
         self._menu.addAction(self.queue_action)
 
+        self.review_trash_action = REVIEW_TRASH.action(self._menu)
+        self._menu.addAction(self.review_trash_action)
+
         self._menu.addSeparator()
 
         self.restart_action = RESTART.action(self._menu)
@@ -95,6 +99,7 @@ class EvolverTray(QSystemTrayIcon):
             "settings": self.settings_action.triggered,
             "stats": self.stats_action.triggered,
             "queue": self.queue_action.triggered,
+            "review_trash": self.review_trash_action.triggered,
             "restart": self.restart_action.triggered,
             "quit": self.quit_action.triggered,
         }

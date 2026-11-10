@@ -33,8 +33,20 @@ def stems_in_trash() -> set[str]:
 @dataclass(frozen=True)
 class InTrash:
     video: Path
-    played_at: Path | None
+    restores_to: Path | None
     upscaled_from: Path | None = None
+
+
+def non_ai_videos_in_trash() -> list[Path]:
+    _, genau_trash = trash_dirs()
+    ai = lanes.in_trash(delivered) if (delivered := lanes.genau_delivery_dir()) else None
+    return [video for video in videos_in_trash()
+            if video.is_relative_to(genau_trash) and not (ai is not None and video.is_relative_to(ai))]
+
+
+def non_ai_in_trash() -> list[InTrash]:
+    return _marked(non_ai_videos_in_trash())
+
 
 
 def marked_as(videos) -> list[InTrash]:
@@ -61,8 +73,8 @@ def _out_of_the_outbox(video: Path, sorted_copies: dict[str, list[Path]]) -> InT
     upscales = {spot: copy
                 for copy in sorted_copies.get(sorted_stem_of(Path(name_before_trash(video.name)).stem), [])
                 if (spot := lanes.upscale_filed_for(copy)) is not None}
-    played_at = _the_one_vacant(list(upscales)) or _the_one_vacant(_recorded_spots(video))
-    return InTrash(video, played_at, upscales.get(played_at))
+    restores_to = _the_one_vacant(list(upscales)) or _the_one_vacant(_recorded_spots(video))
+    return InTrash(video, restores_to, upscales.get(restores_to))
 
 
 def _out_of_genau(video: Path, folder: Path, sorted_copies: dict[str, list[Path]]) -> InTrash:
@@ -83,13 +95,29 @@ def _recorded_spots(video: Path) -> list[Path]:
             for record in records.rglob(glob.escape(f"{Path(name).stem}.json"))]
 
 
+def restore(marked: InTrash) -> None:
+    if marked.restores_to is None:
+        raise ValueError(f"Nothing says where {marked.video.name} was sent to Trash from")
+    if marked.restores_to.exists():
+        raise FileExistsError(f"Something else is at {marked.restores_to} now")
+    marked.restores_to.parent.mkdir(parents=True, exist_ok=True)
+    retry_while_in_use(lambda: marked.video.rename(marked.restores_to))
+    log.info("Restored %s  ->  %s", marked.video, marked.restores_to)
+    for script in script_library.scripts_held_for(marked.video):
+        home = script_library.script_path_for_video(marked.restores_to)
+        if not home.exists():
+            home.parent.mkdir(parents=True, exist_ok=True)
+            script.rename(home)
+            script_library.carry_mark(script, home)
+
+
 def delete_permanently(marked: InTrash) -> None:
-    own_record = sidecar_path(marked.played_at) if marked.played_at is not None else None
+    own_record = sidecar_path(marked.restores_to) if marked.restores_to is not None else None
     for gone in (marked.upscaled_from, marked.video, own_record, _sound_only_it_plays(marked)):
         if gone is not None and gone.exists():
             retry_while_in_use(gone.unlink)
             log.info("Deleted permanently: %s", gone)
-    for script in script_library.scripts_held_for(marked.video, marked.played_at, marked.upscaled_from):
+    for script in script_library.scripts_held_for(marked.video, marked.restores_to, marked.upscaled_from):
         script_library.delete_script(script)
         log.info("Deleted permanently: %s", script)
 

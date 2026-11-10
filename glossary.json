@@ -63,8 +63,9 @@
     },
     {
       "id": "trash",
-      "thing": "where a video goes when it is sent away, to wait in Origenerator's Trash for Restore or Delete Permanently",
+      "thing": "where a video goes when it is sent away, to wait in Origenerator's Trash, or for a non-AI video in Review Non-AI Trash, for Restore or Delete Permanently",
       "screen": [
+        "Review Non-AI Trash...",
         "Trash"
       ],
       "his_word": "Trash (2026-11-02: 'we're getting rid of \"weird\" references across Haglio in favor of \"trash\"')",
