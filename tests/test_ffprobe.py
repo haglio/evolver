@@ -194,7 +194,7 @@ class TestFfprobeInvocation(unittest.TestCase):
     def test_a_missing_ffprobe_is_no_answer_not_a_crash(self):
         with patch("util.ffprobe.subprocess.Popen",
                    side_effect=FileNotFoundError("ffprobe")):
-            assert duration_seconds(Path("x.mp4")) is None, "Backfill Metadata has no console to show a crash in"
+            assert duration_seconds(Path("x.mp4")) is None, "Evolver runs windowless, with no console to show a crash in"
             assert video_dimensions(Path("x.mp4")) is None
             assert orientation_of(Path("x.mp4")) == "unknown"
             assert videoai_tag(Path("x.mp4")) == ""
