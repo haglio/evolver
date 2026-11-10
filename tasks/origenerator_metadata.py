@@ -6,6 +6,8 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+from app_support.comfy_file_refs import frame_name
+
 from util import lanes, origenerator_gallery, provenance, sidecar
 from util.ffprobe import video_dimensions
 from util.library_records import FRAME_OF_VIDEO_BLOCK, SOURCE_IMAGE_BLOCK
@@ -19,9 +21,6 @@ PUBLISHED_ACTIONS = "combined_labels"
 
 MODEL_KEYS = ("unet_high", "unet", "checkpoint", "unet_low")
 _MODEL_EXT_RE = re.compile(r"\.(safetensors|ckpt|pt|pth|gguf|sft|bin)$", re.IGNORECASE)
-
-# ComfyUI's LoadImage annotation.
-_TYPE_ANNOTATIONS = ("[output]", "[input]", "[temp]")
 
 _COMMON_RATIOS = ((16, 9), (9, 16), (1, 1), (4, 3), (3, 4), (3, 2), (2, 3),
                   (21, 9), (9, 21), (5, 4), (4, 5))
@@ -58,7 +57,7 @@ def _t2v_video_with_the_start_frame_in(image_row: dict, video_row: dict,
                                        rows: list[dict]) -> dict | None:
     frames = _output_frame_names(image_row)
     for row in rows:
-        if row is video_row or _frame_name(_parse_params(row).get("input_image")) not in frames:
+        if row is video_row or frame_name(_parse_params(row).get("input_image")) not in frames:
             continue
         for path in _library_paths_of(row):
             record = _record_of(path)
@@ -115,7 +114,7 @@ def video_row_named(name: str, rows: list[dict]) -> dict | None:
 
 
 def _match_video_row(video_path: Path, rows: list[dict]) -> dict | None:
-    key = _frame_name(strip_uniquifier(video_path.stem) + video_path.suffix)
+    key = frame_name(strip_uniquifier(video_path.stem) + video_path.suffix)
     for row in rows:
         if key in _output_frame_names(row):
             return row
@@ -123,7 +122,7 @@ def _match_video_row(video_path: Path, rows: list[dict]) -> dict | None:
 
 
 def _find_source_image_row(video_row: dict, rows: list[dict]) -> dict | None:
-    target = _frame_name(_parse_params(video_row).get("input_image"))
+    target = frame_name(_parse_params(video_row).get("input_image"))
     if not target:
         return None
     for row in rows:
@@ -225,7 +224,7 @@ def _decoded(raw: str | None, kind: type[dict] | type[list]):
 
 def _output_frame_names(row: dict) -> set[str]:
     return {
-        _frame_name(f.get("filename"))
+        frame_name(f.get("filename"))
         for f in _row_output_files(row)
         if isinstance(f, dict)
     }
@@ -233,11 +232,3 @@ def _output_frame_names(row: dict) -> set[str]:
 
 def _row_output_files(row: dict) -> list:
     return _decoded(row.get("output_files"), list)
-
-
-def _frame_name(ref: str | None) -> str:
-    ref = ref or ""
-    stem, _, tag = ref.rpartition(" ")
-    if stem and tag in _TYPE_ANNOTATIONS:
-        ref = stem
-    return ref.replace("\\", "/").rsplit("/", 1)[-1].lower()

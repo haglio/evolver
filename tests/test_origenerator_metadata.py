@@ -145,6 +145,19 @@ class TestBuildMetadata(unittest.TestCase):
         assert payload["video"]["prompt"] == "she turns around"
         assert payload["source_image"] == {"positive_prompt": "portrait of a woman", "negative_prompt": "blurry", "model": "reapony_v80", "seed": "7", "created": "2026-03-27"}
 
+    def test_a_start_image_named_with_space_around_it_still_finds_its_source_image(self):
+        with workspace_temp_dir() as root:
+            db = root / "origenerator.db"
+            _make_db(db, [
+                _row("img-1", pos="a red kite", seed=7, outputs=["made_up_00003_.png"]),
+                _row("vid-1", pos="the kite climbs", seed=42,
+                     params={"input_image": " made_up_00003_.png [output] "},
+                     outputs=["made_up_00004_.mp4"]),
+            ])
+            with _no_probe():
+                payload = om.build_metadata(Path("made_up_00004_.mp4"), db_path=db)
+        assert payload["source_image"]["positive_prompt"] == "a red kite"
+
     def test_no_source_image_when_input_image_unmatched(self):
         with workspace_temp_dir() as root:
             db = root / "origenerator.db"
@@ -225,17 +238,6 @@ class TestAspectRatio(unittest.TestCase):
 
     def test_empty_for_degenerate(self):
         assert om._aspect_ratio(0, 480) == ""
-
-
-class TestFrameName(unittest.TestCase):
-    def test_strips_output_annotation_and_lowercases(self):
-        assert om._frame_name("Sub/Wan22_T2I_00005_.PNG [output]") == "wan22_t2i_00005_.png"
-
-    def test_bare_filename(self):
-        assert om._frame_name("a.mp4") == "a.mp4"
-
-    def test_empty(self):
-        assert om._frame_name(None) == ""
 
 
 if __name__ == "__main__":
