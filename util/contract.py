@@ -9,6 +9,8 @@ from util.media_files import PARTIAL_MARKER
 
 CONTRACT_FILE = "evolver_contract.json"
 
+DELETE_FROM_TRASH_COMMAND = (".venv/Scripts/python.exe", "-m", "delete_from_trash")
+
 _EVOLVER_CHECKOUT = Path(__file__).resolve().parent.parent
 
 
@@ -28,6 +30,7 @@ def published_for_origenerator_and_fun_time() -> dict:
                            **library_records.declaration()},
         "journals": {"fields": list(warm_gun.FIELDS),
                      "favorite_events": list(warm_gun.FAVORITE_EVENTS)},
+        "delete_from_trash_command": list(DELETE_FROM_TRASH_COMMAND),
     }
 
 

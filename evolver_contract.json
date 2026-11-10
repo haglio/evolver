@@ -95,5 +95,10 @@
       "favorite",
       "unfavorite"
     ]
-  }
+  },
+  "delete_from_trash_command": [
+    ".venv/Scripts/python.exe",
+    "-m",
+    "delete_from_trash"
+  ]
 }

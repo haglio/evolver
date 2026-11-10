@@ -37,6 +37,12 @@ class PublishedDocument(unittest.TestCase):
 
         assert mirrored_path(video, roots=library_roots_beside(metadata), mirror_root=metadata, suffix=".json") == sidecar.sidecar_path(video)
 
+    def test_the_delete_from_trash_command_runs_this_repos_own_module_in_its_own_venv(self):
+        interpreter, flag, module = _document()["delete_from_trash_command"]
+
+        assert (interpreter, flag) == (".venv/Scripts/python.exe", "-m")
+        assert (REPO_ROOT / f"{module}.py").is_file()
+
     def test_a_name_carrying_the_marker_is_one_this_repo_refuses_to_ingest(self):
         marker = _document()["partial_marker"]
 
