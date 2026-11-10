@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import glob
 import logging
-import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+
+from app_support.trash_names import name_before_trash
 
 import config
 from util import lanes, script_library
@@ -15,17 +16,9 @@ from util.versions import sorted_stem_of
 
 log = logging.getLogger(__name__)
 
-_DUPLICATE = "__dup"
-_DUPLICATE_NUMBER = re.compile(rf"{_DUPLICATE}\d+$")
-
 
 def trash_dirs() -> tuple[Path, Path]:
     return tuple(lane.trash for lane in lanes.upscale_lanes())
-
-
-
-def name_it_had(video: Path) -> str:
-    return f"{_DUPLICATE_NUMBER.sub('', video.stem)}{video.suffix}"
 
 
 def videos_in_trash() -> list[Path]:
@@ -34,7 +27,7 @@ def videos_in_trash() -> list[Path]:
 
 
 def stems_in_trash() -> set[str]:
-    return {Path(name_it_had(video)).stem for video in videos_in_trash()}
+    return {Path(name_before_trash(video.name)).stem for video in videos_in_trash()}
 
 
 @dataclass(frozen=True)
@@ -70,7 +63,7 @@ def _sorted_copies_by_stem() -> dict[str, list[Path]]:
 
 def _out_of_the_outbox(video: Path, sorted_copies: dict[str, list[Path]]) -> InTrash:
     upscales = {spot: copy
-                for copy in sorted_copies.get(sorted_stem_of(Path(name_it_had(video)).stem), [])
+                for copy in sorted_copies.get(sorted_stem_of(Path(name_before_trash(video.name)).stem), [])
                 if (spot := lanes.upscale_filed_for(copy)) is not None}
     restores_to = _the_one_vacant(list(upscales)) or _the_one_vacant(_recorded_spots(video))
     return InTrash(video, restores_to, upscales.get(restores_to))
@@ -87,7 +80,7 @@ def _out_of_genau(video: Path, folder: Path, sorted_copies: dict[str, list[Path]
 
 
 def _recorded_spots(video: Path) -> list[Path]:
-    name = name_it_had(video)
+    name = name_before_trash(video.name)
     return [root / record.parent.relative_to(records) / name
             for root in (lanes.kino_upscales_dir(), config.NON_AI_DIR)
             if (records := sidecar_folder(root)) is not None
