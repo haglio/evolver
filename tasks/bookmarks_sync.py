@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 _PROFILE_INFO_KEY = "profile"
 _PROFILE_CACHE_KEY = "info_cache"
 _BOOKMARKS_BAR_KEY = "bookmark_bar"
+_FOLDER_FORMER_NAME = "Fun Time Favs"
 
 
 @dataclass
@@ -179,7 +180,11 @@ def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> int:
     bookmark_bar = roots[_BOOKMARKS_BAR_KEY]
     children = bookmark_bar.setdefault("children", [])
 
-    matching = [child for child in children if child.get("type") == "folder" and child.get("name") == folder_name]
+    names = (folder_name, _FOLDER_FORMER_NAME)
+    matching = sorted(
+        (child for child in children if child.get("type") == "folder" and child.get("name") in names),
+        key=lambda child: names.index(child["name"]),
+    )
     folder = matching[0] if matching else None
     for extra in matching[1:]:
         children.remove(extra)
@@ -200,6 +205,7 @@ def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> int:
         children.append(folder)
         next_id += 1
     else:
+        folder["name"] = folder_name
         folder["date_modified"] = now
 
     wanted = set(urls)
