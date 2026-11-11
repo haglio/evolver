@@ -42,13 +42,13 @@ def _folder(guid, node_id, name, children):
     }
 
 
-def chrome_bookmarks_payload(favs_children=()):
+def chrome_bookmarks_payload(faves_children=(), folder_name="Fun Time Faves"):
     return {
         "checksum": "",
         "roots": {
             "bookmark_bar": _folder(
                 "bar-guid", "1", "Bookmarks bar",
-                [_folder("folder-guid", "10", "Fun Time Favs", list(favs_children))],
+                [_folder("folder-guid", "10", folder_name, list(faves_children))],
             ),
             "other": _folder("other-guid", "2", "Other bookmarks", []),
             "synced": _folder("synced-guid", "3", "Mobile bookmarks", []),
@@ -75,7 +75,6 @@ class TestBookmarksSync(unittest.TestCase):
         with library.config(), override_config(
             CHROME_USER_DATA_DIR=user_data_dir,
             CHROME_PROFILE_NAME="Jane Doe",
-            CHROME_BOOKMARKS_FOLDER_NAME="Fun Time Favs",
         ):
             return bookmarks_sync.run(**given)
 
@@ -100,8 +99,25 @@ class TestBookmarksSync(unittest.TestCase):
             assert result.no_url == 1
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
-            assert folder["name"] == "Fun Time Favs"
+            assert folder["name"] == "Fun Time Faves"
             assert sorted(child["url"] for child in folder["children"]) == ["https://example.com/image/xyz", "https://example.net/image/abc"]
+
+    def test_the_folder_under_its_old_spelling_is_renamed_in_place(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            favorite(library, "scene one.mp4", "https://example.com/a")
+            bookmarks_path.write_text(json.dumps(chrome_bookmarks_payload(
+                [{"id": "20", "name": "a", "type": "url", "url": "https://example.com/a"}],
+                folder_name="Fun Time Favs",
+            )), encoding="utf-8")
+
+            self._sync(library, user_data_dir)
+
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            folders = written["roots"]["bookmark_bar"]["children"]
+            assert [(folder["name"], folder["guid"]) for folder in folders] == [("Fun Time Faves", "folder-guid")]
+            assert [child["url"] for child in folders[0]["children"]] == ["https://example.com/a"]
 
     def test_a_video_no_longer_a_favorite_leaves_the_folder(self):
         with workspace_temp_dir() as root:

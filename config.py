@@ -84,7 +84,7 @@ AI_DIR       = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = LIBRARY_ROOT / "videos" / "videos" / "2D" / "non_AI"
 CHROME_USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"
 CHROME_PROFILE_NAME = overlay_value(_CONTENT, "chrome_profile", path=LOCAL_CONTENT)
-CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Favs"
+CHROME_BOOKMARKS_FOLDER_NAME = "Fun Time Faves"
 
 INBOX_DIR    = AI_DIR / "0_inbox"
 SORTED_DIR   = AI_DIR / "1_sorted"
