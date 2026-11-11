@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QColor, QIcon
+from PySide6.QtGui import QColor, QIcon
 from shared_ui.colors import GREEN, RED, TEXT_MUTED
 from shared_ui.icons import icon_pixmap
 

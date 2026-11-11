@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from PyQt6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialog
 
 from gui.settings import EvolverSettings
 from gui.settings_dialog import SettingsDialog

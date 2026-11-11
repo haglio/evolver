@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from app_support.subprocess_utils import hidden_subprocess_kwargs
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QObject, QTimer, Signal
 from shared_ui.preview import taskbar_identity, window_title
 
 import config
@@ -44,7 +44,7 @@ def relaunch_command() -> str:
 
 
 class BranchSession(QObject):
-    leaving = pyqtSignal()
+    leaving = Signal()
 
     def __init__(self, instance: single_instance.InstanceGateway,
                  a_run_is_going: Callable[[], bool], parent=None):

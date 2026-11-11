@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from PyQt6.QtGui import QPalette
+from PySide6.QtGui import QPalette
 from shared_ui.colors import BLUE, BLUE_LIGHT, TEXT_PRIMARY
 
 from tests.gui_support import QAPP, build_evolver_app

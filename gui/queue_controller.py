@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import partial
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 import evolver
 from gui.background import BackgroundQueue
@@ -11,8 +11,8 @@ from gui.queue_window import UpscaleQueueWindow
 
 
 class QueueController(QObject):
-    run_wanted = pyqtSignal(str)
-    presence_poll_wanted = pyqtSignal()
+    run_wanted = Signal(str)
+    presence_poll_wanted = Signal()
 
     def __init__(self, parent_window, background: BackgroundQueue, parent=None):
         super().__init__(parent)

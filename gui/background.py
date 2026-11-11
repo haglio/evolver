@@ -4,13 +4,13 @@ import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 log = logging.getLogger(__name__)
 
 
 class BackgroundQueue(QObject):
-    _answered = pyqtSignal(object, object)
+    _answered = Signal(object, object)
 
     def __init__(self, parent=None):
         super().__init__(parent)

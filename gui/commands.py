@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from PyQt6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QIcon
 from shared_ui.colors import TEXT_SECONDARY
 from shared_ui.icons import qt_icon
 

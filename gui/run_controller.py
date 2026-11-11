@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 import config
 from gui.progress_popup import ProgressPopup
@@ -15,11 +15,11 @@ STAGE_GRACE_SECONDS = 5.0
 
 
 class RunController(QObject):
-    run_started = pyqtSignal()
-    run_ended = pyqtSignal()
-    run_finished = pyqtSignal(object)
-    run_failed = pyqtSignal(str)
-    run_overran = pyqtSignal()
+    run_started = Signal()
+    run_ended = Signal()
+    run_finished = Signal(object)
+    run_failed = Signal(str)
+    run_overran = Signal()
 
     def __init__(self, window, nonai_enabled: Callable[[], bool], parent=None):
         super().__init__(parent)

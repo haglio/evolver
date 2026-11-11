@@ -8,8 +8,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import atexit
 import contextlib
 
-from PyQt6.QtCore import QEvent
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtCore import QEvent
+from PySide6.QtWidgets import QApplication
 from shared_ui.application import delete_what_python_still_owns
 
 from gui.app import EvolverApp

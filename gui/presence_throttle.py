@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from PyQt6.QtCore import QTimer
+from PySide6.QtCore import QTimer
 
 import config
 import evolver

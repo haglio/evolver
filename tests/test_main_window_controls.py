@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
-from PyQt6.QtCore import QPoint, QRect, Qt
-from PyQt6.QtGui import QIcon, QPalette, QTextDocument
-from PyQt6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToolButton
+from PySide6.QtCore import QPoint, QRect, Qt
+from PySide6.QtGui import QIcon, QPalette, QTextDocument
+from PySide6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToolButton
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
 from shared_ui.icons import icon_pixmap, inline_icon
 
@@ -124,7 +124,7 @@ class TestStageStatusColumn:
             stages=[{"name": "upscale_non_ai", "status": status,
                      "duration_seconds": 1.0, "result": None}],
         )
-        # Held on self: PyQt deletes the table's C++ items with a widget collected as a local.
+        # Held on self: Qt deletes the table's C++ items with a widget collected as a local.
         self.widget = RunDetailWidget()
         self.widget.show_record(record)
         return self.widget._table.item(0, 2)

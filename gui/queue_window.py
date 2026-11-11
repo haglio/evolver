@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QMimeData, QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QDrag
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QMimeData, QPoint, Qt, QTimer, Signal
+from PySide6.QtGui import QDrag
+from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QLabel,
@@ -65,8 +65,8 @@ def dropped_video(mime: QMimeData) -> str:
 
 
 class _QueueTree(QTreeWidget):
-    moved = pyqtSignal(str, int)
-    drag_ended = pyqtSignal()
+    moved = Signal(str, int)
+    drag_ended = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -146,11 +146,11 @@ class _QueueTree(QTreeWidget):
 
 
 class UpscaleQueueWindow(QDialog):
-    arranged = pyqtSignal(list)
-    placed_first = pyqtSignal(str)
-    now_requested = pyqtSignal(str)
-    now_withdrawn = pyqtSignal()
-    refresh_wanted = pyqtSignal()
+    arranged = Signal(list)
+    placed_first = Signal(str)
+    now_requested = Signal(str)
+    now_withdrawn = Signal()
+    refresh_wanted = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

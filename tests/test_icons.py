@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize
-from PyQt6.QtGui import QColor, QIcon, QImage
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QColor, QIcon, QImage
 from shared_ui.icons import icon_pixmap
 
 from gui.icons import pause_icon, quit_icon, restart_icon, review_trash_icon, run_now_icon

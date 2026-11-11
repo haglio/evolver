@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import UTC, datetime, timedelta
 
-from PyQt6.QtTest import QSignalSpy
+from PySide6.QtTest import QSignalSpy
 
 from gui.scheduler import PipelineScheduler
 
@@ -20,7 +20,7 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.stop()
 
         assert fired, "the scheduler's timer never fired"
-        assert spy[0][0] == "scheduled"
+        assert spy.at(0)[0] == "scheduled"
 
     def test_suppresses_tick_when_running(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -30,7 +30,7 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.tick()
         scheduler.stop()
 
-        assert len(spy) == 0
+        assert spy.count() == 0
 
     def test_a_tick_mid_run_schedules_nothing(self):
         scheduler = PipelineScheduler(interval_minutes=10,
@@ -60,13 +60,13 @@ class TestPipelineScheduler(unittest.TestCase):
         spy = QSignalSpy(scheduler.run_requested)
         scheduler.mark_running()
         scheduler.tick()
-        assert len(spy) == 0
+        assert spy.count() == 0
 
         scheduler.mark_idle()
         scheduler.tick()
         scheduler.stop()
 
-        assert len(spy) == 1
+        assert spy.count() == 1
 
     def test_toggling_pauses_a_running_schedule_and_resumes_a_paused_one(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -94,8 +94,8 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.tick()
         scheduler.stop()
 
-        assert len(spy) == 1
-        assert spy[0][0] == "scheduled"
+        assert spy.count() == 1
+        assert spy.at(0)[0] == "scheduled"
 
     def test_run_now_emits_manual_trigger(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -103,8 +103,8 @@ class TestPipelineScheduler(unittest.TestCase):
 
         scheduler.run_now()
 
-        assert len(spy) == 1
-        assert spy[0][0] == "manual"
+        assert spy.count() == 1
+        assert spy.at(0)[0] == "manual"
 
     def test_run_now_suppressed_when_running(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -113,7 +113,7 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.mark_running()
         scheduler.run_now()
 
-        assert len(spy) == 0
+        assert spy.count() == 0
 
     def test_set_interval(self):
         scheduler = PipelineScheduler(interval_minutes=10)
@@ -150,7 +150,7 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler = PipelineScheduler(interval_minutes=10)
         spy = QSignalSpy(scheduler.status_changed)
         scheduler.start()
-        assert len(spy) >= 1
+        assert spy.count() >= 1
         scheduler.stop()
 
     def test_status_changed_emitted_on_pause(self):
@@ -158,7 +158,7 @@ class TestPipelineScheduler(unittest.TestCase):
         scheduler.start()
         spy = QSignalSpy(scheduler.status_changed)
         scheduler.pause()
-        assert len(spy) >= 1
+        assert spy.count() >= 1
 
 
 if __name__ == "__main__":

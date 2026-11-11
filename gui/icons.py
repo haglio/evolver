@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QIcon
+from PySide6.QtGui import QIcon
 from shared_ui.icons import qt_icon
 
 

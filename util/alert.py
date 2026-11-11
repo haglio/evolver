@@ -1,4 +1,4 @@
-# Qt is imported inside the call: the startup crash reporter comes through here when PyQt6 may be what failed to import.
+# Qt is imported inside the call: the startup crash reporter comes through here when PySide6 may be what failed to import.
 
 from __future__ import annotations
 

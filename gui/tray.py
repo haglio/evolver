@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QSystemTrayIcon
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QSystemTrayIcon
 from shared_ui.chrome import menu_rules
 from shared_ui.preview import Preview
 from shared_ui.preview_icon import app_icon
