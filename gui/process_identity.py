@@ -4,8 +4,8 @@ from __future__ import annotations
 import logging
 
 from app_support.win32 import TaskbarApp, dress_window, set_app_user_model_id
-from PyQt6.QtCore import QEvent, QObject
-from PyQt6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import QEvent, QObject
+from PySide6.QtWidgets import QApplication, QWidget
 from shared_ui.preview_icon import app_icon, icon_file
 
 import config
@@ -28,7 +28,7 @@ def taskbar_app() -> TaskbarApp:
                       relaunch=branch_session.relaunch_command())
 
 
-# Run by pythonw.exe, a PyQt app is Python to the Windows shell: its taskbar buttons carry
+# Run by pythonw.exe, a Qt app is Python to the Windows shell: its taskbar buttons carry
 # Python's icon, and a pin made from one starts bare Python.
 def claim(app: QApplication) -> QObject:
     claimed = identity()

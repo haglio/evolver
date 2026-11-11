@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import numpy as np
-from PyQt6.QtCore import QLineF, QPointF, Qt
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPolygonF
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QLineF, QPointF, Qt
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPolygonF
+from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
     QHBoxLayout,

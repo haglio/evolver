@@ -115,7 +115,7 @@ The video library, `videos/videos`, also holds two folders that are not Evolver'
 - `ffprobe` available in `PATH`
 - Topaz ffmpeg at `C:\Program Files\Topaz Labs LLC\Topaz Video\ffmpeg.exe`
 - Topaz model directory at `C:\ProgramData\Topaz Labs LLC\Topaz Video\models`
-- PyQt6 (`pip install PyQt6`)
+- PySide6 (`pip install PySide6`)
 
 ## Run as tray app (recommended)
 

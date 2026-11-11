@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, call, patch
 
 import pytest
-from PyQt6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
 

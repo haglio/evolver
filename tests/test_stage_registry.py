@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 import pytest
-from PyQt6.QtGui import QColor
+from PySide6.QtGui import QColor
 
 from evolver import ALL_STAGES, STAGE_LABELS, STAGES
 from gui import main_window

@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def test_the_suites_application_ends_cleanly_with_a_python_filter_watching_live_windows():
     child = textwrap.dedent("""
-        from PyQt6.QtWidgets import QTableWidget
+        from PySide6.QtWidgets import QTableWidget
         from shared_ui.tooltip_shape import shape_long_tooltips
         from tests.gui_support import QAPP
 

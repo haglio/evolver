@@ -4,9 +4,9 @@ import unittest
 from unittest.mock import patch
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QFontMetrics
-from PyQt6.QtWidgets import QLabel, QMainWindow, QProgressBar
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QFontMetrics
+from PySide6.QtWidgets import QLabel, QMainWindow, QProgressBar
 
 from evolver import ALL_STAGES, STAGE_LABELS
 from gui.progress_popup import BAR_WIDTH, ProgressPopup, _caption_width

@@ -11,8 +11,8 @@ from functools import partial
 
 from app_support import production_update
 from app_support.loading_screen import AppWindow, meeting_place
-from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 from shared_ui.colors import family_palette
 from shared_ui.loading_window import Loading, LoadingCanceled
 from shared_ui.tooltip_shape import shape_long_tooltips

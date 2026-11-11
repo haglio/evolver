@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from PyQt6.QtCore import QPoint
-from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QSystemTrayIcon
+from PySide6.QtCore import QPoint
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QSystemTrayIcon
 from shared_ui.chrome import menu_rules
 from shared_ui.colors import BG_TERTIARY, BLUE, TEXT_PRIMARY, TOGGLE_OFF, TOGGLE_ON
 from shared_ui.spacing import MARGIN_STANDARD

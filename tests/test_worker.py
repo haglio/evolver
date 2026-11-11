@@ -3,7 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock, patch
 
-from PyQt6.QtCore import QEventLoop, QTimer
+from PySide6.QtCore import QEventLoop, QTimer
+from shared_ui.testing import appending_to
 
 from evolver import PipelineResult, StageRecord
 from gui.worker import PipelineWorker
@@ -46,10 +47,10 @@ class TestPipelineWorker(unittest.TestCase):
             return pipeline_result
 
         worker = PipelineWorker(trigger=trigger)
-        worker.stage_started.connect(started.append)
+        worker.stage_started.connect(appending_to(started))
         worker.stage_completed.connect(lambda *args: completed.append(args))
-        worker.pipeline_finished.connect(finished.append)
-        worker.pipeline_error.connect(errors.append)
+        worker.pipeline_finished.connect(appending_to(finished))
+        worker.pipeline_error.connect(appending_to(errors))
         worker.stage_progress.connect(lambda *args: progress.append(args))
 
         with patch("gui.worker.evolver.setup_logging"), \

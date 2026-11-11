@@ -3,8 +3,9 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from PyQt6.QtCore import QMimeData, QPoint, Qt
+from PySide6.QtCore import QMimeData, QPoint, Qt
 from shared_ui.colors import BLUE
+from shared_ui.testing import appending_to
 
 from gui import queue_window
 from gui.queue_window import VIDEO_MIME, UpscaleQueueWindow, dropped_video, running_time
@@ -139,7 +140,7 @@ class TestOnlyTheFirstRowHasTheArrow:
         window.show_queue(queue(Head(NEXT), entry("lagoon/0 unsorted/a.mp4"),
                                   entry("lagoon/0 unsorted/b.mp4")))
         asked, withdrawn = [], []
-        window.now_requested.connect(asked.append)
+        window.now_requested.connect(appending_to(asked))
         window.now_withdrawn.connect(lambda: withdrawn.append(True))
 
         click(window, 0)
@@ -151,7 +152,7 @@ class TestOnlyTheFirstRowHasTheArrow:
     def test_clicking_a_filled_one_hands_the_video_back_to_your_presence(self, window):
         window.show_queue(queue(Head(ASKED_FOR, percent=2), entry("lagoon/0 unsorted/a.mp4")))
         asked, withdrawn = [], []
-        window.now_requested.connect(asked.append)
+        window.now_requested.connect(appending_to(asked))
         window.now_withdrawn.connect(lambda: withdrawn.append(True))
 
         click(window, 0)
@@ -164,7 +165,7 @@ class TestOnlyTheFirstRowHasTheArrow:
     def test_the_rest_of_the_row_is_not_the_arrow(self, window):
         window.show_queue(queue(Head(NEXT), entry("lagoon/0 unsorted/a.mp4")))
         asked = []
-        window.now_requested.connect(asked.append)
+        window.now_requested.connect(appending_to(asked))
 
         click(window, 0, column=1)
 
@@ -174,7 +175,7 @@ class TestOnlyTheFirstRowHasTheArrow:
         window.show_queue(queue(Head(NEXT), entry("lagoon/0 unsorted/a.mp4"),
                                   entry("lagoon/0 unsorted/b.mp4")))
         asked = []
-        window.now_requested.connect(asked.append)
+        window.now_requested.connect(appending_to(asked))
 
         click(window, 1)
 
@@ -184,15 +185,15 @@ class TestOnlyTheFirstRowHasTheArrow:
 class TestWhatItSaysTheUserDid:
     def _arrangements(self, window):
         seen = []
-        window.arranged.connect(seen.append)
+        window.arranged.connect(appending_to(seen))
         return seen
 
     def test_a_video_dragged_to_the_top_goes_first_and_waits_like_any_other(self, window):
         window.show_queue(queue(Head(UPSCALING, percent=41),
                                   *(entry(f"lagoon/0 unsorted/{name}.mp4") for name in "abc")))
         asked, first = [], []
-        window.now_requested.connect(asked.append)
-        window.placed_first.connect(first.append)
+        window.now_requested.connect(appending_to(asked))
+        window.placed_first.connect(appending_to(first))
         seen = self._arrangements(window)
 
         window._tree.move_video("lagoon/0 unsorted/c.mp4", 0)

@@ -4,14 +4,13 @@ import ctypes
 import os
 import subprocess
 import sys
-import threading
 import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from app_support.testing import process_terminated
-from PyQt6.QtNetwork import QLocalServer, QLocalSocket
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
 from gui import run_controller, single_instance
 from gui.single_instance import Answer
@@ -96,25 +95,6 @@ def _ask(launch: bytes) -> Answer | None:
     return single_instance.InstanceGateway().ask(launch, until=time.monotonic() + 10.0)
 
 
-def off_the_thread_the_stand_in_answers_on(work):
-    done = []
-    thread = threading.Thread(target=lambda: done.append(work()), daemon=True)
-    thread.start()
-    _pump_until(lambda: not thread.is_alive(), deadline_seconds=40.0)
-    assert done, "the launch never finished"
-    return done[0]
-
-
-class _Calls(list):
-    def __init__(self, then):
-        super().__init__()
-        self._then = then
-
-    def append(self, item):
-        super().append(item)
-        self._then()
-
-
 class Listening:
     def __init__(self, *, steps_aside_for=lambda launch: False):
         self.shown = []
@@ -129,25 +109,6 @@ class Listening:
         self.gateway.stop_serving()
 
 
-class HangsUpUnanswered:
-    def __init__(self):
-        self._held = []
-        self._server = QLocalServer()
-        QLocalServer.removeServer(single_instance._PIPE_NAME)
-        assert self._server.listen(single_instance._PIPE_NAME), self._server.errorString()
-        self._server.newConnection.connect(self._hear_and_hang_up)
-
-    def _hear_and_hang_up(self):
-        connection = self._server.nextPendingConnection()
-        self._held.append(connection)
-        connection.readyRead.connect(connection.disconnectFromServer)
-        if connection.bytesAvailable():
-            connection.disconnectFromServer()
-
-    def close(self):
-        self._server.close()
-
-
 class FakeClock:
     def __init__(self):
         self.now = 0.0
@@ -159,43 +120,103 @@ class FakeClock:
         self.now += seconds
 
 
-class AnswersBeforeHearing:
-    def __init__(self, reply: bytes, heard: bytes):
-        self._kernel32 = kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        handle, number = ctypes.c_void_p, ctypes.c_uint32
-        kernel32.CreateNamedPipeW.argtypes = [ctypes.c_wchar_p, *[number] * 6, handle]
-        kernel32.CreateNamedPipeW.restype = handle
-        kernel32.ConnectNamedPipe.argtypes = [handle, handle]
-        kernel32.FlushFileBuffers.argtypes = [handle]
-        kernel32.DisconnectNamedPipe.argtypes = [handle]
-        kernel32.CloseHandle.argtypes = [handle]
-        kernel32.WriteFile.argtypes = [handle, ctypes.c_char_p, number, ctypes.POINTER(number),
-                                       handle]
-        kernel32.ReadFile.argtypes = kernel32.WriteFile.argtypes
-        duplex, one_instance, unbuffered = 3, 1, 0
-        self._pipe = self._kernel32.CreateNamedPipeW(
-            "\\\\.\\pipe\\" + single_instance._PIPE_NAME, duplex, 0, one_instance,
-            unbuffered, unbuffered, 0, None)
-        assert self._pipe not in (None, ctypes.c_void_p(-1).value), ctypes.get_last_error()
-        self._reply = reply
-        self._heard = ctypes.create_string_buffer(len(heard))
-        self._serving = threading.Thread(target=self._serve, daemon=True)
-        self._serving.start()
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
-    def _serve(self):
-        moved = ctypes.c_uint32()
-        self._kernel32.ConnectNamedPipe(self._pipe, None)
-        self._kernel32.WriteFile(self._pipe, self._reply, len(self._reply), ctypes.byref(moved),
-                                 None)
-        time.sleep(0.1)
-        self._kernel32.ReadFile(self._pipe, self._heard, len(self._heard), ctypes.byref(moved),
-                                None)
-        self._kernel32.FlushFileBuffers(self._pipe)
-        self._kernel32.DisconnectNamedPipe(self._pipe)
+_STARVED_SECONDS = 2.5
 
-    def close(self):
-        self._serving.join(timeout=10)
-        self._kernel32.CloseHandle(self._pipe)
+_ANSWERS_BEFORE_HEARING = r"""
+import ctypes, sys, time
+pipe_name, reply, heard_length = sys.argv[1], sys.argv[2].encode(), int(sys.argv[3])
+kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+handle, number = ctypes.c_void_p, ctypes.c_uint32
+kernel32.CreateNamedPipeW.argtypes = [ctypes.c_wchar_p, *[number] * 6, handle]
+kernel32.CreateNamedPipeW.restype = handle
+kernel32.ConnectNamedPipe.argtypes = [handle, handle]
+kernel32.FlushFileBuffers.argtypes = [handle]
+kernel32.DisconnectNamedPipe.argtypes = [handle]
+kernel32.CloseHandle.argtypes = [handle]
+kernel32.WriteFile.argtypes = [handle, ctypes.c_char_p, number, ctypes.POINTER(number), handle]
+kernel32.ReadFile.argtypes = kernel32.WriteFile.argtypes
+duplex, one_instance, unbuffered = 3, 1, 0
+pipe = kernel32.CreateNamedPipeW("\\\\.\\pipe\\" + pipe_name, duplex, 0, one_instance,
+                                 unbuffered, unbuffered, 0, None)
+assert pipe not in (None, ctypes.c_void_p(-1).value), ctypes.get_last_error()
+print("serving", flush=True)
+moved = number()
+heard = ctypes.create_string_buffer(heard_length)
+kernel32.ConnectNamedPipe(pipe, None)
+kernel32.WriteFile(pipe, reply, len(reply), ctypes.byref(moved), None)
+time.sleep(0.1)
+kernel32.ReadFile(pipe, heard, heard_length, ctypes.byref(moved), None)
+kernel32.FlushFileBuffers(pipe)
+kernel32.DisconnectNamedPipe(pipe)
+kernel32.CloseHandle(pipe)
+"""
+
+_RUNNING_EVOLVER = """
+import os, sys, time
+from PySide6.QtCore import QCoreApplication
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
+from gui import single_instance
+from gui.single_instance import Answer
+single_instance._MUTEX_NAME, single_instance._PIPE_NAME, manner, starved = sys.argv[1:5]
+app = QCoreApplication([])
+gateway = single_instance.InstanceGateway()
+assert gateway.claim()
+if manner == "slow to hang up":
+    hang_up = QLocalSocket.disconnectFromServer
+    def hang_up_slowly(connection):
+        time.sleep(float(starved))
+        hang_up(connection)
+    QLocalSocket.disconnectFromServer = hang_up_slowly
+def steps_aside_for(launch):
+    if manner == "slow to answer":
+        time.sleep(float(starved))
+    return launch == single_instance.PREVIEW
+if manner == "hangs up without a word":
+    mute = QLocalServer()
+    assert mute.listen(single_instance._PIPE_NAME)
+    mute.newConnection.connect(lambda: mute.nextPendingConnection().disconnectFromServer())
+else:
+    def step_aside():
+        print("stepped aside", flush=True)
+        if manner != "lingers after stepping aside":
+            app.quit()
+    gateway.serve_launches(steps_aside_for=steps_aside_for,
+                           on_show=lambda: print("shown", flush=True), on_step_aside=step_aside)
+print("serving", os.getpid(), flush=True)
+app.exec()
+"""
+
+
+def _running_evolver(test: unittest.TestCase, mutex: str, pipe: str, manner: str) -> subprocess.Popen:
+    running = subprocess.Popen(
+        [sys.executable, "-c", _RUNNING_EVOLVER, mutex, pipe, manner, str(_STARVED_SECONDS)],
+        cwd=REPO_ROOT, stdout=subprocess.PIPE,
+        env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
+        creationflags=subprocess.CREATE_NO_WINDOW)
+    test.addCleanup(lambda: running.poll() is None and running.kill())
+    serving, pid = running.stdout.readline().split()
+    assert serving == b"serving"
+    running.evolver_pid = int(pid)
+    return running
+
+
+def _answering_before_hearing(test: unittest.TestCase, pipe: str, reply: bytes,
+                              heard: bytes) -> subprocess.Popen:
+    running = subprocess.Popen(
+        [sys.executable, "-c", _ANSWERS_BEFORE_HEARING, pipe, reply.decode(), str(len(heard))],
+        stdout=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
+    test.addCleanup(lambda: running.poll() is None and running.kill())
+    assert running.stdout.readline().strip() == b"serving"
+    return running
+
+
+def _what_it_did(running: subprocess.Popen) -> list[str]:
+    first = running.stdout.readline()
+    running.kill()
+    rest, _ = running.communicate(timeout=30)
+    return [line.strip() for line in (first + rest).decode().splitlines()]
 
 
 class TestAskingTheRunningOne(unittest.TestCase):
@@ -204,39 +225,30 @@ class TestAskingTheRunningOne(unittest.TestCase):
             assert _ask(single_instance.USUAL) is None
 
     def test_the_running_one_says_it_steps_aside_and_which_process_it_is(self):
-        with patch.object(single_instance, "_PIPE_NAME", _unique("Aside")):
-            running = Listening(steps_aside_for=lambda launch: launch == single_instance.PREVIEW)
-            try:
-                answer = off_the_thread_the_stand_in_answers_on(
-                    lambda: _ask(single_instance.PREVIEW))
-                _pump_until(lambda: running.stepped_aside)
-            finally:
-                running.close()
+        pipe = _unique("Aside")
+        running = _running_evolver(self, _unique("AsideMutex"), pipe, "answers")
+        with patch.object(single_instance, "_PIPE_NAME", pipe):
+            answer = _ask(single_instance.PREVIEW)
 
-        assert answer == Answer(single_instance.STEPPING_ASIDE, os.getpid())
-        assert (running.stepped_aside, running.shown) == ([True], [])
+        assert answer == Answer(single_instance.STEPPING_ASIDE, running.evolver_pid)
+        assert _what_it_did(running) == ["stepped aside"]
 
     def test_a_launch_it_does_not_step_aside_for_opens_its_window(self):
-        with patch.object(single_instance, "_PIPE_NAME", _unique("Show")):
-            running = Listening()
-            try:
-                answer = off_the_thread_the_stand_in_answers_on(
-                    lambda: _ask(single_instance.USUAL))
-                _pump_until(lambda: running.shown)
-            finally:
-                running.close()
+        pipe = _unique("Show")
+        running = _running_evolver(self, _unique("ShowMutex"), pipe, "answers")
+        with patch.object(single_instance, "_PIPE_NAME", pipe):
+            answer = _ask(single_instance.USUAL)
 
         assert answer.reply == single_instance.SHOWING
-        assert (running.shown, running.stepped_aside) == ([True], [])
+        assert _what_it_did(running) == ["shown"]
 
     def test_an_answer_in_before_the_launch_has_finished_speaking_is_heard(self):
-        with patch.object(single_instance, "_PIPE_NAME", _unique("Early")):
-            running = AnswersBeforeHearing(single_instance.STEPPING_ASIDE,
-                                           heard=single_instance.PREVIEW)
-            try:
-                answer = _ask(single_instance.PREVIEW)
-            finally:
-                running.close()
+        pipe = _unique("Early")
+        running = _answering_before_hearing(self, pipe, single_instance.STEPPING_ASIDE,
+                                            heard=single_instance.PREVIEW)
+        with patch.object(single_instance, "_PIPE_NAME", pipe):
+            answer = _ask(single_instance.PREVIEW)
+        assert running.wait(timeout=30) == 0
 
         assert answer.reply == single_instance.STEPPING_ASIDE
 
@@ -256,15 +268,12 @@ class TestAskingTheRunningOne(unittest.TestCase):
         assert (heard, running.shown) == ([b""], [True])
 
     def test_an_evolver_stepping_aside_answers_no_later_launch(self):
-        with patch.object(single_instance, "_PIPE_NAME", _unique("Gone")):
-            running = Listening(steps_aside_for=lambda launch: True)
-            try:
-                off_the_thread_the_stand_in_answers_on(
-                    lambda: _ask(single_instance.PREVIEW))
-                _pump_until(lambda: running.stepped_aside)
-                later = _ask(single_instance.PREVIEW)
-            finally:
-                running.close()
+        pipe = _unique("Gone")
+        running = _running_evolver(self, _unique("GoneMutex"), pipe, "lingers after stepping aside")
+        with patch.object(single_instance, "_PIPE_NAME", pipe):
+            _ask(single_instance.PREVIEW)
+            assert running.stdout.readline().strip() == b"stepped aside"
+            later = _ask(single_instance.PREVIEW)
 
         assert later is None
 
@@ -302,28 +311,24 @@ class TestTakingOver(unittest.TestCase):
         assert outcome == single_instance.Outcome.CLAIMED
 
     def test_an_evolver_that_opens_its_window_keeps_the_launch(self):
-        mutex = _unique("ShowMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("ShowPipe")),              held_mutex(mutex):
-            running = Listening()
-            try:
-                outcome = off_the_thread_the_stand_in_answers_on(lambda: single_instance.InstanceGateway().take_over(
-                    single_instance.USUAL, end_the_unanswering=False))
-            finally:
-                running.close()
+        mutex, pipe = _unique("ShowMutex"), _unique("ShowPipe")
+        running = _running_evolver(self, mutex, pipe, "answers")
+        with patch.object(single_instance, "_MUTEX_NAME", mutex), \
+             patch.object(single_instance, "_PIPE_NAME", pipe):
+            outcome = single_instance.InstanceGateway().take_over(
+                single_instance.USUAL, end_the_unanswering=False)
 
         assert outcome == single_instance.Outcome.HANDED_OFF
-        assert running.shown == [True]
+        assert _what_it_did(running) == ["shown"]
 
     def test_an_evolver_that_steps_aside_is_waited_out_and_replaced(self):
-        mutex = _unique("AsideMutex")
-        with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", _unique("AsidePipe")),              process_terminated() as terminate,              held_mutex(mutex) as holder:
-            running = Listening(steps_aside_for=lambda launch: True)
-            running.stepped_aside = _Calls(holder.let_go)
-            try:
-                outcome = off_the_thread_the_stand_in_answers_on(lambda: single_instance.InstanceGateway().take_over(
-                    single_instance.PREVIEW, end_the_unanswering=True))
-            finally:
-                running.close()
+        mutex, pipe = _unique("AsideMutex"), _unique("AsidePipe")
+        _running_evolver(self, mutex, pipe, "answers")
+        with patch.object(single_instance, "_MUTEX_NAME", mutex), \
+             patch.object(single_instance, "_PIPE_NAME", pipe), \
+             process_terminated() as terminate:
+            outcome = single_instance.InstanceGateway().take_over(
+                single_instance.PREVIEW, end_the_unanswering=True)
 
         assert outcome == single_instance.Outcome.CLAIMED
         terminate.assert_not_called()
@@ -354,28 +359,24 @@ class TestTakingOver(unittest.TestCase):
         terminate.assert_not_called()
 
     def test_a_preview_ends_an_evolver_that_never_answers(self):
-        mutex = _unique("MuteMutex")
+        mutex, pipe = _unique("MuteMutex"), _unique("MutePipe")
+        running = _running_evolver(self, mutex, pipe, "hangs up without a word")
+        ended = []
+
+        def terminate(pid):
+            ended.append(pid)
+            running.kill()
+            running.wait(timeout=30)
+            return True
+
         with patch.object(single_instance, "_MUTEX_NAME", mutex), \
-             patch.object(single_instance, "_PIPE_NAME", _unique("MutePipe")), \
-             held_mutex(mutex) as holder:
-            mute = HangsUpUnanswered()
-            ended = []
-
-            def terminate(pid):
-                ended.append(pid)
-                holder.let_go()
-                return True
-
-            try:
-                with process_terminated(side_effect=terminate):
-                    outcome = off_the_thread_the_stand_in_answers_on(
-                        lambda: single_instance.InstanceGateway().take_over(
-                            single_instance.PREVIEW, end_the_unanswering=True))
-            finally:
-                mute.close()
+             patch.object(single_instance, "_PIPE_NAME", pipe), \
+             process_terminated(side_effect=terminate):
+            outcome = single_instance.InstanceGateway().take_over(
+                single_instance.PREVIEW, end_the_unanswering=True)
 
         assert outcome == single_instance.Outcome.CLAIMED
-        assert ended == [os.getpid()]
+        assert ended == [running.evolver_pid]
 
     def test_an_evolver_ended_when_the_patience_runs_out_is_still_given_time_to_go(self):
         gateway = single_instance.InstanceGateway()
@@ -405,18 +406,13 @@ class TestTakingOver(unittest.TestCase):
         assert outcome == single_instance.Outcome.CLAIMED
 
     def test_the_usual_launch_leaves_an_evolver_that_never_answers_alone(self):
-        mutex = _unique("OldMutex")
+        mutex, pipe = _unique("OldMutex"), _unique("OldPipe")
+        _running_evolver(self, mutex, pipe, "hangs up without a word")
         with patch.object(single_instance, "_MUTEX_NAME", mutex), \
-             patch.object(single_instance, "_PIPE_NAME", _unique("OldPipe")), \
-             held_mutex(mutex):
-            mute = HangsUpUnanswered()
-            try:
-                with process_terminated() as terminate:
-                    outcome = off_the_thread_the_stand_in_answers_on(
-                        lambda: single_instance.InstanceGateway().take_over(
-                            single_instance.USUAL, end_the_unanswering=False))
-            finally:
-                mute.close()
+             patch.object(single_instance, "_PIPE_NAME", pipe), \
+             process_terminated() as terminate:
+            outcome = single_instance.InstanceGateway().take_over(
+                single_instance.USUAL, end_the_unanswering=False)
 
         assert outcome == single_instance.Outcome.HANDED_OFF, (
             "an Evolver that never answers predates the answers and opened its window on the connection")
@@ -479,52 +475,9 @@ class TestBecomingEvolver(unittest.TestCase):
         assert single_instance.IF_NOT_RUNNING in detail
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-
-_STARVED_SECONDS = 2.5
-
-_RUNNING_EVOLVER = """
-import sys, time
-from PyQt6.QtCore import QCoreApplication
-from PyQt6.QtNetwork import QLocalServer, QLocalSocket
-from gui import single_instance
-from gui.single_instance import Answer
-single_instance._MUTEX_NAME, single_instance._PIPE_NAME, manner, starved = sys.argv[1:5]
-app = QCoreApplication([])
-gateway = single_instance.InstanceGateway()
-assert gateway.claim()
-if manner == "slow to hang up":
-    hang_up = QLocalSocket.disconnectFromServer
-    def hang_up_slowly(connection):
-        time.sleep(float(starved))
-        hang_up(connection)
-    QLocalSocket.disconnectFromServer = hang_up_slowly
-def steps_aside_for(launch):
-    if manner == "slow to answer":
-        time.sleep(float(starved))
-    return launch == single_instance.PREVIEW
-if manner == "hangs up without a word":
-    mute = QLocalServer()
-    assert mute.listen(single_instance._PIPE_NAME)
-    mute.newConnection.connect(lambda: mute.nextPendingConnection().disconnectFromServer())
-else:
-    gateway.serve_launches(steps_aside_for=steps_aside_for,
-                           on_show=lambda: None, on_step_aside=app.quit)
-print("serving", flush=True)
-app.exec()
-"""
-
-
 class TestTheClaimPassesWhenItsHolderExits(unittest.TestCase):
     def _running_evolver(self, mutex: str, pipe: str, manner: str):
-        running = subprocess.Popen(
-            [sys.executable, "-c", _RUNNING_EVOLVER, mutex, pipe, manner, str(_STARVED_SECONDS)],
-            cwd=REPO_ROOT, stdout=subprocess.PIPE,
-            env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
-            creationflags=subprocess.CREATE_NO_WINDOW)
-        self.addCleanup(lambda: running.poll() is None and running.kill())
-        assert running.stdout.readline().strip() == b"serving"
-        return running
+        return _running_evolver(self, mutex, pipe, manner)
 
     def _preview_launch(self, mutex: str, pipe: str):
         with patch.object(single_instance, "_MUTEX_NAME", mutex),              patch.object(single_instance, "_PIPE_NAME", pipe):

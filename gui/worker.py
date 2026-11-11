@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 import config
 import evolver
@@ -15,11 +15,11 @@ log = logging.getLogger(__name__)
 
 class PipelineWorker(QThread):
     # Qt queues a signal emitted on this thread to slots of objects living on the window's thread.
-    stage_started = pyqtSignal(str)
-    stage_completed = pyqtSignal(str)
-    stage_progress = pyqtSignal(str, int, int)
-    pipeline_finished = pyqtSignal(object)
-    pipeline_error = pyqtSignal(str)
+    stage_started = Signal(str)
+    stage_completed = Signal(str)
+    stage_progress = Signal(str, int, int)
+    pipeline_finished = Signal(object)
+    pipeline_error = Signal(str)
 
     def __init__(self, trigger: str = "scheduled", nonai_enabled: bool = False, parent=None):
         super().__init__(parent)

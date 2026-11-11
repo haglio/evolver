@@ -5,9 +5,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from PyQt6.QtCore import QObject
-from PyQt6.QtGui import QIcon, QImage
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtCore import QObject
+from PySide6.QtGui import QIcon, QImage
+from PySide6.QtWidgets import QWidget
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
 

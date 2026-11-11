@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
-from PyQt6.QtGui import QFontMetrics, QImage
+from PySide6.QtGui import QFontMetrics, QImage
 
 from evolver import ALL_STAGES, STAGE_LABELS
 from gui.main_window import EvolverMainWindow
@@ -484,7 +484,7 @@ class TestStatsActionExists:
 class TestTheStageRegistry:
     def test_imports_without_qt_and_holds_plain_rgb(self):
         driver = ("import sys, content_overlay as c; c.LOCAL_CONTENT = c.EXAMPLE_CONTENT; import evolver;"
-                  "print([m for m in sys.modules if m.startswith('PyQt')]);"
+                  "print([m for m in sys.modules if m.startswith('PySide')]);"
                   "print(all(isinstance(s.color, tuple) and all(isinstance(v, int) for v in s.color)"
                   " for s in evolver.STAGES))")
         env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}

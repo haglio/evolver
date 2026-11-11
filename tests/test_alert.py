@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from app_support.testing import error_popup
-from PyQt6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 from shared_ui.alert import Link
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview

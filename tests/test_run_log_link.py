@@ -3,8 +3,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextDocument
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QTextDocument
+from shared_ui.testing import appending_to
 
 import gui.main_window
 from gui.log_window import RunLogWindow
@@ -58,7 +59,7 @@ class TestTheRunsTitleLinksToItsLog(unittest.TestCase):
     def test_clicking_it_asks_for_that_run_and_no_other(self):
         record = make_run_record(id="2026-07-25T15-20-02")
         asked = []
-        self.widget.log_requested.connect(asked.append)
+        self.widget.log_requested.connect(appending_to(asked))
         self.widget.show_record(record)
 
         self.widget._on_title_clicked("log")
@@ -73,7 +74,7 @@ class TestTheRunsTitleLinksToItsLog(unittest.TestCase):
 
     def test_a_click_with_no_run_shown_asks_for_nothing(self):
         asked = []
-        self.widget.log_requested.connect(asked.append)
+        self.widget.log_requested.connect(appending_to(asked))
 
         self.widget._on_title_clicked("log")
 
@@ -88,7 +89,7 @@ class TestTheRunsTitleLinksToItsLog(unittest.TestCase):
         window = EvolverMainWindow()
         self.addCleanup(window.deleteLater)
         asked = []
-        window.log_requested.connect(asked.append)
+        window.log_requested.connect(appending_to(asked))
         record = make_run_record()
 
         window._detail_widget.show_record(record)

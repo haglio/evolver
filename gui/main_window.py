@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QItemDelegate,
@@ -68,7 +68,7 @@ class _NoFocusRectDelegate(QItemDelegate):
 
 
 class RunDetailWidget(QWidget):
-    log_requested = pyqtSignal(object)
+    log_requested = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -282,7 +282,7 @@ def _encode_state(result: dict[str, Any]) -> str:
 
 
 class EvolverMainWindow(QMainWindow):
-    log_requested = pyqtSignal(object)
+    log_requested = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)

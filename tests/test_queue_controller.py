@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget
 
 from gui.queue_controller import QueueController
 from tests.gui_support import EMPTY_QUEUE, DoneWhileTheTestsPatchesStand

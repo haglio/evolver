@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from gui.schedule_state import ScheduleStatus
 
@@ -12,8 +12,8 @@ _HOURS_PER_DAY = 24
 
 
 class PipelineScheduler(QObject):
-    run_requested = pyqtSignal(str)
-    status_changed = pyqtSignal(object)
+    run_requested = Signal(str)
+    status_changed = Signal(object)
 
     def __init__(self, interval_minutes: int = 10, parent=None,
                  now: Callable[[], datetime] = datetime.now):
