@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import glob
 import logging
+import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,8 +11,9 @@ from app_support.trash_names import name_before_trash
 from app_support.video_names import strip_uniquifier
 
 import config
-from util import lanes, script_library
+from util import lanes, origenerator_gallery, script_library
 from util.media_files import library_videos, retry_while_in_use
+from util.origenerator_gallery import EVOLVER_UPSCALE
 from util.sidecar import sidecar_folder, sidecar_path
 from util.versions import sorted_stem_of
 
@@ -90,10 +92,21 @@ def _out_of_genau(video: Path, folder: Path, sorted_copies: dict[str, list[Path]
 
 def _recorded_spots(video: Path) -> list[Path]:
     name = name_before_trash(video.name)
-    return [root / record.parent.relative_to(records) / name
-            for root in (lanes.kino_upscales_dir(), config.NON_AI_DIR)
-            if (records := sidecar_folder(root)) is not None
-            for record in records.rglob(glob.escape(f"{Path(name).stem}.json"))]
+    non_ai = config.NON_AI_DIR
+    records = sidecar_folder(non_ai)
+    return [*_where_the_gallery_keeps(name, lanes.kino_upscales_dir()),
+            *([] if records is None else
+              [non_ai / record.parent.relative_to(records) / name
+               for record in records.rglob(glob.escape(f"{Path(name).stem}.json"))])]
+
+
+def _where_the_gallery_keeps(name: str, kino: Path) -> list[Path]:
+    try:
+        rows = origenerator_gallery.rows(("prompt_id", "output_files"), optional=(EVOLVER_UPSCALE,))
+    except (FileNotFoundError, sqlite3.Error):
+        return []
+    return list(dict.fromkeys(place for row in rows for place in origenerator_gallery.places_of(row)
+                              if place.name == name and place.is_relative_to(kino)))
 
 
 def restore(marked: InTrash) -> None:

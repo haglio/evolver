@@ -7,8 +7,6 @@ import unittest
 from contextlib import contextmanager
 from unittest.mock import patch
 
-from app_support.video_kind import GENAU_FLICK
-
 import check_correspondence
 import config
 from tasks import genau_deliver, sort, upscale
@@ -16,12 +14,11 @@ from tests.gallery_fakes import GalleryOnDisk, a_gallery_of, kept_at
 from tests.temp_helpers import (
     LaneLibrary,
     gallery_of_videos_made_again,
-    recorded_kind,
     touch_video,
     workspace_temp_dir,
     write_sidecar,
 )
-from util import lanes, provenance, sidecar, topaz
+from util import lanes, provenance, sidecar
 
 GENAU_SOURCE = "example-loop-clips"
 
@@ -40,10 +37,6 @@ def _upscaled(lib: LaneLibrary, stem="loop_1", orient="landscape", contents="ups
     flick = lanes.upscale_of(GENAU_SOURCE, orient, stem)
     flick.parent.mkdir(parents=True, exist_ok=True)
     flick.write_text(contents, encoding="utf-8")
-    stamp = provenance.by_evolver(method=topaz.AI_UPSCALE_ORIGENERATOR.name,
-                                  method_version=topaz.AI_UPSCALE_ORIGENERATOR.version)
-    sidecar.update(sidecar.sidecar_path(flick),
-                   lambda record: provenance.recorded(record, provenance.UPSCALE, stamp))
     return flick, original
 
 
@@ -75,44 +68,15 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
 
             assert upscale.collect_queued_videos(upscale.UpscaleFolders.configured()) == []
 
-    def test_a_record_that_cannot_be_written_never_holds_the_flick_back(self):
-        with _genau_lane() as lib:
-            _flick, original = _upscaled(lib)
-            with patch.object(genau_deliver.sidecar, "update", side_effect=OSError("read-only")):
-                result = genau_deliver.run()
-
-            assert (result.delivered, result.failed) == (1, 0)
-            assert not original.exists()
-
-    def test_the_flicks_record_says_what_it_is_and_keeps_what_it_held(self):
+    def test_a_delivered_flick_is_given_no_sidecar_since_the_gallery_is_its_record(self):
         with _genau_lane() as lib:
             flick, _original = _upscaled(lib)
-            sidecar.update(sidecar.sidecar_path(flick),
-                           lambda record: {**record, "video": {"prompt": "a prompt", "seed": "1"}})
 
-            genau_deliver.run()
+            result = genau_deliver.run()
 
-            record = sidecar.read(sidecar.sidecar_path(flick))
-            assert record["video"]["prompt"] == "a prompt"
-            assert recorded_kind(record) == GENAU_FLICK
-
-    def test_finishing_adds_nothing_to_what_made_the_flick(self):
-        with _genau_lane() as lib:
-            flick, _original = _upscaled(lib)
-            stamps = sidecar.read(sidecar.sidecar_path(flick))[provenance.BLOCK]
-
-            genau_deliver.run()
-
-            assert sidecar.read(sidecar.sidecar_path(flick))[provenance.BLOCK] == stamps
-
-    def test_a_flick_without_any_record_still_gets_one(self):
-        with _genau_lane() as lib:
-            flick, _original = _upscaled(lib)
-            sidecar.sidecar_path(flick).unlink()
-            with patch.object(upscale, "awaits_its_upscale", return_value=False):
-                genau_deliver.run()
-
-            assert recorded_kind(sidecar.read(sidecar.sidecar_path(flick))) == GENAU_FLICK
+            assert result.delivered == 1
+            assert not sidecar.sidecar_path(flick).exists()
+            assert not lib.metadata.exists()
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
         saved = []

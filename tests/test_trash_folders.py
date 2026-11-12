@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.gallery_fakes import a_gallery_of, kept_at
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
 from util import trash_folders
 from util.script_library import is_marked_generated, mark_generated, script_path_for_video
@@ -119,6 +120,23 @@ class TestWhereAVideoMarkedTrashCameFrom(_InALibrary):
         [found] = _all_in_trash()
 
         assert found.restores_to == scene
+
+    def test_an_ai_video_no_sorted_copy_explains_goes_back_where_the_gallery_keeps_it(self):
+        kept = self.lib.kino_upscales / "landscape" / "example-source" / "scene six_topaz.mp4"
+        a_gallery_of(self.lib.gallery_db, [kept_at("outside-1", kept)])
+        touch_video(self.lib.trash / "scene six_topaz.mp4")
+
+        [found] = _all_in_trash()
+
+        assert found.restores_to == kept
+
+    def test_an_ai_videos_old_sidecar_no_longer_says_where_it_goes_back(self):
+        _a_record_for(self.lib.kino_upscales / "landscape" / "example-source" / "scene seven_topaz.mp4")
+        touch_video(self.lib.trash / "scene seven_topaz.mp4")
+
+        [found] = _all_in_trash()
+
+        assert found.restores_to is None
 
     def test_two_places_a_video_could_have_left_are_no_answer(self):
         for bucket in ("example-bucket", "other-bucket"):

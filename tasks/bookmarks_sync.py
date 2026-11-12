@@ -12,7 +12,6 @@ from urllib.parse import urlparse
 
 from app_support.favorites import Favorite
 from app_support.file_channel import write_whole
-from app_support.gallery_rows import file_entries, place_of_its_own
 from app_support.kino_folder import is_ai_video
 
 import config
@@ -133,9 +132,8 @@ def _starred_in_the_gallery() -> list[Favorite] | None:
 
 
 def _ai_videos_of(row: dict) -> list[Path]:
-    places = [place_of_its_own(entry) for entry in file_entries(row)]
-    return list(dict.fromkeys(Path(place) for place in (*places, row.get(EVOLVER_UPSCALE))
-                              if place and is_ai_video(Path(place)) and Path(place).is_file()))
+    return [place for place in origenerator_gallery.places_of(row)
+            if is_ai_video(place) and place.is_file()]
 
 
 def _pages_of(favorites: Iterable[Favorite]) -> _Favorites:

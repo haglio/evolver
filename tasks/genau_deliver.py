@@ -6,11 +6,9 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from app_support.video_kind import GENAU_FLICK
-
 import config
 from tasks import upscale
-from util import lanes, sidecar, video_kind
+from util import lanes
 from util.ffprobe import has_sound
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
 from util.sound import save_as_mp3
@@ -48,13 +46,6 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
     return None
 
 
-def _say_what_it_is(flick: Path) -> None:
-    try:
-        sidecar.update(sidecar.sidecar_path(flick),
-                       lambda record: video_kind.stamped(record, GENAU_FLICK))
-    except (ValueError, OSError):
-        log.warning("Could not record what %s is", flick.name, exc_info=True)
-
 
 def _save_its_sound(flick: Path, audio_dir: Path) -> None:
     if not has_sound(flick):
@@ -76,7 +67,7 @@ def run() -> GenauDeliverResult:
     log.info("=== Genau lane: finishing the upscales in %s ===", delivery_dir)
 
     for flick, original in _fresh_upscales(delivery_dir, genau_sorted_dir):
-        _say_what_it_is(flick)
+
         _save_its_sound(flick, config.GENAU_AUDIO_DIR)
         try:
             # ComfyUI's output folder and Origenerator's gallery still hold the flick.

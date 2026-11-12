@@ -31,33 +31,40 @@ def _orientation_unknown(_video):
     return orientation.UNKNOWN
 
 
-class TestAiLane(unittest.TestCase):
-    def test_a_sorted_clip_is_recorded_on_the_sidecar_at_its_upscale_path(self):
+def _scene(lib: LaneLibrary, name: str) -> tuple[Path, Path]:
+    video = touch_video(lib.non_ai / "bucket" / f"{name}.mp4")
+    return video, sidecar.sidecar_path(video)
+
+
+def _oriented_scene(lib: LaneLibrary, name: str) -> tuple[Path, Path]:
+    video, path = _scene(lib, name)
+    write_sidecar(path, video_kind.oriented({}, orientation.PORTRAIT))
+    return video, path
+
+
+class TestAnAiVideo(unittest.TestCase):
+    def test_no_ai_video_and_no_ai_genau_flick_is_given_a_sidecar_since_the_gallery_is_their_record(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                video = touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_a.mp4")
-                path = sidecar.sidecar_path(
-                    lib.kino_upscales / "portrait" / "provider2" / "clip_a_topaz.mp4"
-                )
-                write_sidecar(path, {"video": {"prompt": "a prompt"}})
+                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_a.mp4")
+                touch_video(lib.kino_upscales / "portrait" / "provider2" / "clip_a_topaz.mp4")
+                touch_video(lib.sorted_dir / GENAU_SOURCE / "portrait" / "loop_1.mp4")
+                touch_video(lib.genau_flicks / "2D" / "AI" / "loop_2_topaz.mp4")
 
-                result = video_kinds.run(probe=_probe({video.stem: 5.0}),
-                                         orientation_probe=_orientation_unknown)
+                result = video_kinds.run(probe=_refuses_to_be_called,
+                                         orientation_probe=_refuses_to_be_called)
 
-                payload = sidecar.read(path)
-            assert recorded_kind(payload) == EXCERPT
-            assert payload["video"]["prompt"] == "a prompt"
-            assert result.recorded == 1
+            assert not lib.metadata.exists()
+            assert (result.recorded, result.already, result.skipped, result.deferred) == (0, 0, 0, 0)
 
+
+class TestANonAiVideo(unittest.TestCase):
     def test_an_act_struck_out_while_the_stage_measures_is_still_there_after(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_c.mp4")
-                path = sidecar.sidecar_path(
-                    lib.kino_upscales / "portrait" / "provider2" / "clip_c_topaz.mp4"
-                )
+                _video, path = _scene(lib, "clip_c")
                 write_sidecar(path, {"video": {"action": "Alpha"}})
 
                 def measure_while_a_viewer_rejects(clip):
@@ -71,31 +78,6 @@ class TestAiLane(unittest.TestCase):
             assert payload["video"]["wrong_action"] == "Alpha"
             assert "action" not in payload["video"]
             assert recorded_kind(payload) == EXCERPT
-
-    def test_a_long_generated_clip_is_full_length(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            with lib.config(GENAU_SOURCE):
-                video = touch_video(lib.sorted_dir / "provider2" / "landscape" / "clip_b.mp4")
-                path = sidecar.sidecar_path(
-                    lib.kino_upscales / "landscape" / "provider2" / "clip_b_topaz.mp4"
-                )
-
-                video_kinds.run(probe=_probe({video.stem: 240.0}),
-                                orientation_probe=_orientation_unknown)
-
-                assert recorded_kind(sidecar.read(path)) == FULL_LENGTH
-
-    def test_a_clip_in_the_genau_source_is_a_genau_loop_before_it_is_finished(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            with lib.config(GENAU_SOURCE):
-                touch_video(lib.sorted_dir / GENAU_SOURCE / "portrait" / "loop_1.mp4")
-                path = sidecar.sidecar_path(lib.genau_flicks / "2D" / "AI" / "loop_1_topaz.mp4")
-
-                video_kinds.run(probe=_unmeasurable, orientation_probe=_orientation_unknown)
-
-                assert recorded_kind(sidecar.read(path)) == GENAU_FLICK
 
 
 class TestGenauLane(unittest.TestCase):
@@ -158,10 +140,7 @@ class TestRunningItAgain(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                video = touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_c.mp4")
-                path = sidecar.sidecar_path(
-                    lib.kino_upscales / "portrait" / "provider2" / "clip_c_topaz.mp4"
-                )
+                video, path = _scene(lib, "clip_c")
                 write_sidecar(path, video_kind.oriented(video_kind.timed(
                     video_kind.stamped({}, FULL_LENGTH), 240.0), orientation.PORTRAIT))
 
@@ -176,11 +155,9 @@ class TestRunningItAgain(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_i.mp4")
-                path = sidecar.sidecar_path(
-                    lib.kino_upscales / "portrait" / "provider2" / "clip_i_topaz.mp4"
-                )
-                write_sidecar(path, video_kind.stamped({}, FULL_LENGTH))
+                _video, path = _scene(lib, "clip_i")
+                write_sidecar(path, video_kind.oriented(
+                    video_kind.stamped({}, FULL_LENGTH), orientation.PORTRAIT))
 
                 first = video_kinds.run(probe=_probe({"clip_i": 240.0}),
                                         orientation_probe=_orientation_unknown)
@@ -194,10 +171,10 @@ class TestRunningItAgain(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                video = touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_d.mp4")
+                video, _path = _scene(lib, "clip_d")
 
                 video_kinds.run(probe=_probe({video.stem: 6.0}),
-                                orientation_probe=_orientation_unknown)
+                                orientation_probe=_orientations({video.stem: orientation.PORTRAIT}))
                 again = video_kinds.run(probe=_refuses_to_be_called,
                                         orientation_probe=_refuses_to_be_called)
 
@@ -297,36 +274,6 @@ class TestRecordingTheOrientation(unittest.TestCase):
                 payload = sidecar.read(sidecar.sidecar_path(flick))
             assert video_kind.orientation_of(payload) == orientation.LANDSCAPE
 
-    def test_a_generated_clip_s_orientation_is_the_folder_it_was_sorted_into(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            with lib.config(GENAU_SOURCE):
-                video = touch_video(lib.sorted_dir / "provider2" / "landscape" / "clip_j.mp4")
-                path = sidecar.sidecar_path(
-                    lib.kino_upscales / "landscape" / "provider2" / "clip_j_topaz.mp4"
-                )
-
-                video_kinds.run(probe=_probe({video.stem: 5.0}),
-                                orientation_probe=_refuses_to_be_called)
-
-                assert video_kind.orientation_of(sidecar.read(path)) == orientation.LANDSCAPE
-
-    def test_a_generated_clip_s_orientation_costs_no_measurement(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            with lib.config(GENAU_SOURCE, VIDEO_KIND_PROBES_PER_RUN=0):
-                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_k.mp4")
-                path = sidecar.sidecar_path(
-                    lib.kino_upscales / "portrait" / "provider2" / "clip_k_topaz.mp4"
-                )
-                write_sidecar(path, video_kind.timed(
-                    video_kind.stamped({}, EXCERPT), 5.0))
-
-                result = video_kinds.run(probe=_refuses_to_be_called,
-                                         orientation_probe=_refuses_to_be_called)
-
-                assert video_kind.orientation_of(sidecar.read(path)) == orientation.PORTRAIT
-            assert result.recorded == 1
 
     def test_an_orientation_is_measured_once(self):
         with workspace_temp_dir() as root:
@@ -382,10 +329,7 @@ class TestWhatItRefusesToGuess(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_e.mp4")
-                path = sidecar.sidecar_path(
-                    lib.kino_upscales / "portrait" / "provider2" / "clip_e_topaz.mp4"
-                )
+                _video, path = _scene(lib, "clip_e")
 
                 result = video_kinds.run(probe=_unmeasurable,
                                          orientation_probe=_orientation_unknown)
@@ -485,7 +429,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(VIDEO_KIND_PROBES_PER_RUN=2):
                 for index in range(5):
-                    touch_video(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
+                    _oriented_scene(lib, f"clip_{index}")
                 measured = []
 
                 first = video_kinds.run(probe=lambda video: measured.append(video) or 4.0,
@@ -503,7 +447,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(VIDEO_KIND_PROBES_PER_RUN=1):
                 for index in range(3):
-                    touch_video(lib.sorted_dir / "provider2" / "portrait" / f"clip_{index}.mp4")
+                    _oriented_scene(lib, f"clip_{index}")
 
                 result = video_kinds.run(probe=_probe({f"clip_{i}": 4.0 for i in range(3)}),
                                          orientation_probe=_orientation_unknown)
@@ -515,7 +459,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
             lib = LaneLibrary(root)
             with lib.config(VIDEO_KIND_PROBES_PER_RUN=0):
                 clip = touch_video(lib.genau_flicks / "loop_3_topaz.mp4")
-                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_g.mp4")
+                _oriented_scene(lib, "clip_g")
 
                 result = video_kinds.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
@@ -575,7 +519,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(GENAU_SOURCE):
-                touch_video(lib.sorted_dir / "provider2" / "portrait" / "clip_h.mp4")
+                _oriented_scene(lib, "clip_h")
 
                 video_kinds.run(probe=_probe({"clip_h": 4.0}),
                                 orientation_probe=_orientation_unknown)

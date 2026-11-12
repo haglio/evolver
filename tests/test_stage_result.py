@@ -83,7 +83,7 @@ WENT_WRONG_AND_WANTS_AN_EYE = (False, True)
     pytest.param(NonAiGroupResult(grouped=2), WENT_WELL, id="version families recorded"),
     pytest.param(NonAiTitleResult(titled=2), WENT_WELL, id="titles recorded"),
     pytest.param(VideoKindsResult(recorded=2), WENT_WELL, id="video kinds recorded"),
-    pytest.param(ProvenanceResult(looked_up=2), WENT_WELL, id="provenance recorded"),
+    pytest.param(ProvenanceResult(from_notes=2), WENT_WELL, id="provenance recorded"),
     pytest.param(DuplicateSizesResult(scanned_count=4), WENT_WELL, id="no duplicate sizes"),
     pytest.param(DuplicateSizesResult(scanned_count=4,
                                       duplicate_groups={10: ["a/one.mp4", "b/two.mp4"]}),
