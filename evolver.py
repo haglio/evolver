@@ -155,9 +155,8 @@ STAGES: tuple[Stage, ...] = (
           f"{_FLICK} -- with their metadata and funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its audio once the video with its audio is there",
           (0x00, 0x00, 0x6C), run=lambda _: unsent_videos.run()),
     Stage("metadata", "Transfer prompts",
-          "Read the prompt each AI video in 1_sorted was made from and save it in that video's sidecar",
+          "Read the prompt each AI video in 1_sorted was made from and hand it to Origenerator's gallery once the video's upscale is in its folder",
           (0x14, 0x7D, 0x3C), run=lambda _: prompt_scrape.run()),
-
     Stage("sort", "Sort inbox",
           "Move AI videos from 0_inbox into 1_sorted, filed by where they came from and by portrait or landscape",
           (0x38, 0x6A, 0x9C), run=lambda _: sort.run()),
@@ -171,7 +170,7 @@ STAGES: tuple[Stage, ...] = (
           "Make each AI video in 1_sorted into a 60fps video four times larger with Topaz, and put it in its Kino or Genau folder",
           (0xED, 0xC9, 0x48), run=_upscale),
     Stage("genau_deliver", "Genau delivery",
-          f"Finish each Genau-lane {_FLICK} the upscale put in the folder Genau plays from: record what it is, save its audio and retire the 1_sorted copy it was made from",
+          f"Finish each Genau-lane {_FLICK} the upscale put in the folder Genau plays from: save its audio and retire the 1_sorted copy it was made from",
           (0x7B, 0x41, 0x73), run=lambda _: genau_deliver.run()),
     Stage("upscale_non_ai", "Upscale non-AI videos",
           "Upscale one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
@@ -180,7 +179,7 @@ STAGES: tuple[Stage, ...] = (
           "Verify every 1_sorted video has its upscale in its Kino or Genau folder, and no upscale is missing from either",
           (0xFF, 0x9D, 0x83), run=_verify),
     Stage("watch_weights", "Update weights",
-          "Add up the completions, skips and locks Fun Time and Warm Gun recorded for each library video and save the total on its sidecar, as the weight both apps shuffle by, and mark the phone's favorites on their sidecars",
+          "Add up the completions, skips and locks Fun Time and Warm Gun recorded for each library video and save the total, as the weight both apps shuffle by, in Origenerator's gallery for an AI video and on its sidecar for any other, and mark the phone's favorites in the same places",
           (0xB5, 0xE6, 0x1D),
           run=lambda _: watch_weights.run(
               tell_the_gallery=origenerator_commands.write_gallery_entries)),
@@ -205,12 +204,12 @@ STAGES: tuple[Stage, ...] = (
           "Record what to call each 2D/non_AI video -- the performer and movie its clip record names, carried to the whole scene that clip was cut out of -- so every app reads one name instead of working it out at launch",
           (0xAA, 0x44, 0xCC), run=lambda _: nonai_titles.run()),
     Stage("video_types", "Set video kinds",
-          f"Record on each library video's sidecar whether it is a Genau {_FLICK}, a clip or a full video "
+          f"Record on each non-AI video's sidecar whether it is a Genau {_FLICK}, a clip or a full video "
           "-- a clip being one cut from a scene, one in a folder of clips, or one of ten seconds or less -- "
           "with how long it runs and whether it is portrait or landscape",
           (0x2B, 0x2B, 0xE8), run=lambda _: video_kinds.run()),
     Stage("provenance", "Set video sources",
-          "Record on each library video's sidecar what made it -- which app, which version of its code, which workflow or Topaz settings -- looking its videos up in Origenerator's gallery and reading the note Topaz wrote into each upscale, and marking unknown whatever neither can say",
+          "Record on each non-AI video's sidecar what made it -- which app, which version of its code, which Topaz settings -- reading the note Topaz wrote into each upscale, and marking unknown whatever it cannot say",
           (0xEE, 0x00, 0xBB), run=lambda _: provenance_sweep.run()),
     Stage("dupes", "Duplicate check",
           "Find likely duplicate videos in the non_AI folder by their exact file size",
