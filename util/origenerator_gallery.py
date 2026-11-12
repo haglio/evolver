@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 import json
-import logging
-import sqlite3
 from collections.abc import Callable, Iterable
 from fractions import Fraction
 from pathlib import Path
 
+from app_support import gallery_rows
+from app_support.gallery_rows import is_video_name, output_names
 from app_support.video_names import generation_stem
 
 import config
-
-log = logging.getLogger(__name__)
 
 PUBLISHED = "origenerator_gallery_contract.json"
 
@@ -25,23 +23,9 @@ def generated_fps(checkout: Path) -> Fraction | None:
     return rate if rate > 0 else None
 
 
-def database(db_path=None) -> Path:
-    db_path = Path(db_path) if db_path is not None else config.ORIGENERATOR_DB_PATH
-    if not db_path.exists():
-        raise FileNotFoundError(f"Origenerator database not found: {db_path}")
-    return db_path
-
-
-def rows(columns: Iterable[str], *, optional: Iterable[str] = (),
-         db_path=None) -> list[dict]:
-    conn = _connect_ro(database(db_path))
-    try:
-        present = {column[1] for column in conn.execute("PRAGMA table_info(generations)")}
-        selected = [*columns, *(name for name in optional if name in present)]
-        cursor = conn.execute(f"SELECT {', '.join(selected)} FROM generations")
-        return [dict(zip(selected, row, strict=True)) for row in cursor.fetchall()]
-    finally:
-        conn.close()
+def rows(columns: Iterable[str], *, optional: Iterable[str] = (), db_path=None) -> list[dict]:
+    return gallery_rows.rows(columns, optional=optional,
+                             db_path=config.ORIGENERATOR_DB_PATH if db_path is None else db_path)
 
 
 REMADE_AT = "remade_at"
@@ -66,30 +50,3 @@ def the_one_version_in(folder: Path, name: str) -> Path | None:
                 if video.is_file() and is_video_name(video.name)
                 and generation_stem(video.stem) == made_from] if folder.is_dir() else []
     return versions[0] if len(versions) == 1 else None
-
-
-def output_names(row: dict) -> list[str]:
-    entries = output_entries(row)
-    if entries is None:
-        log.warning("Could not read what a generation produced: %r", row.get("output_files"))
-        return []
-    return [entry["filename"] for entry in entries]
-
-
-def output_entries(row: dict) -> list[dict] | None:
-    try:
-        return [entry for entry in json.loads(row.get("output_files") or "[]")
-                if entry.get("filename")]
-    except (AttributeError, TypeError, ValueError):
-        return None
-
-
-def is_video_name(name: str) -> bool:
-    return Path(name).suffix.lower() in config.VIDEO_EXTENSIONS
-
-
-def _connect_ro(db_path: Path) -> sqlite3.Connection:
-    # SQLite handed a plain path that does not exist makes an empty database
-    # there; opened read-only by URI, a wrong path fails instead.
-    uri = db_path.resolve().as_uri() + "?mode=ro"
-    return sqlite3.connect(uri, uri=True, timeout=5.0)
