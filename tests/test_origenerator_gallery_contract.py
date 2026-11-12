@@ -47,6 +47,13 @@ class OrigeneratorGalleryContract(unittest.TestCase):
 
         assert read == (None if promised is None else tuple(promised))
 
+    def test_the_workflow_names_telling_how_a_site_made_a_video_are_read_as_it_publishes_them(self):
+        promised = self.promise.get(origenerator_gallery.WORKFLOW_PREFIXES)
+        read = origenerator_gallery.workflow_prefixes(self.origenerator)
+
+        assert read == (None if promised is None else origenerator_gallery.WorkflowPrefixes(
+            promised["text_to_video"], promised["image_to_video"]))
+
     def test_every_column_read_here_is_one_origenerator_promises(self):
         promised = {*self.promise["columns"], *self.promise["optional_columns"]}
         read = {

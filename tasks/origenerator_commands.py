@@ -10,7 +10,7 @@ from pathlib import Path
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 import config
-from util.origenerator_gallery import PUBLISHED
+from util.origenerator_gallery import published
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -35,9 +35,8 @@ class DowntimeResult(StageResult):
 
 def published_command(checkout: Path, name: str) -> tuple[str, ...] | None:
     try:
-        published = json.loads((checkout / PUBLISHED).read_text(encoding="utf-8"))
-        command = tuple(str(part) for part in published[name])
-    except (OSError, ValueError, KeyError, TypeError):
+        command = tuple(str(part) for part in published(checkout)[name])
+    except (KeyError, TypeError):
         return None
     return command or None
 
