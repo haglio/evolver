@@ -6,6 +6,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.video_kind import GENAU_FLICK
+
 import config
 from tasks import upscale
 from util import lanes, sidecar, video_kind
@@ -49,7 +51,7 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
 def _say_what_it_is(flick: Path) -> None:
     try:
         sidecar.update(sidecar.sidecar_path(flick),
-                       lambda record: video_kind.stamped(record, video_kind.GENAU_FLICK))
+                       lambda record: video_kind.stamped(record, GENAU_FLICK))
     except (ValueError, OSError):
         log.warning("Could not record what %s is", flick.name, exc_info=True)
 

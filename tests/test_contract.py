@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app_support import favorites, video_ids, watch_weights
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
+from app_support.video_kind import EXCERPT, TYPES
 from shared_ui.orientation import ORIENTATIONS, PORTRAIT
 
 import config
@@ -59,7 +60,7 @@ class TheLibraryRecord(unittest.TestCase):
         self.record = _document()["library_record"]
 
     def test_every_kind_it_names_is_one_this_repo_records(self):
-        assert self.record["video_kinds"] == list(video_kind.TYPES)
+        assert self.record["video_kinds"] == list(TYPES)
 
     def test_the_orientations_it_names_are_the_familys_two_words(self):
         assert self.record["video_orientations"] == list(ORIENTATIONS)
@@ -83,7 +84,7 @@ class TheLibraryRecord(unittest.TestCase):
 
     def test_the_kind_the_running_time_and_the_orientation_sit_where_it_says(self):
         stamped = video_kind.oriented(
-            video_kind.timed(video_kind.stamped({}, video_kind.CLIP), 12.5), PORTRAIT)
+            video_kind.timed(video_kind.stamped({}, EXCERPT), 12.5), PORTRAIT)
         own = {video_kind.FIELD, video_kind.DURATION_FIELD, video_kind.ORIENTATION_FIELD}
 
         assert set(stamped[video_kind.BLOCK]) == own

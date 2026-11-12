@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app_support import favorites, video_ids, watch_weights
+from app_support.video_kind import TYPES
 from shared_ui.orientation import ORIENTATIONS
 
 from util import scene_links, video_kind, watch
@@ -15,7 +16,7 @@ VIDEO_ACTION_FIELD = "action"
 VIDEO_WRONG_ACTION_FIELD = WRONG_ACTION_FIELD
 VIDEO_FIELDS_FUN_TIME_WRITES = (VIDEO_WRONG_ACTION_FIELD,)
 
-VIDEO_KINDS = video_kind.TYPES
+VIDEO_KINDS = TYPES
 
 VIDEO_GENERATION_FIELDS = (
     "prompt", "model", "resolution", "aspect_ratio", "quality", "style",

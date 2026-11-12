@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 from app_support import favorites, video_ids
+from app_support.video_kind import TYPES
 from shared_ui.orientation import ORIENTATIONS
 
 from util import provenance, watch
-
-GENAU_FLICK = "genau_flick"
-CLIP = "excerpt"
-FULL_LENGTH = "full_length"
-
-TYPES = (GENAU_FLICK, CLIP, FULL_LENGTH)
-
-CLIP_MAX_SECONDS = 10.0
 
 BLOCK = "video"
 FIELD = "type"
@@ -24,23 +17,6 @@ _OWN_FIELDS = frozenset({FIELD, DURATION_FIELD, ORIENTATION_FIELD})
 
 _STAMPS = frozenset({watch.BLOCK, provenance.BLOCK, favorites.FAVORITE_KEY, favorites.PAGE_KEY})
 _ABOUT_THE_FILE = frozenset({provenance.BLOCK, video_ids.ID_KEY})
-
-
-def free_kind(*, genau: bool, clip: bool) -> str:
-    if genau:
-        return GENAU_FLICK
-    if clip:
-        return CLIP
-    return ""
-
-
-def classify(*, genau: bool, clip: bool, duration_seconds: float | None) -> str:
-    free = free_kind(genau=genau, clip=clip)
-    if free:
-        return free
-    if duration_seconds is not None and duration_seconds <= CLIP_MAX_SECONDS:
-        return CLIP
-    return FULL_LENGTH
 
 
 def kind_of(payload: dict) -> str:

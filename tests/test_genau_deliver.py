@@ -6,6 +6,8 @@ import unittest
 from contextlib import contextmanager
 from unittest.mock import patch
 
+from app_support.video_kind import GENAU_FLICK
+
 import check_correspondence
 from tasks import genau_deliver, sort, upscale
 from tests.temp_helpers import (
@@ -88,7 +90,7 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
 
             record = sidecar.read(sidecar.sidecar_path(flick))
             assert record["video"]["prompt"] == "a prompt"
-            assert video_kind.kind_of(record) == video_kind.GENAU_FLICK
+            assert video_kind.kind_of(record) == GENAU_FLICK
 
     def test_finishing_adds_nothing_to_what_made_the_flick(self):
         with _genau_lane() as lib:
@@ -106,7 +108,7 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
             with patch.object(upscale, "awaits_its_upscale", return_value=False):
                 genau_deliver.run()
 
-            assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(flick))) == video_kind.GENAU_FLICK
+            assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(flick))) == GENAU_FLICK
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
         saved = []

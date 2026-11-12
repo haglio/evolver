@@ -4,37 +4,18 @@ import inspect
 import unittest
 
 import pytest
+from app_support.video_kind import EXCERPT, FULL_LENGTH
 
 from util import orientation, provenance, video_kind
 
 
-class TestClassify(unittest.TestCase):
-    def test_a_video_of_ten_seconds_or_less_is_a_clip(self):
-        assert video_kind.classify(genau=False, clip=False, duration_seconds=4.0) == video_kind.CLIP
-
-    def test_a_long_running_clip_is_full_length(self):
-        assert video_kind.classify(genau=False, clip=False, duration_seconds=900.0) == video_kind.FULL_LENGTH
-
-    def test_an_unknown_running_time_reads_as_full_length(self):
-        assert video_kind.classify(genau=False, clip=False, duration_seconds=None) == video_kind.FULL_LENGTH
-
-    def test_a_carved_excerpt_outranks_its_running_time(self):
-        assert video_kind.classify(genau=False, clip=True, duration_seconds=4.0) == video_kind.CLIP
-
-    def test_a_genau_flick_outranks_everything_else(self):
-        assert video_kind.classify(genau=True, clip=True, duration_seconds=900.0) == video_kind.GENAU_FLICK
-
-    def test_the_boundary_second_still_counts_as_a_clip(self):
-        assert video_kind.classify(genau=False, clip=False, duration_seconds=video_kind.CLIP_MAX_SECONDS) == video_kind.CLIP
-
+class TestRecording(unittest.TestCase):
     def test_short_is_no_longer_a_kind_a_sidecar_can_hold(self):
         assert video_kind.kind_of({"video": {"type": "short"}}) == ""
 
-
-class TestRecording(unittest.TestCase):
     def test_reads_the_kind_off_the_video_block(self):
-        payload = {"video": {"action": "Alpha", "type": video_kind.CLIP}}
-        assert video_kind.kind_of(payload) == video_kind.CLIP
+        payload = {"video": {"action": "Alpha", "type": EXCERPT}}
+        assert video_kind.kind_of(payload) == EXCERPT
 
     def test_a_sidecar_written_before_the_field_existed_reads_as_nothing(self):
         assert video_kind.kind_of({"video": {"action": "Alpha"}}) == ""
@@ -46,13 +27,13 @@ class TestRecording(unittest.TestCase):
     def test_stamping_keeps_the_rest_of_the_block_and_the_payload(self):
         payload = {"video": {"action": "Alpha"}, "version": {"group": "g"}}
 
-        stamped = video_kind.stamped(payload, video_kind.CLIP)
+        stamped = video_kind.stamped(payload, EXCERPT)
 
-        assert stamped == {"video": {"action": "Alpha", "type": video_kind.CLIP}, "version": {"group": "g"}}
+        assert stamped == {"video": {"action": "Alpha", "type": EXCERPT}, "version": {"group": "g"}}
         assert payload == {"video": {"action": "Alpha"}, "version": {"group": "g"}}
 
     def test_stamping_a_sidecar_that_has_no_video_block_makes_one(self):
-        assert video_kind.stamped({"version": {"group": "g"}}, video_kind.FULL_LENGTH) == {"version": {"group": "g"}, "video": {"type": video_kind.FULL_LENGTH}}
+        assert video_kind.stamped({"version": {"group": "g"}}, FULL_LENGTH) == {"version": {"group": "g"}, "video": {"type": FULL_LENGTH}}
 
     def test_a_kind_outside_the_vocabulary_is_refused(self):
         with pytest.raises(ValueError, match="not a video type: 'medium_length'"):
@@ -64,19 +45,19 @@ class TestTheRunningTime(unittest.TestCase):
         assert video_kind.duration_of({"video": {"duration_seconds": 812.5}}) == 812.5
 
     def test_a_sidecar_that_records_none_reads_as_nothing_to_go_on(self):
-        assert video_kind.duration_of({"video": {"type": video_kind.CLIP}}) is None
+        assert video_kind.duration_of({"video": {"type": EXCERPT}}) is None
         assert video_kind.duration_of({}) is None
 
     def test_a_running_time_nothing_could_read_as_a_number_is_no_answer(self):
         assert video_kind.duration_of({"video": {"duration_seconds": "long"}}) is None
 
     def test_timing_keeps_the_rest_of_the_block_and_the_payload(self):
-        payload = {"video": {"type": video_kind.CLIP}, "version": {"group": "g"}}
+        payload = {"video": {"type": EXCERPT}, "version": {"group": "g"}}
 
         timed = video_kind.timed(payload, 4)
 
-        assert timed == {"video": {"type": video_kind.CLIP, "duration_seconds": 4.0}, "version": {"group": "g"}}
-        assert payload == {"video": {"type": video_kind.CLIP}, "version": {"group": "g"}}
+        assert timed == {"video": {"type": EXCERPT, "duration_seconds": 4.0}, "version": {"group": "g"}}
+        assert payload == {"video": {"type": EXCERPT}, "version": {"group": "g"}}
 
     def test_a_negative_running_time_is_refused(self):
         with pytest.raises(ValueError, match=r"not a running time: -1\.0"):
@@ -88,26 +69,26 @@ class TestTheOrientation(unittest.TestCase):
         assert video_kind.orientation_of({"video": {"orientation": orientation.PORTRAIT}}) == orientation.PORTRAIT
 
     def test_a_sidecar_that_records_none_reads_as_nothing(self):
-        assert video_kind.orientation_of({"video": {"type": video_kind.CLIP}}) == ""
+        assert video_kind.orientation_of({"video": {"type": EXCERPT}}) == ""
         assert video_kind.orientation_of({}) == ""
 
     def test_a_word_that_is_neither_orientation_reads_as_nothing(self):
         assert video_kind.orientation_of({"video": {"orientation": orientation.UNKNOWN}}) == ""
 
     def test_orienting_keeps_the_rest_of_the_block_and_the_payload(self):
-        payload = {"video": {"type": video_kind.CLIP}, "version": {"group": "g"}}
+        payload = {"video": {"type": EXCERPT}, "version": {"group": "g"}}
 
         oriented = video_kind.oriented(payload, orientation.LANDSCAPE)
 
-        assert oriented == {"video": {"type": video_kind.CLIP, "orientation": orientation.LANDSCAPE}, "version": {"group": "g"}}
-        assert payload == {"video": {"type": video_kind.CLIP}, "version": {"group": "g"}}
+        assert oriented == {"video": {"type": EXCERPT, "orientation": orientation.LANDSCAPE}, "version": {"group": "g"}}
+        assert payload == {"video": {"type": EXCERPT}, "version": {"group": "g"}}
 
     def test_the_third_answer_is_never_written_down(self):
         with pytest.raises(ValueError, match="not an orientation: 'unknown'"):
             video_kind.oriented({}, orientation.UNKNOWN)
 
 
-_A_VALUE_EACH_WRITER_TAKES = {"stamped": video_kind.CLIP, "timed": 4.0, "oriented": orientation.PORTRAIT}
+_A_VALUE_EACH_WRITER_TAKES = {"stamped": EXCERPT, "timed": 4.0, "oriented": orientation.PORTRAIT}
 
 
 def _the_writers_video_kind_has() -> set[str]:
@@ -124,22 +105,22 @@ class TestTellingABareSidecarApart(unittest.TestCase):
                 assert video_kind.only_the_video_itself(getattr(video_kind, writer)({}, value)), "a field this module writes must not turn a bare record into evidence"
 
     def test_a_sidecar_holding_only_a_kind_records_nothing_else(self):
-        assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}})
+        assert video_kind.only_the_video_itself({"video": {"type": EXCERPT}})
 
     def test_a_sidecar_holding_a_kind_and_a_running_time_records_nothing_else(self):
-        assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP, "duration_seconds": 4.0}})
+        assert video_kind.only_the_video_itself({"video": {"type": EXCERPT, "duration_seconds": 4.0}})
 
     def test_a_sidecar_holding_its_orientation_beside_them_records_nothing_else(self):
-        assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP, "duration_seconds": 4.0, "orientation": orientation.PORTRAIT}})
+        assert video_kind.only_the_video_itself({"video": {"type": EXCERPT, "duration_seconds": 4.0, "orientation": orientation.PORTRAIT}})
 
     def test_the_viewing_stamped_beside_them_is_still_nothing_else(self):
-        assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, "watch": {"completions": 2, "skips": 0, "locks": 0, "weight": 1.5874}})
+        assert video_kind.only_the_video_itself({"video": {"type": EXCERPT}, "watch": {"completions": 2, "skips": 0, "locks": 0, "weight": 1.5874}})
 
     def test_a_favorite_marked_beside_them_with_its_page_is_still_nothing_else(self):
-        assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, "favorite": True, "web_url": "https://example.com/gallery/101"})
+        assert video_kind.only_the_video_itself({"video": {"type": EXCERPT}, "favorite": True, "web_url": "https://example.com/gallery/101"})
 
     def test_a_record_of_what_made_the_file_beside_them_is_still_nothing_else(self):
-        assert video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}}), "a scrape that took the stamp for its own work would never fetch the clip's prompts"
+        assert video_kind.only_the_video_itself({"video": {"type": EXCERPT}, provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}}), "a scrape that took the stamp for its own work would never fetch the clip's prompts"
 
     def test_a_provenance_stamp_alone_is_nothing_else(self):
         assert video_kind.only_the_video_itself({provenance.BLOCK: {"upscale": provenance.reconstructed("evolver")}}), "an upscale is stamped as it is written, before its scrape or its kind lands"
@@ -148,7 +129,7 @@ class TestTellingABareSidecarApart(unittest.TestCase):
         assert not video_kind.only_the_video_itself({}), "an unreadable record reads empty too"
 
     def test_a_generation_beside_them_is_something_else(self):
-        assert not video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP, "prompt": "a prompt"}})
+        assert not video_kind.only_the_video_itself({"video": {"type": EXCERPT, "prompt": "a prompt"}})
 
     def test_a_block_of_its_own_beside_them_is_something_else(self):
-        assert not video_kind.only_the_video_itself({"video": {"type": video_kind.CLIP}, "clip": {"index": 1}})
+        assert not video_kind.only_the_video_itself({"video": {"type": EXCERPT}, "clip": {"index": 1}})

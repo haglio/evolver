@@ -5,6 +5,8 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.video_kind import classify, free_kind
+
 import config
 from util import lanes, orientation, sidecar, video_kind
 from util.ffprobe import duration_seconds, orientation_of
@@ -57,7 +59,7 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsR
     result = VideoKindsResult()
     measurements = _Measurements(config.VIDEO_KIND_PROBES_PER_RUN, config.CLOUD_DRIVE_PROBES_PER_RUN)
     for listed in _library_videos():
-        free = video_kind.free_kind(genau=listed.genau, clip=listed.clip)
+        free = free_kind(genau=listed.genau, excerpt=listed.clip)
         seconds = video_kind.duration_of(listed.payload)
         unmeasurable = False
         if seconds is None and measurements.spent_on(listed):
@@ -84,8 +86,7 @@ def run(probe=duration_seconds, orientation_probe=orientation_of) -> VideoKindsR
             orient=orient,
         ) -> dict | None:
             written = video_kind.stamped(
-                current, video_kind.classify(genau=genau, clip=clip,
-                                             duration_seconds=seconds))
+                current, classify(genau=genau, excerpt=clip, duration_seconds=seconds))
             if seconds is not None:
                 written = video_kind.timed(written, seconds)
             if orient:
