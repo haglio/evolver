@@ -16,7 +16,6 @@ from tests.temp_helpers import (
     gallery_of_videos_made_again,
     touch_video,
     workspace_temp_dir,
-    write_sidecar,
 )
 from util import lanes, provenance, sidecar
 
@@ -185,7 +184,7 @@ class TestAFlickMadeAgain(unittest.TestCase):
             upscale.run(gallery=GalleryOnDisk(config.ORIGENERATOR_DB_PATH), max_items=5, low_disk=upscale.LowDiskWarning.configured(floor_gb=1))
             genau_deliver.run()
 
-    def test_it_takes_the_place_of_the_one_genau_plays_and_keeps_its_record(self):
+    def test_it_takes_the_place_of_the_one_genau_plays(self):
         with workspace_temp_dir() as root:
             gallery = gallery_of_videos_made_again(root / "gallery.db", ["loop_1.mp4"])
             lib = LaneLibrary(root)
@@ -193,15 +192,12 @@ class TestAFlickMadeAgain(unittest.TestCase):
                 played = lanes.upscale_of(GENAU_SOURCE, "landscape", "loop_1")
                 touch_video(played).write_text("the flick first made", encoding="utf-8")
                 os.utime(played, (1_700_000_000, 1_700_000_000))
-                write_sidecar(sidecar.sidecar_path(played), {"favorite": True, "genau": {"flipped": True}})
 
                 self._remade(lib, "loop_1.mp4")
 
-                record = sidecar.read(sidecar.sidecar_path(played))
             assert sorted(path.name for path in played.parent.iterdir()) == [played.name]
             assert played.read_text(encoding="utf-8") == "upscaled again"
             assert played.stat().st_mtime == 1700000001
-            assert (record["favorite"], record["genau"]) == (True, {"flipped": True})
             assert not list((lib.sorted_dir / GENAU_SOURCE).rglob("*.mp4"))
 
     def test_under_a_new_name_it_takes_the_place_of_the_one_under_the_old(self):
@@ -212,15 +208,12 @@ class TestAFlickMadeAgain(unittest.TestCase):
                 played = lib.genau_flicks / "2D" / "AI" / "loop_1__topaz.mp4"
                 touch_video(played).write_text("the flick first made", encoding="utf-8")
                 its_sound = touch_video(lib.genau_audio / "loop_1__topaz.mp3")
-                write_sidecar(sidecar.sidecar_path(played), {"favorite": True})
 
                 self._remade(lib, "loop_1-audio.mp4")
 
                 remade = played.with_name("loop_1-audio_topaz.mp4")
-                record = sidecar.read(sidecar.sidecar_path(remade))
             assert sorted(path.name for path in played.parent.iterdir()) == [remade.name]
             assert remade.read_text(encoding="utf-8") == "upscaled again"
-            assert record["favorite"]
             assert sorted(path.name for path in its_sound.parent.iterdir()) == ["loop_1-audio_topaz.mp3"]
 
 

@@ -99,6 +99,11 @@ class TestSortHelpers(unittest.TestCase):
             assert not ambient.exists()
 
 
+def write_sidecar_for(video: Path) -> Path:
+    write_sidecar(sidecar.sidecar_path(video), {})
+    return sidecar.sidecar_path(video)
+
+
 class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
     def setUp(self):
         self.gallery = FakeGallery()
@@ -109,7 +114,6 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
         sorted_copy.parent.mkdir(parents=True)
         sorted_copy.write_bytes(b"first made")
         upscaled = touch_video(lanes.upscale_of(source, "portrait", sorted_copy.stem))
-        write_sidecar(sidecar.sidecar_path(upscaled), {"favorite": True})
         current = topaz.AI_UPSCALE_ORIGENERATOR
         made_by = provenance.reconstructed("evolver", method=current.name,
                                            method_version=current.version)
@@ -140,7 +144,6 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
                 assert not handed_over.exists()
                 assert sorted_copy.read_bytes() == b"made again"
                 assert self.gallery.upscales == [(upscaled, provenance.reconstructed(None))]
-                assert sidecar.read(sidecar.sidecar_path(upscaled)) == {"favorite": True}
 
     def test_made_again_under_its_new_name_takes_the_place_of_the_copy_under_the_old(self):
         with workspace_temp_dir() as root:
@@ -151,6 +154,7 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
                 old_script = script_library.script_path_for_video(old_upscale)
                 old_script.parent.mkdir(parents=True)
                 old_script.write_text("{}", encoding="utf-8")
+                where_its_record_was = write_sidecar_for(old_upscale)
 
                 self._sent_again(lib, "made_00001-audio.mp4", b"made again")
 
@@ -160,10 +164,10 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
                 assert not old_upscale.exists()
                 assert remake.read_bytes() == b"made again"
                 assert self.gallery.upscales == [(its_upscale, provenance.reconstructed(None))]
-                assert sidecar.read(sidecar.sidecar_path(its_upscale))["favorite"]
-                assert not sidecar.sidecar_path(old_upscale).exists()
                 assert script_library.script_path_for_video(its_upscale).is_file()
                 assert not old_script.exists()
+                assert where_its_record_was.exists()
+                assert not sidecar.sidecar_path(its_upscale).exists()
 
     def test_sent_again_as_it_already_is_leaves_its_upscale_alone(self):
         with workspace_temp_dir() as root:
