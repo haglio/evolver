@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app_support import favorites, video_ids
+from app_support import favorites, video_ids, watch_weights
 from shared_ui.orientation import ORIENTATIONS
 
 from util import scene_links, video_kind, watch
@@ -41,7 +41,7 @@ VERSION_BLOCK = "version"
 VERSION_GROUP_FIELD = "group"
 
 WATCH_BLOCK = watch.BLOCK
-WATCH_COUNT_FIELDS = watch.COUNT_FIELDS
+WATCH_COUNT_FIELDS = watch_weights.COUNT_FIELDS
 WATCH_WEIGHT_FIELD = watch.WEIGHT_FIELD
 
 TITLE_KEY = "title"

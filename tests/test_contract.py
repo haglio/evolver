@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
-from app_support import favorites, video_ids
+from app_support import favorites, video_ids, watch_weights
 from app_support.mirrored_tree import library_roots_beside, mirrored_path
 from shared_ui.orientation import ORIENTATIONS, PORTRAIT
 
@@ -71,7 +71,7 @@ class TheLibraryRecord(unittest.TestCase):
         assert sidecar.WRONG_ACTION_FIELD in video["fields"]
 
     def test_the_watch_block_it_names_is_the_one_this_repo_stamps(self):
-        stamped = watch.stamped({}, dict.fromkeys(watch.COUNT_FIELDS, 1))
+        stamped = watch.stamped({}, dict.fromkeys(watch_weights.COUNT_FIELDS, 1))
 
         assert sorted(stamped[watch.BLOCK]) == sorted(self.record["blocks"][watch.BLOCK]["fields"])
 
