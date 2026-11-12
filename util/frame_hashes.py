@@ -31,22 +31,20 @@ _POPCOUNT = np.array([i.bit_count() for i in range(256)], dtype=np.uint8)
 PROBE_POINTS = (0.2, 0.5, 0.8)
 PROBE_SECONDS = 4.0
 
-# ffmpeg's cropdetect: below 24 is black, rounded to 2, reset 0 grows one box over the window.
-_CROP_LIMIT, _CROP_ROUND, _CROPDETECT_NEVER_RESETS = 24, 2, 0
+BLACK_AT_MOST = 24
+FRAMES_MEASURED_PER_SECOND = 2
 
 REAL_LETTERBOX_MIN_CONTENT = 0.5
 
-_CROP_REPORT = re.compile(r"crop=(\d+):(\d+):(\d+):(\d+)")
+_PGM_HEADER = re.compile(rb"P5\s+(\d+)\s+(\d+)\s+(\d+)\s")
+
+Corners = tuple[int, int, int, int]
 
 
 def content_crop_in(
-    reports: Iterable[str], width: int, height: int,
+    measured: Iterable[Corners | None], width: int, height: int,
 ) -> tuple[int, int, int, int] | None:
-    corners = [
-        (int(x), int(y), int(x) + int(w), int(y) + int(h))
-        for report in reports
-        for w, h, x, y in _CROP_REPORT.findall(report)
-    ]
+    corners = [corner for corner in measured if corner is not None]
     if not corners:
         return None
     left = min(corner[0] for corner in corners)
@@ -67,21 +65,47 @@ def content_crop_in(
     return crop_width, crop_height, left, upper
 
 
-def _cropdetect(video: Path, at: float) -> str:
+def content_corners(frames: Iterable[np.ndarray]) -> Corners | None:
+    brightest_rows = brightest_columns = None
+    for frame in frames:
+        rows, columns = frame.mean(axis=1), frame.mean(axis=0)
+        brightest_rows = rows if brightest_rows is None else np.maximum(brightest_rows, rows)
+        brightest_columns = columns if brightest_columns is None else np.maximum(brightest_columns, columns)
+    if brightest_rows is None:
+        return None
+    lit_rows = np.flatnonzero(brightest_rows > BLACK_AT_MOST)
+    lit_columns = np.flatnonzero(brightest_columns > BLACK_AT_MOST)
+    if not len(lit_rows) or not len(lit_columns):
+        return None
+    return int(lit_columns[0]), int(lit_rows[0]), int(lit_columns[-1]) + 1, int(lit_rows[-1]) + 1
+
+
+def _pgm_frames(stream: bytes) -> Iterable[np.ndarray]:
+    at = 0
+    while header := _PGM_HEADER.match(stream, at):
+        width, height = int(header[1]), int(header[2])
+        at = header.end() + width * height
+        pixels = stream[header.end():at]
+        if len(pixels) < width * height:
+            return
+        yield np.frombuffer(pixels, dtype=np.uint8).reshape(height, width)
+
+
+def _measure_content(video: Path, at: float) -> Corners | None:
     command = [
-        "ffmpeg", "-nostats", "-ss", f"{at:.3f}", "-t", str(PROBE_SECONDS),
-        "-i", str(video), "-an",
-        "-vf", f"cropdetect={_CROP_LIMIT}:{_CROP_ROUND}:{_CROPDETECT_NEVER_RESETS}",
-        "-f", "null", "-",
+        "ffmpeg", "-nostats", "-v", "error", "-ss", f"{at:.3f}", "-t", str(PROBE_SECONDS),
+        "-i", str(video), "-an", "-vf", f"fps={FRAMES_MEASURED_PER_SECOND}",
+        "-pix_fmt", "gray", "-f", "image2pipe", "-c:v", "pgm", "-",
     ]
     try:
-        return subprocess.run(
-            command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False,
+        stream = subprocess.run(
+            command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
             **hidden_subprocess_kwargs(),
-        ).stderr.decode(errors="replace")
+        ).stdout
     except OSError as exc:
         log.warning("could not measure %s: %s", video.name, exc)
-        return ""
+        return None
+    return content_corners(_pgm_frames(stream))
 
 
 def content_crop(video: Path) -> tuple[int, int, int, int] | None:
@@ -91,7 +115,7 @@ def content_crop(video: Path) -> tuple[int, int, int, int] | None:
         return None
     width, height = dimensions
     return content_crop_in(
-        [_cropdetect(video, duration * point) for point in PROBE_POINTS], width, height,
+        [_measure_content(video, duration * point) for point in PROBE_POINTS], width, height,
     )
 
 
