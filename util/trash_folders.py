@@ -82,7 +82,7 @@ def _out_of_the_outbox(video: Path, sorted_copies: dict[str, list[Path]]) -> InT
 
 
 def _out_of_genau(video: Path, folder: Path, sorted_copies: dict[str, list[Path]]) -> InTrash:
-    lane = config.SORTED_DIR / config.GENAU_SOURCE
+    lane = config.SORTED_DIR / lanes.genau_source()
     left_in_the_lane = [copy
                         for copy in sorted_copies.get(sorted_stem_of(strip_uniquifier(video.stem)), [])
                         if copy.is_relative_to(lane)]
@@ -134,6 +134,28 @@ def delete_permanently(marked: InTrash) -> None:
     for script in script_library.scripts_held_for(marked.video, marked.restores_to, marked.upscaled_from):
         script_library.delete_script(script)
         log.info("Deleted permanently: %s", script)
+    if _out_of_genaus_delivery(marked.video):
+        _remember_deleted_for_good(name_before_trash(marked.video.name))
+
+
+def genau_videos_deleted_for_good() -> set[str]:
+    try:
+        text = _deleted_for_good_record().read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return set()
+    return {name for name in text.splitlines() if name}
+
+
+def _out_of_genaus_delivery(video: Path) -> bool:
+    delivered = lanes.genau_delivery_dir()
+    return delivered is not None and video.is_relative_to(lanes.in_trash(delivered))
+
+
+def _remember_deleted_for_good(name: str) -> None:
+    record = _deleted_for_good_record()
+    record.parent.mkdir(parents=True, exist_ok=True)
+    with record.open("a", encoding="utf-8", newline="\n") as names:
+        names.write(f"{name}\n")
 
 
 def _own_record(marked: InTrash) -> Path | None:
@@ -154,3 +176,7 @@ def _sound_only_it_plays(marked: InTrash) -> Path | None:
 def _the_one_vacant(spots: list[Path]) -> Path | None:
     vacant = [spot for spot in spots if not spot.exists()]
     return vacant[0] if len(vacant) == 1 else None
+
+
+def _deleted_for_good_record() -> Path:
+    return config.GENAU_DELETED_FOR_GOOD_FILE

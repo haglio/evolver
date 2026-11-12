@@ -257,6 +257,14 @@ class TestDeletingPermanently(_InALibrary):
 
         assert sound.exists()
 
+    def test_only_a_video_out_of_genaus_delivered_trash_is_remembered_as_deleted_for_good(self):
+        touch_video(self.lib.genau_trash / "2D" / "AI" / "loop_13_topaz.mp4")
+        touch_video(self.lib.trash / "scene twelve_topaz.mp4")
+        for found in _all_in_trash():
+            trash_folders.delete_permanently(found)
+
+        assert trash_folders.genau_videos_deleted_for_good() == {"loop_13_topaz.mp4"}
+
     def test_the_log_names_everything_it_deleted_the_copy_first(self):
         source = touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene eleven.mp4")
         marked = touch_video(self.lib.trash / "scene eleven_topaz.mp4")

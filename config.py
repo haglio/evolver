@@ -173,5 +173,6 @@ LOG_FILE = LIVE_DIR / "evolver.log"
 RUNS_DIR = LIVE_DIR / "runs"
 RUNS_SHOWN = 1000
 GUI_SETTINGS_FILE = LIVE_DIR / "gui_settings.json"
+GENAU_DELETED_FOR_GOOD_FILE = LIVE_DIR / "state" / "genau_deleted_for_good.txt"
 
 

@@ -10,7 +10,7 @@ from app_support.trash_names import name_before_trash
 from app_support.video_names import generation_stem
 
 import config
-from util import lanes, origenerator_gallery
+from util import lanes, origenerator_gallery, trash_folders
 from util.alert import show_error
 from util.media_files import library_videos
 from util.stage_result import StageResult
@@ -19,6 +19,8 @@ from util.versions import upscaled_stem
 log = logging.getLogger(__name__)
 
 _LISTED = 10
+CUT_MARK = "-audio_stroke"
+TRIMMED_FROM = "trimmed_from"
 
 
 @dataclass
@@ -86,7 +88,7 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
         made |= set(by_name)
         if lane.kept_once_sorted_copy_retired:
             genau_names |= set(by_name)
-            awaited = {generation_stem(copy.stem) for copy in lane.sorted_copies}
+            awaited = {_made_as(copy.name) for copy in lane.sorted_copies}
         upscale_count += len(lane.upscales)
         duplicates |= {name: sorted(paths) for name, paths in by_name.items() if len(paths) > 1}
 
@@ -108,27 +110,48 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     return result
 
 
-def _sent_to_genau() -> set[str] | None:
+@dataclass(frozen=True)
+class _Sent:
+    stem: str
+    found_as: frozenset[str]
+
+
+def _made_as(name: str) -> str:
+    return generation_stem(generation_stem(Path(name).stem).removesuffix(CUT_MARK))
+
+
+def _sent_to_genau() -> list[_Sent] | None:
     lane = lanes.genau_sent_lane()
     try:
-        rows = origenerator_gallery.rows(("output_files",), optional=lane.stamps)
+        rows = origenerator_gallery.rows(("prompt_id", "output_files"),
+                                         optional=(*lane.stamps, TRIMMED_FROM))
     except FileNotFoundError:
         return None
     except sqlite3.Error:
         log.warning("Could not read Origenerator's gallery; the Genau flicks are not checked "
                     "against it this run.", exc_info=True)
         return None
-    return {generation_stem(Path(name).stem) for row in rows
-            if lane.still_sent(row)
-            for name in output_names(row) if is_video_name(name)}
+    videos = {row["prompt_id"]: [name for name in output_names(row) if is_video_name(name)]
+              for row in rows}
+    cut_into: dict[str, set[str]] = {}
+    for row in rows:
+        if row.get(TRIMMED_FROM):
+            cut_into.setdefault(row[TRIMMED_FROM], set()).update(map(_made_as, videos[row["prompt_id"]]))
+    return [_Sent(generation_stem(Path(name).stem),
+                  frozenset({_made_as(name),
+                             *cut_into.get(row["prompt_id"], ()),
+                             *map(_made_as, videos.get(row.get(TRIMMED_FROM), ()))}))
+            for row in rows if lane.still_sent(row)
+            for name in videos[row["prompt_id"]]]
 
 
-def _flicks_sent_and_gone(sent: set[str] | None, present: set[str], awaited: set[str]) -> list[str]:
+def _flicks_sent_and_gone(sent: list[_Sent] | None, present: set[str], awaited: set[str]) -> list[str]:
     genau = lanes.genau_delivery_dir()
     if sent is None or genau is None:
         return []
-    there = {generation_stem(Path(name).stem) for name in present}
-    return sorted(_shown(genau / f"{upscaled_stem(stem)}.mp4") for stem in sent - there - awaited)
+    accounted = awaited | {_made_as(name) for name in (*present, *trash_folders.genau_videos_deleted_for_good())}
+    return sorted({_shown(genau / f"{upscaled_stem(video.stem)}.mp4")
+                   for video in sent if not video.found_as & accounted})
 
 
 def _log_result(result: CorrespondenceResult) -> None:

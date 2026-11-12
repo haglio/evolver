@@ -10,7 +10,7 @@ import pytest
 import check_correspondence
 from tests.gallery_fakes import a_gallery_of
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
-from util import lanes, sidecar
+from util import lanes, sidecar, trash_folders
 
 GENAU_SOURCE = "example-loop-clips"
 
@@ -31,10 +31,15 @@ def _kino(lib: LaneLibrary, source: str, orient: str, name: str) -> Path:
     return touch_video(lib.kino_upscales / orient / source / name)
 
 
+def _sent(prompt_id: str, name: str, **columns) -> dict:
+    return {"prompt_id": prompt_id,
+            "output_files": json.dumps([{"filename": name, "subfolder": "video"}]),
+            "genau_exported_at": "2026-01-02 03:04:05", "genau_unsent_at": None,
+            "trimmed_from": None, **columns}
+
+
 def _sent_to_genau(lib: LaneLibrary, name: str, **columns) -> None:
-    a_gallery_of(lib.gallery_db, [{
-        "prompt_id": "made-1", "output_files": json.dumps([{"filename": name, "subfolder": "video"}]),
-        "genau_exported_at": "2026-01-02 03:04:05", "genau_unsent_at": None, **columns}])
+    a_gallery_of(lib.gallery_db, [_sent("made-1", name, **columns)])
 
 
 def _flick(lib: LaneLibrary, name: str) -> Path:
@@ -184,6 +189,49 @@ class TestTheGenauLane:
             _sent_to_genau(lib, "loop_1.mp4")
             flick = _flick(lib, "loop_1_topaz.mp4")
             flick.replace(touch_video(lanes.in_trash(flick)))
+
+            assert check_correspondence.run().ok
+
+    def test_a_flick_replaced_in_genaus_folder_by_its_cut_is_not_missing(self):
+        with _library() as lib:
+            a_gallery_of(lib.gallery_db, [
+                _sent("made-1", "loop_1.mp4"),
+                _sent("cut-1", "loop_2-audio_stroke.mp4", trimmed_from="made-1")])
+            _flick(lib, "loop_2-audio_stroke_topaz.mp4")
+
+            assert check_correspondence.run().ok
+
+    def test_a_cut_delivered_under_the_name_of_the_flick_it_was_cut_from_is_not_missing(self):
+        with _library() as lib:
+            a_gallery_of(lib.gallery_db, [
+                _sent("made-1", "loop_1.mp4"),
+                _sent("cut-1", "loop_2-audio_stroke.mp4", trimmed_from="made-1")])
+            _flick(lib, "loop_1-audio_stroke_topaz.mp4")
+
+            assert check_correspondence.run().ok
+
+    def test_a_flick_and_its_cut_both_gone_from_genaus_folder_are_both_missing(self):
+        with _library() as lib:
+            a_gallery_of(lib.gallery_db, [
+                _sent("made-1", "loop_1.mp4"),
+                _sent("cut-1", "loop_2-audio_stroke.mp4", trimmed_from="made-1"),
+                _sent("made-3", "loop_3.mp4")])
+            _flick(lib, "loop_3_topaz.mp4")
+
+            result = check_correspondence.run()
+
+            delivered = Path("videos") / "videos" / "genau" / "flicks" / "2D" / "AI"
+            assert result.missing_flicks == [str(delivered / "loop_1_topaz.mp4"),
+                                             str(delivered / "loop_2-audio_stroke_topaz.mp4")]
+
+    def test_a_flick_evolver_deleted_for_good_from_genaus_trash_is_not_missing(self):
+        with _library() as lib:
+            _sent_to_genau(lib, "loop_1.mp4")
+            flick = _flick(lib, "loop_1_topaz.mp4")
+            flick.replace(touch_video(lanes.in_trash(flick)))
+            [marked] = trash_folders.marked_as(trash_folders.videos_in_trash())
+
+            trash_folders.delete_permanently(marked)
 
             assert check_correspondence.run().ok
 
