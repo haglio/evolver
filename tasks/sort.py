@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 
+from app_support.video_names import generation_stem
+
 import config
 from util import lanes, orientation, origenerator_gallery, provenance, script_library, sidecar
 from util.ffprobe import orientation_of
@@ -93,7 +95,7 @@ def _the_copy_it_remakes(dest: Path, handed_over: Path, source: str,
                          made_again: Callable[[], set[str]]) -> Path | None:
     if not lanes.sent_by_origenerator(source):
         return None
-    if origenerator_gallery.generation_stem(handed_over.stem) not in made_again():
+    if generation_stem(handed_over.stem) not in made_again():
         return None
     copy = origenerator_gallery.the_one_version_in(dest.parent, dest.name)
     if copy is None or filecmp.cmp(handed_over, copy, shallow=False):
@@ -105,7 +107,7 @@ def _the_flick_it_remakes(handed_over: Path, source: str, orient: str, dest: Pat
                           made_again: Callable[[], set[str]]) -> Path | None:
     if not lanes.is_genau_lane(source) or dest.exists():
         return None
-    if origenerator_gallery.generation_stem(handed_over.stem) not in made_again():
+    if generation_stem(handed_over.stem) not in made_again():
         return None
     upscale = lanes.upscale_of(source, orient, dest.stem)
     return None if upscale is None else origenerator_gallery.the_one_version_in(upscale.parent, upscale.name)

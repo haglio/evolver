@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from app_support.testing import no_wait_for_a_held_file
+from app_support.video_names import strip_uniquifier
 
 import config
 from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
@@ -24,7 +25,6 @@ from util.media_files import (
     remove_empty_dirs,
     remove_partial_files,
     retry_while_in_use,
-    strip_uniquifier,
     take_its_place,
     unique_path,
 )
@@ -150,7 +150,7 @@ class TestTheUniquifier(unittest.TestCase):
 
             assert unique_path(root / "clip one.mkv") == root / "clip one (2).mkv"
 
-    def test_stripping_is_the_inverse_of_appending(self):
+    def test_the_number_appended_is_the_one_app_supports_reading_takes_off(self):
         with workspace_temp_dir() as root:
             (root / "clip.mp4").write_bytes(b"one")
 
@@ -158,12 +158,6 @@ class TestTheUniquifier(unittest.TestCase):
 
             assert strip_uniquifier(taken.stem) == "clip"
 
-    def test_a_stem_with_no_number_comes_back_whole(self):
-        assert strip_uniquifier("clip one") == "clip one"
-
-    def test_only_a_trailing_number_in_parentheses_is_stripped(self):
-        assert strip_uniquifier("clip (director's cut)") == "clip (director's cut)"
-        assert strip_uniquifier("clip (2) more") == "clip (2) more"
 
 
 class TestRemoveEmptyDirs(unittest.TestCase):

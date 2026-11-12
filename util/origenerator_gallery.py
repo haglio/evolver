@@ -7,10 +7,9 @@ from collections.abc import Callable, Iterable
 from fractions import Fraction
 from pathlib import Path
 
-from app_support.video_names import strip_processing_suffixes
+from app_support.video_names import generation_stem
 
 import config
-from util.media_files import strip_uniquifier
 
 log = logging.getLogger(__name__)
 
@@ -59,21 +58,6 @@ def stems_made_again() -> set[str]:
 def video_stems(made: Iterable[dict], where: Callable[[dict], object]) -> set[str]:
     return {Path(name).stem for row in made if where(row)
             for name in output_names(row) if is_video_name(name)}
-
-
-def origin_stem(stem: str) -> str:
-    while True:
-        reduced = strip_processing_suffixes(strip_uniquifier(stem))
-        if reduced == stem:
-            return stem
-        stem = reduced
-
-
-SOUND_COPY_SUFFIX = "-audio"
-
-
-def generation_stem(stem: str) -> str:
-    return origin_stem(stem).removesuffix(SOUND_COPY_SUFFIX).rstrip("_")
 
 
 def the_one_version_in(folder: Path, name: str) -> Path | None:

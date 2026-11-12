@@ -85,13 +85,6 @@ class TestWhatAGenerationRowProduced(unittest.TestCase):
         assert origenerator_gallery.output_names({"output_files": "{not json"}) == []
         assert origenerator_gallery.output_names({"output_files": '"text"'}) == []
 
-    def test_a_stem_is_taken_back_to_what_arrived_through_every_layer_added_after(self):
-        assert origenerator_gallery.origin_stem("scene one (2)_topaz (3)") == "scene one"
-        assert origenerator_gallery.origin_stem("scene one_topaz (2)_topaz") == "scene one"
-
-    def test_a_stem_with_nothing_added_comes_back_whole(self):
-        assert origenerator_gallery.origin_stem("scene one") == "scene one"
-
 
 def _gallery_with_columns(root, column: str, values: list[tuple]):
     db_path = root / "gallery.db"
