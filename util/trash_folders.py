@@ -7,10 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support.trash_names import name_before_trash
+from app_support.video_names import strip_uniquifier
 
 import config
 from util import lanes, script_library
-from util.media_files import library_videos, retry_while_in_use, strip_uniquifier
+from util.media_files import library_videos, retry_while_in_use
 from util.sidecar import sidecar_folder, sidecar_path
 from util.versions import sorted_stem_of
 

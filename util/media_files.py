@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-import re
 import time
 import uuid
 from collections.abc import Callable
@@ -109,9 +108,6 @@ def file_size(path: Path) -> int:
         return 0
 
 
-_UNIQUIFIER_RE = re.compile(r" \((\d+)\)$")
-
-
 def unique_path(path: Path) -> Path:
     if not path.exists():
         return path
@@ -121,10 +117,6 @@ def unique_path(path: Path) -> Path:
         if not candidate.exists():
             return candidate
         number += 1
-
-
-def strip_uniquifier(stem: str) -> str:
-    return _UNIQUIFIER_RE.sub("", stem)
 
 
 def path_key(path: str | Path) -> str:

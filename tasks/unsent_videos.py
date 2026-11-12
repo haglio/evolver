@@ -5,10 +5,12 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.video_names import origin_stem
+
 import config
 from util import lanes, origenerator_gallery, script_library
 from util.media_files import library_videos
-from util.origenerator_gallery import is_video_name, origin_stem, output_entries
+from util.origenerator_gallery import is_video_name, output_entries
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)

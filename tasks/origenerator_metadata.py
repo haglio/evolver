@@ -7,11 +7,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app_support.comfy_file_refs import frame_name
+from app_support.video_names import strip_uniquifier
 
 from util import lanes, origenerator_gallery, provenance, sidecar
 from util.ffprobe import video_dimensions
 from util.library_records import FRAME_OF_VIDEO_BLOCK, SOURCE_IMAGE_BLOCK
-from util.media_files import path_key, strip_uniquifier
+from util.media_files import path_key
 
 COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "positive_prompt",
             "negative_prompt", "seed", "params_json", "output_files", "created_at")
