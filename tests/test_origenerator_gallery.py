@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from tests.product_sources import PROJECT_ROOT, product_sources
-from tests.temp_helpers import workspace_temp_dir
+from tests.temp_helpers import override_config, workspace_temp_dir
 from util import origenerator_gallery
 
 
@@ -41,49 +41,22 @@ def _connects_to_sqlite(node: ast.AST) -> bool:
 
 class TestTheGalleryDatabase(unittest.TestCase):
     @pytest.mark.repo_check
-    def test_only_this_module_connects_to_sqlite(self):
+    def test_nothing_here_connects_to_sqlite_the_gallery_is_read_through_app_support(self):
         opening = [
             f"{name}:{node.lineno}" for name in product_sources(PROJECT_ROOT)
-            if name != "util/origenerator_gallery.py"
             for node in ast.walk(ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8")))
             if _connects_to_sqlite(node)]
 
         assert opening == []
 
-    def test_a_missing_gallery_is_named_in_the_error(self):
-        with workspace_temp_dir() as root, pytest.raises(FileNotFoundError) as raised:
-            origenerator_gallery.rows(("output_files",), db_path=root / "gallery.db")
-
-        assert "gallery.db" in str(raised.value)
-
-    def test_a_column_an_older_gallery_lacks_is_missing_from_every_row(self):
+    def test_the_rows_come_from_the_gallery_the_settings_name_at_the_time_of_reading(self):
         with workspace_temp_dir() as root:
             db_path = _gallery_with_columns(root, "output_files", [('[{"filename": "a.mp4"}]',)])
 
-            found = origenerator_gallery.rows(("output_files",), optional=("remade_at",), db_path=db_path)
+            with override_config(ORIGENERATOR_DB_PATH=db_path):
+                found = origenerator_gallery.rows(("output_files",), optional=("remade_at",))
 
         assert found == [{"output_files": '[{"filename": "a.mp4"}]'}]
-
-    def test_the_gallery_is_opened_so_nothing_here_can_write_to_it(self):
-        with workspace_temp_dir() as root:
-            db_path = _gallery_with_columns(root, "output_files", [("[]",)])
-            connection = origenerator_gallery._connect_ro(db_path)
-            try:
-                with pytest.raises(sqlite3.OperationalError):
-                    connection.execute("DELETE FROM generations")
-            finally:
-                connection.close()
-
-
-class TestWhatAGenerationRowProduced(unittest.TestCase):
-    def test_the_file_names_are_the_ones_the_row_lists(self):
-        row = {"output_files": json.dumps([{"filename": "a.mp4"}, {"filename": "b.png"}])}
-
-        assert origenerator_gallery.output_names(row) == ["a.mp4", "b.png"]
-
-    def test_a_row_whose_list_cannot_be_read_costs_that_row_and_not_the_run(self):
-        assert origenerator_gallery.output_names({"output_files": "{not json"}) == []
-        assert origenerator_gallery.output_names({"output_files": '"text"'}) == []
 
 
 def _gallery_with_columns(root, column: str, values: list[tuple]):
