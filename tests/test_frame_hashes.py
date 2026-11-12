@@ -47,11 +47,8 @@ class TestFrameHashes:
 
 class TestContentCropIn:
 
-    def _report(self, width: int, height: int, x: int = 0, y: int = 0) -> str:
-        return (
-            f"[Parsed_cropdetect_0 @ 000] x1:{x} x2:0 y1:{y} y2:0 w:{width} h:{height} "
-            f"x:{x} y:{y} pts:1 t:0.04 limit:24 crop={width}:{height}:{x}:{y}"
-        )
+    def _report(self, width: int, height: int, x: int = 0, y: int = 0) -> tuple[int, int, int, int]:
+        return x, y, x + width, y + height
 
     def test_finds_the_content_inside_a_pillarboxed_frame(self):
         report = self._report(1440, 1080, x=240)
@@ -77,7 +74,7 @@ class TestContentCropIn:
         assert content_crop_in([report], 1920, 1080) is None
 
     def test_nothing_measured_means_nothing_cropped(self):
-        assert content_crop_in(["ffmpeg version 7.1", ""], 1920, 1080) is None
+        assert content_crop_in([None, None], 1920, 1080) is None
 
     def test_the_rectangle_is_even_on_every_side(self):
         crop = content_crop_in([self._report(1437, 1077, x=241, y=1)], 1920, 1080)
@@ -94,6 +91,66 @@ class TestContentCropIn:
         assert upper <= 1, outward
         assert left + crop_width >= 241 + 1436, outward
         assert upper + crop_height >= 1 + 1076, outward
+
+
+def _pillarboxed(width: int = 64, height: int = 36, bar: int = 8, black: int = 16) -> np.ndarray:
+    frame = np.full((height, width), 120, dtype=np.uint8)
+    frame[:, :bar] = black
+    frame[:, width - bar:] = black
+    return frame
+
+
+def _pgm(*frames: np.ndarray) -> bytes:
+    return b"".join(
+        b"P5\n%d %d\n255\n" % (frame.shape[1], frame.shape[0]) + frame.tobytes() for frame in frames)
+
+
+class TestContentCorners:
+    def test_the_black_bars_either_side_are_left_outside(self):
+        assert fh.content_corners([_pillarboxed()]) == (8, 0, 56, 36)
+
+    def test_a_line_as_dark_as_ffmpegs_old_limit_counts_as_black(self):
+        assert fh.content_corners([_pillarboxed(black=24)]) == (8, 0, 56, 36)
+
+    def test_a_line_lit_in_any_frame_is_content(self):
+        dark = np.full((36, 64), 16, dtype=np.uint8)
+
+        assert fh.content_corners([dark, _pillarboxed(), dark]) == (8, 0, 56, 36)
+
+    def test_frames_that_are_black_throughout_measure_nothing(self):
+        assert fh.content_corners([np.full((36, 64), 16, dtype=np.uint8)]) is None
+
+    def test_no_frames_measure_nothing(self):
+        assert fh.content_corners([]) is None
+
+
+class TestMeasuringTheBars:
+    def _measured(self, stdout: bytes):
+        seen: dict[str, list[str]] = {}
+
+        class _Finished:
+            def __init__(self):
+                self.stdout = stdout
+
+        with patch.object(fh.subprocess, "run",
+                          lambda command, **kwargs: seen.update(command=command) or _Finished()):
+            return fh._measure_content(Path("scene.mp4"), 12.0), seen["command"]
+
+    def test_the_frames_ffmpeg_hands_back_are_measured_in_full(self):
+        corners, _command = self._measured(_pgm(_pillarboxed(), _pillarboxed()))
+
+        assert corners == (8, 0, 56, 36)
+
+    def test_it_reads_a_few_frames_a_second_of_the_window_after_the_moment(self):
+        _corners, command = self._measured(b"")
+
+        assert command[command.index("-ss") + 1] == "12.000"
+        assert command[command.index("-t") + 1] == str(fh.PROBE_SECONDS)
+        assert command[command.index("-vf") + 1] == f"fps={fh.FRAMES_MEASURED_PER_SECOND}"
+
+    def test_a_video_ffmpeg_cannot_open_measures_nothing(self):
+        with patch.object(fh.subprocess, "run", side_effect=OSError("no ffmpeg")):
+            assert fh._measure_content(Path("scene.mp4"), 12.0) is None
 
 
 class TestContentCrop:
