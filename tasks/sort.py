@@ -13,7 +13,7 @@ import config
 from tasks.origenerator_commands import GalleryRecords
 from util import lanes, orientation, origenerator_gallery, provenance, script_library
 from util.ffprobe import orientation_of
-from util.library_moves import move_with_its_records
+from util.library_moves import move_with_its_script
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
 from util.stage_result import StageResult
 
@@ -120,7 +120,7 @@ def _the_flick_it_remakes(handed_over: Path, source: str, orient: str, dest: Pat
 def _make_way_for_the_remake(played: Path, upscale: Path, gallery: GalleryRecords) -> None:
     log.info("MADE AGAIN (to be upscaled in place of the one Genau plays): %s", played)
     if played != upscale:
-        move_with_its_records(played, upscale)
+        move_with_its_script(played, upscale)
         sound = lanes.genau_sound_of(played)
         if sound.is_file():
             sound.replace(lanes.genau_sound_of(upscale))
@@ -130,9 +130,9 @@ def _make_way_for_the_remake(played: Path, upscale: Path, gallery: GalleryRecord
 def _rename_to_the_remakes_name(old_copy: Path, dest: Path,
                                 old_upscale: Path | None, upscale: Path | None) -> None:
     log.info("MADE AGAIN UNDER A NEW NAME (renaming its copies): %s  ->  %s", old_copy, dest)
-    move_with_its_records(old_copy, dest)
+    move_with_its_script(old_copy, dest)
     if old_upscale is not None and upscale is not None and old_upscale.exists() and not upscale.exists():
-        move_with_its_records(old_upscale, upscale)
+        move_with_its_script(old_upscale, upscale)
 
 
 def _take_the_remake(src: Path, dest: Path, upscale: Path | None,
