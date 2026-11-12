@@ -59,10 +59,10 @@ class OrigeneratorGalleryContract(unittest.TestCase):
         assert read <= promised
 
     def test_the_lane_stamps_read_here_are_the_ones_origenerator_writes(self):
-        promised = {lane: stamps["unsent"]
+        promised = {lane: (stamps["sent"], stamps["unsent"])
                     for lane, stamps in self.promise["lanes"].items()}
 
-        assert {lane.key: lane.unsent_column for lane in lanes.sent_lanes()} == promised
+        assert {lane.key: lane.stamps for lane in lanes.sent_lanes()} == promised
 
     def test_the_soundless_copy_role_read_here_is_the_one_origenerator_writes(self):
         assert self.promise["silent_copy_role"] == unsent_videos.SILENT_COPY_ROLE

@@ -1,24 +1,24 @@
 from __future__ import annotations
 
 import logging
-import re
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app_support.gallery_rows import is_video_name, output_names
 from app_support.trash_names import name_before_trash
+from app_support.video_names import generation_stem
 
 import config
-from util import lanes
+from util import lanes, origenerator_gallery
 from util.alert import show_error
 from util.media_files import library_videos
-from util.sidecar import sidecar_folder
 from util.stage_result import StageResult
 from util.versions import upscaled_stem
 
 log = logging.getLogger(__name__)
 
 _LISTED = 10
-_PCLOUD_CONFLICT_COPY = re.compile(r" \[conflicted( \d+)?\]$")
 
 
 @dataclass
@@ -29,10 +29,12 @@ class CorrespondenceResult(StageResult):
     orphan_sorted: list[str] = field(default_factory=list)
     duplicates: dict[str, list[str]] = field(default_factory=dict)
     missing_flicks: list[str] = field(default_factory=list)
+    flicks_never_sent: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
-        return not (self.orphan_upscales or self.orphan_sorted or self.duplicates or self.missing_flicks)
+        return not (self.orphan_upscales or self.orphan_sorted or self.duplicates
+                    or self.missing_flicks or self.flicks_never_sent)
 
 
 def upscale_name(sorted_file: Path) -> str:
@@ -71,6 +73,8 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     duplicates: dict[str, list[str]] = {}
     orphan_upscales: list[str] = []
     orphan_sorted: list[str] = []
+    genau_names: set[str] = set()
+    awaited: set[str] = set()
     for lane in _lanes(sorted_by_source):
         expected = {upscale_name(p) for p in lane.sorted_copies}
         by_name: dict[str, list[str]] = {}
@@ -82,17 +86,21 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
         orphan_sorted += [str(p.relative_to(sorted_root)) for p in lane.sorted_copies
                           if upscale_name(p) not in by_name]
         made |= set(by_name)
+        if lane.kept_once_sorted_copy_retired:
+            genau_names |= set(by_name)
+            awaited = {generation_stem(copy.stem) for copy in lane.sorted_copies}
         upscale_count += len(lane.upscales)
         duplicates |= {name: sorted(paths) for name, paths in by_name.items() if len(paths) > 1}
 
+    sent = _sent_to_genau()
     result = CorrespondenceResult(
         sorted_count=len(sorted_files),
         upscale_count=upscale_count,
         orphan_upscales=sorted(orphan_upscales),
         orphan_sorted=sorted(orphan_sorted),
         duplicates=duplicates,
-        missing_flicks=_flicks_whose_record_outlived_them(
-            made, {upscale_name(p) for p in sorted_files}),
+        missing_flicks=_flicks_sent_and_gone(sent, genau_names, awaited),
+        flicks_never_sent=_flicks_never_sent(sent),
     )
     _log_result(result)
 
@@ -104,14 +112,35 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     return result
 
 
-def _flicks_whose_record_outlived_them(present: set[str], awaited: set[str]) -> list[str]:
+def _sent_to_genau() -> set[str] | None:
+    lane = lanes.genau_sent_lane()
+    try:
+        rows = origenerator_gallery.rows(("output_files",), optional=lane.stamps)
+    except FileNotFoundError:
+        return None
+    except sqlite3.Error:
+        log.warning("Could not read Origenerator's gallery; the Genau flicks are not checked "
+                    "against it this run.", exc_info=True)
+        return None
+    return {generation_stem(Path(name).stem) for row in rows
+            if lane.still_sent(row)
+            for name in output_names(row) if is_video_name(name)}
+
+
+def _flicks_sent_and_gone(sent: set[str] | None, present: set[str], awaited: set[str]) -> list[str]:
     genau = lanes.genau_delivery_dir()
-    records = None if genau is None else sidecar_folder(genau)
-    if records is None or not records.is_dir():
+    if sent is None or genau is None:
         return []
-    return sorted(_shown(genau / f"{record.stem}.mp4") for record in records.glob("*.json")
-                  if not _PCLOUD_CONFLICT_COPY.search(record.stem)
-                  and f"{record.stem}.mp4" not in present | awaited)
+    there = {generation_stem(Path(name).stem) for name in present}
+    return sorted(_shown(genau / f"{upscaled_stem(stem)}.mp4") for stem in sent - there - awaited)
+
+
+def _flicks_never_sent(sent: set[str] | None) -> list[str]:
+    genau = lanes.genau_delivery_dir()
+    if sent is None or genau is None or not genau.is_dir():
+        return []
+    return sorted(_shown(flick) for flick in library_videos(genau)
+                  if generation_stem(flick.stem) not in sent)
 
 
 def _log_result(result: CorrespondenceResult) -> None:
@@ -128,7 +157,9 @@ def _log_result(result: CorrespondenceResult) -> None:
         for path in paths:
             log.error("  -> %s", path)
     for missing in result.missing_flicks:
-        log.error("MISSING FROM GENAU'S FOLDER (its record is still there): %s", missing)
+        log.error("MISSING FROM GENAU'S FOLDER (Origenerator's gallery sent it there): %s", missing)
+    for unsent in result.flicks_never_sent:
+        log.error("IN GENAU'S FOLDER BUT NEVER SENT THERE BY ORIGENERATOR: %s", unsent)
 
     if result.ok:
         log.info("Correspondence check done. Every 1_sorted video has its upscale, and no upscale is missing.")
@@ -137,6 +168,7 @@ def _log_result(result: CorrespondenceResult) -> None:
 
 
 def _popup_message(result: CorrespondenceResult) -> str:
+    flicks = config.GENAU_FLICKS_WORD
     lines = [
         "Evolver found 1_sorted videos and upscales that do not match.",
         "",
@@ -151,7 +183,9 @@ def _popup_message(result: CorrespondenceResult) -> str:
         ("1_sorted videos without their upscale", result.orphan_sorted),
         ("Upscale names in more than one place",
          [f"{name} -> {', '.join(paths[:2])}" for name, paths in sorted(result.duplicates.items())]),
-        (f"Genau {config.GENAU_FLICKS_WORD} missing from Genau's folder", result.missing_flicks),
+        (f"Genau {flicks} missing from Genau's folder", result.missing_flicks),
+        (f"Genau {flicks} in Genau's folder that Origenerator never sent there",
+         result.flicks_never_sent),
     )
     for heading, items in sections:
         if items:

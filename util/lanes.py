@@ -21,19 +21,27 @@ VR_FOLDER = "VR"
 class SentLane:
     key: str
     source: str
+    sent_column: str
     unsent_column: str
     upscales: tuple[Path, ...]
     trash: Path
+
+    @property
+    def stamps(self) -> tuple[str, str]:
+        return self.sent_column, self.unsent_column
+
+    def still_sent(self, row: dict) -> bool:
+        return bool(row.get(self.sent_column)) and not row.get(self.unsent_column)
 
 
 def sent_lanes() -> tuple[SentLane, ...]:
     kino, genau = upscale_lanes()
     return (
-        SentLane("evolver", ORIGENERATOR_SOURCE, "evolver_unsent_at",
+        SentLane("evolver", ORIGENERATOR_SOURCE, "evolver_exported_at", "evolver_unsent_at",
                  upscales=tuple(kino.upscales / orient / ORIGENERATOR_SOURCE
                                 for orient in orientation.SORTED),
                  trash=kino.trash),
-        SentLane("genau", genau_source(), "genau_unsent_at",
+        SentLane("genau", genau_source(), "genau_exported_at", "genau_unsent_at",
                  upscales=() if genau.upscales is None else (genau.upscales,),
                  trash=genau.trash),
     )
@@ -108,6 +116,10 @@ def filed_in_kino(library_relative: Path) -> tuple[str, str] | None:
 
 def genau_sound_of(flick: Path) -> Path:
     return config.GENAU_AUDIO_DIR / f"{flick.stem}.mp3"
+
+
+def genau_sent_lane() -> SentLane:
+    return next(lane for lane in sent_lanes() if lane.source == genau_source())
 
 
 def sent_by_origenerator(source: str) -> bool:
