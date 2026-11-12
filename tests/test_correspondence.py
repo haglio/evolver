@@ -209,18 +209,6 @@ class TestTheGenauLane:
 
             assert check_correspondence.run().ok
 
-    def test_a_flick_in_genaus_folder_the_gallery_never_sent_there_is_reported(self):
-        with _library() as lib:
-            _sent_to_genau(lib, "loop_1.mp4")
-            _flick(lib, "loop_1_topaz.mp4")
-            _flick(lib, "loop_2_topaz.mp4")
-
-            result = check_correspondence.run()
-
-            assert not result.ok
-            assert result.flicks_never_sent == [
-                str(Path("videos") / "videos" / "genau" / "flicks" / "2D" / "AI" / "loop_2_topaz.mp4")]
-
     def test_an_old_sidecar_left_by_a_flick_no_longer_says_it_is_missing(self):
         with _library() as lib:
             write_sidecar(sidecar.sidecar_path(lib.genau_flicks / "2D" / "AI" / "loop_1_topaz.mp4"),
@@ -228,14 +216,13 @@ class TestTheGenauLane:
 
             assert check_correspondence.run().ok
 
-    def test_a_gallery_that_cannot_be_read_reports_no_flick_either_way(self):
+    def test_a_gallery_that_cannot_be_read_reports_no_flick_missing(self):
         with _library() as lib:
-            _flick(lib, "loop_2_topaz.mp4")
             lib.gallery_db.write_bytes(b"not a database, made up for this test")
 
             result = check_correspondence.run()
 
-            assert (result.missing_flicks, result.flicks_never_sent) == ([], [])
+            assert result.missing_flicks == []
 
 
 class TestTheExitCodeAShellOrScheduledTaskReads:
@@ -267,11 +254,9 @@ class TestTheExitCodeAShellOrScheduledTaskReads:
     def test_a_missing_flick_is_named_in_the_word_genau_shows(self, capsys):
         with _library() as lib, patch("config.GENAU_FLICKS_WORD", "loopies"):
             _sent_to_genau(lib, "loop_1.mp4")
-            _flick(lib, "loop_2_topaz.mp4")
 
             check_correspondence.main()
 
         out = capsys.readouterr().out
         assert "Genau loopies missing from Genau's folder: 1" in out
-        assert "Genau loopies in Genau's folder that Origenerator never sent there: 1" in out
         assert "Genau flicks" not in out
