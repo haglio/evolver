@@ -10,7 +10,8 @@ from pathlib import Path
 from app_support.video_names import generation_stem
 
 import config
-from util import lanes, orientation, origenerator_gallery, provenance, script_library, sidecar
+from tasks.origenerator_commands import GalleryRecords
+from util import lanes, orientation, origenerator_gallery, provenance, script_library
 from util.ffprobe import orientation_of
 from util.library_moves import move_with_its_records
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
@@ -28,9 +29,11 @@ class SortResult(StageResult):
     moved_files: list[Path] = field(default_factory=list)
 
 
-def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> SortResult:
+def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None,
+        gallery: GalleryRecords | None = None) -> SortResult:
     inbox_dir = config.INBOX_DIR if inbox_dir is None else inbox_dir
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
+    gallery = GalleryRecords() if gallery is None else gallery
 
     result = SortResult()
     sorted_dir.mkdir(parents=True, exist_ok=True)
@@ -68,12 +71,13 @@ def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None) -> Sor
                 if remade != dest:
                     _rename_to_the_remakes_name(
                         remade, dest, lanes.upscale_of(source, orient, remade.stem), upscale)
-                _take_the_remake(src, dest, upscale)
+                _take_the_remake(src, dest, upscale, gallery)
                 result.made_again += 1
                 result.moved_files.append(dest)
             elif (played := _the_flick_it_remakes(src, source, orient, dest, made_again)) is not None:
                 src.replace(dest)
-                _make_way_for_the_remake(played, lanes.upscale_of(source, orient, dest.stem))
+                _make_way_for_the_remake(played, lanes.upscale_of(source, orient, dest.stem),
+                                         gallery)
                 result.made_again += 1
                 result.moved_files.append(dest)
             elif _move_unique(src, dest):
@@ -113,14 +117,14 @@ def _the_flick_it_remakes(handed_over: Path, source: str, orient: str, dest: Pat
     return None if upscale is None else origenerator_gallery.the_one_version_in(upscale.parent, upscale.name)
 
 
-def _make_way_for_the_remake(played: Path, upscale: Path) -> None:
+def _make_way_for_the_remake(played: Path, upscale: Path, gallery: GalleryRecords) -> None:
     log.info("MADE AGAIN (to be upscaled in place of the one Genau plays): %s", played)
     if played != upscale:
         move_with_its_records(played, upscale)
         sound = lanes.genau_sound_of(played)
         if sound.is_file():
             sound.replace(lanes.genau_sound_of(upscale))
-    _upscale_again(upscale)
+    _upscale_again(upscale, gallery)
 
 
 def _rename_to_the_remakes_name(old_copy: Path, dest: Path,
@@ -131,25 +135,20 @@ def _rename_to_the_remakes_name(old_copy: Path, dest: Path,
         move_with_its_records(old_upscale, upscale)
 
 
-def _take_the_remake(src: Path, dest: Path, upscale: Path | None) -> None:
+def _take_the_remake(src: Path, dest: Path, upscale: Path | None,
+                     gallery: GalleryRecords) -> None:
     log.info("MADE AGAIN (taking the place of its sorted copy): %s  ->  %s", src, dest)
     src.replace(dest)
     _carry_its_script(src, (dest,) if upscale is None else (dest, upscale))
     if upscale is not None:
-        _upscale_again(upscale)
+        _upscale_again(upscale, gallery)
 
 
-def _upscale_again(upscale: Path) -> None:
-    try:
-        record = sidecar.sidecar_path(upscale)
-    except ValueError:
-        return
-    sidecar.update(record, _forget_what_made_the_copy_it_replaces)
-
-
-def _forget_what_made_the_copy_it_replaces(current: dict) -> dict:
-    return provenance.recorded(provenance.without(current, provenance.GENERATION),
-                               provenance.UPSCALE, provenance.reconstructed(None))
+def _upscale_again(upscale: Path, gallery: GalleryRecords) -> None:
+    answer = gallery.upscaled(upscale, provenance.reconstructed(None))
+    if answer is None or not answer.done:
+        log.warning("Origenerator's gallery did not forget what made the upscale of %s; "
+                    "it may not be upscaled again", upscale)
 
 
 def _carry_its_script(handed_over: Path, copies: tuple[Path, ...]) -> None:

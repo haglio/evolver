@@ -4,17 +4,18 @@ import datetime
 import json
 import logging
 import re
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from email.utils import parsedate
 from pathlib import Path
 from urllib.parse import urlparse
 
-from app_support import video_ids
+from app_support.gallery_rows import VideoRows
 
 import config
-from tasks import origenerator_metadata
-from util import lanes, orientation, provenance, relative_dates, sidecar, video_kind
+from tasks.origenerator_commands import GalleryRecords, write_gallery_entries
+from util import lanes, orientation, origenerator_gallery, relative_dates
 from util.headless_browser import fetch_dom, find_browser_executable
 from util.html_query import (
     Node,
@@ -24,8 +25,10 @@ from util.html_query import (
     query_selector,
     text_content,
 )
+from util.library_records import SOURCE_IMAGE_BLOCK
 from util.media_files import child_dirs, library_videos
-from util.sidecar import sidecar_path
+from util.origenerator_gallery import EVOLVER_UPSCALE
+from util.scraped_records import ScrapedRecords
 from util.stage_result import StageResult
 from util.versions import source_stem
 
@@ -41,6 +44,7 @@ class PromptScrapeResult(StageResult):
     skipped_failed: int = 0
     no_scrape_strat: int = 0
     errors: int = 0
+    handed_over: int = 0
 
     @property
     def ok(self) -> bool:
@@ -48,17 +52,23 @@ class PromptScrapeResult(StageResult):
 
 
 def run(*, sorted_dir: Path | None = None,
-        browser_profile_dir: Path | None = None) -> PromptScrapeResult:
+        browser_profile_dir: Path | None = None,
+        scraped: ScrapedRecords | None = None,
+        gallery: GalleryRecords | None = None) -> PromptScrapeResult:
     sorted_dir = config.SORTED_DIR if sorted_dir is None else sorted_dir
     browser_profile_dir = (
         config.PROMPT_BROWSER_PROFILE_DIR if browser_profile_dir is None
         else browser_profile_dir
     )
+    scraped = kept_for_the_gallery() if scraped is None else scraped
+    gallery = GalleryRecords() if gallery is None else gallery
     result = PromptScrapeResult()
     log.info("=== Stage: scrape AI metadata ===")
     log.info("SORTED DIR: %s", sorted_dir)
-    log.info("METADATA DIR: %s", config.METADATA_DIR)
 
+    in_the_gallery = _recorded_in_the_gallery()
+    if in_the_gallery is None:
+        return result
     browser = find_browser_executable()
     if browser is None:
         log.warning("No supported browser found; Provider scraping is unavailable this run.")
@@ -66,6 +76,8 @@ def run(*, sorted_dir: Path | None = None,
 
     for source_dir in child_dirs(sorted_dir):
         source = source_dir.name
+        if lanes.sent_by_origenerator(source):
+            continue
         strategy = strategies.get(source)
 
         for video in sorted(library_videos(source_dir)):
@@ -80,11 +92,10 @@ def run(*, sorted_dir: Path | None = None,
             upscale = lanes.upscale_of(source, orient, video.stem)
             if upscale is None:
                 continue
-            output_path = sidecar_path(upscale)
-            if _already_scraped(output_path):
+            if scraped.staged(upscale) is not None or in_the_gallery(upscale):
                 result.already_scraped += 1
                 continue
-            if _failure_marker_path(output_path).exists():
+            if scraped.failed(upscale):
                 result.skipped_failed += 1
                 continue
 
@@ -92,43 +103,75 @@ def run(*, sorted_dir: Path | None = None,
                 payload = strategy(video)
             except Exception as exc:
                 result.errors += 1
-                _write_failure_marker(output_path, video, exc)
+                scraped.mark_failed(upscale, video, exc)
                 log.exception("Metadata build failed for: %s", video)
                 continue
 
-            def keep_what_landed_first(current: dict, payload=payload) -> dict:
-                recorded = video_kind.kind_of(current)
-                kept = video_kind.stamped(payload, recorded) if recorded else payload
-                return video_ids.carried_forward(current, provenance.carried_forward(current, kept))
-
-            sidecar.update(output_path, keep_what_landed_first)
+            scraped.stage(upscale, payload)
             result.newly_scraped += 1
-            log.info("Wrote metadata: %s", output_path)
+            log.info("Scraped the record of %s", video)
 
+    result.handed_over = sum(hand_over_the_record_of(upscale, scraped=scraped, gallery=gallery)
+                             for upscale, _record in scraped.waiting() if upscale.is_file())
     log.info(
-        "Metadata scrape done. Scraped: %d, Already: %d, Skipped failed: %d, No strategy: %d, Errors: %d",
+        "Metadata scrape done. Scraped: %d, Already: %d, Skipped failed: %d, No strategy: %d, "
+        "Errors: %d, Handed to Origenerator's gallery: %d",
         result.newly_scraped,
         result.already_scraped,
         result.skipped_failed,
         result.no_scrape_strat,
         result.errors,
+        result.handed_over,
     )
     return result
 
 
-def _already_scraped(output_path: Path) -> bool:
-    return output_path.exists() and not video_kind.only_the_video_itself(
-        sidecar.read(output_path))
+def hand_over_the_record_of(upscale: Path, *, scraped: ScrapedRecords,
+                            gallery: GalleryRecords) -> bool:
+    record = scraped.staged(upscale)
+    if record is None:
+        return False
+    answer = gallery.record(upscale, record)
+    if answer is None or not answer.done:
+        log.info("Origenerator's gallery did not take the record of %s; it waits for the next run",
+                 upscale)
+        return False
+    scraped.drop(upscale)
+    return True
 
 
-def _failure_marker_path(output_path: Path) -> Path:
-    return output_path.with_name(output_path.name + ".failed")
+def tell_the_gallery_of_the_filed(
+        _source: str, upscale: Path, *, scraped: ScrapedRecords | None = None,
+        gallery: GalleryRecords | None = None,
+        write_entries: Callable[[], object] = write_gallery_entries) -> None:
+    hand_over_the_record_of(
+        upscale, scraped=kept_for_the_gallery() if scraped is None else scraped,
+        gallery=GalleryRecords() if gallery is None else gallery)
+    write_entries()
 
 
-def _write_failure_marker(output_path: Path, video: Path, error: BaseException) -> None:
-    marker = _failure_marker_path(output_path)
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(f"{video.name}\n{error}\n", encoding="utf-8")
+def kept_for_the_gallery() -> ScrapedRecords:
+    return ScrapedRecords(config.SCRAPED_RECORDS_FILE)
+
+
+def made_from_words_alone(upscale: Path) -> bool:
+    scraped = kept_for_the_gallery().staged(upscale)
+    return bool(scraped) and SOURCE_IMAGE_BLOCK not in scraped
+
+
+def _recorded_in_the_gallery() -> Callable[[Path], bool] | None:
+    try:
+        prompted = [row for row in origenerator_gallery.rows(
+            ("prompt_id", "output_files", "positive_prompt"), optional=(EVOLVER_UPSCALE,))
+            if row.get("positive_prompt")]
+    except FileNotFoundError:
+        prompted = []
+    except sqlite3.Error:
+        log.warning("Could not read Origenerator's gallery; the scrape waits for a run that can.",
+                    exc_info=True)
+        return None
+    found = VideoRows(prompted)
+    return lambda upscale: found(upscale) is not None
 
 
 def _provider_image_url(video: Path, base_url: str) -> str:
@@ -221,7 +264,7 @@ def _scrape_source_image(url: str, browser: Path, *, profile_dir: Path) -> dict[
 def _build_strategies(browser, profile_dir):
     provider_source = config.PROVIDER_SOURCE
     base_url = config.PROVIDER_BASE_URL
-    strategies = {lanes.ORIGENERATOR_SOURCE: origenerator_metadata.build_metadata}
+    strategies = {}
     if browser is not None:
         strategies[provider_source] = lambda video: _scrape_provider_video(
             video, _provider_image_url(video, base_url), browser, base_url, profile_dir

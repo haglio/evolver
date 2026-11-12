@@ -96,6 +96,7 @@ class LaneLibrary:
             "ORIGENERATOR_VIDEOS_DIR": self.origenerator,
             "GENAU_TRASH_DIR": self.genau_trash, "GENAU_AUDIO_DIR": self.genau_audio,
             "CLIP_FOLDERS": (), "VR_VIDEO_DIR": None,
+            "ORIGENERATOR_DB_PATH": self.search_root.parent / "no gallery.db",
         }
         settings.update(extra)
         flat_flicks_in(self.genau_flicks).mkdir(parents=True, exist_ok=True)
@@ -111,6 +112,10 @@ def gallery_of_videos_made_again(path: Path, names) -> Path:
     conn.commit()
     conn.close()
     return path
+
+
+def recorded_kind(payload: dict) -> str:
+    return (payload.get("video") or {}).get("type", "")
 
 
 def touch_video(path: Path) -> Path:

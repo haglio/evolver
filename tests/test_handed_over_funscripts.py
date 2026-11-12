@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tasks import scripts_sync, sort, stray_files
+from tests.gallery_fakes import FakeGallery
 from tests.temp_helpers import (
     LaneLibrary,
     gallery_of_videos_made_again,
@@ -32,7 +33,7 @@ class TestAFunscriptHandedOverWithItsClip(unittest.TestCase):
 
                 stray_files.run()
                 with patch("tasks.sort.orientation_of", return_value="portrait"):
-                    sort.run()
+                    sort.run(gallery=FakeGallery())
                 upscale = touch_video(lanes.upscale_of(
                     lanes.ORIGENERATOR_SOURCE, "portrait", "made_00001"))
                 scripts_sync.run()
@@ -62,7 +63,7 @@ class TestAFunscriptHandedOverWithItsClip(unittest.TestCase):
 
                 stray_files.run()
                 with patch("tasks.sort.orientation_of", return_value="portrait"):
-                    sort.run()
+                    sort.run(gallery=FakeGallery())
                 synced = scripts_sync.run()
 
                 assert synced.ok

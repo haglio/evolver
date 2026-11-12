@@ -40,6 +40,13 @@ class OrigeneratorGalleryContract(unittest.TestCase):
 
         assert read == (None if promised is None else tuple(promised))
 
+    def test_the_command_that_takes_the_ai_videos_records_is_read_as_it_promises_it(self):
+        promised = self.promise.get(origenerator_commands.RECORDS)
+        read = origenerator_commands.published_command(
+            self.origenerator, origenerator_commands.RECORDS)
+
+        assert read == (None if promised is None else tuple(promised))
+
     def test_every_column_read_here_is_one_origenerator_promises(self):
         promised = {*self.promise["columns"], *self.promise["optional_columns"]}
         read = {
@@ -60,9 +67,6 @@ class OrigeneratorGalleryContract(unittest.TestCase):
 
     def test_the_soundless_copy_role_read_here_is_the_one_origenerator_writes(self):
         assert self.promise["silent_copy_role"] == unsent_videos.SILENT_COPY_ROLE
-
-    def test_the_model_keys_read_here_are_the_ones_origenerator_records(self):
-        assert list(origenerator_metadata.MODEL_KEYS) == self.promise["params_model_keys"]
 
     def test_the_rate_its_videos_are_generated_at_is_read_where_origenerator_publishes_it(self):
         assert origenerator_gallery.generated_fps(self.origenerator) is not None

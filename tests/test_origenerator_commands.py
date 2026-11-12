@@ -4,6 +4,9 @@ import json
 import logging
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
+
+import pytest
 
 import config
 from tasks import origenerator_commands
@@ -124,11 +127,107 @@ def test_the_gallery_command_is_given_less_time_than_a_run_keeps_spare_after_its
     assert 0 < options["timeout"] < spare
 
 
-def test_a_video_origenerator_sent_is_told_to_its_gallery_like_any_other_sites():
-    told = []
 
-    for source in ("origenerator", "a-site"):
-        origenerator_commands.write_the_gallery_entry_of_a_video_from(
-            source, write=lambda source=source: told.append(source))
+RECORDS = [".venv/Scripts/python.exe", "-m", "origenerator.ai_video_records"]
 
-    assert told == ["origenerator", "a-site"]
+
+def _handing_over(stdout: str, handed: list):
+    def runner(args, **options):
+        files = [Path(args[i + 1]) for i, arg in enumerate(args)
+                 if arg in ("--record", "--totals", "--provenance")]
+        handed.append((args, options, [json.loads(file.read_text(encoding="utf-8"))
+                                       for file in files]))
+        return _Answered(stdout)
+    return runner
+
+
+def test_a_sites_record_of_a_video_is_handed_to_the_gallery_from_origenerators_checkout(
+        tmp_path):
+    checkout, handed = _checkout(tmp_path, records_command=RECORDS), []
+    video = tmp_path / "kino" / "scene one_topaz.mp4"
+    gallery = origenerator_commands.GalleryRecords(
+        checkout, runner=_handing_over('{"done": 1, "no_row": 0}', handed))
+
+    answer = gallery.record(video, {"video": {"prompt": "made up"}})
+
+    assert answer == origenerator_commands.Handed(done=1, no_row=0)
+    ((args, options, given),) = handed
+    assert args[:6] == [str(checkout / ".venv/Scripts/python.exe"), "-m",
+                        "origenerator.ai_video_records", "record", "--video", str(video)]
+    assert args[6] == "--record"
+    assert given == [{"video": {"prompt": "made up"}}]
+    assert options["cwd"] == str(checkout)
+    assert options["creationflags"] & subprocess.CREATE_NO_WINDOW
+
+
+def test_the_file_handed_over_is_gone_once_the_gallery_has_answered(tmp_path):
+    handed = []
+    gallery = origenerator_commands.GalleryRecords(
+        _checkout(tmp_path, records_command=RECORDS),
+        runner=_handing_over('{"done": 1, "no_row": 0}', handed))
+
+    gallery.upscaled(tmp_path / "a.mp4", {"app": "evolver"})
+
+    ((args, _options, _given),) = handed
+    assert not Path(args[args.index("--provenance") + 1]).exists()
+
+
+def test_every_verb_names_its_video_and_hands_over_what_it_was_given(tmp_path):
+    handed = []
+    video = tmp_path / "a.mp4"
+    gallery = origenerator_commands.GalleryRecords(
+        _checkout(tmp_path, records_command=RECORDS),
+        runner=_handing_over('{"done": 2, "no_row": 1}', handed))
+
+    gallery.watched({video: {"completions": 2, "skips": 0, "locks": 1}})
+    gallery.favorite(video, True)
+    gallery.favorite(video, False)
+    gallery.upscaled(video, {"app": "evolver"})
+
+    assert [(args[3:], given) for args, _options, given in handed] == [
+        (["watched", "--totals", handed[0][0][5]],
+         [{str(video): {"completions": 2, "skips": 0, "locks": 1}}]),
+        (["favorite", "--video", str(video), "--on"], []),
+        (["favorite", "--video", str(video), "--off"], []),
+        (["upscaled", "--video", str(video), "--provenance", handed[3][0][7]],
+         [{"app": "evolver"}]),
+    ]
+
+
+def test_an_origenerator_from_before_it_took_records_is_asked_nothing(tmp_path):
+    ran = []
+
+    answer = origenerator_commands.GalleryRecords(
+        _checkout(tmp_path), runner=_answering("", ran)).favorite(tmp_path / "a.mp4", True)
+
+    assert (answer, ran) == (None, [])
+
+
+def test_a_gallery_that_cannot_answer_about_a_record_is_reported_rather_than_passed_in_silence(
+        tmp_path, caplog):
+    gallery = origenerator_commands.GalleryRecords(
+        _checkout(tmp_path, records_command=RECORDS), runner=_never_answers)
+
+    with caplog.at_level(logging.WARNING):
+        answer = gallery.favorite(tmp_path / "a.mp4", True)
+
+    assert answer is None
+    assert "could not be handed" in caplog.text
+
+
+def test_a_gallery_left_to_its_usual_runner_is_never_the_real_one_in_a_test(tmp_path):
+    gallery = origenerator_commands.GalleryRecords(_checkout(tmp_path, records_command=RECORDS))
+
+    with pytest.raises(AssertionError, match="real gallery"):
+        gallery.favorite(tmp_path / "a.mp4", True)
+
+
+def test_videos_the_gallery_has_no_row_for_are_counted_in_the_log(tmp_path, caplog):
+    gallery = origenerator_commands.GalleryRecords(
+        _checkout(tmp_path, records_command=RECORDS),
+        runner=_answering('{"done": 1, "no_row": 2}', []))
+
+    with caplog.at_level(logging.INFO):
+        gallery.watched({tmp_path / "a.mp4": {}, tmp_path / "b.mp4": {}, tmp_path / "c.mp4": {}})
+
+    assert "no row for 2 of the videos" in caplog.text

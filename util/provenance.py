@@ -28,16 +28,6 @@ def recorded(payload: dict, act: str, stamp: dict) -> dict:
     return {**payload, BLOCK: {**stamps_of(payload), act: stamp}}
 
 
-def without(payload: dict, act: str) -> dict:
-    return {**payload, BLOCK: {kept: stamp for kept, stamp in stamps_of(payload).items()
-                               if kept != act}}
-
-
-def carried_forward(earlier: dict, later: dict) -> dict:
-    stamps = {**stamps_of(earlier), **stamps_of(later)}
-    return {**later, BLOCK: stamps} if stamps else later
-
-
 def stamps_of(payload: dict) -> dict:
     stamps = payload.get(BLOCK)
     return stamps if isinstance(stamps, dict) else {}
