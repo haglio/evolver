@@ -18,17 +18,6 @@ VIDEO_FIELDS_FUN_TIME_WRITES = (VIDEO_WRONG_ACTION_FIELD,)
 
 VIDEO_KINDS = TYPES
 
-VIDEO_GENERATION_FIELDS = (
-    "prompt", "model", "resolution", "aspect_ratio", "quality", "style",
-    "seed", "created",
-)
-
-SOURCE_IMAGE_BLOCK = "source_image"
-FRAME_OF_VIDEO_BLOCK = "frame_of_video"
-SOURCE_IMAGE_FIELDS = (
-    "positive_prompt", "negative_prompt", "model", "action", "resolution",
-    "aspect_ratio", "quality", "style", "creativity", "seed", "created", FRAME_OF_VIDEO_BLOCK,
-)
 
 CLIP_BLOCK = scene_links.BLOCK
 CLIP_PERFORMER_FIELD = "performer"
@@ -61,12 +50,9 @@ def promised_to_fun_time() -> dict:
                     VIDEO_ORIENTATION_FIELD,
                     VIDEO_ACTION_FIELD,
                     VIDEO_WRONG_ACTION_FIELD,
-                    *VIDEO_GENERATION_FIELDS,
                 ],
                 "written_by_the_reader": list(VIDEO_FIELDS_FUN_TIME_WRITES),
-                "missing_from_older_records": list(VIDEO_GENERATION_FIELDS),
             },
-            SOURCE_IMAGE_BLOCK: {"fields": list(SOURCE_IMAGE_FIELDS)},
             CLIP_BLOCK: {"fields": [*CLIP_FIELDS_WRITTEN_WHEN_A_CLIP_IS_CUT, *CLIP_FIELDS_THE_CLIP_MATCH_ADDS]},
             VERSION_BLOCK: {"fields": [VERSION_GROUP_FIELD]},
             WATCH_BLOCK: {
