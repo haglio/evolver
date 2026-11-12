@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
@@ -7,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 import check_correspondence
+from tests.gallery_fakes import a_gallery_of
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
 from util import lanes, sidecar
 
@@ -27,6 +29,12 @@ def _sorted(lib: LaneLibrary, source: str, orient: str, name: str) -> Path:
 
 def _kino(lib: LaneLibrary, source: str, orient: str, name: str) -> Path:
     return touch_video(lib.kino_upscales / orient / source / name)
+
+
+def _sent_to_genau(lib: LaneLibrary, name: str, **columns) -> None:
+    a_gallery_of(lib.gallery_db, [{
+        "prompt_id": "made-1", "output_files": json.dumps([{"filename": name, "subfolder": "video"}]),
+        "genau_exported_at": "2026-01-02 03:04:05", "genau_unsent_at": None, **columns}])
 
 
 def _flick(lib: LaneLibrary, name: str) -> Path:
@@ -154,11 +162,9 @@ class TestTheGenauLane:
             assert result.orphan_upscales == [
                 str(Path("videos") / "videos" / "kino" / "2D" / "AI" / "landscape" / GENAU_SOURCE / "loop_1_topaz.mp4")]
 
-    def test_a_flick_gone_from_genaus_folder_is_reported_by_the_record_it_left(self):
+    def test_a_flick_sent_to_genau_and_gone_from_genaus_folder_is_reported_by_its_gallery_row(self):
         with _library() as lib:
-            flick = _flick(lib, "loop_1_topaz.mp4")
-            write_sidecar(sidecar.sidecar_path(flick), {"video": {"seed": "1"}})
-            flick.unlink()
+            _sent_to_genau(lib, "loop_1.mp4")
 
             result = check_correspondence.run()
 
@@ -166,32 +172,70 @@ class TestTheGenauLane:
             assert result.missing_flicks == [
                 str(Path("videos") / "videos" / "genau" / "flicks" / "2D" / "AI" / "loop_1_topaz.mp4")]
 
-    def test_a_copy_pcloud_made_of_a_flicks_record_is_no_flick_of_its_own(self):
+    def test_a_flick_there_under_the_name_its_sound_copy_gave_it_is_not_missing(self):
         with _library() as lib:
-            flick = _flick(lib, "loop_1_topaz.mp4")
-            record = write_sidecar(sidecar.sidecar_path(flick), {"video": {"seed": "1"}})
-            conflicted = sidecar.sidecar_path(flick).with_name("loop_1_topaz [conflicted].json")
-            write_sidecar(conflicted, record)
+            _sent_to_genau(lib, "loop_1-audio.mp4")
+            _flick(lib, "loop_1-audio_topaz.mp4")
 
-            assert check_correspondence.run().missing_flicks == []
+            assert check_correspondence.run().ok
 
     def test_a_flick_sent_to_genaus_trash_is_not_missing(self):
         with _library() as lib:
+            _sent_to_genau(lib, "loop_1.mp4")
             flick = _flick(lib, "loop_1_topaz.mp4")
-            write_sidecar(sidecar.sidecar_path(flick), {"video": {"seed": "1"}})
             flick.replace(touch_video(lanes.in_trash(flick)))
 
             assert check_correspondence.run().ok
 
-    def test_a_record_written_before_its_flick_was_upscaled_is_not_missing(self):
+    def test_a_flick_sent_before_it_was_upscaled_is_not_missing(self):
         with _library() as lib:
             _sorted(lib, GENAU_SOURCE, "landscape", "loop_1.mp4")
-            write_sidecar(sidecar.sidecar_path(lanes.upscale_of(GENAU_SOURCE, "landscape", "loop_1")),
-                          {"video": {"seed": "1"}})
+            _sent_to_genau(lib, "loop_1.mp4")
 
             result = check_correspondence.run()
 
             assert result.missing_flicks == []
+
+    def test_a_video_unsent_from_genau_is_not_missing(self):
+        with _library() as lib:
+            _sent_to_genau(lib, "loop_1.mp4", genau_unsent_at="2026-01-03 04:05:06")
+
+            assert check_correspondence.run().ok
+
+    def test_a_video_never_sent_to_genau_is_not_missing(self):
+        with _library() as lib:
+            a_gallery_of(lib.gallery_db, [{"prompt_id": "made-1", "output_files": json.dumps(
+                [{"filename": "loop_1.mp4"}]), "genau_exported_at": None}])
+
+            assert check_correspondence.run().ok
+
+    def test_a_flick_in_genaus_folder_the_gallery_never_sent_there_is_reported(self):
+        with _library() as lib:
+            _sent_to_genau(lib, "loop_1.mp4")
+            _flick(lib, "loop_1_topaz.mp4")
+            _flick(lib, "loop_2_topaz.mp4")
+
+            result = check_correspondence.run()
+
+            assert not result.ok
+            assert result.flicks_never_sent == [
+                str(Path("videos") / "videos" / "genau" / "flicks" / "2D" / "AI" / "loop_2_topaz.mp4")]
+
+    def test_an_old_sidecar_left_by_a_flick_no_longer_says_it_is_missing(self):
+        with _library() as lib:
+            write_sidecar(sidecar.sidecar_path(lib.genau_flicks / "2D" / "AI" / "loop_1_topaz.mp4"),
+                          {"video": {"seed": "1"}})
+
+            assert check_correspondence.run().ok
+
+    def test_a_gallery_that_cannot_be_read_reports_no_flick_either_way(self):
+        with _library() as lib:
+            _flick(lib, "loop_2_topaz.mp4")
+            lib.gallery_db.write_bytes(b"not a database, made up for this test")
+
+            result = check_correspondence.run()
+
+            assert (result.missing_flicks, result.flicks_never_sent) == ([], [])
 
 
 class TestTheExitCodeAShellOrScheduledTaskReads:
@@ -222,12 +266,12 @@ class TestTheExitCodeAShellOrScheduledTaskReads:
 
     def test_a_missing_flick_is_named_in_the_word_genau_shows(self, capsys):
         with _library() as lib, patch("config.GENAU_FLICKS_WORD", "loopies"):
-            flick = _flick(lib, "loop_1_topaz.mp4")
-            write_sidecar(sidecar.sidecar_path(flick), {"video": {"seed": "1"}})
-            flick.unlink()
+            _sent_to_genau(lib, "loop_1.mp4")
+            _flick(lib, "loop_2_topaz.mp4")
 
             check_correspondence.main()
 
         out = capsys.readouterr().out
         assert "Genau loopies missing from Genau's folder: 1" in out
+        assert "Genau loopies in Genau's folder that Origenerator never sent there: 1" in out
         assert "Genau flicks" not in out
