@@ -409,8 +409,14 @@ def _record_the_upscale(out: Path, settings: topaz.Settings, gallery: GalleryRec
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:
-    return (source == config.PROVIDER_SOURCE
-            and prompt_scrape.made_from_words_alone(lanes.upscale_of(source, orient, stem)))
+    if source != config.PROVIDER_SOURCE:
+        return False
+    upscaled = lanes.upscale_of(source, orient, stem)
+    for told in (prompt_scrape.made_from_words_alone, origenerator_gallery.made_from_words_alone):
+        said = told(upscaled)
+        if said is not None:
+            return said
+    return False
 
 
 class _Due(Enum):

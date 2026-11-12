@@ -155,9 +155,9 @@ def kept_for_the_gallery() -> ScrapedRecords:
     return ScrapedRecords(config.SCRAPED_RECORDS_FILE)
 
 
-def made_from_words_alone(upscale: Path) -> bool:
+def made_from_words_alone(upscale: Path) -> bool | None:
     scraped = kept_for_the_gallery().staged(upscale)
-    return bool(scraped) and SOURCE_IMAGE_BLOCK not in scraped
+    return None if not scraped else SOURCE_IMAGE_BLOCK not in scraped
 
 
 GALLERY_COLUMNS = ("prompt_id", "output_files", "positive_prompt")

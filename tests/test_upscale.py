@@ -39,7 +39,8 @@ def library_dirs(root):
 
 
 def kino_folders(out_dir):
-    return {"KINO_DIR": out_dir.parent.parent}
+    return {"KINO_DIR": out_dir.parent.parent,
+            "ORIGENERATOR_DB_PATH": out_dir.parent.parent / "gallery.db"}
 
 
 def fake_run_ffmpeg(_in_file, tmp, _env, _settings=None, **kwargs):
@@ -415,7 +416,12 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
 class TestIsT2vProvider(unittest.TestCase):
     def _kino(self, root):
-        return override_config(KINO_DIR=root / "kino")
+        return override_config(KINO_DIR=root / "kino", ORIGENERATOR_DB_PATH=root / "gallery.db")
+
+    def _in_the_gallery(self, root, source, workflow_name):
+        upscaled = root / "kino" / "2D" / "AI" / "landscape" / source / "clip_topaz.mp4"
+        a_gallery_of(root / "gallery.db",
+                     [kept_at("outside-1", upscaled, workflow_name=workflow_name)])
 
     def _scraped_for(self, root, source, record):
         _scraped(root / "kino" / "2D" / "AI" / "landscape" / source / "clip_topaz.mp4", record)
@@ -460,8 +466,39 @@ class TestIsT2vProvider(unittest.TestCase):
 
             assert not upscale._is_t2v_provider("provider", "landscape", "clip"), "a wrong answer bakes the text-to-video model into an encode nobody redoes"
 
-    def test_false_when_nothing_was_scraped(self):
+    def test_false_when_nothing_was_scraped_and_the_gallery_has_no_row(self):
         with workspace_temp_dir() as root, self._kino(root):
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+
+    def test_with_its_record_handed_over_the_gallery_row_says_it_was_made_from_words(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            self._in_the_gallery(root, "provider", "outside text-to-video:provider")
+
+            assert upscale._is_t2v_provider("provider", "landscape", "clip")
+
+    def test_with_its_record_handed_over_the_gallery_row_says_it_was_made_from_an_image(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            self._in_the_gallery(root, "provider", "outside image-to-video:provider")
+
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+
+    def test_a_row_that_says_neither_reads_as_made_from_an_image(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            self._in_the_gallery(root, "provider", "outside:provider")
+
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+
+    def test_the_record_kept_for_the_gallery_outranks_what_the_gallery_says(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            self._in_the_gallery(root, "provider", "outside text-to-video:provider")
+            self._scraped_for(root, "provider", {"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}})
+
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+
+    def test_a_gallery_that_cannot_be_read_reads_as_made_from_an_image(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            (root / "gallery.db").write_bytes(b"not a database, made up for this test")
+
             assert not upscale._is_t2v_provider("provider", "landscape", "clip")
 
 
