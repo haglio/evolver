@@ -206,20 +206,26 @@ class TestDeletingPermanently(_InALibrary):
         assert not marked.exists()
         assert not source.exists()
 
-    def test_its_own_record_goes_and_every_namesake_keeps_its_own(self):
-        touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene nine.mp4")
-        touch_video(self.lib.trash / "scene nine_topaz.mp4")
+    def test_a_non_ai_copys_own_record_goes_and_every_namesake_keeps_its_own(self):
+        touch_video(self.lib.genau_trash / "loop_9_topaz.mp4")
         [found] = _all_in_trash()
         own = _a_record_for(found.restores_to)
-        namesakes = [
-            _a_record_for(touch_video(self.lib.kino_upscales / "landscape" / "example-source" / "scene nine_topaz.mp4")),
-            _a_record_for(touch_video(self.lib.non_ai / "example-bucket" / "0 unsorted" / "scene nine_topaz.mp4")),
-        ]
+        namesake = _a_record_for(touch_video(self.lib.non_ai / "example-bucket" / "0 unsorted" / "loop_9_topaz.mp4"))
 
         trash_folders.delete_permanently(found)
 
         assert not own.exists()
-        assert all(record.exists() for record in namesakes)
+        assert namesake.exists()
+
+    def test_an_ai_copy_leaves_the_records_folder_as_it_was(self):
+        touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene nine.mp4")
+        touch_video(self.lib.trash / "scene nine_topaz.mp4")
+        [found] = _all_in_trash()
+        where_its_record_was = _a_record_for(found.restores_to)
+
+        trash_folders.delete_permanently(found)
+
+        assert where_its_record_was.exists()
 
     def test_every_funscript_it_and_its_copy_held_goes_with_its_mark(self):
         source = touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene ten.mp4")
@@ -255,13 +261,12 @@ class TestDeletingPermanently(_InALibrary):
         source = touch_video(self.lib.sorted_dir / "example-source" / "portrait" / "scene eleven.mp4")
         marked = touch_video(self.lib.trash / "scene eleven_topaz.mp4")
         [found] = _all_in_trash()
-        record = _a_record_for(found.restores_to)
         script = _a_script_for(marked)
 
         with self.assertLogs("util.trash_folders", level="INFO") as said:
             trash_folders.delete_permanently(found)
 
-        assert [entry.args[0] for entry in said.records] == [source, marked, record, script]
+        assert [entry.args[0] for entry in said.records] == [source, marked, script]
 
 
 if __name__ == "__main__":

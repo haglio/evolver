@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.kino_folder import is_ai_video
 from app_support.trash_names import name_before_trash
 from app_support.video_names import strip_uniquifier
 
@@ -126,14 +127,18 @@ def restore(marked: InTrash) -> None:
 
 
 def delete_permanently(marked: InTrash) -> None:
-    own_record = sidecar_path(marked.restores_to) if marked.restores_to is not None else None
-    for gone in (marked.upscaled_from, marked.video, own_record, _sound_only_it_plays(marked)):
+    for gone in (marked.upscaled_from, marked.video, _own_record(marked), _sound_only_it_plays(marked)):
         if gone is not None and gone.exists():
             retry_while_in_use(gone.unlink)
             log.info("Deleted permanently: %s", gone)
     for script in script_library.scripts_held_for(marked.video, marked.restores_to, marked.upscaled_from):
         script_library.delete_script(script)
         log.info("Deleted permanently: %s", script)
+
+
+def _own_record(marked: InTrash) -> Path | None:
+    home = marked.restores_to
+    return None if home is None or is_ai_video(home) else sidecar_path(home)
 
 
 def _sound_only_it_plays(marked: InTrash) -> Path | None:
