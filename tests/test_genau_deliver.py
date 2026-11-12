@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import os
 import unittest
 from contextlib import contextmanager
@@ -9,15 +10,18 @@ from unittest.mock import patch
 from app_support.video_kind import GENAU_FLICK
 
 import check_correspondence
+import config
 from tasks import genau_deliver, sort, upscale
+from tests.gallery_fakes import GalleryOnDisk, a_gallery_of, kept_at
 from tests.temp_helpers import (
     LaneLibrary,
     gallery_of_videos_made_again,
+    recorded_kind,
     touch_video,
     workspace_temp_dir,
     write_sidecar,
 )
-from util import lanes, provenance, sidecar, topaz, video_kind
+from util import lanes, provenance, sidecar, topaz
 
 GENAU_SOURCE = "example-loop-clips"
 
@@ -90,7 +94,7 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
 
             record = sidecar.read(sidecar.sidecar_path(flick))
             assert record["video"]["prompt"] == "a prompt"
-            assert video_kind.kind_of(record) == GENAU_FLICK
+            assert recorded_kind(record) == GENAU_FLICK
 
     def test_finishing_adds_nothing_to_what_made_the_flick(self):
         with _genau_lane() as lib:
@@ -108,7 +112,7 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
             with patch.object(upscale, "awaits_its_upscale", return_value=False):
                 genau_deliver.run()
 
-            assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(flick))) == GENAU_FLICK
+            assert recorded_kind(sidecar.read(sidecar.sidecar_path(flick))) == GENAU_FLICK
 
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
         saved = []
@@ -172,8 +176,8 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
     def test_a_flick_still_waiting_for_its_upscale_keeps_its_sorted_copy(self):
         with _genau_lane() as lib:
             flick, original = _upscaled(lib)
-            sidecar.update(sidecar.sidecar_path(flick), lambda record: provenance.recorded(
-                record, provenance.UPSCALE, provenance.reconstructed(None)))
+            a_gallery_of(config.ORIGENERATOR_DB_PATH, [kept_at(
+                "made-1", flick, upscale_provenance=json.dumps(provenance.reconstructed(None)))])
 
             result = genau_deliver.run()
 
@@ -213,8 +217,8 @@ class TestAFlickMadeAgain(unittest.TestCase):
              patch("tasks.upscale._run_ffmpeg", side_effect=encode), \
              patch("tasks.upscale.ffprobe.frame_rate", return_value=None), \
              patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-            sort.run()
-            upscale.run(max_items=5, low_disk=upscale.LowDiskWarning.configured(floor_gb=1))
+            sort.run(gallery=GalleryOnDisk(config.ORIGENERATOR_DB_PATH))
+            upscale.run(gallery=GalleryOnDisk(config.ORIGENERATOR_DB_PATH), max_items=5, low_disk=upscale.LowDiskWarning.configured(floor_gb=1))
             genau_deliver.run()
 
     def test_it_takes_the_place_of_the_one_genau_plays_and_keeps_its_record(self):

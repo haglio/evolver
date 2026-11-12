@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import sqlite3
 import subprocess
 import time
 from collections.abc import Callable
@@ -9,17 +11,19 @@ from enum import Enum, auto
 from functools import partial
 from pathlib import Path
 
+from app_support.gallery_rows import VideoRows
+
 import config
+from tasks import prompt_scrape
+from tasks.origenerator_commands import GalleryRecords
 from util import (
     ffprobe,
     lanes,
     orientation,
     origenerator_gallery,
     provenance,
-    sidecar,
     system_resources,
     topaz,
-    video_kind,
 )
 from util.alert import show_error
 from util.media_files import (
@@ -31,7 +35,7 @@ from util.media_files import (
     retry_while_in_use,
     take_its_place,
 )
-from util.sidecar import sidecar_path
+from util.origenerator_gallery import EVOLVER_UPSCALE, UPSCALE_PROVENANCE
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -87,7 +91,7 @@ class LowDiskWarning:
 @dataclass(frozen=True)
 class Listeners:
     on_progress: Callable[[int, int], None] = lambda done, queued: None
-    on_filed: Callable[[str], None] = lambda source: None
+    on_filed: Callable[[str, Path], None] = lambda source, upscale: None
 
 
 def _given_or_configured(given: dict, defaults: dict) -> dict:
@@ -136,8 +140,10 @@ def run(
     listeners: Listeners | None = None,
     folders: UpscaleFolders | None = None,
     low_disk: LowDiskWarning | None = None,
+    gallery: GalleryRecords | None = None,
 ) -> UpscaleResult:
     listeners = Listeners() if listeners is None else listeners
+    gallery = GalleryRecords() if gallery is None else gallery
     folders = UpscaleFolders.configured() if folders is None else folders
     low_disk = LowDiskWarning.configured() if low_disk is None else low_disk
     result = UpscaleResult()
@@ -176,10 +182,13 @@ def run(
             log.warning("Stopping the upscale stage early due to low free disk space.")
             break
 
-        outcome = _upscale_one(candidate, env, folders, budget)
+        def filed(out: Path, settings: topaz.Settings, source: str = candidate[1]) -> None:
+            listeners.on_filed(source, out)
+            _record_the_upscale(out, settings, gallery)
+
+        outcome = _upscale_one(candidate, env, folders, budget, filed)
         if outcome is _Outcome.UPSCALED:
             result.processed += 1
-            listeners.on_filed(candidate[1])
         elif outcome is _Outcome.FAILED:
             result.failed += 1
         else:
@@ -216,8 +225,8 @@ def _prepare_the_lane_folders(low_disk: LowDiskWarning):
         log.info("Removed %d stale partial output file(s)", removed_partial_outputs)
 
 
-def _upscale_one(candidate: tuple[Path, str, str], env: dict,
-                 folders: UpscaleFolders, budget: _Budget) -> _Outcome:
+def _upscale_one(candidate: tuple[Path, str, str], env: dict, folders: UpscaleFolders,
+                 budget: _Budget, filed: Callable[[Path, topaz.Settings], None]) -> _Outcome:
     in_file, source, orient = candidate
     out = lanes.upscale_of(source, orient, in_file.stem)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -244,11 +253,11 @@ def _upscale_one(candidate: tuple[Path, str, str], env: dict,
         tmp.unlink(missing_ok=True)
         log.info("FAILED (ffmpeg error): %s", in_file)
         return _Outcome.FAILED
-    return _promote_the_output(in_file, tmp, out, settings)
+    return _promote_the_output(in_file, tmp, out, lambda: filed(out, settings))
 
 
 def _promote_the_output(in_file: Path, tmp: Path, out: Path,
-                        settings: topaz.Settings) -> _Outcome:
+                        filed: Callable[[], None]) -> _Outcome:
     if not (tmp.exists() and tmp.stat().st_size > 0):
         tmp.unlink(missing_ok=True)
         log.info("FAILED (empty output): %s", in_file)
@@ -260,7 +269,7 @@ def _promote_the_output(in_file: Path, tmp: Path, out: Path,
         return _Outcome.FAILED
     else:
         log.info("Wrote: %s", out)
-        _record_the_upscale(out, settings)
+        filed()
         return _Outcome.UPSCALED
     finally:
         tmp.unlink(missing_ok=True)
@@ -281,12 +290,13 @@ def collect_queued_videos(
     candidates: list[tuple[Path, str, str]] = []
     remakes: list[tuple[Path, str, str]] = []
     seen: set[Path] = set()
+    made_by = _WhatMadeTheUpscales()
 
     def add_candidate(in_file: Path, source: str, orient: str) -> bool:
         if in_file in seen or not in_file.exists():
             return False
         seen.add(in_file)
-        due = _due(source, orient, in_file.stem)
+        due = _due(source, orient, in_file.stem, made_by)
         if due is _Due.REMADE:
             remakes.append((in_file, source, orient))
         elif due is _Due.MADE:
@@ -332,16 +342,52 @@ def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, settings: topaz.Settings,
     ).returncode == 0
 
 
-def _made_by_superseded_settings(source: str, upscaled: Path) -> bool:
+_MadeBy = Callable[[Path], "dict | None"]
+
+
+class _WhatMadeTheUpscales:
+    def __init__(self) -> None:
+        self._read: _MadeBy | None = None
+
+    def __call__(self, upscaled: Path) -> dict | None:
+        if self._read is None:
+            self._read = _what_the_gallery_says_made_each_upscale()
+        return self._read(upscaled)
+
+
+def _what_the_gallery_says_made_each_upscale() -> _MadeBy:
+    try:
+        rows = origenerator_gallery.rows(("prompt_id", "output_files"),
+                                         optional=(EVOLVER_UPSCALE, UPSCALE_PROVENANCE))
+    except FileNotFoundError:
+        return lambda _upscaled: None
+    except sqlite3.Error:
+        log.warning("Could not read Origenerator's gallery; no upscale is made again this run "
+                    "for newer settings.", exc_info=True)
+        return lambda _upscaled: None
+    row_of, by_id = VideoRows(rows), {row["prompt_id"]: row for row in rows}
+
+    def made_by(upscaled: Path) -> dict | None:
+        row = by_id.get(row_of(upscaled))
+        if row is None:
+            return None
+        try:
+            stamp = json.loads(row.get(UPSCALE_PROVENANCE) or "{}")
+        except ValueError:
+            return {}
+        return stamp if isinstance(stamp, dict) else {}
+
+    return made_by
+
+
+def _made_by_superseded_settings(source: str, upscaled: Path, made_by: _MadeBy) -> bool:
     if not lanes.sent_by_origenerator(source):
         return False
-    try:
-        payload = sidecar.read(sidecar_path(upscaled))
-    except ValueError:
+    stamp = made_by(upscaled)
+    if stamp is None:
         return False
-    made_by = provenance.stamps_of(payload).get(provenance.UPSCALE) or {}
     current = topaz.AI_UPSCALE_ORIGENERATOR
-    return (made_by.get(provenance.METHOD), made_by.get(provenance.METHOD_VERSION)) != (current.name, current.version)
+    return (stamp.get(provenance.METHOD), stamp.get(provenance.METHOD_VERSION)) != (current.name, current.version)
 
 
 def _settings_for(in_file: Path, source: str, orient: str,
@@ -355,26 +401,16 @@ def _settings_for(in_file: Path, source: str, orient: str,
     return topaz.AI_UPSCALE
 
 
-def _record_the_upscale(out: Path, settings: topaz.Settings) -> None:
-    try:
-        path = sidecar_path(out)
-    except ValueError:
-        return
+def _record_the_upscale(out: Path, settings: topaz.Settings, gallery: GalleryRecords) -> None:
     stamp = provenance.by_evolver(method=settings.name, method_version=settings.version)
-    sidecar.update(path, lambda current: provenance.recorded(current, provenance.UPSCALE, stamp))
+    answer = gallery.upscaled(out, stamp)
+    if answer is None or not answer.done:
+        log.warning("Origenerator's gallery did not record what made %s", out)
 
 
 def _is_t2v_provider(source: str, orient: str, stem: str) -> bool:
-    if source != config.PROVIDER_SOURCE:
-        return False
-    try:
-        meta_path = sidecar_path(lanes.upscale_of(source, orient, stem))
-    except ValueError:
-        return False
-    payload = sidecar.read(meta_path)
-    if not payload or video_kind.only_the_video_itself(payload):
-        return False
-    return "source_image" not in payload
+    return (source == config.PROVIDER_SOURCE
+            and prompt_scrape.made_from_words_alone(lanes.upscale_of(source, orient, stem)))
 
 
 class _Due(Enum):
@@ -383,19 +419,19 @@ class _Due(Enum):
     REMADE = auto()
 
 
-def _due(source: str, orient: str, sorted_stem: str) -> _Due:
+def _due(source: str, orient: str, sorted_stem: str, made_by: _MadeBy) -> _Due:
     out = lanes.upscale_of(source, orient, sorted_stem)
     if out is None:
         return _Due.NOTHING
     if not _already_made(source, sorted_stem):
         return _Due.MADE
-    if out.is_file() and _made_by_superseded_settings(source, out):
+    if out.is_file() and _made_by_superseded_settings(source, out, made_by):
         return _Due.REMADE
     return _Due.NOTHING
 
 
 def awaits_its_upscale(sorted_copy: Path, source: str, orient: str) -> bool:
-    return _due(source, orient, sorted_copy.stem) is not _Due.NOTHING
+    return _due(source, orient, sorted_copy.stem, _WhatMadeTheUpscales()) is not _Due.NOTHING
 
 
 def _already_made(source: str, sorted_stem: str) -> bool:

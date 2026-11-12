@@ -10,19 +10,28 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from app_support.video_kind import EXCERPT
 
 import config
 from tasks import upscale
+from tasks.origenerator_commands import Handed
+from tests.gallery_fakes import FakeGallery, a_gallery_of, kept_at
 from tests.temp_helpers import (
     LaneLibrary,
     override_config,
     touch_video,
     workspace_temp_dir,
-    write_sidecar,
 )
-from util import lanes, origenerator_gallery, provenance, sidecar, topaz
+from util import lanes, origenerator_gallery, provenance, topaz
 from util.media_files import partial_path
+from util.scraped_records import ScrapedRecords
+
+
+def _upscaled(gallery=None, **given):
+    return upscale.run(gallery=FakeGallery() if gallery is None else gallery, **given)
+
+
+def _scraped(upscale_path: Path, record: dict) -> None:
+    ScrapedRecords(config.SCRAPED_RECORDS_FILE).stage(upscale_path, record)
 
 
 def library_dirs(root):
@@ -88,7 +97,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(max_items=5)
+                result = _upscaled(max_items=5)
 
             assert result.processed == 1
             assert result.failed == 0
@@ -112,7 +121,7 @@ class TestUpscaleHelpers(unittest.TestCase):
                 LOW_DISK_WARNING_GB=10 ** 9,
             ), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(
+                result = _upscaled(
                     max_items=5,
                     folders=upscale.UpscaleFolders.configured(sorted=given_sorted),
                     low_disk=upscale.LowDiskWarning.configured(floor_gb=1),
@@ -132,7 +141,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             with override_config(**kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(
+                result = _upscaled(
                     max_items=5,
                     folders=upscale.UpscaleFolders.configured(sorted=sorted_dir),
                     low_disk=upscale.LowDiskWarning.configured(floor_gb=1),
@@ -172,7 +181,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(max_items=1)
+                result = _upscaled(max_items=1)
 
             assert result.processed == 1
             assert not stale_partial.exists()
@@ -187,7 +196,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             with override_config(**kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg) as run_ffmpeg, \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(
+                _upscaled(
                     max_items=1,
                     folders=upscale.UpscaleFolders.configured(sorted=sorted_dir),
                     low_disk=upscale.LowDiskWarning.configured(floor_gb=1))
@@ -204,7 +213,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", return_value=False), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(max_items=5)
+                result = _upscaled(max_items=5)
 
             assert result.processed == 0
             assert result.failed == 1
@@ -222,7 +231,7 @@ class TestUpscaleHelpers(unittest.TestCase):
                 UPSCALE_RUN_BUDGET_SECONDS=1, UPSCALE_MIN_START_REMAINING_SECONDS=9999,
             ), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(max_items=10)
+                result = _upscaled(max_items=10)
 
             assert result.processed == 1
             assert result.pending_after_run > 0
@@ -237,7 +246,7 @@ class TestUpscaleHelpers(unittest.TestCase):
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg") as ffmpeg_mock, \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=1), \
                      patch("tasks.upscale.show_error"):
-                result = upscale.run(max_items=5)
+                result = _upscaled(max_items=5)
 
             assert result.deferred_low_disk
             assert result.processed == 0
@@ -256,7 +265,7 @@ class TestUpscaleHelpers(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg_empty), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(max_items=5)
+                result = _upscaled(max_items=5)
 
             assert result.processed == 0
             assert result.failed == 1
@@ -277,7 +286,7 @@ class TestTheLowDiskWarning(unittest.TestCase):
                  patch("tasks.upscale.show_error", return_value=clicked_dismiss) as show_error:
                 for free in free_bytes_each_run:
                     free_bytes.return_value = free
-                    upscale.run(
+                    _upscaled(
                         max_items=5,
                         folders=upscale.UpscaleFolders.configured(sorted=sorted_dir),
                         low_disk=upscale.LowDiskWarning.configured(
@@ -297,7 +306,7 @@ class TestTheLowDiskWarning(unittest.TestCase):
             with override_config(**kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=30 * 1024 ** 3), \
                  patch("tasks.upscale.show_error") as show_error:
-                result = upscale.run(
+                result = _upscaled(
                     max_items=5,
                     folders=upscale.UpscaleFolders.configured(sorted=sorted_dir),
                     low_disk=upscale.LowDiskWarning.configured(
@@ -335,7 +344,8 @@ class TestTheLowDiskWarning(unittest.TestCase):
 
 
 class TestWhatMadeTheUpscale(unittest.TestCase):
-    def test_an_upscale_records_the_settings_and_the_version_of_them_that_made_it(self):
+    def test_an_upscale_hands_the_gallery_the_settings_and_the_version_of_them_that_made_it(self):
+        gallery = FakeGallery()
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             touch_video(lib.sorted_dir / "examplesource" / "landscape" / "clip.mp4")
@@ -344,110 +354,115 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
             with lib.config(), \
                  patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=1)
+                _upscaled(gallery, max_items=1)
 
-                stamp = sidecar.read(sidecar.sidecar_path(upscaled))[provenance.BLOCK][provenance.UPSCALE]
+            ((recorded_for, stamp),) = gallery.upscales
+            assert recorded_for == upscaled
+            assert list(lib.metadata.rglob("*")) == []
 
         assert (stamp["app"], stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("evolver", "ai_upscale", topaz.AI_UPSCALE.version)
 
-    def test_a_text_to_video_clip_records_the_settings_it_was_given_instead(self):
+    def test_a_text_to_video_clip_hands_over_the_settings_it_was_given_instead(self):
+        gallery = FakeGallery()
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
             with lib.config(PROVIDER_SOURCE="exampleprovider"):
                 touch_video(lib.sorted_dir / "exampleprovider" / "portrait" / "clip.mp4")
-                upscaled = lib.kino_upscales / "portrait" / "exampleprovider" / "clip_topaz.mp4"
-                write_sidecar(sidecar.sidecar_path(upscaled), {"video": {"prompt": "a prompt"}})
+                _scraped(lib.kino_upscales / "portrait" / "exampleprovider" / "clip_topaz.mp4",
+                         {"video": {"prompt": "a prompt"}})
 
                 with patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                    upscale.run(max_items=1)
+                    _upscaled(gallery, max_items=1)
 
-                stamp = sidecar.read(sidecar.sidecar_path(upscaled))[provenance.BLOCK][provenance.UPSCALE]
-
+        ((_recorded_for, stamp),) = gallery.upscales
         assert (stamp[provenance.METHOD], stamp[provenance.METHOD_VERSION]) == ("ai_upscale_t2v", topaz.AI_UPSCALE_T2V.version)
+
+    def test_the_gallery_is_told_the_upscale_is_filed_before_it_hears_what_made_it(self):
+        heard = []
+
+        class Hearing(FakeGallery):
+            def upscaled(self, video, provenance):
+                heard.append(("what made it", video.name))
+                return super().upscaled(video, provenance)
+
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            touch_video(lib.sorted_dir / "examplesource" / "landscape" / "clip.mp4")
+
+            with lib.config(), \
+                 patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                 patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                _upscaled(Hearing(), max_items=1, listeners=upscale.Listeners(
+                    on_filed=lambda source, out: heard.append(("filed", out.name))))
+
+        assert heard == [("filed", "clip_topaz.mp4"), ("what made it", "clip_topaz.mp4")]
+
+    def test_a_gallery_that_does_not_take_what_made_an_upscale_is_said_in_the_log(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            touch_video(lib.sorted_dir / "examplesource" / "landscape" / "clip.mp4")
+
+            with lib.config(), \
+                 patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
+                 patch("tasks.upscale.system_resources.free_bytes", return_value=10**15), \
+                 self.assertLogs("tasks.upscale", level="WARNING") as said:
+                result = _upscaled(FakeGallery(Handed(done=0, no_row=1)), max_items=1)
+
+        assert result.processed == 1
+        assert any("did not record what made" in line for line in said.output)
 
 
 class TestIsT2vProvider(unittest.TestCase):
-    def test_true_for_provider_without_source_image(self):
-        with workspace_temp_dir() as root:
-            meta_dir = root / "meta"
-            json_path = meta_dir / "kino" / "2D" / "AI" / "landscape" / "provider" / "clip_topaz.json"
-            json_path.parent.mkdir(parents=True)
-            json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
+    def _kino(self, root):
+        return override_config(KINO_DIR=root / "kino")
 
-            with override_config(METADATA_DIR=meta_dir):
-                assert upscale._is_t2v_provider("provider", "landscape", "clip")
+    def _scraped_for(self, root, source, record):
+        _scraped(root / "kino" / "2D" / "AI" / "landscape" / source / "clip_topaz.mp4", record)
+
+    def test_true_for_provider_without_source_image(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            self._scraped_for(root, "provider", {"video": {"prompt": "test"}})
+
+            assert upscale._is_t2v_provider("provider", "landscape", "clip")
 
     def test_false_for_provider_with_source_image(self):
-        with workspace_temp_dir() as root:
-            meta_dir = root / "meta"
-            json_path = meta_dir / "kino" / "2D" / "AI" / "landscape" / "provider" / "clip_topaz.json"
-            json_path.parent.mkdir(parents=True)
-            json_path.write_text(json.dumps({"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}}), encoding="utf-8")
+        with workspace_temp_dir() as root, self._kino(root):
+            self._scraped_for(root, "provider", {"video": {"prompt": "test"}, "source_image": {"positive_prompt": "img"}})
 
-            with override_config(METADATA_DIR=meta_dir):
-                assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip")
 
     def test_false_for_another_source_beside_a_record_that_would_say_t2v(self):
-        with workspace_temp_dir() as root:
-            meta_dir = root / "meta"
-            json_path = meta_dir / "kino" / "2D" / "AI" / "landscape" / "provider2" / "clip_topaz.json"
-            json_path.parent.mkdir(parents=True)
-            json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
+        with workspace_temp_dir() as root, self._kino(root):
+            self._scraped_for(root, "provider2", {"video": {"prompt": "test"}})
 
-            with override_config(METADATA_DIR=meta_dir):
-                assert not upscale._is_t2v_provider("provider2", "landscape", "clip")
+            assert not upscale._is_t2v_provider("provider2", "landscape", "clip")
 
     def test_the_provider_is_whoever_the_overlay_names(self):
-        with workspace_temp_dir() as root:
-            meta_dir = root / "meta"
-            json_path = meta_dir / "kino" / "2D" / "AI" / "landscape" / "examplesource" / "clip_topaz.json"
-            json_path.parent.mkdir(parents=True)
-            json_path.write_text(json.dumps({"video": {"prompt": "test"}}), encoding="utf-8")
+        with workspace_temp_dir() as root, self._kino(root), \
+                override_config(PROVIDER_SOURCE="examplesource"):
+            self._scraped_for(root, "examplesource", {"video": {"prompt": "test"}})
+            self._scraped_for(root, "provider", {"video": {"prompt": "test"}})
 
-            with override_config(METADATA_DIR=meta_dir, PROVIDER_SOURCE="examplesource"):
-                assert upscale._is_t2v_provider("examplesource", "landscape", "clip")
-                assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+            assert upscale._is_t2v_provider("examplesource", "landscape", "clip")
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip")
 
-    def test_false_when_the_sidecar_is_not_readable_as_json(self):
-        with workspace_temp_dir() as root:
-            meta_dir = root / "meta"
-            json_path = (meta_dir / "kino" / "2D" / "AI" / "landscape" / "provider"
-                         / "clip_topaz.json")
-            json_path.parent.mkdir(parents=True)
-            json_path.write_text('{"video": {"prompt"', encoding="utf-8")
+    def test_false_when_the_records_kept_for_the_gallery_cannot_be_read(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            config.SCRAPED_RECORDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            config.SCRAPED_RECORDS_FILE.write_text('{"records": {"', encoding="utf-8")
 
-            with override_config(METADATA_DIR=meta_dir):
-                assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip")
 
-    def test_false_when_the_sidecar_holds_something_other_than_a_record(self):
-        with workspace_temp_dir() as root:
-            meta_dir = root / "meta"
-            json_path = (meta_dir / "kino" / "2D" / "AI" / "landscape" / "provider"
-                         / "clip_topaz.json")
-            json_path.parent.mkdir(parents=True)
-            json_path.write_text("5", encoding="utf-8")
+    def test_false_when_the_record_kept_is_empty(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            self._scraped_for(root, "provider", {})
 
-            with override_config(METADATA_DIR=meta_dir):
-                assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip"), "a wrong answer bakes the text-to-video model into an encode nobody redoes"
 
-    def test_false_when_the_sidecar_holds_only_the_video_kind(self):
-        with workspace_temp_dir() as root:
-            meta_dir = root / "meta"
-            json_path = meta_dir / "kino" / "2D" / "AI" / "landscape" / "provider" / "clip_topaz.json"
-            json_path.parent.mkdir(parents=True)
-            json_path.write_text(
-                json.dumps({"video": {"type": EXCERPT}}), encoding="utf-8",
-            )
-
-            with override_config(METADATA_DIR=meta_dir):
-                assert not upscale._is_t2v_provider("provider", "landscape", "clip"), "a wrong answer bakes the text-to-video model into an encode nobody redoes"
-
-    def test_false_when_metadata_missing(self):
-        with workspace_temp_dir() as root:
-            meta_dir = root / "meta"
-            with override_config(METADATA_DIR=meta_dir):
-                assert not upscale._is_t2v_provider("provider", "landscape", "clip")
+    def test_false_when_nothing_was_scraped(self):
+        with workspace_temp_dir() as root, self._kino(root):
+            assert not upscale._is_t2v_provider("provider", "landscape", "clip")
 
 
 class TestListeners(unittest.TestCase):
@@ -461,18 +476,19 @@ class TestListeners(unittest.TestCase):
 
             progress_calls, filed = [], []
 
-            def on_filed(source):
+            def on_filed(source, out):
                 upscales = (out_dir / "landscape" / "src").iterdir()
-                filed.append((source, sorted(upscale.name for upscale in upscales)))
+                filed.append((source, out.name, sorted(upscale.name for upscale in upscales)))
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=10, listeners=upscale.Listeners(
+                _upscaled(max_items=10, listeners=upscale.Listeners(
                     on_progress=lambda cur, tot: progress_calls.append((cur, tot)),
                     on_filed=on_filed))
 
-            assert filed == [("src", ["a_topaz.mp4"]), ("src", ["a_topaz.mp4", "b_topaz.mp4"]),
-                             ("src", ["a_topaz.mp4", "b_topaz.mp4", "c_topaz.mp4"])]
+            assert filed == [("src", "a_topaz.mp4", ["a_topaz.mp4"]),
+                             ("src", "b_topaz.mp4", ["a_topaz.mp4", "b_topaz.mp4"]),
+                             ("src", "c_topaz.mp4", ["a_topaz.mp4", "b_topaz.mp4", "c_topaz.mp4"])]
             assert len(progress_calls) == 3
             assert progress_calls[0] == (1, 3)
             assert progress_calls[1] == (2, 3)
@@ -490,9 +506,9 @@ class TestListeners(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", return_value=False), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=10, listeners=upscale.Listeners(
+                _upscaled(max_items=10, listeners=upscale.Listeners(
                     on_progress=lambda cur, tot: progress_calls.append((cur, tot)),
-                    on_filed=filed.append))
+                    on_filed=lambda source, out: filed.append(out)))
 
             assert filed == []
             assert len(progress_calls) == 2
@@ -507,7 +523,7 @@ class TestListeners(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(max_items=5)
+                result = _upscaled(max_items=5)
 
             assert result.processed == 1
 
@@ -522,7 +538,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(max_items=5)
+                result = _upscaled(max_items=5)
 
             assert result.stopped_at_budget == 1
             assert result.failed == 0
@@ -539,7 +555,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)) as mock_ffmpeg, \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                result = upscale.run(max_items=10)
+                result = _upscaled(max_items=10)
 
             mock_ffmpeg.assert_called_once()
             assert result.stopped_at_budget == 1
@@ -567,7 +583,7 @@ class TestSubprocessTimeout(unittest.TestCase):
                 patch("tasks.upscale._run_ffmpeg", side_effect=encode_then_run_out_of_time),
                 patch("tasks.upscale.system_resources.free_bytes", return_value=10**15),
             ):
-                result = upscale.run(max_items=5)
+                result = _upscaled(max_items=5)
 
             assert result.processed == 1
             assert result.stopped_at_budget == 1
@@ -584,7 +600,7 @@ class TestSubprocessTimeout(unittest.TestCase):
 
             with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), patch("tasks.upscale._run_ffmpeg", side_effect=subprocess.TimeoutExpired("ffmpeg", 5)), \
                      patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-                upscale.run(max_items=5, listeners=upscale.Listeners(
+                _upscaled(max_items=5, listeners=upscale.Listeners(
                     on_progress=lambda cur, tot: progress_calls.append((cur, tot))))
 
             assert len(progress_calls) == 1
@@ -604,7 +620,7 @@ class TestFfmpegWindowSuppression(unittest.TestCase):
 
 
 class TestSettingsSelection(unittest.TestCase):
-    def _run_capturing_the_settings(self, root, sidecar_payload):
+    def _run_capturing_the_settings(self, root, scraped):
         video_lib = root / "videos"
         ai_dir = video_lib / "2D" / "AI"
         sorted_dir = ai_dir / "1_sorted"
@@ -614,13 +630,7 @@ class TestSettingsSelection(unittest.TestCase):
         in_file = sorted_dir / "provider" / "landscape" / "clip.mp4"
         in_file.parent.mkdir(parents=True)
         in_file.write_bytes(b"video")
-
-        json_path = (
-            meta_dir / "kino" / "2D" / "AI"
-            / "landscape" / "provider" / "clip_topaz.json"
-        )
-        json_path.parent.mkdir(parents=True)
-        json_path.write_text(json.dumps(sidecar_payload), encoding="utf-8")
+        _scraped(kino / "2D" / "AI" / "landscape" / "provider" / "clip_topaz.mp4", scraped)
 
         encoded_with = []
 
@@ -632,7 +642,7 @@ class TestSettingsSelection(unittest.TestCase):
         with override_config(VIDEO_LIBRARY_DIR=video_lib, AI_DIR=ai_dir, SORTED_DIR=sorted_dir,
                              KINO_DIR=kino, METADATA_DIR=meta_dir), patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg), \
                  patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-            upscale.run(max_items=1)
+            _upscaled(max_items=1)
         return encoded_with
 
     def test_run_uses_the_t2v_settings_for_t2v_provider(self):
@@ -665,11 +675,11 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             tmp.write_bytes(b"upscaled")
             return True
 
-        with lib.config(), \
+        with lib.config(ORIGENERATOR_DB_PATH=root / "gallery.db"), \
              patch("tasks.upscale._run_ffmpeg", side_effect=encode), \
              patch("tasks.upscale.ffprobe.frame_rate", return_value=Fraction(112)) as probed, \
              patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
-            upscale.run(
+            _upscaled(
                 max_items=1,
                 folders=upscale.UpscaleFolders.configured(origenerator=origenerator))
         return video, encoded_with, probed
@@ -690,8 +700,8 @@ class TestOrigeneratorsVideos(unittest.TestCase):
     def _upscaled_before(self, lib: LaneLibrary, source: str, stem: str, settings: topaz.Settings) -> Path:
         upscaled = touch_video(lanes.upscale_of(source, "portrait", stem))
         stamp = provenance.reconstructed("evolver", method=settings.name, method_version=settings.version)
-        sidecar.update(sidecar.sidecar_path(upscaled),
-                       lambda current: provenance.recorded(current, provenance.UPSCALE, stamp))
+        a_gallery_of(lib.search_root.parent / "gallery.db",
+                     [kept_at("made-0", upscaled, upscale_provenance=json.dumps(stamp))])
         return upscaled
 
     def test_upscaled_by_earlier_settings_are_upscaled_again_in_place(self):
@@ -708,7 +718,7 @@ class TestOrigeneratorsVideos(unittest.TestCase):
     def test_never_upscaled_come_before_those_upscaled_again(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
-            with lib.config():
+            with lib.config(ORIGENERATOR_DB_PATH=root / "gallery.db"):
                 self._upscaled_before(lib, lanes.ORIGENERATOR_SOURCE, "a scene", topaz.AI_UPSCALE)
                 touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "a scene.mp4")
                 fresh = touch_video(lib.sorted_dir / lanes.ORIGENERATOR_SOURCE / "portrait" / "b scene.mp4")
@@ -745,6 +755,26 @@ class TestOrigeneratorsVideos(unittest.TestCase):
             with lib.config():
                 self._upscaled_before(
                     lib, lanes.ORIGENERATOR_SOURCE, "scene one", topaz.AI_UPSCALE_ORIGENERATOR)
+            _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
+
+        assert encoded_with == []
+
+    def test_one_the_gallery_has_no_row_for_is_left_alone(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                upscaled = touch_video(lanes.upscale_of(lanes.ORIGENERATOR_SOURCE, "portrait", "scene one"))
+                a_gallery_of(root / "gallery.db", [])
+            _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
+
+        assert (encoded_with, upscaled.name) == ([], "scene one_topaz.mp4")
+
+    def test_none_is_upscaled_again_while_the_gallery_cannot_be_read(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                touch_video(lanes.upscale_of(lanes.ORIGENERATOR_SOURCE, "portrait", "scene one"))
+            (root / "gallery.db").write_bytes(b"not a database, made up for this test")
             _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE)
 
         assert encoded_with == []

@@ -112,8 +112,7 @@ def _upscale_unless_the_computer_is_unfit(this_run: ThisRun,
         log.info("Skipping upscale: Topaz's sign-in has expired, and Topaz can watermark "
                  "what it makes until someone signs in to the Topaz Video app.")
         return Skipped(topaz.SIGN_IN_EXPIRED)
-    listeners = upscale.Listeners(
-        on_filed=origenerator_commands.write_the_gallery_entry_of_a_video_from)
+    listeners = upscale.Listeners(on_filed=prompt_scrape.tell_the_gallery_of_the_filed)
     on_progress = this_run.progress_of("upscale")
     if on_progress is not None:
         listeners = replace(listeners, on_progress=on_progress)

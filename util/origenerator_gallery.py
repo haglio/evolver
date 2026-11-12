@@ -29,6 +29,8 @@ def rows(columns: Iterable[str], *, optional: Iterable[str] = (), db_path=None) 
 
 
 REMADE_AT = "remade_at"
+EVOLVER_UPSCALE = "evolver_upscale"
+UPSCALE_PROVENANCE = "upscale_provenance"
 
 
 def stems_made_again() -> set[str]:

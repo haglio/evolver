@@ -1,26 +1,21 @@
 from __future__ import annotations
 
 import dataclasses
-import json
 import unittest
 from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from app_support import video_ids
-from app_support.video_kind import EXCERPT
 
 import config
-from tasks import prompt_scrape, upscale
-from tests.temp_helpers import override_config, workspace_temp_dir
-from util import (
-    html_query,
-    provenance,
-    sidecar,
-    video_kind,
-)
+from tasks import prompt_scrape
+from tasks.origenerator_commands import Handed
+from tests.gallery_fakes import FakeGallery, a_gallery_of, kept_at
+from tests.temp_helpers import override_config, touch_video, workspace_temp_dir
+from util import html_query
 from util.html_query import parse_document
+from util.scraped_records import ScrapedRecords
 
 _A_REAL_PAGE_WITH_NO_PROMPT = "<html></html>"
 
@@ -43,274 +38,230 @@ class TestPromptScrape(unittest.TestCase):
         sorted_dir, metadata_dir = self._dirs(root)
         return override_config(VIDEO_LIBRARY_DIR=root / "videos" / "videos",
                                AI_DIR=ai, SORTED_DIR=sorted_dir, METADATA_DIR=metadata_dir,
-                               KINO_DIR=root / "videos" / "videos" / "kino")
+                               KINO_DIR=root / "videos" / "videos" / "kino",
+                               ORIGENERATOR_DB_PATH=root / "gallery.db")
 
-    def _mirror_path(self, metadata_dir, orient, source, stem):
-        return metadata_dir / "kino" / "2D" / "AI" / orient / source / f"{stem}_topaz.json"
+    def _upscale(self, root, orient, source, stem):
+        return root / "videos" / "videos" / "kino" / "2D" / "AI" / orient / source / f"{stem}_topaz.mp4"
 
-    def _marker_path(self, metadata_dir, orient, source, stem):
-        p = self._mirror_path(metadata_dir, orient, source, stem)
-        return p.with_name(p.name + ".failed")
+    def _run(self, root, fetch, *, gallery=None, browser=Path("chrome.exe")):
+        self.staged = ScrapedRecords(root / "state" / "scraped.json")
+        self.gallery = FakeGallery() if gallery is None else gallery
+        with (
+            self._override(root),
+            patch("tasks.prompt_scrape.find_browser_executable", return_value=browser),
+            patch("tasks.prompt_scrape.fetch_dom", side_effect=fetch) as fetch_dom,
+            patch("util.relative_dates.today", return_value=date(2026, 3, 28)),
+        ):
+            result = prompt_scrape.run(scraped=self.staged, gallery=self.gallery)
+        self.pages_fetched = fetch_dom.call_count
+        return result
 
-    def test_run_writes_mirrored_json_for_provider_video_with_source_image_prompts(self):
+    def test_a_sites_record_with_its_source_images_prompts_is_kept_for_the_gallery_and_no_sidecar_is_written(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
 
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_with_source_image),
-                patch("util.relative_dates.today", return_value=date(2026, 3, 28)),
-            ):
-                result = prompt_scrape.run()
+            result = self._run(root, self._fetch_dom_with_source_image)
 
             assert result.ok
             assert result.newly_scraped == 1
-            output_path = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
-            payload = json.loads(output_path.read_text(encoding="utf-8"))
-            assert payload == {"video": {"prompt": "video prompt text", "model": "Video v3", "seed": "123", "created": "2026-03-21"}, "source_image": {"positive_prompt": "positive prompt text", "negative_prompt": "negative prompt text", "model": "X Dream", "seed": "999", "created": "2026-03-26", "style": "Realistic", "creativity": "Balance"}}
+            upscale = self._upscale(root, "portrait", config.PROVIDER_SOURCE, "abc")
+            assert self.staged.staged(upscale) == {"video": {"prompt": "video prompt text", "model": "Video v3", "seed": "123", "created": "2026-03-21"}, "source_image": {"positive_prompt": "positive prompt text", "negative_prompt": "negative prompt text", "model": "X Dream", "seed": "999", "created": "2026-03-26", "style": "Realistic", "creativity": "Balance"}}
+            assert list(metadata_dir.rglob("*")) == []
 
     def test_a_video_outside_an_orientation_folder_has_no_place_for_its_record_and_is_never_scraped(self):
         with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
+            sorted_dir, _metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "extras", "stray.mp4")
 
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", return_value=_A_REAL_PAGE_WITH_NO_PROMPT) as fetch_dom,
-            ):
-                result = prompt_scrape.run()
+            result = self._run(root, lambda *a, **k: _A_REAL_PAGE_WITH_NO_PROMPT)
 
-            assert result.ok
-            assert result.newly_scraped == 0
-            fetch_dom.assert_not_called()
-            assert list(metadata_dir.rglob("*.json")) == []
+            assert (result.ok, result.newly_scraped, self.pages_fetched) == (True, 0, 0)
+            assert self.staged.waiting() == []
 
     def test_run_no_scrape_strat_for_unknown_source(self):
         with workspace_temp_dir() as root:
             sorted_dir, _metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "provider2", "portrait", "two.mp4")
 
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom") as fetch_dom,
-            ):
-                result = prompt_scrape.run()
+            result = self._run(root, RuntimeError("reached a page"))
 
-            assert result.ok
-            assert result.no_scrape_strat == 1
-            fetch_dom.assert_not_called()
+            assert (result.ok, result.no_scrape_strat, self.pages_fetched) == (True, 1, 0)
 
-    def test_run_builds_origenerator_metadata_without_browser(self):
+    def test_a_video_origenerator_made_is_never_scraped_since_the_gallery_is_its_record(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, "origenerator", "portrait", "wan22_i2v_00001_.mp4")
-            payload = {"video": {"prompt": "a scene", "seed": "42"}}
 
-            with self._override(root), patch("tasks.prompt_scrape.find_browser_executable", return_value=None), patch("tasks.prompt_scrape.origenerator_metadata.build_metadata",
-                       return_value=payload) as build:
-                result = prompt_scrape.run()
+            result = self._run(root, RuntimeError("reached a page"), browser=None)
 
-            assert result.ok
-            assert result.newly_scraped == 1
-            build.assert_called_once()
-            out = self._mirror_path(metadata_dir, "portrait", "origenerator", "wan22_i2v_00001_")
-            assert json.loads(out.read_text(encoding="utf-8")) == payload
+            assert dataclasses.astuple(result) == dataclasses.astuple(prompt_scrape.PromptScrapeResult())
+            assert (self.staged.waiting(), self.gallery.records) == ([], [])
+            assert list(metadata_dir.rglob("*")) == []
 
     def test_run_ignores_partial_video_files(self):
         with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
+            sorted_dir, _metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "one.mp4")
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "one.partial.deadbeef.mp4")
 
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only),
-            ):
-                result = prompt_scrape.run()
+            result = self._run(root, self._fetch_dom_text_only)
 
-            assert result.ok
-            assert result.newly_scraped == 1
-            assert not self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "one.partial.deadbeef").exists()
+            assert (result.ok, result.newly_scraped) == (True, 1)
+            assert [upscale.name for upscale, _record in self.staged.waiting()] == ["one_topaz.mp4"]
 
     def test_run_counts_error_and_reports_not_ok(self):
         with workspace_temp_dir() as root:
             sorted_dir, _metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
 
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", side_effect=RuntimeError("network error")),
-            ):
-                result = prompt_scrape.run()
+            result = self._run(root, RuntimeError("network error"))
 
-            assert not result.ok
-            assert result.errors == 1
-            assert result.newly_scraped == 0
+            assert (result.ok, result.errors, result.newly_scraped) == (False, 1, 0)
 
-    def test_a_failed_scrape_leaves_a_marker_beside_the_record(self):
+    def test_a_failed_scrape_is_remembered_in_evolvers_state_and_never_beside_a_sidecar(self):
         with workspace_temp_dir() as root:
             sorted_dir, metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
 
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", side_effect=RuntimeError("source gone")),
-            ):
-                result = prompt_scrape.run()
-                read_as_text_to_video = upscale._is_t2v_provider(
-                    config.PROVIDER_SOURCE, "landscape", "fail")
+            result = self._run(root, RuntimeError("source gone"))
 
+            upscale = self._upscale(root, "landscape", config.PROVIDER_SOURCE, "fail")
             assert result.errors == 1
-            assert not read_as_text_to_video, "a failure kept in the record reads to the upscale stage as a text-to-video clip"
-            assert self._marker_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists()
-            assert not self._mirror_path(metadata_dir, "landscape", config.PROVIDER_SOURCE, "fail").exists()
+            assert self.staged.failed(upscale)
+            assert self.staged.staged(upscale) is None, "a failure kept as a record reads to the upscale stage as a text-to-video clip"
+            assert list(metadata_dir.rglob("*")) == []
 
-    def test_skips_video_that_already_has_json(self):
+    def test_a_failed_scrape_is_not_tried_again_on_the_next_run(self):
         with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
-            existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
-            existing.parent.mkdir(parents=True, exist_ok=True)
-            existing.write_text("{}", encoding="utf-8")
-
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", return_value="<html></html>") as fetch_dom,
-            ):
-                result = prompt_scrape.run()
-
-            assert result.already_scraped == 1
-            assert result.newly_scraped == 0
-            fetch_dom.assert_not_called()
-
-    def test_a_sidecar_holding_only_the_video_kind_is_not_a_scrape(self):
-        with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
-            existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
-            existing.parent.mkdir(parents=True, exist_ok=True)
-            existing.write_text(
-                json.dumps({"video": {"type": EXCERPT}}), encoding="utf-8",
-            )
-
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only),
-            ):
-                result = prompt_scrape.run()
-
-            assert (result.newly_scraped, result.already_scraped) == (1, 0)
-            assert video_kind.kind_of(sidecar.read(existing)) == EXCERPT, "the kind already recorded would cost another ffprobe to learn again"
-
-    def test_the_id_the_video_was_given_before_its_scrape_survives_it(self):
-        with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
-            existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
-            given = video_ids.id_of(existing)
-
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only),
-            ):
-                result = prompt_scrape.run()
-
-            assert result.newly_scraped == 1
-            assert video_ids.recorded_id(sidecar.read(existing)) == given
-
-    def test_an_upscale_stamp_survives_a_retried_scrape(self):
-        upscaled = provenance.reconstructed("evolver", method="ai_upscale")
-        with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
-            existing = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
-            existing.parent.mkdir(parents=True, exist_ok=True)
-            existing.write_text(json.dumps({
-                "video": {"type": EXCERPT},
-                provenance.BLOCK: {"upscale": upscaled},
-            }), encoding="utf-8")
-
-            with (
-                self._override(root),
-                patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only),
-            ):
-                result = prompt_scrape.run()
-
-            assert result.newly_scraped == 1
-            assert sidecar.read(existing)[provenance.BLOCK] == {"upscale": upscaled}, "a failed scrape let retry lands after its clip was upscaled, and nothing could learn the stamp again"
-
-    def test_the_stamp_a_scrape_brings_joins_the_ones_already_there(self):
-        upscaled = provenance.reconstructed("evolver", method="ai_upscale")
-        generated = provenance.reconstructed("origenerator", method="wan22_i2v",
-                                             method_version="v007")
-        with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, "origenerator", "portrait", "wan22_i2v_00001_.mp4")
-            existing = self._mirror_path(metadata_dir, "portrait", "origenerator", "wan22_i2v_00001_")
-            existing.parent.mkdir(parents=True, exist_ok=True)
-            existing.write_text(json.dumps({provenance.BLOCK: {"upscale": upscaled}}),
-                                encoding="utf-8")
-            payload = {"video": {"prompt": "a scene"},
-                       provenance.BLOCK: {provenance.GENERATION: generated}}
-
-            with self._override(root), patch("tasks.prompt_scrape.find_browser_executable", return_value=None), patch("tasks.prompt_scrape.origenerator_metadata.build_metadata",
-                       return_value=payload):
-                prompt_scrape.run()
-
-            assert sidecar.read(existing)[provenance.BLOCK] == {"upscale": upscaled, provenance.GENERATION: generated}
-
-    def test_deleting_a_failure_marker_lets_the_scrape_retry(self):
-        with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
-            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
-            marker = self._marker_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
-            marker.parent.mkdir(parents=True, exist_ok=True)
-            marker.write_text("previously failed", encoding="utf-8")
+            sorted_dir, _metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "landscape", "fail.mp4")
+            self._run(root, RuntimeError("source gone"))
+            failed = self.staged
 
             with (
                 self._override(root),
                 patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
                 patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only) as fetch_dom,
             ):
-                held_back = prompt_scrape.run()
-                asked_while_marked = fetch_dom.call_count
-                marker.unlink()
-                retried = prompt_scrape.run()
+                held_back = prompt_scrape.run(scraped=failed, gallery=FakeGallery())
 
-            assert (held_back.skipped_failed, asked_while_marked) == (1, 0)
-            assert retried.newly_scraped == 1
+            assert (held_back.skipped_failed, fetch_dom.call_count) == (1, 0)
 
-    def test_run_scans_sorted_and_writes_metadata_at_outbox_mirror_path(self):
+    def test_a_record_already_waiting_for_the_gallery_is_not_scraped_again(self):
         with workspace_temp_dir() as root:
-            sorted_dir, metadata_dir = self._dirs(root)
+            sorted_dir, _metadata_dir = self._dirs(root)
             self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            self._run(root, self._fetch_dom_text_only)
+            staged = self.staged
 
             with (
                 self._override(root),
                 patch("tasks.prompt_scrape.find_browser_executable", return_value=Path("chrome.exe")),
-                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only),
-                patch("util.relative_dates.today", return_value=date(2026, 3, 28)),
+                patch("tasks.prompt_scrape.fetch_dom", side_effect=self._fetch_dom_text_only) as fetch_dom,
             ):
-                result = prompt_scrape.run()
+                again = prompt_scrape.run(scraped=staged, gallery=FakeGallery())
 
-            assert result.ok
+            assert (again.already_scraped, again.newly_scraped, fetch_dom.call_count) == (1, 0, 0)
+
+    def test_a_video_whose_gallery_row_has_its_prompt_is_already_scraped(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, _metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            upscale = self._upscale(root, "portrait", config.PROVIDER_SOURCE, "abc")
+            a_gallery_of(root / "gallery.db", [kept_at("outside-1", upscale, positive_prompt="made up")])
+
+            result = self._run(root, self._fetch_dom_text_only)
+
+            assert (result.already_scraped, result.newly_scraped, self.pages_fetched) == (1, 0, 0)
+
+    def test_a_gallery_row_without_a_prompt_is_no_scrape(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, _metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            upscale = self._upscale(root, "portrait", config.PROVIDER_SOURCE, "abc")
+            a_gallery_of(root / "gallery.db", [kept_at("outside-1", upscale, positive_prompt="")])
+
+            result = self._run(root, self._fetch_dom_text_only)
+
             assert result.newly_scraped == 1
 
-            expected_path = self._mirror_path(metadata_dir, "portrait", config.PROVIDER_SOURCE, "abc")
-            assert expected_path.exists(), f"Expected metadata at {expected_path}"
-            payload = json.loads(expected_path.read_text(encoding="utf-8"))
-            assert payload["video"]["prompt"] == "text only video prompt"
+    def test_with_a_gallery_that_cannot_be_read_nothing_is_scraped_this_run(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, _metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            (root / "gallery.db").write_bytes(b"not a database at all, made up for this test")
+
+            result = self._run(root, self._fetch_dom_text_only)
+
+            assert (result.newly_scraped, self.pages_fetched, self.staged.waiting()) == (0, 0, [])
+
+    def test_a_record_whose_upscale_is_filed_is_handed_to_the_gallery_and_no_longer_kept(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, _metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+            upscale = touch_video(self._upscale(root, "portrait", config.PROVIDER_SOURCE, "abc"))
+
+            result = self._run(root, self._fetch_dom_text_only)
+
+            ((handed_for, record),) = self.gallery.records
+            assert (handed_for, record["video"]["prompt"]) == (upscale, "text only video prompt")
+            assert (result.handed_over, self.staged.waiting()) == (1, [])
+
+    def test_a_record_the_gallery_could_not_take_is_kept_for_the_next_run(self):
+        for answer in (Handed(done=0, no_row=1), None):
+            with self.subTest(answer=str(answer)), workspace_temp_dir() as root:
+                sorted_dir, _metadata_dir = self._dirs(root)
+                self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+                upscale = touch_video(self._upscale(root, "portrait", config.PROVIDER_SOURCE, "abc"))
+
+                result = self._run(root, self._fetch_dom_text_only, gallery=FakeGallery(answer))
+
+                assert result.handed_over == 0
+                assert [kept for kept, _record in self.staged.waiting()] == [upscale]
+
+    def test_a_record_waits_for_its_upscale_before_it_is_handed_over(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, _metadata_dir = self._dirs(root)
+            self._make_video(sorted_dir, config.PROVIDER_SOURCE, "portrait", "abc.mp4")
+
+            self._run(root, self._fetch_dom_text_only)
+
+            assert self.gallery.records == []
+            assert len(self.staged.waiting()) == 1
+
+    def test_a_filed_upscale_from_any_site_hands_over_its_record_then_has_the_gallery_take_in_its_entries(self):
+        with workspace_temp_dir() as root:
+            staged = ScrapedRecords(root / "scraped.json")
+            upscale = root / "kino" / "abc_topaz.mp4"
+            staged.stage(upscale, {"video": {"seed": "7"}})
+            told = []
+
+            class Telling(FakeGallery):
+                def record(self, video, record):
+                    told.append(("record", video))
+                    return super().record(video, record)
+
+            for source, filed in (("a-site", upscale), ("origenerator", root / "kino" / "made.mp4")):
+                prompt_scrape.tell_the_gallery_of_the_filed(
+                    source, filed, scraped=staged, gallery=Telling(),
+                    write_entries=lambda source=source: told.append(("entries", source)))
+
+            assert told == [("record", upscale), ("entries", "a-site"), ("entries", "origenerator")]
+
+    def test_the_upscale_filed_hands_over_the_record_kept_for_it(self):
+        with workspace_temp_dir() as root:
+            staged = ScrapedRecords(root / "scraped.json")
+            upscale = root / "kino" / "abc_topaz.mp4"
+            staged.stage(upscale, {"video": {"seed": "7"}})
+            gallery = FakeGallery()
+
+            prompt_scrape.hand_over_the_record_of(upscale, scraped=staged, gallery=gallery)
+            prompt_scrape.hand_over_the_record_of(root / "kino" / "other_topaz.mp4",
+                                                  scraped=staged, gallery=gallery)
+
+            assert (gallery.records, staged.waiting()) == ([(upscale, {"video": {"seed": "7"}})], [])
 
     @staticmethod
     def _fetch_dom_with_source_image(url: str, browser: Path, *, profile_dir: Path) -> str:
@@ -535,7 +486,8 @@ class TestTheStagesTwoDirectoriesAreParameters(unittest.TestCase):
         return override_config(
             VIDEO_LIBRARY_DIR=root / "videos" / "videos", AI_DIR=ai,
             SORTED_DIR=ai / "1_sorted", METADATA_DIR=root / "videos" / "metadata",
-            KINO_DIR=root / "videos" / "videos" / "kino")
+            KINO_DIR=root / "videos" / "videos" / "kino",
+            ORIGENERATOR_DB_PATH=root / "gallery.db", SCRAPED_RECORDS_FILE=root / "scraped.json")
 
     def test_the_tree_walked_is_the_one_the_parameter_names(self):
         with workspace_temp_dir() as root:

@@ -416,7 +416,7 @@ class TestTheUpscaleStage:
         computer.upscale.assert_called_once_with(
             priority_files=["new-file"], max_items=config.UPSCALE_BATCH_LIMIT,
             listeners=evolver.upscale.Listeners(
-                on_filed=evolver.origenerator_commands.write_the_gallery_entry_of_a_video_from),
+                on_filed=evolver.prompt_scrape.tell_the_gallery_of_the_filed),
         )
 
     def test_the_library_encode_is_frozen_around_every_topaz_step(self):
