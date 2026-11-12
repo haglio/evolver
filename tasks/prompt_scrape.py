@@ -25,7 +25,6 @@ from util.html_query import (
     query_selector,
     text_content,
 )
-from util.library_records import SOURCE_IMAGE_BLOCK
 from util.media_files import child_dirs, library_videos
 from util.origenerator_gallery import EVOLVER_UPSCALE
 from util.scraped_records import ScrapedRecords
@@ -35,6 +34,8 @@ from util.versions import source_stem
 log = logging.getLogger(__name__)
 
 _CONTENT_PANEL_SELECTOR = r"main > div > div > div.flex-1.overflow-hidden > div.font-regular"
+
+SOURCE_IMAGE_BLOCK = "source_image"
 
 
 @dataclass
@@ -206,7 +207,7 @@ def _scrape_provider_video(
         image_data = _scrape_source_image(
             found.source_image_url, browser, profile_dir=profile_dir)
         if image_data:
-            payload["source_image"] = image_data
+            payload[SOURCE_IMAGE_BLOCK] = image_data
     return payload
 
 
