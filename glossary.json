@@ -312,7 +312,7 @@
     },
     {
       "id": "prompts_stage",
-      "thing": "the stage that saves the prompt each AI video was made from on its sidecar",
+      "thing": "the stage that hands the prompt each AI video was made from to Origenerator's gallery",
       "screen": [
         "Transfer prompts"
       ],
@@ -410,7 +410,7 @@
     },
     {
       "id": "sources_stage",
-      "thing": "the stage that records on each video's sidecar what made it",
+      "thing": "the stage that records on each non-AI video's sidecar what made it",
       "screen": [
         "Set video sources"
       ],
