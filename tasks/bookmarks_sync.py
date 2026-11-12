@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -11,9 +12,12 @@ from urllib.parse import urlparse
 
 from app_support.favorites import Favorite
 from app_support.file_channel import write_whole
+from app_support.gallery_rows import file_entries, place_of_its_own
+from app_support.kino_folder import is_ai_video
 
 import config
-from util import sidecar
+from util import origenerator_gallery, sidecar
+from util.origenerator_gallery import EVOLVER_UPSCALE, STARRED, WEB_URL
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -31,10 +35,11 @@ class BookmarksSyncResult(StageResult):
     bad_url: int = 0
     profile_missing: bool = False
     write_error: str = ""
+    gallery_unread: bool = False
 
     @property
     def ok(self) -> bool:
-        return not (self.profile_missing or self.write_error)
+        return not (self.profile_missing or self.write_error or self.gallery_unread)
 
 
 @dataclass(frozen=True)
@@ -69,7 +74,12 @@ def run(
     if not config.METADATA_DIR.is_dir():
         log.info("The library's records cannot be reached. Skipping bookmarks sync.")
         return result
-    favorites = _pages_of(sidecar.library_favorites())
+    starred = _starred_in_the_gallery()
+    if starred is None:
+        result.gallery_unread = True
+        return result
+    favorites = _pages_of([*(favorite for favorite in sidecar.library_favorites()
+                             if not is_ai_video(favorite.video)), *starred])
     result.no_url = favorites.no_url
     result.bad_url = favorites.bad_url
 
@@ -106,6 +116,26 @@ def run(
         bookmarks_path,
     )
     return result
+
+
+def _starred_in_the_gallery() -> list[Favorite] | None:
+    try:
+        rows = origenerator_gallery.rows(("prompt_id", "output_files"),
+                                         optional=(EVOLVER_UPSCALE, STARRED, WEB_URL))
+    except FileNotFoundError:
+        return []
+    except sqlite3.Error:
+        log.warning("Could not read Origenerator's gallery; the bookmarks are left as they were.",
+                    exc_info=True)
+        return None
+    return [Favorite(video=video, page=row.get(WEB_URL) or "")
+            for row in rows if row.get(STARRED) for video in _ai_videos_of(row)]
+
+
+def _ai_videos_of(row: dict) -> list[Path]:
+    places = [place_of_its_own(entry) for entry in file_entries(row)]
+    return list(dict.fromkeys(Path(place) for place in (*places, row.get(EVOLVER_UPSCALE))
+                              if place and is_ai_video(Path(place)) and Path(place).is_file()))
 
 
 def _pages_of(favorites: Iterable[Favorite]) -> _Favorites:

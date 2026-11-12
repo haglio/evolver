@@ -7,6 +7,7 @@ from pathlib import Path
 from app_support.favorites import mark
 
 from tasks import bookmarks_sync
+from tests.gallery_fakes import a_gallery_of, kept_at
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
 from util import sidecar
 
@@ -72,10 +73,8 @@ class TestBookmarkName(unittest.TestCase):
 
 class TestBookmarksSync(unittest.TestCase):
     def _sync(self, library: LaneLibrary, user_data_dir: Path, **given) -> bookmarks_sync.BookmarksSyncResult:
-        with library.config(), override_config(
-            CHROME_USER_DATA_DIR=user_data_dir,
-            CHROME_PROFILE_NAME="Jane Doe",
-        ):
+        with library.config(ORIGENERATOR_DB_PATH=library.search_root.parent / "gallery.db"), \
+                override_config(CHROME_USER_DATA_DIR=user_data_dir, CHROME_PROFILE_NAME="Jane Doe"):
             return bookmarks_sync.run(**given)
 
     def test_run_syncs_the_favorites_pages_into_named_profile_folder(self):
@@ -204,6 +203,69 @@ class TestBookmarksSync(unittest.TestCase):
 
             assert result.synced == 0
             assert bookmarks_path.read_text(encoding="utf-8") == before
+
+    def test_an_ai_video_starred_in_the_gallery_is_bookmarked_by_its_page_there(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            starred = touch_video(library.kino_upscales / "portrait" / "a-site" / "scene one_topaz.mp4")
+            unstarred = touch_video(library.kino_upscales / "portrait" / "a-site" / "scene two_topaz.mp4")
+            with library.config():
+                mark(sidecar.sidecar_path(unstarred), True, page="https://example.com/old-sidecar")
+            a_gallery_of(root / "gallery.db", [
+                kept_at("outside-1", starred, starred=1, web_url="https://example.com/starred"),
+                kept_at("outside-2", unstarred, starred=0, web_url="https://example.com/unstarred"),
+            ])
+
+            result = self._sync(library, user_data_dir)
+
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
+        assert urls == ["https://example.com/starred"]
+        assert result.synced == 1
+
+    def test_an_ai_video_upscaled_from_a_starred_generation_is_bookmarked_at_its_upscale(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, _bookmarks_path = chrome_profile(root)
+            upscale = touch_video(library.kino_upscales / "portrait" / "origenerator" / "made_00001__topaz.mp4")
+            library.metadata.mkdir(parents=True)
+            a_gallery_of(root / "gallery.db", [{
+                "prompt_id": "made-1", "starred": 1, "evolver_upscale": str(upscale),
+                "output_files": json.dumps([{"filename": "made_00001_.mp4", "subfolder": "video"}])}])
+
+            result = self._sync(library, user_data_dir)
+
+        assert (result.synced, result.no_url) == (0, 1)
+
+    def test_a_starred_ai_video_whose_file_is_gone_is_left_out(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, _bookmarks_path = chrome_profile(root)
+            gone = library.kino_upscales / "portrait" / "a-site" / "scene one_topaz.mp4"
+            library.metadata.mkdir(parents=True)
+            a_gallery_of(root / "gallery.db", [
+                kept_at("outside-1", gone, starred=1, web_url="https://example.com/gone")])
+
+            result = self._sync(library, user_data_dir)
+
+        assert (result.synced, result.no_url) == (0, 0)
+
+    def test_a_gallery_that_cannot_be_read_leaves_the_folder_as_it_was(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            favorite(library, "scene one.mp4", "https://example.com/a")
+            before = json.dumps(chrome_bookmarks_payload([
+                {"id": "20", "name": "b", "type": "url", "url": "https://example.com/b"},
+            ]))
+            bookmarks_path.write_text(before, encoding="utf-8")
+            (root / "gallery.db").write_bytes(b"not a database, made up for this test")
+
+            result = self._sync(library, user_data_dir)
+
+            assert bookmarks_path.read_text(encoding="utf-8") == before
+        assert result.synced == 0
 
     def test_run_reports_missing_profile(self):
         with workspace_temp_dir() as root:
