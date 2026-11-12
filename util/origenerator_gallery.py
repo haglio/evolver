@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
@@ -19,15 +20,38 @@ from app_support.video_names import generation_stem
 import config
 
 PUBLISHED = "origenerator_gallery_contract.json"
+WORKFLOW_PREFIXES = "outside_workflow_prefixes"
+
+
+def published(checkout: Path) -> dict:
+    try:
+        document = json.loads((checkout / PUBLISHED).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return document if isinstance(document, dict) else {}
 
 
 def generated_fps(checkout: Path) -> Fraction | None:
     try:
-        published = json.loads((checkout / PUBLISHED).read_text(encoding="utf-8"))
-        rate = Fraction(str(published["generated_fps"]))
-    except (OSError, ValueError, KeyError, TypeError):
+        rate = Fraction(str(published(checkout)["generated_fps"]))
+    except (ValueError, KeyError, TypeError):
         return None
     return rate if rate > 0 else None
+
+
+@dataclass(frozen=True)
+class WorkflowPrefixes:
+    made_from_words: str
+    made_from_an_image: str
+
+
+def workflow_prefixes(checkout: Path) -> WorkflowPrefixes | None:
+    try:
+        named = published(checkout)[WORKFLOW_PREFIXES]
+        prefixes = WorkflowPrefixes(str(named["text_to_video"]), str(named["image_to_video"]))
+    except (KeyError, TypeError):
+        return None
+    return prefixes if prefixes.made_from_words and prefixes.made_from_an_image else None
 
 
 def rows(columns: Iterable[str], *, optional: Iterable[str] = (), db_path=None) -> list[dict]:
@@ -43,11 +67,10 @@ STARRED = "starred"
 WEB_URL = "web_url"
 
 
-_MADE_FROM_WORDS = "outside text-to-video:"
-_MADE_FROM_AN_IMAGE = "outside image-to-video:"
-
-
 def made_from_words_alone(video: Path) -> bool | None:
+    prefixes = workflow_prefixes(config.ORIGENERATOR_PROJECT_DIR)
+    if prefixes is None:
+        return None
     try:
         made = rows(("prompt_id", "output_files", "workflow_name"), optional=(EVOLVER_UPSCALE,))
     except (FileNotFoundError, sqlite3.Error):
@@ -55,9 +78,9 @@ def made_from_words_alone(video: Path) -> bool | None:
     found = VideoRows(made)(video)
     workflow = next((row.get("workflow_name") or "" for row in made
                      if found is not None and row["prompt_id"] == found), "")
-    if workflow.startswith(_MADE_FROM_WORDS):
+    if workflow.startswith(prefixes.made_from_words):
         return True
-    return False if workflow.startswith(_MADE_FROM_AN_IMAGE) else None
+    return False if workflow.startswith(prefixes.made_from_an_image) else None
 
 
 def stems_made_again() -> set[str]:

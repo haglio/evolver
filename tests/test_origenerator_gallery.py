@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.gallery_fakes import a_gallery_of, kept_at
 from tests.product_sources import PROJECT_ROOT, product_sources
 from tests.temp_helpers import override_config, workspace_temp_dir
 from util import origenerator_gallery
@@ -73,6 +74,41 @@ def _generated_fps_published_in(document: str) -> Fraction | None:
     with workspace_temp_dir() as checkout:
         (checkout / origenerator_gallery.PUBLISHED).write_text(document, encoding="utf-8")
         return origenerator_gallery.generated_fps(checkout)
+
+
+_FABRICATED = {"video": "made-up:", "image_to_video": "made-up picture:",
+               "text_to_video": "made-up words:", "image": "made-up still:"}
+
+
+class TestHowASiteMadeAVideoIsReadFromOrigeneratorsWorkflowName(unittest.TestCase):
+    def test_the_prefixes_are_read_from_the_document_its_checkout_publishes(self):
+        with workspace_temp_dir() as checkout:
+            (checkout / origenerator_gallery.PUBLISHED).write_text(
+                json.dumps({origenerator_gallery.WORKFLOW_PREFIXES: _FABRICATED}), encoding="utf-8")
+
+            prefixes = origenerator_gallery.workflow_prefixes(checkout)
+
+        assert (prefixes.made_from_words, prefixes.made_from_an_image) == (
+            "made-up words:", "made-up picture:")
+
+    def test_an_origenerator_that_publishes_none_says_nothing_about_how_a_video_was_made(self):
+        with workspace_temp_dir() as checkout:
+            (checkout / origenerator_gallery.PUBLISHED).write_text("{}", encoding="utf-8")
+
+            assert origenerator_gallery.workflow_prefixes(checkout) is None
+
+    def test_a_row_is_read_by_the_prefixes_published_and_not_by_any_spelled_here(self):
+        with workspace_temp_dir() as root:
+            checkout = root / "origenerator"
+            checkout.mkdir()
+            (checkout / origenerator_gallery.PUBLISHED).write_text(
+                json.dumps({origenerator_gallery.WORKFLOW_PREFIXES: _FABRICATED}), encoding="utf-8")
+            video = root / "kino" / "2D" / "AI" / "landscape" / "a-site" / "clip_topaz.mp4"
+            db = root / "gallery.db"
+            a_gallery_of(db, [kept_at("outside-1", video, workflow_name="made-up words:a-site")])
+
+            with override_config(ORIGENERATOR_PROJECT_DIR=checkout, ORIGENERATOR_DB_PATH=db):
+                assert origenerator_gallery.made_from_words_alone(video) is True
 
 
 if __name__ == "__main__":

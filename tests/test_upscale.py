@@ -416,7 +416,14 @@ class TestWhatMadeTheUpscale(unittest.TestCase):
 
 class TestIsT2vProvider(unittest.TestCase):
     def _kino(self, root):
-        return override_config(KINO_DIR=root / "kino", ORIGENERATOR_DB_PATH=root / "gallery.db")
+        origenerator = root / "origenerator"
+        origenerator.mkdir()
+        (origenerator / origenerator_gallery.PUBLISHED).write_text(json.dumps({
+            origenerator_gallery.WORKFLOW_PREFIXES: {
+                "text_to_video": "outside text-to-video:",
+                "image_to_video": "outside image-to-video:"}}), encoding="utf-8")
+        return override_config(KINO_DIR=root / "kino", ORIGENERATOR_DB_PATH=root / "gallery.db",
+                               ORIGENERATOR_PROJECT_DIR=origenerator)
 
     def _in_the_gallery(self, root, source, workflow_name):
         upscaled = root / "kino" / "2D" / "AI" / "landscape" / source / "clip_topaz.mp4"
