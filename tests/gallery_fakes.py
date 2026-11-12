@@ -39,7 +39,7 @@ class FakeGallery:
 def a_gallery_of(path: Path, rows: list[dict]) -> Path:
     columns = sorted({"prompt_id", "output_files", *(name for row in rows for name in row)})
     conn = sqlite3.connect(path)
-    conn.execute(f"CREATE TABLE generations ({', '.join(f'{name} TEXT' for name in columns)})")
+    conn.execute(f"CREATE TABLE generations ({', '.join(columns)})")
     for row in rows:
         conn.execute(f"INSERT INTO generations ({', '.join(row)}) VALUES "
                      f"({', '.join('?' for _ in row)})", tuple(row.values()))
