@@ -35,13 +35,6 @@ def _gallery(path: Path, rows) -> Path:
     return path
 
 
-def _sidecar(library: LaneLibrary, *parts) -> Path:
-    path = library.metadata.joinpath(*parts)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("{}", encoding="utf-8")
-    return path
-
-
 class TestTheEvolverLane(unittest.TestCase):
     def test_a_withdrawn_clip_goes_from_the_outbox_and_from_1_sorted(self):
         with workspace_temp_dir() as root:
@@ -158,34 +151,6 @@ class TestTheEvolverLane(unittest.TestCase):
                 unsent_videos.run()
 
                 assert not second.exists()
-
-    def test_the_clip_takes_its_metadata_with_it(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            source = lanes.ORIGENERATOR_SOURCE
-            db = _gallery(root / "gallery.db", [("p1", "made_00006.mp4", "evolver_unsent_at")])
-            with lib.config(ORIGENERATOR_DB_PATH=db):
-                touch_video(lib.kino_upscales / "portrait" / source / "made_00006_topaz.mp4")
-                record = _sidecar(lib, "kino", "2D", "AI",
-                                  "portrait", source, "made_00006_topaz.json")
-
-                result = unsent_videos.run()
-
-                assert not record.exists()
-        assert result.deleted_metadata == 1
-
-    def test_a_record_left_where_the_video_used_to_be_filed_goes_too(self):
-        with workspace_temp_dir() as root:
-            lib = LaneLibrary(root)
-            source = lanes.ORIGENERATOR_SOURCE
-            db = _gallery(root / "gallery.db", [("p1", "made_00009.mp4", "evolver_unsent_at")])
-            with lib.config(ORIGENERATOR_DB_PATH=db):
-                touch_video(lib.kino_upscales / "portrait" / source / "made_00009_topaz.mp4")
-                left_behind = _sidecar(lib, "kino", "2D", "AI", "landscape", source, "made_00009_topaz.json")
-
-                unsent_videos.run()
-
-                assert not left_behind.exists()
 
     def test_a_copy_that_reappears_is_deleted_again(self):
         with workspace_temp_dir() as root:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import glob
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,7 +18,6 @@ log = logging.getLogger(__name__)
 @dataclass
 class UnsentVideosResult(StageResult):
     deleted: int = 0
-    deleted_metadata: int = 0
     deleted_scripts: int = 0
     failed: int = 0
 
@@ -30,7 +28,6 @@ class UnsentVideosResult(StageResult):
     def __add__(self, other: UnsentVideosResult) -> UnsentVideosResult:
         return UnsentVideosResult(
             deleted=self.deleted + other.deleted,
-            deleted_metadata=self.deleted_metadata + other.deleted_metadata,
             deleted_scripts=self.deleted_scripts + other.deleted_scripts,
             failed=self.failed + other.failed)
 
@@ -48,8 +45,7 @@ def run() -> UnsentVideosResult:
             rows, lambda row, lane=lane: row.get(lane.unsent_column)))
         result = result + _empty_lane(lane, _soundless_copies_beside_their_sound(rows, lane))
 
-    log.info("Withdrawn done. Deleted: %d, deleted metadata: %d, failed: %d",
-             result.deleted, result.deleted_metadata, result.failed)
+    log.info("Withdrawn done. Deleted: %d, failed: %d", result.deleted, result.failed)
     return result
 
 
@@ -125,7 +121,6 @@ def _delete_all(videos: list[Path]) -> UnsentVideosResult:
             continue
         log.info("WITHDRAWN %s", video)
         result.deleted += 1
-        result.deleted_metadata += _delete_every_record_of_its_name(video)
         result = result + _delete_scripts(video)
     return result
 
@@ -144,13 +139,3 @@ def _delete_scripts(video: Path) -> UnsentVideosResult:
         result.deleted_scripts += 1
     return result
 
-
-def _delete_every_record_of_its_name(video: Path) -> int:
-    if not config.METADATA_DIR.is_dir():
-        return 0
-    removed = 0
-    for record in config.METADATA_DIR.rglob(glob.escape(video.stem) + ".json"):
-        record.unlink(missing_ok=True)
-        log.info("Deleted metadata: %s", record)
-        removed += 1
-    return removed
