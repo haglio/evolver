@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from app_support.video_kind import EXCERPT, FULL_LENGTH, GENAU_FLICK
+
 from tasks import video_kinds
 from tests.temp_helpers import (
     LaneLibrary,
@@ -43,7 +45,7 @@ class TestAiLane(unittest.TestCase):
                                          orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
-            assert video_kind.kind_of(payload) == video_kind.CLIP
+            assert video_kind.kind_of(payload) == EXCERPT
             assert payload["video"]["prompt"] == "a prompt"
             assert result.recorded == 1
 
@@ -67,7 +69,7 @@ class TestAiLane(unittest.TestCase):
                 payload = sidecar.read(path)
             assert payload["video"]["wrong_action"] == "Alpha"
             assert "action" not in payload["video"]
-            assert video_kind.kind_of(payload) == video_kind.CLIP
+            assert video_kind.kind_of(payload) == EXCERPT
 
     def test_a_long_generated_clip_is_full_length(self):
         with workspace_temp_dir() as root:
@@ -81,7 +83,7 @@ class TestAiLane(unittest.TestCase):
                 video_kinds.run(probe=_probe({video.stem: 240.0}),
                                 orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(path)) == video_kind.FULL_LENGTH
+                assert video_kind.kind_of(sidecar.read(path)) == FULL_LENGTH
 
     def test_a_clip_in_the_genau_source_is_a_genau_loop_before_it_is_finished(self):
         with workspace_temp_dir() as root:
@@ -92,7 +94,7 @@ class TestAiLane(unittest.TestCase):
 
                 video_kinds.run(probe=_unmeasurable, orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(path)) == video_kind.GENAU_FLICK
+                assert video_kind.kind_of(sidecar.read(path)) == GENAU_FLICK
 
 
 class TestGenauLane(unittest.TestCase):
@@ -106,7 +108,7 @@ class TestGenauLane(unittest.TestCase):
                                          orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
-            assert video_kind.kind_of(payload) == video_kind.GENAU_FLICK
+            assert video_kind.kind_of(payload) == GENAU_FLICK
             assert result.recorded == 1
             assert (lib.metadata / "genau" / "flicks" / "loop_2_topaz.json").is_file()
 
@@ -125,7 +127,7 @@ class TestNonAiLane(unittest.TestCase):
 
                 video_kinds.run(probe=_unmeasurable, orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(path)) == video_kind.CLIP
+                assert video_kind.kind_of(sidecar.read(path)) == EXCERPT
 
     def test_a_declared_clip_folder_vouches_for_clips_split_before_any_record_said_so(self):
         with workspace_temp_dir() as root:
@@ -136,7 +138,7 @@ class TestNonAiLane(unittest.TestCase):
                 video_kinds.run(probe=_probe({video.stem: 900.0}),
                                 orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.CLIP
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == EXCERPT
 
     def test_an_ordinary_scene_is_full_length(self):
         with workspace_temp_dir() as root:
@@ -147,7 +149,7 @@ class TestNonAiLane(unittest.TestCase):
                 video_kinds.run(probe=_probe({video.stem: 1800.0}),
                                 orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.FULL_LENGTH
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == FULL_LENGTH
 
 
 class TestRunningItAgain(unittest.TestCase):
@@ -160,12 +162,12 @@ class TestRunningItAgain(unittest.TestCase):
                     lib.kino_upscales / "portrait" / "provider2" / "clip_c_topaz.mp4"
                 )
                 write_sidecar(path, video_kind.oriented(video_kind.timed(
-                    video_kind.stamped({}, video_kind.FULL_LENGTH), 240.0), orientation.PORTRAIT))
+                    video_kind.stamped({}, FULL_LENGTH), 240.0), orientation.PORTRAIT))
 
                 result = video_kinds.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
 
-                assert video_kind.kind_of(sidecar.read(path)) == video_kind.FULL_LENGTH
+                assert video_kind.kind_of(sidecar.read(path)) == FULL_LENGTH
             assert (result.recorded, result.already) == (0, 1)
             assert video.name == "clip_c.mp4"
 
@@ -177,7 +179,7 @@ class TestRunningItAgain(unittest.TestCase):
                 path = sidecar.sidecar_path(
                     lib.kino_upscales / "portrait" / "provider2" / "clip_i_topaz.mp4"
                 )
-                write_sidecar(path, video_kind.stamped({}, video_kind.FULL_LENGTH))
+                write_sidecar(path, video_kind.stamped({}, FULL_LENGTH))
 
                 first = video_kinds.run(probe=_probe({"clip_i": 240.0}),
                                         orientation_probe=_orientation_unknown)
@@ -221,7 +223,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
 
                 payload = sidecar.read(sidecar.sidecar_path(video))
             assert video_kind.duration_of(payload) == 1800.0
-            assert video_kind.kind_of(payload) == video_kind.FULL_LENGTH
+            assert video_kind.kind_of(payload) == FULL_LENGTH
 
     def test_an_excerpt_is_measured_even_though_its_kind_was_free(self):
         with workspace_temp_dir() as root:
@@ -235,7 +237,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(path)
-            assert video_kind.kind_of(payload) == video_kind.CLIP
+            assert video_kind.kind_of(payload) == EXCERPT
             assert video_kind.duration_of(payload) == 240.0
 
     def test_measuring_a_free_kind_still_counts_against_the_batch_limit(self):
@@ -261,7 +263,7 @@ class TestKeepingTheRunningTime(unittest.TestCase):
                                          orientation_probe=_orientation_unknown)
 
                 payload = sidecar.read(sidecar.sidecar_path(clip))
-            assert video_kind.kind_of(payload) == video_kind.GENAU_FLICK
+            assert video_kind.kind_of(payload) == GENAU_FLICK
             assert video_kind.duration_of(payload) is None
             assert (result.recorded, result.skipped) == (1, 0)
 
@@ -279,7 +281,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
 
                 payload = sidecar.read(sidecar.sidecar_path(video))
             assert video_kind.orientation_of(payload) == orientation.PORTRAIT
-            assert video_kind.kind_of(payload) == video_kind.FULL_LENGTH
+            assert video_kind.kind_of(payload) == FULL_LENGTH
 
     def test_a_genau_flick_s_orientation_is_measured_too(self):
         with workspace_temp_dir() as root:
@@ -317,7 +319,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
                     lib.kino_upscales / "portrait" / "provider2" / "clip_k_topaz.mp4"
                 )
                 write_sidecar(path, video_kind.timed(
-                    video_kind.stamped({}, video_kind.CLIP), 5.0))
+                    video_kind.stamped({}, EXCERPT), 5.0))
 
                 result = video_kinds.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
@@ -363,7 +365,7 @@ class TestRecordingTheOrientation(unittest.TestCase):
                 for index in range(3):
                     video = touch_video(lib.non_ai / "alpha" / "0 unsorted" / f"scene-{index}.mp4")
                     write_sidecar(sidecar.sidecar_path(video), video_kind.timed(
-                        video_kind.stamped({}, video_kind.FULL_LENGTH), 1800.0))
+                        video_kind.stamped({}, FULL_LENGTH), 1800.0))
                 measured = []
 
                 result = video_kinds.run(
@@ -401,7 +403,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
                 video_kinds.run(probe=_probe({video.stem: 4.0}),
                                 orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.CLIP
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == EXCERPT
 
     def test_a_vr_video_kept_on_the_cloud_drive_gets_its_running_time_where_the_library_files_it(self):
         with workspace_temp_dir() as root:
@@ -432,7 +434,7 @@ class TestReachingEveryVideoTheMainFunestraPlays(unittest.TestCase):
             vr_root = root / "cloud" / "VR"
             touch_video(vr_root / "finished" / "scene one.mp4")
             write_sidecar(lib.metadata / "VR" / "finished" / "scene one.json",
-                          video_kind.timed(video_kind.stamped({}, video_kind.FULL_LENGTH), 1800.0))
+                          video_kind.timed(video_kind.stamped({}, FULL_LENGTH), 1800.0))
             with lib.config(VR_VIDEO_DIR=vr_root):
                 result = video_kinds.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
@@ -517,7 +519,7 @@ class TestNotHoldingTheRestOfThePipelineUp(unittest.TestCase):
                 result = video_kinds.run(probe=_refuses_to_be_called,
                                          orientation_probe=_refuses_to_be_called)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(clip))) == video_kind.GENAU_FLICK
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(clip))) == GENAU_FLICK
             assert (result.recorded, result.deferred) == (1, 1)
 
 
@@ -530,13 +532,13 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 touch_video(video)
                 video_kinds.run(probe=_probe({video.stem: 900.0}),
                                 orientation_probe=_orientation_unknown)
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.FULL_LENGTH
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == FULL_LENGTH
 
             with lib.config(GENAU_SOURCE, CLIP_FOLDERS=("2D/non_AI/alpha/excerpts",)):
                 result = video_kinds.run(probe=_refuses_to_be_called,
                                          orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.CLIP
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == EXCERPT
             assert (result.recorded, result.already) == (1, 0)
 
     def test_a_scene_carved_after_it_was_recorded_is_corrected_too(self):
@@ -552,7 +554,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
                 write_sidecar(path, dict(sidecar.read(path), clip={"index": 3}))
                 video_kinds.run(probe=_refuses_to_be_called, orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(path)) == video_kind.CLIP
+                assert video_kind.kind_of(sidecar.read(path)) == EXCERPT
 
     def test_a_scene_that_is_no_longer_an_excerpt_is_reclassified(self):
         with workspace_temp_dir() as root:
@@ -566,7 +568,7 @@ class TestAnAnswerThatCostsNothingIsAskedAgain(unittest.TestCase):
             with lib.config(GENAU_SOURCE):
                 video_kinds.run(probe=_refuses_to_be_called, orientation_probe=_orientation_unknown)
 
-                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == video_kind.FULL_LENGTH
+                assert video_kind.kind_of(sidecar.read(sidecar.sidecar_path(video))) == FULL_LENGTH
 
     def test_a_measured_video_is_never_probed_again(self):
         with workspace_temp_dir() as root:
@@ -605,8 +607,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                     v.name: video_kind.kind_of(sidecar.read(sidecar.sidecar_path(v)))
                     for v in [*carved, unrecorded, *wholes]
                 }
-            assert kinds["carved-3.mp4"] == video_kind.CLIP
-            assert kinds["whole-0.mp4"] == video_kind.FULL_LENGTH
+            assert kinds["carved-3.mp4"] == EXCERPT
+            assert kinds["whole-0.mp4"] == FULL_LENGTH
 
     def test_one_carved_scene_stranded_among_the_wholes_does_not_undo_the_batch_s_cut_folder(self):
         with workspace_temp_dir() as root:
@@ -622,8 +624,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
                 kinds = {v.name: video_kind.kind_of(sidecar.read(sidecar.sidecar_path(v))) for v in every}
-            assert kinds["carved-4.mp4"] == video_kind.CLIP
-            assert kinds["whole-0.mp4"] == video_kind.FULL_LENGTH
+            assert kinds["carved-4.mp4"] == EXCERPT
+            assert kinds["whole-0.mp4"] == FULL_LENGTH
 
     def test_a_batch_that_never_separated_its_cuts_keeps_every_whole_video(self):
         with workspace_temp_dir() as root:
@@ -639,8 +641,8 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                     v.name: video_kind.kind_of(sidecar.read(sidecar.sidecar_path(v)))
                     for v in [carved, *wholes]
                 }
-            assert kinds["carved-1.mp4"] == video_kind.CLIP
-            assert [kinds[f"whole-{i}.mp4"] for i in range(3)] == [video_kind.FULL_LENGTH] * 3
+            assert kinds["carved-1.mp4"] == EXCERPT
+            assert [kinds[f"whole-{i}.mp4"] for i in range(3)] == [FULL_LENGTH] * 3
 
     def test_a_scene_carved_and_filed_beside_its_source_leaves_the_source_whole(self):
         with workspace_temp_dir() as root:
@@ -656,4 +658,4 @@ class TestFindingTheExcerptFoldersItself(unittest.TestCase):
                                 orientation_probe=_orientation_unknown)
 
                 kind = video_kind.kind_of(sidecar.read(sidecar.sidecar_path(source)))
-            assert kind == video_kind.FULL_LENGTH
+            assert kind == FULL_LENGTH

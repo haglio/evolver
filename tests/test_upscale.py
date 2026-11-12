@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from app_support.video_kind import EXCERPT
 
 import config
 from tasks import upscale
@@ -20,7 +21,7 @@ from tests.temp_helpers import (
     workspace_temp_dir,
     write_sidecar,
 )
-from util import lanes, origenerator_gallery, provenance, sidecar, topaz, video_kind
+from util import lanes, origenerator_gallery, provenance, sidecar, topaz
 from util.media_files import partial_path
 
 
@@ -436,7 +437,7 @@ class TestIsT2vProvider(unittest.TestCase):
             json_path = meta_dir / "kino" / "2D" / "AI" / "landscape" / "provider" / "clip_topaz.json"
             json_path.parent.mkdir(parents=True)
             json_path.write_text(
-                json.dumps({"video": {"type": video_kind.CLIP}}), encoding="utf-8",
+                json.dumps({"video": {"type": EXCERPT}}), encoding="utf-8",
             )
 
             with override_config(METADATA_DIR=meta_dir):
