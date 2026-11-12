@@ -5,6 +5,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+from app_support.kino_folder import is_ai_video
 from app_support.video_kind import classify, free_kind
 
 import config
@@ -116,24 +117,16 @@ def _orientation_measured(video: Path, orientation_probe) -> str:
 
 
 def _library_videos():
-    yield from _genau_flicks()
-    yield from _ai_videos()
+    yield from _genau_flicks_genaumacher_cut()
     yield from _non_ai_videos()
     yield from _vr_videos()
 
 
-def _genau_flicks():
+def _genau_flicks_genaumacher_cut():
     for video in lanes.genau_flicks():
-        path = sidecar.sidecar_path(video)
-        yield _Listed(video, path, sidecar.read(path), genau=True)
-
-
-def _ai_videos():
-    for clip in lanes.ai_videos():
-        path = sidecar.sidecar_path(clip.upscale)
-        filed_under = clip.orientation if clip.orientation in orientation.SORTED else ""
-        yield _Listed(clip.video, path, sidecar.read(path),
-                      genau=clip.source == config.GENAU_SOURCE, orientation=filed_under)
+        if not is_ai_video(video):
+            path = sidecar.sidecar_path(video)
+            yield _Listed(video, path, sidecar.read(path), genau=True)
 
 
 def _non_ai_videos():

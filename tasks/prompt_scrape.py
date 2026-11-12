@@ -159,10 +159,13 @@ def made_from_words_alone(upscale: Path) -> bool:
     return bool(scraped) and SOURCE_IMAGE_BLOCK not in scraped
 
 
+GALLERY_COLUMNS = ("prompt_id", "output_files", "positive_prompt")
+
+
 def _recorded_in_the_gallery() -> Callable[[Path], bool] | None:
     try:
         prompted = [row for row in origenerator_gallery.rows(
-            ("prompt_id", "output_files", "positive_prompt"), optional=(EVOLVER_UPSCALE,))
+            GALLERY_COLUMNS, optional=(EVOLVER_UPSCALE,))
             if row.get("positive_prompt")]
     except FileNotFoundError:
         prompted = []

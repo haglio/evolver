@@ -6,7 +6,7 @@ from fractions import Fraction
 from pathlib import Path
 
 from app_support import gallery_rows
-from app_support.gallery_rows import is_video_name, output_names
+from app_support.gallery_rows import file_entries, is_video_name, output_names, place_of_its_own
 from app_support.video_names import generation_stem
 
 import config
@@ -55,3 +55,8 @@ def the_one_version_in(folder: Path, name: str) -> Path | None:
                 if video.is_file() and is_video_name(video.name)
                 and generation_stem(video.stem) == made_from] if folder.is_dir() else []
     return versions[0] if len(versions) == 1 else None
+
+
+def places_of(row: dict) -> list[Path]:
+    kept = (*map(place_of_its_own, file_entries(row)), row.get(EVOLVER_UPSCALE))
+    return list(dict.fromkeys(Path(place) for place in kept if place))

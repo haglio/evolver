@@ -5,7 +5,6 @@ from app_support.provenance import METHOD, METHOD_VERSION
 
 BLOCK = "provenance"
 
-GENERATION = "generation"
 UPSCALE = "upscale"
 UPSCALE_NON_AI = "upscale_non_ai"
 CLIP_SCRIPTS = "clip_scripts"

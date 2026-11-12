@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 import config
-from tasks import origenerator_commands, origenerator_metadata, unsent_videos
+from tasks import origenerator_commands, prompt_scrape, unsent_videos
 from util import lanes, origenerator_gallery
 
 CONTRACT = Path("origenerator") / origenerator_gallery.PUBLISHED
@@ -50,8 +50,7 @@ class OrigeneratorGalleryContract(unittest.TestCase):
     def test_every_column_read_here_is_one_origenerator_promises(self):
         promised = {*self.promise["columns"], *self.promise["optional_columns"]}
         read = {
-            *origenerator_metadata.COLUMNS,
-            origenerator_metadata.OWN_PROVENANCE,
+            *prompt_scrape.GALLERY_COLUMNS,
             *unsent_videos.COLUMNS,
             origenerator_gallery.REMADE_AT,
             *(lane.unsent_column for lane in lanes.sent_lanes()),

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-import sqlite3
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app_support.kino_folder import is_ai_video
+
 import config
-from tasks import origenerator_metadata
 from util import ffprobe, lanes, provenance, sidecar, topaz
 from util.stage_result import StageResult
 from util.versions import is_upscaled_stem
@@ -27,7 +27,6 @@ class _Filled:
 
 @dataclass
 class ProvenanceResult(StageResult):
-    looked_up: int = 0
     from_notes: int = 0
     unknown: int = 0
     already: int = 0
@@ -37,29 +36,11 @@ class ProvenanceResult(StageResult):
         if not filled.written and not filled.waiting:
             self.already += 1
         self.deferred += int(filled.waiting)
-        for act, stamp in filled.written.items():
-            if act == provenance.GENERATION:
-                self.looked_up += 1
-            elif stamp.get(provenance.METHOD) is not None:
+        for stamp in filled.written.values():
+            if stamp.get(provenance.METHOD) is not None:
                 self.from_notes += 1
             else:
                 self.unknown += 1
-
-
-class _Gallery:
-    def __init__(self) -> None:
-        self._generation_of: Callable[[Path], dict] | None = None
-        self._unreadable = False
-
-    def generation_of(self, video: Path) -> dict | None:
-        if self._generation_of is None and not self._unreadable:
-            try:
-                self._generation_of = origenerator_metadata.generation_records()
-            except (FileNotFoundError, sqlite3.Error):
-                log.warning("Could not read Origenerator's gallery; its clips wait for "
-                            "a run that can.", exc_info=True)
-                self._unreadable = True
-        return None if self._generation_of is None else self._generation_of(video)
 
 
 class _Notes:
@@ -82,28 +63,17 @@ def run(read_note: Callable[[Path], str] = ffprobe.videoai_tag,
     log.info("=== Stage: record what made each video ===")
     result = ProvenanceResult()
     notes = _Notes(read_note, notes_per_run)
-    for path, acts in _what_each_video_went_through(_Gallery(), notes):
+    for path, acts in _what_each_video_went_through(notes):
         result.add(_fill_in(path, acts))
-    log.info("Provenance: looked up %d, named by their note %d, unknown %d, "
+    log.info("Provenance: named by their note %d, unknown %d, "
              "already recorded %d, left for a later run %d.",
-             result.looked_up, result.from_notes, result.unknown, result.already,
-             result.deferred)
+             result.from_notes, result.unknown, result.already, result.deferred)
     return result
 
 
-def _what_each_video_went_through(
-    gallery: _Gallery, notes: _Notes,
-) -> Iterator[tuple[Path, dict[str, StampFor]]]:
-    for clip in lanes.ai_videos():
-        acts: dict[str, StampFor] = {}
-        if clip.source == lanes.ORIGENERATOR_SOURCE:
-            acts[provenance.GENERATION] = lambda clip=clip: gallery.generation_of(clip.video)
-        if clip.upscale.is_file():
-            acts[provenance.UPSCALE] = lambda clip=clip: notes.made(clip.upscale)
-        if acts:
-            yield sidecar.sidecar_path(clip.upscale), acts
+def _what_each_video_went_through(notes: _Notes) -> Iterator[tuple[Path, dict[str, StampFor]]]:
     for video in lanes.genau_flicks():
-        if is_upscaled_stem(video.stem):
+        if is_upscaled_stem(video.stem) and not is_ai_video(video):
             yield sidecar.sidecar_path(video), {
                 provenance.UPSCALE: lambda video=video: notes.made(video)}
     for video in lanes.non_ai_videos():

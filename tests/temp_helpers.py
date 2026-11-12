@@ -83,6 +83,7 @@ class LaneLibrary:
         self.unmatched = videos / "scripts" / "unmatched_scripts"
         self.generated = videos / "scripts" / "generated"
         self.search_root = videos
+        self.gallery_db = root / "gallery.db"
 
     def config(self, genau_source="example-loop-clips", **extra):
         settings = {
@@ -96,7 +97,7 @@ class LaneLibrary:
             "ORIGENERATOR_VIDEOS_DIR": self.origenerator,
             "GENAU_TRASH_DIR": self.genau_trash, "GENAU_AUDIO_DIR": self.genau_audio,
             "CLIP_FOLDERS": (), "VR_VIDEO_DIR": None,
-            "ORIGENERATOR_DB_PATH": self.search_root.parent / "no gallery.db",
+            "ORIGENERATOR_DB_PATH": self.gallery_db,
         }
         settings.update(extra)
         flat_flicks_in(self.genau_flicks).mkdir(parents=True, exist_ok=True)

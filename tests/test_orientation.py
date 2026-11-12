@@ -9,9 +9,6 @@ from util import orientation
 
 _OWNER = "util/orientation.py"
 
-_ORIGENERATORS_WORKFLOW_NAME_FOR_A_FOUND_CLIP = {("tasks/origenerator_metadata.py", orientation.UNKNOWN)}
-
-
 class TestTheOrientations(unittest.TestCase):
     def test_the_walk_order_is_the_two_folder_names(self):
         assert orientation.SORTED == (orientation.LANDSCAPE, orientation.PORTRAIT)
@@ -30,7 +27,7 @@ class TestOnlyOneModuleSpellsThem(unittest.TestCase):
                 continue
             offenders += [
                 f"{name}:{node.lineno}" for node in literals_in(name)
-                if node.value in wanted and (name, node.value) not in _ORIGENERATORS_WORKFLOW_NAME_FOR_A_FOUND_CLIP
+                if node.value in wanted
             ]
 
         assert offenders == [], "the orientations belong to util.orientation -- LANDSCAPE, PORTRAIT, UNKNOWN, and SORTED for the walk order"
