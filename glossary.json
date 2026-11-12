@@ -285,7 +285,7 @@
     },
     {
       "id": "actions_stage",
-      "thing": "the stage that copies onto each AI video's sidecar the actions Origenerator gives it: its image's actions, its own, and the boxes checked on it",
+      "thing": "the stage, taken out of the run, that copied onto each AI video's sidecar the actions Origenerator gives it; older runs in the run history still show it",
       "screen": [
         "Transfer actions"
       ],

@@ -7,18 +7,11 @@ from pathlib import Path
 from app_support.comfy_file_refs import frame_name
 from app_support.video_names import strip_uniquifier
 
-from util import lanes, origenerator_gallery, provenance
-from util.media_files import path_key
+from util import origenerator_gallery, provenance
 
 COLUMNS = ("prompt_id", "workflow_name", "workflow_version", "output_files")
 
 OWN_PROVENANCE = "provenance"
-PUBLISHED_ACTIONS = "combined_labels"
-
-
-def _library_paths_of(row: dict) -> list[Path]:
-    return [Path(file["library_path"]) for file in _row_output_files(row)
-            if isinstance(file, dict) and file.get("library_path")]
 
 
 def generation_records(db_path=None) -> Callable[[Path], dict]:
@@ -33,22 +26,8 @@ def generation_records(db_path=None) -> Callable[[Path], dict]:
     return generation_of
 
 
-def published_actions(db_path=None) -> Callable[[lanes.AiVideo], tuple[str, ...] | None]:
-    rows = load_rows(db_path)
-    brought_in = {path_key(path): row for row in rows for path in _library_paths_of(row)}
-
-    def actions_of(clip: lanes.AiVideo) -> tuple[str, ...] | None:
-        row = (_match_video_row(clip.video, rows) if clip.source == lanes.ORIGENERATOR_SOURCE
-               else brought_in.get(path_key(clip.upscale)))
-        published = None if row is None else row.get(PUBLISHED_ACTIONS)
-        return None if published is None else tuple(_decoded(published, list))
-
-    return actions_of
-
-
 def load_rows(db_path) -> list[dict]:
-    return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE, PUBLISHED_ACTIONS),
-                                     db_path=db_path)
+    return origenerator_gallery.rows(COLUMNS, optional=(OWN_PROVENANCE,), db_path=db_path)
 
 
 def _match_video_row(video_path: Path, rows: list[dict]) -> dict | None:

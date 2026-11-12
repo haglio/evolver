@@ -22,7 +22,6 @@ from tasks.scene_scripts import SceneScriptsResult
 from tasks.scripts_sync import ScriptsSyncResult
 from tasks.sort import SortResult
 from tasks.stray_files import StrayFilesResult
-from tasks.video_actions import VideoActionsResult
 from tasks.video_kinds import VideoKindsResult
 from tests.color_support import CIE76_DELTA_E_OF_COLORS_OBVIOUSLY_DIFFERENT, band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
@@ -55,8 +54,7 @@ WHY_IT_CANNOT_FAIL = {
                       "videos for a later run",
     StrayFilesResult: "what it cannot repair it reports, for a person to judge",
     VideoKindsResult: "a video it cannot measure is left for the next run",
-    VideoActionsResult: "copies actions onto sidecars already there; a gallery it cannot read "
-                       "leaves the actions for a later run",
+
 }
 
 _STAGES_THAT_MAKE_OR_MOVE_A_VIDEO = ("strays", "withdrawn", "sort", "upscale", "genau_deliver", "upscale_non_ai")

@@ -34,7 +34,6 @@ from tasks import (
     stray_files,
     unsent_videos,
     upscale,
-    video_actions,
     video_kinds,
     watch_weights,
 )
@@ -158,11 +157,7 @@ STAGES: tuple[Stage, ...] = (
     Stage("metadata", "Transfer prompts",
           "Read the prompt each AI video in 1_sorted was made from and save it in that video's sidecar",
           (0x14, 0x7D, 0x3C), run=lambda _: prompt_scrape.run()),
-    Stage("labels", "Transfer actions",
-          "Copy the actions Origenerator gives each AI video from Origenerator onto that video's sidecar "
-          "-- its image's actions, then its own, then the boxes checked on it -- which Fun Time and "
-          "Warm Gun filter and group by",
-          (0xEE, 0x22, 0x00), run=lambda _: video_actions.run()),
+
     Stage("sort", "Sort inbox",
           "Move AI videos from 0_inbox into 1_sorted, filed by where they came from and by portrait or landscape",
           (0x38, 0x6A, 0x9C), run=lambda _: sort.run()),
@@ -224,6 +219,7 @@ STAGES: tuple[Stage, ...] = (
 
 ALL_STAGES = tuple(stage.key for stage in STAGES)
 TAKEN_OUT_STAGE_LABELS = MappingProxyType({
+    "labels": "Transfer actions",
     "purge": "Purge Trash",
     "references": "Follow moved videos",
 })
