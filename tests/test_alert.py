@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from app_support.testing import error_popup
@@ -37,7 +38,7 @@ class TestShowError(unittest.TestCase):
         alert.show_error("Title", "Body")
 
         show_alert.assert_called_once_with(
-            "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False)
+            "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY)
 
     @alert_shown()
     def test_a_previews_alert_wears_its_letter_in_the_preview_ink(self, show_alert):
@@ -56,7 +57,18 @@ class TestShowError(unittest.TestCase):
 
         show_alert.assert_called_once_with(
             "Title", "Body", icon=alert.ICON_FILE, links=[Link("Open its folder", folder)],
-            dismissible=False)
+            dismissible=False, work_on_this=ANY)
+
+    @alert_shown()
+    def test_work_on_this_opens_a_session_in_the_checkout_that_showed_the_window_told_what_it_said(self, show_alert):
+        alert.show_error("Evolver - Made-Up Error", "Video one has no script.")
+
+        link = urlsplit(show_alert.call_args.kwargs["work_on_this"])
+        asked = parse_qs(link.query)
+        assert (link.scheme, link.netloc, link.path) == ("claude", "code", "/new")
+        assert asked["folder"] == [str(Path(PROJECT_ROOT).resolve())]
+        assert "Evolver - Made-Up Error" in asked["q"][0]
+        assert "Video one has no script." in asked["q"][0]
 
     @alert_shown(return_value=True)
     def test_an_alert_that_offers_dismiss_says_whether_it_was_dismissed(self, show_alert):
