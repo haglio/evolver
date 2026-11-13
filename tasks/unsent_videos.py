@@ -41,8 +41,7 @@ def run() -> UnsentVideosResult:
 
     log.info("=== Stage: videos unsent in Origenerator ===")
     for lane in lanes.sent_lanes():
-        result = result + _empty_lane(lane, origenerator_gallery.video_stems(
-            rows, lambda row, lane=lane: row.get(lane.unsent_column)))
+        result = result + _empty_lane(lane, _names_only_withdrawn_videos_hold(rows, lane))
         result = result + _empty_lane(lane, _soundless_copies_beside_their_sound(rows, lane))
 
     log.info("Withdrawn done. Deleted: %d, failed: %d", result.deleted, result.failed)
@@ -57,8 +56,13 @@ COLUMNS = ("output_files",)
 def _gallery_rows() -> list[dict]:
     return origenerator_gallery.rows(
         COLUMNS,
-        optional=tuple(lane.unsent_column for lane in lanes.sent_lanes()),
+        optional=tuple(column for lane in lanes.sent_lanes() for column in lane.stamps),
     )
+
+
+def _names_only_withdrawn_videos_hold(rows: list[dict], lane: lanes.SentLane) -> set[str]:
+    withdrawn = origenerator_gallery.video_stems(rows, lambda row: row.get(lane.unsent_column))
+    return withdrawn - origenerator_gallery.video_stems(rows, lane.still_sent)
 
 
 def _soundless_copies_beside_their_sound(rows: list[dict], lane: lanes.SentLane) -> set[str]:

@@ -22,13 +22,13 @@ _SCHEMA = (
 def _gallery(path: Path, rows) -> Path:
     conn = sqlite3.connect(path)
     conn.execute(_SCHEMA)
-    for prompt_id, filename, unsent_column in rows:
+    for prompt_id, filename, *stamped in rows:
         outputs = json.dumps([{"filename": filename, "subfolder": "video"}])
         conn.execute("INSERT INTO generations (prompt_id, output_files) VALUES (?, ?)",
                      (prompt_id, outputs))
-        if unsent_column:
+        for column in filter(None, stamped):
             conn.execute(
-                f"UPDATE generations SET {unsent_column} = '2026-01-02 03:04:05'"
+                f"UPDATE generations SET {column} = '2026-01-02 03:04:05'"
                 " WHERE prompt_id = ?", (prompt_id,))
     conn.commit()
     conn.close()
@@ -169,6 +169,22 @@ class TestTheEvolverLane(unittest.TestCase):
                 stamps = gallery.execute("SELECT evolver_unsent_at FROM generations").fetchall()
         assert again.deleted == 1
         assert stamps == [("2026-01-02 03:04:05",)], "a take-back is a standing mark on the row, never cleared from this side"
+
+    def test_a_copy_another_video_of_the_same_name_still_sends_down_the_lane_stays(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            source = lanes.ORIGENERATOR_SOURCE
+            db = _gallery(root / "gallery.db", [
+                ("p1", "made_00012.mp4", "evolver_exported_at", "evolver_unsent_at"),
+                ("p2", "made_00012.webm", "evolver_exported_at")])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                kept = (touch_video(lib.kino_upscales / "portrait" / source / "made_00012_topaz.mp4"),
+                        touch_video(lib.sorted_dir / source / "portrait" / "made_00012.webm"))
+
+                result = unsent_videos.run()
+
+                assert all(copy.exists() for copy in kept)
+        assert result.deleted == 0
 
     def test_a_source_stays_while_its_upscale_will_not_go(self):
         with workspace_temp_dir() as root:
