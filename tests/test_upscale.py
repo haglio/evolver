@@ -705,13 +705,15 @@ class TestSettingsSelection(unittest.TestCase):
 
 
 class TestOrigeneratorsVideos(unittest.TestCase):
-    def _upscale(self, root: Path, source: str):
+    def _upscale(self, root: Path, source: str, workflow: str = ""):
         lib = LaneLibrary(root)
         video = touch_video(lib.sorted_dir / source / "portrait" / "scene one.mp4")
         origenerator = root / "origenerator"
         origenerator.mkdir()
-        (origenerator / origenerator_gallery.PUBLISHED).write_text(
-            json.dumps({"generated_fps": 16.0}), encoding="utf-8")
+        (origenerator / origenerator_gallery.PUBLISHED).write_text(json.dumps(
+            {"generated_fps": 16.0, "generated_fps_by_workflow": {"made_at_28": 28.0}}), encoding="utf-8")
+        if workflow:
+            a_gallery_of(root / "gallery.db", [kept_at("made-1", video, workflow_name=workflow)])
         encoded_with = []
 
         def encode(_in_file, tmp, _env, settings, **kwargs):
@@ -734,6 +736,12 @@ class TestOrigeneratorsVideos(unittest.TestCase):
 
         assert encoded_with == [topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, "portrait", video_fps=Fraction(112), generated_fps=Fraction(16))]
         probed.assert_called_once_with(video)
+
+    def test_made_by_a_workflow_with_a_rate_of_its_own_are_given_the_frames_made_at_that_rate(self):
+        with workspace_temp_dir() as root:
+            _, encoded_with, _ = self._upscale(root, lanes.ORIGENERATOR_SOURCE, "made_at_28")
+
+        assert encoded_with == [topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, "portrait", video_fps=Fraction(112), generated_fps=Fraction(28))]
 
     def test_sent_down_the_genau_lane_take_the_same_settings(self):
         with workspace_temp_dir() as root:

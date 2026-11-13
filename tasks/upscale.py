@@ -395,7 +395,7 @@ def _settings_for(in_file: Path, source: str, orient: str,
     if lanes.sent_by_origenerator(source):
         return topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orient,
                             video_fps=ffprobe.frame_rate(in_file),
-                            generated_fps=origenerator_gallery.generated_fps(origenerator_dir))
+                            generated_fps=origenerator_gallery.generated_fps(origenerator_dir, in_file))
     if _is_t2v_provider(source, orient, in_file.stem):
         return topaz.AI_UPSCALE_T2V
     return topaz.AI_UPSCALE

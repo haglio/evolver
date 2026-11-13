@@ -32,6 +32,31 @@ class TestTheRateOrigeneratorsVideosAreGeneratedAt(unittest.TestCase):
             with self.subTest(document=document):
                 assert _generated_fps_published_in(document) is None
 
+    def test_of_a_video_is_the_rate_of_the_workflow_that_made_it(self):
+        with workspace_temp_dir() as root:
+            video = root / "made" / "a woman waves.mp4"
+            assert _generated_fps_of(root, video, "made_at_24") == Fraction(24)
+
+    def test_of_a_video_whose_workflow_published_no_rate_of_its_own_is_the_rate_of_all_of_them(self):
+        with workspace_temp_dir() as root:
+            video = root / "made" / "a woman waves.mp4"
+            assert _generated_fps_of(root, video, "made_before_rates_were_per_workflow") == Fraction(16)
+
+    def test_of_a_video_the_gallery_does_not_hold_is_the_rate_of_all_of_them(self):
+        with workspace_temp_dir() as root:
+            assert _generated_fps_of(root, root / "elsewhere.mp4", "made_at_24") == Fraction(16)
+
+
+def _generated_fps_of(root: Path, video: Path, workflow: str) -> Fraction | None:
+    checkout = root / "origenerator"
+    checkout.mkdir()
+    (checkout / origenerator_gallery.PUBLISHED).write_text(json.dumps(
+        {"generated_fps": 16.0, "generated_fps_by_workflow": {"made_at_24": 24.0}}), encoding="utf-8")
+    db = root / "gallery.db"
+    a_gallery_of(db, [kept_at("made-1", root / "made" / "a woman waves.mp4", workflow_name=workflow)])
+    with override_config(ORIGENERATOR_DB_PATH=db):
+        return origenerator_gallery.generated_fps(checkout, video)
+
 
 def _connects_to_sqlite(node: ast.AST) -> bool:
     if isinstance(node, ast.ImportFrom):
