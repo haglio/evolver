@@ -21,6 +21,7 @@ import config
 
 PUBLISHED = "origenerator_gallery_contract.json"
 WORKFLOW_PREFIXES = "outside_workflow_prefixes"
+GENERATED_FPS_BY_WORKFLOW = "generated_fps_by_workflow"
 
 
 def published(checkout: Path) -> dict:
@@ -31,10 +32,19 @@ def published(checkout: Path) -> dict:
     return document if isinstance(document, dict) else {}
 
 
-def generated_fps(checkout: Path) -> Fraction | None:
+def generated_fps(checkout: Path, video: Path | None = None) -> Fraction | None:
+    document = published(checkout)
+    by_workflow = document.get(GENERATED_FPS_BY_WORKFLOW)
+    workflow = _workflow_of(video) if video is not None else ""
+    if isinstance(by_workflow, dict) and workflow in by_workflow:
+        return _rate(by_workflow[workflow])
+    return _rate(document.get("generated_fps"))
+
+
+def _rate(published_rate) -> Fraction | None:
     try:
-        rate = Fraction(str(published(checkout)["generated_fps"]))
-    except (ValueError, KeyError, TypeError):
+        rate = Fraction(str(published_rate))
+    except (ValueError, TypeError):
         return None
     return rate if rate > 0 else None
 
@@ -71,16 +81,22 @@ def made_from_words_alone(video: Path) -> bool | None:
     prefixes = workflow_prefixes(config.ORIGENERATOR_PROJECT_DIR)
     if prefixes is None:
         return None
+    workflow = _workflow_of(video)
+    if workflow is None:
+        return None
+    if workflow.startswith(prefixes.made_from_words):
+        return True
+    return False if workflow.startswith(prefixes.made_from_an_image) else None
+
+
+def _workflow_of(video: Path) -> str | None:
     try:
         made = rows(("prompt_id", "output_files", "workflow_name"), optional=(EVOLVER_UPSCALE,))
     except (FileNotFoundError, sqlite3.Error):
         return None
     found = VideoRows(made)(video)
-    workflow = next((row.get("workflow_name") or "" for row in made
-                     if found is not None and row["prompt_id"] == found), "")
-    if workflow.startswith(prefixes.made_from_words):
-        return True
-    return False if workflow.startswith(prefixes.made_from_an_image) else None
+    return next((row.get("workflow_name") or "" for row in made
+                 if found is not None and row["prompt_id"] == found), "")
 
 
 def stems_made_again() -> set[str]:
