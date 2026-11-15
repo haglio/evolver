@@ -23,9 +23,12 @@ LIBRARY_ROOT = Path(haglio_settings.value("library_root"))
 PROJECT_ROOTS = haglio_settings.project_roots()
 
 
-def retired_root(content: dict[str, Any]) -> Path | None:
-    configured = content.get("retired_root")
+def _folder(configured: str | None) -> Path | None:
     return Path(configured) if configured else None
+
+
+def retired_root(content: dict[str, Any]) -> Path | None:
+    return _folder(content.get("retired_root"))
 
 
 def project_dir(name: str, roots: tuple[Path, ...] | None = None) -> Path:
@@ -76,11 +79,17 @@ GENERATED_SCRIPTS_DIR = funscript.generated_marks_tree_in(LIBRARY_ROOT / "videos
 
 
 def vr_video_dir(content: dict[str, Any]) -> Path | None:
-    configured = content.get("vr_videos")
-    return Path(configured) if configured else None
+    return _folder(content.get("vr_videos"))
 
 
 VR_VIDEO_DIR = vr_video_dir(_CONTENT)
+
+
+def goblinscript_dir(content: dict[str, Any]) -> Path | None:
+    return _folder(content.get("goblinscript_dir"))
+
+
+GOBLINSCRIPT_DIR = goblinscript_dir(_CONTENT)
 AI_DIR       = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = LIBRARY_ROOT / "videos" / "videos" / "2D" / "non_AI"
 CHROME_USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"

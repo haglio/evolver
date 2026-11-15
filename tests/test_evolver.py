@@ -504,6 +504,38 @@ class TestTheUpscaleStage:
         assert listeners.on_progress is evolver.upscale.Listeners().on_progress
 
 
+class TestTheMakeFunscriptsStage:
+    def test_holds_off_with_the_reason_goblinscript_gives(self):
+        with patch("evolver.funscript_drafts.hold_off_reason", return_value="goblinscript_failed"), \
+             patch("evolver.funscript_drafts.run") as drafted:
+            outcome = _stage("funscript_drafts").run(evolver.ThisRun())
+
+        assert outcome == evolver.Skipped("goblinscript_failed")
+        drafted.assert_not_called()
+
+    def test_waits_while_origenerator_trains_a_lora_on_the_graphics_card(self):
+        with patch("evolver.funscript_drafts.hold_off_reason", return_value=""), \
+             patch("evolver.funscript_drafts.run") as drafted:
+            outcome = _stage("funscript_drafts").run(_after(
+                origenerator_downtime=DowntimeResult(holds_the_graphics_card=True)))
+
+        assert outcome == evolver.Skipped("origenerator_training")
+        drafted.assert_not_called()
+
+    def test_otherwise_drafts_with_goblinscript_where_the_settings_put_it(self, tmp_path):
+        did = _Done()
+        with patch("evolver.config.GOBLINSCRIPT_DIR", tmp_path / "goblin"), \
+             patch("evolver.config.LOCAL_STATE_DIR", tmp_path / "state"), \
+             patch("evolver.funscript_drafts.hold_off_reason", return_value=""), \
+             patch("evolver.funscript_drafts.run", return_value=did) as drafted:
+            outcome = _stage("funscript_drafts").run(evolver.ThisRun())
+
+        assert outcome is did
+        drafted.assert_called_once_with(
+            goblin=evolver.funscript_drafts.Goblin(tmp_path / "goblin"),
+            drafting=evolver.funscript_drafts.Drafting.kept_in(tmp_path / "state"))
+
+
 def _the_non_ai_mode(this_run: evolver.ThisRun, *, cpu_busy=False) -> nonai_upscale.RunMode:
     with patch("evolver.nonai_upscale.run", return_value=NonAiUpscaleResult()) as run, \
          patch("evolver._should_skip_upscale_due_to_cpu", return_value=cpu_busy):
