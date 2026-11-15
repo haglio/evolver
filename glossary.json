@@ -339,6 +339,20 @@
       "ruled": "2026-11-16, his words; the code keeps the stage's key, which the run history stores, and upscale, his word for code about Topaz"
     },
     {
+      "id": "make_funscripts_stage",
+      "thing": "the stage that has GoblinScript draft a funscript for each new Kino upscale that has none",
+      "screen": [
+        "Make funscripts"
+      ],
+      "his_word": "Make funscripts (2026-11-15)",
+      "code_today": [
+        "funscript drafts"
+      ],
+      "code_word": "funscript drafts",
+      "status": "ruled",
+      "ruled": "2026-11-15, his words; the code keeps the stage's key, which the run history stores"
+    },
+    {
       "id": "upscale_non_ai_stage",
       "thing": "the stage that enhances the non-AI videos with Topaz while the user is away",
       "screen": [

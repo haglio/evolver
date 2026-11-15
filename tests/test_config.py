@@ -76,6 +76,17 @@ class TestVrVideoDir(unittest.TestCase):
         assert config.vr_video_dir({"vr_videos": "Q:/cloud/VR"}) == Path("Q:/cloud/VR")
 
 
+class TestGoblinscriptDir(unittest.TestCase):
+    def test_unset_means_goblinscript_is_not_installed_here(self):
+        assert config.goblinscript_dir({}) is None
+
+    def test_an_empty_value_counts_as_unset(self):
+        assert config.goblinscript_dir({"goblinscript_dir": ""}) is None
+
+    def test_reads_where_goblinscript_is_installed_from_the_overlay(self):
+        assert config.goblinscript_dir({"goblinscript_dir": "Q:/tools/goblin"}) == Path("Q:/tools/goblin")
+
+
 class TestFoldersTheSharedSettingsPlace(unittest.TestCase):
     def test_each_one_is_where_the_shared_settings_say_and_nowhere_else(self):
         places = {

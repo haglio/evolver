@@ -19,6 +19,7 @@ import config
 from tasks import (
     bookmarks_sync,
     clip_scripts,
+    funscript_drafts,
     genau_deliver,
     nonai_group,
     nonai_queue,
@@ -52,6 +53,7 @@ SKIPPED = "skipped"
 
 _FLICK = config.GENAU_FLICK_WORD
 _NO_PENDING_WORK = "no_pending_work"
+_ORIGENERATOR_TRAINING = "origenerator_training"
 
 
 @dataclass(frozen=True)
@@ -96,10 +98,9 @@ def _upscale(this_run: ThisRun) -> StageResult | Skipped:
     if live_session.is_live():
         log.info("Skipping enhancing: a Funestra is playing.")
         return Skipped("session_live")
-    downtime = this_run.outcome_of("origenerator_downtime")
-    if isinstance(downtime, DowntimeResult) and downtime.holds_the_graphics_card:
+    if _origenerator_holds_the_graphics_card(this_run):
         log.info("Skipping enhancing: Origenerator is training a LoRA on the graphics card.")
-        return Skipped("origenerator_training")
+        return Skipped(_ORIGENERATOR_TRAINING)
     if nonai_upscale.foreign_topaz_running():
         log.info("Skipping enhancing: a Topaz encode Evolver did not start is running.")
         return Skipped("topaz_busy")
@@ -144,6 +145,23 @@ def _upscale_non_ai(this_run: ThisRun) -> StageResult:
         ai_waiting=ai_waiting))
 
 
+def _make_funscripts(this_run: ThisRun) -> StageResult | Skipped:
+    installed_in = config.GOBLINSCRIPT_DIR
+    goblin = None if installed_in is None else funscript_drafts.Goblin(installed_in)
+    drafting = funscript_drafts.Drafting.kept_in(config.LOCAL_STATE_DIR)
+    reason = funscript_drafts.hold_off_reason(goblin=goblin, drafting=drafting)
+    if reason:
+        return Skipped(reason)
+    if _origenerator_holds_the_graphics_card(this_run):
+        return Skipped(_ORIGENERATOR_TRAINING)
+    return funscript_drafts.run(goblin=goblin, drafting=drafting)
+
+
+def _origenerator_holds_the_graphics_card(this_run: ThisRun) -> bool:
+    downtime = this_run.outcome_of("origenerator_downtime")
+    return isinstance(downtime, DowntimeResult) and downtime.holds_the_graphics_card
+
+
 def _verify(this_run: ThisRun) -> StageResult | Skipped:
     if _ai_videos_still_waiting(this_run):
         logging.getLogger(__name__).info(
@@ -181,6 +199,11 @@ STAGES: tuple[Stage, ...] = (
     Stage("upscale_non_ai", "Enhance non-AI videos",
           "Enhance one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
           (0x76, 0x67, 0x47), run=_upscale_non_ai),
+    Stage("funscript_drafts", "Make funscripts",
+          "Have GoblinScript draft a funscript for each new Kino upscale that has none, newest first, "
+          "marked as a script no person wrote; the video it was upscaled from gets the same funscript "
+          "from Scripts sync, so the two are never drafted twice",
+          (0x00, 0x9E, 0xD8), run=_make_funscripts),
     Stage("verify", "Correspondence check",
           "Verify every 1_sorted video has its enhanced video in its Kino or Genau folder, and no enhanced video is missing from either",
           (0xFF, 0x9D, 0x83), run=_verify),
@@ -288,8 +311,9 @@ def setup_logging():
 
 
 def check_dependencies():
-    if not config.FFMPEG.is_file():
-        raise RuntimeError(f"Topaz ffmpeg not found: {config.FFMPEG}")
+    topaz_ffmpeg = config.FFMPEG
+    if not topaz_ffmpeg.is_file():
+        raise RuntimeError(f"Topaz ffmpeg not found: {topaz_ffmpeg}")
     probe = subprocess.run(["ffprobe", "-version"], capture_output=True, check=False,
                            **hidden_subprocess_kwargs())
     if probe.returncode != 0:
@@ -426,12 +450,9 @@ def _should_skip_upscale_due_to_cpu(log: logging.Logger) -> bool:
         log.exception("CPU usage probe failed; proceeding with enhancing.")
         return False
 
-    log.info(
-        "CPU busy sample: %.1f%% (threshold %.1f%%)",
-        busy_percent,
-        config.CPU_BUSY_SKIP_THRESHOLD_PCT,
-    )
-    return busy_percent >= config.CPU_BUSY_SKIP_THRESHOLD_PCT
+    threshold = config.CPU_BUSY_SKIP_THRESHOLD_PCT
+    log.info("CPU busy sample: %.1f%% (threshold %.1f%%)", busy_percent, threshold)
+    return busy_percent >= threshold
 
 
 if __name__ == "__main__":

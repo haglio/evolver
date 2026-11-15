@@ -67,6 +67,7 @@ OVERLAY_KEYS = {
     "chrome_profile",
     "display_timezone",
     "excerpt_folders",
+    "goblinscript_dir",
     "retired_root",
     "scrape_provider",
     "scrape_provider.base_url",
@@ -79,7 +80,7 @@ OVERLAY_KEYS = {
 }
 
 OPTIONAL_OVERLAY_KEYS = {
-    "display_timezone", "retired_root", "topaz_ffmpeg",
+    "display_timezone", "goblinscript_dir", "retired_root", "topaz_ffmpeg",
     "topaz_models", "version_overrides", "vr_videos", "warm_gun_outbox",
 }
 
