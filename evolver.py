@@ -151,32 +151,32 @@ STAGES: tuple[Stage, ...] = (
           "Fix a video whose file name has no dot before its extension, move a funscript found among the videos to its place in the scripts folder -- marking one Origenerator handed over as a script no person wrote -- and report any other file there that is not a video",
           (0x0A, 0x12, 0x2C), run=lambda _: stray_files.run()),
     Stage("withdrawn", "Delete unsent videos",
-          "Delete every copy this library holds of a video unsent in Origenerator -- the inbox copy, the 1_sorted copy, the upscale and, down the Genau lane, the delivered "
+          "Delete every copy this library holds of a video unsent in Origenerator -- the inbox copy, the 1_sorted copy, the enhanced copy and, down the Genau lane, the delivered "
           f"{_FLICK} -- with their funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its audio once the video with its audio is there",
           (0x00, 0x00, 0x6C), run=lambda _: unsent_videos.run()),
     Stage("metadata", "Transfer prompts",
-          "Read the prompt each AI video in 1_sorted was made from and hand it to Origenerator's gallery once the video's upscale is in its folder",
+          "Read the prompt each AI video in 1_sorted was made from and hand it to Origenerator's gallery once its enhanced video is in its folder",
           (0x14, 0x7D, 0x3C), run=lambda _: prompt_scrape.run()),
     Stage("sort", "Sort inbox",
           "Move AI videos from 0_inbox into 1_sorted, filed by where they came from and by portrait or landscape",
           (0x38, 0x6A, 0x9C), run=lambda _: sort.run()),
     Stage("origenerator_downtime", "Origenerator downtime tasks",
           "While Origenerator is closed, start the work it leaves for then: the experiments and "
-          "other runs it used to hand ComfyUI as it closed. The upscale waits while a LoRA "
+          "other runs it used to hand ComfyUI as it closed. Enhancing waits while a LoRA "
           "started with Origenerator's Train button is still training, since the training needs "
           "the graphics card",
           (0x30, 0xD0, 0x40), run=lambda _: origenerator_commands.run_downtime()),
-    Stage("upscale", "Upscale AI videos",
+    Stage("upscale", "Enhance AI videos",
           "Make each AI video in 1_sorted into a 60fps video four times larger with Topaz, and put it in its Kino or Genau folder",
           (0xED, 0xC9, 0x48), run=_upscale),
     Stage("genau_deliver", "Genau delivery",
-          f"Finish each Genau-lane {_FLICK} the upscale put in the folder Genau plays from: save its audio and retire the 1_sorted copy it was made from",
+          f"Finish each Genau-lane {_FLICK} that enhancing put in the folder Genau plays from: save its audio and retire the 1_sorted copy it was made from",
           (0x7B, 0x41, 0x73), run=lambda _: genau_deliver.run()),
-    Stage("upscale_non_ai", "Upscale non-AI videos",
-          "Upscale one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
+    Stage("upscale_non_ai", "Enhance non-AI videos",
+          "Enhance one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
           (0x76, 0x67, 0x47), run=_upscale_non_ai),
     Stage("verify", "Correspondence check",
-          "Verify every 1_sorted video has its upscale in its Kino or Genau folder, and no upscale is missing from either",
+          "Verify every 1_sorted video has its enhanced video in its Kino or Genau folder, and no enhanced video is missing from either",
           (0xFF, 0x9D, 0x83), run=_verify),
     Stage("watch_weights", "Update weights",
           "Add up the completions, skips and locks Fun Time and Warm Gun recorded for each library video and save the total, as the weight both apps shuffle by, in Origenerator's gallery for an AI video and on its sidecar for any other, and mark the phone's favorites in the same places",
@@ -196,7 +196,7 @@ STAGES: tuple[Stage, ...] = (
           "Move funscripts so their folders match the video folders",
           (0xAD, 0x40, 0x35), run=lambda _: scripts_sync.run(show_popup=True)),
     Stage("group_non_ai", "Group non-AI video versions",
-          "Work out which 2D/non_AI files are one video -- the original, its Topaz upscales and copies "
+          "Work out which 2D/non_AI files are one video -- the original, its Topaz-enhanced versions and copies "
           "saved under another name, found by their file names and by comparing their frames -- and write "
           "that group on each file's sidecar, so Fun Time knows which files are versions of one video",
           (0x6F, 0xDB, 0x9A), run=lambda _: nonai_group.run()),
@@ -209,7 +209,7 @@ STAGES: tuple[Stage, ...] = (
           "with how long it runs and whether it is portrait or landscape",
           (0x2B, 0x2B, 0xE8), run=lambda _: video_kinds.run()),
     Stage("provenance", "Set video sources",
-          "Record on each non-AI video's sidecar what made it -- which app, which version of its code, which Topaz settings -- reading the note Topaz wrote into each upscale, and marking unknown whatever it cannot say",
+          "Record on each non-AI video's sidecar what made it -- which app, which version of its code, which Topaz settings -- reading the note Topaz wrote into each enhanced video, and marking unknown whatever it cannot say",
           (0xEE, 0x00, 0xBB), run=lambda _: provenance_sweep.run()),
     Stage("dupes", "Duplicate check",
           "Find likely duplicate videos in the non_AI folder by their exact file size",
