@@ -294,9 +294,11 @@ class TestTheExitCodeAShellOrScheduledTaskReads:
 
         out = capsys.readouterr().out
         assert exit_code == 1
-        assert "Upscales without their 1_sorted video: 1" in out
+        assert "Evolver found 1_sorted videos and enhanced videos that do not match." in out
+        assert "Enhanced videos in the Kino and Genau folders: 1" in out
+        assert "Enhanced videos without their 1_sorted video: 1" in out
         assert "clip-b_topaz.mp4" in out
-        assert "1_sorted videos without their upscale: 1" in out
+        assert "1_sorted videos without their enhanced video: 1" in out
         assert "[FAIL]" in out
 
     def test_a_missing_flick_is_named_in_the_word_genau_shows(self, capsys):

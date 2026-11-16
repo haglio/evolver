@@ -179,18 +179,18 @@ def _log_result(result: CorrespondenceResult) -> None:
 def _popup_message(result: CorrespondenceResult) -> str:
     flicks = config.GENAU_FLICKS_WORD
     lines = [
-        "Evolver found 1_sorted videos and upscales that do not match.",
+        "Evolver found 1_sorted videos and enhanced videos that do not match.",
         "",
         "Check the log for full details:",
         str(config.LOG_FILE),
         "",
         f"1_sorted videos: {result.sorted_count}",
-        f"Upscales in the Kino and Genau folders: {result.upscale_count}",
+        f"Enhanced videos in the Kino and Genau folders: {result.upscale_count}",
     ]
     sections = (
-        ("Upscales without their 1_sorted video", result.orphan_upscales),
-        ("1_sorted videos without their upscale", result.orphan_sorted),
-        ("Upscale names in more than one place",
+        ("Enhanced videos without their 1_sorted video", result.orphan_upscales),
+        ("1_sorted videos without their enhanced video", result.orphan_sorted),
+        ("Enhanced video names in more than one place",
          [f"{name} -> {', '.join(paths[:2])}" for name, paths in sorted(result.duplicates.items())]),
         (f"Genau {flicks} missing from Genau's folder", result.missing_flicks),
     )
@@ -210,7 +210,7 @@ def main() -> int:
     result = run(show_popup=False)
     print(_popup_message(result))
     if result.ok:
-        print("\n[OK] Every 1_sorted video has its upscale, and no upscale is missing.")
+        print("\n[OK] Every 1_sorted video has its enhanced video, and no enhanced video is missing.")
         return 0
     print("\n[FAIL] Correspondence issues found.")
     return 1

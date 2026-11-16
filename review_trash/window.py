@@ -29,7 +29,7 @@ from util.selection_highlight import SELECTION_HIGHLIGHT
 LOOK_AGAIN_SECONDS = 2.0
 _ICON_COLOR = TEXT_SECONDARY.name()
 _HINT = ("Restore puts a video back in the folder it was sent to Trash from. Delete Permanently deletes it, "
-         "along with the copy it was upscaled from, its metadata and its funscript. "
+         "along with the copy it was enhanced from, its metadata and its funscript. "
          "Ctrl or Shift picks several.")
 _NOWHERE = "Nothing says which folder it was sent to Trash from, so it can't be restored"
 

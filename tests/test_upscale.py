@@ -299,6 +299,14 @@ class TestTheLowDiskWarning(unittest.TestCase):
 
         assert show_error.call_args.kwargs["dismissible"] is True
 
+    def test_the_low_disk_warning_says_enhancing_is_paused_and_names_the_folder(self):
+        title, message = self.runs(FULL_DRIVE).call_args.args
+
+        assert title == "Evolver - Low Disk Space"
+        assert message.startswith(
+            "Evolver paused enhancing because free disk space is below the configured safety floor.\n\n"
+            "Enhanced videos folder: ")
+
     def test_a_drive_with_30_gb_free_still_upscales_a_send(self):
         with workspace_temp_dir() as root:
             sorted_dir, out_dir = library_dirs(root)
