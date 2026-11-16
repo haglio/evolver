@@ -32,24 +32,24 @@ ASK_AGAIN_SECONDS = 15.0
 
 _STATE_WORDS = {
     upscale_queue.NEXT: "Next, once you're away from the computer",
-    upscale_queue.UPSCALING: "Upscaling",
+    upscale_queue.UPSCALING: "Enhancing",
     upscale_queue.PAUSED: "Paused while you're at the computer",
-    upscale_queue.ASKED_FOR: "Upscaling at your request",
+    upscale_queue.ASKED_FOR: "Enhancing at your request",
     upscale_queue.STARTING: "Starting at your request",
-    upscale_queue.FINISHING: "Done upscaling; Evolver's next run replaces the original with it",
+    upscale_queue.FINISHING: "Done enhancing; Evolver's next run replaces the original with it",
 }
 
 _HELD_BACK_WORDS = {
-    "topaz_busy": "waiting for another Topaz upscale to finish",
+    "topaz_busy": "waiting for another Topaz enhancement to finish",
     "low_ram": "waiting for memory to free up",
     "ai_clips_waiting": "waiting for the newly downloaded AI videos, which go first",
     "low_disk": "waiting for room on the drive",
     "topaz_sign_in_expired": "waiting for you to sign in to the Topaz Video app",
 }
 
-_RUNS_NOW_TIP = ("Upscaling now, even while you're at the computer. "
+_RUNS_NOW_TIP = ("Enhancing now, even while you're at the computer. "
                  "Click to let it wait until you are away.")
-_WAITS_TIP = "Click to upscale this one now, even while you're at the computer."
+_WAITS_TIP = "Click to enhance this one now, even while you're at the computer."
 
 
 def running_time(seconds: float | None) -> str:
@@ -169,8 +169,8 @@ class UpscaleQueueWindow(QDialog):
         self._heading.setFont(font)
         layout.addWidget(self._heading)
 
-        hint = QLabel("Drag to reorder; the top video is the next one upscaled. Its "
-                      "arrow upscales it right away, even while you're at the computer.")
+        hint = QLabel("Drag to reorder; the top video is the next one enhanced. Its "
+                      "arrow enhances it right away, even while you're at the computer.")
         hint.setStyleSheet(f"color: {_THE_RUN_HISTORYS_GRAY}")
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -276,7 +276,7 @@ def _arrow_tip(head: Head | None) -> str:
 
 def _queue_heading(rows: tuple) -> str:
     if not rows:
-        return "Nothing is waiting to be upscaled"
+        return "Nothing is waiting to be enhanced"
     hours = sum(entry.seconds or 0.0 for entry in rows) / 3600
     videos = f"{len(rows)} video" + ("" if len(rows) == 1 else "s")
     return f"{videos}, {hours:.1f} hours of footage"

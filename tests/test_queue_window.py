@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from PySide6.QtCore import QMimeData, QPoint, Qt
+from PySide6.QtWidgets import QLabel
 from shared_ui.colors import BLUE
 from shared_ui.testing import appending_to
 
@@ -81,16 +82,18 @@ class TestWhatItShows:
                                   entry("lagoon/0 unsorted/a.mp4"),
                                   entry("lagoon/0 unsorted/b.mp4")))
 
-        assert window._tree.topLevelItem(0).text(2) == "Upscaling — 41% done"
+        assert window._tree.topLevelItem(0).text(2) == "Enhancing — 41% done"
         assert window._tree.topLevelItem(1).text(2) == ""
 
     @pytest.mark.parametrize(("head", "words"), [
         (Head(NEXT), "Next, once you're away from the computer"),
         (Head(PAUSED, percent=41), "Paused while you're at the computer — 41% done"),
-        (Head(ASKED_FOR, percent=2), "Upscaling at your request — 2% done"),
+        (Head(ASKED_FOR, percent=2), "Enhancing at your request — 2% done"),
+        (Head(STARTING, held_back="topaz_busy"),
+         "Starting at your request — waiting for another Topaz enhancement to finish"),
         (Head(STARTING, held_back="low_ram"),
          "Starting at your request — waiting for memory to free up"),
-        (Head(FINISHING), "Done upscaling; Evolver's next run replaces the original with it"),
+        (Head(FINISHING), "Done enhancing; Evolver's next run replaces the original with it"),
     ])
     def test_each_state_reads_as_words_rather_than_the_stages_own(self, window, head, words):
         window.show_queue(queue(head, entry("lagoon/0 unsorted/a.mp4")))
@@ -107,8 +110,24 @@ class TestWhatItShows:
     def test_an_empty_queue_says_so(self, window):
         window.show_queue(UpscaleQueue(rows=(), head=None))
 
-        assert window._heading.text() == "Nothing is waiting to be upscaled"
+        assert window._heading.text() == "Nothing is waiting to be enhanced"
         assert window._tree.videos() == []
+
+    def test_the_hint_says_how_to_reorder_and_what_the_arrow_does(self, window):
+        hints = [label.text() for label in window.findChildren(QLabel) if label is not window._heading]
+
+        assert hints == ["Drag to reorder; the top video is the next one enhanced. Its "
+                         "arrow enhances it right away, even while you're at the computer."]
+
+    @pytest.mark.parametrize(("head", "tip"), [
+        (Head(ASKED_FOR, percent=2),
+         "Enhancing now, even while you're at the computer. Click to let it wait until you are away."),
+        (Head(NEXT), "Click to enhance this one now, even while you're at the computer."),
+    ])
+    def test_the_arrows_tooltip_says_what_a_click_does(self, window, head, tip):
+        window.show_queue(queue(head, entry("lagoon/0 unsorted/a.mp4")))
+
+        assert window._tree.topLevelItem(0).toolTip(0) == tip
 
     def test_the_picked_row_wears_the_familys_blue(self, window):
         window.show_queue(queue(None, entry("lagoon/0 unsorted/a.mp4"),
@@ -163,7 +182,7 @@ class TestOnlyTheFirstRowHasTheArrow:
         assert withdrawn == [True]
         assert asked == []
         assert icon_of(window, 0) == arrow(filled=False)
-        assert window._tree.topLevelItem(0).text(2) == "Upscaling — 2% done"
+        assert window._tree.topLevelItem(0).text(2) == "Enhancing — 2% done"
 
     def test_the_rest_of_the_row_is_not_the_arrow(self, window):
         window.show_queue(queue(Head(NEXT), entry("lagoon/0 unsorted/a.mp4")))
