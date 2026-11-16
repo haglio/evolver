@@ -150,7 +150,7 @@
     },
     {
       "id": "version",
-      "thing": "another version of one video, such as its upscale",
+      "thing": "another version of one video, such as its enhanced copy",
       "screen": [
         "version family",
         "copied to a version"
@@ -326,31 +326,31 @@
     },
     {
       "id": "upscale_stage",
-      "thing": "the stage that upscales the AI videos in 1_sorted with Topaz",
+      "thing": "the stage that enhances the AI videos in 1_sorted with Topaz",
       "screen": [
-        "Upscale AI videos"
+        "Enhance AI videos"
       ],
-      "his_word": "Upscale AI videos (2026-11-07)",
+      "his_word": "Enhance AI videos (2026-11-16: every Haglio screen says enhance)",
       "code_today": [
         "upscale"
       ],
       "code_word": "upscale",
       "status": "ruled",
-      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+      "ruled": "2026-11-16, his words; the code keeps the stage's key, which the run history stores, and upscale, his word for code about Topaz"
     },
     {
       "id": "upscale_non_ai_stage",
-      "thing": "the stage that upscales the non-AI videos with Topaz while the user is away",
+      "thing": "the stage that enhances the non-AI videos with Topaz while the user is away",
       "screen": [
-        "Upscale non-AI videos"
+        "Enhance non-AI videos"
       ],
-      "his_word": "Upscale non-AI videos (2026-11-07)",
+      "his_word": "Enhance non-AI videos (2026-11-16: every Haglio screen says enhance)",
       "code_today": [
         "nonai upscale"
       ],
       "code_word": "nonai upscale",
       "status": "ruled",
-      "ruled": "2026-11-07, his words; the code keeps the stage's key, which the run history stores"
+      "ruled": "2026-11-16, his words; the code keeps the stage's key, which the run history stores, and upscale, his word for code about Topaz"
     },
     {
       "id": "weights_stage",

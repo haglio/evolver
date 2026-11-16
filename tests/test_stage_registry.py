@@ -189,3 +189,13 @@ class TestStageRegistry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_the_two_topaz_stages_are_named_for_enhancing():
+    assert (STAGE_LABELS["upscale"], STAGE_LABELS["upscale_non_ai"]) == (
+        "Enhance AI videos", "Enhance non-AI videos")
+
+
+@pytest.mark.parametrize("stage", STAGES, ids=lambda stage: stage.key)
+def test_no_stage_name_or_tooltip_says_upscale_where_the_screen_says_enhance(stage):
+    assert "upscal" not in f"{stage.label} {stage.tooltip}".lower()
