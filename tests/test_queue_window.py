@@ -61,6 +61,9 @@ def click(window, row: int, column: int = 0) -> None:
 
 
 class TestWhatItShows:
+    def test_the_window_is_named_the_enhance_queue(self, window):
+        assert window.windowTitle() == "Evolver — Enhance Queue"
+
     def test_every_video_is_a_numbered_row_in_order(self, window):
         window.show_queue(queue(None,
                                   entry("lagoon/0 unsorted/a.mp4", "Jane Doe - Alpha Study 3"),

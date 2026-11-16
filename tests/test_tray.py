@@ -17,19 +17,22 @@ from tests.gui_support import QAPP
 
 
 class TestTrayMenu:
-    def test_the_upscale_queue_is_on_the_menu_as_it_is_on_the_toolbar(self):
+    def test_the_enhance_queue_is_on_the_menu_as_it_is_on_the_toolbar(self):
         tray = EvolverTray()
         assert "queue" in tray.commands()
-        assert tray.queue_action.text() == "Upscale Queue..."
+        assert tray.queue_action.text() == "Enhance Queue..."
+
+    def test_the_non_ai_switch_says_enhance(self):
+        assert EvolverTray().nonai_action.text() == "Enhance Non-AI When Idle"
 
     def test_the_two_tools_sit_together_with_a_line_above_and_below(self):
         tray = EvolverTray()
         entries = ["---" if action.isSeparator() else action.text()
                    for action in tray.contextMenu().actions()]
-        first = entries.index("Upscale Queue...")
+        first = entries.index("Enhance Queue...")
 
         assert entries[first - 1:first + 3] == [
-            "---", "Upscale Queue...", "Review Non-AI Trash...", "---"]
+            "---", "Enhance Queue...", "Review Non-AI Trash...", "---"]
         assert tray.commands()["review_trash"] == tray.review_trash_action.triggered
 
 
