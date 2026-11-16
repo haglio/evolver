@@ -13,18 +13,18 @@
   "things": [
     {
       "id": "upscale_queue",
-      "thing": "the window listing the videos waiting for a non-AI upscale, the next one on top",
+      "thing": "the window listing the non-AI videos waiting to be enhanced, the next one on top",
       "screen": [
-        "Upscale Queue..."
+        "Enhance Queue..."
       ],
-      "his_word": "Upscale Queue (2026-10-09)",
+      "his_word": "Enhance Queue (2026-11-16: every Haglio screen says enhance)",
       "code_today": [
         "upscale queue",
         "queue"
       ],
       "code_word": "upscale queue",
       "status": "ruled",
-      "ruled": "the window's own name; his word of 2026-10-09",
+      "ruled": "the window's own name, his word of 2026-11-16; the code keeps upscale, his word for code about Topaz",
       "retired": [
         "lineup"
       ]
