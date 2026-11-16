@@ -31,7 +31,7 @@
     },
     {
       "id": "queued_video",
-      "thing": "one row of the Upscale Queue",
+      "thing": "one row of the Enhance Queue",
       "screen": [
         "Video"
       ],
