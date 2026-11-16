@@ -11,12 +11,13 @@ import contextlib
 from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QApplication
 from shared_ui.application import delete_what_python_still_owns
+from shared_ui.gui_thread_collection import the_application
 
 from gui.app import EvolverApp
 from util.upscale_queue import UpscaleQueue
 
 # A QApplication has to exist before the first GUI module is imported.
-QAPP = QApplication.instance() or QApplication([])
+QAPP = the_application(QApplication, [])
 atexit.register(delete_what_python_still_owns, QAPP)
 
 EMPTY_QUEUE = UpscaleQueue(rows=(), head=None)
