@@ -9,6 +9,7 @@ import pytest
 from app_support.testing import error_popup
 from PySide6.QtWidgets import QApplication
 from shared_ui.alert import Link
+from shared_ui.gui_thread_collection import the_application
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
 from shared_ui.testing import alert_shown
@@ -42,7 +43,7 @@ class TestShowError(unittest.TestCase):
 
     @alert_shown()
     def test_a_previews_alert_wears_its_letter_in_the_preview_ink(self, show_alert):
-        _app = QApplication.instance() or QApplication([])
+        _app = the_application(QApplication, [])
         with patch("util.preview.shown_as", return_value=Preview(feature=None)):
             alert.show_error("Title", "Body")
 
