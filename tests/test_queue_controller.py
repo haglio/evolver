@@ -43,7 +43,7 @@ class TestTheQueueWindowsLifetime:
             then(work())
 
         queue.assert_called_once_with()
-        assert controller._window.current._heading.text() == "Nothing is waiting to be upscaled"
+        assert controller._window.current._heading.text() == "Nothing is waiting to be enhanced"
 
     def test_opening_it_hands_it_the_queue_as_it_stands(self, parent):
         controller, queue = _opened(parent)
