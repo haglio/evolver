@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import QLabel
 from shared_ui.colors import BLUE
 
 from review_trash.window import ReviewTrashWindow
@@ -53,6 +54,14 @@ class TestWhatTheWindowLists(_ReviewingALibrary):
         touch_video(self.lib.genau_trash / "loop_2_topaz.mp4")
 
         assert self._window().heading.text() == "1 video in Trash"
+
+    def test_the_hint_says_what_restore_and_delete_permanently_do(self):
+        hints = [label.text() for label in self._window().findChildren(QLabel)
+                 if label.text().startswith("Restore puts")]
+
+        assert hints == [
+            "Restore puts a video back in the folder it was sent to Trash from. Delete Permanently deletes it, "
+            "along with the copy it was enhanced from, its metadata and its funscript. Ctrl or Shift picks several."]
 
     def test_with_nothing_marked_the_heading_says_so(self):
         assert self._window().heading.text() == "Nothing is in Trash"

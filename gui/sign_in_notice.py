@@ -6,9 +6,9 @@ from util.alert import show_error
 
 TITLE = "Evolver - Topaz Sign-In Expired"
 MESSAGE = (
-    "Topaz Video's sign-in has expired, so Evolver is holding off on upscaling. "
-    "Topaz can put its watermark on videos it upscales until you sign in again.\n\n"
-    "Open the Topaz Video app and sign in. Upscaling starts again on its own."
+    "Topaz Video's sign-in has expired, so Evolver is holding off on enhancing. "
+    "Topaz can put its watermark on videos it enhances until you sign in again.\n\n"
+    "Open the Topaz Video app and sign in. Enhancing starts again on its own."
 )
 _REMIND_AFTER_SECONDS = 24 * 3600
 
