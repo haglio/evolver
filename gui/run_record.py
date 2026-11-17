@@ -68,9 +68,12 @@ def in_display_zone(moment: datetime) -> datetime:
     return moment.astimezone(config.DISPLAY_TIMEZONE)
 
 
+def format_run_start(started_at: str) -> str:
+    return in_display_zone(utc_time(started_at)).strftime('%Y/%m/%d %H:%M')
+
+
 def format_run_label(started_at: str, duration_seconds: float) -> str:
-    shown = in_display_zone(utc_time(started_at))
-    return f"{shown.strftime('%Y/%m/%d %H:%M')} ({duration_seconds:.0f}s)"
+    return f"{format_run_start(started_at)} ({duration_seconds:.0f}s)"
 
 
 def result_to_dict(result: Any) -> dict[str, Any] | None:
