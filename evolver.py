@@ -227,6 +227,10 @@ STAGE_TOOLTIPS = MappingProxyType({stage.key: stage.tooltip for stage in STAGES}
 STAGE_NUMBER = MappingProxyType({stage.key: number for number, stage in enumerate(STAGES, start=1)})
 
 
+def stage_label(stage_key: str) -> str:
+    return STAGE_LABELS.get(stage_key) or TAKEN_OUT_STAGE_LABELS.get(stage_key, stage_key)
+
+
 @dataclass
 class StageRecord:
     name: str

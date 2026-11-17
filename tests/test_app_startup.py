@@ -314,6 +314,22 @@ class TestTopazSignInNotice:
         show_error.assert_called_once()
 
 
+class TestFailedStagesNotice:
+    def test_a_finished_run_with_a_failed_stage_opens_the_stage_error_window(self, request):
+        app = build_evolver_app(request)
+        record = RunRecord(
+            id="r", started_at="2026-01-01T00:00:00", finished_at="2026-01-01T00:00:10",
+            duration_seconds=10.0, trigger="scheduled", status="error",
+            stages=[{"name": "watch_weights", "status": "error", "duration_seconds": 1.0,
+                     "result": None}],
+        )
+
+        with patch("gui.failed_stages_notice.show_error") as show_error:
+            app._on_finished(record)
+
+        assert show_error.call_args.args[0] == "Evolver - Stage Error"
+
+
 class TestStatsWindowLifetime:
     def test_the_window_opens_at_once_and_the_run_history_is_read_off_its_thread(
             self, request):

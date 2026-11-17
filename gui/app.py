@@ -20,6 +20,7 @@ from shared_ui.tooltip_shape import shape_long_tooltips
 import config
 from gui import branch_session, peer_watch, process_identity, single_instance
 from gui.background import BackgroundQueue
+from gui.failed_stages_notice import FailedStagesNotice
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow
 from gui.one_window import OneWindow
@@ -105,6 +106,7 @@ class EvolverApp:
             self._instance, a_run_is_going=lambda: self._runs.is_running)
         self._session.leaving.connect(self._shutdown)
         self._sign_in_notice = SignInNotice()
+        self._failed_stages_notice = FailedStagesNotice()
 
         self._presence = PresenceThrottle(
             lambda: self._settings.nonai_upscale_enabled)
@@ -276,6 +278,7 @@ class EvolverApp:
             5000,
         )
         self._sign_in_notice.after_run(record, time.monotonic())
+        self._failed_stages_notice.after_run(record)
 
     def _on_error(self, message: str):
         self._notify(f"Pipeline error: {message}",
