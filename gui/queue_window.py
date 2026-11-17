@@ -30,6 +30,12 @@ _THE_RUN_HISTORYS_GRAY = GRAY.name()
 
 ASK_AGAIN_SECONDS = 15.0
 
+_COLUMNS = range(4)
+_VIDEO = 1
+_BESIDE_THE_VIDEO = (0, 2, 3)
+# QHeaderView.resizeContentsPrecision: -1 measures every row, where its default stops at 1000.
+_EVERY_ROW = -1
+
 _STATE_WORDS = {
     upscale_queue.NEXT: "Next, once you're away from the computer",
     upscale_queue.UPSCALING: "Enhancing",
@@ -82,14 +88,32 @@ class _QueueTree(QTreeWidget):
         self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.header().setStretchLastSection(False)
-        self.header().setSectionResizeMode(1, self.header().ResizeMode.Stretch)
-        for column in (0, 2, 3):
-            self.header().setSectionResizeMode(column, self.header().ResizeMode.ResizeToContents)
+        self.header().setSectionResizeMode(self.header().ResizeMode.Fixed)
+        self.header().setResizeContentsPrecision(_EVERY_ROW)
+        self._widths_needed = dict.fromkeys(_COLUMNS, 0)
         self._dragging = False
 
     @property
     def is_dragging(self) -> bool:
         return self._dragging
+
+    def fit_columns(self) -> int:
+        self._widths_needed = {
+            column: max(self.sizeHintForColumn(column), self.header().sectionSizeHint(column))
+            for column in _COLUMNS}
+        self._spread_columns()
+        return sum(self._widths_needed.values())
+
+    def _spread_columns(self) -> None:
+        beside_the_video = sum(self._widths_needed[column] for column in _BESIDE_THE_VIDEO)
+        for column in _BESIDE_THE_VIDEO:
+            self.setColumnWidth(column, self._widths_needed[column])
+        self.setColumnWidth(_VIDEO, max(self._widths_needed[_VIDEO],
+                                        self.viewport().width() - beside_the_video))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._spread_columns()
 
     def videos(self) -> list[str]:
         return [self.topLevelItem(row).data(0, Qt.ItemDataRole.UserRole)
@@ -152,10 +176,12 @@ class UpscaleQueueWindow(QDialog):
     now_withdrawn = Signal()
     refresh_wanted = Signal()
 
+    NARROWEST = 560
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Evolver — Enhance Queue")
-        self.setMinimumSize(560, 400)
+        self.setMinimumSize(self.NARROWEST, 400)
         self.resize(820, 680)
 
         layout = QVBoxLayout(self)
@@ -184,6 +210,7 @@ class UpscaleQueueWindow(QDialog):
         self._pinned: set[str] = set()
         self._head: Head | None = None
         self._held: UpscaleQueue | None = None
+        self._widest_columns = 0
 
         self._clock = QTimer(self)
         self._clock.setInterval(int(ASK_AGAIN_SECONDS * 1000))
@@ -206,7 +233,17 @@ class UpscaleQueueWindow(QDialog):
             item.setToolTip(1, entry.video)
             self._tree.addTopLevelItem(item)
         self._mark_places()
+        self._widen_for(self._tree.fit_columns())
         self._tree.verticalScrollBar().setValue(scrolled)
+
+    def _widen_for(self, columns: int) -> None:
+        if columns <= self._widest_columns:
+            return
+        self._widest_columns = columns
+        around_the_columns = (2 * MARGIN_STANDARD + 2 * self._tree.frameWidth()
+                              + self._tree.verticalScrollBar().sizeHint().width())
+        on_screen = self.screen().availableGeometry().width()
+        self.resize(max(self.width(), min(columns + around_the_columns, on_screen)), self.height())
 
     def showEvent(self, event):
         super().showEvent(event)
