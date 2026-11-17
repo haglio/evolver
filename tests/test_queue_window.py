@@ -179,6 +179,17 @@ class TestTheVideoColumn:
         assert self.NARROW < window.width() < window.screen().availableGeometry().width()
         assert window._tree.horizontalScrollBar().maximum() == 0
 
+    def test_a_window_that_widens_near_the_screens_edge_stays_on_the_screen(self, window):
+        screen = window.screen().availableGeometry()
+        window.resize(self.NARROW, 400)
+        window.move(screen.right() - self.NARROW, screen.top())
+        window.show()
+
+        window.show_queue(self.WIDER_THAN_NARROW)
+
+        assert window.width() > self.NARROW
+        assert window.frameGeometry().right() <= screen.right()
+
     def test_a_window_he_narrowed_is_not_widened_again_by_the_same_lineup(self, window):
         window.show()
         window.show_queue(self.WIDER_THAN_NARROW)

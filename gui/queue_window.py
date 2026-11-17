@@ -242,8 +242,12 @@ class UpscaleQueueWindow(QDialog):
         self._widest_columns = columns
         around_the_columns = (2 * MARGIN_STANDARD + 2 * self._tree.frameWidth()
                               + self._tree.verticalScrollBar().sizeHint().width())
-        on_screen = self.screen().availableGeometry().width()
-        self.resize(max(self.width(), min(columns + around_the_columns, on_screen)), self.height())
+        screen = self.screen().availableGeometry()
+        self.resize(max(self.width(), min(columns + around_the_columns, screen.width())),
+                    self.height())
+        past_the_edge = self.frameGeometry().right() - screen.right()
+        if past_the_edge > 0:
+            self.move(max(screen.left(), self.x() - past_the_edge), self.y())
 
     def showEvent(self, event):
         super().showEvent(event)
