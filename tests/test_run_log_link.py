@@ -4,7 +4,10 @@ import unittest
 from unittest.mock import patch
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QTextDocument
+from PySide6.QtGui import QKeySequence, QShortcut, QTextDocument
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QLabel, QLineEdit
+from shared_ui.find_bar import FindBar
 from shared_ui.testing import appending_to
 
 import gui.main_window
@@ -197,6 +200,64 @@ class TestLogWindowWidget(unittest.TestCase):
         assert window._view.lineWrapMode() == window._view.LineWrapMode.NoWrap, (
             "a line carries a full path, and wrapped it breaks the column of timestamps")
         assert window._view.isReadOnly()
+
+
+class TestTheLogWindowFinds(unittest.TestCase):
+    def setUp(self):
+        self.window = RunLogWindow("2026/07/25 08:20 (12s)",
+                                   "[2026-07-25 08:20:02] Stage 1: sorting new arrivals\n"
+                                   "[2026-07-25 08:20:05] moved alpha.mp4\n"
+                                   "[2026-07-25 08:20:09] moved bravo.mp4")
+        self.addCleanup(self.window.deleteLater)
+        self.window.show()
+
+    def _press_ctrl_f(self):
+        [key] = [shortcut for shortcut in self.window.findChildren(QShortcut)
+                 if shortcut.key() == QKeySequence(QKeySequence.StandardKey.Find)]
+        key.activated.emit()
+
+    def test_ctrl_f_shows_the_familys_find_bar(self):
+        self._press_ctrl_f()
+
+        assert self.window.findChild(FindBar).isVisible()
+
+    def _find(self, word: str):
+        self._press_ctrl_f()
+        self.window.findChild(FindBar).findChild(QLineEdit).setText(word)
+
+    def _count(self) -> str:
+        return self.window.findChild(QLabel, "findCount").text()
+
+    def _current_match_line(self) -> str:
+        return self.window._view.textCursor().block().text()
+
+    def test_a_word_in_the_log_marks_its_first_match(self):
+        self._find("moved")
+
+        assert self._count() == "1 of 2"
+        assert self._current_match_line().endswith("moved alpha.mp4")
+
+    def test_enter_moves_to_the_next_match(self):
+        self._find("moved")
+
+        QTest.keyClick(self.window.findChild(FindBar).findChild(QLineEdit), Qt.Key.Key_Return)
+
+        assert self._count() == "2 of 2"
+        assert self._current_match_line().endswith("moved bravo.mp4")
+
+    def test_a_word_not_in_the_log_says_no_matches(self):
+        self._find("charlie")
+
+        assert self._count() == "No matches"
+
+    def test_esc_closes_the_find_and_leaves_the_log_open(self):
+        self._find("moved")
+
+        QTest.keyClick(self.window.findChild(FindBar).findChild(QLineEdit), Qt.Key.Key_Escape)
+
+        assert not self.window.findChild(FindBar).isVisible()
+        assert self.window.isVisible()
+        assert self.window._view.extraSelections() == []
 
 
 if __name__ == "__main__":
