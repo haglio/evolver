@@ -62,10 +62,10 @@ class TestCollectCandidates(unittest.TestCase):
             work = non_ai / "lagoon" / "1 could use work"
 
             good = make_video(
-                work / "2_originals_good_trimwise_but_need_upscaling" / "good.mp4"
+                work / "2_originals_good_trimwise_but_need_enhancing" / "good.mp4"
             )
             trimmed = make_video(
-                work / "3_trimmed_from_originals_but_still_need_upscaling" / "trimmed.mp4"
+                work / "3_trimmed_from_originals_but_still_need_enhancing" / "trimmed.mp4"
             )
             make_video(work / "1_originals_needing_trimming" / "not yet.mp4")
 

@@ -88,7 +88,7 @@ class TestSplitInProgress(unittest.TestCase):
             overrides = library(root)
             non_ai = overrides["NON_AI_DIR"]
             make_video(
-                non_ai / "alpha" / "1 could use work" / "2_needs_upscaling" / "one.mp4"
+                non_ai / "alpha" / "1 could use work" / "2_needs_enhancing" / "one.mp4"
             )
             with override_config(**overrides):
                 found = buckets()
@@ -119,11 +119,11 @@ class TestStageDirs(unittest.TestCase):
         with workspace_temp_dir() as root:
             triage = root / "1 could use work"
             (triage / "1_originals_needing_trimming").mkdir(parents=True)
-            (triage / "2_originals_good_trimwise_but_need_upscaling").mkdir()
+            (triage / "2_originals_good_trimwise_but_need_enhancing").mkdir()
 
             found = stage_dirs(triage, digits=(2, 3))
 
-            assert [path.name for _, path in found] == ["2_originals_good_trimwise_but_need_upscaling"]
+            assert [path.name for _, path in found] == ["2_originals_good_trimwise_but_need_enhancing"]
 
     def test_files_and_unnumbered_folders_are_not_stages(self):
         with workspace_temp_dir() as root:
