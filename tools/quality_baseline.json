@@ -7,5 +7,21 @@
   "private_imports": {},
   "private_reaches": {},
   "prose_lines": {},
-  "trailing_comments": {}
+  "trailing_comments": {},
+  "wall_clock_waits": {
+    "tests/temp_helpers.py": 1,
+    "tests/test_background.py": 5,
+    "tests/test_imports_without_win32.py": 1,
+    "tests/test_main_window_controls.py": 1,
+    "tests/test_nonai_job.py": 2,
+    "tests/test_nonai_request.py": 1,
+    "tests/test_nonai_upscale.py": 11,
+    "tests/test_run_lock.py": 1,
+    "tests/test_scheduler.py": 1,
+    "tests/test_sidecar.py": 4,
+    "tests/test_single_instance.py": 15,
+    "tests/test_stats_window.py": 1,
+    "tests/test_the_suites_application.py": 1,
+    "tests/test_upscale.py": 1
+  }
 }
