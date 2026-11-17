@@ -130,13 +130,70 @@ class TestWhatItShows:
         assert window._tree.topLevelItem(0).toolTip(0) == tip
 
     def test_the_picked_row_wears_the_familys_blue(self, window):
-        window.show_queue(queue(None, entry("lagoon/0 unsorted/a.mp4"),
-                                  entry("lagoon/0 unsorted/b.mp4")))
+        window.show_queue(queue(None, entry("lagoon/0 unsorted/a.mp4", "a"),
+                                  entry("lagoon/0 unsorted/b.mp4", "b")))
         window.show()
         window._tree.setCurrentItem(window._tree.topLevelItem(1))
 
+        assert window._tree.horizontalScrollBar().maximum() == 0
         assert row_ground_past_its_text(window._tree, 1) == BLUE.name()
         assert row_ground_past_its_text(window._tree, 0) != BLUE.name()
+
+
+class TestTheVideoColumn:
+    LONG_NAME = "Jane Doe - " + "a made-up title that goes on " * 4
+
+    def test_it_holds_the_longest_name_whole_however_far_down_the_list_it_is(self, window):
+        rows = [entry(f"lagoon/0 unsorted/{n}.mp4", f"video {n}") for n in range(1200)]
+        rows.append(entry("lagoon/0 unsorted/long.mp4", self.LONG_NAME))
+
+        window.show_queue(queue(Head(STARTING, held_back="topaz_busy"), *rows))
+
+        assert (window._tree.columnWidth(1)
+                >= window._tree.fontMetrics().horizontalAdvance(self.LONG_NAME))
+
+    def test_the_words_beside_a_long_name_are_whole_too(self, window):
+        window.show_queue(queue(Head(STARTING, held_back="topaz_busy"),
+                                entry("lagoon/0 unsorted/long.mp4", self.LONG_NAME)))
+
+        words = window._tree.topLevelItem(0).text(2)
+        assert window._tree.columnWidth(2) >= window._tree.fontMetrics().horizontalAdvance(words)
+
+    def test_short_names_leave_the_length_at_the_lists_right_edge(self, window):
+        window.show_queue(queue(None, entry("lagoon/0 unsorted/a.mp4", "a")))
+        window.show()
+
+        tree = window._tree
+        assert sum(tree.columnWidth(column) for column in range(4)) == tree.viewport().width()
+
+    NARROW = UpscaleQueueWindow.NARROWEST
+    WIDER_THAN_NARROW = queue(Head(UPSCALING),
+                              entry("lagoon/0 unsorted/a.mp4", "Jane Doe - a made-up title, part 2"))
+
+    def test_the_window_widens_until_the_longest_name_needs_no_sideways_scrolling(self, window):
+        window.resize(self.NARROW, 400)
+        window.show()
+
+        window.show_queue(self.WIDER_THAN_NARROW)
+
+        assert self.NARROW < window.width() < window.screen().availableGeometry().width()
+        assert window._tree.horizontalScrollBar().maximum() == 0
+
+    def test_a_window_he_narrowed_is_not_widened_again_by_the_same_lineup(self, window):
+        window.show()
+        window.show_queue(self.WIDER_THAN_NARROW)
+        window.resize(self.NARROW, 400)
+
+        window.show_queue(self.WIDER_THAN_NARROW)
+
+        assert window.width() == self.NARROW
+
+    def test_a_window_wider_than_the_screen_would_be_stops_at_the_screen(self, window):
+        window.show()
+
+        window.show_queue(queue(None, entry("lagoon/0 unsorted/long.mp4", self.LONG_NAME)))
+
+        assert window.width() == window.screen().availableGeometry().width()
 
 
 class TestOnlyTheFirstRowHasTheArrow:
