@@ -88,14 +88,14 @@ def _upscale(this_run: ThisRun) -> StageResult | Skipped:
     sorted_ = this_run.outcome_of("sort")
     priority_files = sorted_.moved_files if isinstance(sorted_, SortResult) else []
     if not upscale.has_pending_work(priority_files=priority_files):
-        log.info("No pending upscale work found. Skipping upscale.")
+        log.info("No videos are waiting to be enhanced. Skipping enhancing.")
         return Skipped(_NO_PENDING_WORK)
     downtime = this_run.outcome_of("origenerator_downtime")
     if isinstance(downtime, DowntimeResult) and downtime.holds_the_graphics_card:
-        log.info("Skipping upscale: Origenerator is training a LoRA on the graphics card.")
+        log.info("Skipping enhancing: Origenerator is training a LoRA on the graphics card.")
         return Skipped("origenerator_training")
     if nonai_upscale.foreign_topaz_running():
-        log.info("Skipping upscale: a Topaz encode Evolver did not start is running.")
+        log.info("Skipping enhancing: a Topaz encode Evolver did not start is running.")
         return Skipped("topaz_busy")
     with nonai_upscale.frozen_for_ai_videos():
         return _upscale_unless_the_computer_is_unfit(this_run, priority_files)
@@ -105,10 +105,10 @@ def _upscale_unless_the_computer_is_unfit(this_run: ThisRun,
                                           priority_files) -> StageResult | Skipped:
     log = logging.getLogger(__name__)
     if _should_skip_upscale_due_to_cpu(log):
-        log.info("Skipping upscale because CPU usage is above the configured threshold.")
+        log.info("Skipping enhancing because CPU usage is above the configured threshold.")
         return Skipped("cpu_busy")
     if topaz.sign_in_expired():
-        log.info("Skipping upscale: Topaz's sign-in has expired, and Topaz can watermark "
+        log.info("Skipping enhancing: Topaz's sign-in has expired, and Topaz can watermark "
                  "what it makes until someone signs in to the Topaz Video app.")
         return Skipped(topaz.SIGN_IN_EXPIRED)
     listeners = upscale.Listeners(on_filed=prompt_scrape.tell_the_gallery_of_the_filed)
@@ -141,7 +141,7 @@ def _upscale_non_ai(this_run: ThisRun) -> StageResult:
 def _verify(this_run: ThisRun) -> StageResult | Skipped:
     if _ai_videos_still_waiting(this_run):
         logging.getLogger(__name__).info(
-            "Skipping correspondence check: upscale has unprocessed files that would cause a false mismatch.")
+            "Skipping correspondence check: enhancing has unprocessed files that would cause a false mismatch.")
         return Skipped("upscale_pending")
     return check_correspondence.run(show_popup=True)
 
@@ -400,7 +400,7 @@ def _should_skip_upscale_due_to_cpu(log: logging.Logger) -> bool:
         busy_percent = system_resources.measure_cpu_busy_percent(
             config.CPU_BUSY_SKIP_SAMPLE_SECONDS)
     except Exception:
-        log.exception("CPU usage probe failed; proceeding with the upscale stage.")
+        log.exception("CPU usage probe failed; proceeding with enhancing.")
         return False
 
     log.info(

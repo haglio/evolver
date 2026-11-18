@@ -163,7 +163,7 @@ def _apply_phone_favorites(
             favorite = warm_gun.FAVORITE_EVENTS[event.event]
             carried[favorite] += sidecar.mark_favorite(video, favorite)
         elif video is not None and warm_gun.played_video(event.path).exists():
-            log.info("Phone %s of %s waits for its upscale.", event.event, video)
+            log.info("Phone %s of %s waits for its enhanced video.", event.event, video)
             return False
         return True
 

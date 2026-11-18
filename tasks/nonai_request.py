@@ -20,14 +20,14 @@ def request_now(video: str) -> None:
             nonai_job.clear_request(files.request)
             return
         nonai_job.save_request(files.request, nonai_job.Request(video))
-        log.info("Asked for the non-AI upscale of %s.", video)
+        log.info("Asked for the non-AI enhancement of %s.", video)
 
 
 def put_first(video: str) -> None:
     files = StageFiles.configured()
     with run_poll_and_window_lock:
         _put_ahead(video, files, "you put another video first")
-        log.info("Put %s first in the non-AI upscale queue.", video)
+        log.info("Put %s first in the Enhance Queue.", video)
 
 
 def withdraw_request() -> None:
@@ -58,7 +58,7 @@ def start_requested(request: nonai_job.Request, files: StageFiles,
     busy = nonai_encode.LOW_DISK if low_disk else nonai_encode.computer_busy_reason(
         files.cooldown, settings, asked_for=True, ai_waiting=ai_waiting)
     if busy:
-        log.info("Holding back the non-AI upscale asked for: %s.", busy)
+        log.info("Holding back the non-AI enhancement asked for: %s.", busy)
         nonai_job.save_request(files.request, nonai_job.Request(request.video, held_back=busy))
         return StartAttempt(deferred="" if low_disk else busy, deferred_low_disk=low_disk)
     queued_video = next((queued_video for queued_video in files.queued_videos()

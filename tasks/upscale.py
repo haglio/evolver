@@ -169,7 +169,7 @@ def run(
     for candidate in candidates:
         if budget.too_little_left_for_another(bool(result.processed or result.failed)):
             log.info(
-                "Stopping the upscale stage before starting another video to stay under the run budget "
+                "Stopping enhancing before starting another video to stay under the run budget "
                 "(elapsed %.1f min, remaining %.1f min).",
                 budget.elapsed() / 60,
                 max(budget.remaining(), 0) / 60,
@@ -180,7 +180,7 @@ def run(
             result.deferred_low_disk = True
             result.pending_after_run = total_pending - result.processed - result.failed
             _show_low_disk_warning(lanes.kino_upscales_dir(), low_disk.floor_gb, low_disk.dismissed_file)
-            log.warning("Stopping the upscale stage early due to low free disk space.")
+            log.warning("Stopping enhancing early due to low free disk space.")
             break
 
         def filed(out: Path, settings: topaz.Settings, source: str = candidate[1],
@@ -207,7 +207,7 @@ def run(
 
     log.info("")
     log.info("Done.")
-    log.info("Upscaled: %d", result.processed)
+    log.info("Enhanced: %d", result.processed)
     log.info("Failed: %d", result.failed)
     if result.pending_after_run:
         log.info("Pending after this run: %d", result.pending_after_run)
@@ -224,7 +224,7 @@ def _prepare_the_lane_folders(low_disk: LowDiskWarning):
     if system_resources.free_gb(kino) >= low_disk.floor_gb:
         _bring_back_the_low_disk_warning(low_disk.dismissed_file)
 
-    log.info("=== Stage: upscale from 1_sorted ===")
+    log.info("=== Stage: enhance from 1_sorted ===")
     log.info("OUT: %s", ", ".join(str(folder) for folder in lanes.upscale_folders()))
     if removed_partial_outputs:
         log.info("Removed %d stale partial output file(s)", removed_partial_outputs)
@@ -272,7 +272,7 @@ def _promote_the_output(in_file: Path, tmp: Path, out: Path,
     try:
         retry_while_in_use(partial(take_its_place, tmp, out))
     except OSError:
-        log.info("FAILED (a player still holds the upscale it replaces): %s", out)
+        log.info("FAILED (a player still holds the enhanced video it replaces): %s", out)
         return _Outcome.FAILED
     else:
         log.info("Wrote: %s", out)
@@ -374,7 +374,7 @@ def _what_the_gallery_says_made_each_upscale() -> _MadeBy:
     except FileNotFoundError:
         return lambda _upscaled: None
     except sqlite3.Error:
-        log.warning("Could not read Origenerator's gallery; no upscale is made again this run "
+        log.warning("Could not read Origenerator's gallery; no video is enhanced again this run "
                     "for newer settings.", exc_info=True)
         return lambda _upscaled: None
     row_of, by_id = VideoRows(rows), {row["prompt_id"]: row for row in rows}

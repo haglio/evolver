@@ -157,21 +157,21 @@ def _flicks_sent_and_gone(sent: list[_Sent] | None, present: set[str], awaited: 
 def _log_result(result: CorrespondenceResult) -> None:
     log.info("=== Stage: correspondence check ===")
     log.info("1_sorted: %d video file(s)", result.sorted_count)
-    log.info("Upscales: %d video file(s) in the Kino and Genau folders and their trash",
+    log.info("Enhanced videos: %d video file(s) in the Kino and Genau folders and their trash",
              result.upscale_count)
     for orphan in result.orphan_upscales:
-        log.error("UPSCALE WITHOUT ITS 1_SORTED VIDEO: %s", orphan)
+        log.error("ENHANCED VIDEO WITHOUT ITS 1_SORTED VIDEO: %s", orphan)
     for orphan in result.orphan_sorted:
-        log.error("1_SORTED VIDEO WITHOUT ITS UPSCALE: %s", orphan)
+        log.error("1_SORTED VIDEO WITHOUT ITS ENHANCED VIDEO: %s", orphan)
     for name, paths in sorted(result.duplicates.items()):
-        log.error("UPSCALE NAME IN MORE THAN ONE PLACE: %s", name)
+        log.error("ENHANCED VIDEO'S NAME IN MORE THAN ONE PLACE: %s", name)
         for path in paths:
             log.error("  -> %s", path)
     for missing in result.missing_flicks:
         log.error("MISSING FROM GENAU'S FOLDER (Origenerator's gallery sent it there): %s", missing)
 
     if result.ok:
-        log.info("Correspondence check done. Every 1_sorted video has its upscale, and no upscale is missing.")
+        log.info("Correspondence check done. Every 1_sorted video has its enhanced video, and no enhanced video is missing.")
     else:
         log.error("Correspondence check failed. See log entries above for the mismatch details.")
 

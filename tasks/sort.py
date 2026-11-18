@@ -118,7 +118,7 @@ def _the_flick_it_remakes(handed_over: Path, source: str, orient: str, dest: Pat
 
 
 def _make_way_for_the_remake(played: Path, upscale: Path, gallery: GalleryRecords) -> None:
-    log.info("MADE AGAIN (to be upscaled in place of the one Genau plays): %s", played)
+    log.info("MADE AGAIN (to be enhanced in place of the one Genau plays): %s", played)
     if played != upscale:
         move_with_its_script(played, upscale)
         sound = lanes.genau_sound_of(played)
@@ -147,8 +147,8 @@ def _take_the_remake(src: Path, dest: Path, upscale: Path | None,
 def _upscale_again(upscale: Path, gallery: GalleryRecords) -> None:
     answer = gallery.upscaled(upscale, provenance.reconstructed(None))
     if answer is None or not answer.done:
-        log.warning("Origenerator's gallery did not forget what made the upscale of %s; "
-                    "it may not be upscaled again", upscale)
+        log.warning("Origenerator's gallery did not forget what made the enhanced video of %s; "
+                    "it may not be enhanced again", upscale)
 
 
 def _carry_its_script(handed_over: Path, copies: tuple[Path, ...]) -> None:
