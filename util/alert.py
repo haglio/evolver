@@ -23,6 +23,17 @@ def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (),
     if work_on_this and _shown_before(title, message if same_error is None else same_error):
         log.info("Not showing %s again: the same error's window was shown before", title)
         return False
+    return _show(title, message, links, dismissible=dismissible, work_on_this=work_on_this)
+
+
+def show_warning(title: str, message: str) -> bool:
+    from shared_ui.alert import Level  # noqa: PLC0415  (see the module docstring)
+
+    return _show(title, message, (), dismissible=False, work_on_this=True, level=Level.WARNING)
+
+
+def _show(title: str, message: str, links: Sequence[tuple[str, Path]], *, dismissible: bool, work_on_this: bool,
+          **look: object) -> bool:
     try:
         from shared_ui.alert import Link, show_alert  # noqa: PLC0415  (see the module docstring)
         from shared_ui.preview_icon import app_icon  # noqa: PLC0415  (see the module docstring)
@@ -33,7 +44,7 @@ def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (),
         return show_alert(title, message, icon=ICON_FILE if shown is None else app_icon(ICON_FILE, shown),
                           links=[Link(text, target) for text, target in links],
                           dismissible=dismissible,
-                          work_on_this=_work_on_this(title, message) if work_on_this else None)
+                          work_on_this=_work_on_this(title, message) if work_on_this else None, **look)
     except Exception:
         log.exception("Could not open the alert dialog: %s", title)
         targets = "\n".join(str(target) for _text, target in links)

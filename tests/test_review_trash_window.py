@@ -212,10 +212,10 @@ class TestRestoring(_ReviewingALibrary):
         window.videos.selectAll()
         touch_video(self.lib.genau_flicks / "loop_11_topaz.mp4")
 
-        with patch("review_trash.window.QMessageBox.warning") as warned:
+        with patch("review_trash.window.show_warning") as warned:
             window.restore_button.click()
 
-        assert "loop_11_topaz.mp4" in warned.call_args.args[2]
+        assert "loop_11_topaz.mp4" in warned.call_args.args[1]
         assert (self.lib.genau_flicks / "loop_12_topaz.mp4").is_file()
         assert [row[0] for row in self._rows(window)] == ["loop_11_topaz.mp4"]
 
@@ -274,7 +274,7 @@ class TestDeletingPermanently(_ReviewingALibrary):
 
 
 def _no_question_asked():
-    return patch("review_trash.window.QMessageBox.question")
+    return patch("PySide6.QtWidgets.QMessageBox.question")
 
 
 def _delete_key(window: ReviewTrashWindow) -> QShortcut:

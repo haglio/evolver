@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QSplitter,
     QTreeWidget,
@@ -23,6 +22,7 @@ from shared_ui.spacing import MARGIN_STANDARD
 
 import config
 from util import run_reads, trash_folders
+from util.alert import show_warning
 from util.looping_preview import LoopingPreview
 from util.selection_highlight import SELECTION_HIGHLIGHT
 
@@ -128,7 +128,7 @@ class ReviewTrashWindow(QWidget):
             try:
                 verdict(marked)
             except (OSError, ValueError) as error:
-                QMessageBox.warning(self, "Review Non-AI Trash", f"{marked.video.name}: {error}")
+                show_warning("Review Non-AI Trash", f"{marked.video.name}: {error}")
         self._show(trash_folders.non_ai_in_trash(), row)
 
     def _chosen(self) -> list[trash_folders.InTrash]:
