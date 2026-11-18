@@ -80,8 +80,8 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
     def test_a_loop_with_sound_leaves_its_sound_where_genau_plays_sound_from(self):
         saved = []
         with _genau_lane() as lib, \
-             patch("tasks.genau_deliver.has_sound", return_value=True), \
-             patch("tasks.genau_deliver.save_as_mp3",
+             patch("util.genau_flicks.has_sound", return_value=True), \
+             patch("util.genau_flicks.save_as_mp3",
                    side_effect=lambda video, mp3: saved.append((video, mp3))):
             flick, _original = _upscaled(lib)
 
@@ -91,8 +91,8 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
 
     def test_a_silent_loop_leaves_no_sound_behind(self):
         with _genau_lane() as lib, \
-             patch("tasks.genau_deliver.has_sound", return_value=False), \
-             patch("tasks.genau_deliver.save_as_mp3") as save:
+             patch("util.genau_flicks.has_sound", return_value=False), \
+             patch("util.genau_flicks.save_as_mp3") as save:
             _upscaled(lib)
 
             result = genau_deliver.run()
@@ -102,9 +102,9 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
 
     def test_a_sound_that_cannot_be_saved_leaves_the_loop_finished(self):
         with _genau_lane() as lib, \
-             patch("tasks.genau_deliver.has_sound", return_value=True), \
-             patch("tasks.genau_deliver.save_as_mp3", side_effect=OSError("disk full")), \
-             self.assertLogs("tasks.genau_deliver", level="WARNING"):
+             patch("util.genau_flicks.has_sound", return_value=True), \
+             patch("util.genau_flicks.save_as_mp3", side_effect=OSError("disk full")), \
+             self.assertLogs("util.genau_flicks", level="WARNING"):
             flick, original = _upscaled(lib)
 
             result = genau_deliver.run()

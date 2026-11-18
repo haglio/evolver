@@ -18,6 +18,7 @@ from tasks import prompt_scrape
 from tasks.origenerator_commands import GalleryRecords
 from util import (
     ffprobe,
+    genau_flicks,
     lanes,
     orientation,
     origenerator_gallery,
@@ -182,9 +183,13 @@ def run(
             log.warning("Stopping the upscale stage early due to low free disk space.")
             break
 
-        def filed(out: Path, settings: topaz.Settings, source: str = candidate[1]) -> None:
+        def filed(out: Path, settings: topaz.Settings, source: str = candidate[1],
+                  in_file: Path = candidate[0]) -> None:
             listeners.on_filed(source, out)
-            _record_the_upscale(out, settings, gallery)
+            if source != lanes.GENAUMACHER_SOURCE:
+                _record_the_upscale(out, settings, gallery)
+            if in_file.parent == out.parent:
+                genau_flicks.take_the_place_of(in_file, out)
 
         outcome = _upscale_one(candidate, env, folders, budget, filed)
         if outcome is _Outcome.UPSCALED:
@@ -248,6 +253,8 @@ def _upscale_one(candidate: tuple[Path, str, str], env: dict, folders: UpscaleFo
         return _Outcome.BUDGET_SPENT
     except OSError:
         log.exception("FAILED (ffmpeg launch error): %s", in_file)
+    except ValueError:
+        log.exception("FAILED (its size could not be read): %s", in_file)
 
     if not ffmpeg_ok:
         tmp.unlink(missing_ok=True)
@@ -329,6 +336,11 @@ def collect_queued_videos(
                 if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
                     return candidates
 
+    for flick in lanes.flicks_never_upscaled():
+        if (add_candidate(flick.video, flick.source, ffprobe.orientation_of(flick.video))
+                and limit is not None and len(candidates) >= limit):
+            return candidates
+
     pending = candidates + remakes
     return pending if limit is None else pending[:limit]
 
@@ -392,6 +404,9 @@ def _made_by_superseded_settings(source: str, upscaled: Path, made_by: _MadeBy) 
 
 def _settings_for(in_file: Path, source: str, orient: str,
                   origenerator_dir: Path) -> topaz.Settings:
+    if source == lanes.GENAUMACHER_SOURCE:
+        return topaz.framed(topaz.GENAU_FLICK_UPSCALE, orient,
+                            video_size=ffprobe.video_dimensions(in_file))
     if lanes.sent_by_origenerator(source):
         return topaz.framed(topaz.AI_UPSCALE_ORIGENERATOR, orient,
                             video_fps=ffprobe.frame_rate(in_file),

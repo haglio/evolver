@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import glob
 import logging
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import config
 from tasks import upscale
-from util import lanes
-from util.ffprobe import has_sound
+from util import genau_flicks, lanes
 from util.media_files import child_dirs, library_videos, remove_empty_dirs
-from util.sound import save_as_mp3
 from util.stage_result import StageResult
 from util.versions import is_upscaled_stem, sorted_stem_of
 
@@ -28,12 +25,15 @@ class GenauDeliverResult(StageResult):
         return not self.failed
 
 
-def _fresh_upscales(delivery_dir: Path, genau_sorted_dir: Path):
-    for flick in sorted(library_videos(delivery_dir)):
-        original = _sorted_original(flick, genau_sorted_dir)
-        if original is not None and not upscale.awaits_its_upscale(
-                original, genau_sorted_dir.name, original.parent.name):
-            yield flick, original
+def _fresh_upscales(genau_sorted_dir: Path):
+    for folder in (lanes.genau_delivery_dir(), lanes.genaumacher_flicks_dir()):
+        for flick in sorted(library_videos(folder)) if folder is not None and folder.is_dir() else ():
+            original = _sorted_original(flick, genau_sorted_dir)
+            if original is not None and not upscale.awaits_its_upscale(
+                    original, genau_sorted_dir.name, original.parent.name):
+                yield flick, original
+            elif (beside := _original_beside(flick)) is not None:
+                yield flick, beside
 
 
 def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
@@ -46,14 +46,23 @@ def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
     return None
 
 
+def _original_beside(upscaled: Path) -> Path | None:
+    if not is_upscaled_stem(upscaled.stem):
+        return None
+    original = upscaled.with_stem(sorted_stem_of(upscaled.stem))
+    return original if original.is_file() else None
 
-def _save_its_sound(flick: Path, audio_dir: Path) -> None:
-    if not has_sound(flick):
-        return
+
+def _retire_the_sorted_copy(flick: Path, original: Path) -> bool:
+    genau_flicks.save_its_sound(flick)
     try:
-        save_as_mp3(flick, audio_dir / f"{flick.stem}.mp3")
-    except (OSError, subprocess.CalledProcessError):
-        log.warning("Could not save the audio of %s", flick.name, exc_info=True)
+        # ComfyUI's output folder and Origenerator's gallery still hold the flick.
+        original.unlink()
+    except OSError:
+        log.warning("Could not retire %s; leaving it for the next run",
+                    original.name, exc_info=True)
+        return False
+    return True
 
 
 def run() -> GenauDeliverResult:
@@ -66,15 +75,10 @@ def run() -> GenauDeliverResult:
         return result
     log.info("=== Genau lane: finishing the upscales in %s ===", delivery_dir)
 
-    for flick, original in _fresh_upscales(delivery_dir, genau_sorted_dir):
-
-        _save_its_sound(flick, config.GENAU_AUDIO_DIR)
-        try:
-            # ComfyUI's output folder and Origenerator's gallery still hold the flick.
-            original.unlink()
-        except OSError:
-            log.warning("Could not retire %s; leaving it for the next run",
-                        original.name, exc_info=True)
+    for flick, original in _fresh_upscales(genau_sorted_dir):
+        retired = (genau_flicks.take_the_place_of(original, flick) if original.parent == flick.parent
+                   else _retire_the_sorted_copy(flick, original))
+        if not retired:
             result.failed += 1
             continue
         log.info("DELIVER %s", flick)
