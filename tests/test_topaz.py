@@ -96,13 +96,13 @@ class TestTheGenauFlickSettings(unittest.TestCase):
         assert "tvai_fi" not in _flick_filters((1260, 700))
 
     def test_a_flick_smaller_than_the_long_edge_is_upscaled_to_it_keeping_its_shape(self):
-        assert ":w=2560:h=1422:" in _flick_filters((1260, 700))
+        assert _flick_filters((1260, 700)).endswith(",scale=w=2560:h=1422:flags=lanczos")
 
     def test_a_tall_flick_puts_the_long_edge_on_its_height(self):
-        assert ":w=1422:h=2560:" in _flick_filters((700, 1260))
+        assert _flick_filters((700, 1260)).endswith(",scale=w=1422:h=2560:flags=lanczos")
 
     def test_a_flick_already_larger_keeps_its_size(self):
-        assert ":w=3840:h=2160:" in _flick_filters((3840, 2160))
+        assert _flick_filters((3840, 2160)).endswith(",scale=w=3840:h=2160:flags=lanczos")
 
     def test_is_refused_until_it_is_turned_to_the_flick(self):
         with pytest.raises(ValueError, match="genau_flick_upscale still names"):
@@ -116,7 +116,7 @@ SHIPPED = {
     ("ai_upscale", "v002"): "81093271ab54e32e",
     ("ai_upscale_t2v", "v002"): "aebaf14fdcf41a06",
     ("ai_upscale_origenerator", "v001"): "f1d39dc7491ac14e",
-    ("genau_flick_upscale", "v001"): "1bf0f87e53ef9148",
+    ("genau_flick_upscale", "v001"): "ff8c789ffcecd93f",
 }
 
 
