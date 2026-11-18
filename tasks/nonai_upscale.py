@@ -89,7 +89,7 @@ def run(mode: RunMode | None = None, files: StageFiles | None = None,
     files = StageFiles.configured() if files is None else files
     settings = EncodeSettings() if settings is None else settings
     result = NonAiUpscaleResult()
-    log.info("=== Stage: upscale non-AI library ===")
+    log.info("=== Stage: enhance non-AI library ===")
 
     with run_poll_and_window_lock:
         job = nonai_job.load_job(files.job)
@@ -136,7 +136,7 @@ def run(mode: RunMode | None = None, files: StageFiles | None = None,
     if result.in_flight and result.suspended:
         in_flight = f"{in_flight} [suspended: user present]"
     log.info(
-        "Non-AI upscale: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s "
+        "Non-AI enhancement: started=%s in_flight=%s promoted=%s stopped=%s deferred=%s "
         "failed=%s pending=%d left=%.1fh done=%s unmeasured=%d",
         result.started or "-", in_flight, result.promoted or "-",
         result.stopped or "-", result.start_deferred or "-",
@@ -186,7 +186,7 @@ def frozen_for_ai_videos(*, job_file: Path | None = None) -> Iterator[None]:
         job = nonai_job.load_job(job_file)
         was_running = job is not None and not job.suspended and job.is_running()
         if was_running:
-            nonai_encode.suspend_job(job, job_file, because="AI videos are upscaling first")
+            nonai_encode.suspend_job(job, job_file, because="AI videos are enhanced first")
         try:
             yield
         finally:
@@ -201,7 +201,7 @@ def _supervise(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings, 
         on_request = job.on_request
         if stop and not on_request:
             return Supervision(
-                stopped=nonai_encode.stop_in_flight(job, "the non-AI upscale toggle is off", files))
+                stopped=nonai_encode.stop_in_flight(job, "Enhance Non-AI When Idle is off", files))
         if nonai_encode.is_low_disk(settings):
             return Supervision(
                 deferred_low_disk=True,
@@ -237,7 +237,7 @@ def _conclude(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings) -
     finished = actual and expected and actual >= settings.died_partway_below * expected
     archive = config.NONAI_RETIRED_ROOT
     if finished and archive is not None and not reachable(archive):
-        log.warning("The upscale of %s is finished and waits until %s can be reached to take "
+        log.warning("The enhancement of %s is finished and waits until %s can be reached to take "
                     "the original.", source, archive)
         return Conclusion(unreachable_archive=str(archive))
 
@@ -251,10 +251,10 @@ def _conclude(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings) -
             current, provenance.UPSCALE_NON_AI, stamp))
         retire_original(source, archive_root=archive)
         nonai_job.clear_attempts(files.attempts, queue_key(source))
-        log.info("Promoted finished non-AI upscale: %s", out)
+        log.info("Promoted finished non-AI enhancement: %s", out)
         return Conclusion(promoted=queue_key(source))
 
-    log.error("Non-AI upscale did not complete (%s): output covers %s of expected %.1fs.",
+    log.error("Non-AI enhancement did not complete (%s): output covers %s of expected %.1fs.",
               source, f"{actual:.1f}s" if actual else "none", expected)
     nonai_encode.delete_tmp(tmp)
     if nonai_job.attempts_of(files.attempts, queue_key(source)) >= settings.max_attempts:
@@ -274,11 +274,11 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
 
 def _start_next_queued_video(files: StageFiles, settings: EncodeSettings) -> StartAttempt:
     if nonai_encode.is_low_disk(settings):
-        log.warning("Deferring non-AI upscale start: free disk is below the safety floor.")
+        log.warning("Deferring non-AI enhancement start: free disk is below the safety floor.")
         return StartAttempt(deferred_low_disk=True)
     busy = nonai_encode.computer_busy_reason(files.cooldown, settings)
     if busy:
-        log.info("Deferring non-AI upscale start: %s.", busy)
+        log.info("Deferring non-AI enhancement start: %s.", busy)
         return StartAttempt(deferred=busy)
 
     for queued_video in files.queued_videos():

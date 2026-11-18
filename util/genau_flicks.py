@@ -36,7 +36,7 @@ def take_the_place_of(original: Path, upscale: Path) -> bool:
     os.utime(upscale, (time.time(), dated))
     move_its_records(original, upscale)
     _carry_its_sound(original, upscale)
-    log.info("UPSCALED IN PLACE %s", upscale)
+    log.info("ENHANCED IN PLACE %s", upscale)
     return True
 
 

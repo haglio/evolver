@@ -31,7 +31,7 @@ def carry_metadata(source: Path, out: Path) -> bool:
 
     if sidecar.update(sidecar.sidecar_path(out), carry_them_over) is None:
         return False
-    log.info("Carried metadata onto upscale: %s -> %s", source.name, out.name)
+    log.info("Carried metadata onto the enhanced video: %s -> %s", source.name, out.name)
     return True
 
 
@@ -40,7 +40,7 @@ def carry_funscript(source: Path, out: Path) -> None:
     destination = script_library.script_path_for_video(out)
     if script.is_file() and not destination.exists():
         script_library.copy_script(script, destination)
-        log.info("Carried funscript onto upscale: %s -> %s", source.name, out.name)
+        log.info("Carried funscript onto the enhanced video: %s -> %s", source.name, out.name)
 
 
 def retire_original(source: Path, *, archive_root: Path | None) -> None:

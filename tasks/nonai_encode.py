@@ -128,7 +128,7 @@ def percent_encoded(job: nonai_job.Job) -> int | None:
 def terminate_ffmpeg(pid: int, reason: str) -> None:
     image = processes.exe_of(pid)
     if image and Path(image).name.lower() == config.FFMPEG.name.lower():
-        log.warning("Killing non-AI upscale ffmpeg (pid %d): %s.", pid, reason)
+        log.warning("Killing non-AI enhancement ffmpeg (pid %d): %s.", pid, reason)
         processes.terminate(pid)
     else:
         log.warning("Job pid %d is no longer ffmpeg; treating the encode as ended.", pid)
@@ -180,7 +180,7 @@ def start(queued_video: QueuedVideo, files: StageFiles, *, on_request: bool = Fa
                                          method_version=topaz.NON_AI_UPSCALE.version),
         on_request=on_request)
     nonai_job.save_job(files.job, job)
-    log.info("Started detached non-AI upscale (pid %d%s): %s -> %s",
+    log.info("Started detached non-AI enhancement (pid %d%s): %s -> %s",
              pid, ", asked for" if on_request else "", source, out)
     return True
 
@@ -201,7 +201,7 @@ def stop_in_flight(job: nonai_job.Job, reason: str, files: StageFiles) -> str:
     delete_tmp(job.tmp)
     nonai_job.clear_attempts(files.attempts, queue_key(source))
     nonai_job.clear_job(files.job)
-    log.info("Stopped the in-flight non-AI upscale of %s; it stays queued.", source)
+    log.info("Stopped the in-flight non-AI enhancement of %s; it stays queued.", source)
     return queue_key(source)
 
 

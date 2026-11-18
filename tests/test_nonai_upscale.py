@@ -1325,7 +1325,7 @@ class TestAnArchiveThatCannotBeReached(unittest.TestCase):
             ):
                 nonai_upscale.run(nonai_upscale.RunMode(allow_start=False))
 
-            assert f"WARNING:tasks.nonai_upscale:The upscale of {source} is finished and waits until {archive} can be reached to take the original." in logged.output
+            assert f"WARNING:tasks.nonai_upscale:The enhancement of {source} is finished and waits until {archive} can be reached to take the original." in logged.output
 
 
 class TestPromotionCarriesTheRecord(unittest.TestCase):

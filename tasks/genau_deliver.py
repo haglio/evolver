@@ -73,7 +73,7 @@ def run() -> GenauDeliverResult:
     if delivery_dir is None:
         log.warning("=== Genau lane: no folder is laid out the way Genau's folder is; nothing delivered ===")
         return result
-    log.info("=== Genau lane: finishing the upscales in %s ===", delivery_dir)
+    log.info("=== Genau lane: finishing the enhanced videos in %s ===", delivery_dir)
 
     for flick, original in _fresh_upscales(genau_sorted_dir):
         retired = (genau_flicks.take_the_place_of(original, flick) if original.parent == flick.parent
