@@ -19,7 +19,8 @@ _EXAMPLE = topaz.Settings(name="example", version="v000",
 
 
 def _turned_to_an_example_video(settings: topaz.Settings, orient: str) -> topaz.Settings:
-    return topaz.framed(settings, orient, video_fps=Fraction(112), generated_fps=Fraction(16))
+    return topaz.framed(settings, orient, video_fps=Fraction(112), generated_fps=Fraction(16),
+                        video_size=(1280, 720) if orient == orientation.LANDSCAPE else (720, 1280))
 
 
 class TestCommand(unittest.TestCase):
@@ -86,6 +87,28 @@ class TestTheOrigeneratorSettings(unittest.TestCase):
             topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.AI_UPSCALE_ORIGENERATOR)
 
 
+def _flick_filters(size: tuple[int, int]) -> str:
+    return topaz.framed(topaz.GENAU_FLICK_UPSCALE, orientation.LANDSCAPE, video_size=size).filter_complex
+
+
+class TestTheGenauFlickSettings(unittest.TestCase):
+    def test_keep_every_frame_a_flick_was_cut_with_since_genau_plays_it_frame_by_frame(self):
+        assert "tvai_fi" not in _flick_filters((1260, 700))
+
+    def test_a_flick_smaller_than_the_long_edge_is_upscaled_to_it_keeping_its_shape(self):
+        assert ":w=2560:h=1422:" in _flick_filters((1260, 700))
+
+    def test_a_tall_flick_puts_the_long_edge_on_its_height(self):
+        assert ":w=1422:h=2560:" in _flick_filters((700, 1260))
+
+    def test_a_flick_already_larger_keeps_its_size(self):
+        assert ":w=3840:h=2160:" in _flick_filters((3840, 2160))
+
+    def test_is_refused_until_it_is_turned_to_the_flick(self):
+        with pytest.raises(ValueError, match="genau_flick_upscale still names"):
+            topaz.command(Path("in.mp4"), Path("tmp.mp4"), topaz.GENAU_FLICK_UPSCALE)
+
+
 SHIPPED = {
     ("ai_upscale", "v001"): "ba105a7372baef8f",
     ("ai_upscale_t2v", "v001"): "433ce5942b2b7849",
@@ -93,6 +116,7 @@ SHIPPED = {
     ("ai_upscale", "v002"): "81093271ab54e32e",
     ("ai_upscale_t2v", "v002"): "aebaf14fdcf41a06",
     ("ai_upscale_origenerator", "v001"): "f1d39dc7491ac14e",
+    ("genau_flick_upscale", "v001"): "1bf0f87e53ef9148",
 }
 
 

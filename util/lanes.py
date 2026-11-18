@@ -5,7 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app_support import kino_folder
-from app_support.flick_folder import flat_flicks_in, flicks_folder_in, trash_folder_beside
+from app_support.flick_folder import (
+    ai_flicks_in,
+    flicks_folder_in,
+    non_ai_flicks_in,
+    trash_folder_beside,
+)
+from app_support.video_names import strip_processing_suffixes
 
 import config
 from util import orientation
@@ -13,6 +19,8 @@ from util.media_files import is_finalized_video_file, library_videos, listed_vid
 from util.versions import upscaled_stem
 
 ORIGENERATOR_SOURCE = "origenerator"
+
+GENAUMACHER_SOURCE = "genaumacher"
 
 VR_FOLDER = "VR"
 
@@ -86,9 +94,9 @@ def is_genau_lane(source: str) -> bool:
 
 
 def upscale_of(source: str, orient: str, sorted_stem: str) -> Path | None:
-    if not is_genau_lane(source):
+    if not is_genau_lane(source) and source != GENAUMACHER_SOURCE:
         return kino_folder.upscale_in(_kino(), orient, source, sorted_stem)
-    genau = genau_delivery_dir()
+    genau = genau_delivery_dir() if is_genau_lane(source) else genaumacher_flicks_dir()
     return None if genau is None else genau / f"{upscaled_stem(sorted_stem)}.mp4"
 
 
@@ -159,7 +167,28 @@ def genau_flicks_dir() -> Path | None:
 
 def genau_delivery_dir() -> Path | None:
     flicks = genau_flicks_dir()
-    return None if flicks is None else flat_flicks_in(flicks) / "AI"
+    return None if flicks is None else ai_flicks_in(flicks)
+
+
+def genaumacher_flicks_dir() -> Path | None:
+    flicks = genau_flicks_dir()
+    return None if flicks is None else non_ai_flicks_in(flicks)
+
+
+@dataclass(frozen=True)
+class UnupscaledFlick:
+    video: Path
+    source: str
+
+
+def flicks_never_upscaled() -> Iterator[UnupscaledFlick]:
+    for folder, source in ((genau_delivery_dir(), genau_source()),
+                           (genaumacher_flicks_dir(), GENAUMACHER_SOURCE)):
+        if folder is None or not folder.is_dir():
+            continue
+        for video in sorted(library_videos(folder)):
+            if strip_processing_suffixes(video.stem) == video.stem:
+                yield UnupscaledFlick(video, source)
 
 
 def genau_flicks() -> Iterator[Path]:

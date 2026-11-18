@@ -25,6 +25,7 @@ class Settings:
     videoai_tag: str
     keep_audio: bool = False
     frame: tuple[int, int] | None = None
+    long_edge: int | None = None
 
 
 AI_UPSCALE = Settings(
@@ -82,7 +83,20 @@ AI_UPSCALE_ORIGENERATOR = Settings(
     keep_audio=True,
 )
 
-ALL_SETTINGS = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE, AI_UPSCALE_ORIGENERATOR)
+GENAU_FLICK_UPSCALE = Settings(
+    name="genau_flick_upscale",
+    version="v001",
+    filter_complex=(
+        "tvai_up=model=iris-2:scale=0:w={width}:h={height}:preblur=0:noise=0:details=0:"
+        "halo=0:blur=0:compression=0:estimate=20:blend=1:download=0:device=0:vram=1:instances=1"
+    ),
+    videoai_tag=("Processed using iris-2 in auto mode with recover original detail at 100 "
+                 "for upscale toward a 2560 long edge, keeping every frame"),
+    keep_audio=True,
+    long_edge=2560,
+)
+
+ALL_SETTINGS = (AI_UPSCALE, AI_UPSCALE_T2V, NON_AI_UPSCALE, AI_UPSCALE_ORIGENERATOR, GENAU_FLICK_UPSCALE)
 
 RETIRED_SETTINGS = (
     replace(AI_UPSCALE, version="v001", keep_audio=False,
@@ -113,7 +127,8 @@ def settings_noted(note: str) -> Settings | None:
 
 
 def framed(settings: Settings, orient: str, video_fps: Fraction | None = None,
-           generated_fps: Fraction | None = None) -> Settings:
+           generated_fps: Fraction | None = None,
+           video_size: tuple[int, int] | None = None) -> Settings:
     every = _generated_frame_spacing(video_fps, generated_fps)
     settled = {"every": every, "kept_fps": video_fps / every if video_fps else "source_fps"}
     if settings.frame is not None:
@@ -121,7 +136,24 @@ def framed(settings: Settings, orient: str, video_fps: Fraction | None = None,
         settled["width"], settled["height"] = ((long_edge, short_edge)
                                                if orient == orientation.LANDSCAPE
                                                else (short_edge, long_edge))
-    return replace(settings, filter_complex=settings.filter_complex.format(**settled))
+    if settings.long_edge is not None and video_size is not None:
+        settled["width"], settled["height"] = _grown_to_the_long_edge(video_size, settings.long_edge)
+    return replace(settings, filter_complex=settings.filter_complex.format_map(_Unsettled(settled)))
+
+
+class _Unsettled(dict):
+    def __missing__(self, name: str) -> str:
+        return f"{{{name}}}"
+
+
+def _grown_to_the_long_edge(size: tuple[int, int], long_edge: int) -> tuple[int, int]:
+    width, height = size
+    growth = max(Fraction(long_edge, max(width, height)), Fraction(1))
+    return _even(width * growth), _even(height * growth)
+
+
+def _even(length: Fraction) -> int:
+    return int(length) // 2 * 2
 
 
 def _generated_frame_spacing(video_fps: Fraction | None, generated_fps: Fraction | None) -> int:
