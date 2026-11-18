@@ -88,7 +88,8 @@ GENAU_FLICK_UPSCALE = Settings(
     version="v001",
     filter_complex=(
         "tvai_up=model=iris-2:scale=0:w={width}:h={height}:preblur=0:noise=0:details=0:"
-        "halo=0:blur=0:compression=0:estimate=20:blend=1:download=0:device=0:vram=1:instances=1"
+        "halo=0:blur=0:compression=0:estimate=20:blend=1:download=0:device=0:vram=1:instances=1,"
+        "scale=w={width}:h={height}:flags=lanczos"
     ),
     videoai_tag=("Processed using iris-2 in auto mode with recover original detail at 100 "
                  "for upscale toward a 2560 long edge, keeping every frame"),
