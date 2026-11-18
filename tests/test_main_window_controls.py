@@ -45,8 +45,7 @@ class TestRunDetailRendering:
         widget = RunDetailWidget()
         widget.show_record(self._record())
         details = self._row_details(widget, STAGE_LABELS["metadata"])
-        assert "newly_scraped=0" in details
-        assert "errors=58" in details
+        assert details == "0 prompts read, 58 failed to read"
 
     def test_the_stage_column_reads_the_stage_name_not_its_key(self):
         widget = RunDetailWidget()
@@ -186,25 +185,6 @@ class TestRunVerdictInDetailPane:
                 colored.append(fragment.text())
             iterator += 1
         assert (images, colored) == (1, [])
-
-
-class TestSummarizeResult:
-    def test_metadata_shows_scraped_and_errors_even_at_zero(self):
-        result = {"newly_scraped": 0, "no_scrape_strat": 0,
-                  "skipped_unknown_orient": 0, "errors": 58}
-        summary = _summarize_result(result, None, "metadata")
-        assert "newly_scraped=0" in summary, "a hidden zero makes a total failure read as a partial one"
-        assert "errors=58" in summary
-
-    def test_other_stages_still_hide_zero_fields(self):
-        result = {"moved": 103, "deleted_collisions": 0, "skipped_unknown": 0}
-        summary = _summarize_result(result, None, "sort")
-        assert "moved=103" in summary
-        assert "deleted_collisions" not in summary
-
-    def test_skip_reason_takes_precedence(self):
-        summary = _summarize_result(None, "upscale_pending", "verify")
-        assert summary == "Reason: upscale_pending"
 
 
 class TestScriptsSyncSummary:

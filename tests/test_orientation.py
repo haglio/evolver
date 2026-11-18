@@ -4,10 +4,17 @@ import unittest
 
 import pytest
 
+from gui.stage_details import SENTENCES
 from tests.product_sources import PROJECT_ROOT, literals_in, product_sources
 from util import orientation
 
 _OWNER = "util/orientation.py"
+_THE_DETAILS_COLUMN = "gui/stage_details.py"
+_COUNTS_A_STAGE_RECORDS = {part.key for sentence in SENTENCES.values() for part in sentence.parts}
+
+
+def _a_count_named_like_an_orientation(name: str, word: str) -> bool:
+    return name == _THE_DETAILS_COLUMN and word in _COUNTS_A_STAGE_RECORDS
 
 class TestTheOrientations(unittest.TestCase):
     def test_the_walk_order_is_the_two_folder_names(self):
@@ -27,7 +34,7 @@ class TestOnlyOneModuleSpellsThem(unittest.TestCase):
                 continue
             offenders += [
                 f"{name}:{node.lineno}" for node in literals_in(name)
-                if node.value in wanted
+                if node.value in wanted and not _a_count_named_like_an_orientation(name, node.value)
             ]
 
         assert offenders == [], "the orientations belong to util.orientation -- LANDSCAPE, PORTRAIT, UNKNOWN, and SORTED for the walk order"

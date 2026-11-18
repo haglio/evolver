@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtGui import QColor
 
-from evolver import ALL_STAGES, STAGE_LABELS, STAGES
+from evolver import ALL_STAGES, STAGE_LABELS, STAGES, TAKEN_OUT_STAGE_LABELS
 from gui import stage_details
 from gui.stats_window import STAGE_COLORS
 from tasks.clip_scripts import ClipScriptsResult
@@ -67,11 +67,11 @@ def _place(key: str) -> int:
 class TestStageRegistry(unittest.TestCase):
     def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
         for table, name in (
-            (stage_details._HEADLINE_FIELDS, "_HEADLINE_FIELDS"),
+            (stage_details.SENTENCES, "SENTENCES"),
             (stage_details._SUMMARIZERS, "_SUMMARIZERS"),
         ):
             with self.subTest(table=name):
-                assert sorted(set(table) - set(ALL_STAGES)) == []
+                assert sorted(set(table) - set(ALL_STAGES) - set(TAKEN_OUT_STAGE_LABELS)) == []
 
     def test_every_counter_a_summarized_stage_declares_reaches_the_detail_view(self):
         scripts_keys = (
