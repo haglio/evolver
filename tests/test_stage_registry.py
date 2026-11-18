@@ -11,7 +11,7 @@ import pytest
 from PySide6.QtGui import QColor
 
 from evolver import ALL_STAGES, STAGE_LABELS, STAGES
-from gui import main_window
+from gui import stage_details
 from gui.stats_window import STAGE_COLORS
 from tasks.clip_scripts import ClipScriptsResult
 from tasks.nonai_group import NonAiGroupResult
@@ -29,7 +29,7 @@ from util.stage_result import StageResult
 
 
 def _keys_read_in_any_branch_of(function_names: tuple[str, ...]) -> set[str]:
-    tree = ast.parse(Path(PROJECT_ROOT, "gui", "main_window.py").read_text(encoding="utf-8"))
+    tree = ast.parse(Path(PROJECT_ROOT, "gui", "stage_details.py").read_text(encoding="utf-8"))
     keys: set[str] = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.FunctionDef) or node.name not in function_names:
@@ -67,17 +67,17 @@ def _place(key: str) -> int:
 class TestStageRegistry(unittest.TestCase):
     def test_every_stage_keyed_table_in_the_detail_view_names_a_real_stage(self):
         for table, name in (
-            (main_window._HEADLINE_FIELDS, "_HEADLINE_FIELDS"),
-            (main_window._SUMMARIZERS, "_SUMMARIZERS"),
+            (stage_details._HEADLINE_FIELDS, "_HEADLINE_FIELDS"),
+            (stage_details._SUMMARIZERS, "_SUMMARIZERS"),
         ):
             with self.subTest(table=name):
                 assert sorted(set(table) - set(ALL_STAGES)) == []
 
     def test_every_counter_a_summarized_stage_declares_reaches_the_detail_view(self):
         scripts_keys = (
-            {key for key, _label, _names in main_window._SCRIPTS_PROBLEMS}
-            | {names for _key, _label, names in main_window._SCRIPTS_PROBLEMS if names}
-            | {key for key, _label in main_window._SCRIPTS_ROUTINE}
+            {key for key, _label, _names in stage_details._SCRIPTS_PROBLEMS}
+            | {names for _key, _label, names in stage_details._SCRIPTS_PROBLEMS if names}
+            | {key for key, _label in stage_details._SCRIPTS_ROUTINE}
         )
         for result_type, functions, table_keys in (
             (ScriptsSyncResult, ("_summarize_scripts_sync",), scripts_keys),
