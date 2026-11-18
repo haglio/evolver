@@ -7,13 +7,13 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
-    QMessageBox,
     QSpinBox,
     QVBoxLayout,
 )
 
 from gui import startup
 from gui.settings import EvolverSettings
+from util.alert import show_warning
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class SettingsDialog(QDialog):
                 startup.unregister_startup()
         except Exception as exc:
             log.exception("Failed to update startup registration")
-            QMessageBox.warning(self, "Startup Registration", f"Could not update startup shortcut:\n{exc}")
+            show_warning("Startup Registration", f"Could not update startup shortcut:\n{exc}")
 
         super().accept()
 

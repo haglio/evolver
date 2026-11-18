@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from app_support.testing import error_popup
 from PySide6.QtWidgets import QApplication
-from shared_ui.alert import Link
+from shared_ui.alert import Level, Link
 from shared_ui.gui_thread_collection import the_application
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
@@ -40,6 +40,14 @@ class TestShowError(unittest.TestCase):
 
         show_alert.assert_called_once_with(
             "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY)
+
+    @alert_shown()
+    def test_a_warning_opens_the_familys_dialog_at_the_warning_level(self, show_alert):
+        alert.show_warning("Title", "Body")
+
+        show_alert.assert_called_once_with(
+            "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY,
+            level=Level.WARNING)
 
     @alert_shown()
     def test_a_previews_alert_wears_its_letter_in_the_preview_ink(self, show_alert):
