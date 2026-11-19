@@ -124,3 +124,18 @@ class TestMain:
         assert "clip-a.mp4" in out
         assert "clip-b.mp4" in out
         assert "[FAIL]" in out
+
+
+def test_many_videos_are_sized_from_their_folders_listing_not_one_by_one(tmp_path):
+    for number in range(5):
+        video = tmp_path / "bucket" / f"scene {number}.mp4"
+        video.parent.mkdir(parents=True, exist_ok=True)
+        video.write_bytes(b"same size")
+
+    with override_config(VIDEO_EXTENSIONS={".mp4"}), \
+            patch.object(Path, "stat", side_effect=AssertionError("asked one video its size")):
+        result = check_duplicate_sizes.run(non_ai_dir=tmp_path)
+
+    assert result.scanned_count == 5
+    assert list(result.duplicate_groups.values()) == [
+        sorted(str(Path("bucket") / f"scene {number}.mp4") for number in range(5))]
