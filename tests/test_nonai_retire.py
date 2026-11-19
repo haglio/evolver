@@ -186,6 +186,29 @@ class TestCarryMetadata(unittest.TestCase):
             assert carried["clip"] == {"compilation": "Volume One", "index": 1}
             assert "version" not in carried
 
+    def test_the_upscale_keeps_its_own_length_since_an_encode_runs_a_little_longer_or_shorter(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            source = make_video(non_ai / "lagoon" / "1 clips to upscale" / "Lee-Poe.mp4")
+            out = make_video(
+                non_ai / "lagoon" / "3_good_to_go" / "processed" / "Lee-Poe_apo8_iris2.mp4"
+            )
+
+            with override_config(**overrides):
+                write_sidecar(sidecar.sidecar_path(source), {
+                    "video": {"type": "scene", "orientation": "landscape",
+                              "duration_seconds": 600.0},
+                })
+                write_sidecar(sidecar.sidecar_path(out),
+                              {"video": {"duration_seconds": 600.04}})
+
+                nonai_retire.carry_metadata(source, out)
+                carried = sidecar.read(sidecar.sidecar_path(out))
+
+            assert carried["video"] == {"type": "scene", "orientation": "landscape",
+                                        "duration_seconds": 600.04}
+
     def test_the_upscale_keeps_its_own_id_since_it_is_another_file(self):
         with workspace_temp_dir() as root:
             overrides = library_overrides(root)
