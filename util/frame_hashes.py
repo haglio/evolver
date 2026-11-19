@@ -100,7 +100,7 @@ def _measure_content(video: Path, at: float) -> Corners | None:
     try:
         stream = subprocess.run(
             command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
-            **hidden_subprocess_kwargs(),
+            **hidden_subprocess_kwargs(creationflags=subprocess.BELOW_NORMAL_PRIORITY_CLASS),
         ).stdout
     except OSError as exc:
         log.warning("could not measure %s: %s", video.name, exc)

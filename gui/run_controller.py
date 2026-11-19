@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, QThread, QTimer, Signal
 
 import config
 from gui.progress_popup import ProgressPopup
@@ -55,7 +55,7 @@ class RunController(QObject):
             self._worker.stage_progress.connect(self._progress_popup.on_stage_progress)
             self._progress_popup.show_over(self._window)
 
-        self._worker.start()
+        self._worker.start(QThread.Priority.LowPriority)
         self._watchdog.start(config.PIPELINE_WALL_TIMEOUT_SECONDS * 1000)
 
     def start_when_free(self, trigger: str) -> None:

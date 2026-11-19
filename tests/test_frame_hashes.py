@@ -148,6 +148,17 @@ class TestMeasuringTheBars:
         assert command[command.index("-t") + 1] == str(fh.PROBE_SECONDS)
         assert command[command.index("-vf") + 1] == f"fps={fh.FRAMES_MEASURED_PER_SECOND}"
 
+    def test_its_ffmpeg_decodes_below_normal_priority(self):
+        seen = {}
+
+        class _Finished:
+            stdout = b""
+
+        with patch.object(fh.subprocess, "run", lambda command, **kwargs: seen.update(kwargs) or _Finished()):
+            fh._measure_content(Path("scene.mp4"), 12.0)
+
+        assert seen["creationflags"] & subprocess.BELOW_NORMAL_PRIORITY_CLASS, "whatever he is doing comes first"
+
     def test_a_video_ffmpeg_cannot_open_measures_nothing(self):
         with patch.object(fh.subprocess, "run", side_effect=OSError("no ffmpeg")):
             assert fh._measure_content(Path("scene.mp4"), 12.0) is None

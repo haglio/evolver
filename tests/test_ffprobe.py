@@ -33,6 +33,19 @@ def _selectors(calls: list) -> list[str]:
     return [argv[argv.index("-show_entries") + 1] for argv in calls]
 
 
+def test_ffprobe_runs_below_normal_priority_so_what_he_is_using_comes_first():
+    seen = {}
+
+    def popen(argv, **kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(communicate=lambda timeout=None: ("1.0\n", None))
+
+    with patch("util.ffprobe.subprocess.Popen", side_effect=popen):
+        duration_seconds(Path("example.mp4"))
+
+    assert seen["creationflags"] & subprocess.BELOW_NORMAL_PRIORITY_CLASS
+
+
 class TestFrameRate(unittest.TestCase):
     def test_the_first_video_streams_rate_is_read_exactly(self):
         calls = []

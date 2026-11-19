@@ -93,7 +93,7 @@ def _run_ffprobe(args: list[str]) -> str:
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS,
         )
     except OSError:
         return ""

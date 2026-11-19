@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from unittest.mock import MagicMock, patch
 
+from PySide6.QtCore import QThread
+
 import gui.run_controller
 from tests.gui_support import build_evolver_app
 from tests.product_sources import PROJECT_ROOT, gui_modules_imported_by, product_sources
@@ -22,6 +24,15 @@ def test_a_new_run_never_talks_to_the_last_runs_popup(request):
         app._runs._on_finished(MagicMock(status="success", duration_seconds=12.0))
 
     assert last_runs_popup.mock_calls == []
+
+
+def test_a_run_works_below_normal_priority_so_what_he_is_using_comes_first(request):
+    app = build_evolver_app(request)
+
+    with patch("gui.run_controller.PipelineWorker") as worker:
+        app._runs.start("scheduled")
+
+    worker.return_value.start.assert_called_once_with(QThread.Priority.LowPriority)
 
 
 def test_it_imports_nothing_that_reacts_to_its_runs():
