@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from tasks import unsent_videos
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir
-from util import lanes, script_library
+from util import lanes, media_files, script_library
 
 _SCHEMA = (
     "CREATE TABLE generations ("
@@ -313,3 +313,24 @@ class TestAGalleryThisCannotRead(unittest.TestCase):
 
                 assert kept.exists()
         assert result.deleted == 0
+
+
+class TestEachFolderWalkedOnce(unittest.TestCase):
+    def test_a_lane_with_videos_withdrawn_walks_each_of_its_folders_once(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            source = lanes.ORIGENERATOR_SOURCE
+            db = _gallery(root / "gallery.db", [(f"p{number}", f"made_0000{number}.mp4", "evolver_unsent_at")
+                                                for number in range(4)])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                for number in range(4):
+                    touch_video(lib.sorted_dir / source / "portrait" / f"made_0000{number}.mp4")
+                    touch_video(lib.kino_upscales / "portrait" / source / f"made_0000{number}_topaz.mp4")
+                walks = []
+                real_walked = media_files._walked
+                with patch.object(media_files, "_walked",
+                                  lambda folder: walks.append(folder) or real_walked(folder)):
+                    result = unsent_videos.run()
+
+        assert result.deleted == 8
+        assert len(walks) == len(set(walks))

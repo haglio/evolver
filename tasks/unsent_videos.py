@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,8 +42,9 @@ def run() -> UnsentVideosResult:
 
     log.info("=== Stage: videos unsent in Origenerator ===")
     for lane in lanes.sent_lanes():
-        result = result + _empty_lane(lane, _names_only_withdrawn_videos_hold(rows, lane))
-        result = result + _empty_lane(lane, _soundless_copies_beside_their_sound(rows, lane))
+        files = _LaneFiles(lane)
+        result = result + files.emptied_of(_names_only_withdrawn_videos_hold(rows, lane))
+        result = result + files.emptied_of(_soundless_copies_beside_their_sound(rows, files.reachable))
 
     log.info("Withdrawn done. Deleted: %d, failed: %d", result.deleted, result.failed)
     return result
@@ -65,8 +67,8 @@ def _names_only_withdrawn_videos_hold(rows: list[dict], lane: lanes.SentLane) ->
     return withdrawn - origenerator_gallery.video_stems(rows, lane.still_sent)
 
 
-def _soundless_copies_beside_their_sound(rows: list[dict], lane: lanes.SentLane) -> set[str]:
-    reachable = {origin_stem(video.stem) for video in _videos_under(_reachable_roots(lane))}
+def _soundless_copies_beside_their_sound(rows: list[dict], reachable_copies: list[Path]) -> set[str]:
+    reachable = {origin_stem(video.stem) for video in reachable_copies}
     stems = set()
     for row in rows:
         videos = [entry for entry in output_entries(row) or []
@@ -79,33 +81,29 @@ def _soundless_copies_beside_their_sound(rows: list[dict], lane: lanes.SentLane)
     return stems
 
 
-def _empty_lane(lane: lanes.SentLane, stems: set[str]) -> UnsentVideosResult:
-    copies_a_viewer_can_reach, sorted_sources, still_in_the_inbox = _copy_groups(lane, stems)
-    result = _delete_all(copies_a_viewer_can_reach)
-    if not result.failed:
-        result = result + _delete_all(sorted_sources)
-    return result + _delete_all(still_in_the_inbox)
+class _LaneFiles:
+    def __init__(self, lane: lanes.SentLane) -> None:
+        self._lane = lane
 
+    @functools.cached_property
+    def reachable(self) -> list[Path]:
+        return _videos_under([*self._lane.upscales, self._lane.trash])
 
-def _copy_groups(lane: lanes.SentLane,
-                 stems: set[str]) -> tuple[list[Path], list[Path], list[Path]]:
-    if not stems:
-        return ([], [], [])
-    return (_reachable_copies(lane, stems),
-            _matches([config.SORTED_DIR / lane.source], stems),
-            _matches([config.INBOX_DIR / lane.source], stems))
+    @functools.cached_property
+    def sorted_sources(self) -> list[Path]:
+        return _videos_under([config.SORTED_DIR / self._lane.source])
 
+    @functools.cached_property
+    def still_in_the_inbox(self) -> list[Path]:
+        return _videos_under([config.INBOX_DIR / self._lane.source])
 
-def _reachable_copies(lane: lanes.SentLane, stems: set[str]) -> list[Path]:
-    return _matches(_reachable_roots(lane), stems)
-
-
-def _reachable_roots(lane: lanes.SentLane) -> list[Path]:
-    return [*lane.upscales, lane.trash]
-
-
-def _matches(roots, stems: set[str]) -> list[Path]:
-    return [video for video in _videos_under(roots) if origin_stem(video.stem) in stems]
+    def emptied_of(self, stems: set[str]) -> UnsentVideosResult:
+        if not stems:
+            return UnsentVideosResult()
+        result = _delete_all(self.reachable, stems)
+        if not result.failed:
+            result = result + _delete_all(self.sorted_sources, stems)
+        return result + _delete_all(self.still_in_the_inbox, stems)
 
 
 def _videos_under(roots) -> list[Path]:
@@ -113,9 +111,9 @@ def _videos_under(roots) -> list[Path]:
             for video in sorted(library_videos(Path(root)))]
 
 
-def _delete_all(videos: list[Path]) -> UnsentVideosResult:
+def _delete_all(videos: list[Path], stems: set[str]) -> UnsentVideosResult:
     result = UnsentVideosResult()
-    for video in videos:
+    for video in [video for video in videos if origin_stem(video.stem) in stems]:
         try:
             video.unlink()
         except OSError:
@@ -123,6 +121,7 @@ def _delete_all(videos: list[Path]) -> UnsentVideosResult:
                         video.name, exc_info=True)
             result.failed += 1
             continue
+        videos.remove(video)
         log.info("WITHDRAWN %s", video)
         result.deleted += 1
         result = result + _delete_scripts(video)
