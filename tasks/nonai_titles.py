@@ -10,7 +10,7 @@ from app_support.video_names import clip_title, version_group_of
 from util import scene_links, sidecar
 from util.library_records import CLIP_BLOCK
 from util.library_records import TITLE_KEY as TITLE_FIELD
-from util.media_files import is_finalized_video_file
+from util.media_files import library_videos
 from util.nonai_library import buckets
 from util.stage_result import StageResult
 
@@ -48,9 +48,8 @@ def run() -> NonAiTitleResult:
     result = NonAiTitleResult()
     payloads: dict[Path, dict] = {}
     for bucket in buckets():
-        for video in sorted(bucket.rglob("*")):
-            if is_finalized_video_file(video):
-                payloads[video] = sidecar.read(sidecar.sidecar_path(video))
+        for video in sorted(library_videos(bucket)):
+            payloads[video] = sidecar.read(sidecar.sidecar_path(video))
     result.videos = len(payloads)
     titles = titles_by_family(payloads)
 

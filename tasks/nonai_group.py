@@ -11,7 +11,7 @@ from app_support.video_names import strip_processing_suffixes
 import config
 from util import same_footage, sidecar, trash_folders
 from util.library_records import CLIP_BLOCK, VERSION_BLOCK, VERSION_GROUP_FIELD
-from util.media_files import file_size, is_finalized_video_file
+from util.media_files import file_size, library_videos
 from util.nonai_library import buckets
 from util.stage_result import StageResult
 from util.version_groups import group_ids
@@ -42,11 +42,7 @@ def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupRes
     expected: set[Path] = set()
 
     for bucket in buckets():
-        videos = [
-            video
-            for video in sorted(bucket.rglob("*"))
-            if is_finalized_video_file(video)
-        ]
+        videos = sorted(library_videos(bucket))
         if not videos:
             continue
         named = group_ids([video.stem for video in videos], config.NONAI_VERSION_OVERRIDES)

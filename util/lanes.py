@@ -15,7 +15,7 @@ from app_support.video_names import strip_processing_suffixes
 
 import config
 from util import orientation
-from util.media_files import is_finalized_video_file, library_videos, listed_videos
+from util.media_files import library_videos, listed_videos
 from util.versions import upscaled_stem
 
 ORIGENERATOR_SOURCE = "origenerator"
@@ -195,9 +195,7 @@ def genau_flicks() -> Iterator[Path]:
     flicks = genau_flicks_dir()
     if flicks is None:
         return
-    for video in sorted(flicks.rglob("*")):
-        if is_finalized_video_file(video):
-            yield video
+    yield from sorted(library_videos(flicks))
 
 
 def non_ai_videos() -> list[Path]:
