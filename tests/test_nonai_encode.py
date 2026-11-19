@@ -136,3 +136,7 @@ class TestUserPresent(unittest.TestCase):
     def test_input_older_than_a_reading_pause_means_the_user_is_away(self):
         away = self.SETTINGS.reading_pause_seconds + 1
         assert not nonai_encode.user_present(self.SETTINGS, idle_seconds=lambda: away)
+
+    def test_a_funestra_playing_for_him_means_he_is_present_with_no_key_pressed_for_an_hour(self):
+        an_hour = 3600.0
+        assert nonai_encode.user_present(self.SETTINGS, idle_seconds=lambda: an_hour, session_is_live=lambda: True)
