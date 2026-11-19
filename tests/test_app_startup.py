@@ -342,7 +342,7 @@ class TestFailedStagesNotice:
         with patch("gui.failed_stages_notice.show_error") as show_error:
             app._on_finished(record)
 
-        assert show_error.call_args.args[0] == "Evolver - Stage Error"
+        assert show_error.call_args.args[0] == "Evolver - Stage error"
 
 
 class TestStatsWindowLifetime:

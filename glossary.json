@@ -15,9 +15,9 @@
       "id": "upscale_queue",
       "thing": "the window listing the non-AI videos waiting to be enhanced, the next one on top",
       "screen": [
-        "Enhance Queue..."
+        "Enhance queue..."
       ],
-      "his_word": "Enhance Queue (2026-11-16: every Haglio screen says enhance)",
+      "his_word": "Enhance queue (2026-11-16: every Haglio screen says enhance)",
       "code_today": [
         "upscale queue",
         "queue"
@@ -31,7 +31,7 @@
     },
     {
       "id": "queued_video",
-      "thing": "one row of the Enhance Queue",
+      "thing": "one row of the Enhance queue",
       "screen": [
         "Video"
       ],
@@ -63,9 +63,9 @@
     },
     {
       "id": "trash",
-      "thing": "where a video goes when it is sent away, to wait in Origenerator's Trash, or for a non-AI video in Review Non-AI Trash, for Restore or Delete Permanently",
+      "thing": "where a video goes when it is sent away, to wait in Origenerator's Trash, or for a non-AI video in Review non-AI trash, for Restore or Delete Permanently",
       "screen": [
-        "Review Non-AI Trash...",
+        "Review non-AI trash...",
         "Trash"
       ],
       "his_word": "Trash (2026-11-02: 'we're getting rid of \"weird\" references across Haglio in favor of \"trash\"')",
@@ -87,7 +87,7 @@
     },
     {
       "id": "band",
-      "thing": "one colored layer of the Run Statistics chart, one per stage",
+      "thing": "one colored layer of the Run statistics chart, one per stage",
       "screen": null,
       "his_word": "band (2026-11-02: '\"band\" is fine')",
       "code_today": [

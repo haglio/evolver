@@ -180,7 +180,7 @@ class UpscaleQueueWindow(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Evolver — Enhance Queue")
+        self.setWindowTitle("Evolver — Enhance queue")
         self.setMinimumSize(self.NARROWEST, 400)
         self.resize(820, 680)
 

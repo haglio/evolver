@@ -204,7 +204,7 @@ def _supervise(job: nonai_job.Job, files: StageFiles, settings: EncodeSettings, 
         on_request = job.on_request
         if stop and not on_request:
             return Supervision(
-                stopped=nonai_encode.stop_in_flight(job, "Enhance Non-AI When Idle is off", files))
+                stopped=nonai_encode.stop_in_flight(job, "Enhance non-AI when idle is off", files))
         if nonai_encode.is_low_disk(settings):
             return Supervision(
                 deferred_low_disk=True,

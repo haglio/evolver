@@ -4,7 +4,7 @@ from gui.run_record import RunRecord
 from util import topaz
 from util.alert import show_error
 
-TITLE = "Evolver - Topaz Sign-In Expired"
+TITLE = "Evolver - Topaz sign-in expired"
 MESSAGE = (
     "Topaz Video's sign-in has expired, so Evolver is holding off on enhancing. "
     "Topaz can put its watermark on videos it enhances until you sign in again.\n\n"

@@ -27,7 +27,7 @@ def put_first(video: str) -> None:
     files = StageFiles.configured()
     with run_poll_and_window_lock:
         _put_ahead(video, files, "you put another video first")
-        log.info("Put %s first in the Enhance Queue.", video)
+        log.info("Put %s first in the Enhance queue.", video)
 
 
 def withdraw_request() -> None:

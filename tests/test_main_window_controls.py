@@ -426,7 +426,7 @@ class TestToolbarMatchesTheTrayMenu:
         menu = _menu_entries(tray)
         bar = _toolbar_entries(window)
 
-        assert bar[bar.index("Run Now"):] == menu[menu.index("Run Now"):]
+        assert bar[bar.index("Run now"):] == menu[menu.index("Run now"):]
 
 
 def test_the_toolbar_is_styled_the_way_that_holds_on_any_address():
@@ -532,7 +532,7 @@ class TestMainWindowToolbarExists:
         assert not window.restart_action.icon().isNull()
 
     def test_the_pause_button_starts_as_pause_scheduling(self, window):
-        assert window.pause_action.text() == "Pause Scheduling"
+        assert window.pause_action.text() == "Pause scheduling"
 
 
 class TestToolbarStateUpdates:
@@ -565,12 +565,12 @@ class TestToolbarStateUpdates:
 
     def test_the_pause_button_reads_resume_scheduling_while_paused(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
-        assert window.pause_action.iconText() == "Resume Scheduling"
+        assert window.pause_action.iconText() == "Resume scheduling"
 
     def test_the_pause_button_reads_pause_scheduling_once_resumed(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
         window.show_schedule(ScheduleStatus(next_run_at=datetime.now(UTC)))
-        assert window.pause_action.iconText() == "Pause Scheduling"
+        assert window.pause_action.iconText() == "Pause scheduling"
 
 
 class TestEachToolbarButtonDoesItsJob:

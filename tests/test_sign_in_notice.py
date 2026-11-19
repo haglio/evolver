@@ -29,7 +29,7 @@ class TestSignInNotice(unittest.TestCase):
             SignInNotice().after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=0.0)
 
         show_error.assert_called_once_with(
-            "Evolver - Topaz Sign-In Expired",
+            "Evolver - Topaz sign-in expired",
             "Topaz Video's sign-in has expired, so Evolver is holding off on enhancing. "
             "Topaz can put its watermark on videos it enhances until you sign in again.\n\n"
             "Open the Topaz Video app and sign in. Enhancing starts again on its own.", work_on_this=False)

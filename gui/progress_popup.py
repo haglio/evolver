@@ -27,7 +27,7 @@ def _caption_width(font) -> int:
 class ProgressPopup(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Evolver - Pipeline Progress")
+        self.setWindowTitle("Evolver - Pipeline progress")
         self.setWindowFlags(
             Qt.WindowType.Tool
             | Qt.WindowType.WindowCloseButtonHint
@@ -35,7 +35,7 @@ class ProgressPopup(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)
 
-        header = QLabel("Pipeline Progress")
+        header = QLabel("Pipeline progress")
         font = header.font()
         font.setPointSize(SIZE_BODY)
         font.setBold(True)

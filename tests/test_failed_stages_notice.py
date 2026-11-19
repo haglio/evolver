@@ -24,7 +24,7 @@ class TestFailedStagesNotice(unittest.TestCase):
         FailedStagesNotice(show=lambda title, message, **_: shown.append((title, message))).after_run(
             a_run(a_stage("sort", "completed"), a_stage("watch_weights", "error")))
 
-        assert [title for title, _message in shown] == ["Evolver - Stage Error"]
+        assert [title for title, _message in shown] == ["Evolver - Stage error"]
         assert "Update weights" in shown[0][1]
         assert "Sort inbox" not in shown[0][1]
 

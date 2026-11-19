@@ -78,7 +78,7 @@ class TestAccept:
             dialog.accept()
 
         warned.assert_called_once()
-        assert warned.call_args[0][0] == "Startup Registration"
+        assert warned.call_args[0][0] == "Startup registration"
         assert "read-only" in warned.call_args[0][1]
         save.assert_called_once()
         assert dialog.result() == QDialog.DialogCode.Accepted

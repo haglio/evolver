@@ -331,7 +331,7 @@ def _window_showing(*records: RunRecord) -> StatsWindow:
 class TestStatsWindow:
     def test_window_title(self):
         window = StatsWindow()
-        assert "Statistics" in window.windowTitle()
+        assert "Run statistics" in window.windowTitle()
 
     def test_the_two_measures_are_historical_and_averages(self):
         window = StatsWindow()
