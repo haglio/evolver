@@ -14,7 +14,7 @@ from app_support.flick_folder import (
 from app_support.video_names import strip_processing_suffixes
 
 import config
-from util import orientation
+from util import orientation, run_reads
 from util.media_files import library_videos, listed_videos
 from util.versions import upscaled_stem
 
@@ -162,7 +162,8 @@ def upscale_filed_for(video: Path) -> Path | None:
 
 
 def genau_flicks_dir() -> Path | None:
-    return flicks_folder_in(config.GENAU_DIR)
+    genau = config.GENAU_DIR
+    return run_reads.once_per_run(f"genau_flicks_dir {genau}", lambda: flicks_folder_in(genau))
 
 
 def genau_delivery_dir() -> Path | None:
@@ -195,13 +196,13 @@ def genau_flicks() -> Iterator[Path]:
     flicks = genau_flicks_dir()
     if flicks is None:
         return
-    yield from sorted(library_videos(flicks))
+    yield from run_reads.videos_in(flicks, library_videos)
 
 
 def non_ai_videos() -> list[Path]:
     if not config.NON_AI_DIR.is_dir():
         return []
-    return sorted(library_videos(config.NON_AI_DIR))
+    return run_reads.videos_in(config.NON_AI_DIR, library_videos)
 
 
 @dataclass(frozen=True)

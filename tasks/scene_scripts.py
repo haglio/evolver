@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from app_support import funscript
 
 import config
-from util import ffprobe, provenance, scene_links, script_library, sidecar
+from util import ffprobe, provenance, run_reads, scene_links, script_library, sidecar
 from util.library_records import CLIP_BLOCK, CLIP_SCENE_OFFSET_FIELD
 from util.media_files import library_videos
 from util.stage_result import StageResult
@@ -29,7 +29,7 @@ def run() -> SceneScriptsResult:
 
     log.info("=== Stage: carved clip funscripts -> their source scenes ===")
     videos_by_id = scene_links.videos_by_id()
-    for video in library_videos(config.VIDEO_LIBRARY_DIR):
+    for video in run_reads.videos_in(config.VIDEO_LIBRARY_DIR, library_videos):
         clip = sidecar.read(sidecar.sidecar_path(video)).get(CLIP_BLOCK)
         if not isinstance(clip, dict):
             continue

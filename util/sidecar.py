@@ -8,6 +8,7 @@ from app_support.json_store import locked_update, read_json_or_empty
 from app_support.mirrored_tree import mirrored_path
 
 import config
+from util import run_reads
 
 
 def sidecar_path(video: Path) -> Path:
@@ -34,11 +35,14 @@ def _mirrored(path: Path, suffix: str) -> Path | None:
 
 
 def videos_by_id() -> dict[str, Path]:
-    return video_ids.videos_by_id(((_records_root(), _video_roots()),))
+    return run_reads.until_files_move(
+        "videos_by_id", lambda: video_ids.videos_by_id(((_records_root(), _video_roots()),)))
 
 
 def mark_favorite(video: Path, favorite: bool) -> bool:
-    return favorites.mark(sidecar_path(video), favorite)
+    path = sidecar_path(video)
+    forget(path)
+    return favorites.mark(path, favorite)
 
 
 def library_favorites() -> list[favorites.Favorite]:
@@ -47,11 +51,25 @@ def library_favorites() -> list[favorites.Favorite]:
 
 
 def read(path: Path) -> dict:
-    return read_json_or_empty(path)
+    reads = run_reads.current()
+    return read_json_or_empty(path) if reads is None else reads.payload(path, read_json_or_empty)
 
 
 def update(path: Path, change: Callable[[dict], dict | None]) -> dict | None:
-    return locked_update(path, change)
+    reads = run_reads.current()
+    if reads is None:
+        return locked_update(path, change)
+    if change(reads.payload(path, read_json_or_empty)) is None:
+        return None
+    written = locked_update(path, change)
+    reads.wrote(path, written)
+    return written
+
+
+def forget(path: Path) -> None:
+    reads = run_reads.current()
+    if reads is not None:
+        reads.forget(path)
 
 
 WRONG_ACTION_FIELD = "wrong_action"

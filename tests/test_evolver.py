@@ -27,7 +27,7 @@ from tasks.stray_files import StrayFilesResult
 from tasks.unsent_videos import UnsentVideosResult
 from tasks.upscale import UpscaleResult
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
-from util import run_lock, run_log, topaz
+from util import run_lock, run_log, sidecar, topaz
 from util.sidecar import sidecar_path
 from util.stage_result import StageResult
 
@@ -281,6 +281,40 @@ class TestTheListOfStagesRunsItself:
             result = _run(_made_up("first"))
 
         assert (result.log_start, result.log_end) == (None, None)
+
+
+class TestReadsSharedBetweenStages:
+    def test_stages_that_move_no_videos_read_each_sidecar_once_between_them(self, monkeypatch):
+        reads = []
+        monkeypatch.setattr(sidecar, "read_json_or_empty", lambda path: reads.append(path) or {})
+        records = [Path(f"video {number}.json") for number in range(4)]
+
+        def reading(_):
+            for record in records:
+                sidecar.read(record)
+            return _Done()
+
+        _run(*(replace(_made_up(key, run=reading), moves_no_videos=True)
+               for key in ("first", "second", "third")))
+
+        assert reads == records
+
+    def test_a_stage_that_may_move_videos_reads_afresh_and_makes_the_next_stage_read_afresh(
+            self, monkeypatch):
+        reads = []
+        monkeypatch.setattr(sidecar, "read_json_or_empty", lambda path: reads.append(path) or {})
+        record = Path("video.json")
+
+        def reading(_):
+            sidecar.read(record)
+            sidecar.read(record)
+            return _Done()
+
+        _run(replace(_made_up("first", run=reading), moves_no_videos=True),
+             _made_up("mover", run=reading),
+             replace(_made_up("after", run=reading), moves_no_videos=True))
+
+        assert reads == [record] * 4
 
 
 class TestCooperativeStop:

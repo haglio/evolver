@@ -11,8 +11,8 @@ from app_support.video_names import strip_processing_suffixes
 import config
 from util import same_footage, sidecar, trash_folders
 from util.library_records import CLIP_BLOCK, VERSION_BLOCK, VERSION_GROUP_FIELD
-from util.media_files import file_size, library_videos
-from util.nonai_library import buckets
+from util.media_files import file_size
+from util.nonai_library import buckets, videos_by_bucket
 from util.stage_result import StageResult
 from util.version_groups import group_ids
 from util.versions import is_processed_stem
@@ -41,8 +41,7 @@ def run(*, fingerprint: Fingerprint = same_footage.fingerprint) -> NonAiGroupRes
     measure = _Allowance(fingerprint, MEASURED_PER_RUN)
     expected: set[Path] = set()
 
-    for bucket in buckets():
-        videos = sorted(library_videos(bucket))
+    for videos in videos_by_bucket().values():
         if not videos:
             continue
         named = group_ids([video.stem for video in videos], config.NONAI_VERSION_OVERRIDES)

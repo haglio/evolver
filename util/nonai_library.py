@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import config
+from util import run_reads
+from util.media_files import library_videos
 
 _STAGE_DIGITS = "0123"
 
@@ -31,10 +33,15 @@ def _sub_libraries(folder: Path) -> list[Path]:
 
 
 def buckets() -> list[Path]:
-    if not config.NON_AI_DIR.is_dir():
+    non_ai = config.NON_AI_DIR
+    return run_reads.until_files_move(f"buckets {non_ai}", lambda: _buckets_in(non_ai))
+
+
+def _buckets_in(non_ai: Path) -> list[Path]:
+    if not non_ai.is_dir():
         return []
     found: list[Path] = []
-    for child in sorted(config.NON_AI_DIR.iterdir()):
+    for child in sorted(non_ai.iterdir()):
         if not child.is_dir():
             continue
         split = _sub_libraries(child)
@@ -42,6 +49,15 @@ def buckets() -> list[Path]:
             found.extend(split)
         elif holds_stages(child):
             found.append(child)
+    return found
+
+
+def videos_by_bucket() -> dict[Path, list[Path]]:
+    found: dict[Path, list[Path]] = {bucket: [] for bucket in buckets()}
+    for video in run_reads.videos_in(config.NON_AI_DIR, library_videos):
+        bucket = next((bucket for bucket in found if video.is_relative_to(bucket)), None)
+        if bucket is not None:
+            found[bucket].append(video)
     return found
 
 
