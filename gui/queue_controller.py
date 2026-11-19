@@ -19,6 +19,7 @@ class QueueController(QObject):
         self._parent_window = parent_window
         self._background = background
         self._window = OneWindow()
+        self._shown = None
 
     @property
     def is_on_screen(self) -> bool:
@@ -38,15 +39,23 @@ class QueueController(QObject):
         window.placed_first.connect(self._put_first)
         window.now_requested.connect(self._ask_for_now)
         window.now_withdrawn.connect(self._withdraw)
-        window.refresh_wanted.connect(self.refresh)
+        window.refresh_wanted.connect(self._ask_again)
         return window
 
+    def _ask_again(self) -> None:
+        if self._shown is None:
+            self.refresh()
+        elif self._window.current is not None:
+            self._background.run(partial(evolver.upscale_queue_again, self._shown), then=self._draw)
+
     def _draw(self, queue) -> None:
+        self._shown = queue
         if self._window.current is not None:
             self._window.current.show_queue(queue)
 
     def _arrange(self, videos: list) -> None:
-        self._background.run(partial(evolver.arrange_upscale_queue, videos))
+        self._background.run(partial(evolver.arrange_upscale_queue, videos),
+                             then=lambda _: self.refresh())
 
     def _put_first(self, video: str) -> None:
         self._background.run(partial(evolver.upscale_next, video), then=lambda _: self.refresh())

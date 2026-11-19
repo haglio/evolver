@@ -60,11 +60,22 @@ class TestTheQueueWindowsLifetime:
 
         assert controller._window.current is first
 
-    def test_it_asks_to_be_redrawn_while_it_is_open(self, parent):
+    def test_while_it_is_open_it_asks_again_only_what_moves_the_head_of_the_queue(self, parent):
+        controller, _lineup = _opened(parent)
+
+        with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE) as queue, \
+                patch("evolver.upscale_queue_again", return_value=EMPTY_QUEUE) as again:
+            for _ in range(3):
+                controller._window.current.refresh_wanted.emit()
+
+        queue.assert_not_called()
+        assert again.call_args_list == [((EMPTY_QUEUE,),)] * 3
+
+    def test_a_run_that_ended_reads_the_whole_queue_again(self, parent):
         controller, _lineup = _opened(parent)
 
         with patch("evolver.upscale_queue", return_value=EMPTY_QUEUE) as queue:
-            controller._window.current.refresh_wanted.emit()
+            controller.refresh()
 
         queue.assert_called_once_with()
 
@@ -81,10 +92,12 @@ class TestTheQueueWindowsVerbs:
     def test_rearranging_it_pins_the_order_through_the_pipeline_module(self, parent):
         controller, _lineup = _opened(parent)
 
-        with patch("evolver.arrange_upscale_queue") as arranged:
+        with patch("evolver.arrange_upscale_queue") as arranged, \
+                patch("evolver.upscale_queue", return_value=EMPTY_QUEUE) as queue:
             controller._window.current.arranged.emit(["lagoon/0 unsorted/a.mp4"])
 
         arranged.assert_called_once_with(["lagoon/0 unsorted/a.mp4"])
+        queue.assert_called_once_with()
 
     def test_a_video_put_first_goes_first_and_asks_for_no_run(self, parent):
         controller, _lineup = _opened(parent)

@@ -148,3 +148,25 @@ class TestRowOne(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAskedAgain(unittest.TestCase):
+    def test_asked_again_it_reads_no_video_and_no_record_and_puts_the_one_asked_for_first(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            with override_config(**overrides):
+                listed = [make_video(overrides["NON_AI_DIR"] / "lagoon" / "0 unsorted" / f"scene {number}.mp4")
+                          for number in range(4)]
+                queue = nonai_upscale_queue.current()
+                nonai_job.save_request(overrides["NONAI_REQUEST_FILE"],
+                                       nonai_job.Request("lagoon/0 unsorted/scene 2.mp4"))
+
+                with patch("tasks.nonai_upscale_queue.collect_queued_videos",
+                           side_effect=AssertionError("listed the videos again")), \
+                        patch("util.sidecar.read", side_effect=AssertionError("read a record again")):
+                    again = nonai_upscale_queue.again(queue)
+
+        assert len(listed) == 4
+        assert videos(again)[0] == "lagoon/0 unsorted/scene 2.mp4"
+        assert sorted(videos(again)) == sorted(videos(queue))
+        assert again.head == upscale_queue.Head(upscale_queue.STARTING)

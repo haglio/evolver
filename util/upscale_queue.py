@@ -39,3 +39,4 @@ class Head:
 class UpscaleQueue:
     rows: tuple[Entry, ...]
     head: Head | None
+    listed: tuple[Entry, ...] = ()
