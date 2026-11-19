@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import json
 import os
 import subprocess
@@ -95,7 +94,7 @@ class TestFoldersTheSharedSettingsPlace(unittest.TestCase):
         with workspace_temp_dir() as root:
             settings = root / "settings.json"
             settings.write_text(
-                json.dumps({**copy.deepcopy(haglio_settings.EXAMPLE), **places}), encoding="utf-8")
+                json.dumps({**haglio_settings.example_inside(root), **places}), encoding="utf-8")
             read = subprocess.run(
                 [sys.executable, "-c", reading], cwd=config.PROJECT_DIR, check=True,
                 capture_output=True, text=True,

@@ -11,14 +11,13 @@ from shared_ui.testing import alert_shown
 
 import content_overlay
 
-os.environ[haglio_settings.SETTINGS_ENV] = haglio_settings.THE_EXAMPLE
+_run_state = tempfile.TemporaryDirectory(prefix="evolver-tests-", ignore_cleanup_errors=True)
+RUN_STATE = Path(_run_state.name)
+haglio_settings.run_on(haglio_settings.example_inside(RUN_STATE), RUN_STATE, os.environ)
 content_overlay.LOCAL_CONTENT = content_overlay.EXAMPLE_CONTENT
 
 import config  # noqa: E402
 from util import crash_log  # noqa: E402
-
-_run_state = tempfile.TemporaryDirectory(prefix="evolver-tests-", ignore_cleanup_errors=True)
-RUN_STATE = Path(_run_state.name)
 
 # A Qt or Windows modal dialog blocks until a person clicks it, so one a test reached would hang an unattended run.
 alert_shown(return_value=False).start()
