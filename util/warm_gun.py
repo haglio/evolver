@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import config
-from util import lanes
+from util import lanes, run_reads
+from util.media_files import library_videos
 
 JOURNAL_PATTERN = "*.jsonl"
 FIELDS = ("t", "event", "path")
@@ -68,11 +69,21 @@ def _genau_flick(flicks_folder: Path | None, folder_named: str, inside: list[str
     if flicks_folder is None or folder_named not in (flicks_folder.name, PHONES_NAME_FOR_GENAUS_FLICKS_FOLDER):
         return None
     named = flicks_folder.joinpath(*inside)
-    if len(inside) == 1 and not named.exists():
-        found = list(flicks_folder.rglob(inside[0])) if flicks_folder.is_dir() else []
-        if len(found) == 1:
+    if len(inside) == 1:
+        found = _flicks_by_name(flicks_folder).get(inside[0], [])
+        if named not in found and len(found) == 1:
             return found[0]
     return named
+
+
+def _flicks_by_name(flicks_folder: Path) -> dict[str, list[Path]]:
+    def walked() -> dict[str, list[Path]]:
+        found: dict[str, list[Path]] = {}
+        for flick in run_reads.videos_in(flicks_folder, library_videos):
+            found.setdefault(flick.name, []).append(flick)
+        return found
+
+    return run_reads.until_files_move(f"flicks by name {flicks_folder}", walked)
 
 
 def played_video(journal_path: str) -> Path | None:

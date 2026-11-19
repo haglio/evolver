@@ -18,7 +18,7 @@ from tests.temp_helpers import (
     workspace_temp_dir,
     write_sidecar,
 )
-from util import sidecar
+from util import lanes, media_files, run_reads, sidecar
 
 
 class _Setting(LaneLibrary):
@@ -490,3 +490,32 @@ class TestTellingOrigeneratorsGallery(unittest.TestCase):
                               gallery=FakeGallery())
 
         assert told == [True]
+
+
+class TestOneLookPerRun:
+    def test_many_plays_of_many_videos_look_up_genaus_folder_once_and_walk_it_once(self, monkeypatch):
+        with _setting() as s:
+            flicks = [touch_video(s.genau_flicks / "2D" / "AI" / f"flick {number}_topaz.mp4")
+                      for number in range(3)]
+            clips = [s.sorted_clip(f"clip {number}") for number in range(3)]
+            s.journal(*((t, "completion", path) for t, path in enumerate(
+                [f"genau/clips/{flick.name}" for flick in flicks] * 4
+                + [f"1_sorted/provider2/portrait/clip {number}.mp4" for number in range(3)] * 4)))
+            lookups, walks, asked = [], [], []
+            real_lookup, real_walk, real_is_file = (lanes.flicks_folder_in, media_files._walked,
+                                                    Path.is_file)
+            monkeypatch.setattr(lanes, "flicks_folder_in",
+                                lambda genau: lookups.append(genau) or real_lookup(genau))
+            monkeypatch.setattr(media_files, "_walked",
+                                lambda folder: walks.append(folder) or real_walk(folder))
+            monkeypatch.setattr(Path, "is_file", lambda path: asked.append(path) or real_is_file(path))
+            gallery = FakeGallery()
+
+            with run_reads.kept(run_reads.RunReads()):
+                result = watch_weights.run(gallery=gallery)
+
+        assert len(lookups) == 1
+        assert walks.count(s.genau_flicks) == 1
+        assert not [path for path in asked if path in {upscale for _, upscale in clips}]
+        assert result.unmapped == 0
+        assert set(gallery.watched_totals[0]) >= {upscale for _, upscale in clips}

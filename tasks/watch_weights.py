@@ -16,8 +16,8 @@ from app_support.kino_folder import is_ai_video
 
 import config
 from tasks.origenerator_commands import GalleryRecords
-from util import lanes, origenerator_gallery, sidecar, warm_gun, watch
-from util.media_files import path_key, reachable
+from util import lanes, origenerator_gallery, run_reads, sidecar, warm_gun, watch
+from util.media_files import library_videos, path_key, reachable
 from util.origenerator_gallery import EVOLVER_UPSCALE, LIBRARY_ID
 from util.stage_result import StageResult
 
@@ -66,7 +66,7 @@ def _records_brought_up_to_what_was_watched(gallery: GalleryRecords) -> WatchWei
         return result
     journals = warm_gun.read_journals(config.WARM_GUN_JOURNAL_DIRS)
     events = sorted({event for found in journals.values() for event in found})
-    videos = {event.path: warm_gun.library_video(event.path) for event in events}
+    videos = {path: warm_gun.library_video(path) for path in {event.path for event in events}}
     result.unmapped = sum(1 for event in events if videos[event.path] is None)
     phone_favorites = _apply_phone_favorites(journals, videos, gallery)
     result.favorites_added = phone_favorites.added
@@ -103,6 +103,8 @@ def _records_brought_up_to_what_was_watched(gallery: GalleryRecords) -> WatchWei
 def _ai_totals(videos: list[Path], fun_time_counts: dict,
                phone_counts: dict[str, dict[str, int]]) -> dict[Path, dict[str, int]]:
     library_id_of = _library_ids()
+    made = {upscale for folder in lanes.upscale_folders()
+            for upscale in run_reads.videos_in(folder, library_videos)}
 
     def counted_under(key: str | None) -> dict | None:
         return None if key is None else fun_time_counts.get(key)
@@ -110,7 +112,7 @@ def _ai_totals(videos: list[Path], fun_time_counts: dict,
     return {video: watch_weights.add_counts(counted_under(library_id_of(video)),
                                             counted_under(path_key(video)),
                                             phone_counts.get(path_key(video)))
-            for video in videos if video.is_file()}
+            for video in videos if video in made}
 
 
 def _library_ids() -> Callable[[Path], str | None]:
