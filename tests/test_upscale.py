@@ -659,16 +659,92 @@ class TestSubprocessTimeout(unittest.TestCase):
             assert progress_calls[0] == (0, 1)
 
 
-class TestFfmpegWindowSuppression(unittest.TestCase):
-    def test_run_ffmpeg_passes_create_no_window(self):
-        with patch("tasks.upscale.subprocess.run") as mock_run:
-            mock_run.return_value = unittest.mock.MagicMock(returncode=0)
-            upscale._run_ffmpeg(
-                Path("in.mp4"), Path("out.mp4"), {}, topaz.AI_UPSCALE,
-            )
-            kwargs = mock_run.call_args.kwargs
-            assert "creationflags" in kwargs
-            assert kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW
+class _Encode:
+    def __init__(self, *, exit_codes=(0,), creationflags=0):
+        self._answers = list(exit_codes)
+        self.creationflags = creationflags
+        self.ended = False
+
+    def wait(self, timeout=None):
+        answer = self._answers.pop(0) if self._answers else None
+        if answer is None and not self.ended:
+            raise subprocess.TimeoutExpired("ffmpeg", timeout)
+        return answer
+
+    def kill(self):
+        self.ended = True
+
+
+def _encoded(encode, *, session_is_live=lambda: False, timeout=None):
+    def popen(command, **kwargs):
+        encode.creationflags = kwargs["creationflags"]
+        return encode
+
+    return upscale._run_ffmpeg(Path("in.mp4"), Path("out.mp4"), {}, topaz.AI_UPSCALE, timeout=timeout,
+                               popen=popen, session_is_live=session_is_live)
+
+
+class TestTheEncode(unittest.TestCase):
+    def test_it_runs_with_no_window_below_normal_priority(self):
+        encode = _Encode()
+
+        assert _encoded(encode) is True
+        assert encode.creationflags & subprocess.CREATE_NO_WINDOW
+        assert encode.creationflags & subprocess.BELOW_NORMAL_PRIORITY_CLASS
+
+    def test_an_encode_ffmpeg_refused_says_so(self):
+        assert _encoded(_Encode(exit_codes=(1,))) is False
+
+    def test_an_encode_still_going_when_a_funestra_starts_playing_for_him_is_ended(self):
+        encode = _Encode(exit_codes=(None,))
+
+        with pytest.raises(upscale.SessionBegan):
+            _encoded(encode, session_is_live=lambda: True)
+
+        assert encode.ended
+
+    def test_an_encode_still_going_with_no_session_live_is_waited_for(self):
+        encode = _Encode(exit_codes=(None, None, 0))
+
+        assert _encoded(encode) is True
+        assert not encode.ended
+
+
+class TestAnEncodeASessionStopped(unittest.TestCase):
+    def test_its_video_stays_queued_and_counts_as_no_failure(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, out_dir = library_dirs(root)
+            in_file = sorted_dir / "src" / "landscape" / "clip.mp4"
+            in_file.parent.mkdir(parents=True)
+            in_file.write_bytes(b"video")
+
+            def stopped(_in_file, tmp, _env, _settings=None, **kwargs):
+                tmp.write_bytes(b"half")
+                raise upscale.SessionBegan
+
+            with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), \
+                    patch("tasks.upscale._run_ffmpeg", side_effect=stopped), \
+                    patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                result = _upscaled(max_items=5)
+
+            assert (result.processed, result.failed, result.pending_after_run) == (0, 0, 1)
+            assert [path.name for path in out_dir.rglob("*") if path.is_file()] == []
+
+    def test_no_video_starts_while_a_funestra_plays_for_him(self):
+        with workspace_temp_dir() as root:
+            sorted_dir, out_dir = library_dirs(root)
+            for name in ("one.mp4", "two.mp4"):
+                in_file = sorted_dir / "src" / "landscape" / name
+                in_file.parent.mkdir(parents=True, exist_ok=True)
+                in_file.write_bytes(b"video")
+
+            with override_config(SORTED_DIR=sorted_dir, **kino_folders(out_dir)), \
+                    patch("tasks.upscale._run_ffmpeg", side_effect=fake_run_ffmpeg) as encode, \
+                    patch("tasks.upscale.system_resources.free_bytes", return_value=10**15):
+                result = _upscaled(max_items=5, session_is_live=lambda: True)
+
+            encode.assert_not_called()
+            assert result.pending_after_run == 2
 
 
 class TestSettingsSelection(unittest.TestCase):

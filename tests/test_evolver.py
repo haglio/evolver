@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+from app_support import live_session
 
 import config
 import evolver
@@ -33,6 +34,7 @@ from util.sidecar import sidecar_path
 from util.stage_result import StageResult
 
 WHAT_LOGGING_ENDS_A_LINE_WITH = os.linesep.encode("ascii")
+HIS_DESKTOP = "WinSta0\\Default"
 
 
 @dataclass
@@ -412,6 +414,14 @@ class TestTheUpscaleStage:
 
         assert outcome == evolver.Skipped("origenerator_training")
         computer.upscale.assert_not_called()
+
+    def test_waits_while_a_funestra_plays_for_him(self):
+        with _the_computer() as computer, live_session.holding_a_live_session(desktop=lambda: HIS_DESKTOP):
+            outcome = _stage("upscale").run(_after(**_newly_sorted("f")))
+
+        assert outcome == evolver.Skipped("session_live")
+        computer.upscale.assert_not_called()
+        computer.frozen.assert_not_called()
 
     def test_waits_while_a_topaz_encode_evolver_did_not_start_is_running(self):
         with _the_computer(foreign_topaz=True) as computer:
