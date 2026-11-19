@@ -5,7 +5,7 @@ import logging
 from tasks import nonai_encode, nonai_queue
 from tasks.nonai_encode import EncodeSettings, StartAttempt
 from tasks.nonai_files import StageFiles, run_poll_and_window_lock
-from tasks.nonai_queue import queue_key
+from tasks.nonai_queue import QueuedVideo, queue_key
 from util import nonai_job
 
 log = logging.getLogger(__name__)
@@ -52,8 +52,8 @@ def make_way_for(video: str, job: nonai_job.Job,
     return None, nonai_encode.stop_in_flight(job, "you asked for another video now", files)
 
 
-def start_requested(request: nonai_job.Request, files: StageFiles,
-                    settings: EncodeSettings, *, ai_waiting: bool) -> StartAttempt:
+def start_requested(request: nonai_job.Request, files: StageFiles, settings: EncodeSettings,
+                    queued: list[QueuedVideo], *, ai_waiting: bool) -> StartAttempt:
     low_disk = nonai_encode.is_low_disk(settings)
     busy = nonai_encode.LOW_DISK if low_disk else nonai_encode.computer_busy_reason(
         files.cooldown, settings, asked_for=True, ai_waiting=ai_waiting)
@@ -61,8 +61,8 @@ def start_requested(request: nonai_job.Request, files: StageFiles,
         log.info("Holding back the non-AI enhancement asked for: %s.", busy)
         nonai_job.save_request(files.request, nonai_job.Request(request.video, held_back=busy))
         return StartAttempt(deferred="" if low_disk else busy, deferred_low_disk=low_disk)
-    queued_video = next((queued_video for queued_video in files.queued_videos()
-                      if queue_key(queued_video.path) == request.video), None)
+    queued_video = next((queued_video for queued_video in queued
+                         if queue_key(queued_video.path) == request.video), None)
     nonai_job.clear_request(files.request)
     if queued_video is None or not nonai_encode.start(queued_video, files, on_request=True):
         return StartAttempt()

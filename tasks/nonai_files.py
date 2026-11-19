@@ -36,6 +36,7 @@ class StageFiles:
             raise TypeError(f"unknown stage file: {', '.join(sorted(unknown))}")
         return cls(**{name: given.get(name) or default for name, default in defaults.items()})
 
-    def queued_videos(self) -> list[nonai_queue.QueuedVideo]:
+    def queued_videos(self, by_bucket: dict[Path, list[Path]] | None = None) -> list[nonai_queue.QueuedVideo]:
         return nonai_queue.collect_queued_videos(
-            skip_list=self.skip_list, pin_list=self.pin_list, watch_stats_file=self.watch_stats)
+            skip_list=self.skip_list, pin_list=self.pin_list, watch_stats_file=self.watch_stats,
+            by_bucket=by_bucket)
