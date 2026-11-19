@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import glob
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,7 +7,7 @@ from pathlib import Path
 import config
 from tasks import upscale
 from util import genau_flicks, lanes
-from util.media_files import child_dirs, library_videos, remove_empty_dirs
+from util.media_files import child_dirs, library_videos, listed_videos, remove_empty_dirs
 from util.stage_result import StageResult
 from util.versions import is_upscaled_stem, sorted_stem_of
 
@@ -26,24 +25,26 @@ class GenauDeliverResult(StageResult):
 
 
 def _fresh_upscales(genau_sorted_dir: Path):
+    sorted_copies = _sorted_copies_by_stem(genau_sorted_dir)
+    looked_at = upscale.UpscalesLookedAt()
     for folder in (lanes.genau_delivery_dir(), lanes.genaumacher_flicks_dir()):
         for flick in sorted(library_videos(folder)) if folder is not None and folder.is_dir() else ():
-            original = _sorted_original(flick, genau_sorted_dir)
-            if original is not None and not upscale.awaits_its_upscale(
+            original = (sorted_copies.get(sorted_stem_of(flick.stem))
+                        if is_upscaled_stem(flick.stem) else None)
+            if original is not None and not looked_at.awaits_its_upscale(
                     original, genau_sorted_dir.name, original.parent.name):
                 yield flick, original
             elif (beside := _original_beside(flick)) is not None:
                 yield flick, beside
 
 
-def _sorted_original(upscaled: Path, genau_sorted_dir: Path) -> Path | None:
-    if not is_upscaled_stem(upscaled.stem):
-        return None
+def _sorted_copies_by_stem(genau_sorted_dir: Path) -> dict[str, Path]:
+    found: dict[str, Path] = {}
     for orient_dir in child_dirs(genau_sorted_dir):
-        for candidate in orient_dir.glob(f"{glob.escape(sorted_stem_of(upscaled.stem))}.*"):
-            if candidate.suffix.lower() in config.VIDEO_EXTENSIONS:
-                return candidate
-    return None
+        for candidate in sorted(listed_videos(orient_dir)):
+            if candidate.parent == orient_dir:
+                found.setdefault(candidate.stem, candidate)
+    return found
 
 
 def _original_beside(upscaled: Path) -> Path | None:

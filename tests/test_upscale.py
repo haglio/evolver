@@ -21,7 +21,7 @@ from tests.temp_helpers import (
     touch_video,
     workspace_temp_dir,
 )
-from util import lanes, origenerator_gallery, provenance, topaz
+from util import lanes, origenerator_gallery, provenance, run_reads, topaz
 from util.media_files import partial_path
 from util.scraped_records import ScrapedRecords
 
@@ -858,3 +858,32 @@ def test_a_folder_the_upscale_does_not_have_is_refused():
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheQueueLooksAtEachFolderOnce:
+    def test_many_sorted_videos_ask_the_disk_about_no_upscale_one_by_one(self, monkeypatch):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                waiting, made = [], []
+                for source in ("provider2", lanes.ORIGENERATOR_SOURCE):
+                    for number in range(3):
+                        waiting.append(touch_video(lib.sorted_dir / source / "portrait" / f"new {number}.mp4"))
+                        touch_video(lib.sorted_dir / source / "portrait" / f"done {number}.mp4")
+                        made.append(touch_video(lib.kino_upscales / "portrait" / source / f"done {number}_topaz.mp4"))
+                asked, lookups = [], []
+                real_lookup = lanes.flicks_folder_in
+                monkeypatch.setattr(lanes, "flicks_folder_in",
+                                    lambda genau: lookups.append(genau) or real_lookup(genau))
+                for method in ("exists", "is_file", "stat"):
+                    real = getattr(Path, method)
+                    monkeypatch.setattr(Path, method, lambda path, *args, real=real, **kwargs:
+                                        asked.append(path) or real(path, *args, **kwargs))
+
+                with run_reads.kept(run_reads.RunReads()):
+                    queued = upscale.collect_queued_videos(upscale.UpscaleFolders.configured())
+
+        assert sorted(video for video, _source, _orient in queued) == sorted(waiting)
+        assert not [path for path in asked if path.is_relative_to(lib.kino) or path.is_relative_to(lib.genau)
+                    or path.is_relative_to(lib.sorted_dir)]
+        assert len(lookups) <= 1
