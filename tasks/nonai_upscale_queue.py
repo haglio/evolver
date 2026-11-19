@@ -26,11 +26,21 @@ def current() -> UpscaleQueue:
     entries = [_entry(queued_video.path, pinned) for queued_video in collect_queued_videos(
         skip_list=files.skip_list, pin_list=files.pin_list,
         watch_stats_file=files.watch_stats)]
+    return _headed(files, entries, pinned)
+
+
+def again(queue: UpscaleQueue) -> UpscaleQueue:
+    entries = list(queue.listed)
+    return _headed(StageFiles.configured(), entries, {entry.video for entry in entries if entry.pinned})
+
+
+def _headed(files: StageFiles, entries: list[Entry], pinned: set[str]) -> UpscaleQueue:
     first, head = _first(files, entries, pinned)
     if first is None:
-        return UpscaleQueue(rows=tuple(entries), head=Head(NEXT) if entries else None)
+        return UpscaleQueue(rows=tuple(entries), head=Head(NEXT) if entries else None,
+                            listed=tuple(entries))
     rest = tuple(entry for entry in entries if entry.video != first.video)
-    return UpscaleQueue(rows=(first, *rest), head=head)
+    return UpscaleQueue(rows=(first, *rest), head=head, listed=tuple(entries))
 
 
 def _first(files: StageFiles, entries: list[Entry],

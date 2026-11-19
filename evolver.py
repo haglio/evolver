@@ -300,6 +300,10 @@ def upscale_queue() -> upscale_queue_shape.UpscaleQueue:
     return nonai_upscale_queue.current()
 
 
+def upscale_queue_again(queue: upscale_queue_shape.UpscaleQueue) -> upscale_queue_shape.UpscaleQueue:
+    return nonai_upscale_queue.again(queue)
+
+
 def arrange_upscale_queue(videos: list[str]) -> None:
     nonai_queue.pin_ahead(config.NONAI_PIN_LIST, videos)
 
