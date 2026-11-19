@@ -6,8 +6,9 @@ from itertools import islice
 from pathlib import Path
 
 import config
+from util import run_reads
 from util.alert import show_error
-from util.media_files import library_videos
+from util.media_files import ListedSizes, library_videos
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -28,12 +29,13 @@ class DuplicateSizesResult(StageResult):
 def run(show_popup: bool = False, *, non_ai_dir: Path | None = None) -> DuplicateSizesResult:
     non_ai_root = config.NON_AI_DIR if non_ai_dir is None else non_ai_dir
 
-    files = sorted(library_videos(non_ai_root))
+    files = run_reads.videos_in(non_ai_root, library_videos)
+    listed = ListedSizes()
     size_to_paths: dict[int, list[str]] = {}
 
     for file_path in files:
         relative_path = str(file_path.relative_to(non_ai_root))
-        size_to_paths.setdefault(file_path.stat().st_size, []).append(relative_path)
+        size_to_paths.setdefault(listed.size(file_path) or 0, []).append(relative_path)
 
     duplicate_groups = {
         size: sorted(paths)
