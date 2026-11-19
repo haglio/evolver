@@ -53,7 +53,7 @@ def open_the_loading_screen():
     from shared_ui.loading_process import LoadingProcess  # noqa: PLC0415
 
     return LoadingProcess.open(
-        caption="Evolver Loading", wordmark="Evolver", icon=process_identity.LETTER, preview=branch_session.shown_as(),
+        caption="Evolver loading", wordmark="Evolver", icon=process_identity.LETTER, preview=branch_session.shown_as(),
         steps=STEPS, cancel_hint="Press Esc to cancel opening Evolver",
         app_id=process_identity.identity(), taskbar=process_identity.taskbar_app())
 

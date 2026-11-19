@@ -479,7 +479,7 @@ def _show_low_disk_warning(upscales_dir: Path, floor_gb: float, dismissed: Path)
         return
     free_gb = system_resources.free_gb(upscales_dir)
     clicked_dismiss = show_error(
-        "Evolver - Low Disk Space",
+        "Evolver - Low disk space",
         (
             "Evolver paused enhancing because free disk space is below the configured safety floor.\n\n"
             f"Enhanced videos folder: {upscales_dir}\n"

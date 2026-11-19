@@ -20,19 +20,19 @@ class TestTrayMenu:
     def test_the_enhance_queue_is_on_the_menu_as_it_is_on_the_toolbar(self):
         tray = EvolverTray()
         assert "queue" in tray.commands()
-        assert tray.queue_action.text() == "Enhance Queue..."
+        assert tray.queue_action.text() == "Enhance queue..."
 
     def test_the_non_ai_switch_says_enhance(self):
-        assert EvolverTray().nonai_action.text() == "Enhance Non-AI When Idle"
+        assert EvolverTray().nonai_action.text() == "Enhance non-AI when idle"
 
     def test_the_two_tools_sit_together_with_a_line_above_and_below(self):
         tray = EvolverTray()
         entries = ["---" if action.isSeparator() else action.text()
                    for action in tray.contextMenu().actions()]
-        first = entries.index("Enhance Queue...")
+        first = entries.index("Enhance queue...")
 
         assert entries[first - 1:first + 3] == [
-            "---", "Enhance Queue...", "Review Non-AI Trash...", "---"]
+            "---", "Enhance queue...", "Review non-AI trash...", "---"]
         assert tray.commands()["review_trash"] == tray.review_trash_action.triggered
 
 
@@ -147,9 +147,9 @@ class TestTrayScheduleDisplay:
     def test_pausing_turns_the_menu_item_into_resume(self):
         tray = EvolverTray()
         tray.show_schedule(ScheduleStatus(is_paused=True))
-        assert tray.pause_action.text() == "Resume Scheduling"
+        assert tray.pause_action.text() == "Resume scheduling"
         tray.show_schedule(ScheduleStatus())
-        assert tray.pause_action.text() == "Pause Scheduling"
+        assert tray.pause_action.text() == "Pause scheduling"
 
     def test_a_running_pipeline_reads_running_and_disables_run_now(self):
         tray = EvolverTray()

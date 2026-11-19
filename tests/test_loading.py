@@ -67,7 +67,7 @@ def test_the_loading_screen_runs_in_a_process_of_its_own_wearing_evolvers_taskba
         evolver_app.open_the_loading_screen()
 
     opened.assert_called_once_with(
-        caption="Evolver Loading", wordmark="Evolver", icon=config.PROJECT_DIR / "icon.ico", preview=shown_as(),
+        caption="Evolver loading", wordmark="Evolver", icon=config.PROJECT_DIR / "icon.ico", preview=shown_as(),
         steps=evolver_app.STEPS, cancel_hint="Press Esc to cancel opening Evolver",
         app_id=process_identity.identity(), taskbar=process_identity.taskbar_app())
 

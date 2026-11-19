@@ -37,7 +37,7 @@ _NOWHERE = "Nothing says which folder it was sent to Trash from, so it can't be 
 class ReviewTrashWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Evolver - Review Non-AI Trash")
+        self.setWindowTitle("Evolver - Review non-AI trash")
         self.resize(1200, 720)
 
         self.heading = QLabel()
@@ -61,7 +61,7 @@ class ReviewTrashWindow(QWidget):
 
         self.restore_button = QPushButton(qt_icon("undo_arrow", color=_ICON_COLOR), "Restore")
         self.restore_button.clicked.connect(self._restore)
-        self.delete_button = QPushButton(qt_icon("trash", color=_ICON_COLOR), "Delete Permanently")
+        self.delete_button = QPushButton(qt_icon("trash", color=_ICON_COLOR), "Delete permanently")
         self.delete_button.clicked.connect(self._delete_permanently)
         QShortcut(QKeySequence(QKeySequence.StandardKey.Delete), self, self._delete_permanently)
 
@@ -128,7 +128,7 @@ class ReviewTrashWindow(QWidget):
             try:
                 verdict(marked)
             except (OSError, ValueError) as error:
-                show_warning("Review Non-AI Trash", f"{marked.video.name}: {error}")
+                show_warning("Review non-AI trash", f"{marked.video.name}: {error}")
         self._show(trash_folders.non_ai_in_trash(), row)
 
     def _chosen(self) -> list[trash_folders.InTrash]:

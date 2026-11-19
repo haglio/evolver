@@ -147,3 +147,9 @@ places = ["startup"]
 [tool.setuptools.packages.find]
 include = ["evolver*"]
 namespaces = false
+
+# The names the screen capitalizes inside sentence-case text, and the calls here
+# that take on-screen text (app_support.sentence_case).
+[tool.haglio.sentence-case]
+names = ["Evolver", "Origenerator", "Genau", "Fun Time", "Kino", "Topaz", "Windows", "Trash"]
+calls = ["Command", "show_warning", "show_error"]

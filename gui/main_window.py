@@ -187,7 +187,7 @@ class EvolverMainWindow(QMainWindow):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD, GAP_SMALL, MARGIN_STANDARD)
 
-        history_header = QLabel("Run History")
+        history_header = QLabel("Run history")
         font = history_header.font()
         font.setBold(True)
         history_header.setFont(font)

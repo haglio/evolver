@@ -22,7 +22,7 @@ class SettingsDialog(QDialog):
 
     def __init__(self, settings: EvolverSettings, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Evolver Settings")
+        self.setWindowTitle("Evolver settings")
         self._settings = settings
 
         layout = QVBoxLayout(self)
@@ -62,7 +62,7 @@ class SettingsDialog(QDialog):
                 startup.unregister_startup()
         except Exception as exc:
             log.exception("Failed to update startup registration")
-            show_warning("Startup Registration", f"Could not update startup shortcut:\n{exc}")
+            show_warning("Startup registration", f"Could not update startup shortcut:\n{exc}")
 
         super().accept()
 

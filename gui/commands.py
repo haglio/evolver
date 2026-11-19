@@ -32,16 +32,16 @@ def _icon(name: str) -> Callable[[str], QIcon]:
 
 
 OPEN = Command("Open", _icon("external_link"))
-RUN_NOW = Command("Run Now", run_now_icon)
-PAUSE = Command("Pause Scheduling", pause_icon)
-NONAI = Command("Enhance Non-AI When Idle", _icon("moon"))
+RUN_NOW = Command("Run now", run_now_icon)
+PAUSE = Command("Pause scheduling", pause_icon)
+NONAI = Command("Enhance non-AI when idle", _icon("moon"))
 SETTINGS = Command("Settings...", _icon("settings"))
 STATS = Command("Stats...", _icon("chart"))
-QUEUE = Command("Enhance Queue...", _icon("enlarge"))
-REVIEW_TRASH = Command("Review Non-AI Trash...", review_trash_icon)
+QUEUE = Command("Enhance queue...", _icon("enlarge"))
+REVIEW_TRASH = Command("Review non-AI trash...", review_trash_icon)
 RESTART = Command("Restart", restart_icon)
 QUIT = Command("Quit", quit_icon)
 
 
 def pause_or_resume(is_paused: bool) -> str:
-    return "Resume Scheduling" if is_paused else PAUSE.label
+    return "Resume scheduling" if is_paused else PAUSE.label

@@ -173,7 +173,7 @@ def _report(result: ScriptsSyncResult, trees: Trees, show_popup: bool):
         if show_popup:
             log.info("Showing error popup for scripts-sync failure")
             links = [("Open unmatched_scripts", trees.unmatched)] if result.unmatched_paths else []
-            show_error("Evolver - Funscript Match Error", _popup_message(result), links=links)
+            show_error("Evolver - Funscript match error", _popup_message(result), links=links)
             log.info("Error popup closed")
 
 

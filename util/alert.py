@@ -72,7 +72,7 @@ def _work_on_this(title: str, message: str) -> str:
         "",
         message,
         "",
-        ("Load the debugging skill first. Find out why Evolver showed it, from Evolver's log, its Run History, the "
+        ("Load the debugging skill first. Find out why Evolver showed it, from Evolver's log, its Run history, the "
          "file times on disk and the transcripts of the Claude sessions at work at that minute: most of these errors "
          "come from another session's script, preview or test run, so find which Claude session changed the thing "
          "and tell that session what it broke. Fix the cause in Evolver's code only when no session did it, or do "

@@ -356,7 +356,7 @@ def _either_or(parent, *buttons: QPushButton) -> QButtonGroup:
 class StatsWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Evolver \u2014 Run Statistics")
+        self.setWindowTitle("Evolver \u2014 Run statistics")
         self.setMinimumSize(800, 500)
         self.resize(1000, 600)
 
