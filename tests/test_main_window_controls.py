@@ -269,6 +269,9 @@ class TestScriptsSyncSummary:
         assert "14 followed a retired video out of the library" in summary
         assert "53 already aligned" in summary
 
+    def test_says_how_many_funscripts_followed_a_video_renamed_by_hand(self):
+        assert "2 followed a video renamed by hand" in self._result(followed_renames=2)
+
     def test_an_old_record_without_the_paths_still_summarizes(self):
         summary = _summarize_result({"already_aligned": 53, "unmatched": 15}, None, "scripts")
         assert "15 match no video" in summary

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -8,6 +9,7 @@ from unittest.mock import patch
 from tasks import scripts_sync
 from tests.product_sources import config_names_read
 from tests.temp_helpers import a_drive_that_is_not_there, override_config, workspace_temp_dir
+from util.library_records import ID_KEY, VIDEO_BLOCK, VIDEO_DURATION_FIELD
 
 
 def _places_pointed_away(video_root, script_root) -> dict:
@@ -986,7 +988,7 @@ class TestFollowRetiredVideos(unittest.TestCase):
 
 class TestScriptsSyncResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
-        assert {f.name for f in dataclasses.fields(scripts_sync.ScriptsSyncResult)} == {"moved", "already_aligned", "unmatched", "ambiguous", "collisions", "copied_variants", "ambiguous_variant_groups", "variant_copy_errors", "rehomed_to_variants", "followed_to_archive", "discarded_duplicates", "not_checked", "unreachable", "unmatched_paths", "ambiguous_paths", "collision_paths", "variant_copy_error_paths"}
+        assert {f.name for f in dataclasses.fields(scripts_sync.ScriptsSyncResult)} == {"moved", "already_aligned", "unmatched", "ambiguous", "collisions", "copied_variants", "ambiguous_variant_groups", "variant_copy_errors", "rehomed_to_variants", "followed_to_archive", "followed_renames", "discarded_duplicates", "not_checked", "unreachable", "unmatched_paths", "ambiguous_paths", "collision_paths", "variant_copy_error_paths"}
 
 
 class TestAsksTheDiskNoQuestionPerScript(unittest.TestCase):
@@ -1009,3 +1011,98 @@ class TestAsksTheDiskNoQuestionPerScript(unittest.TestCase):
 
             assert result.copied_variants == 5
             assert not [path for path in asked if path.suffix == ".funscript"]
+
+
+class TestAVideoRenamedByHand(unittest.TestCase):
+    FOLDER = Path("2D", "non_AI", "studio", "full")
+
+    def _library(self, root: Path, durations: dict[str, float]):
+        video_root, script_root, metadata = root / "videos", root / "scripts", root / "metadata"
+        for name in durations:
+            _write(video_root / self.FOLDER / name)
+        return video_root, script_root, metadata
+
+    def _record(self, metadata: Path, stem: str, seconds: float, video_id: str) -> Path:
+        path = metadata / self.FOLDER / f"{stem}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({VIDEO_BLOCK: {VIDEO_DURATION_FIELD: seconds}, ID_KEY: video_id}),
+                        encoding="utf-8")
+        return path
+
+    def _run(self, root: Path, durations: dict[str, float]):
+        video_root, script_root, metadata = root / "videos", root / "scripts", root / "metadata"
+        with library_overrides(video_root, script_root, METADATA_DIR=metadata, VIDEO_SEARCH_ROOT=root):
+            return scripts_sync.run(duration=lambda video: durations[video.name])
+
+    def test_its_funscript_and_record_take_its_new_name(self):
+        with workspace_temp_dir() as root:
+            durations = {"scene renamed.mp4": 1234.5, "something new.mp4": 99.25}
+            _, script_root, metadata = self._library(root, durations)
+            _write(script_root / self.FOLDER / "scene old.funscript")
+            self._record(metadata, "scene old", 1234.5, "made-up-id")
+
+            result = self._run(root, durations)
+
+            assert (script_root / self.FOLDER / "scene renamed.funscript").is_file()
+            assert json.loads((metadata / self.FOLDER / "scene renamed.json").read_text(encoding="utf-8"))[ID_KEY] == "made-up-id"
+            assert not (metadata / self.FOLDER / "scene old.json").exists()
+            assert result.ok
+            assert result.unmatched_paths == []
+
+    def test_its_generated_mark_takes_its_new_name_too(self):
+        with workspace_temp_dir() as root:
+            durations = {"scene renamed.mp4": 1234.5}
+            _, script_root, metadata = self._library(root, durations)
+            _write(script_root / self.FOLDER / "scene old.funscript",
+                   root / "generated" / self.FOLDER / "scene old.generated")
+            self._record(metadata, "scene old", 1234.5, "made-up-id")
+
+            self._run(root, durations)
+
+            assert (root / "generated" / self.FOLDER / "scene renamed.generated").is_file()
+            assert not (root / "generated" / self.FOLDER / "scene old.generated").exists()
+
+    def test_a_new_video_of_another_length_beside_it_is_not_taken_for_it(self):
+        with workspace_temp_dir() as root:
+            durations = {"something new.mp4": 99.25}
+            _, script_root, metadata = self._library(root, durations)
+            _write(script_root / self.FOLDER / "scene old.funscript")
+            self._record(metadata, "scene old", 1234.5, "made-up-id")
+
+            result = self._run(root, durations)
+
+            assert result.unmatched_paths == ["scene old.funscript"]
+            assert (metadata / self.FOLDER / "scene old.json").is_file()
+
+    def test_two_videos_of_its_length_leave_it_for_a_person(self):
+        with workspace_temp_dir() as root:
+            durations = {"scene a.mp4": 1234.5, "scene b.mp4": 1234.5}
+            _, script_root, metadata = self._library(root, durations)
+            _write(script_root / self.FOLDER / "scene old.funscript")
+            self._record(metadata, "scene old", 1234.5, "made-up-id")
+
+            result = self._run(root, durations)
+
+            assert result.unmatched_paths == ["scene old.funscript"]
+
+    def test_a_video_that_already_has_its_own_funscript_is_not_taken_for_it(self):
+        with workspace_temp_dir() as root:
+            durations = {"scene other.mp4": 1234.5}
+            _, script_root, metadata = self._library(root, durations)
+            _write(script_root / self.FOLDER / "scene old.funscript",
+                   script_root / self.FOLDER / "scene other.funscript")
+            self._record(metadata, "scene old", 1234.5, "made-up-id")
+
+            result = self._run(root, durations)
+
+            assert result.unmatched_paths == ["scene old.funscript"]
+
+    def test_with_no_record_of_how_long_it_ran_the_funscript_waits_for_a_person(self):
+        with workspace_temp_dir() as root:
+            durations = {"scene renamed.mp4": 1234.5}
+            _, script_root, _ = self._library(root, durations)
+            _write(script_root / self.FOLDER / "scene old.funscript")
+
+            result = self._run(root, durations)
+
+            assert result.unmatched_paths == ["scene old.funscript"]

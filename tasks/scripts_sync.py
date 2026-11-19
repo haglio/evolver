@@ -15,8 +15,9 @@ from tasks.script_versions import (
     copy_missing_version_scripts,
     version_key,
 )
-from util import lanes
+from util import ffprobe, lanes, renamed_videos
 from util.alert import show_error
+from util.library_moves import move_its_records
 from util.media_files import (
     library_files,
     library_videos,
@@ -47,6 +48,7 @@ class ScriptsSyncResult(StageResult):
     variant_copy_errors: int = 0
     rehomed_to_variants: int = 0
     followed_to_archive: int = 0
+    followed_renames: int = 0
     discarded_duplicates: int = 0
     not_checked: int = 0
     unreachable: list[str] = field(default_factory=list)
@@ -113,7 +115,8 @@ class _Aligned:
     collision_paths: list[str] = field(default_factory=list)
 
 
-def run(show_popup: bool = False, *, trees: Trees | None = None) -> ScriptsSyncResult:
+def run(show_popup: bool = False, *, trees: Trees | None = None,
+        duration: renamed_videos.Duration = ffprobe.duration_seconds) -> ScriptsSyncResult:
     trees = Trees.configured() if trees is None else trees
     result = ScriptsSyncResult()
     trees.scripts.mkdir(parents=True, exist_ok=True)
@@ -128,7 +131,7 @@ def run(show_popup: bool = False, *, trees: Trees | None = None) -> ScriptsSyncR
     video_index = _index_videos(trees)
 
     aligned = _align_scripts(trees, video_index, vr_out_of_reach)
-    orphans = aligned.orphans
+    orphans, result.followed_renames = _follow_renamed_videos(aligned.orphans, trees, duration)
     result.moved += aligned.moved
     result.already_aligned += aligned.already_aligned
     result.not_checked += aligned.not_checked
@@ -155,6 +158,23 @@ def run(show_popup: bool = False, *, trees: Trees | None = None) -> ScriptsSyncR
     result.variant_copy_errors = len(result.variant_copy_error_paths)
     _report(result, trees, show_popup)
     return result
+
+
+def _follow_renamed_videos(orphans: list[Path], trees: Trees,
+                           duration: renamed_videos.Duration) -> tuple[list[Path], int]:
+    left = []
+    followed = 0
+    for script_path in orphans:
+        renamed = None if _waiting(script_path, trees) else renamed_videos.renamed_in_place(
+            script_path, (trees.videos / script_path.relative_to(trees.scripts)).parent, duration)
+        if renamed is None:
+            left.append(script_path)
+            continue
+        was_at, now_at = renamed
+        move_its_records(was_at, now_at)
+        followed += 1
+        log.info("FOLLOW RENAMED VIDEO  %s  ->  %s", was_at, now_at)
+    return left, followed
 
 
 def _tidy_and_copy_versions(trees: Trees, video_index: dict[str, list[Path]]) -> VersionCopies:
@@ -212,7 +232,7 @@ def _align_scripts(trees: Trees, video_index: dict[str, list[Path]],
 
 def _log_summary(result: ScriptsSyncResult):
     log.info(
-        "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Version copies: %d, Ambiguous version groups: %d, Version copy errors: %d, Rehomed to versions: %d, Followed to archive: %d, Discarded duplicates: %d",
+        "Scripts sync done. Moved: %d, Already aligned: %d, Unmatched: %d, Ambiguous: %d, Collisions: %d, Version copies: %d, Ambiguous version groups: %d, Version copy errors: %d, Rehomed to versions: %d, Followed to archive: %d, Followed renamed videos: %d, Discarded duplicates: %d",
         result.moved,
         result.already_aligned,
         result.unmatched,
@@ -223,6 +243,7 @@ def _log_summary(result: ScriptsSyncResult):
         result.variant_copy_errors,
         result.rehomed_to_variants,
         result.followed_to_archive,
+        result.followed_renames,
         result.discarded_duplicates,
     )
 
