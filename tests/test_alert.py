@@ -71,6 +71,14 @@ class TestShowError(unittest.TestCase):
         assert "Evolver - Made-Up Error" in asked["q"][0]
         assert "Video one has no script." in asked["q"][0]
 
+    @alert_shown()
+    def test_work_on_this_sends_the_session_to_the_debugging_skill_to_find_the_session_that_caused_it(self, show_alert):
+        alert.show_error("Evolver - Made-Up Error", "Video one has no script.")
+
+        asked = parse_qs(urlsplit(show_alert.call_args.kwargs["work_on_this"]).query)["q"][0]
+        assert "debugging skill" in asked
+        assert "which Claude session" in asked
+
     @alert_shown(return_value=True)
     def test_an_alert_that_offers_dismiss_says_whether_it_was_dismissed(self, show_alert):
         dismissed = alert.show_error("Title", "Body", dismissible=True)

@@ -39,8 +39,11 @@ def _work_on_this(title: str, message: str) -> str:
         "",
         message,
         "",
-        ("Find out why Evolver showed it, from Evolver's log and its Run History, and take care of it: fix the "
-         "cause in Evolver's code, or do what the window asks of him wherever a session can. Tell him in one short "
+        ("Load the debugging skill first. Find out why Evolver showed it, from Evolver's log, its Run History, the "
+         "file times on disk and the transcripts of the Claude sessions at work at that minute: most of these errors "
+         "come from another session's script, preview or test run, so find which Claude session changed the thing "
+         "and tell that session what it broke. Fix the cause in Evolver's code only when no session did it, or do "
+         "what the window asks of him wherever a session can. Tell him in one short "
          "message what you did and anything only he can do. Follow every law in ~/.claude/CLAUDE.md and "
          "~/.claude/engineering.md as any session does."),
     ]))
