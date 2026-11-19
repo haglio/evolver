@@ -18,6 +18,7 @@ from tasks.script_versions import (
 from util import lanes
 from util.alert import show_error
 from util.media_files import (
+    library_files,
     library_videos,
     reachable,
     remove_empty_dirs,
@@ -369,8 +370,8 @@ def _library_videos(trees: Trees):
 
 def _iter_funscripts(*roots: Path):
     for root in roots:
-        for path in root.rglob(f"*{config.FUNSCRIPT_EXTENSION}"):
-            if path.is_file():
+        for path in library_files(root):
+            if path.suffix.lower() == config.FUNSCRIPT_EXTENSION:
                 yield path
 
 
