@@ -79,6 +79,20 @@ class TestShowError(unittest.TestCase):
         assert "debugging skill" in asked
         assert "which Claude session" in asked
 
+    @alert_shown()
+    def test_an_error_whose_window_was_shown_before_is_not_shown_again(self, show_alert):
+        alert.show_error("Evolver - Made-Up Error", "Video one has no script.")
+        alert.show_error("Evolver - Made-Up Error", "Video one has no script.")
+
+        assert show_alert.call_count == 1
+
+    @alert_shown()
+    def test_a_window_meant_to_come_back_is_shown_every_time(self, show_alert):
+        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", every_time=True)
+        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", every_time=True)
+
+        assert show_alert.call_count == 2
+
     @alert_shown(return_value=True)
     def test_an_alert_that_offers_dismiss_says_whether_it_was_dismissed(self, show_alert):
         dismissed = alert.show_error("Title", "Body", dismissible=True)

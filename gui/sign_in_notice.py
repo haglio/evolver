@@ -23,7 +23,7 @@ class SignInNotice:
         if self._shown_at is not None and now - self._shown_at < _REMIND_AFTER_SECONDS:
             return
         self._shown_at = now
-        show_error(TITLE, MESSAGE)
+        show_error(TITLE, MESSAGE, every_time=True)
 
 
 def _held_for_sign_in(record: RunRecord) -> bool:

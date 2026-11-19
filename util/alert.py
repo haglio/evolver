@@ -2,20 +2,27 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from collections.abc import Sequence
 from pathlib import Path
 
 from app_support.claude_sessions import new_session_link
 
+from local_state import CHECKOUT, LOCAL_STATE_DIR
+
 log = logging.getLogger(__name__)
 
-CHECKOUT = Path(__file__).resolve().parent.parent
 ICON_FILE = CHECKOUT / "icon.ico"
+ERRORS_SHOWN_FILE = LOCAL_STATE_DIR / "errors_shown.json"
 
 
 def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (), *,
-               dismissible: bool = False) -> bool:
+               dismissible: bool = False, same_error: str | None = None, every_time: bool = False) -> bool:
+    if not every_time and _shown_before(title, message if same_error is None else same_error):
+        log.info("Not showing %s again: the same error's window was shown before", title)
+        return False
     try:
         from shared_ui.alert import Link, show_alert  # noqa: PLC0415  (see the module docstring)
         from shared_ui.preview_icon import app_icon  # noqa: PLC0415  (see the module docstring)
@@ -31,6 +38,20 @@ def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (),
         targets = "\n".join(str(target) for _text, target in links)
         _fall_back_to_windows(title, f"{message}\n\n{targets}" if targets else message)
         return False
+
+
+def _shown_before(title: str, error_said: str) -> bool:
+    try:
+        record = ERRORS_SHOWN_FILE
+        error = hashlib.sha256(f"{title}\n{error_said}".encode()).hexdigest()
+        shown = set(json.loads(record.read_text(encoding="utf-8"))) if record.exists() else set()
+        if error in shown:
+            return True
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(json.dumps(sorted(shown | {error})), encoding="utf-8")
+    except Exception:
+        log.exception("Could not read or write the errors already shown: %s", title)
+    return False
 
 
 def _work_on_this(title: str, message: str) -> str:

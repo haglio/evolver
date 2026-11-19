@@ -32,7 +32,7 @@ class TestSignInNotice(unittest.TestCase):
             "Evolver - Topaz Sign-In Expired",
             "Topaz Video's sign-in has expired, so Evolver is holding off on enhancing. "
             "Topaz can put its watermark on videos it enhances until you sign in again.\n\n"
-            "Open the Topaz Video app and sign in. Enhancing starts again on its own.")
+            "Open the Topaz Video app and sign in. Enhancing starts again on its own.", every_time=True)
 
     def test_a_non_ai_upscale_waiting_for_the_topaz_sign_in_tells_the_user_too(self):
         waiting = {"name": "upscale_non_ai", "status": "completed", "duration_seconds": 1.0,
@@ -66,7 +66,7 @@ class TestSignInNotice(unittest.TestCase):
         notice = SignInNotice()
         held = a_run(UPSCALE_HELD_FOR_SIGN_IN)
 
-        def next_run_finishes_meanwhile(*_):
+        def next_run_finishes_meanwhile(*_, **__):
             notice.after_run(held, now=600.0)
 
         with patch("gui.sign_in_notice.show_error",

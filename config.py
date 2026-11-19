@@ -11,6 +11,7 @@ from app_support import funscript, haglio_settings, kino_folder, siblings
 from app_support.flick_folder import trash_folder_in
 from app_support.overlay import overlay_value
 
+import local_state
 from content_overlay import LOCAL_CONTENT, load_content, refuse_an_incomplete_overlay
 
 refuse_an_incomplete_overlay()
@@ -152,9 +153,7 @@ NONAI_OUTPUT_SUFFIX = "_apo8_iris2"
 NONAI_PROCESSED_DIR_NAME = "processed"
 NONAI_FALLBACK_DONE_DIR_NAME = "3_good_to_go"
 NONAI_RETIRED_ROOT = retired_root(_CONTENT)
-# pCloud renamed a job file it saw rewritten mid-run ("[conflicted N]"), orphaning live encodes
-# until the computer crashed; Windows' LOCALAPPDATA is never synced, so such files live under it.
-LOCAL_STATE_DIR = Path(os.environ.get("LOCALAPPDATA", str(PROJECT_DIR))) / "Evolver"
+LOCAL_STATE_DIR = local_state.LOCAL_STATE_DIR
 NONAI_JOB_STATE_FILE = LOCAL_STATE_DIR / "nonai_upscale_job.json"
 NONAI_ATTEMPTS_FILE = LOCAL_STATE_DIR / "nonai_upscale_attempts.json"
 NONAI_COOLDOWN_FILE = LOCAL_STATE_DIR / "nonai_upscale_cooldown.json"

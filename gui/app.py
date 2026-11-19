@@ -65,6 +65,7 @@ def _say_the_running_evolver_did_not_answer(app: QApplication) -> None:
         "Evolver is already running but did not respond, so its window "
         "could not be opened.\n\nQuit it from the tray icon, or end the "
         "pythonw.exe process, then start Evolver again.",
+        every_time=True,
     )
 
 

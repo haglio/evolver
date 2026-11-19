@@ -12,14 +12,14 @@ pytestmark = pytest.mark.repo_check
 
 _OURS = (
     "check_correspondence", "check_duplicate_sizes",
-    "config", "content_overlay", "evolver", "gui", "review_trash", "review_trash_app", "tasks",
+    "config", "content_overlay", "evolver", "gui", "local_state", "review_trash", "review_trash_app", "tasks",
     "tray_app", "util", "vulture_whitelist",
 )
 
 ALLOWED = {
     "check_correspondence": {"config", "util"},
     "check_duplicate_sizes": {"config", "util"},
-    "config": {"content_overlay"},
+    "config": {"content_overlay", "local_state"},
     "evolver": {"check_correspondence", "check_duplicate_sizes", "config",
                 "tasks", "util"},
     "gui": {"config", "evolver", "util"},
@@ -27,7 +27,7 @@ ALLOWED = {
     "review_trash_app": {"evolver", "gui", "review_trash"},
     "tasks": {"config", "util"},
     "tray_app": {"gui", "util"},
-    "util": {"config"},
+    "util": {"config", "local_state"},
 }
 
 
