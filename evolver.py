@@ -40,7 +40,7 @@ from tasks import (
 from tasks.origenerator_commands import DowntimeResult
 from tasks.sort import SortResult
 from tasks.upscale import UpscaleResult
-from util import run_lock, run_log, system_resources, topaz
+from util import run_lock, run_log, run_reads, system_resources, topaz
 from util import upscale_queue as upscale_queue_shape
 from util.stage_result import StageResult
 
@@ -63,6 +63,7 @@ class ThisRun:
     nonai_enabled: bool | None = None
     on_progress: Callable[[str, int, int], None] | None = None
     outcomes: dict[str, StageResult | Skipped] = field(default_factory=dict)
+    reads: run_reads.RunReads = field(default_factory=run_reads.RunReads)
 
     def outcome_of(self, key: str) -> StageResult | Skipped | None:
         return self.outcomes.get(key)
@@ -81,6 +82,7 @@ class Stage:
     tooltip: str
     color: tuple[int, int, int]
     run: Callable[[ThisRun], StageResult | Skipped]
+    moves_no_videos: bool = False
 
 
 def _upscale(this_run: ThisRun) -> StageResult | Skipped:
@@ -182,38 +184,48 @@ STAGES: tuple[Stage, ...] = (
           "Add up the completions, skips and locks Fun Time and Warm Gun recorded for each library video and save the total, as the weight both apps shuffle by, in Origenerator's gallery for an AI video and on its sidecar for any other, and mark the phone's favorites in the same places",
           (0xB5, 0xE6, 0x1D),
           run=lambda _: watch_weights.run(
-              tell_the_gallery=origenerator_commands.write_gallery_entries)),
+              tell_the_gallery=origenerator_commands.write_gallery_entries),
+          moves_no_videos=True),
     Stage("bookmarks", "Bookmarks sync",
           "Copy Fun Time favorites into a Chrome bookmarks folder",
-          (0x4B, 0x96, 0x88), run=lambda _: bookmarks_sync.run()),
+          (0x4B, 0x96, 0x88), run=lambda _: bookmarks_sync.run(),
+          moves_no_videos=True),
     Stage("clip_scripts", "Transfer scene funscripts to clips",
           "Cut each clip's funscript out of its scene's, from the point where the clip was found in the scene",
-          (0xF6, 0x70, 0x99), run=lambda _: clip_scripts.run()),
+          (0xF6, 0x70, 0x99), run=lambda _: clip_scripts.run(),
+          moves_no_videos=True),
     Stage("scene_scripts", "Transfer clip funscripts to scenes",
           "Give a scene with no funscript one that is mostly blank, holding the funscript of the clip cut from it, placed where the clip sits in the scene",
-          (0xDE, 0xB8, 0xC6), run=lambda _: scene_scripts.run()),
+          (0xDE, 0xB8, 0xC6), run=lambda _: scene_scripts.run(),
+          moves_no_videos=True),
     Stage("scripts", "Scripts sync",
           "Move funscripts so their folders match the video folders",
-          (0xAD, 0x40, 0x35), run=lambda _: scripts_sync.run(show_popup=True)),
+          (0xAD, 0x40, 0x35), run=lambda _: scripts_sync.run(show_popup=True),
+          moves_no_videos=True),
     Stage("group_non_ai", "Group non-AI video versions",
           "Work out which 2D/non_AI files are one video -- the original, its Topaz-enhanced versions and copies "
           "saved under another name, found by their file names and by comparing their frames -- and write "
           "that group on each file's sidecar, so Fun Time knows which files are versions of one video",
-          (0x6F, 0xDB, 0x9A), run=lambda _: nonai_group.run()),
+          (0x6F, 0xDB, 0x9A), run=lambda _: nonai_group.run(),
+          moves_no_videos=True),
     Stage("title_non_ai", "Title non-AI videos",
           "Record what to call each 2D/non_AI video -- the performer and movie its clip record names, carried to the whole scene that clip was cut out of -- so every app reads one name instead of working it out at launch",
-          (0xAA, 0x44, 0xCC), run=lambda _: nonai_titles.run()),
+          (0xAA, 0x44, 0xCC), run=lambda _: nonai_titles.run(),
+          moves_no_videos=True),
     Stage("video_types", "Set video kinds",
           f"Record on each non-AI video's sidecar whether it is a Genau {_FLICK}, a clip or a full video "
           "-- a clip being one cut from a scene, one in a folder of clips, or one of ten seconds or less -- "
           "with how long it runs and whether it is portrait or landscape",
-          (0x2B, 0x2B, 0xE8), run=lambda _: video_kinds.run()),
+          (0x2B, 0x2B, 0xE8), run=lambda _: video_kinds.run(),
+          moves_no_videos=True),
     Stage("provenance", "Set video sources",
           "Record on each non-AI video's sidecar what made it -- which app, which version of its code, which Topaz settings -- reading the note Topaz wrote into each enhanced video, and marking unknown whatever it cannot say",
-          (0xEE, 0x00, 0xBB), run=lambda _: provenance_sweep.run()),
+          (0xEE, 0x00, 0xBB), run=lambda _: provenance_sweep.run(),
+          moves_no_videos=True),
     Stage("dupes", "Duplicate check",
           "Find likely duplicate videos in the non_AI folder by their exact file size",
-          (0xCA, 0x94, 0xDB), run=lambda _: check_duplicate_sizes.run(show_popup=True)),
+          (0xCA, 0x94, 0xDB), run=lambda _: check_duplicate_sizes.run(show_popup=True),
+          moves_no_videos=True),
 )
 
 ALL_STAGES = tuple(stage.key for stage in STAGES)
@@ -356,7 +368,9 @@ def _run_stage(stage: Stage, this_run: ThisRun, watchers: _Watchers) -> StageRec
     if watchers.on_start:
         watchers.on_start(stage.key)
     t0 = time.monotonic()
-    outcome = stage.run(this_run)
+    this_run.reads.files_may_move(not stage.moves_no_videos)
+    with run_reads.kept(this_run.reads):
+        outcome = stage.run(this_run)
     this_run.outcomes[stage.key] = outcome
     if isinstance(outcome, Skipped):
         if watchers.on_complete:

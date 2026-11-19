@@ -12,7 +12,9 @@ _SCENE_PATH = "full_video"
 
 
 def link_to(scene: Path) -> dict[str, str]:
-    return {SCENE_ID: video_ids.id_of(sidecar.sidecar_path(scene))}
+    record = sidecar.sidecar_path(scene)
+    sidecar.forget(record)
+    return {SCENE_ID: video_ids.id_of(record)}
 
 
 def scene_id(clip: dict) -> str | None:
