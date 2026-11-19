@@ -7,7 +7,7 @@ from pathlib import Path
 from app_support import video_ids
 
 import config
-from util import script_library, sidecar
+from util import script_library, sidecar, video_kind
 from util.library_moves import MIRRORS, move_its_records
 from util.nonai_library import bucket_of, stage_dirs
 
@@ -19,7 +19,7 @@ _FILE_SCOPED_SIDECAR_KEYS = frozenset({"version", video_ids.ID_KEY})
 def carry_metadata(source: Path, out: Path) -> bool:
     payload = sidecar.read(sidecar.sidecar_path(source))
     carried = {
-        key: value for key, value in payload.items()
+        key: value for key, value in _without_the_length(payload).items()
         if key not in _FILE_SCOPED_SIDECAR_KEYS
     }
     if not carried:
@@ -27,12 +27,24 @@ def carry_metadata(source: Path, out: Path) -> bool:
 
     def carry_them_over(existing: dict) -> dict | None:
         merged = {**existing, **carried}
+        own_length = video_kind.duration_of(existing)
+        if own_length is not None:
+            merged = video_kind.timed(merged, own_length)
         return merged if merged != existing else None
 
     if sidecar.update(sidecar.sidecar_path(out), carry_them_over) is None:
         return False
     log.info("Carried metadata onto the enhanced video: %s -> %s", source.name, out.name)
     return True
+
+
+def _without_the_length(payload: dict) -> dict:
+    block = payload.get(video_kind.BLOCK)
+    if not isinstance(block, dict) or video_kind.DURATION_FIELD not in block:
+        return payload
+    rest = {key: value for key, value in block.items() if key != video_kind.DURATION_FIELD}
+    others = {key: value for key, value in payload.items() if key != video_kind.BLOCK}
+    return {**others, video_kind.BLOCK: rest} if rest else others
 
 
 def carry_funscript(source: Path, out: Path) -> None:
