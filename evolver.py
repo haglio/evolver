@@ -352,7 +352,8 @@ def _run_stages(stages: Sequence[Stage], this_run: ThisRun, watchers: _Watchers)
 
     records: list[StageRecord] = []
     try:
-        records.extend(_run_stage(stage, this_run, watchers) for stage in stages)
+        with origenerator_commands.one_rewrite_of_the_phones_file():
+            records.extend(_run_stage(stage, this_run, watchers) for stage in stages)
     except _StopRequested:
         log.warning("Stop requested; dropping the remaining stages after %d ran.", len(records))
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 import logging
 import os
 import subprocess
@@ -21,13 +22,13 @@ from gui.run_record import RunRecord
 from tasks import nonai_upscale
 from tasks.genau_deliver import GenauDeliverResult
 from tasks.nonai_upscale import NonAiUpscaleResult
-from tasks.origenerator_commands import DowntimeResult
+from tasks.origenerator_commands import DowntimeResult, GalleryRecords
 from tasks.sort import SortResult
 from tasks.stray_files import StrayFilesResult
 from tasks.unsent_videos import UnsentVideosResult
 from tasks.upscale import UpscaleResult
 from tests.temp_helpers import LaneLibrary, override_config, touch_video, workspace_temp_dir
-from util import run_lock, run_log, sidecar, topaz
+from util import origenerator_gallery, run_lock, run_log, sidecar, topaz
 from util.sidecar import sidecar_path
 from util.stage_result import StageResult
 
@@ -803,3 +804,25 @@ class TestOneRunAtATime:
 
         assert exited.value.code == 1
         assert "running the pipeline" in caplog.text
+
+
+def test_the_phones_file_is_rewritten_once_after_every_stage_has_handed_its_videos_over(tmp_path):
+    records = [".venv/Scripts/python.exe", "-m", "origenerator.ai_video_records"]
+    (tmp_path / origenerator_gallery.PUBLISHED).write_text(json.dumps(
+        {"records_command": records, "phones_file_command": [*records, "phones_file"]}),
+        encoding="utf-8")
+    asked = []
+
+    def answering(args, **_options):
+        asked.append(args[3])
+        return SimpleNamespace(stdout='{"done": 1, "no_row": 0}')
+
+    gallery = GalleryRecords(tmp_path, runner=answering)
+
+    def favoring(_this_run):
+        gallery.favorite(tmp_path / "video.mp4", True)
+        return _Done()
+
+    _run(_made_up("first", run=favoring), _made_up("second", run=favoring))
+
+    assert asked == ["favorite", "favorite", "phones_file"]
