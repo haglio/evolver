@@ -87,11 +87,11 @@ class TestShowError(unittest.TestCase):
         assert show_alert.call_count == 1
 
     @alert_shown()
-    def test_a_window_meant_to_come_back_is_shown_every_time(self, show_alert):
-        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", every_time=True)
-        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", every_time=True)
+    def test_a_window_no_session_could_help_with_offers_no_work_on_this_and_comes_back_every_time(self, show_alert):
+        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", work_on_this=False)
+        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", work_on_this=False)
 
-        assert show_alert.call_count == 2
+        assert [shown.kwargs["work_on_this"] for shown in show_alert.call_args_list] == [None, None]
 
     @alert_shown(return_value=True)
     def test_an_alert_that_offers_dismiss_says_whether_it_was_dismissed(self, show_alert):
