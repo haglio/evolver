@@ -12,7 +12,7 @@ from app_support.trash_names import name_before_trash
 from app_support.video_names import strip_uniquifier
 
 import config
-from util import lanes, origenerator_gallery, script_library
+from util import lanes, origenerator_gallery, run_reads, script_library
 from util.media_files import library_videos, retry_while_in_use
 from util.origenerator_gallery import EVOLVER_UPSCALE
 from util.sidecar import sidecar_folder, sidecar_path
@@ -26,8 +26,11 @@ def trash_dirs() -> tuple[Path, Path]:
 
 
 def videos_in_trash() -> list[Path]:
-    return [video for folder in trash_dirs()
-            for video in sorted(library_videos(folder), key=lambda video: (video.name.lower(), video))]
+    return [video for folder in trash_dirs() for video in _videos_in(folder)]
+
+
+def _videos_in(folder: Path) -> list[Path]:
+    return sorted(library_videos(folder), key=lambda video: (video.name.lower(), video))
 
 
 def stems_in_trash() -> set[str]:
@@ -42,14 +45,15 @@ class InTrash:
 
 
 def non_ai_videos_in_trash() -> list[Path]:
-    _, genau_trash = trash_dirs()
-    ai = lanes.in_trash(delivered) if (delivered := lanes.genau_delivery_dir()) else None
-    return [video for video in videos_in_trash()
-            if video.is_relative_to(genau_trash) and not (ai is not None and video.is_relative_to(ai))]
+    with run_reads.one_look():
+        ai = lanes.in_trash(delivered) if (delivered := lanes.genau_delivery_dir()) else None
+        return [video for video in _videos_in(lanes.genau_trash_dir())
+                if not (ai is not None and video.is_relative_to(ai))]
 
 
 def non_ai_in_trash() -> list[InTrash]:
-    return _marked(non_ai_videos_in_trash())
+    with run_reads.one_look():
+        return _marked(non_ai_videos_in_trash())
 
 
 
@@ -59,9 +63,9 @@ def marked_as(videos) -> list[InTrash]:
 
 
 def _marked(videos: list[Path]) -> list[InTrash]:
-    _, genau_trash = trash_dirs()
+    genau_trash, flicks = lanes.genau_trash_dir(), lanes.genau_flicks_dir()
     sorted_copies = _sorted_copies_by_stem() if videos else {}
-    return [_out_of_genau(video, genau_trash, sorted_copies) if video.is_relative_to(genau_trash)
+    return [_out_of_genau(video, genau_trash, flicks, sorted_copies) if video.is_relative_to(genau_trash)
             else _out_of_the_outbox(video, sorted_copies)
             for video in videos]
 
@@ -81,12 +85,12 @@ def _out_of_the_outbox(video: Path, sorted_copies: dict[str, list[Path]]) -> InT
     return InTrash(video, restores_to, upscales.get(restores_to))
 
 
-def _out_of_genau(video: Path, folder: Path, sorted_copies: dict[str, list[Path]]) -> InTrash:
+def _out_of_genau(video: Path, folder: Path, flicks: Path | None,
+                  sorted_copies: dict[str, list[Path]]) -> InTrash:
     lane = config.SORTED_DIR / lanes.genau_source()
     left_in_the_lane = [copy
                         for copy in sorted_copies.get(sorted_stem_of(strip_uniquifier(video.stem)), [])
                         if copy.is_relative_to(lane)]
-    flicks = lanes.genau_flicks_dir()
     return InTrash(video, _the_one_vacant([flicks / video.relative_to(folder)] if flicks else []),
                        left_in_the_lane[0] if len(left_in_the_lane) == 1 else None)
 

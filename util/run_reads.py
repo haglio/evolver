@@ -78,6 +78,16 @@ def kept(reads: RunReads | None) -> Iterator[RunReads | None]:
         _here.reads = before
 
 
+@contextmanager
+def one_look() -> Iterator[RunReads]:
+    reads = current()
+    if reads is not None:
+        yield reads
+        return
+    with kept(RunReads()) as reads:
+        yield reads
+
+
 def videos_in(root: Path, walk: Callable[[Path], Iterable[Path]]) -> list[Path]:
     reads = current()
     return sorted(walk(root)) if reads is None else reads.videos(root, walk)

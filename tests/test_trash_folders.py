@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from tests.gallery_fakes import a_gallery_of, kept_at
 from tests.temp_helpers import LaneLibrary, touch_video, workspace_temp_dir, write_sidecar
-from util import trash_folders
+from util import lanes, media_files, trash_folders
 from util.script_library import is_marked_generated, mark_generated, script_path_for_video
 from util.sidecar import sidecar_path
 
@@ -279,3 +280,21 @@ class TestDeletingPermanently(_InALibrary):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheNonAiTrashLooks(_InALibrary):
+    def test_a_look_walks_only_genaus_trash_and_looks_up_genaus_folder_once(self):
+        for number in range(4):
+            touch_video(self.lib.trash / f"kino {number}_topaz.mp4")
+            touch_video(self.lib.genau_trash / "2D" / "non_AI" / f"cut {number}.mp4")
+        walks, lookups = [], []
+        real_walked, real_lookup = media_files._walked, lanes.flicks_folder_in
+        with patch.object(media_files, "_walked", lambda folder: walks.append(folder) or real_walked(folder)), \
+                patch.object(lanes, "flicks_folder_in", lambda genau: lookups.append(genau) or real_lookup(genau)):
+            listed = trash_folders.non_ai_videos_in_trash()
+            marked = trash_folders.non_ai_in_trash()
+
+        assert len(listed) == 4
+        assert [each.video for each in marked] == listed
+        assert self.lib.trash not in walks
+        assert len(lookups) <= 2

@@ -171,3 +171,16 @@ def test_the_non_ai_stages_of_one_run_read_each_sidecar_once_and_walk_the_folder
 
     assert counted["read"] == len(videos)
     assert walks.count(lib.non_ai) == 1
+
+
+def test_one_look_works_out_a_run_s_answer_once_and_joins_a_look_already_open():
+    asked = []
+
+    with run_reads.one_look():
+        run_reads.once_per_run("folder", lambda: asked.append(1))
+        with run_reads.one_look():
+            run_reads.once_per_run("folder", lambda: asked.append(1))
+    with run_reads.one_look():
+        run_reads.once_per_run("folder", lambda: asked.append(1))
+
+    assert asked == [1, 1]
