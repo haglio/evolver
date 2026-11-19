@@ -22,6 +22,7 @@ from gui.run_history import RunHistory
 from gui.run_record import RunRecord
 from gui.settings import EvolverSettings
 from gui.single_instance import Outcome
+from tests import RUN_STATE
 from tests.gui_support import (
     EMPTY_QUEUE,
     QAPP,
@@ -53,7 +54,11 @@ class TestTheSuiteItself:
     def test_the_suite_reads_the_committed_examples(self):
         why = "a run here must match a public checkout, never the developer's own files"
         assert content_overlay.LOCAL_CONTENT == content_overlay.EXAMPLE_CONTENT, why
-        assert os.environ[haglio_settings.SETTINGS_ENV] == haglio_settings.THE_EXAMPLE, why
+        assert haglio_settings.load() == haglio_settings.example_inside(RUN_STATE), why
+
+    def test_the_suites_settings_name_no_folder_outside_the_suites_own_scratch(self):
+        assert haglio_settings.reaching_outside(haglio_settings.load(), RUN_STATE) == []
+        assert config.LIBRARY_ROOT.is_relative_to(RUN_STATE)
 
     def test_tests_build_evolver_apps_only_through_build_evolver_app(self):
         builders = sorted(
