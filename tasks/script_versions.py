@@ -9,6 +9,7 @@ from pathlib import Path
 from app_support.video_names import strip_processing_suffixes
 
 from util import lanes
+from util.media_files import ListedSizes
 from util.script_library import copy_script, script_path_for_video
 
 log = logging.getLogger(__name__)
@@ -49,16 +50,15 @@ def copy_missing_version_scripts(video_index: dict[str, list[Path]], videos_root
         for video_path in matches:
             groups[version_key(video_path, videos_root)].append(video_path)
 
+    scripts = ListedSizes()
     for (_, normalized_stem), videos in sorted(groups.items()):
         if len(videos) <= 1:
             continue
 
-        missing_targets = [video for video in videos if not script_path_for_video(video).exists()]
-        if not missing_targets:
-            continue
-
-        existing_sources = [video for video in videos if script_path_for_video(video).exists()]
-        if not existing_sources:
+        scripted = {video: scripts.size(script_path_for_video(video)) is not None for video in videos}
+        missing_targets = [video for video in videos if not scripted[video]]
+        existing_sources = [video for video in videos if scripted[video]]
+        if not missing_targets or not existing_sources:
             continue
 
         for target_video in sorted(missing_targets):

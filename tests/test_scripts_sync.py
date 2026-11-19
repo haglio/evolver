@@ -987,3 +987,25 @@ class TestFollowRetiredVideos(unittest.TestCase):
 class TestScriptsSyncResultSurface(unittest.TestCase):
     def test_the_result_carries_only_what_a_reader_consults(self):
         assert {f.name for f in dataclasses.fields(scripts_sync.ScriptsSyncResult)} == {"moved", "already_aligned", "unmatched", "ambiguous", "collisions", "copied_variants", "ambiguous_variant_groups", "variant_copy_errors", "rehomed_to_variants", "followed_to_archive", "discarded_duplicates", "not_checked", "unreachable", "unmatched_paths", "ambiguous_paths", "collision_paths", "variant_copy_error_paths"}
+
+
+class TestAsksTheDiskNoQuestionPerScript(unittest.TestCase):
+    def test_many_versions_are_scripted_without_asking_about_any_script_one_by_one(self):
+        with workspace_temp_dir() as root:
+            video_root, script_root = root / "videos", root / "scripts"
+            sorted_folder = Path("2D", "AI", "1_sorted", "src", "portrait")
+            enhanced_folder = Path("kino", "2D", "AI", "portrait", "src")
+            for number in range(5):
+                _write(video_root / sorted_folder / f"clip {number}.mp4",
+                       video_root / enhanced_folder / f"clip {number}_topaz.mp4",
+                       script_root / sorted_folder / f"clip {number}.funscript")
+            asked = []
+            real_exists, real_is_file = Path.exists, Path.is_file
+
+            with library_overrides(video_root, script_root), \
+                    patch.object(Path, "exists", lambda path, *a, **k: asked.append(path) or real_exists(path, *a, **k)), \
+                    patch.object(Path, "is_file", lambda path, *a, **k: asked.append(path) or real_is_file(path, *a, **k)):
+                result = scripts_sync.run()
+
+            assert result.copied_variants == 5
+            assert not [path for path in asked if path.suffix == ".funscript"]
