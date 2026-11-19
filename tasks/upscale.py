@@ -28,6 +28,7 @@ from util import (
 )
 from util.alert import show_error
 from util.media_files import (
+    ListedSizes,
     child_dirs,
     is_finalized_video_file,
     library_videos,
@@ -298,12 +299,13 @@ def collect_queued_videos(
     remakes: list[tuple[Path, str, str]] = []
     seen: set[Path] = set()
     made_by = _WhatMadeTheUpscales()
+    listed = ListedSizes()
 
-    def add_candidate(in_file: Path, source: str, orient: str) -> bool:
-        if in_file in seen or not in_file.exists():
+    def add_candidate(in_file: Path, source: str, orient: str, *, listed_there: bool = False) -> bool:
+        if in_file in seen or not (listed_there or in_file.exists()):
             return False
         seen.add(in_file)
-        due = _due(source, orient, in_file.stem, made_by)
+        due = _due(source, orient, in_file.stem, made_by, listed)
         if due is _Due.REMADE:
             remakes.append((in_file, source, orient))
         elif due is _Due.MADE:
@@ -333,11 +335,13 @@ def collect_queued_videos(
             if not in_root.is_dir():
                 continue
             for in_file in library_videos(in_root):
-                if add_candidate(in_file, source, orient) and limit is not None and len(candidates) >= limit:
+                if (add_candidate(in_file, source, orient, listed_there=True)
+                        and limit is not None and len(candidates) >= limit):
                     return candidates
 
     for flick in lanes.flicks_never_upscaled():
-        if (add_candidate(flick.video, flick.source, ffprobe.orientation_of(flick.video))
+        if (add_candidate(flick.video, flick.source, ffprobe.orientation_of(flick.video),
+                          listed_there=True)
                 and limit is not None and len(candidates) >= limit):
             return candidates
 
@@ -440,25 +444,34 @@ class _Due(Enum):
     REMADE = auto()
 
 
-def _due(source: str, orient: str, sorted_stem: str, made_by: _MadeBy) -> _Due:
+def _due(source: str, orient: str, sorted_stem: str, made_by: _MadeBy, listed: ListedSizes) -> _Due:
     out = lanes.upscale_of(source, orient, sorted_stem)
     if out is None:
         return _Due.NOTHING
-    if not _already_made(source, sorted_stem):
+    if not _already_made(source, sorted_stem, listed):
         return _Due.MADE
-    if out.is_file() and _made_by_superseded_settings(source, out, made_by):
+    if listed.size(out) is not None and _made_by_superseded_settings(source, out, made_by):
         return _Due.REMADE
     return _Due.NOTHING
 
 
+class UpscalesLookedAt:
+    def __init__(self) -> None:
+        self._made_by = _WhatMadeTheUpscales()
+        self._listed = ListedSizes()
+
+    def awaits_its_upscale(self, sorted_copy: Path, source: str, orient: str) -> bool:
+        return _due(source, orient, sorted_copy.stem, self._made_by, self._listed) is not _Due.NOTHING
+
+
 def awaits_its_upscale(sorted_copy: Path, source: str, orient: str) -> bool:
-    return _due(source, orient, sorted_copy.stem, _WhatMadeTheUpscales()) is not _Due.NOTHING
+    return UpscalesLookedAt().awaits_its_upscale(sorted_copy, source, orient)
 
 
-def _already_made(source: str, sorted_stem: str) -> bool:
+def _already_made(source: str, sorted_stem: str, listed: ListedSizes | None = None) -> bool:
+    listed = ListedSizes() if listed is None else listed
     made = {lanes.upscale_of(source, orient, sorted_stem) for orient in orientation.SORTED} - {None}
-    return any(spot.exists() and spot.stat().st_size > 0
-               for upscale in made for spot in (upscale, lanes.in_trash(upscale)))
+    return any(listed.size(spot) for upscale in made for spot in (upscale, lanes.in_trash(upscale)))
 
 
 def _show_low_disk_warning(upscales_dir: Path, floor_gb: float, dismissed: Path) -> None:

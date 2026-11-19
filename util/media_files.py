@@ -68,6 +68,26 @@ def library_files(root: Path):
     yield from _walked(root)
 
 
+class ListedSizes:
+    def __init__(self) -> None:
+        self._sizes: dict[Path, dict[str, int]] = {}
+
+    def size(self, path: Path) -> int | None:
+        folder = path.parent
+        if folder not in self._sizes:
+            self._sizes[folder] = _file_sizes_in(folder)
+        return self._sizes[folder].get(os.path.normcase(path.name))
+
+
+def _file_sizes_in(folder: Path) -> dict[str, int]:
+    try:
+        with os.scandir(folder) as listing:
+            return {os.path.normcase(entry.name): entry.stat().st_size
+                    for entry in listing if entry.is_file()}
+    except OSError:
+        return {}
+
+
 def reachable(folder: Path) -> bool:
     try:
         with os.scandir(folder.anchor):

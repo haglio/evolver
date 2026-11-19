@@ -224,3 +224,24 @@ class TestGenauDeliverResultSurface(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+def _listings_of_the_sorted_folders_with(delivered_before: int) -> int:
+    with _genau_lane() as lib:
+        for number in range(delivered_before):
+            _upscaled(lib, stem=f"loop {number}")[1].unlink()
+        _, original = _upscaled(lib, stem="loop new", orient="portrait")
+        sorted_dir = str(lib.sorted_dir / GENAU_SOURCE)
+        listed = []
+        real_scandir = os.scandir
+        with patch("os.scandir", lambda folder=".": listed.append(str(folder)) or real_scandir(folder)):
+            result = genau_deliver.run()
+
+        assert (result.delivered, original.exists()) == (1, False)
+        return sum(1 for folder in listed if folder.startswith(sorted_dir))
+
+
+class TestLooksOnceAtTheSortedCopies:
+    def test_the_sorted_folders_are_listed_no_more_often_however_many_flicks_were_delivered_before(self):
+        assert _listings_of_the_sorted_folders_with(8) == _listings_of_the_sorted_folders_with(1)
