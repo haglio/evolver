@@ -117,6 +117,16 @@ class TestBuildingIsNotStarting:
             build_evolver_app(request)
         load.assert_not_called()
 
+    def test_a_run_that_finished_joins_the_run_history_without_it_being_read_again(self, request):
+        app = build_evolver_app(request)
+        record = make_run_record()
+
+        with patch("gui.main_window.newest_runs", side_effect=AssertionError("read the history again")), \
+                patch("gui.failed_stages_notice.show_error"):
+            app._runs.run_finished.emit(record)
+
+        assert app._window._records[0] is record
+
     def test_starting_does_all_four(self, request):
         app = build_evolver_app(request)
         with patch("gui.app.process_identity.claim") as claim, \

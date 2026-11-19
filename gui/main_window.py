@@ -206,6 +206,7 @@ class EvolverMainWindow(QMainWindow):
         splitter.setSizes([300, 700])
 
         self._records: list[RunRecord] = []
+        self._runs_shown = config.RUNS_SHOWN
 
     def _build_toolbar(self):
         toolbar = QToolBar()
@@ -286,7 +287,13 @@ class EvolverMainWindow(QMainWindow):
         self.nonai_switch.setChecked(enabled)
 
     def refresh_history(self):
-        self._records = newest_runs(config.RUNS_DIR, config.RUNS_SHOWN)
+        self._show_history(newest_runs(config.RUNS_DIR, self._runs_shown))
+
+    def add_run(self, record: RunRecord) -> None:
+        self._show_history([record, *self._records][:self._runs_shown])
+
+    def _show_history(self, records: list[RunRecord]) -> None:
+        self._records = records
         self._history_list.clear()
         for record in self._records:
             item = QListWidgetItem(

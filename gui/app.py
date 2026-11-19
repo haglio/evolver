@@ -141,7 +141,7 @@ class EvolverApp:
         self._queue.run_wanted.connect(self._runs.start_when_free)
         self._queue.presence_poll_wanted.connect(self._presence.poll)
         self._runs.run_ended.connect(self._scheduler.mark_idle)
-        self._runs.run_ended.connect(self._window.refresh_history)
+        self._runs.run_finished.connect(self._window.add_run)
         self._runs.run_ended.connect(self._queue.refresh)
 
         shared_commands = {

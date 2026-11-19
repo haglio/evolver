@@ -104,6 +104,22 @@ class TestRunHistoryMarks:
         assert "34" in info
         assert "99" not in info
 
+    def test_a_run_that_ends_joins_the_list_without_the_history_being_read_again(self):
+        self.window = EvolverMainWindow()
+        older = [make_run_record(id=f"2026-07-25T15-{minute:02d}-02") for minute in (10, 0)]
+        with patch("gui.main_window.newest_runs", return_value=older):
+            self.window.refresh_history()
+        newest = make_run_record(id="2026-07-25T15-20-02", duration_seconds=34.0)
+
+        self.window._runs_shown = 2
+        with patch("gui.main_window.newest_runs", side_effect=AssertionError("read the history again")):
+            self.window.add_run(newest)
+
+        assert self.window._records == [newest, older[0]]
+        assert self.window._history_list.count() == 2
+        assert self.window._history_list.currentRow() == 0
+        assert "34" in self.window._detail_widget._info_label.text()
+
     def test_closing_the_window_hides_it_to_the_tray_instead(self):
         self.window = EvolverMainWindow()
         self.window.show()
