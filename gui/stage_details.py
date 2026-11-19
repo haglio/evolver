@@ -216,6 +216,7 @@ SKIP_REASONS: dict[str, str] = {
         "Waited: a LoRA started with Origenerator's Train button is training on the graphics card",
     "topaz_busy": "Waited: Topaz is enhancing a video Evolver did not start",
     "cpu_busy": "Waited: the computer's processor was too busy",
+    "session_live": "Waited: a Funestra was playing",
     topaz.SIGN_IN_EXPIRED:
         "Waited: Topaz Video's sign-in has expired; open the Topaz Video app and sign in",
     "upscale_pending":

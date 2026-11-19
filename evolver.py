@@ -10,6 +10,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from types import MappingProxyType
 
+from app_support import live_session
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 import check_correspondence
@@ -92,6 +93,9 @@ def _upscale(this_run: ThisRun) -> StageResult | Skipped:
     if not upscale.has_pending_work(priority_files=priority_files):
         log.info("No videos are waiting to be enhanced. Skipping enhancing.")
         return Skipped(_NO_PENDING_WORK)
+    if live_session.is_live():
+        log.info("Skipping enhancing: a Funestra is playing.")
+        return Skipped("session_live")
     downtime = this_run.outcome_of("origenerator_downtime")
     if isinstance(downtime, DowntimeResult) and downtime.holds_the_graphics_card:
         log.info("Skipping enhancing: Origenerator is training a LoRA on the graphics card.")

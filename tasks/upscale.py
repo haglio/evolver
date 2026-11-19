@@ -11,6 +11,7 @@ from enum import Enum, auto
 from functools import partial
 from pathlib import Path
 
+from app_support import live_session
 from app_support.gallery_rows import VideoRows
 
 import config
@@ -41,6 +42,12 @@ from util.origenerator_gallery import EVOLVER_UPSCALE, UPSCALE_PROVENANCE
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
+
+SESSION_LOOKED_FOR_EVERY_S = 2.0
+
+
+class SessionBegan(Exception):
+    pass
 
 _SORTED_DEPTH = 3
 
@@ -108,6 +115,7 @@ class _Outcome(Enum):
     UPSCALED = auto()
     FAILED = auto()
     BUDGET_SPENT = auto()
+    SESSION_BEGAN = auto()
 
 
 @dataclass(frozen=True)
@@ -143,6 +151,7 @@ def run(
     folders: UpscaleFolders | None = None,
     low_disk: LowDiskWarning | None = None,
     gallery: GalleryRecords | None = None,
+    session_is_live: Callable[[], bool] = live_session.is_live,
 ) -> UpscaleResult:
     listeners = Listeners() if listeners is None else listeners
     gallery = GalleryRecords() if gallery is None else gallery
@@ -168,20 +177,12 @@ def run(
     )
 
     for candidate in candidates:
-        if budget.too_little_left_for_another(bool(result.processed or result.failed)):
-            log.info(
-                "Stopping enhancing before starting another video to stay under the run budget "
-                "(elapsed %.1f min, remaining %.1f min).",
-                budget.elapsed() / 60,
-                max(budget.remaining(), 0) / 60,
-            )
-            break
-
-        if system_resources.free_gb(lanes.kino_upscales_dir()) < low_disk.floor_gb:
+        stopping = _why_stop_before_another(bool(result.processed or result.failed), budget, low_disk,
+                                            session_is_live)
+        if stopping == _LOW_DISK:
             result.deferred_low_disk = True
             result.pending_after_run = total_pending - result.processed - result.failed
-            _show_low_disk_warning(lanes.kino_upscales_dir(), low_disk.floor_gb, low_disk.dismissed_file)
-            log.warning("Stopping enhancing early due to low free disk space.")
+        if stopping:
             break
 
         def filed(out: Path, settings: topaz.Settings, source: str = candidate[1],
@@ -192,7 +193,9 @@ def run(
             if in_file.parent == out.parent:
                 genau_flicks.take_the_place_of(in_file, out)
 
-        outcome = _upscale_one(candidate, env, folders, budget, filed)
+        outcome = _upscale_one(candidate, env, folders, budget, filed, session_is_live)
+        if outcome is _Outcome.SESSION_BEGAN:
+            break
         if outcome is _Outcome.UPSCALED:
             result.processed += 1
         elif outcome is _Outcome.FAILED:
@@ -215,6 +218,29 @@ def run(
     return result
 
 
+_LOW_DISK = "low_disk"
+
+
+def _why_stop_before_another(already_worked: bool, budget: _Budget, low_disk: LowDiskWarning,
+                             session_is_live: Callable[[], bool]) -> str:
+    if session_is_live():
+        log.info("Stopping enhancing before starting another video: a Funestra is playing.")
+        return "session_live"
+    if budget.too_little_left_for_another(already_worked):
+        log.info(
+            "Stopping enhancing before starting another video to stay under the run budget "
+            "(elapsed %.1f min, remaining %.1f min).",
+            budget.elapsed() / 60,
+            max(budget.remaining(), 0) / 60,
+        )
+        return "budget"
+    if system_resources.free_gb(lanes.kino_upscales_dir()) < low_disk.floor_gb:
+        _show_low_disk_warning(lanes.kino_upscales_dir(), low_disk.floor_gb, low_disk.dismissed_file)
+        log.warning("Stopping enhancing early due to low free disk space.")
+        return _LOW_DISK
+    return ""
+
+
 def _prepare_the_lane_folders(low_disk: LowDiskWarning):
     kino = lanes.kino_upscales_dir()
     for orient in orientation.SORTED:
@@ -232,7 +258,8 @@ def _prepare_the_lane_folders(low_disk: LowDiskWarning):
 
 
 def _upscale_one(candidate: tuple[Path, str, str], env: dict, folders: UpscaleFolders,
-                 budget: _Budget, filed: Callable[[Path, topaz.Settings], None]) -> _Outcome:
+                 budget: _Budget, filed: Callable[[Path, topaz.Settings], None],
+                 session_is_live: Callable[[], bool] = live_session.is_live) -> _Outcome:
     in_file, source, orient = candidate
     out = lanes.upscale_of(source, orient, in_file.stem)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -244,7 +271,12 @@ def _upscale_one(candidate: tuple[Path, str, str], env: dict, folders: UpscaleFo
 
     ffmpeg_ok = False
     try:
-        ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, settings, timeout=budget.encode_timeout())
+        ffmpeg_ok = _run_ffmpeg(in_file, tmp, env, settings, timeout=budget.encode_timeout(),
+                                session_is_live=session_is_live)
+    except SessionBegan:
+        log.info("A Funestra started playing; stopped this encode and left the video queued: %s", in_file)
+        tmp.unlink(missing_ok=True)
+        return _Outcome.SESSION_BEGAN
     except subprocess.TimeoutExpired:
         log.info(
             "Run budget spent after %.1fs; stopped this encode and left the video queued: %s",
@@ -350,12 +382,29 @@ def collect_queued_videos(
 
 
 def _run_ffmpeg(in_file: Path, tmp: Path, env: dict, settings: topaz.Settings,
-                timeout: float | None = None) -> bool:
-    return subprocess.run(
-        topaz.command(in_file, tmp, settings), env=env, timeout=timeout,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    ).returncode == 0
+                timeout: float | None = None, *, popen=subprocess.Popen,
+                session_is_live: Callable[[], bool] = live_session.is_live) -> bool:
+    encode = popen(
+        topaz.command(in_file, tmp, settings), env=env,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.BELOW_NORMAL_PRIORITY_CLASS,
+    )
+    ends_by = None if timeout is None else time.monotonic() + timeout
+    while True:
+        try:
+            return encode.wait(timeout=SESSION_LOOKED_FOR_EVERY_S) == 0
+        except subprocess.TimeoutExpired:
+            if session_is_live():
+                _end(encode)
+                raise SessionBegan from None
+            if ends_by is not None and time.monotonic() >= ends_by:
+                _end(encode)
+                raise
+
+
+def _end(encode) -> None:
+    encode.kill()
+    encode.wait()
 
 
 _MadeBy = Callable[[Path], "dict | None"]
