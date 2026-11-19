@@ -41,22 +41,31 @@ def kept_by_another_app(path: Path) -> bool:
 
 def _walked(root: Path):
     left_out = config.kept_by_other_apps()
-    for folder, subfolders, names in root.walk():
-        subfolders[:] = [name for name in subfolders if folder / name not in left_out]
-        for name in names:
-            yield folder / name
+    folders = [root]
+    while folders:
+        folder = folders.pop()
+        try:
+            with os.scandir(folder) as listing:
+                entries = list(listing)
+        except OSError:
+            continue
+        for entry in entries:
+            path = folder / entry.name
+            if entry.is_dir(follow_symlinks=False):
+                if path not in left_out:
+                    folders.append(path)
+            elif entry.is_file():
+                yield path
 
 
 def library_videos(root: Path):
     for path in _walked(root):
-        if is_finalized_video_file(path):
+        if _is_finished_video_name(path):
             yield path
 
 
 def library_files(root: Path):
-    for path in _walked(root):
-        if path.is_file():
-            yield path
+    yield from _walked(root)
 
 
 def reachable(folder: Path) -> bool:

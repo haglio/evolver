@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import inspect
 import logging
 import os
@@ -32,6 +33,14 @@ from util.media_files import (
 _IN_USE = PermissionError(32, "The process cannot access the file")
 
 
+def _no_question_about_one_file():
+    asked = AssertionError("asked the disk about one file")
+    stack = contextlib.ExitStack()
+    for target in ("os.stat", "os.path.isfile", "pathlib.Path.is_file", "pathlib.Path.stat"):
+        stack.enter_context(patch(target, side_effect=asked))
+    return stack
+
+
 class TestLibraryVideos(unittest.TestCase):
     def test_finds_finished_videos_at_any_depth_and_skips_partials(self):
         with workspace_temp_dir() as root:
@@ -60,6 +69,21 @@ class TestLibraryVideos(unittest.TestCase):
     def test_a_root_that_is_not_there_yields_nothing(self):
         with workspace_temp_dir() as root, override_config(VIDEO_EXTENSIONS={".mp4"}):
             assert list(library_videos(root / "nope")) == []
+
+    def test_many_videos_are_found_without_asking_the_disk_about_any_one(self):
+        with workspace_temp_dir() as root:
+            videos = [root / folder / f"clip {number}.mp4" for folder in ("a", "b") for number in range(5)]
+            for video in videos:
+                video.parent.mkdir(parents=True, exist_ok=True)
+                video.write_bytes(b"video")
+            (root / "a" / "notes.txt").write_text("notes", encoding="utf-8")
+
+            with override_config(VIDEO_EXTENSIONS={".mp4"}), _no_question_about_one_file():
+                found = sorted(library_videos(root))
+                files = sorted(media_files.library_files(root))
+
+        assert found == sorted(videos)
+        assert files == sorted([*videos, root / "a" / "notes.txt"])
 
 
 class TestListedVideos(unittest.TestCase):
