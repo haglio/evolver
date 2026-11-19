@@ -13,6 +13,7 @@ _FAILED = "failed"
 class ScrapedRecords:
     def __init__(self, file: Path) -> None:
         self._file = file
+        self._contents: dict | None = None
 
     def staged(self, upscale: Path) -> dict | None:
         entry = self._section(_RECORDS).get(path_key(upscale))
@@ -35,7 +36,9 @@ class ScrapedRecords:
         self._change(_FAILED, path_key(upscale), f"{video.name}\n{error}")
 
     def _section(self, name: str) -> dict:
-        section = read_json_or_empty(self._file).get(name)
+        if self._contents is None:
+            self._contents = read_json_or_empty(self._file)
+        section = self._contents.get(name)
         return section if isinstance(section, dict) else {}
 
     def _change(self, name: str, key: str, value: object) -> None:
@@ -47,4 +50,4 @@ class ScrapedRecords:
                 section[key] = value
             return {**current, name: section}
 
-        locked_update(self._file, changed)
+        self._contents = locked_update(self._file, changed)
