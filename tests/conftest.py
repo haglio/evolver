@@ -3,12 +3,19 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from app_support import testing
 
 import config
 import gui.app
 from tasks import origenerator_commands
 from tests import gui_support  # noqa: F401  -- builds the shared QApplication
 from util import alert, origenerator_gallery
+
+
+@pytest.fixture(autouse=True)
+def _no_session_of_his_is_live_unless_a_test_says_so():
+    with testing.no_session_live():
+        yield
 
 
 @pytest.fixture(autouse=True)

@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from app_support import processes
+from app_support import live_session, processes
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 from app_support.win32 import seconds_since_input
 
@@ -233,7 +233,10 @@ def _cooling_down(cooldown_file: Path, settings: EncodeSettings) -> bool:
     return since_last_encode < settings.cooldown_minutes * 60
 
 
-def user_present(settings: EncodeSettings, *, idle_seconds=None) -> bool:
+def user_present(settings: EncodeSettings, *, idle_seconds=None,
+                 session_is_live: Callable[[], bool] = live_session.is_live) -> bool:
+    if session_is_live():
+        return True
     try:
         idle = (idle_seconds or seconds_since_input)()
     except OSError:
