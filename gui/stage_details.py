@@ -252,6 +252,7 @@ _SCRIPTS_ROUTINE = (
     ("copied_variants", "copied to a version"),
     ("rehomed_to_variants", "rehomed to a version still in the library"),
     ("followed_to_archive", "followed a retired video out of the library"),
+    ("followed_renames", "followed a video renamed by hand"),
     ("discarded_duplicates", "duplicate discarded"),
     ("already_aligned", "already aligned"),
 )
