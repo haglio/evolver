@@ -4,6 +4,7 @@ import json
 import logging
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,7 +19,9 @@ log = logging.getLogger(__name__)
 DOWNTIME = "downtime_command"
 GALLERY_ENTRIES = "outside_video_entries_command"
 RECORDS = "records_command"
-_GIVEN_SECONDS = {DOWNTIME: 8 * 60, GALLERY_ENTRIES: 2 * 60, RECORDS: 2 * 60}
+PHONES_FILE = "phones_file_command"
+_GIVEN_SECONDS = {DOWNTIME: 8 * 60, GALLERY_ENTRIES: 2 * 60, RECORDS: 2 * 60, PHONES_FILE: 2 * 60}
+_LEFT_FOR_ONE_REWRITE: list[dict] = []
 _UNANSWERED = (OSError, subprocess.TimeoutExpired, ValueError, KeyError, IndexError, TypeError)
 
 
@@ -41,8 +44,12 @@ def published_command(checkout: Path, name: str) -> tuple[str, ...] | None:
     return command or None
 
 
+def _origenerators(checkout: Path | None) -> Path:
+    return config.ORIGENERATOR_PROJECT_DIR if checkout is None else checkout
+
+
 def _answer(name: str, checkout: Path | None, runner, *verb: str) -> dict | None:
-    checkout = config.ORIGENERATOR_PROJECT_DIR if checkout is None else checkout
+    checkout = _origenerators(checkout)
     command = published_command(checkout, name)
     if command is None:
         return None
@@ -91,6 +98,25 @@ def _run_unseen(*args, **options):
     return subprocess.run(*args, check=False, **options)
 
 
+@contextmanager
+def one_rewrite_of_the_phones_file():
+    left: dict = {}
+    _LEFT_FOR_ONE_REWRITE.append(left)
+    try:
+        yield
+    finally:
+        _LEFT_FOR_ONE_REWRITE.remove(left)
+        for checkout, runner in left.items():
+            _rewrite_the_phones_file(checkout, runner)
+
+
+def _rewrite_the_phones_file(checkout: Path, runner) -> None:
+    try:
+        _answer(PHONES_FILE, checkout, runner)
+    except _UNANSWERED as e:
+        log.warning("Origenerator could not rewrite the phone's records file: %s", e)
+
+
 class GalleryRecords:
     def __init__(self, checkout: Path | None = None, *, runner=None) -> None:
         self._checkout = checkout
@@ -109,6 +135,13 @@ class GalleryRecords:
     def upscaled(self, video: Path, provenance: dict) -> Handed | None:
         return self._hand_over("upscaled", "--video", str(video), provenance=provenance)
 
+    def _leaving_the_phones_file(self) -> tuple[str, ...]:
+        checkout = _origenerators(self._checkout)
+        if not _LEFT_FOR_ONE_REWRITE or published_command(checkout, PHONES_FILE) is None:
+            return ()
+        _LEFT_FOR_ONE_REWRITE[-1][checkout] = self._runner or _run_unseen
+        return ("--leave-the-phones-file",)
+
     def _hand_over(self, *verb: str, **handed: object) -> Handed | None:
         with tempfile.TemporaryDirectory(prefix="evolver-to-the-gallery-") as folder:
             files = []
@@ -118,7 +151,7 @@ class GalleryRecords:
                 files += [f"--{flag}", str(file)]
             try:
                 said = _answer(RECORDS, self._checkout, self._runner or _run_unseen,
-                               *verb, *files)
+                               *verb, *files, *self._leaving_the_phones_file())
                 answer = None if said is None else Handed(int(said["done"]), int(said["no_row"]))
             except _UNANSWERED as e:
                 log.warning("%s could not be handed to Origenerator's gallery: %s", verb[0], e)

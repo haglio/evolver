@@ -231,3 +231,36 @@ def test_videos_the_gallery_has_no_row_for_are_counted_in_the_log(tmp_path, capl
         gallery.watched({tmp_path / "a.mp4": {}, tmp_path / "b.mp4": {}, tmp_path / "c.mp4": {}})
 
     assert "no row for 2 of the videos" in caplog.text
+
+
+PHONES_FILE = [*RECORDS, "phones_file"]
+
+
+def test_a_run_leaves_the_phones_file_for_one_rewrite_once_its_videos_are_handed_over(tmp_path):
+    handed = []
+    gallery = origenerator_commands.GalleryRecords(
+        _checkout(tmp_path, records_command=RECORDS, phones_file_command=PHONES_FILE),
+        runner=_handing_over('{"done": 1, "no_row": 0}', handed))
+
+    with origenerator_commands.one_rewrite_of_the_phones_file():
+        for n in range(3):
+            gallery.favorite(tmp_path / f"video {n}.mp4", True)
+
+    assert [args[3:] for args, _options, _given in handed] == [
+        *(["favorite", "--video", str(tmp_path / f"video {n}.mp4"), "--on",
+           "--leave-the-phones-file"] for n in range(3)),
+        ["phones_file"],
+    ]
+
+
+def test_an_origenerator_that_offers_no_single_rewrite_rewrites_it_with_every_video(tmp_path):
+    handed = []
+    gallery = origenerator_commands.GalleryRecords(
+        _checkout(tmp_path, records_command=RECORDS),
+        runner=_handing_over('{"done": 1, "no_row": 0}', handed))
+
+    with origenerator_commands.one_rewrite_of_the_phones_file():
+        gallery.favorite(tmp_path / "video.mp4", True)
+
+    assert [args[3:] for args, _options, _given in handed] == [
+        ["favorite", "--video", str(tmp_path / "video.mp4"), "--on"]]
