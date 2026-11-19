@@ -12,10 +12,10 @@ from functools import partial
 from app_support import production_update
 from app_support.loading_screen import AppWindow, meeting_place
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
-from shared_ui.colors import family_palette
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon
+from shared_ui.asking import asked
+from shared_ui.colors import dress_application
 from shared_ui.loading_window import Loading, LoadingCanceled
-from shared_ui.tooltip_shape import shape_long_tooltips
 
 import config
 from gui import branch_session, peer_watch, process_identity, single_instance
@@ -94,8 +94,7 @@ class EvolverApp:
         self._app = app
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("Evolver")
-        app.setPalette(family_palette(app.palette()))
-        shape_long_tooltips(app)
+        dress_application(app)
 
         self._checkout = config.PROJECT_DIR
         self._settings = EvolverSettings.load()
@@ -302,14 +301,7 @@ class EvolverApp:
         self._shutdown()
 
     def _confirm_quit(self):
-        result = QMessageBox.question(
-            self._window,
-            "Quit Evolver",
-            self._session.quit_question(),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if result == QMessageBox.StandardButton.Yes:
+        if asked(self._window, "Quit Evolver", self._session.quit_question()):
             self._session.quit()
 
     def _restart(self):
