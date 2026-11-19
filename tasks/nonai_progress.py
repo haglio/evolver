@@ -7,8 +7,7 @@ from pathlib import Path
 from app_support.video_names import strip_processing_suffixes
 
 from util import sidecar, video_kind
-from util.media_files import is_finalized_video_file
-from util.nonai_library import buckets
+from util.nonai_library import videos_by_bucket
 from util.versions import is_processed_stem
 
 
@@ -24,8 +23,10 @@ class Progress:
         return None if total <= 0 else round(self.done_seconds / total * 100)
 
 
-def so_far(queue_already_collected: Iterable[Path]) -> Progress:
-    done_seconds, unmeasured = _total(_originals_running_times_off_their_upscales().values())
+def so_far(queue_already_collected: Iterable[Path],
+           by_bucket: dict[Path, list[Path]] | None = None) -> Progress:
+    by_bucket = videos_by_bucket() if by_bucket is None else by_bucket
+    done_seconds, unmeasured = _total(_originals_running_times_off_their_upscales(by_bucket).values())
     remaining_seconds, still_unmeasured = _total(_recorded_duration(video)
                                                  for video in queue_already_collected)
     return Progress(done_seconds, remaining_seconds, unmeasured + still_unmeasured)
@@ -41,12 +42,11 @@ def _total(durations: Iterable[float | None]) -> tuple[float, int]:
     return total, unmeasured
 
 
-def _originals_running_times_off_their_upscales() -> dict[str, float | None]:
+def _originals_running_times_off_their_upscales(
+        by_bucket: dict[Path, list[Path]]) -> dict[str, float | None]:
     found: dict[str, float | None] = {}
-    for bucket in buckets():
-        for video in sorted(bucket.rglob("*")):
-            if not is_finalized_video_file(video):
-                continue
+    for videos in by_bucket.values():
+        for video in videos:
             if not is_processed_stem(video.stem):
                 continue
             original = strip_processing_suffixes(video.stem)

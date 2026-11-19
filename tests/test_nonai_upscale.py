@@ -4,6 +4,7 @@ import json
 import threading
 import time
 import unittest
+import unittest.mock
 
 from app_support import funscript
 
@@ -24,7 +25,16 @@ from tests.temp_helpers import (
 from tests.temp_helpers import (
     nonai_library_overrides as library_overrides,
 )
-from util import nonai_job, orientation, provenance, script_library, sidecar, topaz, video_kind
+from util import (
+    media_files,
+    nonai_job,
+    orientation,
+    provenance,
+    script_library,
+    sidecar,
+    topaz,
+    video_kind,
+)
 from util.media_files import partial_path
 
 
@@ -1484,3 +1494,24 @@ class TestReportingHowFarAlongItIs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOneWalkPerRun(unittest.TestCase):
+    def test_a_run_that_starts_one_of_many_walks_the_non_ai_folder_once(self):
+        with workspace_temp_dir() as root:
+            overrides = library_overrides(root)
+            non_ai = overrides["NON_AI_DIR"]
+            for number in range(4):
+                make_video(non_ai / "lagoon" / "0 unsorted" / f"scene {number}.mp4")
+            make_video(non_ai / "lagoon" / "3_good_to_go" / "done_apo8_iris2.mp4")
+            walks = []
+            real_walked = media_files._walked
+
+            stack, _mocks = probes()
+            with override_config(**overrides), stack, unittest.mock.patch.object(
+                    media_files, "_walked", lambda folder: walks.append(folder) or real_walked(folder)):
+                result = nonai_upscale.run(nonai_upscale.RunMode(allow_start=True))
+
+            assert result.started == "lagoon/0 unsorted/scene 0.mp4"
+            assert result.pending == 4
+            assert walks == [non_ai]

@@ -34,7 +34,7 @@ def test_the_candidates_are_collected_from_its_three_lists():
         assert files.queued_videos() == ["a"]
 
     collect.assert_called_once_with(skip_list=Path("skip"), pin_list=Path("pin"),
-                                    watch_stats_file=Path("watch"))
+                                    watch_stats_file=Path("watch"), by_bucket=None)
 
 
 def test_a_file_name_it_does_not_have_is_refused():

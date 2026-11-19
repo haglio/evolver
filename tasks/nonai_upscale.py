@@ -10,7 +10,7 @@ import config
 from tasks import nonai_encode, nonai_progress, nonai_request
 from tasks.nonai_encode import EncodeSettings, StartAttempt
 from tasks.nonai_files import StageFiles, run_poll_and_window_lock
-from tasks.nonai_queue import add_to_skip_list, queue_key
+from tasks.nonai_queue import QueuedVideo, add_to_skip_list, listed_videos, queue_key
 from util import (
     ffprobe,
     nonai_job,
@@ -18,7 +18,7 @@ from util import (
     sidecar,
 )
 from util.media_files import reachable, remove_partial_files
-from util.nonai_library import buckets, stage_dirs
+from util.nonai_library import buckets, stage_dirs, videos_by_bucket
 from util.nonai_retire import carry_funscript, carry_metadata, retire_original
 from util.stage_result import StageResult
 
@@ -112,21 +112,24 @@ def run(mode: RunMode | None = None, files: StageFiles | None = None,
             result.unreachable_archive = supervised.unreachable_archive
             result.on_request = bool(result.in_flight and job.on_request)
 
+        by_bucket = videos_by_bucket()
+        queued = files.queued_videos(by_bucket)
         attempt = None
         if not result.in_flight and request is not None:
             attempt = nonai_request.start_requested(
-                request, files, settings, ai_waiting=mode.ai_waiting)
+                request, files, settings, queued, ai_waiting=mode.ai_waiting)
             result.on_request = bool(attempt.started)
         elif not result.in_flight and mode.allow_start and not mode.stop:
-            attempt = _start_next_queued_video(files, settings)
+            attempt = _start_next_queued_video(files, settings, queued)
         if attempt is not None:
             result.started = attempt.started
             result.start_deferred = attempt.deferred
             result.deferred_low_disk |= attempt.deferred_low_disk
 
-    queued = files.queued_videos()
+    skipped = set(listed_videos(files.skip_list))
+    queued = [queued_video for queued_video in queued if queue_key(queued_video.path) not in skipped]
     result.pending = len(queued)
-    progress = nonai_progress.so_far(queued_video.path for queued_video in queued)
+    progress = nonai_progress.so_far((queued_video.path for queued_video in queued), by_bucket)
     result.percent_complete = progress.percent
     result.remaining_seconds = progress.remaining_seconds
     result.unmeasured_videos = progress.unmeasured
@@ -272,7 +275,8 @@ def _sweep_orphaned_partials(keep: Path | None) -> None:
                 log.info("Removed %d stale partial output file(s) from %s", removed, done_dir)
 
 
-def _start_next_queued_video(files: StageFiles, settings: EncodeSettings) -> StartAttempt:
+def _start_next_queued_video(files: StageFiles, settings: EncodeSettings,
+                             queued: list[QueuedVideo]) -> StartAttempt:
     if nonai_encode.is_low_disk(settings):
         log.warning("Deferring non-AI enhancement start: free disk is below the safety floor.")
         return StartAttempt(deferred_low_disk=True)
@@ -281,7 +285,7 @@ def _start_next_queued_video(files: StageFiles, settings: EncodeSettings) -> Sta
         log.info("Deferring non-AI enhancement start: %s.", busy)
         return StartAttempt(deferred=busy)
 
-    for queued_video in files.queued_videos():
+    for queued_video in queued:
         if nonai_encode.start(queued_video, files):
             return StartAttempt(started=queue_key(queued_video.path))
     return StartAttempt()

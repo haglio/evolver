@@ -10,8 +10,8 @@ from app_support.video_names import strip_processing_suffixes
 
 import config
 from util import script_library
-from util.media_files import is_finalized_video_file
-from util.nonai_library import buckets, stage_dirs
+from util.media_files import ListedSizes
+from util.nonai_library import stage_dirs, videos_by_bucket
 from util.versions import is_processed_stem
 
 log = logging.getLogger(__name__)
@@ -28,19 +28,21 @@ class QueuedVideo:
     watch_score: float
 
 
-def collect_queued_videos(*, skip_list: Path, pin_list: Path,
-                       watch_stats_file: Path) -> list[QueuedVideo]:
+def collect_queued_videos(*, skip_list: Path, pin_list: Path, watch_stats_file: Path,
+                          by_bucket: dict[Path, list[Path]] | None = None) -> list[QueuedVideo]:
     queued_videos: list[QueuedVideo] = []
     skipped = set(listed_videos(skip_list))
     pinned = listed_videos(pin_list)
     watch_scores = _watch_scores(watch_stats_file)
-    for bucket in buckets():
-        processed_stems = _processed_stems(bucket)
+    scripts = ListedSizes()
+    for bucket, videos in (videos_by_bucket() if by_bucket is None else by_bucket).items():
+        processed_stems = processed_originals(videos)
+        in_folder: dict[Path, list[Path]] = {}
+        for video in videos:
+            in_folder.setdefault(video.parent, []).append(video)
         for triage_digit, triage_dir in stage_dirs(bucket, digits=(0, 1)):
             for scan_dir in _upscale_ready_dirs(triage_dir):
-                for video in sorted(scan_dir.iterdir()):
-                    if not is_finalized_video_file(video):
-                        continue
+                for video in sorted(in_folder.get(scan_dir, ())):
                     rel = queue_key(video)
                     if is_processed_stem(video.stem):
                         continue
@@ -49,7 +51,7 @@ def collect_queued_videos(*, skip_list: Path, pin_list: Path,
                     if rel in skipped:
                         continue
                     queued_videos.append(QueuedVideo(
-                        video, bucket, triage_digit, _has_funscript(video),
+                        video, bucket, triage_digit, _has_funscript(video, scripts),
                         watch_scores.get(str(video).strip().lower(), 0.0),
                     ))
     queued_videos.sort(key=lambda c: (
@@ -94,12 +96,8 @@ def _upscale_ready_dirs(triage_dir: Path) -> list[Path]:
     return [triage_dir] + [d for _, d in stage_dirs(triage_dir, digits=_SUBSTAGES_ALREADY_TRIMMED)]
 
 
-def _processed_stems(bucket: Path) -> set[str]:
-    stems = set()
-    for video in bucket.rglob("*"):
-        if is_finalized_video_file(video) and is_processed_stem(video.stem):
-            stems.add(strip_processing_suffixes(video.stem))
-    return stems
+def processed_originals(videos: list[Path]) -> set[str]:
+    return {strip_processing_suffixes(video.stem) for video in videos if is_processed_stem(video.stem)}
 
 
 def _watch_scores(path: Path) -> dict[str, float]:
@@ -110,8 +108,8 @@ def _watch_scores(path: Path) -> dict[str, float]:
     }
 
 
-def _has_funscript(video: Path) -> bool:
-    return script_library.script_path_for_video(video).is_file()
+def _has_funscript(video: Path, scripts: ListedSizes) -> bool:
+    return scripts.size(script_library.script_path_for_video(video)) is not None
 
 
 def _pin_rank(pinned: list[str], video: Path) -> int:
