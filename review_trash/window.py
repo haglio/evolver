@@ -22,7 +22,7 @@ from shared_ui.icons import qt_icon
 from shared_ui.spacing import MARGIN_STANDARD
 
 import config
-from util import trash_folders
+from util import run_reads, trash_folders
 from util.looping_preview import LoopingPreview
 from util.selection_highlight import SELECTION_HIGHLIGHT
 
@@ -105,7 +105,9 @@ class ReviewTrashWindow(QWidget):
             self.preview.show(video)
 
     def _look_again(self) -> None:
-        if trash_folders.non_ai_videos_in_trash() != [each.video for each in self._marked]:
+        with run_reads.one_look():
+            if trash_folders.non_ai_videos_in_trash() == [each.video for each in self._marked]:
+                return
             current = self.videos.currentItem()
             self._show(trash_folders.non_ai_in_trash(), self.videos.indexOfTopLevelItem(current),
                        current=_marked(current).video if current is not None else None,

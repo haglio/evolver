@@ -74,7 +74,11 @@ def kino_lane() -> UpscaleLane:
 
 
 def genau_lane() -> UpscaleLane:
-    return UpscaleLane(True, genau_delivery_dir(), config.GENAU_TRASH_DIR)
+    return UpscaleLane(True, genau_delivery_dir(), genau_trash_dir())
+
+
+def genau_trash_dir() -> Path:
+    return config.GENAU_TRASH_DIR
 
 
 def upscale_lanes() -> tuple[UpscaleLane, UpscaleLane]:
