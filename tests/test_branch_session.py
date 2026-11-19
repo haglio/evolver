@@ -12,6 +12,7 @@ import pytest
 from PySide6.QtWidgets import QMessageBox
 from shared_ui.palette import PREVIEW_INK
 from shared_ui.preview import Preview
+from shared_ui.testing import questions_answered
 
 from gui import branch_session
 from tests.gui_support import build_evolver_app
@@ -181,15 +182,14 @@ class TestHandingTheWorkBack:
         assert steps.mock_calls == [call.leaving()]
         assert "stepping aside" in logged.call_args.args[0].lower()
 
-    def test_the_windows_quit_says_the_work_goes_back_before_it_does(self, request):
+    def test_the_windows_quit_says_the_work_goes_back_before_it_does(self, request, monkeypatch):
         app = self._started_preview(request)
+        asked = questions_answered(monkeypatch, QMessageBox.StandardButton.No)
 
-        with patch("gui.app.QMessageBox.question",
-                   return_value=QMessageBox.StandardButton.No) as asked, \
-             patch("gui.branch_session.start_the_usual_evolver") as started:
+        with patch("gui.branch_session.start_the_usual_evolver") as started:
             app._confirm_quit()
 
-        assert "Your usual Evolver takes the work back" in asked.call_args.args[2]
+        assert "Your usual Evolver takes the work back" in asked[0].text
         started.assert_not_called()
 
     def test_leaving_the_work_quits_the_app(self, request):

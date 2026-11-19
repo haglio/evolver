@@ -7,9 +7,16 @@ from zoneinfo import ZoneInfo
 import pytest
 from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QIcon, QPalette, QTextDocument
-from PySide6.QtWidgets import QAbstractButton, QLabel, QMessageBox, QToolBar, QToolButton
+from PySide6.QtWidgets import (
+    QAbstractButton,
+    QLabel,
+    QMessageBox,
+    QToolBar,
+    QToolButton,
+)
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
 from shared_ui.icons import icon_pixmap, inline_icon
+from shared_ui.testing import questions_answered
 
 from evolver import STAGE_LABELS, STAGE_TOOLTIPS
 from gui.main_window import EvolverMainWindow, RunDetailWidget
@@ -581,32 +588,26 @@ class TestEachToolbarButtonDoesItsJob:
     def app(self, request):
         return build_evolver_app(request)
 
-    def _quit_confirmation(self, answer):
-        patcher = patch("gui.app.QMessageBox")
-        mock_alert = patcher.start()
-        mock_alert.StandardButton.Yes = QMessageBox.StandardButton.Yes
-        mock_alert.StandardButton.No = QMessageBox.StandardButton.No
-        mock_alert.question.return_value = answer
-        return patcher, mock_alert
-
-    def test_the_quit_button_asks_first_and_a_yes_quits(self, app):
-        patcher, mock_alert = self._quit_confirmation(QMessageBox.StandardButton.Yes)
-        try:
-            with patch.object(app._app, "quit") as mock_quit:
-                app._window.quit_action.trigger()
-        finally:
-            patcher.stop()
-        assert mock_alert.question.call_count == 1, (
+    def test_the_quit_button_asks_first_and_a_yes_quits(self, app, monkeypatch):
+        asked = questions_answered(monkeypatch, QMessageBox.StandardButton.Yes)
+        with patch.object(app._app, "quit") as mock_quit:
+            app._window.quit_action.trigger()
+        assert len(asked) == 1, (
             "fired and checked by what it does: a count of receivers passed with Quit wired to the wrong slot")
         mock_quit.assert_called_once()
 
-    def test_a_no_to_the_quit_confirmation_changes_nothing(self, app):
-        patcher, _ = self._quit_confirmation(QMessageBox.StandardButton.No)
-        try:
-            with patch.object(app._app, "quit") as mock_quit:
-                app._window.quit_action.trigger()
-        finally:
-            patcher.stop()
+    def test_the_quit_question_has_yes_as_the_default(self, app, monkeypatch):
+        asked = questions_answered(monkeypatch, QMessageBox.StandardButton.No)
+        with patch.object(app._app, "quit"):
+            app._window.quit_action.trigger()
+        [box] = asked
+        assert box.title == "Quit Evolver"
+        assert box.default == QMessageBox.StandardButton.Yes
+
+    def test_a_no_to_the_quit_confirmation_changes_nothing(self, app, monkeypatch):
+        questions_answered(monkeypatch, QMessageBox.StandardButton.No)
+        with patch.object(app._app, "quit") as mock_quit:
+            app._window.quit_action.trigger()
         mock_quit.assert_not_called()
 
     def test_run_now_starts_a_manual_pipeline_run(self, app):
@@ -679,10 +680,10 @@ class TestEachToolbarButtonDoesItsJob:
         app._tray.open_action.trigger()
         assert app._window.isVisible()
 
-    def test_the_trays_quit_item_quits_without_asking(self, app):
+    def test_the_trays_quit_item_quits_without_asking(self, app, monkeypatch):
         # The tray binds the bound _quit, so only QApplication.quit is observable.
-        with patch.object(app._app, "quit") as mock_app_quit, \
-             patch("gui.app.QMessageBox") as mock_alert:
+        asked = questions_answered(monkeypatch, QMessageBox.StandardButton.No)
+        with patch.object(app._app, "quit") as mock_app_quit:
             app._tray.quit_action.trigger()
         mock_app_quit.assert_called_once()
-        mock_alert.question.assert_not_called()
+        assert asked == []

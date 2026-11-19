@@ -10,8 +10,10 @@ import pytest
 from app_support import haglio_settings
 from app_support.testing import start_again_stand_in, update_waiting_for
 from PySide6.QtCore import QEvent, QPoint
-from PySide6.QtGui import QHelpEvent
-from PySide6.QtWidgets import QLabel, QMessageBox, QToolTip
+from PySide6.QtGui import QColor, QHelpEvent
+from PySide6.QtWidgets import QLabel, QMessageBox, QPushButton, QToolTip
+from shared_ui.palette import BLUE
+from shared_ui.testing import questions_answered
 from shared_ui.tooltip_shape import shaped
 
 import config
@@ -91,6 +93,20 @@ class TestAppStartup:
         QAPP.sendEvent(label, QHelpEvent(QEvent.Type.ToolTip, QPoint(2, 2), label.mapToGlobal(QPoint(2, 2))))
 
         assert QToolTip.text() == shaped("word " * 40)
+
+    def test_the_button_enter_presses_wears_the_familys_blue_edge(self, request):
+        build_evolver_app(request)
+        button = QPushButton("Yes")
+        button.setDefault(True)
+        button.resize(button.sizeHint())
+        button.show()
+        request.addfinalizer(button.deleteLater)
+        request.addfinalizer(button.close)
+        QAPP.processEvents()
+
+        drawn = button.grab().toImage()
+
+        assert drawn.pixelColor(0, drawn.height() // 2) == QColor(*BLUE)
 
 
 class TestRetiringAnApp:
@@ -172,15 +188,14 @@ class TestStartingInOrder:
 
 
 class TestQuitting:
-    def test_only_the_window_asks_before_quitting(self, request):
+    def test_only_the_window_asks_before_quitting(self, request, monkeypatch):
         with patch("gui.app.branch_session.BranchSession.quit") as quit_evolver:
             app = build_evolver_app(request)
-            with patch("gui.app.QMessageBox.question",
-                       return_value=QMessageBox.StandardButton.No) as asked:
-                app._tray.quit_action.trigger()
-                app._window.quit_action.trigger()
+            asked = questions_answered(monkeypatch, QMessageBox.StandardButton.No)
+            app._tray.quit_action.trigger()
+            app._window.quit_action.trigger()
 
-        assert (asked.call_count, quit_evolver.call_count) == (1, 1), (
+        assert (len(asked), quit_evolver.call_count) == (1, 1), (
             "the window is where a stray click lands")
 
 
