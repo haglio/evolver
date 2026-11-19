@@ -8,7 +8,7 @@ import config
 import gui.app
 from tasks import origenerator_commands
 from tests import gui_support  # noqa: F401  -- builds the shared QApplication
-from util import origenerator_gallery
+from util import alert, origenerator_gallery
 
 
 @pytest.fixture(autouse=True)
@@ -40,6 +40,7 @@ def _anything_but_his_gallery(columns, *, optional=(), db_path=None):
 @pytest.fixture(autouse=True)
 def _records_are_staged_in_the_test_s_own_folder(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "SCRAPED_RECORDS_FILE", tmp_path / "scraped_records.json")
+    monkeypatch.setattr(alert, "ERRORS_SHOWN_FILE", tmp_path / "errors_shown.json")
 
 
 @pytest.fixture(autouse=True)

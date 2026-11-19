@@ -10,7 +10,7 @@ TITLE = "Evolver - Stage Error"
 
 
 class FailedStagesNotice:
-    def __init__(self, *, show: Callable[[str, str], object] | None = None) -> None:
+    def __init__(self, *, show: Callable[..., object] | None = None) -> None:
         self._show = show
         self._showing = False
 
@@ -21,7 +21,7 @@ class FailedStagesNotice:
             return
         self._showing = True
         try:
-            (self._show or show_error)(TITLE, _message(failed, record))
+            (self._show or show_error)(TITLE, _message(failed, record), same_error=", ".join(failed))
         finally:
             self._showing = False
 
