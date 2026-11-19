@@ -35,7 +35,7 @@ def report_startup_crash(detail: str) -> None:
     show_error(
         "Evolver failed to start",
         f"{detail.strip().splitlines()[-1]}\n\nFull details: {crash_log.CRASH_LOG}",
-        every_time=True,
+        work_on_this=False,
     )
 
 

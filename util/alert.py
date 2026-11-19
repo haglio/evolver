@@ -19,8 +19,8 @@ ERRORS_SHOWN_FILE = LOCAL_STATE_DIR / "errors_shown.json"
 
 
 def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (), *,
-               dismissible: bool = False, same_error: str | None = None, every_time: bool = False) -> bool:
-    if not every_time and _shown_before(title, message if same_error is None else same_error):
+               dismissible: bool = False, same_error: str | None = None, work_on_this: bool = True) -> bool:
+    if work_on_this and _shown_before(title, message if same_error is None else same_error):
         log.info("Not showing %s again: the same error's window was shown before", title)
         return False
     try:
@@ -32,7 +32,8 @@ def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (),
         shown = shown_as()
         return show_alert(title, message, icon=ICON_FILE if shown is None else app_icon(ICON_FILE, shown),
                           links=[Link(text, target) for text, target in links],
-                          dismissible=dismissible, work_on_this=_work_on_this(title, message))
+                          dismissible=dismissible,
+                          work_on_this=_work_on_this(title, message) if work_on_this else None)
     except Exception:
         log.exception("Could not open the alert dialog: %s", title)
         targets = "\n".join(str(target) for _text, target in links)
