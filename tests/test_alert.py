@@ -39,7 +39,8 @@ class TestShowError(unittest.TestCase):
         alert.show_error("Title", "Body")
 
         show_alert.assert_called_once_with(
-            "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY)
+            "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY,
+            copyable=True)
 
     @alert_shown()
     def test_a_warning_opens_the_familys_dialog_at_the_warning_level(self, show_alert):
@@ -47,7 +48,7 @@ class TestShowError(unittest.TestCase):
 
         show_alert.assert_called_once_with(
             "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY,
-            level=Level.WARNING)
+            copyable=True, level=Level.WARNING)
 
     @alert_shown()
     def test_a_previews_alert_wears_its_letter_in_the_preview_ink(self, show_alert):
@@ -66,7 +67,7 @@ class TestShowError(unittest.TestCase):
 
         show_alert.assert_called_once_with(
             "Title", "Body", icon=alert.ICON_FILE, links=[Link("Open its folder", folder)],
-            dismissible=False, work_on_this=ANY)
+            dismissible=False, work_on_this=ANY, copyable=True)
 
     @alert_shown()
     def test_work_on_this_opens_a_session_in_the_checkout_that_showed_the_window_told_what_it_said(self, show_alert):
@@ -100,6 +101,12 @@ class TestShowError(unittest.TestCase):
         alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", work_on_this=False)
 
         assert [shown.kwargs["work_on_this"] for shown in show_alert.call_args_list] == [None, None]
+
+    @alert_shown()
+    def test_a_window_no_session_could_help_with_offers_nothing_to_copy_either(self, show_alert):
+        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", work_on_this=False)
+
+        assert show_alert.call_args.kwargs["copyable"] is False
 
     @alert_shown(return_value=True)
     def test_an_alert_that_offers_dismiss_says_whether_it_was_dismissed(self, show_alert):
