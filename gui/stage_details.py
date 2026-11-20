@@ -127,6 +127,14 @@ SENTENCES: dict[str, Sentence] = {
         Count("delivered", "delivered to Genau's folder"),
         Count("failed", "failed"),
     )),
+    "funscript_drafts": Sentence((
+        Count("made", "funscripts made", "funscript made"),
+        Count("started", "videos sent to GoblinScript", "video sent to GoblinScript"),
+        Count("waiting", "videos still waiting for a funscript", "video still waiting for a funscript"),
+        Count("nothing_usable", "videos GoblinScript made nothing usable for",
+              "video GoblinScript made nothing usable for"),
+        Count("failed_batches", "times GoblinScript wrote nothing", "time GoblinScript wrote nothing"),
+    )),
     "verify": Sentence((
         Count("sorted_count", "1_sorted videos", "1_sorted video", even_at_zero=True),
         Count("upscale_count", "enhanced videos", "enhanced video", even_at_zero=True),
@@ -217,6 +225,11 @@ SKIP_REASONS: dict[str, str] = {
     "topaz_busy": "Waited: Topaz is enhancing a video Evolver did not start",
     "cpu_busy": "Waited: the computer's processor was too busy",
     "session_live": "Waited: a Funestra was playing",
+    "goblinscript_not_installed": "Waited: GoblinScript is not installed where Evolver's settings say",
+    "goblinscript_still_drafting": "Waited: GoblinScript is still making funscripts for the videos it was sent",
+    "goblinscript_failed":
+        "Waited: GoblinScript wrote nothing for the last videos it was sent, so they are sent again "
+        "an hour after that",
     topaz.SIGN_IN_EXPIRED:
         "Waited: Topaz Video's sign-in has expired; open the Topaz Video app and sign in",
     "upscale_pending":

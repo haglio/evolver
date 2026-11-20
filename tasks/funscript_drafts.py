@@ -8,9 +8,10 @@ import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 
-from app_support import funscript, processes
+from app_support import funscript, gallery_rows, processes
 from app_support.file_channel import write_whole
 from app_support.json_store import read_json_or_empty
 from app_support.subprocess_utils import hidden_subprocess_kwargs
@@ -30,6 +31,9 @@ GOBLINSCRIPT_FAILED = "goblinscript_failed"
 GOBLINSCRIPT_MISSING = "goblinscript_not_installed"
 HOLD_OFF_AFTER_A_FAILURE_SECONDS = 60 * 60
 DRAFTS_PER_RUN = 60
+BARELY_MOVING_TRAVEL_PER_SECOND = 20.0
+BARELY_MOVING_SPREAD = 15
+HELD_FLAT_NOTE = "Flat: GoblinScript found very little movement in this video."
 
 _BATCH = "batch"
 _NOTHING_USABLE = "nothing_usable"
@@ -48,6 +52,14 @@ class FunscriptDraftsResult(StageResult):
     @property
     def ok(self) -> bool:
         return not self.failed_batches
+
+
+@dataclass(frozen=True)
+class Library:
+    videos: Path
+    sorted_videos: Path
+    gallery: Path
+    actions_given_no_funscript: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -125,7 +137,7 @@ def _now(now: float | None) -> float:
     return time.time() if now is None else now
 
 
-def run(*, goblin: Goblin, drafting: Drafting,
+def run(*, library: Library, goblin: Goblin, drafting: Drafting,
         start: Callable[[list[str], Path], int] = launch,
         still_running: Callable[[int], bool] | None = None,
         max_items: int = DRAFTS_PER_RUN,
@@ -133,7 +145,7 @@ def run(*, goblin: Goblin, drafting: Drafting,
     if hold_off_reason(goblin=goblin, drafting=drafting, still_running=still_running, now=now):
         return FunscriptDraftsResult()
     record = drafting.read()
-    made = _take_in_the_finished_batch(goblin, drafting, record)
+    made = _take_in_the_finished_batch(library, goblin, drafting, record)
     if made is None:
         record[_FAILED_AT] = _now(now)
         drafting.write(record)
@@ -142,7 +154,7 @@ def run(*, goblin: Goblin, drafting: Drafting,
         return FunscriptDraftsResult(nothing_usable=len(record.get(_NOTHING_USABLE, ())),
                                      failed_batches=1)
     nothing_usable = set(record.get(_NOTHING_USABLE, ()))
-    waiting = [upscale for upscale in _waiting_newest_first() if _key(upscale) not in nothing_usable]
+    waiting = [video for video in _waiting_newest_first(library) if _key(library, video) not in nothing_usable]
     batch = _one_of_each_name(waiting)[:max_items]
     if batch:
         pid = start(goblin.draft_command(batch, drafting.drafts), drafting.log)
@@ -166,7 +178,8 @@ def _one_of_each_name(videos: list[Path]) -> list[Path]:
     return list(first_of_each.values())
 
 
-def _take_in_the_finished_batch(goblin: Goblin, drafting: Drafting, record: dict) -> int | None:
+def _take_in_the_finished_batch(library: Library, goblin: Goblin, drafting: Drafting,
+                                record: dict) -> int | None:
     batch = record.pop(_BATCH, None)
     if batch is None:
         return 0
@@ -180,7 +193,7 @@ def _take_in_the_finished_batch(goblin: Goblin, drafting: Drafting, record: dict
     for video in map(Path, batch["videos"]):
         draft = funscript.read(drafting.drafts / f"{video.stem}{funscript.EXTENSION}")
         if len(funscript.actions_of(draft)) < _FEWEST_ACTIONS_OF_A_USABLE_DRAFT:
-            nothing_usable.append(_key(video))
+            nothing_usable.append(_key(library, video))
         elif video.is_file() and not has_a_funscript(video):
             _place(video, draft)
             made += 1
@@ -193,29 +206,80 @@ def _clear_the_batch_away(goblin: Goblin, drafting: Drafting) -> None:
     shutil.rmtree(goblin.project, ignore_errors=True)
 
 
-def _key(upscale: Path) -> str:
-    return upscale.relative_to(lanes.kino_upscales_dir()).as_posix()
+def _key(library: Library, video: Path) -> str:
+    return video.relative_to(library.videos).as_posix()
 
 
 def _place(video: Path, draft: dict) -> None:
     metadata = draft.get(funscript.METADATA)
     metadata = metadata if isinstance(metadata, dict) else {}
     script = script_path_for_video(video)
-    funscript.write(script, {**draft, funscript.METADATA: {**metadata, "creator": CREATOR}})
+    placed = {**draft, funscript.METADATA: {**metadata, "creator": CREATOR}}
+    funscript.write(script, _held_flat(placed) if _barely_moves(placed) else placed)
     mark_generated(script)
+
+
+def _barely_moves(draft: dict) -> bool:
+    moves = sorted((action["at"], action["pos"]) for action in funscript.actions_of(draft))
+    seconds = (moves[-1][0] - moves[0][0]) / 1000 or 1.0
+    travel_per_second = sum(abs(after[1] - before[1]) for before, after in pairwise(moves)) / seconds
+    spots = sorted(pos for _, pos in moves)
+    spread = spots[max(int(0.9 * len(spots)) - 1, 0)] - spots[int(0.1 * len(spots))]
+    return travel_per_second < BARELY_MOVING_TRAVEL_PER_SECOND or spread < BARELY_MOVING_SPREAD
+
+
+def _held_flat(draft: dict) -> dict:
+    end = max(1000, *(action["at"] for action in funscript.actions_of(draft)))
+    metadata = {**draft[funscript.METADATA], "description": HELD_FLAT_NOTE}
+    return {**draft, funscript.METADATA: metadata, funscript.ACTIONS: [{"at": 0, "pos": 0}, {"at": end, "pos": 0}]}
 
 
 class _HasAFunscript:
     def __init__(self) -> None:
-        self._sorted_video_scripted = {ai.upscale for ai in lanes.ai_videos()
-                                       if script_path_for_video(ai.video).exists()}
+        self._scripted_twin = {}
+        for ai in lanes.ai_videos():
+            self._scripted_twin[ai.upscale] = ai.video
+            self._scripted_twin[ai.video] = ai.upscale
 
-    def __call__(self, upscale: Path) -> bool:
-        return script_path_for_video(upscale).exists() or upscale in self._sorted_video_scripted
+    def __call__(self, video: Path) -> bool:
+        twin = self._scripted_twin.get(video)
+        return any(script_path_for_video(one).exists() for one in (video, twin) if one is not None)
 
 
-def _waiting_newest_first() -> list[Path]:
+def _sorted_videos_not_yet_upscaled(library: Library) -> list[Path]:
+    if not library.sorted_videos.is_dir():
+        return []
+    return [video for video in library_videos(library.sorted_videos)
+            if not (lanes.upscale_filed_for(video) or Path()).is_file()]
+
+
+def _given_no_funscript(library: Library) -> Callable[[Path], bool]:
+    left_out = library.actions_given_no_funscript
+    if not left_out:
+        return lambda video: False
+    found = gallery_rows.rows(("prompt_id", "output_files", "evolver_upscale", "video_actions"),
+                              db_path=library.gallery)
+    actions_by_id = {row["prompt_id"]: _actions_in(row) for row in found}
+    row_of = gallery_rows.VideoRows(found)
+
+    def every_action_is_given_no_funscript(video: Path) -> bool:
+        actions = actions_by_id.get(row_of(video) or "", set())
+        return bool(actions) and actions <= left_out
+    return every_action_is_given_no_funscript
+
+
+def _actions_in(row: dict) -> set[str]:
+    try:
+        actions = json.loads(row.get("video_actions") or "[]")
+    except ValueError:
+        return set()
+    return set(actions) if isinstance(actions, list) else set()
+
+
+def _waiting_newest_first(library: Library) -> list[Path]:
     has_a_funscript = _HasAFunscript()
-    waiting = [upscale for upscale in library_videos(lanes.kino_upscales_dir())
-               if not has_a_funscript(upscale)]
-    return sorted(waiting, key=lambda upscale: upscale.stat().st_mtime, reverse=True)
+    given_no_funscript = _given_no_funscript(library)
+    videos = [*library_videos(lanes.kino_upscales_dir()), *_sorted_videos_not_yet_upscaled(library),
+              *lanes.non_ai_videos()]
+    waiting = [video for video in videos if not has_a_funscript(video) and not given_no_funscript(video)]
+    return sorted(waiting, key=lambda video: video.stat().st_mtime, reverse=True)

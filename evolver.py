@@ -154,7 +154,10 @@ def _make_funscripts(this_run: ThisRun) -> StageResult | Skipped:
         return Skipped(reason)
     if _origenerator_holds_the_graphics_card(this_run):
         return Skipped(_ORIGENERATOR_TRAINING)
-    return funscript_drafts.run(goblin=goblin, drafting=drafting)
+    library = funscript_drafts.Library(
+        videos=config.VIDEO_LIBRARY_DIR, sorted_videos=config.SORTED_DIR, gallery=config.ORIGENERATOR_DB_PATH,
+        actions_given_no_funscript=config.VIDEO_ACTIONS_GIVEN_NO_FUNSCRIPT)
+    return funscript_drafts.run(library=library, goblin=goblin, drafting=drafting)
 
 
 def _origenerator_holds_the_graphics_card(this_run: ThisRun) -> bool:
@@ -200,9 +203,9 @@ STAGES: tuple[Stage, ...] = (
           "Enhance one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
           (0x76, 0x67, 0x47), run=_upscale_non_ai),
     Stage("funscript_drafts", "Make funscripts",
-          "Have GoblinScript draft a funscript for each new Kino upscale that has none, newest first, "
-          "marked as a script no person wrote; the video it was upscaled from gets the same funscript "
-          "from Scripts sync, so the two are never drafted twice",
+          "Have GoblinScript draft a funscript for each video in the library that has none, newest first, "
+          "marked as a script no person wrote; a Kino video and the 1_sorted video it was made from "
+          "get one funscript between them through Scripts sync, so the two are never drafted twice",
           (0x00, 0x9E, 0xD8), run=_make_funscripts),
     Stage("verify", "Correspondence check",
           "Verify every 1_sorted video has its enhanced video in its Kino or Genau folder, and no enhanced video is missing from either",
