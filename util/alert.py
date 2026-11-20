@@ -44,7 +44,8 @@ def _show(title: str, message: str, links: Sequence[tuple[str, Path]], *, dismis
         return show_alert(title, message, icon=ICON_FILE if shown is None else app_icon(ICON_FILE, shown),
                           links=[Link(text, target) for text, target in links],
                           dismissible=dismissible,
-                          work_on_this=_work_on_this(title, message) if work_on_this else None, **look)
+                          work_on_this=_work_on_this(title, message) if work_on_this else None,
+                          copyable=work_on_this, **look)
     except Exception:
         log.exception("Could not open the alert dialog: %s", title)
         targets = "\n".join(str(target) for _text, target in links)
