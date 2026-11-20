@@ -219,13 +219,13 @@ class TestTheListOfStagesRunsItself:
         assert _statuses(result) == {"origenerator_downtime": "error"}, (
             "the work Origenerator leaves for while it is closed would otherwise stop unseen")
 
-    def test_a_stray_file_only_reported_warns(self):
+    def test_a_stray_file_only_reported_fails_the_run(self):
         result = _run(replace(_stage("strays"),
                               run=lambda _: StrayFilesResult(reported=["notes.txt"])))
 
-        assert _statuses(result) == {"strays": "warning"}, (
-            "reporting what it cannot repair is the stage doing its job, not failing at it")
-        assert not result.has_errors
+        assert _statuses(result) == {"strays": "error"}, (
+            "a file Evolver cannot put right waits on him, and only a failure gets seen")
+        assert result.has_errors
 
     def test_upscales_held_back_for_disk_space_warn(self):
         result = _run(replace(_stage("upscale"),

@@ -31,7 +31,7 @@ WENT_WRONG_AND_WANTS_AN_EYE = (False, True)
 @pytest.mark.parametrize(("result", "said"), [
     pytest.param(StrayFilesResult(renamed=2, rehomed_scripts=1), WENT_WELL,
                  id="stray files put right"),
-    pytest.param(StrayFilesResult(reported=["example/notes one.txt"]), WANTS_AN_EYE,
+    pytest.param(StrayFilesResult(reported=["example/notes one.txt"]), WENT_WRONG,
                  id="a stray file only reported"),
     pytest.param(UnsentVideosResult(deleted=3), WENT_WELL, id="videos unsent"),
     pytest.param(UnsentVideosResult(deleted=1, failed=1), WENT_WRONG,
