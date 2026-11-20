@@ -23,8 +23,8 @@ class StrayFilesResult(StageResult):
     reported: list[str] = field(default_factory=list)
 
     @property
-    def needs_an_eye(self) -> bool:
-        return bool(self.reported)
+    def ok(self) -> bool:
+        return not self.reported
 
 
 @dataclass(frozen=True)

@@ -31,7 +31,7 @@ class TestFailedStagesNotice(unittest.TestCase):
     def test_a_run_whose_stages_only_warned_opens_no_window(self):
         shown = []
         FailedStagesNotice(show=lambda *window, **_: shown.append(window)).after_run(
-            a_run(a_stage("strays", "warning"), a_stage("sort", "completed")))
+            a_run(a_stage("upscale", "warning"), a_stage("sort", "completed")))
 
         assert shown == []
 

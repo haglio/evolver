@@ -21,7 +21,6 @@ from tasks.provenance_sweep import ProvenanceResult
 from tasks.scene_scripts import SceneScriptsResult
 from tasks.scripts_sync import ScriptsSyncResult
 from tasks.sort import SortResult
-from tasks.stray_files import StrayFilesResult
 from tasks.video_kinds import VideoKindsResult
 from tests.color_support import CIE76_DELTA_E_OF_COLORS_OBVIOUSLY_DIFFERENT, band_fill, delta_e
 from tests.product_sources import PROJECT_ROOT, product_sources
@@ -52,7 +51,6 @@ WHY_IT_CANNOT_FAIL = {
     NonAiTitleResult: "bookkeeping over whatever files happen to be there",
     ProvenanceResult: "only fills in a record where none is; a gallery it cannot read leaves its "
                       "videos for a later run",
-    StrayFilesResult: "what it cannot repair it reports, for a person to judge",
     VideoKindsResult: "a video it cannot measure is left for the next run",
 
 }
