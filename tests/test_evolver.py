@@ -526,12 +526,19 @@ class TestTheMakeFunscriptsStage:
         did = _Done()
         with patch("evolver.config.GOBLINSCRIPT_DIR", tmp_path / "goblin"), \
              patch("evolver.config.LOCAL_STATE_DIR", tmp_path / "state"), \
+             patch("evolver.config.VIDEO_LIBRARY_DIR", tmp_path / "videos"), \
+             patch("evolver.config.SORTED_DIR", tmp_path / "videos" / "sorted"), \
+             patch("evolver.config.ORIGENERATOR_DB_PATH", tmp_path / "gallery.db"), \
+             patch("evolver.config.VIDEO_ACTIONS_GIVEN_NO_FUNSCRIPT", frozenset({"alpha"})), \
              patch("evolver.funscript_drafts.hold_off_reason", return_value=""), \
              patch("evolver.funscript_drafts.run", return_value=did) as drafted:
             outcome = _stage("funscript_drafts").run(evolver.ThisRun())
 
         assert outcome is did
         drafted.assert_called_once_with(
+            library=evolver.funscript_drafts.Library(
+                videos=tmp_path / "videos", sorted_videos=tmp_path / "videos" / "sorted",
+                gallery=tmp_path / "gallery.db", actions_given_no_funscript=frozenset({"alpha"})),
             goblin=evolver.funscript_drafts.Goblin(tmp_path / "goblin"),
             drafting=evolver.funscript_drafts.Drafting.kept_in(tmp_path / "state"))
 

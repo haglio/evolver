@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
 import subprocess
-import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -48,8 +48,13 @@ def goblin_home(tmp_path) -> Path:
     return home
 
 
-def _drafted(goblin_home: Path, tmp_path: Path, fake: FakeGoblin, **given):
+def _drafted(goblin_home: Path, tmp_path: Path, fake: FakeGoblin, *,
+             actions_given_no_funscript: frozenset[str] = frozenset(), **given):
+    lanes = LaneLibrary(tmp_path)
     return funscript_drafts.run(
+        library=funscript_drafts.Library(videos=lanes.library, sorted_videos=lanes.sorted_dir,
+                                         gallery=lanes.gallery_db,
+                                         actions_given_no_funscript=actions_given_no_funscript),
         goblin=funscript_drafts.Goblin(goblin_home),
         drafting=funscript_drafts.Drafting.kept_in(tmp_path / "state"),
         start=fake.start, still_running=fake.still_running, **given)
@@ -75,6 +80,62 @@ def _script_for(library: LaneLibrary, video: Path) -> Path:
     return (library.scripts / video.relative_to(library.library)).with_suffix(".funscript")
 
 
+def test_a_sorted_ai_video_not_yet_upscaled_and_a_non_ai_video_are_sent_too(library, goblin_home, tmp_path):
+    sorted_video = touch_video(library.sorted_dir / "example-source" / "portrait" / "video one.mp4")
+    non_ai = touch_video(library.non_ai / "Jane Doe" / "clips" / "video two.mp4")
+    fake = FakeGoblin()
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    assert sorted(fake.started[0][3:-7]) == sorted([str(sorted_video), str(non_ai)])
+    assert result.started == 2
+
+
+def _gallery_with_actions(path: Path, actions_of: dict[Path, list[str]]) -> None:
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE generations (prompt_id TEXT, output_files TEXT, evolver_upscale TEXT, "
+                 "video_actions TEXT)")
+    for number, (video, actions) in enumerate(actions_of.items()):
+        conn.execute("INSERT INTO generations VALUES (?, ?, '', ?)",
+                     (f"made-{number}", json.dumps([{"filename": video.name, "path": str(video)}]),
+                      json.dumps(actions)))
+    conn.commit()
+    conn.close()
+
+
+def test_only_a_video_whose_actions_are_set_and_all_given_no_funscript_is_skipped(library, goblin_home, tmp_path):
+    folder = library.sorted_dir / "example-source" / "portrait"
+    left_out = touch_video(folder / "video one.mp4")
+    with_one_drafted = touch_video(folder / "video two.mp4")
+    not_set = touch_video(folder / "video three.mp4")
+    _gallery_with_actions(library.gallery_db, {left_out: ["alpha"], with_one_drafted: ["alpha", "beta"], not_set: []})
+    fake = FakeGoblin()
+
+    _drafted(goblin_home, tmp_path, fake, actions_given_no_funscript=frozenset({"alpha"}))
+
+    assert sorted(fake.started[0][3:-7]) == sorted([str(with_one_drafted), str(not_set)])
+
+
+def test_a_video_still_in_the_inbox_waits_until_it_is_sorted(library, goblin_home, tmp_path):
+    touch_video(library.inbox / "example-source" / "video one.mp4")
+    fake = FakeGoblin()
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    assert (fake.started, result.waiting) == ([], 0)
+
+
+def test_a_sorted_video_whose_upscale_is_there_is_drafted_once_through_its_upscale(
+        library, goblin_home, tmp_path):
+    upscale = touch_video(library.kino_upscales / "portrait" / "example-source" / "video one_topaz.mp4")
+    touch_video(library.sorted_dir / "example-source" / "portrait" / "video one.mp4")
+    fake = FakeGoblin()
+
+    _drafted(goblin_home, tmp_path, fake)
+
+    assert fake.started[0][3:-7] == [str(upscale)]
+
+
 def test_an_upscale_that_has_a_funscript_is_left_alone(library, goblin_home, tmp_path):
     upscale = touch_video(library.kino_upscales / "portrait" / "example-source" / "video one_topaz.mp4")
     touch_video(_script_for(library, upscale))
@@ -97,8 +158,11 @@ def test_an_upscale_whose_sorted_source_has_a_funscript_waits_for_the_copy_of_th
     assert (fake.started, result.started) == ([], 0)
 
 
+_SOME_MOMENT = 1_800_000_000.0
+
+
 def _aged(video: Path, seconds_ago: float) -> Path:
-    stamp = time.time() - seconds_ago
+    stamp = _SOME_MOMENT - seconds_ago
     os.utime(video, (stamp, stamp))
     return video
 
@@ -131,7 +195,7 @@ def test_the_stage_holds_off_while_its_own_batch_is_still_running(library, gobli
     assert _held_off(goblin_home, tmp_path, fake) == funscript_drafts.STILL_DRAFTING
 
 
-_ACTIONS = [{"at": 0, "pos": 10}, {"at": 400, "pos": 90}, {"at": 800, "pos": 10}]
+_ACTIONS = [{"at": at, "pos": 10 if at % 800 else 90} for at in range(0, 8000, 400)]
 
 
 def _finish(fake: FakeGoblin, tmp_path: Path, goblin_home: Path, drafted: dict[str, list[dict]]) -> None:
@@ -159,6 +223,20 @@ def test_a_finished_batch_gives_each_upscale_its_draft_marked_as_made_by_goblins
     assert (result.made, result.started) == (1, 0)
     assert not (tmp_path / "state" / "funscript_drafts").exists()
     assert not (goblin_home / "GoblinTrainingGrounds" / "projects" / "evolver").exists()
+
+
+def test_a_draft_with_very_little_movement_is_placed_as_a_flat_funscript(library, goblin_home, tmp_path):
+    upscale = touch_video(library.kino_upscales / "portrait" / "example-source" / "video one_topaz.mp4")
+    fake = FakeGoblin()
+    _drafted(goblin_home, tmp_path, fake)
+    barely = [{"at": at, "pos": 50 + at % 2} for at in range(0, 60_000, 500)]
+    _finish(fake, tmp_path, goblin_home, {"video one_topaz": barely})
+
+    _drafted(goblin_home, tmp_path, fake)
+
+    script = funscript.read(_script_for(library, upscale))
+    assert script["actions"] == [{"at": 0, "pos": 0}, {"at": 59_500, "pos": 0}]
+    assert script["metadata"]["creator"] == "GoblinScript v0.6.0"
 
 
 def test_a_run_while_its_batch_is_still_drafting_leaves_that_batch_alone(library, goblin_home, tmp_path):

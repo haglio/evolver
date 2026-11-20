@@ -15,7 +15,7 @@ pytestmark = pytest.mark.repo_check
 CONFIG_REFERENCE_CEILINGS = {
     "check_correspondence.py": 4,
     "check_duplicate_sizes.py": 4,
-    "evolver.py": 11,
+    "evolver.py": 15,
     "gui/app.py": 4,
     "gui/branch_session.py": 6,
     "gui/main_window.py": 2,
@@ -75,13 +75,15 @@ OVERLAY_KEYS = {
     "topaz_ffmpeg",
     "topaz_models",
     "version_overrides",
+    "video_actions_given_no_funscript",
     "vr_videos",
     "warm_gun_outbox",
 }
 
 OPTIONAL_OVERLAY_KEYS = {
     "display_timezone", "goblinscript_dir", "retired_root", "topaz_ffmpeg",
-    "topaz_models", "version_overrides", "vr_videos", "warm_gun_outbox",
+    "topaz_models", "version_overrides", "video_actions_given_no_funscript", "vr_videos",
+    "warm_gun_outbox",
 }
 
 

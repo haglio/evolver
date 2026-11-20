@@ -90,6 +90,7 @@ def goblinscript_dir(content: dict[str, Any]) -> Path | None:
 
 
 GOBLINSCRIPT_DIR = goblinscript_dir(_CONTENT)
+VIDEO_ACTIONS_GIVEN_NO_FUNSCRIPT = frozenset(_CONTENT.get("video_actions_given_no_funscript") or ())
 AI_DIR       = LIBRARY_ROOT / "videos" / "videos" / "2D" / "AI"
 NON_AI_DIR   = LIBRARY_ROOT / "videos" / "videos" / "2D" / "non_AI"
 CHROME_USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "Chrome" / "User Data"

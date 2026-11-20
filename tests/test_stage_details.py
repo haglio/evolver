@@ -10,8 +10,10 @@ from check_duplicate_sizes import DuplicateSizesResult
 from evolver import ALL_STAGES
 from gui import stage_details
 from gui.stage_details import NOTHING_TO_DO, SENTENCES, SKIP_REASONS, Sentence, details_of
+from tasks import funscript_drafts
 from tasks.bookmarks_sync import BookmarksSyncResult
 from tasks.clip_scripts import ClipScriptsResult
+from tasks.funscript_drafts import FunscriptDraftsResult
 from tasks.genau_deliver import GenauDeliverResult
 from tasks.nonai_group import NonAiGroupResult
 from tasks.nonai_titles import NonAiTitleResult
@@ -29,7 +31,8 @@ from tasks.watch_weights import WatchWeightsResult
 RESULT_OF_STAGE = {
     "strays": StrayFilesResult, "withdrawn": UnsentVideosResult, "metadata": PromptScrapeResult,
     "sort": SortResult, "origenerator_downtime": DowntimeResult, "upscale": UpscaleResult,
-    "genau_deliver": GenauDeliverResult, "verify": CorrespondenceResult,
+    "genau_deliver": GenauDeliverResult, "funscript_drafts": FunscriptDraftsResult,
+    "verify": CorrespondenceResult,
     "watch_weights": WatchWeightsResult, "bookmarks": BookmarksSyncResult,
     "clip_scripts": ClipScriptsResult, "scene_scripts": SceneScriptsResult,
     "group_non_ai": NonAiGroupResult, "title_non_ai": NonAiTitleResult,
@@ -68,14 +71,24 @@ def _value_of(argument: ast.expr) -> str:
     return getattr(getattr(evolver, argument.value.id), argument.attr)
 
 
+THE_REASONS_A_STAGE_HANDS_BACK = {"reason": {funscript_drafts.GOBLINSCRIPT_MISSING, funscript_drafts.STILL_DRAFTING,
+                                              funscript_drafts.GOBLINSCRIPT_FAILED}}
+
+
 def _skip_reasons_evolver_gives() -> set[str]:
     tree = ast.parse(Path(evolver.__file__).read_text(encoding="utf-8"))
     return {
-        _value_of(argument)
+        reason
         for call in ast.walk(tree)
         if isinstance(call, ast.Call) and getattr(call.func, "id", "") == "Skipped"
         for argument in call.args
+        for reason in _reasons_in(argument)
     }
+
+
+def _reasons_in(argument: ast.expr) -> set[str]:
+    handed_back = THE_REASONS_A_STAGE_HANDS_BACK.get(getattr(argument, "id", ""))
+    return handed_back if handed_back is not None else {_value_of(argument)}
 
 
 def test_every_stage_has_a_sentence_of_its_own():
