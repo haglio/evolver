@@ -12,9 +12,9 @@ import pytest
 from app_support import funscript
 from app_support.testing import process_alive, process_exe
 
-from tasks import funscript_drafts
+from tasks import funscript_drafts, vr_draft
 from tasks.script_versions import copy_missing_version_scripts
-from tests.temp_helpers import LaneLibrary, touch_video
+from tests.temp_helpers import LaneLibrary, override_config, touch_video
 from util.script_library import is_marked_generated
 
 
@@ -400,3 +400,60 @@ def test_the_runs_log_says_what_the_stage_did(library, goblin_home, tmp_path, ca
 
     assert caplog.messages[-1] == ("Funscripts made: 1. Videos GoblinScript drafted nothing usable for: 1. "
                                    "Sent to GoblinScript now: 0. Still waiting: 0.")
+
+
+@pytest.fixture
+def vr_folder(library, tmp_path):
+    kept_in = tmp_path / "vr drive" / "VR"
+    with override_config(VR_VIDEO_DIR=kept_in):
+        yield kept_in
+
+
+def test_a_vr_video_with_no_funscript_is_flattened_to_one_eye_and_drafted_on_its_own(
+        library, vr_folder, goblin_home, tmp_path):
+    vr = touch_video(vr_folder / "finished" / "video one_180.mp4")
+    fake = FakeGoblin()
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    flat = tmp_path / "state" / "funscript_drafts_flat" / "video one_180.mp4"
+    goblin = funscript_drafts.Goblin(goblin_home)
+    assert fake.started == [[str(goblin.python), str(vr_draft.__file__), str(vr), str(flat), "--",
+                             *goblin.draft_command([flat], tmp_path / "state" / "funscript_drafts")]]
+    assert result.started == 1
+
+
+def test_a_vr_video_waits_while_any_2d_video_waits(library, vr_folder, goblin_home, tmp_path):
+    touch_video(vr_folder / "finished" / "video one_180.mp4")
+    upscale = touch_video(library.kino_upscales / "portrait" / "example-source" / "video two_topaz.mp4")
+    fake = FakeGoblin()
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    assert fake.started[0][3:-7] == [str(upscale)]
+    assert (result.started, result.waiting) == (1, 1)
+
+
+def test_a_finished_vr_draft_becomes_the_funscript_its_vr_video_has_in_the_library(
+        library, vr_folder, goblin_home, tmp_path):
+    touch_video(vr_folder / "finished" / "video one_180.mp4")
+    fake = FakeGoblin()
+    _drafted(goblin_home, tmp_path, fake)
+    _finish(fake, tmp_path, goblin_home, {"video one_180": _ACTIONS})
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    script = library.scripts / "VR" / "finished" / "video one_180.funscript"
+    assert (funscript.actions_of(funscript.read(script)), is_marked_generated(script)) == (_ACTIONS, True)
+    assert (result.made, result.started) == (1, 0)
+    assert not (tmp_path / "state" / "funscript_drafts_flat").exists()
+
+
+def test_a_vr_video_with_a_funscript_in_the_library_is_left_alone(library, vr_folder, goblin_home, tmp_path):
+    touch_video(vr_folder / "finished" / "video one_180.mp4")
+    touch_video(library.scripts / "VR" / "finished" / "video one_180.funscript")
+    fake = FakeGoblin()
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    assert (fake.started, result.waiting) == ([], 0)

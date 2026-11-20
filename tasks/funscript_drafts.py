@@ -16,6 +16,7 @@ from app_support.file_channel import write_whole
 from app_support.json_store import read_json_or_empty
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
+from tasks import vr_draft
 from util import lanes
 from util.media_files import library_videos
 from util.script_library import mark_generated, script_path_for_video
@@ -89,19 +90,38 @@ class Goblin:
 @dataclass(frozen=True)
 class Drafting:
     drafts: Path
+    flattened: Path
     log: Path
     record: Path
 
     @classmethod
     def kept_in(cls, folder: Path) -> Drafting:
-        return cls(drafts=folder / "funscript_drafts", log=folder / "funscript_drafts.log",
-                   record=folder / "funscript_drafts.json")
+        return cls(drafts=folder / "funscript_drafts", flattened=folder / "funscript_drafts_flat",
+                   log=folder / "funscript_drafts.log", record=folder / "funscript_drafts.json")
+
+    def command_for(self, goblin: Goblin, batch: list[Waiting]) -> list[str]:
+        if batch[0].is_vr:
+            flat = self.flattened / f"{batch[0].video.stem}.mp4"
+            return [str(goblin.python), str(vr_draft.__file__), str(batch[0].video), str(flat), "--",
+                    *goblin.draft_command([flat], self.drafts)]
+        return goblin.draft_command([waiting.video for waiting in batch], self.drafts)
 
     def read(self) -> dict:
         return read_json_or_empty(self.record)
 
     def write(self, record: dict) -> None:
         write_whole(self.record, json.dumps(record, indent=2))
+
+
+@dataclass(frozen=True)
+class Waiting:
+    video: Path
+    in_library: Path
+    is_vr: bool = False
+
+    @classmethod
+    def at(cls, video: Path) -> Waiting:
+        return cls(video, video)
 
 
 def launch(command: list[str], log: Path, *, popen=subprocess.Popen) -> int:
@@ -154,11 +174,12 @@ def run(*, library: Library, goblin: Goblin, drafting: Drafting,
         return FunscriptDraftsResult(nothing_usable=len(record.get(_NOTHING_USABLE, ())),
                                      failed_batches=1)
     nothing_usable = set(record.get(_NOTHING_USABLE, ()))
-    waiting = [video for video in _waiting_newest_first(library) if _key(library, video) not in nothing_usable]
-    batch = _one_of_each_name(waiting)[:max_items]
+    waiting = [one for one in _waiting_newest_first(library) if _key(library, one) not in nothing_usable]
+    batch = _next_batch(waiting, max_items)
     if batch:
-        pid = start(goblin.draft_command(batch, drafting.drafts), drafting.log)
-        record[_BATCH] = {"pid": pid, "videos": list(map(str, batch))}
+        pid = start(drafting.command_for(goblin, batch), drafting.log)
+        record[_BATCH] = {"pid": pid, "videos": [str(one.video) for one in batch],
+                          "in_library": [str(one.in_library) for one in batch]}
     drafting.write(record)
     return _logged(FunscriptDraftsResult(made=made, nothing_usable=len(nothing_usable),
                                          started=len(batch), waiting=len(waiting) - len(batch)))
@@ -171,11 +192,14 @@ def _logged(result: FunscriptDraftsResult) -> FunscriptDraftsResult:
     return result
 
 
-def _one_of_each_name(videos: list[Path]) -> list[Path]:
+def _next_batch(waiting: list[Waiting], max_items: int) -> list[Waiting]:
+    flat = [one for one in waiting if not one.is_vr]
+    if not flat:
+        return waiting[:1]
     first_of_each = {}
-    for video in videos:
-        first_of_each.setdefault(video.stem.lower(), video)
-    return list(first_of_each.values())
+    for one in flat:
+        first_of_each.setdefault(one.video.stem.lower(), one)
+    return list(first_of_each.values())[:max_items]
 
 
 def _take_in_the_finished_batch(library: Library, goblin: Goblin, drafting: Drafting,
@@ -190,12 +214,13 @@ def _take_in_the_finished_batch(library: Library, goblin: Goblin, drafting: Draf
     made = 0
     nothing_usable = record.setdefault(_NOTHING_USABLE, [])
     has_a_funscript = _HasAFunscript()
-    for video in map(Path, batch["videos"]):
+    for video, in_library in zip(map(Path, batch["videos"]), map(Path, batch["in_library"]), strict=True):
+        one = Waiting(video, in_library, is_vr=video != in_library)
         draft = funscript.read(drafting.drafts / f"{video.stem}{funscript.EXTENSION}")
         if len(funscript.actions_of(draft)) < _FEWEST_ACTIONS_OF_A_USABLE_DRAFT:
-            nothing_usable.append(_key(library, video))
-        elif video.is_file() and not has_a_funscript(video):
-            _place(video, draft)
+            nothing_usable.append(_key(library, one))
+        elif (one.is_vr or video.is_file()) and not has_a_funscript(in_library):
+            _place(in_library, draft)
             made += 1
     _clear_the_batch_away(goblin, drafting)
     return made
@@ -203,11 +228,12 @@ def _take_in_the_finished_batch(library: Library, goblin: Goblin, drafting: Draf
 
 def _clear_the_batch_away(goblin: Goblin, drafting: Drafting) -> None:
     shutil.rmtree(drafting.drafts, ignore_errors=True)
+    shutil.rmtree(drafting.flattened, ignore_errors=True)
     shutil.rmtree(goblin.project, ignore_errors=True)
 
 
-def _key(library: Library, video: Path) -> str:
-    return video.relative_to(library.videos).as_posix()
+def _key(library: Library, waiting: Waiting) -> str:
+    return waiting.in_library.relative_to(library.videos).as_posix()
 
 
 def _place(video: Path, draft: dict) -> None:
@@ -276,10 +302,13 @@ def _actions_in(row: dict) -> set[str]:
     return set(actions) if isinstance(actions, list) else set()
 
 
-def _waiting_newest_first(library: Library) -> list[Path]:
+def _waiting_newest_first(library: Library) -> list[Waiting]:
     has_a_funscript = _HasAFunscript()
     given_no_funscript = _given_no_funscript(library)
     videos = [*library_videos(lanes.kino_upscales_dir()), *_sorted_videos_not_yet_upscaled(library),
               *lanes.non_ai_videos()]
-    waiting = [video for video in videos if not has_a_funscript(video) and not given_no_funscript(video)]
-    return sorted(waiting, key=lambda video: video.stat().st_mtime, reverse=True)
+    waiting = sorted((video for video in videos if not has_a_funscript(video) and not given_no_funscript(video)),
+                     key=lambda video: video.stat().st_mtime, reverse=True)
+    vr = [Waiting(vr.video, vr.in_library, is_vr=True) for vr in lanes.vr_videos()
+          if not has_a_funscript(vr.in_library)]
+    return [*map(Waiting.at, waiting), *vr]
