@@ -416,7 +416,7 @@ class TestTheUpscaleStage:
         computer.upscale.assert_not_called()
 
     def test_waits_while_a_funestra_plays_for_him(self):
-        with _the_computer() as computer, live_session.holding_a_live_session(desktop=lambda: HIS_DESKTOP):
+        with _the_computer() as computer, live_session.holding_a_live_session(desktop=lambda: HIS_DESKTOP, checkout=lambda: None):
             outcome = _stage("upscale").run(_after(**_newly_sorted("f")))
 
         assert outcome == evolver.Skipped("session_live")
