@@ -539,3 +539,28 @@ def test_a_replaced_funscript_is_kept_beside_the_stages_record(library, goblin_h
 
     kept, = (tmp_path / "state" / "funscript_drafts_replaced").rglob("*.funscript")
     assert funscript.read(kept)["metadata"]["creator"] == "origenerator"
+
+
+def test_an_origenerator_video_whose_goblinscript_funscript_is_kept_under_its_name_alone_is_left_alone(
+        library, goblin_home, tmp_path):
+    touch_video(library.origenerator / "video" / "video one.mp4")
+    _written_by(_origenerator_scripts(tmp_path) / "video one.funscript", "GoblinScript v0.6.0")
+    fake = FakeGoblin()
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    assert (fake.started, result.waiting) == ([], 0)
+
+
+def test_an_origenerator_funscript_kept_under_its_videos_name_alone_is_replaced_where_it_is(
+        library, goblin_home, tmp_path):
+    touch_video(library.origenerator / "video" / "video one.mp4")
+    older = _written_by(_origenerator_scripts(tmp_path) / "video one.funscript", "origenerator")
+    fake = FakeGoblin()
+    _drafted(goblin_home, tmp_path, fake)
+    _finish(fake, tmp_path, goblin_home, {"video one": _ACTIONS[1:]})
+
+    _drafted(goblin_home, tmp_path, fake)
+
+    assert funscript.read(older)["metadata"]["creator"] == "GoblinScript v0.6.0"
+    assert not (_origenerator_scripts(tmp_path) / "video" / "video one.mp4.funscript").exists()
