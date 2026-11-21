@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
 
+from app_support.mirrored_tree import records_under
 from app_support.video_names import strip_processing_suffixes
 
 import config
@@ -149,7 +150,7 @@ def _prune_orphans(expected: set[Path]) -> int:
         bucket_metadata = sidecar.sidecar_folder(bucket)
         if bucket_metadata is None or not bucket_metadata.is_dir():
             continue
-        for json_path in bucket_metadata.rglob("*.json"):
+        for json_path in records_under(bucket_metadata):
             if json_path not in expected and json_path.stem not in awaiting_review:
                 try:
                     json_path.unlink()

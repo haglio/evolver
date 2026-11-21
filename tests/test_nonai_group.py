@@ -160,6 +160,25 @@ class TestNonAiGroup(unittest.TestCase):
                 assert result.pruned == 1
                 assert not sidecar.sidecar_path(clip).exists()
 
+    def test_leaves_alone_the_copy_pcloud_made_of_a_conflict_over_a_record(self):
+        with workspace_temp_dir() as root:
+            video_lib, non_ai, metadata = _library(root)
+            with override_config(
+                VIDEO_LIBRARY_DIR=video_lib, NON_AI_DIR=non_ai, METADATA_DIR=metadata
+            ):
+                clip = _touch(non_ai / "lagoon" / "0 unsorted" / "Scene-3.mp4")
+                nonai_group.run()
+                record = sidecar.sidecar_path(clip)
+                copies = [record.with_stem(f"{record.stem} [conflicted]"),
+                          record.with_stem(f"{record.stem} [conflicted 2]")]
+                for copy in copies:
+                    write_sidecar(copy, {"title": "only this copy has it"})
+
+                result = nonai_group.run()
+
+                assert result.pruned == 0
+                assert [sidecar.read(copy) for copy in copies] == [{"title": "only this copy has it"}] * 2
+
     def test_keeps_the_record_of_a_clip_marked_trash_until_it_is_reviewed(self):
         with workspace_temp_dir() as root:
             lib = LaneLibrary(root)
