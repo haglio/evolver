@@ -59,6 +59,7 @@ METADATA_DIR = LIBRARY_ROOT / "videos" / "metadata"
 
 
 ORIGENERATOR_VIDEOS_DIR = Path(haglio_settings.value("origenerator_videos_dir"))
+ORIGENERATOR_SCRIPTS_DIR = Path(haglio_settings.value("origenerator_scripts_dir"))
 
 
 def warm_gun_outbox(content: dict[str, Any]) -> Path | None:
