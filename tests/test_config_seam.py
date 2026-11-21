@@ -15,7 +15,7 @@ pytestmark = pytest.mark.repo_check
 CONFIG_REFERENCE_CEILINGS = {
     "check_correspondence.py": 4,
     "check_duplicate_sizes.py": 4,
-    "evolver.py": 15,
+    "evolver.py": 17,
     "gui/app.py": 4,
     "gui/branch_session.py": 6,
     "gui/main_window.py": 2,

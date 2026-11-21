@@ -529,6 +529,8 @@ class TestTheMakeFunscriptsStage:
              patch("evolver.config.VIDEO_LIBRARY_DIR", tmp_path / "videos"), \
              patch("evolver.config.SORTED_DIR", tmp_path / "videos" / "sorted"), \
              patch("evolver.config.ORIGENERATOR_DB_PATH", tmp_path / "gallery.db"), \
+             patch("evolver.config.ORIGENERATOR_VIDEOS_DIR", tmp_path / "made videos"), \
+             patch("evolver.config.ORIGENERATOR_SCRIPTS_DIR", tmp_path / "made scripts"), \
              patch("evolver.config.VIDEO_ACTIONS_GIVEN_NO_FUNSCRIPT", frozenset({"alpha"})), \
              patch("evolver.funscript_drafts.hold_off_reason", return_value=""), \
              patch("evolver.funscript_drafts.run", return_value=did) as drafted:
@@ -538,7 +540,8 @@ class TestTheMakeFunscriptsStage:
         drafted.assert_called_once_with(
             library=evolver.funscript_drafts.Library(
                 videos=tmp_path / "videos", sorted_videos=tmp_path / "videos" / "sorted",
-                gallery=tmp_path / "gallery.db", actions_given_no_funscript=frozenset({"alpha"})),
+                gallery=tmp_path / "gallery.db", origenerator_videos=tmp_path / "made videos",
+                origenerator_scripts=tmp_path / "made scripts", actions_given_no_funscript=frozenset({"alpha"})),
             goblin=evolver.funscript_drafts.Goblin(tmp_path / "goblin"),
             drafting=evolver.funscript_drafts.Drafting.kept_in(tmp_path / "state"))
 

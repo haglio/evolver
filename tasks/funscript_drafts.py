@@ -19,7 +19,7 @@ from app_support.subprocess_utils import hidden_subprocess_kwargs
 from tasks import vr_draft
 from util import lanes
 from util.media_files import library_videos
-from util.script_library import mark_generated, script_path_for_video
+from util.script_library import is_marked_generated, mark_generated, script_path_for_video
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -60,6 +60,8 @@ class Library:
     videos: Path
     sorted_videos: Path
     gallery: Path
+    origenerator_videos: Path
+    origenerator_scripts: Path
     actions_given_no_funscript: frozenset[str] = frozenset()
 
 
@@ -91,13 +93,15 @@ class Goblin:
 class Drafting:
     drafts: Path
     flattened: Path
+    replaced: Path
     log: Path
     record: Path
 
     @classmethod
     def kept_in(cls, folder: Path) -> Drafting:
         return cls(drafts=folder / "funscript_drafts", flattened=folder / "funscript_drafts_flat",
-                   log=folder / "funscript_drafts.log", record=folder / "funscript_drafts.json")
+                   replaced=folder / "funscript_drafts_replaced", log=folder / "funscript_drafts.log",
+                   record=folder / "funscript_drafts.json")
 
     def command_for(self, goblin: Goblin, batch: list[Waiting]) -> list[str]:
         if batch[0].is_vr:
@@ -116,12 +120,12 @@ class Drafting:
 @dataclass(frozen=True)
 class Waiting:
     video: Path
-    in_library: Path
+    script: Path
     is_vr: bool = False
 
     @classmethod
-    def at(cls, video: Path) -> Waiting:
-        return cls(video, video)
+    def in_the_library(cls, video: Path) -> Waiting:
+        return cls(video, script_path_for_video(video))
 
 
 def launch(command: list[str], log: Path, *, popen=subprocess.Popen) -> int:
@@ -174,12 +178,12 @@ def run(*, library: Library, goblin: Goblin, drafting: Drafting,
         return FunscriptDraftsResult(nothing_usable=len(record.get(_NOTHING_USABLE, ())),
                                      failed_batches=1)
     nothing_usable = set(record.get(_NOTHING_USABLE, ()))
-    waiting = [one for one in _waiting_newest_first(library) if _key(library, one) not in nothing_usable]
+    waiting = [one for one in _waiting_newest_first(library) if _key(one.script) not in nothing_usable]
     batch = _next_batch(waiting, max_items)
     if batch:
         pid = start(drafting.command_for(goblin, batch), drafting.log)
         record[_BATCH] = {"pid": pid, "videos": [str(one.video) for one in batch],
-                          "in_library": [str(one.in_library) for one in batch]}
+                          "scripts": [str(one.script) for one in batch], "vr": batch[0].is_vr}
     drafting.write(record)
     return _logged(FunscriptDraftsResult(made=made, nothing_usable=len(nothing_usable),
                                          started=len(batch), waiting=len(waiting) - len(batch)))
@@ -213,14 +217,14 @@ def _take_in_the_finished_batch(library: Library, goblin: Goblin, drafting: Draf
         return None
     made = 0
     nothing_usable = record.setdefault(_NOTHING_USABLE, [])
-    has_a_funscript = _HasAFunscript()
-    for video, in_library in zip(map(Path, batch["videos"]), map(Path, batch["in_library"]), strict=True):
-        one = Waiting(video, in_library, is_vr=video != in_library)
+    settled = _Settled(library)
+    for video, script in zip(map(Path, batch["videos"]), map(Path, batch["scripts"]), strict=True):
         draft = funscript.read(drafting.drafts / f"{video.stem}{funscript.EXTENSION}")
         if len(funscript.actions_of(draft)) < _FEWEST_ACTIONS_OF_A_USABLE_DRAFT:
-            nothing_usable.append(_key(library, one))
-        elif (one.is_vr or video.is_file()) and not has_a_funscript(in_library):
-            _place(in_library, draft)
+            nothing_usable.append(_key(script))
+        elif (batch.get("vr") or video.is_file()) and not settled.script(script):
+            _keep_what_it_replaces(script, drafting)
+            _place(script, draft)
             made += 1
     _clear_the_batch_away(goblin, drafting)
     return made
@@ -232,14 +236,20 @@ def _clear_the_batch_away(goblin: Goblin, drafting: Drafting) -> None:
     shutil.rmtree(goblin.project, ignore_errors=True)
 
 
-def _key(library: Library, waiting: Waiting) -> str:
-    return waiting.in_library.relative_to(library.videos).as_posix()
+def _key(script: Path) -> str:
+    return script.as_posix()
 
 
-def _place(video: Path, draft: dict) -> None:
+def _keep_what_it_replaces(script: Path, drafting: Drafting) -> None:
+    if script.is_file():
+        kept = drafting.replaced / script.relative_to(script.anchor)
+        kept.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(script, kept)
+
+
+def _place(script: Path, draft: dict) -> None:
     metadata = draft.get(funscript.METADATA)
     metadata = metadata if isinstance(metadata, dict) else {}
-    script = script_path_for_video(video)
     placed = {**draft, funscript.METADATA: {**metadata, "creator": CREATOR}}
     funscript.write(script, _held_flat(placed) if _barely_moves(placed) else placed)
     mark_generated(script)
@@ -260,16 +270,29 @@ def _held_flat(draft: dict) -> dict:
     return {**draft, funscript.METADATA: metadata, funscript.ACTIONS: [{"at": 0, "pos": 0}, {"at": end, "pos": 0}]}
 
 
-class _HasAFunscript:
-    def __init__(self) -> None:
-        self._scripted_twin = {}
+class _Settled:
+    def __init__(self, library: Library) -> None:
+        self._origenerators = library.origenerator_scripts
+        self._twin = {}
         for ai in lanes.ai_videos():
-            self._scripted_twin[ai.upscale] = ai.video
-            self._scripted_twin[ai.video] = ai.upscale
+            self._twin[ai.upscale] = ai.video
+            self._twin[ai.video] = ai.upscale
 
-    def __call__(self, video: Path) -> bool:
-        twin = self._scripted_twin.get(video)
-        return any(script_path_for_video(one).exists() for one in (video, twin) if one is not None)
+    def video(self, video: Path) -> bool:
+        twin = self._twin.get(video)
+        return any(self.script(script_path_for_video(one)) for one in (video, twin) if one is not None)
+
+    def script(self, script: Path) -> bool:
+        return script.is_file() and not self._written_by_no_person_and_not_by_goblinscript(script)
+
+    def _written_by_no_person_and_not_by_goblinscript(self, script: Path) -> bool:
+        written_by_no_person = script.is_relative_to(self._origenerators) or is_marked_generated(script)
+        return written_by_no_person and not _made_by_goblinscript(script)
+
+
+def _made_by_goblinscript(script: Path) -> bool:
+    metadata = funscript.read(script).get(funscript.METADATA)
+    return isinstance(metadata, dict) and str(metadata.get("creator") or "").startswith("GoblinScript")
 
 
 def _sorted_videos_not_yet_upscaled(library: Library) -> list[Path]:
@@ -303,12 +326,26 @@ def _actions_in(row: dict) -> set[str]:
 
 
 def _waiting_newest_first(library: Library) -> list[Waiting]:
-    has_a_funscript = _HasAFunscript()
+    settled = _Settled(library)
     given_no_funscript = _given_no_funscript(library)
-    videos = [*library_videos(lanes.kino_upscales_dir()), *_sorted_videos_not_yet_upscaled(library),
-              *lanes.non_ai_videos()]
-    waiting = sorted((video for video in videos if not has_a_funscript(video) and not given_no_funscript(video)),
-                     key=lambda video: video.stat().st_mtime, reverse=True)
-    vr = [Waiting(vr.video, vr.in_library, is_vr=True) for vr in lanes.vr_videos()
-          if not has_a_funscript(vr.in_library)]
-    return [*map(Waiting.at, waiting), *vr]
+    in_the_library = [Waiting.in_the_library(video) for video in [
+        *library_videos(lanes.kino_upscales_dir()), *_sorted_videos_not_yet_upscaled(library),
+        *lanes.non_ai_videos()] if not settled.video(video)]
+    waiting = sorted((one for one in [*in_the_library, *_origenerators_own(library, settled)]
+                      if not given_no_funscript(one.video)),
+                     key=lambda one: one.video.stat().st_mtime, reverse=True)
+    vr = [Waiting(vr.video, script_path_for_video(vr.in_library), is_vr=True) for vr in lanes.vr_videos()
+          if not settled.script(script_path_for_video(vr.in_library))]
+    return [*waiting, *vr]
+
+
+def _origenerators_own(library: Library, settled: _Settled) -> list[Waiting]:
+    if not library.origenerator_videos.is_dir():
+        return []
+    waiting = []
+    for video in library_videos(library.origenerator_videos):
+        script = funscript.script_under_its_whole_filename(
+            video, videos=library.origenerator_videos, scripts=library.origenerator_scripts)
+        if script is not None and not settled.script(script):
+            waiting.append(Waiting(video, script))
+    return waiting

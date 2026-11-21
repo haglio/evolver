@@ -15,7 +15,7 @@ from app_support.testing import process_alive, process_exe
 from tasks import funscript_drafts, vr_draft
 from tasks.script_versions import copy_missing_version_scripts
 from tests.temp_helpers import LaneLibrary, override_config, touch_video
-from util.script_library import is_marked_generated
+from util.script_library import is_marked_generated, mark_generated
 
 
 class FakeGoblin:
@@ -48,12 +48,18 @@ def goblin_home(tmp_path) -> Path:
     return home
 
 
+def _origenerator_scripts(tmp_path: Path) -> Path:
+    return LaneLibrary(tmp_path).search_root / "scripts" / "origenerator"
+
+
 def _drafted(goblin_home: Path, tmp_path: Path, fake: FakeGoblin, *,
              actions_given_no_funscript: frozenset[str] = frozenset(), **given):
     lanes = LaneLibrary(tmp_path)
     return funscript_drafts.run(
         library=funscript_drafts.Library(videos=lanes.library, sorted_videos=lanes.sorted_dir,
                                          gallery=lanes.gallery_db,
+                                         origenerator_videos=lanes.origenerator,
+                                         origenerator_scripts=_origenerator_scripts(tmp_path),
                                          actions_given_no_funscript=actions_given_no_funscript),
         goblin=funscript_drafts.Goblin(goblin_home),
         drafting=funscript_drafts.Drafting.kept_in(tmp_path / "state"),
@@ -457,3 +463,79 @@ def test_a_vr_video_with_a_funscript_in_the_library_is_left_alone(library, vr_fo
     result = _drafted(goblin_home, tmp_path, fake)
 
     assert (fake.started, result.waiting) == ([], 0)
+
+
+def _written_by(script: Path, creator: str, *, marked: bool = False) -> Path:
+    funscript.write(script, {"actions": _ACTIONS, "metadata": {"creator": creator}})
+    if marked:
+        mark_generated(script)
+    return script
+
+
+def test_an_origenerator_video_whose_funscript_origenerator_made_gets_goblinscripts_in_its_place(
+        library, goblin_home, tmp_path):
+    video = touch_video(library.origenerator / "video" / "video one.mp4")
+    script = _written_by(_origenerator_scripts(tmp_path) / "video" / "video one.mp4.funscript", "origenerator")
+    fake = FakeGoblin()
+    _drafted(goblin_home, tmp_path, fake)
+    _finish(fake, tmp_path, goblin_home, {"video one": _ACTIONS[1:]})
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    assert fake.started[0][3:-7] == [str(video)]
+    assert funscript.read(script)["metadata"]["creator"] == "GoblinScript v0.6.0"
+    assert funscript.actions_of(funscript.read(script)) == _ACTIONS[1:]
+    assert result.made == 1
+
+
+def test_an_origenerator_video_with_a_goblinscript_funscript_is_left_alone(library, goblin_home, tmp_path):
+    touch_video(library.origenerator / "video" / "video one.mp4")
+    _written_by(_origenerator_scripts(tmp_path) / "video" / "video one.mp4.funscript", "GoblinScript v0.6.0")
+    fake = FakeGoblin()
+
+    result = _drafted(goblin_home, tmp_path, fake)
+
+    assert (fake.started, result.waiting) == ([], 0)
+
+
+def test_a_library_funscript_marked_as_written_by_no_person_is_replaced_and_one_a_person_wrote_is_kept(
+        library, goblin_home, tmp_path):
+    folder = library.kino_upscales / "portrait" / "example-source"
+    handed_over = touch_video(folder / "video one_topaz.mp4")
+    hand_made = touch_video(folder / "video two_topaz.mp4")
+    machine = _written_by(_script_for(library, handed_over), "origenerator", marked=True)
+    person = _written_by(_script_for(library, hand_made), "Jane Doe")
+    fake = FakeGoblin()
+    _drafted(goblin_home, tmp_path, fake)
+    _finish(fake, tmp_path, goblin_home, {"video one_topaz": _ACTIONS[1:]})
+
+    _drafted(goblin_home, tmp_path, fake)
+
+    assert fake.started[0][3:-7] == [str(handed_over)]
+    assert funscript.actions_of(funscript.read(machine)) == _ACTIONS[1:]
+    assert funscript.read(person)["metadata"]["creator"] == "Jane Doe"
+
+
+def test_a_kino_video_whose_sorted_video_has_only_a_funscript_no_person_wrote_is_drafted(
+        library, goblin_home, tmp_path):
+    upscale = touch_video(library.kino_upscales / "portrait" / "example-source" / "video one_topaz.mp4")
+    source = touch_video(library.sorted_dir / "example-source" / "portrait" / "video one.mp4")
+    _written_by(_script_for(library, source), "origenerator", marked=True)
+    fake = FakeGoblin()
+
+    _drafted(goblin_home, tmp_path, fake)
+
+    assert fake.started[0][3:-7] == [str(upscale)]
+
+
+def test_a_replaced_funscript_is_kept_beside_the_stages_record(library, goblin_home, tmp_path):
+    touch_video(library.origenerator / "video" / "video one.mp4")
+    _written_by(_origenerator_scripts(tmp_path) / "video" / "video one.mp4.funscript", "origenerator")
+    fake = FakeGoblin()
+    _drafted(goblin_home, tmp_path, fake)
+    _finish(fake, tmp_path, goblin_home, {"video one": _ACTIONS[1:]})
+
+    _drafted(goblin_home, tmp_path, fake)
+
+    kept, = (tmp_path / "state" / "funscript_drafts_replaced").rglob("*.funscript")
+    assert funscript.read(kept)["metadata"]["creator"] == "origenerator"
