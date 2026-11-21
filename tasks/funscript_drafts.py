@@ -344,8 +344,9 @@ def _origenerators_own(library: Library, settled: _Settled) -> list[Waiting]:
         return []
     waiting = []
     for video in library_videos(library.origenerator_videos):
-        script = funscript.script_under_its_whole_filename(
+        places = funscript.places_a_script_may_be_kept(
             video, videos=library.origenerator_videos, scripts=library.origenerator_scripts)
-        if script is not None and not settled.script(script):
-            waiting.append(Waiting(video, script))
+        kept = next((place for place in places if place.is_file()), None)
+        if kept is None or not settled.script(kept):
+            waiting.append(Waiting(video, kept or places[0]))
     return waiting
