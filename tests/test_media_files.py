@@ -17,6 +17,7 @@ from tests.temp_helpers import a_drive_that_is_not_there, override_config, works
 from util import media_files
 from util.media_files import (
     child_dirs,
+    is_finalized_video_file,
     is_partial_path,
     library_videos,
     listed_videos,
@@ -55,6 +56,24 @@ class TestLibraryVideos(unittest.TestCase):
 
         assert found == [good]
         assert is_partial_path(partial)
+
+    def test_a_copy_pcloud_kept_from_a_sync_conflict_is_no_video_to_enhance(self):
+        with workspace_temp_dir() as root:
+            good = root / "a" / "scene one_topaz.mp4"
+            good.parent.mkdir(parents=True)
+            good.write_bytes(b"video")
+            for name in ("scene one_topaz [conflicted].mp4", "scene one_topaz [conflicted 2].mp4",
+                         "scene one_topaz [Conflicted 2]_topaz.mp4"):
+                (root / "a" / name).write_bytes(b"copy")
+
+            with override_config(VIDEO_EXTENSIONS={".mp4"}):
+                walked = list(library_videos(root))
+                listed = list(listed_videos(root))
+                finalized = sorted(path.name for path in (root / "a").iterdir() if is_finalized_video_file(path))
+
+        assert walked == [good]
+        assert listed == [good]
+        assert finalized == [good.name]
 
     def test_video_extensions_are_read_from_config_at_each_call(self):
         with workspace_temp_dir() as root:
