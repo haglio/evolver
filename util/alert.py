@@ -88,6 +88,6 @@ def _fall_back_to_windows(title: str, message: str) -> None:
     try:
         from app_support.win32 import show_error_popup  # noqa: PLC0415  (see the module docstring)
 
-        show_error_popup(title, message)
+        show_error_popup(title, message, app_icon=ICON_FILE)
     except Exception:
         log.exception("Could not open the Windows dialog either: %s", title)

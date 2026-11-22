@@ -129,7 +129,7 @@ class TestShowError(unittest.TestCase):
         with self.assertLogs("util.alert", level="ERROR") as logged:
             alert.show_error("Title", "Body")
 
-        show_error_popup.assert_called_once_with("Title", "Body")
+        show_error_popup.assert_called_once_with("Title", "Body", app_icon=alert.ICON_FILE)
         assert "Title" in logged.records[0].getMessage()
 
     @error_popup()
@@ -142,7 +142,7 @@ class TestShowError(unittest.TestCase):
         with self.assertLogs("util.alert", level="ERROR"):
             alert.show_error("Title", "Body", links=[("Open its folder", folder)])
 
-        show_error_popup.assert_called_once_with("Title", f"Body\n\n{folder}")
+        show_error_popup.assert_called_once_with("Title", f"Body\n\n{folder}", app_icon=alert.ICON_FILE)
 
     @error_popup()
     @alert_shown(side_effect=ImportError("no Qt"))
