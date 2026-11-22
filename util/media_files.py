@@ -9,6 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app_support.file_channel import retried_while_held
+from app_support.mirrored_tree import PCLOUDS_MARK_ON_A_CONFLICTED_COPY
 
 import config
 
@@ -27,8 +28,13 @@ def is_partial_path(path: Path) -> bool:
     return PARTIAL_MARKER in path.name.lower()
 
 
+def is_pclouds_conflicted_copy(path: Path) -> bool:
+    return PCLOUDS_MARK_ON_A_CONFLICTED_COPY in path.name.lower()
+
+
 def _is_finished_video_name(path: Path) -> bool:
-    return path.suffix.lower() in config.VIDEO_EXTENSIONS and not is_partial_path(path)
+    return (path.suffix.lower() in config.VIDEO_EXTENSIONS
+            and not is_partial_path(path) and not is_pclouds_conflicted_copy(path))
 
 
 def is_finalized_video_file(path: Path) -> bool:
