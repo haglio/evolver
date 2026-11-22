@@ -20,33 +20,38 @@ ERRORS_SHOWN_FILE = LOCAL_STATE_DIR / "errors_shown.json"
 
 def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (), *,
                dismissible: bool = False, same_error: str | None = None, work_on_this: bool = True,
-               copyable: bool = True) -> bool:
+               warning_icon: bool = False) -> bool:
     if work_on_this and _shown_before(title, message if same_error is None else same_error):
         log.info("Not showing %s again: the same error's window was shown before", title)
         return False
-    return _show(title, message, links, dismissible=dismissible, work_on_this=work_on_this, copyable=copyable)
+    return _show(title, message, links, error=True, dismissible=dismissible,
+                 work_on_this=_work_on_this(title, message) if work_on_this else None,
+                 **_with_the_warning_icon(warning_icon))
 
 
 def show_warning(title: str, message: str) -> bool:
     from shared_ui.alert import Level  # noqa: PLC0415  (see the module docstring)
 
-    return _show(title, message, (), dismissible=False, work_on_this=True, copyable=True, level=Level.WARNING)
+    return _show(title, message, (), error=False, level=Level.ERROR)
 
 
-def _show(title: str, message: str, links: Sequence[tuple[str, Path]], *, dismissible: bool, work_on_this: bool,
-          copyable: bool, **look: object) -> bool:
+def _with_the_warning_icon(wanted: bool) -> dict[str, object]:
+    from shared_ui.alert import Level  # noqa: PLC0415  (see the module docstring)
+
+    return {"level": Level.WARNING} if wanted else {}
+
+
+def _show(title: str, message: str, links: Sequence[tuple[str, Path]], *, error: bool, **look: object) -> bool:
     try:
-        from shared_ui.alert import Link, show_alert  # noqa: PLC0415  (see the module docstring)
+        from shared_ui import alert as family  # noqa: PLC0415  (see the module docstring)
         from shared_ui.preview_icon import app_icon  # noqa: PLC0415  (see the module docstring)
 
         from util.preview import shown_as  # noqa: PLC0415  (see the module docstring)
 
         shown = shown_as()
-        return show_alert(title, message, icon=ICON_FILE if shown is None else app_icon(ICON_FILE, shown),
-                          links=[Link(text, target) for text, target in links],
-                          dismissible=dismissible,
-                          work_on_this=_work_on_this(title, message) if work_on_this else None,
-                          copyable=copyable, **look)
+        show = family.show_error if error else family.show_warning
+        return show(title, message, icon=ICON_FILE if shown is None else app_icon(ICON_FILE, shown),
+                    links=[family.Link(text, target) for text, target in links], **look)
     except Exception:
         log.exception("Could not open the alert dialog: %s", title)
         targets = "\n".join(str(target) for _text, target in links)

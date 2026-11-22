@@ -212,7 +212,7 @@ class TestRestoring(_ReviewingALibrary):
         window.videos.selectAll()
         touch_video(self.lib.genau_flicks / "loop_11_topaz.mp4")
 
-        with patch("review_trash.window.show_warning") as warned:
+        with patch("review_trash.window.show_error") as warned:
             window.restore_button.click()
 
         assert "loop_11_topaz.mp4" in warned.call_args.args[1]

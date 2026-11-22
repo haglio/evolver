@@ -19,49 +19,48 @@ UPSCALE_HELD_FOR_SIGN_IN = {"name": "upscale", "status": "skipped", "duration_se
 
 class TestSignInNotice(unittest.TestCase):
     def test_a_run_that_held_upscaling_for_the_topaz_sign_in_tells_the_user(self):
-        with patch("gui.sign_in_notice.show_error") as show_error:
+        with patch("gui.sign_in_notice.show_warning") as show_warning:
             SignInNotice().after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=0.0)
 
-        show_error.assert_called_once()
+        show_warning.assert_called_once()
 
     def test_the_notice_says_enhancing_is_held_until_the_sign_in(self):
-        with patch("gui.sign_in_notice.show_error") as show_error:
+        with patch("gui.sign_in_notice.show_warning") as show_warning:
             SignInNotice().after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=0.0)
 
-        show_error.assert_called_once_with(
+        show_warning.assert_called_once_with(
             "Evolver - Topaz sign-in expired",
             "Topaz Video's sign-in has expired, so Evolver is holding off on enhancing. "
             "Topaz can put its watermark on videos it enhances until you sign in again.\n\n"
-            "Open the Topaz Video app and sign in. Enhancing starts again on its own.", work_on_this=False,
-            copyable=False)
+            "Open the Topaz Video app and sign in. Enhancing starts again on its own.")
 
     def test_a_non_ai_upscale_waiting_for_the_topaz_sign_in_tells_the_user_too(self):
         waiting = {"name": "upscale_non_ai", "status": "completed", "duration_seconds": 1.0,
                    "result": {"start_deferred": "topaz_sign_in_expired", "in_flight": ""}}
-        with patch("gui.sign_in_notice.show_error") as show_error:
+        with patch("gui.sign_in_notice.show_warning") as show_warning:
             SignInNotice().after_run(a_run(waiting), now=0.0)
 
-        show_error.assert_called_once()
+        show_warning.assert_called_once()
 
     def test_the_user_is_told_once_a_day_not_once_a_run(self):
         notice = SignInNotice()
-        with patch("gui.sign_in_notice.show_error") as show_error:
+        with patch("gui.sign_in_notice.show_warning") as show_warning:
             notice.after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=0.0)
             notice.after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=600.0)
-            assert show_error.call_count == 1
+            assert show_warning.call_count == 1
 
             notice.after_run(a_run(UPSCALE_HELD_FOR_SIGN_IN), now=24 * 3600.0)
-            assert show_error.call_count == 2
+            assert show_warning.call_count == 2
 
     def test_a_run_that_held_nothing_back_for_the_sign_in_says_nothing(self):
         nothing_to_do = {"name": "upscale", "status": "skipped", "duration_seconds": 0.0,
                          "result": None, "skip_reason": "no_pending_work"}
         user_present = {"name": "upscale_non_ai", "status": "completed", "duration_seconds": 1.0,
                         "result": {"start_deferred": "user_present", "in_flight": ""}}
-        with patch("gui.sign_in_notice.show_error") as show_error:
+        with patch("gui.sign_in_notice.show_warning") as show_warning:
             SignInNotice().after_run(a_run(nothing_to_do, user_present), now=0.0)
 
-        show_error.assert_not_called()
+        show_warning.assert_not_called()
 
     def test_a_run_finishing_while_the_message_is_still_open_does_not_open_a_second(self):
         notice = SignInNotice()
@@ -70,11 +69,11 @@ class TestSignInNotice(unittest.TestCase):
         def next_run_finishes_meanwhile(*_, **__):
             notice.after_run(held, now=600.0)
 
-        with patch("gui.sign_in_notice.show_error",
-                   side_effect=next_run_finishes_meanwhile) as show_error:
+        with patch("gui.sign_in_notice.show_warning",
+                   side_effect=next_run_finishes_meanwhile) as show_warning:
             notice.after_run(held, now=0.0)
 
-        show_error.assert_called_once()
+        show_warning.assert_called_once()
 
 
 if __name__ == "__main__":
