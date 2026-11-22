@@ -103,8 +103,14 @@ class TestShowError(unittest.TestCase):
         assert [shown.kwargs["work_on_this"] for shown in show_alert.call_args_list] == [None, None]
 
     @alert_shown()
-    def test_a_window_no_session_could_help_with_offers_nothing_to_copy_either(self, show_alert):
-        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", work_on_this=False)
+    def test_a_window_no_session_could_help_with_still_offers_its_message_to_copy(self, show_alert):
+        alert.show_error("Evolver failed to start", "Made-up failure.", work_on_this=False)
+
+        assert show_alert.call_args.kwargs["copyable"] is True
+
+    @alert_shown()
+    def test_a_window_whose_message_never_changes_offers_nothing_to_copy(self, show_alert):
+        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", work_on_this=False, copyable=False)
 
         assert show_alert.call_args.kwargs["copyable"] is False
 
