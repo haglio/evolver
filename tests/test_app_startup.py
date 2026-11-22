@@ -338,10 +338,10 @@ class TestTopazSignInNotice:
                      "result": None, "skip_reason": "topaz_sign_in_expired"}],
         )
 
-        with patch("gui.sign_in_notice.show_error") as show_error:
+        with patch("gui.sign_in_notice.show_warning") as show_warning:
             app._on_finished(record)
 
-        show_error.assert_called_once()
+        show_warning.assert_called_once()
 
 
 class TestFailedStagesNotice:

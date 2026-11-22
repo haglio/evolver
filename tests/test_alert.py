@@ -43,8 +43,8 @@ class TestShowError(unittest.TestCase):
             copyable=True)
 
     @alert_shown()
-    def test_a_warning_opens_the_familys_dialog_at_the_warning_level(self, show_alert):
-        alert.show_warning("Title", "Body")
+    def test_an_error_can_wear_the_warning_icon(self, show_alert):
+        alert.show_error("Title", "Body", warning_icon=True)
 
         show_alert.assert_called_once_with(
             "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY,
@@ -109,10 +109,17 @@ class TestShowError(unittest.TestCase):
         assert show_alert.call_args.kwargs["copyable"] is True
 
     @alert_shown()
-    def test_a_window_whose_message_never_changes_offers_nothing_to_copy(self, show_alert):
-        alert.show_error("Evolver - Made-Up Reminder", "Sign in again.", work_on_this=False, copyable=False)
+    def test_a_warning_that_is_part_of_evolvers_normal_use_offers_nothing_to_copy(self, show_alert):
+        alert.show_warning("Evolver - Made-Up Reminder", "Sign in again.")
 
-        assert show_alert.call_args.kwargs["copyable"] is False
+        assert (show_alert.call_args.kwargs["copyable"], show_alert.call_args.kwargs["level"]) == (False, Level.ERROR)
+
+    @alert_shown()
+    def test_a_warning_comes_back_every_time(self, show_alert):
+        alert.show_warning("Evolver - Made-Up Reminder", "Sign in again.")
+        alert.show_warning("Evolver - Made-Up Reminder", "Sign in again.")
+
+        assert show_alert.call_count == 2
 
     @alert_shown(return_value=True)
     def test_an_alert_that_offers_dismiss_says_whether_it_was_dismissed(self, show_alert):

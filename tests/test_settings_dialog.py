@@ -74,7 +74,7 @@ class TestAccept:
         register.side_effect = OSError("Startup folder is read-only")
         dialog._startup_check.setChecked(True)
 
-        with patch("gui.settings_dialog.show_warning") as warned:
+        with patch("gui.settings_dialog.show_error") as warned:
             dialog.accept()
 
         warned.assert_called_once()

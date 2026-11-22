@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from gui.run_record import RunRecord
 from util import topaz
-from util.alert import show_error
+from util.alert import show_warning
 
 TITLE = "Evolver - Topaz sign-in expired"
 MESSAGE = (
@@ -23,7 +23,7 @@ class SignInNotice:
         if self._shown_at is not None and now - self._shown_at < _REMIND_AFTER_SECONDS:
             return
         self._shown_at = now
-        show_error(TITLE, MESSAGE, work_on_this=False, copyable=False)
+        show_warning(TITLE, MESSAGE)
 
 
 def _held_for_sign_in(record: RunRecord) -> bool:
