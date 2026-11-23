@@ -45,11 +45,6 @@ def mark_favorite(video: Path, favorite: bool) -> bool:
     return favorites.mark(path, favorite)
 
 
-def library_favorites() -> list[favorites.Favorite]:
-    return favorites.favorites_under(_records_root(), video_roots=_video_roots(),
-                                     video_suffixes=sorted(config.VIDEO_EXTENSIONS))
-
-
 def read(path: Path) -> dict:
     reads = run_reads.current()
     return read_json_or_empty(path) if reads is None else reads.payload(path, read_json_or_empty)

@@ -47,7 +47,6 @@ LEFT_AMBIENT = {
     "NONAI_PROCESSED_DIR_NAME": "a folder name, resolved under NON_AI_DIR",
     "TVAI_MODEL_DIR": "the Topaz install; goes into the encoder's environment, "
                       "and no test launches one",
-    "VIDEO_EXTENSIONS": "not a place: the suffixes a record's video may have",
 }
 
 

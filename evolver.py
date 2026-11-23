@@ -231,7 +231,8 @@ SECTIONS: tuple[Section, ...] = (
               "Verify every 1_sorted video has its enhanced video in its Kino or Genau folder, and no enhanced video is missing from either",
               (0xFF, 0x9D, 0x83), run=_verify),
         Stage("bookmarks", "Bookmarks sync",
-              "Copy Fun Time favorites into a Chrome bookmarks folder",
+              "Copy the web page of each favorite AI video from another site into a folder on Chrome's "
+          "bookmarks bar",
               (0x4B, 0x96, 0x88), run=lambda _: bookmarks_sync.run(),
               moves_no_videos=True),
     )),

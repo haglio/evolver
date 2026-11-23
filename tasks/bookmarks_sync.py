@@ -12,10 +12,11 @@ from urllib.parse import urlparse
 
 from app_support.favorites import Favorite
 from app_support.file_channel import write_whole
+from app_support.gallery_rows import OUTSIDE, source_of
 from app_support.kino_folder import is_ai_video
 
 import config
-from util import origenerator_gallery, sidecar
+from util import origenerator_gallery
 from util.origenerator_gallery import EVOLVER_UPSCALE, STARRED, WEB_URL
 from util.stage_result import StageResult
 
@@ -73,12 +74,11 @@ def run(
     if not config.METADATA_DIR.is_dir():
         log.info("The library's records cannot be reached. Skipping bookmarks sync.")
         return result
-    starred = _starred_in_the_gallery()
+    starred = _starred_site_videos()
     if starred is None:
         result.gallery_unread = True
         return result
-    favorites = _pages_of([*(favorite for favorite in sidecar.library_favorites()
-                             if not is_ai_video(favorite.video)), *starred])
+    favorites = _pages_of(starred)
     result.no_url = favorites.no_url
     result.bad_url = favorites.bad_url
 
@@ -117,10 +117,10 @@ def run(
     return result
 
 
-def _starred_in_the_gallery() -> list[Favorite] | None:
+def _starred_site_videos() -> list[Favorite] | None:
     try:
         rows = origenerator_gallery.rows(("prompt_id", "output_files"),
-                                         optional=(EVOLVER_UPSCALE, STARRED, WEB_URL))
+                                         optional=(EVOLVER_UPSCALE, STARRED, WEB_URL, "source"))
     except FileNotFoundError:
         return []
     except sqlite3.Error:
@@ -128,7 +128,8 @@ def _starred_in_the_gallery() -> list[Favorite] | None:
                     exc_info=True)
         return None
     return [Favorite(video=video, page=row.get(WEB_URL) or "")
-            for row in rows if row.get(STARRED) for video in _ai_videos_of(row)]
+            for row in rows if row.get(STARRED) and source_of(row) == OUTSIDE
+            for video in _ai_videos_of(row)]
 
 
 def _ai_videos_of(row: dict) -> list[Path]:
