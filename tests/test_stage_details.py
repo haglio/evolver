@@ -4,6 +4,8 @@ import ast
 import dataclasses
 from pathlib import Path
 
+import pytest
+
 import evolver
 from check_correspondence import CorrespondenceResult
 from check_duplicate_sizes import DuplicateSizesResult
@@ -113,7 +115,20 @@ def test_every_count_a_stage_records_reaches_its_sentence():
 
 
 def test_a_skipped_stage_says_why_in_words():
-    assert details_of(None, "cpu_busy", "upscale") == "Waited: the computer's processor was too busy"
+    assert details_of(None, "cpu_busy", "upscale") == "waited because the computer's processor was too busy"
+
+
+_NAMES_A_DETAIL_MAY_OPEN_WITH = {"Evolver", "Origenerator", "GoblinScript", "Topaz", "Chrome", "Fun"}
+
+
+@pytest.mark.parametrize("said", [NOTHING_TO_DO, *SKIP_REASONS.values()])
+def test_a_detail_starts_in_lowercase_unless_it_opens_with_a_name(said):
+    assert said[0].islower() or said.split()[0] in _NAMES_A_DETAIL_MAY_OPEN_WITH
+
+
+@pytest.mark.parametrize("said", [NOTHING_TO_DO, *SKIP_REASONS.values()])
+def test_a_detail_never_opens_with_a_word_and_a_colon(said):
+    assert ":" not in said.split()[0]
 
 
 def test_an_older_skip_reason_with_no_sentence_is_shown_as_it_was_recorded():
