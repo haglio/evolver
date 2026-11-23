@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import sqlite3
-import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+from app_support import processes
 
 from tasks import pcloud_stuck
 
@@ -226,43 +226,59 @@ def test_pclouds_database_and_drive_are_found_where_pcloud_keeps_them(monkeypatc
 
 
 class StandInForWindows:
-    def __init__(self, listings: list[str]):
-        self._listings = listings
-        self.ended: list[str] = []
+    def __init__(self, running: list[processes.Process]):
+        self.running = running
+        self.ended: list[int] = []
+        self.waited_for: list[int] = []
         self.started: list[list[str]] = []
 
-    def run(self, command, **_):
-        if command[0] == "taskkill":
-            self.ended.append(command[-1])
-            return subprocess.CompletedProcess(command, 0, "", "")
-        listing = self._listings.pop(0) if len(self._listings) > 1 else self._listings[0]
-        return subprocess.CompletedProcess(command, 0, listing, "")
+    def list_running(self) -> list[processes.Process]:
+        return list(self.running)
+
+    def terminate(self, pid: int) -> bool:
+        self.ended.append(pid)
+        return True
+
+    def wait_for_end(self, pid: int) -> bool:
+        self.waited_for.append(pid)
+        self.running = [process for process in self.running if process.pid != pid]
+        return True
 
     def popen(self, command, **_):
         self.started.append(command)
 
 
-_RUNNING = '"pCloud.exe","4321","Console","1","120,000 K"\n'
-_NOT_RUNNING = "INFO: No tasks are running which match the specified criteria.\n"
+def a_process(pid: int, name: str) -> processes.Process:
+    return processes.Process(pid=pid, ppid=1, started=0.0, name=name, exe="", cmdline="")
 
 
-def windows_with(monkeypatch, listings: list[str]) -> StandInForWindows:
-    windows = StandInForWindows(listings)
-    monkeypatch.setattr(pcloud_stuck.subprocess, "run", windows.run)
+def windows_with(monkeypatch, running: list[processes.Process]) -> StandInForWindows:
+    windows = StandInForWindows(running)
+    monkeypatch.setattr(pcloud_stuck.processes, "running", windows.list_running)
+    monkeypatch.setattr(pcloud_stuck.processes, "terminate", windows.terminate)
+    monkeypatch.setattr(pcloud_stuck.processes, "wait_for_end", windows.wait_for_end)
     monkeypatch.setattr(pcloud_stuck.subprocess, "Popen", windows.popen)
     return windows
 
 
 def test_pcloud_is_ended_by_its_own_process_number_and_started_again_through_explorer(monkeypatch):
-    windows = windows_with(monkeypatch, [_RUNNING, _NOT_RUNNING])
+    windows = windows_with(monkeypatch, [a_process(7, "explorer.exe"), a_process(4321, "pCloud.exe")])
     with pcloud_stuck.Pcloud().stopped():
-        assert windows.ended == ["4321"]
+        assert (windows.ended, windows.waited_for) == ([4321], [4321])
         assert windows.started == []
     assert windows.started == [["explorer.exe", r"C:\Program Files\pCloud Drive\pCloud.exe"]]
 
 
 def test_pcloud_that_is_not_running_is_neither_ended_nor_started(monkeypatch):
-    windows = windows_with(monkeypatch, [_NOT_RUNNING])
+    windows = windows_with(monkeypatch, [a_process(7, "explorer.exe")])
     with pytest.raises(RuntimeError), pcloud_stuck.Pcloud().stopped():
         pass
     assert (windows.ended, windows.started) == ([], [])
+
+
+def test_pcloud_that_windows_will_not_end_is_not_waited_for_or_started_again(monkeypatch):
+    windows = windows_with(monkeypatch, [a_process(4321, "pCloud.exe")])
+    monkeypatch.setattr(pcloud_stuck.processes, "terminate", lambda pid: False)
+    with pytest.raises(RuntimeError), pcloud_stuck.Pcloud().stopped():
+        pass
+    assert (windows.waited_for, windows.started) == ([], [])
