@@ -108,7 +108,7 @@ class TestRunHistoryMarks:
         with patch("gui.main_window.newest_runs", return_value=[newest, older]):
             self.window.refresh_history()
         assert self.window._history_list.currentRow() == 0
-        shown = self.window._detail_widget._run_label.text()
+        shown = _words_of(self.window._detail_widget._run_line)
         assert "34" in shown
         assert "99" not in shown
 
@@ -126,7 +126,7 @@ class TestRunHistoryMarks:
         assert self.window._records == [newest, older[0]]
         assert self.window._history_list.count() == 2
         assert self.window._history_list.currentRow() == 0
-        assert "34" in self.window._detail_widget._run_label.text()
+        assert "34" in _words_of(self.window._detail_widget._run_line)
 
     def test_closing_the_window_hides_it_to_the_tray_instead(self):
         self.window = EvolverMainWindow()
@@ -135,6 +135,12 @@ class TestRunHistoryMarks:
         closed = self.window.close()
         assert closed is False
         assert not self.window.isVisible()
+
+
+def _words_of(label: QLabel) -> str:
+    document = QTextDocument()
+    document.setHtml(label.text())
+    return document.toPlainText()
 
 
 def _drawn(icon: QIcon):
@@ -182,7 +188,7 @@ class TestRunVerdictInDetailPane:
         record = make_run_record(status=status)
         self.widget = RunDetailWidget()
         self.widget.show_record(record)
-        return self.widget._info_label.text()
+        return self.widget._run_line.text()
 
     def test_a_failed_run_is_marked_with_the_red_cross(self):
         text = self._info_text("error")
@@ -193,7 +199,7 @@ class TestRunVerdictInDetailPane:
         assert inline_icon("check", color=GREEN, size=self._mark_side()) in text
 
     def _mark_side(self) -> int:
-        return self.widget._info_label.fontMetrics().height()
+        return self.widget._run_line.fontMetrics().height()
 
     def test_qt_binds_the_color_to_the_mark_and_to_nothing_else(self):
         document = QTextDocument()
@@ -205,7 +211,8 @@ class TestRunVerdictInDetailPane:
             fragment = iterator.fragment()
             if fragment.charFormat().isImageFormat():
                 images += 1
-            elif fragment.charFormat().foreground().style() != Qt.BrushStyle.NoBrush:
+            elif (fragment.charFormat().foreground().style() != Qt.BrushStyle.NoBrush
+                  and not fragment.charFormat().isAnchor()):
                 colored.append(fragment.text())
             iterator += 1
         assert (images, colored) == (1, [])
@@ -518,6 +525,12 @@ class TestToolbarSpacing:
         assert (room_around_the_words(window.pause_action)
                 == room_around_the_words(window.run_now_action))
 
+    def test_quit_stands_the_familys_margin_in_from_the_windows_right_edge(self, window):
+        toolbar = _shown(window)
+        quit_button = toolbar.widgetForAction(window.quit_action)
+
+        assert window.width() - (quit_button.mapTo(window, QPoint(0, 0)).x() + quit_button.width()) == MARGIN_STANDARD
+
     def test_the_buttons_stand_the_familys_margin_below_the_windows_top_edge(self, window):
         toolbar = _shown(window)
 
@@ -545,10 +558,18 @@ class TestTheNextRunSitsBesideRunHistory:
         assert there.center().y() == here.center().y()
         assert 0 < there.left() - here.right() <= heading.fontMetrics().horizontalAdvance("  ")
 
-    def test_it_is_off_the_toolbar(self, window):
+    def test_run_history_sits_on_the_buttons_row_so_it_takes_no_line_of_its_own(self, window):
+        heading = self._shown_with(window, ScheduleStatus(is_running=True))
         [toolbar] = window.findChildren(QToolBar)
 
-        assert not toolbar.isAncestorOf(window._next_run_label)
+        assert toolbar.isAncestorOf(heading)
+        assert toolbar.isAncestorOf(window._next_run_label)
+
+    def test_run_history_starts_where_the_list_under_it_starts(self, window):
+        heading = self._shown_with(window, ScheduleStatus(is_running=True))
+
+        assert (heading.mapTo(window, QPoint(0, 0)).x()
+                == window._history_list.mapTo(window, QPoint(0, 0)).x())
 
 
 class TestTheWholeToolbarShows:

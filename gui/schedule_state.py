@@ -52,3 +52,7 @@ class ScheduleStatus:
         if self.state == PAUSED:
             return "No upcoming runs scheduled (inactive)"
         return self.activity()
+
+    @classmethod
+    def longest_window_label(cls) -> str:
+        return cls(is_paused=True).window_label()

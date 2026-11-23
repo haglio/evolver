@@ -4,9 +4,19 @@ from datetime import UTC, datetime
 
 import pytest
 
-from gui.schedule_state import IDLE, PAUSED, RUNNING, SCHEDULED, schedule_state
+from gui.schedule_state import IDLE, PAUSED, RUNNING, SCHEDULED, ScheduleStatus, schedule_state
 
 _AT = datetime(2026, 3, 29, 14, 30, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("status", [
+    ScheduleStatus(is_running=True),
+    ScheduleStatus(is_paused=True),
+    ScheduleStatus(next_run_at=_AT),
+    ScheduleStatus(),
+], ids=["running", "paused", "scheduled", "idle"])
+def test_no_window_label_runs_longer_than_the_longest(status):
+    assert len(status.window_label()) <= len(ScheduleStatus.longest_window_label())
 
 
 @pytest.mark.parametrize(("running", "paused", "next_run", "expected"), [
