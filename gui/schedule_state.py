@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 RUNNING = "running"
 PAUSED = "paused"
@@ -48,11 +48,7 @@ class ScheduleStatus:
             return "Paused"
         return self.next_run_text()
 
-    def window_label(self) -> str:
-        if self.state == PAUSED:
-            return "No upcoming runs scheduled (inactive)"
-        return self.activity()
-
     @classmethod
-    def longest_window_label(cls) -> str:
-        return cls(is_paused=True).window_label()
+    def longest_activity(cls) -> str:
+        every_state = (cls(is_running=True), cls(is_paused=True), cls(next_run_at=datetime(2000, 1, 1, tzinfo=UTC)))
+        return max((status.activity() for status in every_state), key=len)

@@ -605,10 +605,9 @@ class TestToolbarStateUpdates:
         window.show_schedule(ScheduleStatus(next_run_at=next_run))
         assert "14:30" in window._next_run_label.text()
 
-    def test_the_window_alone_says_paused_as_a_sentence(self, window):
+    def test_paused_reads_paused_as_the_tray_says_it(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
-        assert "inactive" in window._next_run_label.text().lower(), (
-            "the one wording that differs from the tray's on purpose: the window has room for it")
+        assert window._next_run_label.text() == "(Paused)"
 
     def test_running_message_when_running(self, window):
         window.show_schedule(ScheduleStatus(is_running=True))

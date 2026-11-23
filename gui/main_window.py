@@ -263,7 +263,7 @@ class EvolverMainWindow(QMainWindow):
     def _toolbar_width_when_paused(self, toolbar: QToolBar) -> int:
         pause = toolbar.widgetForAction(self.pause_action)
         return (toolbar.sizeHint().width() + _growth(pause, pause_or_resume(is_paused=True))
-                + _growth(self._next_run_label, _in_parentheses(ScheduleStatus.longest_window_label())))
+                + _growth(self._next_run_label, _in_parentheses(ScheduleStatus.longest_activity())))
 
     def commands(self):
         return {
@@ -308,7 +308,7 @@ class EvolverMainWindow(QMainWindow):
     def show_schedule(self, status: ScheduleStatus):
         self.run_now_action.setEnabled(not status.is_running)
         set_label(self.pause_action, pause_or_resume(status.is_paused))
-        self._next_run_label.setText(_in_parentheses(status.window_label()))
+        self._next_run_label.setText(_in_parentheses(status.activity()))
 
     def closeEvent(self, event):
         event.ignore()

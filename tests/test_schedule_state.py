@@ -15,8 +15,8 @@ _AT = datetime(2026, 3, 29, 14, 30, tzinfo=UTC)
     ScheduleStatus(next_run_at=_AT),
     ScheduleStatus(),
 ], ids=["running", "paused", "scheduled", "idle"])
-def test_no_window_label_runs_longer_than_the_longest(status):
-    assert len(status.window_label()) <= len(ScheduleStatus.longest_window_label())
+def test_no_activity_runs_longer_than_the_longest(status):
+    assert len(status.activity()) <= len(ScheduleStatus.longest_activity())
 
 
 @pytest.mark.parametrize(("running", "paused", "next_run", "expected"), [
