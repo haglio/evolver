@@ -18,6 +18,7 @@ from tasks.genau_deliver import GenauDeliverResult
 from tasks.nonai_group import NonAiGroupResult
 from tasks.nonai_titles import NonAiTitleResult
 from tasks.origenerator_commands import DowntimeResult
+from tasks.pcloud_stuck import PcloudStuckResult
 from tasks.prompt_scrape import PromptScrapeResult
 from tasks.provenance_sweep import ProvenanceResult
 from tasks.scene_scripts import SceneScriptsResult
@@ -37,7 +38,7 @@ RESULT_OF_STAGE = {
     "clip_scripts": ClipScriptsResult, "scene_scripts": SceneScriptsResult,
     "group_non_ai": NonAiGroupResult, "title_non_ai": NonAiTitleResult,
     "video_types": VideoKindsResult, "provenance": ProvenanceResult,
-    "dupes": DuplicateSizesResult,
+    "dupes": DuplicateSizesResult, "pcloud_stuck": PcloudStuckResult,
 }
 COUNTS_OF_A_STAGE_TAKEN_OUT = {"labels": {"copied": "int", "already": "int"}}
 

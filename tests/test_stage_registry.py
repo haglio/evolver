@@ -17,6 +17,7 @@ from tasks.clip_scripts import ClipScriptsResult
 from tasks.nonai_group import NonAiGroupResult
 from tasks.nonai_titles import NonAiTitleResult
 from tasks.nonai_upscale import NonAiUpscaleResult
+from tasks.pcloud_stuck import PcloudStuckResult
 from tasks.provenance_sweep import ProvenanceResult
 from tasks.scene_scripts import SceneScriptsResult
 from tasks.scripts_sync import ScriptsSyncResult
@@ -52,6 +53,7 @@ WHY_IT_CANNOT_FAIL = {
     ProvenanceResult: "only fills in a record where none is; a gallery it cannot read leaves its "
                       "videos for a later run",
     VideoKindsResult: "a video it cannot measure is left for the next run",
+    PcloudStuckResult: "a change it cannot judge is counted for a look and left for pCloud",
 
 }
 
