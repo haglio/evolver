@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from itertools import pairwise
 from unittest.mock import patch
 
 from PySide6.QtCore import Qt
@@ -13,6 +14,7 @@ from shared_ui.testing import appending_to
 import gui.main_window
 from gui.log_window import RunLogWindow
 from gui.main_window import EvolverMainWindow, RunDetailWidget
+from gui.run_record import format_run_label
 from tests.gui_support import build_evolver_app
 from tests.product_sources import gui_modules_imported_by
 from tests.temp_helpers import make_run_record, override_config, workspace_temp_dir
@@ -31,7 +33,7 @@ class TestTheRunsTitleLinksToItsLog(unittest.TestCase):
 
     def _links(self) -> list[str]:
         document = QTextDocument()
-        document.setHtml(self.widget._header.text())
+        document.setHtml(self.widget._logs_link.text())
         found = []
         iterator = document.firstBlock().begin()
         while not iterator.atEnd():
@@ -49,15 +51,43 @@ class TestTheRunsTitleLinksToItsLog(unittest.TestCase):
     def test_the_link_is_one_the_mouse_can_reach(self):
         self.widget.show_record(make_run_record())
 
-        flags = self.widget._header.textInteractionFlags()
+        flags = self.widget._logs_link.textInteractionFlags()
         assert flags & Qt.TextInteractionFlag.LinksAccessibleByMouse
 
-    def test_the_title_still_reads_as_the_run_it_names(self):
-        self.widget.show_record(make_run_record(started_at="2026-07-25T15:20:02"))
+    def test_the_run_reads_as_it_does_in_the_run_history(self):
+        record = make_run_record(started_at="2026-07-25T15:20:02", duration_seconds=12.0)
+        self.widget.show_record(record)
+
+        assert self.widget._run_label.text() == format_run_label(record.started_at, record.duration_seconds)
+        assert self._links() == ["log"], "the run's own words are not the link"
+
+    def test_the_link_reads_logs_in_parentheses(self):
+        self.widget.show_record(make_run_record())
 
         document = QTextDocument()
-        document.setHtml(self.widget._header.text())
-        assert document.toPlainText() == "Run: 2026-07-25T15:20:02"
+        document.setHtml(self.widget._logs_link.text())
+        assert document.toPlainText() == "(logs)"
+
+    def test_the_run_its_link_and_its_trigger_and_status_share_one_line(self):
+        self.widget.show_record(make_run_record())
+        self.widget.resize(900, 400)
+        self.widget.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
+        self.widget.show()
+
+        parts = [self.widget._run_label, self.widget._logs_link, self.widget._info_label]
+        assert len({part.geometry().center().y() for part in parts}) == 1
+        gaps = [after.geometry().left() - before.geometry().right() for before, after in pairwise(parts)]
+        assert all(0 < gap <= self.widget.fontMetrics().horizontalAdvance("  ") for gap in gaps), (
+            "each part follows the one before it like words in a sentence")
+        assert self.widget._run_label.width() == self.widget._run_label.sizeHint().width()
+
+    def test_the_duration_is_not_said_a_second_time(self):
+        self.widget.show_record(make_run_record(duration_seconds=34.0))
+
+        document = QTextDocument()
+        document.setHtml(self.widget._info_label.text())
+        assert "Duration" not in document.toPlainText()
+        assert "34" not in document.toPlainText()
 
     def test_clicking_it_asks_for_that_run_and_no_other(self):
         record = make_run_record(id="2026-07-25T15-20-02")
@@ -69,7 +99,7 @@ class TestTheRunsTitleLinksToItsLog(unittest.TestCase):
 
         assert asked == [record]
 
-    def test_with_no_run_shown_the_title_is_not_a_link(self):
+    def test_with_no_run_shown_there_is_no_link(self):
         self.widget.show_record(make_run_record())
         self.widget.clear()
 
@@ -86,7 +116,7 @@ class TestTheRunsTitleLinksToItsLog(unittest.TestCase):
     def test_the_title_link_has_no_color_of_its_own(self):
         self.widget.show_record(make_run_record())
 
-        assert "color" not in self.widget._header.text().lower()
+        assert "color" not in self.widget._logs_link.text().lower()
 
     def test_the_window_passes_the_request_to_the_app(self):
         window = EvolverMainWindow()

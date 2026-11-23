@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
 from shared_ui.icons import icon_pixmap, inline_icon
+from shared_ui.spacing import MARGIN_STANDARD
 from shared_ui.testing import questions_answered
 
 from evolver import STAGE_LABELS, STAGE_TOOLTIPS
@@ -107,9 +108,9 @@ class TestRunHistoryMarks:
         with patch("gui.main_window.newest_runs", return_value=[newest, older]):
             self.window.refresh_history()
         assert self.window._history_list.currentRow() == 0
-        info = self.window._detail_widget._info_label.text()
-        assert "34" in info
-        assert "99" not in info
+        shown = self.window._detail_widget._run_label.text()
+        assert "34" in shown
+        assert "99" not in shown
 
     def test_a_run_that_ends_joins_the_list_without_the_history_being_read_again(self):
         self.window = EvolverMainWindow()
@@ -125,7 +126,7 @@ class TestRunHistoryMarks:
         assert self.window._records == [newest, older[0]]
         assert self.window._history_list.count() == 2
         assert self.window._history_list.currentRow() == 0
-        assert "34" in self.window._detail_widget._info_label.text()
+        assert "34" in self.window._detail_widget._run_label.text()
 
     def test_closing_the_window_hides_it_to_the_tray_instead(self):
         self.window = EvolverMainWindow()
@@ -517,6 +518,38 @@ class TestToolbarSpacing:
         assert (room_around_the_words(window.pause_action)
                 == room_around_the_words(window.run_now_action))
 
+    def test_the_buttons_stand_the_familys_margin_below_the_windows_top_edge(self, window):
+        toolbar = _shown(window)
+
+        assert toolbar.widgetForAction(window.run_now_action).mapTo(window, QPoint(0, 0)).y() == MARGIN_STANDARD
+
+
+class TestTheNextRunSitsBesideRunHistory:
+
+    def _shown_with(self, window, status):
+        window.show_schedule(status)
+        _shown(window)
+        [heading] = [label for label in window.findChildren(QLabel) if label.text() == "Run history"]
+        return heading
+
+    def test_it_reads_in_parentheses(self, window):
+        window.show_schedule(ScheduleStatus(next_run_at=datetime(2026, 3, 29, 14, 30, tzinfo=UTC)))
+
+        assert window._next_run_label.text() == "(Next run: 14:30)"
+
+    def test_it_is_on_the_run_history_line_just_after_it(self, window):
+        heading = self._shown_with(window, ScheduleStatus(is_running=True))
+        here, there = heading.geometry(), window._next_run_label.geometry()
+
+        assert window._next_run_label.parent() is heading.parent()
+        assert there.center().y() == here.center().y()
+        assert 0 < there.left() - here.right() <= heading.fontMetrics().horizontalAdvance("  ")
+
+    def test_it_is_off_the_toolbar(self, window):
+        [toolbar] = window.findChildren(QToolBar)
+
+        assert not toolbar.isAncestorOf(window._next_run_label)
+
 
 class TestTheWholeToolbarShows:
 
@@ -551,10 +584,10 @@ class TestToolbarStateUpdates:
         window.show_schedule(ScheduleStatus(next_run_at=next_run))
         assert "14:30" in window._next_run_label.text()
 
-    def test_the_toolbar_alone_says_paused_as_a_sentence(self, window):
+    def test_the_window_alone_says_paused_as_a_sentence(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))
         assert "inactive" in window._next_run_label.text().lower(), (
-            "the one wording that differs from the tray's on purpose: the toolbar has room for it")
+            "the one wording that differs from the tray's on purpose: the window has room for it")
 
     def test_running_message_when_running(self, window):
         window.show_schedule(ScheduleStatus(is_running=True))
@@ -571,7 +604,7 @@ class TestToolbarStateUpdates:
 
     def test_a_run_in_flight_outranks_a_pause_here_as_in_the_tray(self, window):
         window.show_schedule(ScheduleStatus(is_running=True, is_paused=True))
-        assert window._next_run_label.text() == "Running..."
+        assert window._next_run_label.text() == "(Running...)"
 
     def test_the_pause_button_reads_resume_scheduling_while_paused(self, window):
         window.show_schedule(ScheduleStatus(is_paused=True))

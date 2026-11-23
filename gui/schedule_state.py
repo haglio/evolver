@@ -48,11 +48,7 @@ class ScheduleStatus:
             return "Paused"
         return self.next_run_text()
 
-    def toolbar_label(self) -> str:
+    def window_label(self) -> str:
         if self.state == PAUSED:
             return "No upcoming runs scheduled (inactive)"
         return self.activity()
-
-    @classmethod
-    def longest_toolbar_label(cls) -> str:
-        return cls(is_paused=True).toolbar_label()
