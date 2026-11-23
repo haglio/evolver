@@ -187,9 +187,20 @@ SECTIONS: tuple[Section, ...] = (
               "Fix a video whose file name has no dot before its extension, move a funscript found among the videos to its place in the scripts folder -- marking one Origenerator handed over as a script no person wrote -- and report any other file there that is not a video",
               (0x0A, 0x12, 0x2C), run=lambda _: stray_files.run()),
         Stage("withdrawn", "Delete unsent videos",
-              "Delete every copy this library holds of a video unsent in Origenerator -- the inbox copy, the 1_sorted copy, the enhanced copy and, down the Genau lane, the delivered "
-              f"{_FLICK} -- with their funscripts, read off that app's own gallery, which is the only place the withdrawal is recorded; and, in each lane, a video's copy without its audio once the video with its audio is there",
+              "When you press Unsend on a video in Origenerator, Origenerator only marks the video as taken "
+              "back, so this stage deletes the copies Evolver made of it and the video stops playing in Kino "
+              "and Genau: its inbox copy, its 1_sorted copy, its enhanced copy and, for Genau, its "
+              f"{_FLICK}, with their funscripts. It also deletes a copy of a video saved without its audio "
+              "once the same video with its audio has reached Kino or Genau, so the video plays only with "
+              "its audio",
               (0x00, 0x00, 0x6C), run=lambda _: unsent_videos.run()),
+        Stage("pcloud_stuck", "Clear stuck pCloud changes",
+              "Finish or clear each change pCloud gave up syncing after six tries -- a deletion it never made "
+              "in the cloud, an upload it never finished -- so no new file saved under that name becomes a "
+              "conflicted copy; pCloud stops for a few seconds while its list is cleared, and only when it "
+              "has nothing else to sync",
+              (0xFF, 0x77, 0x00), run=lambda _: pcloud_stuck.run(),
+              moves_no_videos=True),
     )),
     Section("AI videos", (
         Stage("metadata", "Transfer prompts",
@@ -210,33 +221,14 @@ SECTIONS: tuple[Section, ...] = (
         Stage("genau_deliver", "Genau delivery",
               f"Finish each Genau-lane {_FLICK} that enhancing put in the folder Genau plays from: save its audio and retire the 1_sorted copy it was made from",
               (0x7B, 0x41, 0x73), run=lambda _: genau_deliver.run()),
-        Stage("upscale_non_ai", "Enhance non-AI videos",
-              "Enhance one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
-              (0x76, 0x67, 0x47), run=_upscale_non_ai),
         Stage("verify", "Correspondence check",
               "Verify every 1_sorted video has its enhanced video in its Kino or Genau folder, and no enhanced video is missing from either",
               (0xFF, 0x9D, 0x83), run=_verify),
     )),
-    Section("Funscripts", (
-        Stage("funscript_drafts", "Make funscripts",
-              "Have GoblinScript draft a funscript for each video in the library that has none, newest first, "
-              "marked as a script no person wrote; a Kino video and the 1_sorted video it was made from "
-              "get one funscript between them through Scripts sync, so the two are never drafted twice",
-              (0x00, 0x9E, 0xD8), run=_make_funscripts),
-        Stage("clip_scripts", "Transfer scene funscripts to clips",
-              "Cut each clip's funscript out of its scene's, from the point where the clip was found in the scene",
-              (0xF6, 0x70, 0x99), run=lambda _: clip_scripts.run(),
-              moves_no_videos=True),
-        Stage("scene_scripts", "Transfer clip funscripts to scenes",
-              "Give a scene with no funscript one that is mostly blank, holding the funscript of the clip cut from it, placed where the clip sits in the scene",
-              (0xDE, 0xB8, 0xC6), run=lambda _: scene_scripts.run(),
-              moves_no_videos=True),
-        Stage("scripts", "Scripts sync",
-              "Move funscripts so their folders match the video folders",
-              (0xAD, 0x40, 0x35), run=lambda _: scripts_sync.run(show_popup=True),
-              moves_no_videos=True),
-    )),
-    Section("Non-AI video records", (
+    Section("Non-AI videos", (
+        Stage("upscale_non_ai", "Enhance non-AI videos",
+              "Enhance one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
+              (0x76, 0x67, 0x47), run=_upscale_non_ai),
         Stage("group_non_ai", "Group non-AI video versions",
               "Work out which 2D/non_AI files are one video -- the original, its Topaz-enhanced versions and copies "
               "saved under another name, found by their file names and by comparing their frames -- and write "
@@ -262,6 +254,25 @@ SECTIONS: tuple[Section, ...] = (
               (0xCA, 0x94, 0xDB), run=lambda _: check_duplicate_sizes.run(show_popup=True),
               moves_no_videos=True),
     )),
+    Section("Funscripts", (
+        Stage("funscript_drafts", "Make funscripts",
+              "Have GoblinScript draft a funscript for each video in the library that has none, newest first, "
+              "marked as a script no person wrote; a Kino video and the 1_sorted video it was made from "
+              "get one funscript between them through Scripts sync, so the two are never drafted twice",
+              (0x00, 0x9E, 0xD8), run=_make_funscripts),
+        Stage("clip_scripts", "Transfer scene funscripts to clips",
+              "Cut each clip's funscript out of its scene's, from the point where the clip was found in the scene",
+              (0xF6, 0x70, 0x99), run=lambda _: clip_scripts.run(),
+              moves_no_videos=True),
+        Stage("scene_scripts", "Transfer clip funscripts to scenes",
+              "Give a scene with no funscript one that is mostly blank, holding the funscript of the clip cut from it, placed where the clip sits in the scene",
+              (0xDE, 0xB8, 0xC6), run=lambda _: scene_scripts.run(),
+              moves_no_videos=True),
+        Stage("scripts", "Scripts sync",
+              "Move funscripts so their folders match the video folders",
+              (0xAD, 0x40, 0x35), run=lambda _: scripts_sync.run(show_popup=True),
+              moves_no_videos=True),
+    )),
     Section("Favorites and weights", (
         Stage("watch_weights", "Update weights",
               "Add up the completions, skips and locks Fun Time and Warm Gun recorded for each library video and save the total, as the weight both apps shuffle by, in Origenerator's gallery for an AI video and on its sidecar for any other, and mark the phone's favorites in the same places",
@@ -272,15 +283,6 @@ SECTIONS: tuple[Section, ...] = (
         Stage("bookmarks", "Bookmarks sync",
               "Copy Fun Time favorites into a Chrome bookmarks folder",
               (0x4B, 0x96, 0x88), run=lambda _: bookmarks_sync.run(),
-              moves_no_videos=True),
-    )),
-    Section("pCloud", (
-        Stage("pcloud_stuck", "Clear stuck pCloud changes",
-              "Finish or clear each change pCloud gave up syncing after six tries -- a deletion it never made "
-              "in the cloud, an upload it never finished -- so no new file saved under that name becomes a "
-              "conflicted copy; pCloud stops for a few seconds while its list is cleared, and only when it "
-              "has nothing else to sync",
-              (0xFF, 0x77, 0x00), run=lambda _: pcloud_stuck.run(),
               moves_no_videos=True),
     )),
 )

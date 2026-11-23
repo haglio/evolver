@@ -106,8 +106,13 @@ class TestStageRegistry(unittest.TestCase):
         assert _place("genau_deliver") < _place("verify"), (
             "a flick made this run is finished before the check reads Genau's folder")
 
-    def test_the_registry_lists_the_genau_delivery_between_the_two_upscales(self):
-        assert _place("upscale_non_ai") == _place("genau_deliver") + 1
+    def test_the_non_ai_videos_are_enhanced_only_after_the_ai_videos(self):
+        assert _place("upscale_non_ai") > _place("upscale"), (
+            "a non-AI video is enhanced only when enhancing left no AI video waiting this run")
+
+    def test_the_non_ai_videos_are_enhanced_before_the_funscript_drafts(self):
+        assert _place("upscale_non_ai") < _place("funscript_drafts"), (
+            "a video enhanced this run gets its funscript drafted this run")
 
     def test_titles_come_after_the_grouping(self):
         assert _place("title_non_ai") > _place("group_non_ai"), (
@@ -126,10 +131,6 @@ class TestStageRegistry(unittest.TestCase):
         assert _place("provenance") > _place("video_types"), (
             "a video it records already has the sidecar the kinds stage made for it")
 
-    def test_the_registry_lists_the_non_ai_grouping_stage_in_pipeline_order(self):
-        assert "group_non_ai" in ALL_STAGES
-        assert ALL_STAGES.index("group_non_ai") == ALL_STAGES.index("scripts") + 1
-
     def test_the_registry_lists_the_script_writing_stages_before_the_sync_that_aligns_them(self):
         assert "clip_scripts" in ALL_STAGES
         assert "scene_scripts" in ALL_STAGES
@@ -144,7 +145,7 @@ class TestStageRegistry(unittest.TestCase):
 
     def test_the_sections_are_headed_as_he_chose(self):
         assert [section.heading for section in SECTIONS] == [
-            "Clean up", "AI videos", "Funscripts", "Non-AI video records", "Favorites and weights", "pCloud"]
+            "Clean up", "AI videos", "Non-AI videos", "Funscripts", "Favorites and weights"]
 
     def test_origenerator_downtime_comes_before_every_stage_that_waits_on_its_training(self):
         assert _place("origenerator_downtime") < min(_place("upscale"), _place("funscript_drafts")), (
