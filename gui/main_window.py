@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 from shared_ui.chrome import style_toolbar
 from shared_ui.icons import inline_icon
-from shared_ui.spacing import BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
+from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
@@ -40,7 +40,7 @@ from gui.commands import (
     pause_or_resume,
     set_label,
 )
-from gui.run_record import RunRecord, format_run_label, newest_runs
+from gui.run_record import RunRecord, format_run_label, format_run_start, newest_runs
 from gui.schedule_state import ScheduleStatus
 from gui.stage_details import details_of
 from gui.status_symbols import GRAY, status_icon, symbol_for
@@ -66,16 +66,7 @@ class _NoFocusRectDelegate(QItemDelegate):
 
 
 _NO_RUN_PICKED = "Select a run to view details"
-
-
-def _one_line(*labels: QLabel) -> QHBoxLayout:
-    line = QHBoxLayout()
-    line.setSpacing(labels[0].fontMetrics().horizontalAdvance(" "))
-    for label in labels:
-        label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
-        line.addWidget(label)
-    line.addStretch()
-    return line
+_WHAT_LOGS_OPENS = "Show what this run wrote to the log"
 
 
 class RunDetailWidget(QWidget):
@@ -88,18 +79,15 @@ class RunDetailWidget(QWidget):
 
         self._record: RunRecord | None = None
 
-        self._run_label = QLabel(_NO_RUN_PICKED)
-        self._run_label.setTextFormat(Qt.TextFormat.PlainText)
-        self._logs_link = QLabel("")
+        self._run_line = QLabel(_NO_RUN_PICKED)
         # Qt's AutoText guesses the format from the string and can draw a <span> or an <a> as
-        # literal markup, so both labels here say RichText outright.
-        self._logs_link.setTextFormat(Qt.TextFormat.RichText)
+        # literal markup, so the label says RichText outright.
+        self._run_line.setTextFormat(Qt.TextFormat.RichText)
         # QLabel emits linkActivated only while its interaction flags let the mouse reach links;
         # setting other flags (selectable text, say) replaces the default that does.
-        self._logs_link.linkActivated.connect(self._on_title_clicked)
-        self._info_label = QLabel("")
-        self._info_label.setTextFormat(Qt.TextFormat.RichText)
-        layout.addLayout(_one_line(self._run_label, self._logs_link, self._info_label))
+        self._run_line.linkActivated.connect(self._on_title_clicked)
+        self._run_line.linkHovered.connect(self._say_what_is_under_the_pointer)
+        layout.addWidget(self._run_line)
 
         self._table = QTableWidget()
         self._table.setItemDelegate(_NoFocusRectDelegate(self._table))
@@ -117,13 +105,14 @@ class RunDetailWidget(QWidget):
 
     def show_record(self, record: RunRecord):
         self._record = record
-        self._run_label.setText(format_run_label(record.started_at, record.duration_seconds))
-        self._logs_link.setText('(<a href="log">logs</a>)')
-        self._logs_link.setToolTip("Show what this run wrote to the log")
         mark, color = symbol_for(record.status)
-        status = inline_icon(mark, color=color, size=self._info_label.fontMetrics().height()) if mark else ""
-        self._info_label.setText(f"|  Trigger: {record.trigger}  |  Status: {status}")
-        self._info_label.setToolTip(record.status)
+        status = inline_icon(mark, color=color, size=self._run_line.fontMetrics().height()) if mark else ""
+        self._run_line.setText(
+            f"{format_run_start(record.started_at)}  |  Trigger: {record.trigger}"
+            f"  |  Duration: {record.duration_seconds:.1f}s  |  Status: {status}"
+            '  |  (<a href="log">logs</a>)'
+        )
+        self._run_line.setToolTip(record.status)
 
         self._table.setRowCount(len(record.stages))
         for i, stage in enumerate(record.stages):
@@ -161,11 +150,13 @@ class RunDetailWidget(QWidget):
 
     def clear(self):
         self._record = None
-        self._run_label.setText(_NO_RUN_PICKED)
-        self._logs_link.setText("")
-        self._logs_link.setToolTip("")
-        self._info_label.setText("")
+        self._run_line.setText(_NO_RUN_PICKED)
+        self._run_line.setToolTip("")
         self._table.setRowCount(0)
+
+    def _say_what_is_under_the_pointer(self, href: str):
+        if self._record is not None:
+            self._run_line.setToolTip(_WHAT_LOGS_OPENS if href else self._record.status)
 
     def _on_title_clicked(self, _href: str):
         if self._record is not None:
@@ -195,13 +186,6 @@ class EvolverMainWindow(QMainWindow):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(MARGIN_STANDARD, MARGIN_STANDARD, GAP_SMALL, MARGIN_STANDARD)
 
-        history_header = QLabel("Run history")
-        font = history_header.font()
-        font.setBold(True)
-        history_header.setFont(font)
-        self._next_run_label = QLabel("")
-        left_layout.addLayout(_one_line(history_header, self._next_run_label))
-
         self._history_list = QListWidget()
         self._history_list.setItemDelegate(_NoFocusRectDelegate(self._history_list))
         self._history_list.currentRowChanged.connect(self._on_history_selection)
@@ -225,6 +209,15 @@ class EvolverMainWindow(QMainWindow):
         toolbar.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
         style_toolbar(toolbar)
         self.addToolBar(toolbar)
+        toolbar.addWidget(_toolbar_end())
+
+        history_header = QLabel("Run history")
+        font = history_header.font()
+        font.setBold(True)
+        history_header.setFont(font)
+        toolbar.addWidget(history_header)
+        self._next_run_label = QLabel("")
+        toolbar.addWidget(self._next_run_label)
 
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -264,11 +257,13 @@ class EvolverMainWindow(QMainWindow):
 
         self.quit_action = QUIT.action(self)
         toolbar.addAction(self.quit_action)
+        toolbar.addWidget(_toolbar_end())
         return toolbar
 
     def _toolbar_width_when_paused(self, toolbar: QToolBar) -> int:
         pause = toolbar.widgetForAction(self.pause_action)
-        return toolbar.sizeHint().width() + _growth(pause, pause_or_resume(is_paused=True))
+        return (toolbar.sizeHint().width() + _growth(pause, pause_or_resume(is_paused=True))
+                + _growth(self._next_run_label, _in_parentheses(ScheduleStatus.longest_window_label())))
 
     def commands(self):
         return {
@@ -313,13 +308,23 @@ class EvolverMainWindow(QMainWindow):
     def show_schedule(self, status: ScheduleStatus):
         self.run_now_action.setEnabled(not status.is_running)
         set_label(self.pause_action, pause_or_resume(status.is_paused))
-        self._next_run_label.setText(f"({status.window_label()})")
+        self._next_run_label.setText(_in_parentheses(status.window_label()))
 
     def closeEvent(self, event):
         event.ignore()
         self.hide()
 
 
-def _growth(button: QToolButton, longer_text: str) -> int:
+def _toolbar_end() -> QWidget:
+    end = QWidget()
+    end.setFixedWidth(MARGIN_STANDARD - BUTTON_GAP)
+    return end
+
+
+def _in_parentheses(words: str) -> str:
+    return f"({words})"
+
+
+def _growth(button: QToolButton | QLabel, longer_text: str) -> int:
     metrics = button.fontMetrics()
     return max(0, metrics.horizontalAdvance(longer_text) - metrics.horizontalAdvance(button.text()))
