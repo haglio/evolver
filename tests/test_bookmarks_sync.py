@@ -19,6 +19,30 @@ def favorite(library: LaneLibrary, name: str, page: str = "") -> Path:
     return video
 
 
+class SiteFavorites:
+    def __init__(self, library: LaneLibrary) -> None:
+        self._gallery = library.search_root.parent / "gallery.db"
+        self._rows: dict[Path, dict] = {}
+        self._metadata = library.metadata
+        self._upscales = library.kino_upscales / "portrait" / "a-site"
+
+    def add(self, name: str, page: str = "") -> Path:
+        self._metadata.mkdir(parents=True, exist_ok=True)
+        video = touch_video(self._upscales / name)
+        self._rows[video] = kept_at(f"outside-{len(self._rows)}", video, starred=1, web_url=page,
+                                    source="outside")
+        self._write()
+        return video
+
+    def unstar(self, video: Path) -> None:
+        self._rows[video]["starred"] = 0
+        self._write()
+
+    def _write(self) -> None:
+        self._gallery.unlink(missing_ok=True)
+        a_gallery_of(self._gallery, list(self._rows.values()))
+
+
 def chrome_profile(root, profile="Profile 2", name="Jane Doe"):
     user_data_dir = root / "User Data"
     profile_dir = user_data_dir / profile
@@ -80,10 +104,11 @@ class TestBookmarksSync(unittest.TestCase):
     def test_run_syncs_the_favorites_pages_into_named_profile_folder(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir, bookmarks_path = chrome_profile(root)
-            favorite(library, "scene one.mp4", "https://example.net/image/abc")
-            favorite(library, "scene two.mp4", "https://example.com/image/xyz")
-            favorite(library, "scene three.mp4")
+            faves.add("scene one.mp4", "https://example.net/image/abc")
+            faves.add("scene two.mp4", "https://example.com/image/xyz")
+            faves.add("scene three.mp4")
             bookmarks_path.write_text(
                 json.dumps(chrome_bookmarks_payload([
                     {"id": "20", "name": "old", "type": "url", "url": "https://old.example/"},
@@ -104,8 +129,9 @@ class TestBookmarksSync(unittest.TestCase):
     def test_the_folder_under_its_old_spelling_is_renamed_in_place(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir, bookmarks_path = chrome_profile(root)
-            favorite(library, "scene one.mp4", "https://example.com/a")
+            faves.add("scene one.mp4", "https://example.com/a")
             bookmarks_path.write_text(json.dumps(chrome_bookmarks_payload(
                 [{"id": "20", "name": "a", "type": "url", "url": "https://example.com/a"}],
                 folder_name="Fun Time Favs",
@@ -121,12 +147,12 @@ class TestBookmarksSync(unittest.TestCase):
     def test_a_video_no_longer_a_favorite_leaves_the_folder(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir, bookmarks_path = chrome_profile(root)
-            kept = favorite(library, "scene one.mp4", "https://example.com/keep")
-            dropped = favorite(library, "scene two.mp4", "https://example.com/drop")
+            kept = faves.add("scene one.mp4", "https://example.com/keep")
+            dropped = faves.add("scene two.mp4", "https://example.com/drop")
             self._sync(library, user_data_dir)
-            with library.config():
-                sidecar.mark_favorite(dropped, False)
+            faves.unstar(dropped)
 
             self._sync(library, user_data_dir)
 
@@ -138,9 +164,10 @@ class TestBookmarksSync(unittest.TestCase):
     def test_a_favorite_whose_video_is_gone_is_left_out(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir, bookmarks_path = chrome_profile(root)
-            favorite(library, "scene one.mp4", "https://example.com/keep")
-            favorite(library, "scene two.mp4", "https://example.com/drop").unlink()
+            faves.add("scene one.mp4", "https://example.com/keep")
+            faves.add("scene two.mp4", "https://example.com/drop").unlink()
 
             result = self._sync(library, user_data_dir)
 
@@ -152,14 +179,15 @@ class TestBookmarksSync(unittest.TestCase):
     def test_the_folder_keeps_its_order_and_a_new_favorite_joins_the_end(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir, bookmarks_path = chrome_profile(root)
-            favorite(library, "b scene.mp4", "https://example.com/b")
-            favorite(library, "c scene.mp4", "https://example.com/c")
+            faves.add("b scene.mp4", "https://example.com/b")
+            faves.add("c scene.mp4", "https://example.com/c")
             bookmarks_path.write_text(json.dumps(chrome_bookmarks_payload([
                 {"id": "20", "name": "c", "type": "url", "url": "https://example.com/c"},
                 {"id": "21", "name": "b", "type": "url", "url": "https://example.com/b"},
             ])), encoding="utf-8")
-            favorite(library, "a scene.mp4", "https://example.com/a")
+            faves.add("a scene.mp4", "https://example.com/a")
 
             self._sync(library, user_data_dir)
 
@@ -170,10 +198,11 @@ class TestBookmarksSync(unittest.TestCase):
     def test_run_deduplicates_identical_urls(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir, _bookmarks_path = chrome_profile(root)
-            favorite(library, "scene one.mp4", "https://example.com/same")
-            favorite(library, "scene two.mp4", "https://example.com/same")
-            favorite(library, "scene three.mp4", "https://example.com/different")
+            faves.add("scene one.mp4", "https://example.com/same")
+            faves.add("scene two.mp4", "https://example.com/same")
+            faves.add("scene three.mp4", "https://example.com/different")
 
             result = self._sync(library, user_data_dir)
 
@@ -183,8 +212,9 @@ class TestBookmarksSync(unittest.TestCase):
     def test_a_page_that_is_no_web_address_is_counted_and_left_out(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir, _bookmarks_path = chrome_profile(root)
-            favorite(library, "scene one.mp4", "file:///C:/not/a/page")
+            faves.add("scene one.mp4", "file:///C:/not/a/page")
 
             result = self._sync(library, user_data_dir)
 
@@ -213,8 +243,8 @@ class TestBookmarksSync(unittest.TestCase):
             with library.config():
                 mark(sidecar.sidecar_path(unstarred), True, page="https://example.com/old-sidecar")
             a_gallery_of(root / "gallery.db", [
-                kept_at("outside-1", starred, starred=1, web_url="https://example.com/starred"),
-                kept_at("outside-2", unstarred, starred=0, web_url="https://example.com/unstarred"),
+                kept_at("outside-1", starred, starred=1, web_url="https://example.com/starred", source="outside"),
+                kept_at("outside-2", unstarred, starred=0, web_url="https://example.com/unstarred", source="outside"),
             ])
 
             result = self._sync(library, user_data_dir)
@@ -224,7 +254,7 @@ class TestBookmarksSync(unittest.TestCase):
         assert urls == ["https://example.com/starred"]
         assert result.synced == 1
 
-    def test_an_ai_video_upscaled_from_a_starred_generation_is_bookmarked_at_its_upscale(self):
+    def test_a_starred_video_origenerator_made_has_no_page_to_bookmark_and_is_not_counted(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
             user_data_dir, _bookmarks_path = chrome_profile(root)
@@ -236,7 +266,23 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-        assert (result.synced, result.no_url) == (0, 1)
+        assert (result.synced, result.no_url) == (0, 0)
+
+    def test_a_non_ai_favorite_has_no_page_to_bookmark_and_is_not_counted(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            faves = SiteFavorites(library)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            faves.add("scene one_topaz.mp4", "https://example.com/site")
+            favorite(library, "scene two.mp4", "https://example.com/non-ai")
+            favorite(library, "scene three.mp4")
+
+            result = self._sync(library, user_data_dir)
+
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
+        assert urls == ["https://example.com/site"]
+        assert (result.synced, result.no_url) == (1, 0)
 
     def test_a_starred_ai_video_whose_file_is_gone_is_left_out(self):
         with workspace_temp_dir() as root:
@@ -245,7 +291,7 @@ class TestBookmarksSync(unittest.TestCase):
             gone = library.kino_upscales / "portrait" / "a-site" / "scene one_topaz.mp4"
             library.metadata.mkdir(parents=True)
             a_gallery_of(root / "gallery.db", [
-                kept_at("outside-1", gone, starred=1, web_url="https://example.com/gone")])
+                kept_at("outside-1", gone, starred=1, web_url="https://example.com/gone", source="outside")])
 
             result = self._sync(library, user_data_dir)
 
@@ -254,8 +300,9 @@ class TestBookmarksSync(unittest.TestCase):
     def test_a_gallery_that_cannot_be_read_leaves_the_folder_as_it_was(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir, bookmarks_path = chrome_profile(root)
-            favorite(library, "scene one.mp4", "https://example.com/a")
+            faves.add("scene one.mp4", "https://example.com/a")
             before = json.dumps(chrome_bookmarks_payload([
                 {"id": "20", "name": "b", "type": "url", "url": "https://example.com/b"},
             ]))
@@ -270,9 +317,10 @@ class TestBookmarksSync(unittest.TestCase):
     def test_run_reports_missing_profile(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
+            faves = SiteFavorites(library)
             user_data_dir = root / "User Data"
             user_data_dir.mkdir(parents=True, exist_ok=True)
-            favorite(library, "scene one.mp4", "https://example.com/")
+            faves.add("scene one.mp4", "https://example.com/")
             (user_data_dir / "Local State").write_text(
                 json.dumps({"profile": {"info_cache": {"Default": {"name": "Alex"}}}}),
                 encoding="utf-8",
@@ -286,7 +334,8 @@ class TestBookmarksSync(unittest.TestCase):
     def test_run_uses_the_profile_it_is_given(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
-            favorite(library, "scene one.mp4", "https://example.com/given")
+            faves = SiteFavorites(library)
+            faves.add("scene one.mp4", "https://example.com/given")
             given_user_data, given_bookmarks = chrome_profile(root / "given", name="Robin")
             ambient_user_data, _ = chrome_profile(root / "ambient", name="Ambient")
 
