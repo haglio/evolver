@@ -58,6 +58,9 @@ def _generated_fps_of(root: Path, video: Path, workflow: str) -> Fraction | None
         return origenerator_gallery.generated_fps(checkout, video)
 
 
+_READS_PCLOUDS_OWN_DATABASE = frozenset({"tasks/pcloud_stuck.py"})
+
+
 def _connects_to_sqlite(node: ast.AST) -> bool:
     if isinstance(node, ast.ImportFrom):
         return node.module == "sqlite3" and any(alias.name == "connect" for alias in node.names)
@@ -70,6 +73,7 @@ class TestTheGalleryDatabase(unittest.TestCase):
     def test_nothing_here_connects_to_sqlite_the_gallery_is_read_through_app_support(self):
         opening = [
             f"{name}:{node.lineno}" for name in product_sources(PROJECT_ROOT)
+            if name not in _READS_PCLOUDS_OWN_DATABASE
             for node in ast.walk(ast.parse(Path(PROJECT_ROOT, name).read_text(encoding="utf-8")))
             if _connects_to_sqlite(node)]
 

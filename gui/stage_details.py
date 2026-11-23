@@ -216,6 +216,13 @@ SENTENCES: dict[str, Sentence] = {
         Groups("duplicate_groups", "groups of videos with the same size",
                "group of videos with the same size"),
     )),
+    "pcloud_stuck": Sentence((
+        Count("deleted_in_cloud", "deletions finished in the cloud", "deletion finished in the cloud"),
+        Count("dropped", "changes with nothing left to do taken off pCloud's list",
+              "change with nothing left to do taken off pCloud's list"),
+        Count("retried", "uploads tried again", "upload tried again"),
+        Count("left", "changes left for a look", "change left for a look"),
+    )),
 }
 
 SKIP_REASONS: dict[str, str] = {

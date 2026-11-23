@@ -28,6 +28,7 @@ from tasks import (
     nonai_upscale,
     nonai_upscale_queue,
     origenerator_commands,
+    pcloud_stuck,
     prompt_scrape,
     provenance_sweep,
     scene_scripts,
@@ -256,6 +257,13 @@ STAGES: tuple[Stage, ...] = (
     Stage("dupes", "Duplicate check",
           "Find likely duplicate videos in the non_AI folder by their exact file size",
           (0xCA, 0x94, 0xDB), run=lambda _: check_duplicate_sizes.run(show_popup=True),
+          moves_no_videos=True),
+    Stage("pcloud_stuck", "Clear stuck pCloud changes",
+          "Finish or clear each change pCloud gave up syncing after six tries -- a deletion it never made "
+          "in the cloud, an upload it never finished -- so no new file saved under that name becomes a "
+          "conflicted copy; pCloud stops for a few seconds while its list is cleared, and only when it "
+          "has nothing else to sync",
+          (0xFF, 0x77, 0x00), run=lambda _: pcloud_stuck.run(),
           moves_no_videos=True),
 )
 
