@@ -92,6 +92,7 @@ def write_gallery_entries(checkout: Path | None = None, *, runner=subprocess.run
 class Handed:
     done: int
     no_row: int
+    changed: int | None = None
 
 
 def _run_unseen(*args, **options):
@@ -152,7 +153,9 @@ class GalleryRecords:
             try:
                 said = _answer(RECORDS, self._checkout, self._runner or _run_unseen,
                                *verb, *files, *self._leaving_the_phones_file())
-                answer = None if said is None else Handed(int(said["done"]), int(said["no_row"]))
+                answer = None if said is None else Handed(
+                    int(said["done"]), int(said["no_row"]),
+                    None if said.get("changed") is None else int(said["changed"]))
             except _UNANSWERED as e:
                 log.warning("%s could not be handed to Origenerator's gallery: %s", verb[0], e)
                 return None

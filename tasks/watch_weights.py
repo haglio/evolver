@@ -15,7 +15,7 @@ from app_support.json_store import read_json_or_empty
 from app_support.kino_folder import is_ai_video
 
 import config
-from tasks.origenerator_commands import GalleryRecords
+from tasks.origenerator_commands import GalleryRecords, Handed
 from util import lanes, origenerator_gallery, run_reads, sidecar, warm_gun, watch
 from util.media_files import library_videos, path_key, reachable
 from util.origenerator_gallery import EVOLVER_UPSCALE, LIBRARY_ID
@@ -78,7 +78,7 @@ def _records_brought_up_to_what_was_watched(gallery: GalleryRecords) -> WatchWei
     ai_videos = [video for video in played if is_ai_video(video)]
     if ai_videos:
         handed = gallery.watched(_ai_totals(ai_videos, fun_time_counts, phone_counts))
-        result.stamped += 0 if handed is None else handed.done
+        result.stamped += 0 if handed is None else _weights_changed(handed)
         result.gallery_untold = handed is None
     for video in played:
         if is_ai_video(video):
@@ -98,6 +98,10 @@ def _records_brought_up_to_what_was_watched(gallery: GalleryRecords) -> WatchWei
         result.stamped, result.favorites_added, result.favorites_removed, result.unmapped,
     )
     return result
+
+
+def _weights_changed(handed: Handed) -> int:
+    return handed.done if handed.changed is None else handed.changed
 
 
 def _ai_totals(videos: list[Path], fun_time_counts: dict,
