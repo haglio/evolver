@@ -254,6 +254,7 @@ def a_process(pid: int, name: str) -> processes.Process:
 
 def windows_with(monkeypatch, running: list[processes.Process]) -> StandInForWindows:
     windows = StandInForWindows(running)
+    monkeypatch.setattr(pcloud_stuck, "_pclouds_drive", lambda: Path("P:\\"))
     monkeypatch.setattr(pcloud_stuck.processes, "running", windows.list_running)
     monkeypatch.setattr(pcloud_stuck.processes, "terminate", windows.terminate)
     monkeypatch.setattr(pcloud_stuck.processes, "wait_for_end", windows.wait_for_end)
@@ -267,6 +268,31 @@ def test_pcloud_is_ended_by_its_own_process_number_and_started_again_through_exp
         assert (windows.ended, windows.waited_for) == ([4321], [4321])
         assert windows.started == []
     assert windows.started == [["explorer.exe", r"C:\Program Files\pCloud Drive\pCloud.exe"]]
+
+
+def test_the_run_goes_on_only_once_pclouds_drive_is_back(monkeypatch):
+    windows_with(monkeypatch, [a_process(4321, "pCloud.exe")])
+    drive = iter([None, None, Path("P:\\")])
+    monkeypatch.setattr(pcloud_stuck, "_pclouds_drive", lambda: next(drive))
+    monkeypatch.setattr(pcloud_stuck.time, "sleep", lambda _seconds: None)
+
+    with pcloud_stuck.Pcloud().stopped():
+        pass
+
+    assert next(drive, "asked no more") == "asked no more"
+
+
+def test_a_drive_that_never_comes_back_holds_the_run_up_a_minute_at_most(monkeypatch):
+    windows_with(monkeypatch, [a_process(4321, "pCloud.exe")])
+    clock = iter(range(0, 10_000, 5))
+    monkeypatch.setattr(pcloud_stuck, "_pclouds_drive", lambda: None)
+    monkeypatch.setattr(pcloud_stuck.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(pcloud_stuck.time, "monotonic", lambda: next(clock))
+
+    with pcloud_stuck.Pcloud().stopped():
+        pass
+
+    assert next(clock) <= 75
 
 
 def test_pcloud_that_is_not_running_is_neither_ended_nor_started(monkeypatch):
