@@ -76,7 +76,7 @@ class TestRunDetailRendering:
         ]))
 
         assert _column_of_names(widget) == [
-            "Clean up", "Handle stray files", "AI videos", "Transfer prompts"]
+            "Housekeeping", "Handle stray files", "AI videos", "Transfer prompts"]
 
     def test_a_heading_spans_the_row_with_no_number_status_or_time(self):
         widget = RunDetailWidget()
@@ -107,7 +107,7 @@ class TestRunDetailRendering:
             {"name": "strays", "status": "completed", "duration_seconds": 1.0},
         ]))
 
-        assert _column_of_names(widget) == ["Clean up", "Handle stray files", "Purge Trash"]
+        assert _column_of_names(widget) == ["Housekeeping", "Handle stray files", "Purge Trash"]
 
     def test_a_stage_since_taken_out_shows_the_name_it_last_had(self):
         widget = RunDetailWidget()

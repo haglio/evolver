@@ -182,7 +182,7 @@ def _verify(this_run: ThisRun) -> StageResult | Skipped:
 
 
 SECTIONS: tuple[Section, ...] = (
-    Section("Clean up", (
+    Section("Housekeeping", (
         Stage("strays", "Handle stray files",
               "Fix a video whose file name has no dot before its extension, move a funscript found among the videos to its place in the scripts folder -- marking one Origenerator handed over as a script no person wrote -- and report any other file there that is not a video",
               (0x0A, 0x12, 0x2C), run=lambda _: stray_files.run()),
@@ -200,6 +200,12 @@ SECTIONS: tuple[Section, ...] = (
               "conflicted copy; pCloud stops for a few seconds while its list is cleared, and only when it "
               "has nothing else to sync",
               (0xFF, 0x77, 0x00), run=lambda _: pcloud_stuck.run(),
+              moves_no_videos=True),
+        Stage("watch_weights", "Update weights",
+              "Add up the completions, skips and locks Fun Time and Warm Gun recorded for each library video and save the total, as the weight both apps shuffle by, in Origenerator's gallery for an AI video and on its sidecar for any other, and mark the phone's favorites in the same places",
+              (0xB5, 0xE6, 0x1D),
+              run=lambda _: watch_weights.run(
+                  tell_the_gallery=origenerator_commands.write_gallery_entries),
               moves_no_videos=True),
     )),
     Section("AI videos", (
@@ -224,6 +230,10 @@ SECTIONS: tuple[Section, ...] = (
         Stage("verify", "Correspondence check",
               "Verify every 1_sorted video has its enhanced video in its Kino or Genau folder, and no enhanced video is missing from either",
               (0xFF, 0x9D, 0x83), run=_verify),
+        Stage("bookmarks", "Bookmarks sync",
+              "Copy Fun Time favorites into a Chrome bookmarks folder",
+              (0x4B, 0x96, 0x88), run=lambda _: bookmarks_sync.run(),
+              moves_no_videos=True),
     )),
     Section("Non-AI videos", (
         Stage("upscale_non_ai", "Enhance non-AI videos",
@@ -271,18 +281,6 @@ SECTIONS: tuple[Section, ...] = (
         Stage("scripts", "Scripts sync",
               "Move funscripts so their folders match the video folders",
               (0xAD, 0x40, 0x35), run=lambda _: scripts_sync.run(show_popup=True),
-              moves_no_videos=True),
-    )),
-    Section("Favorites and weights", (
-        Stage("watch_weights", "Update weights",
-              "Add up the completions, skips and locks Fun Time and Warm Gun recorded for each library video and save the total, as the weight both apps shuffle by, in Origenerator's gallery for an AI video and on its sidecar for any other, and mark the phone's favorites in the same places",
-              (0xB5, 0xE6, 0x1D),
-              run=lambda _: watch_weights.run(
-                  tell_the_gallery=origenerator_commands.write_gallery_entries),
-              moves_no_videos=True),
-        Stage("bookmarks", "Bookmarks sync",
-              "Copy Fun Time favorites into a Chrome bookmarks folder",
-              (0x4B, 0x96, 0x88), run=lambda _: bookmarks_sync.run(),
               moves_no_videos=True),
     )),
 )

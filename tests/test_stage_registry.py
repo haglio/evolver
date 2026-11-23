@@ -145,7 +145,7 @@ class TestStageRegistry(unittest.TestCase):
 
     def test_the_sections_are_headed_as_he_chose(self):
         assert [section.heading for section in SECTIONS] == [
-            "Clean up", "AI videos", "Non-AI videos", "Funscripts", "Favorites and weights"]
+            "Housekeeping", "AI videos", "Non-AI videos", "Funscripts"]
 
     def test_origenerator_downtime_comes_before_every_stage_that_waits_on_its_training(self):
         assert _place("origenerator_downtime") < min(_place("upscale"), _place("funscript_drafts")), (
