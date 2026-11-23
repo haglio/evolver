@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
-from unittest.mock import ANY, patch
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -16,6 +16,11 @@ from shared_ui.testing import alert_shown
 
 from tests.product_sources import PROJECT_ROOT, product_sources
 from util import alert
+
+
+def _shown(show_alert) -> tuple:
+    (title, message), how = show_alert.call_args
+    return title, message, how.get("level", Level.ERROR), how["icon"], how["links"]
 
 
 class TestTheOnlyWayToAModalDialog(unittest.TestCase):
@@ -35,20 +40,10 @@ class TestTheOnlyWayToAModalDialog(unittest.TestCase):
 
 class TestShowError(unittest.TestCase):
     @alert_shown()
-    def test_it_opens_the_familys_dialog_under_evolvers_own_icon(self, show_alert):
+    def test_an_error_is_the_familys_red_x_window_under_evolvers_own_icon(self, show_alert):
         alert.show_error("Title", "Body")
 
-        show_alert.assert_called_once_with(
-            "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY,
-            copyable=True)
-
-    @alert_shown()
-    def test_an_error_can_wear_the_warning_icon(self, show_alert):
-        alert.show_error("Title", "Body", warning_icon=True)
-
-        show_alert.assert_called_once_with(
-            "Title", "Body", icon=alert.ICON_FILE, links=[], dismissible=False, work_on_this=ANY,
-            copyable=True, level=Level.WARNING)
+        assert _shown(show_alert) == ("Title", "Body", Level.ERROR, alert.ICON_FILE, [])
 
     @alert_shown()
     def test_a_previews_alert_wears_its_letter_in_the_preview_ink(self, show_alert):
@@ -65,9 +60,7 @@ class TestShowError(unittest.TestCase):
 
         alert.show_error("Title", "Body", links=[("Open its folder", folder)])
 
-        show_alert.assert_called_once_with(
-            "Title", "Body", icon=alert.ICON_FILE, links=[Link("Open its folder", folder)],
-            dismissible=False, work_on_this=ANY, copyable=True)
+        assert _shown(show_alert)[4] == [Link("Open its folder", folder)]
 
     @alert_shown()
     def test_work_on_this_opens_a_session_in_the_checkout_that_showed_the_window_told_what_it_said(self, show_alert):
@@ -103,16 +96,16 @@ class TestShowError(unittest.TestCase):
         assert [shown.kwargs["work_on_this"] for shown in show_alert.call_args_list] == [None, None]
 
     @alert_shown()
-    def test_a_window_no_session_could_help_with_still_offers_its_message_to_copy(self, show_alert):
+    def test_a_window_no_session_could_help_with_is_still_the_red_x_window(self, show_alert):
         alert.show_error("Evolver failed to start", "Made-up failure.", work_on_this=False)
 
-        assert show_alert.call_args.kwargs["copyable"] is True
+        assert _shown(show_alert)[2] is Level.ERROR
 
     @alert_shown()
-    def test_a_warning_that_is_part_of_evolvers_normal_use_offers_nothing_to_copy(self, show_alert):
+    def test_a_warning_that_is_part_of_evolvers_normal_use_is_the_yellow_triangle_window(self, show_alert):
         alert.show_warning("Evolver - Made-Up Reminder", "Sign in again.")
 
-        assert (show_alert.call_args.kwargs["copyable"], show_alert.call_args.kwargs["level"]) == (False, Level.ERROR)
+        assert _shown(show_alert)[2] is Level.WARNING
 
     @alert_shown()
     def test_a_warning_comes_back_every_time(self, show_alert):

@@ -19,26 +19,16 @@ ERRORS_SHOWN_FILE = LOCAL_STATE_DIR / "errors_shown.json"
 
 
 def show_error(title: str, message: str, links: Sequence[tuple[str, Path]] = (), *,
-               dismissible: bool = False, same_error: str | None = None, work_on_this: bool = True,
-               warning_icon: bool = False) -> bool:
+               dismissible: bool = False, same_error: str | None = None, work_on_this: bool = True) -> bool:
     if work_on_this and _shown_before(title, message if same_error is None else same_error):
         log.info("Not showing %s again: the same error's window was shown before", title)
         return False
     return _show(title, message, links, error=True, dismissible=dismissible,
-                 work_on_this=_work_on_this(title, message) if work_on_this else None,
-                 **_with_the_warning_icon(warning_icon))
+                 work_on_this=_work_on_this(title, message) if work_on_this else None)
 
 
 def show_warning(title: str, message: str) -> bool:
-    from shared_ui.alert import Level  # noqa: PLC0415  (see the module docstring)
-
-    return _show(title, message, (), error=False, level=Level.ERROR)
-
-
-def _with_the_warning_icon(wanted: bool) -> dict[str, object]:
-    from shared_ui.alert import Level  # noqa: PLC0415  (see the module docstring)
-
-    return {"level": Level.WARNING} if wanted else {}
+    return _show(title, message, (), error=False)
 
 
 def _show(title: str, message: str, links: Sequence[tuple[str, Path]], *, error: bool, **look: object) -> bool:
