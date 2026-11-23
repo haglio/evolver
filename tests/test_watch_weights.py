@@ -10,6 +10,7 @@ from app_support import video_ids
 from app_support.favorites import is_favorite, mark
 
 from tasks import watch_weights
+from tasks.origenerator_commands import Handed
 from tests.gallery_fakes import FakeGallery, a_gallery_of, kept_at
 from tests.temp_helpers import (
     LaneLibrary,
@@ -99,6 +100,16 @@ class TestCountsOfAnAiVideo(unittest.TestCase):
             assert not sidecar.sidecar_path(upscale).exists()
         assert gallery.watched_totals == [{upscale: _counts(completions=3)}]
         assert result.stamped == 1
+
+    def test_counts_the_gallery_already_held_are_no_weight_saved(self):
+        gallery = FakeGallery(Handed(done=1, no_row=0, changed=0))
+        with _setting() as s:
+            _, upscale = s.sorted_clip("clip_a")
+            s.fun_time_counts(a=(upscale, {"completions": 3, "skips": 0, "locks": 0}))
+
+            result = watch_weights.run(gallery=gallery)
+
+        assert result.stamped == 0
 
     def test_counts_kept_under_its_old_record_id_and_under_its_path_are_added_together(self):
         gallery = FakeGallery()
