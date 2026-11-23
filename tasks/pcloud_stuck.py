@@ -6,13 +6,13 @@ import os
 import shutil
 import sqlite3
 import subprocess
-import time
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from app_support import processes
 from app_support.subprocess_utils import hidden_subprocess_kwargs
 
 from util.stage_result import StageResult
@@ -166,33 +166,23 @@ class TheApp(Protocol):
 class Pcloud:
     _EXE = Path(r"C:\Program Files\pCloud Drive\pCloud.exe")
     _IMAGE = "pCloud.exe"
-    _EXIT_WAIT_S = 30.0
 
     @contextmanager
     def stopped(self) -> Iterator[None]:
         pid = self._pid()
         if pid is None:
             raise RuntimeError("pCloud is not running")
-        subprocess.run(["taskkill", "/F", "/PID", str(pid)], check=True, capture_output=True,
-                       **hidden_subprocess_kwargs())
-        deadline = time.monotonic() + self._EXIT_WAIT_S
-        while self._pid() == pid:
-            if time.monotonic() > deadline:
-                raise RuntimeError("pCloud did not stop")
-            time.sleep(0.5)
+        if not processes.terminate(pid):
+            raise RuntimeError("pCloud could not be stopped")
+        processes.wait_for_end(pid)
         try:
             yield
         finally:
             subprocess.Popen(["explorer.exe", str(self._EXE)], **hidden_subprocess_kwargs())
 
     def _pid(self) -> int | None:
-        listed = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {self._IMAGE}", "/FO", "CSV", "/NH"],
-                                check=False, capture_output=True, text=True, **hidden_subprocess_kwargs()).stdout
-        for line in listed.splitlines():
-            fields = line.strip().strip('"').split('","')
-            if len(fields) > 1 and fields[0].lower() == self._IMAGE.lower():
-                return int(fields[1])
-        return None
+        return next((process.pid for process in processes.running()
+                     if process.name.lower() == self._IMAGE.lower()), None)
 
 
 def _read_only(database: Path) -> sqlite3.Connection:
