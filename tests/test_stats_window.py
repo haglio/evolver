@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import os
 import subprocess
 import sys
@@ -23,6 +24,7 @@ from gui.stats_window import (
     STAGE_COLORS,
     StackedAreaChart,
     StatsWindow,
+    _heading_font,
     _legend_font,
     _pick_y_ticks,
     _PixelColumns,
@@ -30,6 +32,7 @@ from gui.stats_window import (
     chart_right_margin,
     legend_bottom,
     legend_lines,
+    legend_rows,
     legend_width,
 )
 from gui.tray import EvolverTray
@@ -257,10 +260,20 @@ class TestStackedAreaChartPainting:
             line for section in SECTIONS
             for line in ((section.heading, None), *((stage.label, stage.key) for stage in section.stages)))
 
+    def test_the_legend_writes_its_headings_larger_than_its_stages(self):
+        assert _heading_font().pointSizeF() > _legend_font().pointSizeF()
+
+    def test_the_legend_leaves_more_room_above_a_heading_than_between_two_stages(self):
+        tops = [top for top, _text, _key in legend_rows()]
+        keys = [key for _top, _text, key in legend_rows()]
+        gaps = [later - earlier for earlier, later in itertools.pairwise(tops)]
+        above_a_heading = [gap for gap, key in zip(gaps, keys[1:], strict=True) if key is None]
+        between_stages = [gap for gap, earlier, later in zip(gaps, keys[:-1], keys[1:], strict=True)
+                          if earlier is not None and later is not None]
+        assert min(above_a_heading) > max(between_stages)
+
     def test_the_legend_is_wide_enough_for_the_longest_heading_in_bold(self):
-        bold = _legend_font()
-        bold.setBold(True)
-        widest = max(QFontMetrics(bold).horizontalAdvance(section.heading) for section in SECTIONS)
+        widest = max(QFontMetrics(_heading_font()).horizontalAdvance(section.heading) for section in SECTIONS)
 
         assert legend_width() > widest
 

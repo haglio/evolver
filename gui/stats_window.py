@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 from shared_ui import colors, palette
 from shared_ui.fonts import SIZE_SMALL, SIZE_TINY
-from shared_ui.spacing import BUTTON_GROUP_GAP, GAP_MEDIUM, MARGIN_STANDARD
+from shared_ui.spacing import BUTTON_GROUP_GAP, GAP_MEDIUM, HAIRLINE, MARGIN_STANDARD
 
 from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS, STAGES
 from gui.run_history import RunHistory
@@ -44,6 +44,9 @@ _LEGEND_TEXT_GAP = GAP_MEDIUM
 _LEGEND_LINE_HEIGHT = 16
 _LEGEND_INSET = MARGIN_STANDARD
 _LEGEND_DROP = 10
+_LEGEND_HEADING_POINT_SIZE = SIZE_SMALL
+_LEGEND_HEADING_HEIGHT = 20
+_LEGEND_SECTION_GAP = GAP_MEDIUM
 
 
 def _legend_font() -> QFont:
@@ -53,7 +56,8 @@ def _legend_font() -> QFont:
 
 
 def _heading_font() -> QFont:
-    font = _legend_font()
+    font = QFont()
+    font.setPointSize(_LEGEND_HEADING_POINT_SIZE)
     font.setBold(True)
     return font
 
@@ -71,8 +75,20 @@ def legend_width() -> int:
     return _LEGEND_PADDING + max(_LEGEND_SWATCH + _LEGEND_TEXT_GAP + widest, widest_heading) + _LEGEND_PADDING
 
 
+def legend_rows() -> tuple[tuple[int, str, str | None], ...]:
+    rows = []
+    top = 0
+    for text, stage_key in legend_lines():
+        if stage_key is None and rows:
+            top += _LEGEND_SECTION_GAP
+        rows.append((top, text, stage_key))
+        top += _LEGEND_LINE_HEIGHT if stage_key is not None else _LEGEND_HEADING_HEIGHT
+    return tuple(rows)
+
+
 def _legend_height() -> int:
-    return len(legend_lines()) * _LEGEND_LINE_HEIGHT + _LEGEND_PADDING * 2
+    top, _text, _stage_key = legend_rows()[-1]
+    return _LEGEND_PADDING + top + _LEGEND_LINE_HEIGHT + _LEGEND_PADDING
 
 
 def legend_bottom() -> int:
@@ -339,7 +355,6 @@ class StackedAreaChart(QWidget):
         painter.setFont(_legend_font())
 
         swatch_size = _LEGEND_SWATCH
-        line_height = _LEGEND_LINE_HEIGHT
         padding = _LEGEND_PADDING
         legend_w = legend_width()
 
@@ -353,13 +368,10 @@ class StackedAreaChart(QWidget):
         painter.setPen(colors.BORDER_DEFAULT)
         painter.drawRect(lx, ly, legend_w, legend_h)
 
-        for i, (text, stage_key) in enumerate(legend_lines()):
-            y_pos = ly + padding + i * line_height
+        for top, text, stage_key in legend_rows():
+            y_pos = ly + padding + top
             if stage_key is None:
-                painter.setFont(_heading_font())
-                painter.setPen(colors.BG_TERTIARY)
-                painter.drawText(lx + padding, y_pos + swatch_size - 1, text)
-                painter.setFont(_legend_font())
+                _draw_legend_heading(painter, text, lx + padding, y_pos, legend_w - 2 * padding)
                 continue
             color = STAGE_COLORS[stage_key]
             painter.setBrush(color)
@@ -368,6 +380,17 @@ class StackedAreaChart(QWidget):
             painter.setPen(colors.BG_TERTIARY)
             painter.drawText(lx + padding + swatch_size + _LEGEND_TEXT_GAP,
                              y_pos + swatch_size - 1, text)
+
+
+def _draw_legend_heading(painter: QPainter, text: str, x: int, top: int, width: int):
+    font = _heading_font()
+    painter.setFont(font)
+    painter.setPen(colors.BG_TERTIARY)
+    painter.drawText(x, top + QFontMetrics(font).ascent(), text)
+    underline_y = top + _LEGEND_HEADING_HEIGHT - _LEGEND_SECTION_GAP // 2
+    painter.setPen(QPen(colors.BG_TERTIARY, HAIRLINE))
+    painter.drawLine(x, underline_y, x + width, underline_y)
+    painter.setFont(_legend_font())
 
 
 def _toggle(label: str, *, checked: bool = False) -> QPushButton:

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontMetrics
-from PySide6.QtWidgets import QLabel, QMainWindow, QProgressBar
+from PySide6.QtWidgets import QFrame, QLabel, QMainWindow, QProgressBar
 
 from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS
 from gui.progress_popup import BAR_WIDTH, ProgressPopup, _caption_width
@@ -36,6 +36,27 @@ class TestPopupConstruction(unittest.TestCase):
                                        *((stage.label, False) for stage in section.stages))]
 
         assert lines[1:1 + len(expected)] == expected
+
+    def test_a_heading_is_larger_than_its_stages_and_has_a_line_under_it(self):
+        layout = self.popup.layout()
+        stage_size = next(label for label in self.popup.findChildren(QLabel)
+                          if label.text() == STAGE_LABELS["strays"]).font().pointSizeF()
+        for index in range(layout.count()):
+            widget = layout.itemAt(index).widget()
+            if isinstance(widget, QLabel) and widget.text() in {s.heading for s in SECTIONS}:
+                with self.subTest(heading=widget.text()):
+                    assert widget.font().pointSizeF() > stage_size
+                    line = layout.itemAt(index + 1).widget()
+                    assert isinstance(line, QFrame)
+                    assert line.frameShape() == QFrame.Shape.HLine
+
+    def test_every_section_but_the_first_has_room_above_its_heading(self):
+        layout = self.popup.layout()
+        for index in range(1, layout.count()):
+            widget = layout.itemAt(index).widget()
+            if isinstance(widget, QLabel) and widget.text() in {s.heading for s in SECTIONS[1:]}:
+                with self.subTest(heading=widget.text()):
+                    assert layout.itemAt(index - 1).spacerItem() is not None
 
     def test_every_row_is_captioned_with_the_stage_label(self):
         captions = {label.text() for label in self.popup.findChildren(QLabel)}
