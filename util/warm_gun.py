@@ -61,8 +61,17 @@ def library_video(journal_path: str) -> Path | None:
             return config.NON_AI_DIR.joinpath(*rest)
         case ["genau", folder_named, *inside] if inside:
             return _genau_flick(lanes.genau_flicks_dir(), folder_named, inside)
+        case [*_, "2_outbox", "upscaled_by_orientation", orient, source, name]:
+            return _where_the_retired_outbox_moved(orient, source, name)
     named = config.LIBRARY_ROOT.joinpath(*parts)
     return named if any(named.is_relative_to(folder) for folder in lanes.upscale_folders()) else None
+
+
+def _where_the_retired_outbox_moved(orient: str, source: str, name: str) -> Path | None:
+    if lanes.is_genau_lane(source):
+        genau = lanes.genau_delivery_dir()
+        return None if genau is None else genau / name
+    return lanes.kino_upscales_dir() / orient / source / name
 
 
 def _genau_flick(flicks_folder: Path | None, folder_named: str, inside: list[str]) -> Path | None:

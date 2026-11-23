@@ -7,8 +7,9 @@ from pathlib import Path
 
 from app_support.flick_folder import flat_flicks_in
 
+import config
 from tests.temp_helpers import override_config, touch_video, workspace_temp_dir
-from util import warm_gun
+from util import lanes, warm_gun
 from util.warm_gun import Event
 
 
@@ -109,6 +110,19 @@ class TestLibraryVideo(unittest.TestCase):
         with override_config(LIBRARY_ROOT=Path("C:/lib"), KINO_DIR=Path("C:/lib/kino"),
                              GENAU_DIR=Path("C:/lib/no genau here")):
             assert warm_gun.library_video("kino/2D/AI/portrait/provider2/clip a_topaz.mp4") == Path("C:/lib/kino/2D/AI/portrait/provider2/clip a_topaz.mp4")
+
+    def test_an_upscale_the_phone_saw_in_the_retired_outbox_is_that_upscale_in_kinos_folder(self):
+        with override_config(LIBRARY_ROOT=Path("C:/lib"), KINO_DIR=Path("C:/lib/kino"),
+                             GENAU_DIR=Path("C:/lib/no genau here")):
+            assert warm_gun.library_video(
+                "videos/videos/2D/AI/2_outbox/upscaled_by_orientation/portrait/provider2/clip a_topaz.mp4"
+            ) == Path("C:/lib/kino/2D/AI/portrait/provider2/clip a_topaz.mp4")
+
+    def test_a_flick_the_phone_saw_in_the_retired_outbox_is_that_flick_in_genaus_folder(self):
+        with _genaus_flicks_folder():
+            assert warm_gun.library_video(
+                f"videos/videos/2D/AI/2_outbox/upscaled_by_orientation/portrait/{config.GENAU_SOURCE}/loop_topaz.mp4"
+            ) == lanes.genau_delivery_dir() / "loop_topaz.mp4"
 
     def test_a_lane_this_library_has_no_folder_for_is_nobody_s(self):
         for path in ("VR/finished/scene.mp4", "1_sorted/short.mp4", "genau/audio/track.mp4", "non_AI", ""):
