@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 from PySide6.QtGui import QFontMetrics, QImage
 
-from evolver import ALL_STAGES, STAGE_LABELS
+from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS
 from gui.main_window import EvolverMainWindow
 from gui.run_history import RunHistory
 from gui.run_record import RunRecord
@@ -28,6 +28,8 @@ from gui.stats_window import (
     _PixelColumns,
     _x_axis_labels,
     chart_right_margin,
+    legend_bottom,
+    legend_lines,
     legend_width,
 )
 from gui.tray import EvolverTray
@@ -224,7 +226,8 @@ class TestStackedAreaChartPainting:
         assert not _limit_line_rows(fitted)
 
     def test_the_legend_swatches_every_stage_in_its_chart_color(self):
-        image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})))
+        image = _render(StackedAreaChart(_two_runs({"sort": 100.0}, {"sort": 300.0})),
+                        h=legend_bottom() + 20)
         margin_pixels = {
             _rgb(image, x, y)
             for x in range(800 - chart_right_margin(), 800)
@@ -248,6 +251,25 @@ class TestStackedAreaChartPainting:
             blank = _ink_count(_render(chart), *text_band)
 
         assert named > blank + 100
+
+    def test_the_legend_heads_each_sections_stages_with_its_heading(self):
+        assert legend_lines() == tuple(
+            line for section in SECTIONS
+            for line in ((section.heading, None), *((stage.label, stage.key) for stage in section.stages)))
+
+    def test_the_legend_is_wide_enough_for_the_longest_heading_in_bold(self):
+        bold = _legend_font()
+        bold.setBold(True)
+        widest = max(QFontMetrics(bold).horizontalAdvance(section.heading) for section in SECTIONS)
+
+        assert legend_width() > widest
+
+    def test_the_chart_is_never_shorter_than_its_legend(self):
+        window = _window_showing(_make_record({"sort": 1.0}))
+        window.resize(800, 1)
+        window.layout().activate()
+
+        assert window._chart.height() > legend_bottom()
 
     def test_the_legend_is_wide_enough_for_the_longest_label(self):
         metrics = QFontMetrics(_legend_font())

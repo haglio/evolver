@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from shared_ui.fonts import SIZE_BODY
 from shared_ui.spacing import MARGIN_DIALOG
 
-from evolver import ALL_STAGES, STAGE_LABELS
+from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS
 
 _CAPTION_GUTTER = 12
 BAR_WIDTH = 200
@@ -22,6 +22,14 @@ BAR_WIDTH = 200
 def _caption_width(font) -> int:
     metrics = QFontMetrics(font)
     return max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values()) + _CAPTION_GUTTER
+
+
+def _heading(text: str) -> QLabel:
+    heading = QLabel(text)
+    font = heading.font()
+    font.setBold(True)
+    heading.setFont(font)
+    return heading
 
 
 class ProgressPopup(QWidget):
@@ -43,23 +51,25 @@ class ProgressPopup(QWidget):
         self._stage_values: dict[str, int] = {}
 
         caption_width = _caption_width(self.font())
-        for key in ALL_STAGES:
-            row_layout = QHBoxLayout()
-            label = QLabel(STAGE_LABELS[key])
-            label.setFixedWidth(caption_width)
-            row_layout.addWidget(label)
+        for section in SECTIONS:
+            layout.addWidget(_heading(section.heading))
+            for key in (stage.key for stage in section.stages):
+                row_layout = QHBoxLayout()
+                label = QLabel(STAGE_LABELS[key])
+                label.setFixedWidth(caption_width)
+                row_layout.addWidget(label)
 
-            bar = QProgressBar()
-            bar.setRange(0, 100)
-            bar.setValue(0)
-            bar.setFixedHeight(18)
-            bar.setMinimumWidth(BAR_WIDTH)
-            bar.setTextVisible(True)
-            row_layout.addWidget(bar, stretch=1)
+                bar = QProgressBar()
+                bar.setRange(0, 100)
+                bar.setValue(0)
+                bar.setFixedHeight(18)
+                bar.setMinimumWidth(BAR_WIDTH)
+                bar.setTextVisible(True)
+                row_layout.addWidget(bar, stretch=1)
 
-            layout.addLayout(row_layout)
-            self._bars[key] = bar
-            self._stage_values[key] = 0
+                layout.addLayout(row_layout)
+                self._bars[key] = bar
+                self._stage_values[key] = 0
 
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)

@@ -19,7 +19,7 @@ from shared_ui import colors, palette
 from shared_ui.fonts import SIZE_SMALL, SIZE_TINY
 from shared_ui.spacing import BUTTON_GROUP_GAP, GAP_MEDIUM, MARGIN_STANDARD
 
-from evolver import ALL_STAGES, STAGE_LABELS, STAGES
+from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS, STAGES
 from gui.run_history import RunHistory
 from gui.run_record import in_display_zone
 
@@ -43,6 +43,7 @@ _LEGEND_PADDING = GAP_MEDIUM
 _LEGEND_TEXT_GAP = GAP_MEDIUM
 _LEGEND_LINE_HEIGHT = 16
 _LEGEND_INSET = MARGIN_STANDARD
+_LEGEND_DROP = 10
 
 
 def _legend_font() -> QFont:
@@ -51,10 +52,35 @@ def _legend_font() -> QFont:
     return font
 
 
+def _heading_font() -> QFont:
+    font = _legend_font()
+    font.setBold(True)
+    return font
+
+
+def legend_lines() -> tuple[tuple[str, str | None], ...]:
+    return tuple(
+        line for section in SECTIONS
+        for line in ((section.heading, None), *((STAGE_LABELS[stage.key], stage.key) for stage in section.stages)))
+
+
 def legend_width() -> int:
     metrics = QFontMetrics(_legend_font())
     widest = max(metrics.horizontalAdvance(label) for label in STAGE_LABELS.values())
-    return _LEGEND_PADDING + _LEGEND_SWATCH + _LEGEND_TEXT_GAP + widest + _LEGEND_PADDING
+    widest_heading = max(QFontMetrics(_heading_font()).horizontalAdvance(section.heading) for section in SECTIONS)
+    return _LEGEND_PADDING + max(_LEGEND_SWATCH + _LEGEND_TEXT_GAP + widest, widest_heading) + _LEGEND_PADDING
+
+
+def _legend_height() -> int:
+    return len(legend_lines()) * _LEGEND_LINE_HEIGHT + _LEGEND_PADDING * 2
+
+
+def legend_bottom() -> int:
+    return _MARGIN_TOP + _LEGEND_DROP + _legend_height()
+
+
+def _chart_height_for_its_legend() -> int:
+    return legend_bottom() + _LEGEND_INSET
 
 
 def chart_right_margin() -> int:
@@ -318,24 +344,30 @@ class StackedAreaChart(QWidget):
         legend_w = legend_width()
 
         lx = widget_w - legend_w - _LEGEND_INSET
-        ly = int(top_y + 10)
+        ly = int(top_y + _LEGEND_DROP)
 
-        legend_h = len(ALL_STAGES) * line_height + padding * 2
+        legend_h = _legend_height()
 
         bg = QColor(*palette.WHITE, 220)
         painter.setBrush(bg)
         painter.setPen(colors.BORDER_DEFAULT)
         painter.drawRect(lx, ly, legend_w, legend_h)
 
-        for i, stage_key in enumerate(ALL_STAGES):
-            color = STAGE_COLORS[stage_key]
+        for i, (text, stage_key) in enumerate(legend_lines()):
             y_pos = ly + padding + i * line_height
+            if stage_key is None:
+                painter.setFont(_heading_font())
+                painter.setPen(colors.BG_TERTIARY)
+                painter.drawText(lx + padding, y_pos + swatch_size - 1, text)
+                painter.setFont(_legend_font())
+                continue
+            color = STAGE_COLORS[stage_key]
             painter.setBrush(color)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(lx + padding, y_pos, swatch_size, swatch_size)
             painter.setPen(colors.BG_TERTIARY)
             painter.drawText(lx + padding + swatch_size + _LEGEND_TEXT_GAP,
-                             y_pos + swatch_size - 1, STAGE_LABELS[stage_key])
+                             y_pos + swatch_size - 1, text)
 
 
 def _toggle(label: str, *, checked: bool = False) -> QPushButton:
@@ -357,7 +389,6 @@ class StatsWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Evolver \u2014 Run statistics")
-        self.setMinimumSize(800, 500)
         self.resize(1000, 600)
 
         layout = QVBoxLayout(self)
@@ -377,6 +408,9 @@ class StatsWindow(QDialog):
             btn_row.addWidget(button)
         btn_row.addStretch()
         layout.addLayout(btn_row)
+        margins = layout.contentsMargins()
+        self.setMinimumSize(800, max(500, margins.top() + btn_row.sizeHint().height() + layout.spacing()
+                                     + _chart_height_for_its_legend() + margins.bottom()))
 
         self._chart: StackedAreaChart | None = None
         self._placeholder = QLabel("Reading the run history…")
@@ -391,6 +425,7 @@ class StatsWindow(QDialog):
             self._placeholder.setText("No run data available.")
             return
         self._chart = StackedAreaChart(history)
+        self._chart.setMinimumHeight(_chart_height_for_its_legend())
         self._show_chosen_measure()
         self._show_chosen_scale()
         self._layout.removeWidget(self._placeholder)
