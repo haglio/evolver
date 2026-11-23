@@ -128,7 +128,7 @@ class ReviewTrashWindow(QWidget):
             try:
                 verdict(marked)
             except (OSError, ValueError) as error:
-                show_error("Review non-AI trash", f"{marked.video.name}: {error}", warning_icon=True)
+                show_error("Review non-AI trash", f"{marked.video.name}: {error}")
         self._show(trash_folders.non_ai_in_trash(), row)
 
     def _chosen(self) -> list[trash_folders.InTrash]:

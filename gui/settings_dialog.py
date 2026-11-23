@@ -62,7 +62,7 @@ class SettingsDialog(QDialog):
                 startup.unregister_startup()
         except Exception as exc:
             log.exception("Failed to update startup registration")
-            show_error("Startup registration", f"Could not update startup shortcut:\n{exc}", warning_icon=True)
+            show_error("Startup registration", f"Could not update startup shortcut:\n{exc}")
 
         super().accept()
 
