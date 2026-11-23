@@ -6,7 +6,7 @@ from typing import Any
 
 from util import orientation, topaz
 
-NOTHING_TO_DO = "Nothing to do"
+NOTHING_TO_DO = "nothing to do"
 
 
 def _which(count: int, many: str, one: str) -> str:
@@ -226,21 +226,21 @@ SENTENCES: dict[str, Sentence] = {
 }
 
 SKIP_REASONS: dict[str, str] = {
-    "no_pending_work": "Nothing is waiting to be enhanced",
+    "no_pending_work": "nothing is waiting to be enhanced",
     "origenerator_training":
-        "Waited: a LoRA started with Origenerator's Train button is training on the graphics card",
-    "topaz_busy": "Waited: Topaz is enhancing a video Evolver did not start",
-    "cpu_busy": "Waited: the computer's processor was too busy",
-    "session_live": "Waited: a Funestra was playing",
-    "goblinscript_not_installed": "Waited: GoblinScript is not installed where Evolver's settings say",
-    "goblinscript_still_drafting": "Waited: GoblinScript is still making funscripts for the videos it was sent",
+        "waited while a LoRA started with Origenerator's Train button trained on the graphics card",
+    "topaz_busy": "waited while Topaz enhanced a video Evolver did not start",
+    "cpu_busy": "waited because the computer's processor was too busy",
+    "session_live": "waited while a Funestra was playing",
+    "goblinscript_not_installed": "waited because GoblinScript is not installed where Evolver's settings say",
+    "goblinscript_still_drafting": "waited while GoblinScript made funscripts for the videos it was sent",
     "goblinscript_failed":
-        "Waited: GoblinScript wrote nothing for the last videos it was sent, so they are sent again "
-        "an hour after that",
+        "waited because GoblinScript wrote nothing for the last videos it was sent; they are sent "
+        "again an hour after that",
     topaz.SIGN_IN_EXPIRED:
-        "Waited: Topaz Video's sign-in has expired; open the Topaz Video app and sign in",
+        "waited because Topaz Video's sign-in has expired; open the Topaz Video app and sign in",
     "upscale_pending":
-        "Waited: AI videos are still waiting to be enhanced, so the check would report "
+        "waited because AI videos are still waiting to be enhanced, so the check would report "
         "false mismatches",
 }
 

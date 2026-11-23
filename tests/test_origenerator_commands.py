@@ -41,13 +41,13 @@ def test_origenerators_published_command_runs_from_its_checkout_and_its_answer_i
         tmp_path):
     checkout = _checkout(tmp_path, downtime_command=DOWNTIME)
     ran = []
-    said = json.dumps({"did": "nothing: a fix is training", "holds_the_graphics_card": True})
+    said = json.dumps({"did": "nothing to do while a fix is training", "holds_the_graphics_card": True})
 
     result = origenerator_commands.run_downtime(
         checkout, runner=_answering(f"warming up\n{said}\n", ran))
 
     assert (result.did, result.holds_the_graphics_card, result.failed) == (
-        "nothing: a fix is training", True, False)
+        "nothing to do while a fix is training", True, False)
     ((args, options),) = ran
     assert args == [str(checkout / ".venv/Scripts/python.exe"), "-m", "origenerator.downtime"]
     assert options["cwd"] == str(checkout)
@@ -60,6 +60,12 @@ def test_an_origenerator_that_names_no_such_work_is_left_alone(tmp_path):
     result = origenerator_commands.run_downtime(_checkout(tmp_path), runner=_answering("", ran))
 
     assert (ran, result.failed, result.holds_the_graphics_card) == ([], False, False)
+
+
+def test_an_origenerator_that_names_no_such_work_says_so_in_the_stages_details(tmp_path):
+    result = origenerator_commands.run_downtime(_checkout(tmp_path), runner=_answering("", []))
+
+    assert result.did == "Origenerator names no work for while it is closed"
 
 
 def test_an_answer_that_cannot_be_read_fails_the_stage_rather_than_passing_in_silence(tmp_path):

@@ -64,7 +64,7 @@ def run_downtime(checkout: Path | None = None, *, runner=subprocess.run) -> Down
     try:
         said = _answer(DOWNTIME, checkout, runner)
         if said is None:
-            return DowntimeResult(did="nothing: Origenerator names no work for while it is closed")
+            return DowntimeResult(did="Origenerator names no work for while it is closed")
         result = DowntimeResult(did=str(said["did"]),
                                 holds_the_graphics_card=said["holds_the_graphics_card"] is True)
     except _UNANSWERED as e:
