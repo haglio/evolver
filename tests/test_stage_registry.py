@@ -77,7 +77,7 @@ class TestStageRegistry(unittest.TestCase):
         scripts_keys = (
             {key for key, _label, _names in stage_details._SCRIPTS_PROBLEMS}
             | {names for _key, _label, names in stage_details._SCRIPTS_PROBLEMS if names}
-            | {key for key, _label in stage_details._SCRIPTS_ROUTINE}
+            | {key for key, _label in (*stage_details._SCRIPTS_ROUTINE, stage_details._SCRIPTS_ALREADY_ALIGNED)}
         )
         for result_type, functions, table_keys in (
             (ScriptsSyncResult, ("_summarize_scripts_sync",), scripts_keys),

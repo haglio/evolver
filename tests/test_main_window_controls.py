@@ -431,7 +431,7 @@ class TestNonAiUpscaleSummary:
 
     def test_a_library_nothing_has_measured_yet_still_says_the_count(self):
         summary = self._result(pending=180, percent_complete=None)
-        assert summary.endswith("180 queued")
+        assert summary == "nothing to do (180 queued)"
 
     def test_a_part_measured_library_says_how_much_it_cannot_see(self):
         summary = self._result(pending=180, percent_complete=29,
@@ -449,9 +449,14 @@ class TestNonAiUpscaleSummary:
 
         assert summary.startswith("finished lagoon/1 clips/scene one.mp4, waiting (topaz_busy), ")
 
+    def test_a_run_that_started_nothing_says_so_first_and_how_far_along_in_parentheses(self):
+        summary = self._result(pending=84, percent_complete=44, remaining_seconds=117_000.0)
+
+        assert summary == "nothing to do (84 queued, 32.5h left, 44% done)"
+
     def test_a_low_disk_hold_is_called_out(self):
         summary = self._result(deferred_low_disk=True, start_deferred="")
-        assert "low disk" in summary
+        assert "the disk is nearly full" in summary
 
     def test_an_encode_that_has_not_reported_yet_reads_progress_unknown(self):
         summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4")
