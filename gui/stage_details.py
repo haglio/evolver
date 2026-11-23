@@ -7,6 +7,7 @@ from typing import Any
 from util import orientation, topaz
 
 NOTHING_TO_DO = "nothing to do"
+DONE, WRONG, FOUND = "done", "wrong", "found"
 
 
 def _which(count: int, many: str, one: str) -> str:
@@ -19,6 +20,7 @@ class Count:
     many: str
     one: str = ""
     even_at_zero: bool = False
+    kind: str = FOUND
 
     def said(self, result: dict[str, Any]) -> str | None:
         value = result.get(self.key)
@@ -28,12 +30,17 @@ class Count:
             return None
         return f"{value} {_which(value, self.many, self.one)}"
 
+    def happened(self, result: dict[str, Any]) -> bool:
+        value = result.get(self.key)
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and bool(value)
+
 
 @dataclass(frozen=True)
 class Named:
     key: str
     many: str
     one: str = ""
+    kind: str = WRONG
 
     def said(self, result: dict[str, Any]) -> str | None:
         names = list(result.get(self.key) or [])
@@ -41,35 +48,50 @@ class Named:
             return None
         return f"{len(names)} {_which(len(names), self.many, self.one)} ({_name_sample(names)})"
 
+    def happened(self, result: dict[str, Any]) -> bool:
+        return bool(result.get(self.key))
+
 
 @dataclass(frozen=True)
 class Groups:
     key: str
     many: str
     one: str = ""
+    kind: str = WRONG
 
     def said(self, result: dict[str, Any]) -> str | None:
         count = len(result.get(self.key) or ())
         return f"{count} {_which(count, self.many, self.one)}" if count else None
+
+    def happened(self, result: dict[str, Any]) -> bool:
+        return bool(result.get(self.key))
 
 
 @dataclass(frozen=True)
 class Flag:
     key: str
     words: str
+    kind: str = WRONG
 
     def said(self, result: dict[str, Any]) -> str | None:
         return self.words if result.get(self.key) is True else None
+
+    def happened(self, result: dict[str, Any]) -> bool:
+        return result.get(self.key) is True
 
 
 @dataclass(frozen=True)
 class Text:
     key: str
     words: str = "{}"
+    kind: str = DONE
 
     def said(self, result: dict[str, Any]) -> str | None:
         value = result.get(self.key)
         return self.words.format(value) if isinstance(value, str) and value else None
+
+    def happened(self, result: dict[str, Any]) -> bool:
+        return self.said(result) is not None
 
 
 @dataclass(frozen=True)
@@ -77,63 +99,68 @@ class Sentence:
     parts: tuple[Count | Named | Groups | Flag | Text, ...]
 
     def said(self, result: dict[str, Any]) -> str:
-        said = [words for part in self.parts if (words := part.said(result))]
-        return ", ".join(said) if said else NOTHING_TO_DO
+        if any(part.kind != FOUND and part.happened(result) for part in self.parts):
+            return ", ".join(words for part in self.parts if (words := part.said(result)))
+        return nothing_to_do([part.said(result) for part in self.parts if part.happened(result)])
+
+
+def nothing_to_do(found: list[str]) -> str:
+    return f"{NOTHING_TO_DO} ({', '.join(found)})" if found else NOTHING_TO_DO
 
 
 _NEITHER = f"{orientation.PORTRAIT} nor {orientation.LANDSCAPE}"
 
 SENTENCES: dict[str, Sentence] = {
     "strays": Sentence((
-        Count("renamed", "video names fixed", "video name fixed"),
+        Count("renamed", "video names fixed", "video name fixed", kind=DONE),
         Count("rehomed_scripts", "funscripts moved to the scripts folder",
-              "funscript moved to the scripts folder"),
+              "funscript moved to the scripts folder", kind=DONE),
         Named("reported", "other files reported", "other file reported"),
     )),
     "withdrawn": Sentence((
-        Count("deleted", "videos deleted", "video deleted"),
-        Count("deleted_scripts", "funscripts deleted", "funscript deleted"),
-        Count("failed", "could not be deleted"),
+        Count("deleted", "videos deleted", "video deleted", kind=DONE),
+        Count("deleted_scripts", "funscripts deleted", "funscript deleted", kind=DONE),
+        Count("failed", "could not be deleted", kind=WRONG),
     )),
     "metadata": Sentence((
-        Count("newly_scraped", "prompts read", "prompt read", even_at_zero=True),
-        Count("handed_over", "handed to Origenerator's gallery"),
-        Count("errors", "failed to read", even_at_zero=True),
+        Count("newly_scraped", "prompts read", "prompt read", even_at_zero=True, kind=DONE),
+        Count("handed_over", "handed to Origenerator's gallery", kind=DONE),
+        Count("errors", "failed to read", even_at_zero=True, kind=WRONG),
         Count("already_scraped", "already read"),
         Count("skipped_failed", "failed before and not tried again"),
         Count("no_scrape_strat", "from a site Evolver cannot read prompts from"),
     )),
     "sort": Sentence((
-        Count("moved", "moved into 1_sorted"),
-        Count("made_again", "made again and put in place of the old copy"),
-        Count("deleted_collisions", "already in 1_sorted and deleted from 0_inbox"),
+        Count("moved", "moved into 1_sorted", kind=DONE),
+        Count("made_again", "made again and put in place of the old copy", kind=DONE),
+        Count("deleted_collisions", "already in 1_sorted and deleted from 0_inbox", kind=DONE),
         Count("skipped_unknown", f"left in 0_inbox because they are neither {_NEITHER}",
-              f"left in 0_inbox because it is neither {_NEITHER}"),
+              f"left in 0_inbox because it is neither {_NEITHER}", kind=WRONG),
     )),
     "origenerator_downtime": Sentence((
         Text("did"),
-        Flag("holds_the_graphics_card", "a LoRA is training on the graphics card"),
+        Flag("holds_the_graphics_card", "a LoRA is training on the graphics card", kind=FOUND),
         Flag("failed", "Evolver could not ask Origenerator what to do while it is closed"),
     )),
     "upscale": Sentence((
-        Count("processed", "enhanced"),
-        Count("failed", "failed"),
+        Count("processed", "enhanced", kind=DONE),
+        Count("failed", "failed", kind=WRONG),
         Count("stopped_at_budget", "left for the next run because this run's time for "
                                    "enhancing was up"),
         Count("pending_after_run", "still waiting to be enhanced"),
-        Flag("deferred_low_disk", "held back: low disk"),
+        Flag("deferred_low_disk", "held back because the disk is nearly full"),
     )),
     "genau_deliver": Sentence((
-        Count("delivered", "delivered to Genau's folder"),
-        Count("failed", "failed"),
+        Count("delivered", "delivered to Genau's folder", kind=DONE),
+        Count("failed", "failed", kind=WRONG),
     )),
     "funscript_drafts": Sentence((
-        Count("made", "funscripts made", "funscript made"),
-        Count("started", "videos sent to GoblinScript", "video sent to GoblinScript"),
+        Count("made", "funscripts made", "funscript made", kind=DONE),
+        Count("started", "videos sent to GoblinScript", "video sent to GoblinScript", kind=DONE),
         Count("waiting", "videos still waiting for a funscript", "video still waiting for a funscript"),
         Count("nothing_usable", "videos GoblinScript made nothing usable for",
               "video GoblinScript made nothing usable for"),
-        Count("failed_batches", "times GoblinScript wrote nothing", "time GoblinScript wrote nothing"),
+        Count("failed_batches", "times GoblinScript wrote nothing", "time GoblinScript wrote nothing", kind=WRONG),
     )),
     "verify": Sentence((
         Count("sorted_count", "1_sorted videos", "1_sorted video", even_at_zero=True),
@@ -147,68 +174,68 @@ SENTENCES: dict[str, Sentence] = {
         Named("missing_flicks", "sent to Genau but missing from Genau's folder"),
     )),
     "watch_weights": Sentence((
-        Count("stamped", "weights saved", "weight saved"),
-        Count("favorites_added", "phone favorites added", "phone favorite added"),
-        Count("favorites_removed", "phone favorites removed", "phone favorite removed"),
+        Count("stamped", "weights saved", "weight saved", kind=DONE),
+        Count("favorites_added", "phone favorites added", "phone favorite added", kind=DONE),
+        Count("favorites_removed", "phone favorites removed", "phone favorite removed", kind=DONE),
         Count("unmapped", "Fun Time or Warm Gun records name no video here",
               "Fun Time or Warm Gun record names no video here"),
-        Count("write_errors", "could not be saved"),
+        Count("write_errors", "could not be saved", kind=WRONG),
         Flag("gallery_untold", "Origenerator's gallery could not be told"),
     )),
     "bookmarks": Sentence((
-        Count("synced", "bookmarks written", "bookmark written"),
+        Count("synced", "bookmarks written", "bookmark written", kind=DONE),
         Count("no_url", "favorites have no web page", "favorite has no web page"),
         Count("bad_url", "favorites have a page that is not a web address",
-              "favorite has a page that is not a web address"),
+              "favorite has a page that is not a web address", kind=WRONG),
         Flag("profile_missing", "Chrome profile not found"),
-        Text("write_error", "could not write the bookmarks: {}"),
+        Text("write_error", "could not write the bookmarks: {}", kind=WRONG),
         Flag("gallery_unread", "could not read Origenerator's gallery"),
     )),
     "clip_scripts": Sentence((
-        Count("written", "clips given a funscript", "clip given a funscript"),
+        Count("written", "clips given a funscript", "clip given a funscript", kind=DONE),
         Count("already_scripted", "clips already had one", "clip already had one"),
         Count("no_scene_script", "scenes have no funscript", "scene has no funscript"),
         Count("no_motion_in_window", "clips have no motion in their part of the scene",
               "clip has no motion in its part of the scene"),
-        Count("unprobeable", "clips could not be measured", "clip could not be measured"),
+        Count("unprobeable", "clips could not be measured", "clip could not be measured", kind=WRONG),
         Count("unmatched_clip", "clips' scenes not found", "clip's scene not found"),
     )),
     "scene_scripts": Sentence((
-        Count("written", "scenes given a funscript", "scene given a funscript"),
+        Count("written", "scenes given a funscript", "scene given a funscript", kind=DONE),
         Count("already_scripted", "scenes already had one", "scene already had one"),
         Count("no_clip_script", "clips have no funscript", "clip has no funscript"),
         Count("scene_gone", "scenes no longer in the library", "scene no longer in the library"),
-        Count("unprobeable", "scenes could not be measured", "scene could not be measured"),
+        Count("unprobeable", "scenes could not be measured", "scene could not be measured", kind=WRONG),
         Count("unmatched_clip", "clips' scenes not found", "clip's scene not found"),
     )),
     "group_non_ai": Sentence((
         Count("grouped", "videos", "video"),
         Count("families", "groups", "group"),
         Count("joined", "of the groups found by comparing frames"),
-        Count("measured", "videos compared this run", "video compared this run"),
-        Count("written", "sidecars written", "sidecar written"),
+        Count("measured", "videos compared this run", "video compared this run", kind=DONE),
+        Count("written", "sidecars written", "sidecar written", kind=DONE),
         Count("pruned", "sidecars removed because their video is gone",
-              "sidecar removed because its video is gone"),
+              "sidecar removed because its video is gone", kind=DONE),
     )),
     "title_non_ai": Sentence((
         Count("titled", "videos named", "video named"),
         Count("videos", "videos looked at", "video looked at"),
-        Count("written", "sidecars written", "sidecar written"),
+        Count("written", "sidecars written", "sidecar written", kind=DONE),
     )),
     "video_types": Sentence((
-        Count("recorded", "recorded"),
+        Count("recorded", "recorded", kind=DONE),
         Count("already", "already recorded"),
-        Count("skipped", "could not be measured"),
+        Count("skipped", "could not be measured", kind=WRONG),
         Count("deferred", "left for the next run"),
     )),
     "provenance": Sentence((
-        Count("from_notes", "read from Topaz's note"),
-        Count("unknown", "marked unknown"),
+        Count("from_notes", "read from Topaz's note", kind=DONE),
+        Count("unknown", "marked unknown", kind=DONE),
         Count("already", "already recorded"),
         Count("deferred", "left for the next run"),
     )),
     "labels": Sentence((
-        Count("copied", "videos given their actions", "video given its actions"),
+        Count("copied", "videos given their actions", "video given its actions", kind=DONE),
         Count("already", "already had them"),
     )),
     "dupes": Sentence((
@@ -217,16 +244,16 @@ SENTENCES: dict[str, Sentence] = {
                "group of videos with the same size"),
     )),
     "pcloud_stuck": Sentence((
-        Count("deleted_in_cloud", "deletions finished in the cloud", "deletion finished in the cloud"),
+        Count("deleted_in_cloud", "deletions finished in the cloud", "deletion finished in the cloud", kind=DONE),
         Count("dropped", "changes with nothing left to do taken off pCloud's list",
-              "change with nothing left to do taken off pCloud's list"),
-        Count("retried", "uploads tried again", "upload tried again"),
+              "change with nothing left to do taken off pCloud's list", kind=DONE),
+        Count("retried", "uploads tried again", "upload tried again", kind=DONE),
         Count("left", "changes left for a look", "change left for a look"),
     )),
 }
 
 SKIP_REASONS: dict[str, str] = {
-    "no_pending_work": "nothing is waiting to be enhanced",
+    "no_pending_work": NOTHING_TO_DO,
     "origenerator_training":
         "waited while a LoRA started with Origenerator's Train button trained on the graphics card",
     "topaz_busy": "waited while Topaz enhanced a video Evolver did not start",
@@ -275,8 +302,8 @@ _SCRIPTS_ROUTINE = (
     ("followed_to_archive", "followed a retired video out of the library"),
     ("followed_renames", "followed a video renamed by hand"),
     ("discarded_duplicates", "duplicate discarded"),
-    ("already_aligned", "already aligned"),
 )
+_SCRIPTS_ALREADY_ALIGNED = ("already_aligned", "already aligned")
 _SCRIPTS_NAMES_SHOWN = 3
 
 
@@ -287,10 +314,16 @@ def _summarize_scripts_sync(result: dict[str, Any]) -> str:
     unreachable = " and ".join(result.get("unreachable") or [])
     not_checked = ([f"{result['not_checked']} not checked: {unreachable} cannot be reached"]
                    if result.get("not_checked") else [])
-    routine = [] if problems else [f"{result[key]} {label}" for key, label in _SCRIPTS_ROUTINE
-                                   if isinstance(result.get(key), int) and result[key]]
+    routine = [] if problems else _counted(result, (*_SCRIPTS_ROUTINE, _SCRIPTS_ALREADY_ALIGNED))
+    if not (problems or not_checked or _counted(result, _SCRIPTS_ROUTINE)):
+        return nothing_to_do(routine or ["no funscripts"])
     said = problems + not_checked + ([", ".join(routine)] if routine else [])
-    return "; ".join(said) if said else "no funscripts"
+    return "; ".join(said)
+
+
+def _counted(result: dict[str, Any], labeled: tuple[tuple[str, str], ...]) -> list[str]:
+    return [f"{result[key]} {label}" for key, label in labeled
+            if isinstance(result.get(key), int) and result[key]]
 
 
 def _naming(said: str, names: list[str]) -> str:
@@ -320,9 +353,14 @@ def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
     if result.get("failed"):
         parts.append(f"failed {result['failed']}")
     if result.get("deferred_low_disk"):
-        parts.append("held back: low disk")
+        parts.append("held back because the disk is nearly full")
     elif result.get("start_deferred") and not result.get("in_flight"):
-        parts.append(f"waiting ({result['start_deferred']})")
+        waiting = f"waiting ({result['start_deferred']})"
+        if not parts:
+            return nothing_to_do([waiting, _whats_left(result)])
+        parts.append(waiting)
+    if not parts:
+        return nothing_to_do([_whats_left(result)])
     parts.append(_whats_left(result))
     return ", ".join(parts)
 
@@ -335,7 +373,7 @@ def _whats_left(result: dict[str, Any]) -> str:
     hours = (result.get("remaining_seconds") or 0.0) / 3600
     unmeasured = result.get("unmeasured_videos") or 0
     missing = f", {unmeasured} not yet measured" if unmeasured else ""
-    return f"{left} ({hours:.1f}h left, {percent}% done{missing})"
+    return f"{left}, {hours:.1f}h left, {percent}% done{missing}"
 
 
 def _encode_state(result: dict[str, Any]) -> str:

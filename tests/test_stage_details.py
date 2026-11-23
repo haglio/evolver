@@ -152,6 +152,35 @@ def test_a_stage_that_found_no_work_says_so():
         NOTHING_TO_DO)
 
 
+def test_a_stage_that_did_nothing_says_so_first_and_what_it_found_in_parentheses():
+    said = details_of({"newly_scraped": 0, "handed_over": 0, "errors": 0, "already_scraped": 1064,
+                       "skipped_failed": 0, "no_scrape_strat": 528}, None, "metadata")
+
+    assert said == "nothing to do (1064 already read, 528 from a site Evolver cannot read prompts from)"
+
+
+def test_a_scripts_sync_that_moved_nothing_says_so_first():
+    assert details_of({"already_aligned": 4174}, None, "scripts") == "nothing to do (4174 already aligned)"
+
+
+def test_a_stage_that_did_something_is_not_said_to_have_had_nothing_to_do():
+    said = details_of({"written": 2, "already_scripted": 98}, None, "clip_scripts")
+
+    assert said == "2 clips given a funscript, 98 clips already had one"
+
+
+def test_a_stage_whose_work_failed_is_not_said_to_have_had_nothing_to_do():
+    said = details_of({"deleted": 0, "deleted_scripts": 0, "failed": 3}, None, "withdrawn")
+
+    assert said == "3 could not be deleted"
+
+
+def test_every_part_of_a_sentence_says_whether_it_is_work_done_a_fault_or_a_finding():
+    kinds = {part.kind for sentence in SENTENCES.values() for part in sentence.parts}
+
+    assert kinds <= {stage_details.DONE, stage_details.WRONG, stage_details.FOUND}
+
+
 def test_prompts_read_and_failures_are_shown_even_at_zero():
     said = details_of({"newly_scraped": 0, "errors": 58, "already_scraped": 0}, None, "metadata")
 
