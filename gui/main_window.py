@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QFontMetrics, QIcon
+from PySide6.QtGui import QBrush, QIcon
 from PySide6.QtWidgets import (
     QHeaderView,
     QItemDelegate,
@@ -155,7 +155,7 @@ class RunDetailWidget(QWidget):
             item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             self._table.setItem(i, column, item)
         self._table.setSpan(i, 1, 1, self._table.columnCount() - 1)
-        self._table.setRowHeight(i, QFontMetrics(font).height() + GAP_DIALOG)
+        self._table.setRowHeight(i, self._table.verticalHeader().defaultSectionSize() + GAP_DIALOG)
 
     def _show_stage(self, i: int, stage: dict):
         stage_key = stage.get("name", "")
