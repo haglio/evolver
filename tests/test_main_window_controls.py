@@ -27,6 +27,16 @@ from tasks.scripts_sync import ScriptsSyncResult
 from tests.gui_support import QAPP, build_evolver_app
 from tests.temp_helpers import make_run_record, override_config
 
+
+def _column_of_names(widget) -> list[str]:
+    table = widget._table
+    return [table.item(row, 1).text() for row in range(table.rowCount())]
+
+
+def _row_of(widget, shown_as: str) -> int:
+    return _column_of_names(widget).index(shown_as)
+
+
 _A_ZONE_PINNED_AGAINST_THE_COMPUTERS_OWN = ZoneInfo("America/Los_Angeles")
 
 class TestRunDetailRendering:
@@ -43,10 +53,7 @@ class TestRunDetailRendering:
         )
 
     def _row_details(self, widget, shown_as):
-        for row in range(widget._table.rowCount()):
-            if widget._table.item(row, 1).text() == shown_as:
-                return widget._table.item(row, 4).text()
-        return None
+        return widget._table.item(_row_of(widget, shown_as), 4).text()
 
     def test_metadata_row_shows_scraped_and_errors(self):
         widget = RunDetailWidget()
@@ -58,8 +65,38 @@ class TestRunDetailRendering:
         widget = RunDetailWidget()
         widget.show_record(self._record())
 
-        assert widget._table.item(0, 1).text() == STAGE_LABELS["metadata"]
-        assert widget._table.item(0, 1).toolTip() == STAGE_TOOLTIPS["metadata"]
+        row = _row_of(widget, STAGE_LABELS["metadata"])
+        assert widget._table.item(row, 1).toolTip() == STAGE_TOOLTIPS["metadata"]
+
+    def test_each_section_heading_sits_above_its_stages_in_the_order_they_run(self):
+        widget = RunDetailWidget()
+        widget.show_record(make_run_record(stages=[
+            {"name": "metadata", "status": "completed", "duration_seconds": 1.0},
+            {"name": "strays", "status": "completed", "duration_seconds": 1.0},
+        ]))
+
+        assert _column_of_names(widget) == [
+            "Clean up", "Handle stray files", "AI videos", "Transfer prompts"]
+
+    def test_a_heading_spans_the_row_with_no_number_status_or_time(self):
+        widget = RunDetailWidget()
+        widget.show_record(make_run_record(stages=[
+            {"name": "strays", "status": "completed", "duration_seconds": 1.0}]))
+
+        table = widget._table
+        assert table.item(0, 1).font().bold()
+        assert table.columnSpan(0, 1) == table.columnCount() - 1
+        assert table.item(0, 0) is None or table.item(0, 0).text() == ""
+        assert not table.item(0, 1).flags() & Qt.ItemFlag.ItemIsSelectable
+
+    def test_a_stage_since_taken_out_comes_last_under_no_heading(self):
+        widget = RunDetailWidget()
+        widget.show_record(make_run_record(stages=[
+            {"name": "purge", "status": "completed", "duration_seconds": 1.0},
+            {"name": "strays", "status": "completed", "duration_seconds": 1.0},
+        ]))
+
+        assert _column_of_names(widget) == ["Clean up", "Handle stray files", "Purge Trash"]
 
     def test_a_stage_since_taken_out_shows_the_name_it_last_had(self):
         widget = RunDetailWidget()
@@ -156,7 +193,7 @@ class TestStageStatusColumn:
         # Held on self: Qt deletes the table's C++ items with a widget collected as a local.
         self.widget = RunDetailWidget()
         self.widget.show_record(record)
-        return self.widget._table.item(0, 2)
+        return self.widget._table.item(_row_of(self.widget, STAGE_LABELS["upscale_non_ai"]), 2)
 
     def test_a_completed_stage_shows_a_green_check(self):
         cell = self._status_cell("completed")

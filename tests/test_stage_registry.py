@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtGui import QColor
 
-from evolver import ALL_STAGES, STAGE_LABELS, STAGES, TAKEN_OUT_STAGE_LABELS
+from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS, STAGES, TAKEN_OUT_STAGE_LABELS
 from gui import stage_details
 from gui.stats_window import STAGE_COLORS
 from tasks.clip_scripts import ClipScriptsResult
@@ -139,11 +139,37 @@ class TestStageRegistry(unittest.TestCase):
     def test_the_phones_favorites_are_marked_before_bookmarks_reads_the_marks(self):
         assert ALL_STAGES.index("watch_weights") < ALL_STAGES.index("bookmarks")
 
+    def test_the_run_goes_through_the_sections_in_order_each_stage_in_one(self):
+        assert tuple(stage for section in SECTIONS for stage in section.stages) == STAGES
+
+    def test_the_sections_are_headed_as_he_chose(self):
+        assert [section.heading for section in SECTIONS] == [
+            "Clean up", "AI videos", "Funscripts", "Non-AI video records", "Favorites and weights", "pCloud"]
+
+    def test_origenerator_downtime_comes_before_every_stage_that_waits_on_its_training(self):
+        assert _place("origenerator_downtime") < min(_place("upscale"), _place("funscript_drafts")), (
+            "both enhancing and the funscript drafts read whether Origenerator is training a LoRA "
+            "from what the downtime stage found this run")
+
+    def test_the_sort_comes_before_enhancing(self):
+        assert _place("sort") < _place("upscale"), "enhancing takes the videos sorted this run first"
+
+    def test_the_correspondence_check_comes_after_enhancing(self):
+        assert _place("verify") > _place("upscale"), (
+            "the check is skipped while enhancing left videos waiting, which it reads off this run")
+
+    def test_the_funscript_drafts_come_before_the_sync_that_shares_them(self):
+        assert _place("funscript_drafts") < _place("scripts"), (
+            "a Kino video's draft reaches its 1_sorted video through Scripts sync")
+
     def test_the_readme_enumerates_the_stages_the_registry_declares(self):
         readme = Path(PROJECT_ROOT, "README.md").read_text(encoding="utf-8")
-        listed = re.findall(r"^\d+\. \*\*(.+?)\*\*", readme, re.MULTILINE)
+        stage_list = readme.split("The order above is the order they run in")[0]
+        listed = re.findall(r"^(?:### (.+)|\d+\. \*\*(.+?)\*\*)", stage_list, re.MULTILINE)
 
-        assert listed == [STAGE_LABELS[key] for key in ALL_STAGES]
+        assert [heading or label for heading, label in listed] == [
+            line for section in SECTIONS
+            for line in (section.heading, *(stage.label for stage in section.stages))]
 
     @pytest.mark.repo_check
     def test_nothing_writes_a_stage_number_of_its_own(self):

@@ -31,7 +31,7 @@ from shared_ui.spacing import (
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
-from evolver import STAGE_NUMBER, STAGE_TOOLTIPS, stage_label
+from evolver import STAGE_NUMBER, STAGE_SECTION, STAGE_TOOLTIPS, stage_label
 from gui.commands import (
     NONAI,
     PAUSE,
@@ -72,6 +72,19 @@ class _NoFocusRectDelegate(QItemDelegate):
 
 _NO_RUN_PICKED = "Select a run to view details"
 _WHAT_LOGS_OPENS = "Show what this run wrote to the log"
+
+
+def _under_their_headings(stages: list[dict]) -> list[str | dict]:
+    taken_out_last = len(STAGE_NUMBER) + 1
+    rows: list[str | dict] = []
+    heading = None
+    for stage in sorted(stages, key=lambda stage: STAGE_NUMBER.get(stage.get("name", ""), taken_out_last)):
+        stage_heading = STAGE_SECTION.get(stage.get("name", ""))
+        if stage_heading is not None and stage_heading != heading:
+            rows.append(stage_heading)
+        heading = stage_heading
+        rows.append(stage)
+    return rows
 
 
 class RunDetailWidget(QWidget):
@@ -119,39 +132,57 @@ class RunDetailWidget(QWidget):
         )
         self._run_line.setToolTip(record.status)
 
-        self._table.setRowCount(len(record.stages))
-        for i, stage in enumerate(record.stages):
-            stage_key = stage.get("name", "")
+        self._table.clearSpans()
+        self._table.clearContents()
+        rows = _under_their_headings(record.stages)
+        self._table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            if isinstance(row, str):
+                self._show_heading(i, row)
+            else:
+                self._show_stage(i, row)
 
-            no_edit = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+    def _show_heading(self, i: int, heading: str):
+        item = QTableWidgetItem(heading)
+        font = item.font()
+        font.setBold(True)
+        item.setFont(font)
+        item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        self._table.setItem(i, 1, item)
+        self._table.setSpan(i, 1, 1, self._table.columnCount() - 1)
 
-            num = STAGE_NUMBER.get(stage_key)
-            num_item = QTableWidgetItem("\u2014" if num is None else str(num))
-            num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            num_item.setForeground(GRAY)
-            num_item.setFlags(no_edit)
-            self._table.setItem(i, 0, num_item)
+    def _show_stage(self, i: int, stage: dict):
+        stage_key = stage.get("name", "")
 
-            name_item = QTableWidgetItem(stage_label(stage_key))
-            name_item.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
-            name_item.setFlags(no_edit)
-            self._table.setItem(i, 1, name_item)
+        no_edit = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 
-            status = stage.get("status", "")
-            status_item = QTableWidgetItem()
-            status_item.setIcon(status_icon(status))
-            status_item.setToolTip(status)
-            status_item.setFlags(no_edit)
-            self._table.setItem(i, 2, status_item)
+        num = STAGE_NUMBER.get(stage_key)
+        num_item = QTableWidgetItem("\u2014" if num is None else str(num))
+        num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        num_item.setForeground(GRAY)
+        num_item.setFlags(no_edit)
+        self._table.setItem(i, 0, num_item)
 
-            duration = stage.get("duration_seconds", 0.0)
-            dur_item = QTableWidgetItem(f"{duration:.1f}s")
-            dur_item.setFlags(no_edit)
-            self._table.setItem(i, 3, dur_item)
+        name_item = QTableWidgetItem(stage_label(stage_key))
+        name_item.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
+        name_item.setFlags(no_edit)
+        self._table.setItem(i, 1, name_item)
 
-            details = details_of(stage.get("result"), stage.get("skip_reason"), stage_key)
-            details_item = QTableWidgetItem(details)
-            self._table.setItem(i, 4, details_item)
+        status = stage.get("status", "")
+        status_item = QTableWidgetItem()
+        status_item.setIcon(status_icon(status))
+        status_item.setToolTip(status)
+        status_item.setFlags(no_edit)
+        self._table.setItem(i, 2, status_item)
+
+        duration = stage.get("duration_seconds", 0.0)
+        dur_item = QTableWidgetItem(f"{duration:.1f}s")
+        dur_item.setFlags(no_edit)
+        self._table.setItem(i, 3, dur_item)
+
+        details = details_of(stage.get("result"), stage.get("skip_reason"), stage_key)
+        details_item = QTableWidgetItem(details)
+        self._table.setItem(i, 4, details_item)
 
     def clear(self):
         self._record = None

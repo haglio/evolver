@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtWidgets import QLabel, QMainWindow, QProgressBar
 
-from evolver import ALL_STAGES, STAGE_LABELS
+from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS
 from gui.progress_popup import BAR_WIDTH, ProgressPopup, _caption_width
 
 
@@ -21,6 +21,21 @@ class TestPopupConstruction(unittest.TestCase):
 
     def test_has_a_bar_per_pipeline_stage(self):
         assert len(self.popup._bars) == len(ALL_STAGES)
+
+    def test_each_section_heading_sits_bold_above_its_stages_in_the_order_they_run(self):
+        layout = self.popup.layout()
+        lines = []
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            widget = item.widget() if item.widget() is not None else (
+                item.layout().itemAt(0).widget() if item.layout() is not None else None)
+            if isinstance(widget, QLabel):
+                lines.append((widget.text(), widget.font().bold()))
+        expected = [(line, bold) for section in SECTIONS
+                    for line, bold in ((section.heading, True),
+                                       *((stage.label, False) for stage in section.stages))]
+
+        assert lines[1:1 + len(expected)] == expected
 
     def test_every_row_is_captioned_with_the_stage_label(self):
         captions = {label.text() for label in self.popup.findChildren(QLabel)}
