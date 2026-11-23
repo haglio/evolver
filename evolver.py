@@ -189,7 +189,7 @@ SECTIONS: tuple[Section, ...] = (
         Stage("withdrawn", "Delete unsent videos",
               "When you press Unsend on a video in Origenerator, Origenerator only marks the video as taken "
               "back, so this stage deletes the copies Evolver made of it and the video stops playing in Kino "
-              "and Genau: its inbox copy, its 1_sorted copy, its enhanced copy and, for Genau, its "
+              "and Genau: its inbox copy, its `1_sorted` copy, its enhanced copy and, for Genau, its "
               f"{_FLICK}, with their funscripts. It also deletes a copy of a video saved without its audio "
               "once the same video with its audio has reached Kino or Genau, so the video plays only with "
               "its audio",
@@ -210,10 +210,10 @@ SECTIONS: tuple[Section, ...] = (
     )),
     Section("AI videos", (
         Stage("metadata", "Transfer prompts",
-              "Read the prompt each AI video in 1_sorted was made from and hand it to Origenerator's gallery once its enhanced video is in its folder",
+              "Read the prompt each AI video in `1_sorted` was made from and hand it to Origenerator's gallery once its enhanced video is in its folder",
               (0x14, 0x7D, 0x3C), run=lambda _: prompt_scrape.run()),
         Stage("sort", "Sort inbox",
-              "Move AI videos from 0_inbox into 1_sorted, filed by where they came from and by portrait or landscape",
+              "Move AI videos from `0_inbox` into `1_sorted`, filed by where they came from and by portrait or landscape",
               (0x38, 0x6A, 0x9C), run=lambda _: sort.run()),
         Stage("origenerator_downtime", "Origenerator downtime tasks",
               "While Origenerator is closed, start the work it leaves for then: the experiments and "
@@ -222,13 +222,13 @@ SECTIONS: tuple[Section, ...] = (
               "the graphics card",
               (0x30, 0xD0, 0x40), run=lambda _: origenerator_commands.run_downtime()),
         Stage("upscale", "Enhance AI videos",
-              "Make each AI video in 1_sorted into a 60fps video four times larger with Topaz, and put it in its Kino or Genau folder",
+              "Make each AI video in `1_sorted` into a 60fps video four times larger with Topaz, and put it in its Kino or Genau folder",
               (0xED, 0xC9, 0x48), run=_upscale),
         Stage("genau_deliver", "Genau delivery",
-              f"Finish each Genau-lane {_FLICK} that enhancing put in the folder Genau plays from: save its audio and retire the 1_sorted copy it was made from",
+              f"Finish each Genau-lane {_FLICK} that enhancing put in the folder Genau plays from: save its audio and retire the `1_sorted` copy it was made from",
               (0x7B, 0x41, 0x73), run=lambda _: genau_deliver.run()),
         Stage("verify", "Correspondence check",
-              "Verify every 1_sorted video has its enhanced video in its Kino or Genau folder, and no enhanced video is missing from either",
+              "Verify every `1_sorted` video has its enhanced video in its Kino or Genau folder, and no enhanced video is missing from either",
               (0xFF, 0x9D, 0x83), run=_verify),
         Stage("bookmarks", "Bookmarks sync",
               "Copy the web page of each favorite AI video from another site into a folder on Chrome's "
@@ -238,16 +238,16 @@ SECTIONS: tuple[Section, ...] = (
     )),
     Section("Non-AI videos", (
         Stage("upscale_non_ai", "Enhance non-AI videos",
-              "Enhance one 2D/non_AI video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
+              "Enhance one `2D/non_AI` video at a time with Topaz, to 60fps and toward 4K, while you are away from the computer and no AI videos are waiting, and pause it when you come back",
               (0x76, 0x67, 0x47), run=_upscale_non_ai),
         Stage("group_non_ai", "Group non-AI video versions",
-              "Work out which 2D/non_AI files are one video -- the original, its Topaz-enhanced versions and copies "
+              "Work out which `2D/non_AI` files are one video -- the original, its Topaz-enhanced versions and copies "
               "saved under another name, found by their file names and by comparing their frames -- and write "
               "that group on each file's sidecar, so Fun Time knows which files are versions of one video",
               (0x6F, 0xDB, 0x9A), run=lambda _: nonai_group.run(),
               moves_no_videos=True),
         Stage("title_non_ai", "Title non-AI videos",
-              "Record what to call each 2D/non_AI video -- the performer and movie its clip record names, carried to the whole scene that clip was cut out of -- so every app reads one name instead of working it out at launch",
+              "Record what to call each `2D/non_AI` video -- the performer and movie its clip record names, carried to the whole scene that clip was cut out of -- so every app reads one name instead of working it out at launch",
               (0xAA, 0x44, 0xCC), run=lambda _: nonai_titles.run(),
               moves_no_videos=True),
         Stage("video_types", "Set video kinds",
@@ -261,14 +261,14 @@ SECTIONS: tuple[Section, ...] = (
               (0xEE, 0x00, 0xBB), run=lambda _: provenance_sweep.run(),
               moves_no_videos=True),
         Stage("dupes", "Duplicate check",
-              "Find likely duplicate videos in the non_AI folder by their exact file size",
+              "Find likely duplicate videos in the `non_AI` folder by their exact file size",
               (0xCA, 0x94, 0xDB), run=lambda _: check_duplicate_sizes.run(show_popup=True),
               moves_no_videos=True),
     )),
     Section("Funscripts", (
         Stage("funscript_drafts", "Make funscripts",
               "Have GoblinScript draft a funscript for each video in the library that has none, newest first, "
-              "marked as a script no person wrote; a Kino video and the 1_sorted video it was made from "
+              "marked as a script no person wrote; a Kino video and the `1_sorted` video it was made from "
               "get one funscript between them through Scripts sync, so the two are never drafted twice",
               (0x00, 0x9E, 0xD8), run=_make_funscripts),
         Stage("clip_scripts", "Transfer scene funscripts to clips",

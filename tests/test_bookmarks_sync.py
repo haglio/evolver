@@ -119,7 +119,7 @@ class TestBookmarksSync(unittest.TestCase):
             result = self._sync(library, user_data_dir)
 
             assert result.ok
-            assert result.synced == 2
+            assert (result.added, result.removed) == (2, 1)
             assert result.no_url == 1
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
@@ -144,6 +144,18 @@ class TestBookmarksSync(unittest.TestCase):
             assert [(folder["name"], folder["guid"]) for folder in folders] == [("Fun Time Faves", "folder-guid")]
             assert [child["url"] for child in folders[0]["children"]] == ["https://example.com/a"]
 
+    def test_a_run_that_changes_nothing_adds_and_removes_no_bookmark(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            faves = SiteFavorites(library)
+            user_data_dir, _bookmarks_path = chrome_profile(root)
+            faves.add("scene one.mp4", "https://example.com/a")
+            self._sync(library, user_data_dir)
+
+            again = self._sync(library, user_data_dir)
+
+        assert (again.added, again.removed) == (0, 0)
+
     def test_a_video_no_longer_a_favorite_leaves_the_folder(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
@@ -154,12 +166,13 @@ class TestBookmarksSync(unittest.TestCase):
             self._sync(library, user_data_dir)
             faves.unstar(dropped)
 
-            self._sync(library, user_data_dir)
+            result = self._sync(library, user_data_dir)
 
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
             assert urls == ["https://example.com/keep"]
             assert kept.exists()
+        assert (result.added, result.removed) == (0, 1)
 
     def test_a_favorite_whose_video_is_gone_is_left_out(self):
         with workspace_temp_dir() as root:
@@ -171,7 +184,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            assert result.synced == 1
+            assert result.added == 1
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
             assert urls == ["https://example.com/keep"]
@@ -207,7 +220,7 @@ class TestBookmarksSync(unittest.TestCase):
             result = self._sync(library, user_data_dir)
 
             assert result.ok
-            assert result.synced == 2
+            assert result.added == 2
 
     def test_a_page_that_is_no_web_address_is_counted_and_left_out(self):
         with workspace_temp_dir() as root:
@@ -218,7 +231,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            assert (result.synced, result.bad_url) == (0, 1)
+            assert (result.added, result.bad_url) == (0, 1)
 
     def test_records_that_cannot_be_reached_leave_the_folder_as_it_was(self):
         with workspace_temp_dir() as root:
@@ -231,7 +244,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-            assert result.synced == 0
+            assert result.added == 0
             assert bookmarks_path.read_text(encoding="utf-8") == before
 
     def test_an_ai_video_starred_in_the_gallery_is_bookmarked_by_its_page_there(self):
@@ -252,7 +265,7 @@ class TestBookmarksSync(unittest.TestCase):
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
         assert urls == ["https://example.com/starred"]
-        assert result.synced == 1
+        assert result.added == 1
 
     def test_a_starred_video_origenerator_made_has_no_page_to_bookmark_and_is_not_counted(self):
         with workspace_temp_dir() as root:
@@ -266,7 +279,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-        assert (result.synced, result.no_url) == (0, 0)
+        assert (result.added, result.no_url) == (0, 0)
 
     def test_a_non_ai_favorite_has_no_page_to_bookmark_and_is_not_counted(self):
         with workspace_temp_dir() as root:
@@ -282,7 +295,7 @@ class TestBookmarksSync(unittest.TestCase):
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
         assert urls == ["https://example.com/site"]
-        assert (result.synced, result.no_url) == (1, 0)
+        assert (result.added, result.no_url) == (1, 0)
 
     def test_a_starred_ai_video_whose_file_is_gone_is_left_out(self):
         with workspace_temp_dir() as root:
@@ -295,7 +308,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-        assert (result.synced, result.no_url) == (0, 0)
+        assert (result.added, result.no_url) == (0, 0)
 
     def test_a_gallery_that_cannot_be_read_leaves_the_folder_as_it_was(self):
         with workspace_temp_dir() as root:
@@ -312,7 +325,7 @@ class TestBookmarksSync(unittest.TestCase):
             result = self._sync(library, user_data_dir)
 
             assert bookmarks_path.read_text(encoding="utf-8") == before
-        assert result.synced == 0
+        assert result.added == 0
 
     def test_run_reports_missing_profile(self):
         with workspace_temp_dir() as root:
@@ -351,7 +364,7 @@ class TestBookmarksSync(unittest.TestCase):
                 )
 
             assert result.ok
-            assert result.synced == 1
+            assert result.added == 1
             written = json.loads(given_bookmarks.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
             assert folder["name"] == "Given Folder"

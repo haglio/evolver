@@ -30,7 +30,8 @@ _FOLDER_FORMER_NAME = "Fun Time Favs"
 
 @dataclass
 class BookmarksSyncResult(StageResult):
-    synced: int = 0
+    added: int = 0
+    removed: int = 0
     no_url: int = 0
     bad_url: int = 0
     profile_missing: bool = False
@@ -95,7 +96,7 @@ def run(
     bookmarks_path = profile_dir / "Bookmarks"
     try:
         data = _load_bookmarks(bookmarks_path)
-        added = _upsert_folder(data, favorites.urls, bookmarks_folder_name)
+        result.added, result.removed = _upsert_folder(data, favorites.urls, bookmarks_folder_name)
         _atomic_write_json(bookmarks_path, data)
     except OSError as exc:
         result.write_error = str(exc)
@@ -106,10 +107,10 @@ def run(
         log.exception("Chrome bookmarks file is invalid: %s", bookmarks_path)
         return result
 
-    result.synced = added
     log.info(
-        "Bookmarks sync done. Synced: %d, No URL: %d, Bad URL: %d, Target: %s",
-        result.synced,
+        "Bookmarks sync done. Added: %d, Removed: %d, No URL: %d, Bad URL: %d, Target: %s",
+        result.added,
+        result.removed,
         result.no_url,
         result.bad_url,
         bookmarks_path,
@@ -204,7 +205,7 @@ def _new_root_folder(folder_id: str, name: str) -> dict:
     }
 
 
-def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> int:
+def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> tuple[int, int]:
     roots = data["roots"]
     bookmark_bar = roots[_BOOKMARKS_BAR_KEY]
     children = bookmark_bar.setdefault("children", [])
@@ -238,7 +239,8 @@ def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> int:
         folder["date_modified"] = now
 
     wanted = set(urls)
-    kept = [child.get("url") for child in folder.get("children", []) if child.get("url") in wanted]
+    had = [child.get("url") for child in folder.get("children", []) if child.get("type") == "url"]
+    kept = [url for url in had if url in wanted]
     folder["children"] = []
     for url in dict.fromkeys([*kept, *urls]):
         folder["children"].append(
@@ -255,7 +257,7 @@ def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> int:
         next_id += 1
 
     bookmark_bar["date_modified"] = now
-    return len(urls)
+    return len(wanted - set(kept)), len(set(had) - wanted)
 
 
 def _next_bookmark_id(data: dict) -> int:

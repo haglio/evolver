@@ -152,6 +152,17 @@ def test_an_upscale_that_has_a_funscript_is_left_alone(library, goblin_home, tmp
     assert (fake.started, result.started) == ([], 0)
 
 
+def test_the_videos_that_already_have_a_funscript_are_counted(library, goblin_home, tmp_path):
+    for name in ("video one_topaz.mp4", "video two_topaz.mp4"):
+        upscale = touch_video(library.kino_upscales / "portrait" / "example-source" / name)
+        touch_video(_script_for(library, upscale))
+    touch_video(library.kino_upscales / "portrait" / "example-source" / "video three_topaz.mp4")
+
+    result = _drafted(goblin_home, tmp_path, FakeGoblin())
+
+    assert (result.already_scripted, result.started) == (2, 1)
+
+
 def test_an_upscale_whose_sorted_source_has_a_funscript_waits_for_the_copy_of_that_one(
         library, goblin_home, tmp_path):
     touch_video(library.kino_upscales / "portrait" / "example-source" / "video one_topaz.mp4")

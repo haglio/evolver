@@ -74,13 +74,13 @@ def _log_result(result: DuplicateSizesResult, non_ai_root: Path) -> None:
 
 def _popup_message(result: DuplicateSizesResult) -> str:
     lines = [
-        "Evolver found likely duplicate videos in non_AI.",
+        "Evolver found likely duplicate videos in `non_AI`.",
         "These files have the same exact filesize but different filenames.",
         "",
         "Check the log for full details:",
         str(config.LOG_FILE),
         "",
-        f"non_AI files scanned: {result.scanned_count}",
+        f"`non_AI` files scanned: {result.scanned_count}",
         f"Duplicate-size groups found: {len(result.duplicate_groups)}",
     ]
 

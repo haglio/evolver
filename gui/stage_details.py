@@ -128,14 +128,14 @@ SENTENCES: dict[str, Sentence] = {
         Count("errors", "failed to read", even_at_zero=True, kind=WRONG),
         Count("already_scraped", "already read"),
         Count("skipped_failed", "failed before and not tried again"),
-        Count("no_scrape_strat", "from a site Evolver cannot read prompts from"),
+        Count("no_scrape_strat", "from a site Evolver hasn't been taught how to read prompts from yet"),
     )),
     "sort": Sentence((
-        Count("moved", "moved into 1_sorted", kind=DONE),
+        Count("moved", "moved into `1_sorted`", kind=DONE),
         Count("made_again", "made again and put in place of the old copy", kind=DONE),
-        Count("deleted_collisions", "already in 1_sorted and deleted from 0_inbox", kind=DONE),
-        Count("skipped_unknown", f"left in 0_inbox because they are neither {_NEITHER}",
-              f"left in 0_inbox because it is neither {_NEITHER}", kind=WRONG),
+        Count("deleted_collisions", "already in `1_sorted` and deleted from `0_inbox`", kind=DONE),
+        Count("skipped_unknown", f"left in `0_inbox` because they are neither {_NEITHER}",
+              f"left in `0_inbox` because it is neither {_NEITHER}", kind=WRONG),
     )),
     "origenerator_downtime": Sentence((
         Text("did"),
@@ -161,14 +161,15 @@ SENTENCES: dict[str, Sentence] = {
         Count("nothing_usable", "videos GoblinScript made nothing usable for",
               "video GoblinScript made nothing usable for"),
         Count("failed_batches", "times GoblinScript wrote nothing", "time GoblinScript wrote nothing", kind=WRONG),
+        Count("already_scripted", "videos already have a funscript", "video already has a funscript"),
     )),
     "verify": Sentence((
-        Count("sorted_count", "1_sorted videos", "1_sorted video", even_at_zero=True),
+        Count("sorted_count", "`1_sorted` videos", "`1_sorted` video", even_at_zero=True),
         Count("upscale_count", "enhanced videos", "enhanced video", even_at_zero=True),
-        Named("orphan_upscales", "enhanced videos without their 1_sorted video",
-              "enhanced video without its 1_sorted video"),
-        Named("orphan_sorted", "1_sorted videos without their enhanced video",
-              "1_sorted video without its enhanced video"),
+        Named("orphan_upscales", "enhanced videos without their `1_sorted` video",
+              "enhanced video without its `1_sorted` video"),
+        Named("orphan_sorted", "`1_sorted` videos without their enhanced video",
+              "`1_sorted` video without its enhanced video"),
         Named("duplicates", "enhanced video names in more than one place",
               "enhanced video name in more than one place"),
         Named("missing_flicks", "sent to Genau but missing from Genau's folder"),
@@ -183,7 +184,8 @@ SENTENCES: dict[str, Sentence] = {
         Flag("gallery_untold", "Origenerator's gallery could not be told"),
     )),
     "bookmarks": Sentence((
-        Count("synced", "bookmarks written", "bookmark written", kind=DONE),
+        Count("added", "bookmarks added", "bookmark added", kind=DONE),
+        Count("removed", "bookmarks removed", "bookmark removed", kind=DONE),
         Count("no_url", "favorites have no web page", "favorite has no web page"),
         Count("bad_url", "favorites have a page that is not a web address",
               "favorite has a page that is not a web address", kind=WRONG),
@@ -353,7 +355,10 @@ def _summarize_nonai_upscale(result: dict[str, Any]) -> str:
     if result.get("failed"):
         parts.append(f"failed {result['failed']}")
     if result.get("deferred_low_disk"):
-        parts.append("held back because the disk is nearly full")
+        held_back = "held back because the disk is nearly full"
+        if not parts:
+            return f"{held_back} ({_whats_left(result)})"
+        parts.append(held_back)
     elif result.get("start_deferred") and not result.get("in_flight"):
         waiting = f"waiting ({result['start_deferred']})"
         if not parts:

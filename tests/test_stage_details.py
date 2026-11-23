@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import re
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,7 @@ import pytest
 import evolver
 from check_correspondence import CorrespondenceResult
 from check_duplicate_sizes import DuplicateSizesResult
-from evolver import ALL_STAGES
+from evolver import ALL_STAGES, STAGE_TOOLTIPS
 from gui import stage_details
 from gui.stage_details import NOTHING_TO_DO, SENTENCES, SKIP_REASONS, Sentence, details_of
 from tasks import funscript_drafts
@@ -139,7 +140,7 @@ def test_counts_read_as_a_sentence_and_a_zero_is_left_out():
     said = details_of({"moved": 3, "made_again": 0, "deleted_collisions": 1,
                        "skipped_unknown": 0, "moved_files": ["a.mp4"]}, None, "sort")
 
-    assert said == "3 moved into 1_sorted, 1 already in 1_sorted and deleted from 0_inbox"
+    assert said == "3 moved into `1_sorted`, 1 already in `1_sorted` and deleted from `0_inbox`"
 
 
 def test_one_of_a_thing_is_said_in_the_singular():
@@ -156,7 +157,7 @@ def test_a_stage_that_did_nothing_says_so_first_and_what_it_found_in_parentheses
     said = details_of({"newly_scraped": 0, "handed_over": 0, "errors": 0, "already_scraped": 1064,
                        "skipped_failed": 0, "no_scrape_strat": 528}, None, "metadata")
 
-    assert said == "nothing to do (1064 already read, 528 from a site Evolver cannot read prompts from)"
+    assert said == "nothing to do (1064 already read, 528 from a site Evolver hasn't been taught how to read prompts from yet)"
 
 
 def test_a_scripts_sync_that_moved_nothing_says_so_first():
@@ -194,7 +195,7 @@ def test_the_correspondence_check_names_what_does_not_match():
                        "orphan_upscales": [], "duplicates": {}, "missing_flicks": []},
                       None, "verify")
 
-    assert said == ("412 1_sorted videos, 411 enhanced videos, 1 1_sorted video without its "
+    assert said == ("412 `1_sorted` videos, 411 enhanced videos, 1 `1_sorted` video without its "
                     "enhanced video (Example Studio/portrait/video one.mp4)")
 
 
@@ -230,3 +231,20 @@ def test_no_count_is_shown_as_the_codes_name_for_it():
 def test_a_stage_since_taken_out_still_reads_as_a_sentence_in_older_runs():
     assert details_of({"copied": 2, "already": 40}, None, "labels") == (
         "2 videos given their actions, 40 already had them")
+
+
+_FOLDER_NAMES = re.compile(r"\b(?:0_inbox|1_sorted|non_AI)\b")
+
+
+def _words_on_screen() -> list[str]:
+    words = [*STAGE_TOOLTIPS.values(), *SKIP_REASONS.values()]
+    for sentence in SENTENCES.values():
+        for part in sentence.parts:
+            words += [value for name in ("many", "one", "words")
+                      if isinstance(value := getattr(part, name, None), str)]
+    return words
+
+
+@pytest.mark.parametrize("words", _words_on_screen())
+def test_a_folder_name_on_screen_is_written_in_backticks(words):
+    assert not _FOLDER_NAMES.search(re.sub(r"`[^`]*`", "", words))
