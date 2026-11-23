@@ -89,6 +89,17 @@ class TestRunDetailRendering:
         assert table.item(0, 0) is None or table.item(0, 0).text() == ""
         assert not table.item(0, 1).flags() & Qt.ItemFlag.ItemIsSelectable
 
+    def test_a_heading_stands_apart_from_its_stages_in_a_larger_font_on_a_band_of_its_own(self):
+        widget = RunDetailWidget()
+        widget.show_record(make_run_record(stages=[
+            {"name": "strays", "status": "completed", "duration_seconds": 1.0}]))
+
+        table = widget._table
+        heading, stage = table.item(0, 1), table.item(1, 1)
+        assert heading.font().pointSizeF() > stage.font().pointSizeF()
+        assert heading.background().style() != Qt.BrushStyle.NoBrush
+        assert table.rowHeight(0) > table.rowHeight(1)
+
     def test_a_stage_since_taken_out_comes_last_under_no_heading(self):
         widget = RunDetailWidget()
         widget.show_record(make_run_record(stages=[

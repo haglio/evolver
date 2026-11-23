@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QBrush, QFontMetrics, QIcon
 from PySide6.QtWidgets import (
     QHeaderView,
     QItemDelegate,
@@ -18,13 +18,16 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shared_ui import colors
 from shared_ui.chrome import toolbar_rules
 from shared_ui.flow_layout import FlowLayout
+from shared_ui.fonts import SIZE_BODY, make_font
 from shared_ui.icons import inline_icon
 from shared_ui.spacing import (
     BUTTON_GAP,
     BUTTON_GROUP_GAP,
     BUTTON_ROW_GAP,
+    GAP_DIALOG,
     GAP_SMALL,
     MARGIN_STANDARD,
 )
@@ -143,16 +146,20 @@ class RunDetailWidget(QWidget):
                 self._show_stage(i, row)
 
     def _show_heading(self, i: int, heading: str):
-        item = QTableWidgetItem(heading)
-        font = item.font()
-        font.setBold(True)
-        item.setFont(font)
-        item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-        self._table.setItem(i, 1, item)
+        font = make_font(size=SIZE_BODY, bold=True)
+        band = QBrush(colors.BG_TERTIARY)
+        for column in range(self._table.columnCount()):
+            item = QTableWidgetItem(heading if column == 1 else "")
+            item.setFont(font)
+            item.setBackground(band)
+            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            self._table.setItem(i, column, item)
         self._table.setSpan(i, 1, 1, self._table.columnCount() - 1)
+        self._table.setRowHeight(i, QFontMetrics(font).height() + GAP_DIALOG)
 
     def _show_stage(self, i: int, stage: dict):
         stage_key = stage.get("name", "")
+        self._table.setRowHeight(i, self._table.verticalHeader().defaultSectionSize())
 
         no_edit = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
 

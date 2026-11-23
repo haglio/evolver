@@ -10,8 +10,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.fonts import SIZE_BODY
-from shared_ui.spacing import MARGIN_DIALOG
+from shared_ui.fonts import SIZE_BODY, make_font
+from shared_ui.spacing import GAP_DIALOG, MARGIN_DIALOG
 
 from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS
 
@@ -26,10 +26,15 @@ def _caption_width(font) -> int:
 
 def _heading(text: str) -> QLabel:
     heading = QLabel(text)
-    font = heading.font()
-    font.setBold(True)
-    heading.setFont(font)
+    heading.setFont(make_font(size=SIZE_BODY, bold=True))
     return heading
+
+
+def _line() -> QFrame:
+    line = QFrame()
+    line.setFrameShape(QFrame.Shape.HLine)
+    line.setFrameShadow(QFrame.Shadow.Sunken)
+    return line
 
 
 class ProgressPopup(QWidget):
@@ -51,8 +56,11 @@ class ProgressPopup(QWidget):
         self._stage_values: dict[str, int] = {}
 
         caption_width = _caption_width(self.font())
-        for section in SECTIONS:
+        for number, section in enumerate(SECTIONS):
+            if number:
+                layout.addSpacing(GAP_DIALOG)
             layout.addWidget(_heading(section.heading))
+            layout.addWidget(_line())
             for key in (stage.key for stage in section.stages):
                 row_layout = QHBoxLayout()
                 label = QLabel(STAGE_LABELS[key])
@@ -71,10 +79,7 @@ class ProgressPopup(QWidget):
                 self._bars[key] = bar
                 self._stage_values[key] = 0
 
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(separator)
+        layout.addWidget(_line())
 
         total_layout = QHBoxLayout()
         total_label = QLabel("Total")
