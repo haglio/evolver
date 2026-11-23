@@ -6,6 +6,7 @@ import os
 import shutil
 import sqlite3
 import subprocess
+import time
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, closing, contextmanager
 from dataclasses import dataclass
@@ -166,6 +167,7 @@ class TheApp(Protocol):
 class Pcloud:
     _EXE = Path(r"C:\Program Files\pCloud Drive\pCloud.exe")
     _IMAGE = "pCloud.exe"
+    _DRIVE_WAIT_S = 60.0
 
     @contextmanager
     def stopped(self) -> Iterator[None]:
@@ -179,6 +181,16 @@ class Pcloud:
             yield
         finally:
             subprocess.Popen(["explorer.exe", str(self._EXE)], **hidden_subprocess_kwargs())
+            self._wait_for_its_drive()
+
+    def _wait_for_its_drive(self) -> None:
+        deadline = time.monotonic() + self._DRIVE_WAIT_S
+        while _pclouds_drive() is None:
+            if time.monotonic() > deadline:
+                log.warning("pCloud's drive was not back %d seconds after pCloud was started again",
+                            self._DRIVE_WAIT_S)
+                return
+            time.sleep(0.5)
 
     def _pid(self) -> int | None:
         return next((process.pid for process in processes.running()
