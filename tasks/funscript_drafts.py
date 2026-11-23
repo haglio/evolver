@@ -49,6 +49,7 @@ class FunscriptDraftsResult(StageResult):
     started: int = 0
     waiting: int = 0
     failed_batches: int = 0
+    already_scripted: int = 0
 
     @property
     def ok(self) -> bool:
@@ -178,7 +179,8 @@ def run(*, library: Library, goblin: Goblin, drafting: Drafting,
         return FunscriptDraftsResult(nothing_usable=len(record.get(_NOTHING_USABLE, ())),
                                      failed_batches=1)
     nothing_usable = set(record.get(_NOTHING_USABLE, ()))
-    waiting = [one for one in _waiting_newest_first(library) if _key(one.script) not in nothing_usable]
+    looked_over = _looked_over(library)
+    waiting = [one for one in looked_over.waiting if _key(one.script) not in nothing_usable]
     batch = _next_batch(waiting, max_items)
     if batch:
         pid = start(drafting.command_for(goblin, batch), drafting.log)
@@ -186,7 +188,8 @@ def run(*, library: Library, goblin: Goblin, drafting: Drafting,
                           "scripts": [str(one.script) for one in batch], "vr": batch[0].is_vr}
     drafting.write(record)
     return _logged(FunscriptDraftsResult(made=made, nothing_usable=len(nothing_usable),
-                                         started=len(batch), waiting=len(waiting) - len(batch)))
+                                         started=len(batch), waiting=len(waiting) - len(batch),
+                                         already_scripted=looked_over.already_scripted))
 
 
 def _logged(result: FunscriptDraftsResult) -> FunscriptDraftsResult:
@@ -325,28 +328,39 @@ def _actions_in(row: dict) -> set[str]:
     return set(actions) if isinstance(actions, list) else set()
 
 
-def _waiting_newest_first(library: Library) -> list[Waiting]:
+@dataclass(frozen=True)
+class _LookedOver:
+    waiting: list[Waiting]
+    already_scripted: int
+
+
+def _looked_over(library: Library) -> _LookedOver:
     settled = _Settled(library)
     given_no_funscript = _given_no_funscript(library)
-    in_the_library = [Waiting.in_the_library(video) for video in [
-        *library_videos(lanes.kino_upscales_dir()), *_sorted_videos_not_yet_upscaled(library),
-        *lanes.non_ai_videos()] if not settled.video(video)]
-    waiting = sorted((one for one in [*in_the_library, *_origenerators_own(library, settled)]
+    videos = [*library_videos(lanes.kino_upscales_dir()), *_sorted_videos_not_yet_upscaled(library),
+              *lanes.non_ai_videos()]
+    in_the_library = [Waiting.in_the_library(video) for video in videos if not settled.video(video)]
+    origenerators_own = _origenerators_own(library, settled)
+    waiting = sorted((one for one in [*in_the_library, *origenerators_own.waiting]
                       if not given_no_funscript(one.video)),
                      key=lambda one: one.video.stat().st_mtime, reverse=True)
-    vr = [Waiting(vr.video, script_path_for_video(vr.in_library), is_vr=True) for vr in lanes.vr_videos()
+    vr_videos = list(lanes.vr_videos())
+    vr = [Waiting(vr.video, script_path_for_video(vr.in_library), is_vr=True) for vr in vr_videos
           if not settled.script(script_path_for_video(vr.in_library))]
-    return [*waiting, *vr]
+    already_scripted = (len(videos) - len(in_the_library) + origenerators_own.already_scripted
+                        + len(vr_videos) - len(vr))
+    return _LookedOver([*waiting, *vr], already_scripted)
 
 
-def _origenerators_own(library: Library, settled: _Settled) -> list[Waiting]:
+def _origenerators_own(library: Library, settled: _Settled) -> _LookedOver:
     if not library.origenerator_videos.is_dir():
-        return []
+        return _LookedOver([], 0)
     waiting = []
-    for video in library_videos(library.origenerator_videos):
+    videos = list(library_videos(library.origenerator_videos))
+    for video in videos:
         places = funscript.places_a_script_may_be_kept(
             video, videos=library.origenerator_videos, scripts=library.origenerator_scripts)
         kept = next((place for place in places if place.is_file()), None)
         if kept is None or not settled.script(kept):
             waiting.append(Waiting(video, kept or places[0]))
-    return waiting
+    return _LookedOver(waiting, len(videos) - len(waiting))

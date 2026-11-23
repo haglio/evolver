@@ -69,7 +69,7 @@ WENT_WRONG_AND_WANTS_AN_EYE = (False, True)
     pytest.param(WatchWeightsResult(write_errors=1), WENT_WRONG, id="a sidecar that could not be written"),
     pytest.param(WatchWeightsResult(gallery_untold=True), WENT_WRONG,
                  id="origenerator's gallery not told"),
-    pytest.param(BookmarksSyncResult(synced=2), WENT_WELL, id="favorites bookmarked"),
+    pytest.param(BookmarksSyncResult(added=2), WENT_WELL, id="favorites bookmarked"),
     pytest.param(BookmarksSyncResult(profile_missing=True), WENT_WRONG, id="no chrome profile"),
     pytest.param(BookmarksSyncResult(write_error="the bookmarks file is held"), WENT_WRONG,
                  id="the bookmarks could not be written"),

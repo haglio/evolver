@@ -1,15 +1,29 @@
 from __future__ import annotations
 
 import unittest
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontMetrics
-from PySide6.QtWidgets import QFrame, QLabel, QMainWindow, QProgressBar
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QMainWindow, QProgressBar
 
 from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS
 from gui.progress_popup import BAR_WIDTH, ProgressPopup, _caption_width
+
+
+@contextmanager
+def _the_app_font_at(points: float):
+    app = QApplication.instance()
+    before = app.font()
+    font = QFont(before)
+    font.setPointSizeF(points)
+    app.setFont(font)
+    try:
+        yield
+    finally:
+        app.setFont(before)
 
 
 class TestPopupConstruction(unittest.TestCase):
@@ -37,15 +51,24 @@ class TestPopupConstruction(unittest.TestCase):
 
         assert lines[1:1 + len(expected)] == expected
 
-    def test_a_heading_is_larger_than_its_stages_and_has_a_line_under_it(self):
+    def test_the_title_and_every_heading_wear_totals_font_on_his_large_app_font(self):
+        with _the_app_font_at(13.5):
+            popup = ProgressPopup()
+            labels = {label.text(): label.font() for label in popup.findChildren(QLabel)}
+            popup.close()
+        total = labels["Total"]
+
+        for text in ("Pipeline progress", *(section.heading for section in SECTIONS)):
+            with self.subTest(label=text):
+                assert (labels[text].pointSizeF(), labels[text].bold()) == (total.pointSizeF(), True)
+        assert total.pointSizeF() >= labels[STAGE_LABELS["strays"]].pointSizeF()
+
+    def test_a_heading_has_a_line_under_it(self):
         layout = self.popup.layout()
-        stage_size = next(label for label in self.popup.findChildren(QLabel)
-                          if label.text() == STAGE_LABELS["strays"]).font().pointSizeF()
         for index in range(layout.count()):
             widget = layout.itemAt(index).widget()
             if isinstance(widget, QLabel) and widget.text() in {s.heading for s in SECTIONS}:
                 with self.subTest(heading=widget.text()):
-                    assert widget.font().pointSizeF() > stage_size
                     line = layout.itemAt(index + 1).widget()
                     assert isinstance(line, QFrame)
                     assert line.frameShape() == QFrame.Shape.HLine

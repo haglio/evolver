@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.fonts import SIZE_BODY, make_font
 from shared_ui.spacing import GAP_DIALOG, MARGIN_DIALOG
 
 from evolver import ALL_STAGES, SECTIONS, STAGE_LABELS
@@ -26,7 +25,9 @@ def _caption_width(font) -> int:
 
 def _heading(text: str) -> QLabel:
     heading = QLabel(text)
-    heading.setFont(make_font(size=SIZE_BODY, bold=True))
+    font = heading.font()
+    font.setBold(True)
+    heading.setFont(font)
     return heading
 
 
@@ -45,12 +46,7 @@ class ProgressPopup(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)
 
-        header = QLabel("Pipeline progress")
-        font = header.font()
-        font.setPointSize(SIZE_BODY)
-        font.setBold(True)
-        header.setFont(font)
-        layout.addWidget(header)
+        layout.addWidget(_heading("Pipeline progress"))
 
         self._bars: dict[str, QProgressBar] = {}
         self._stage_values: dict[str, int] = {}
@@ -82,11 +78,8 @@ class ProgressPopup(QWidget):
         layout.addWidget(_line())
 
         total_layout = QHBoxLayout()
-        total_label = QLabel("Total")
+        total_label = _heading("Total")
         total_label.setFixedWidth(caption_width)
-        total_font = total_label.font()
-        total_font.setBold(True)
-        total_label.setFont(total_font)
         total_layout.addWidget(total_label)
 
         self._total_bar = QProgressBar()

@@ -6,8 +6,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from PySide6.QtCore import QPoint, QRect, Qt
-from PySide6.QtGui import QIcon, QPalette, QTextDocument
+from PySide6.QtGui import QFont, QIcon, QPalette, QTextDocument
 from PySide6.QtWidgets import (
+    QApplication,
     QLabel,
     QMessageBox,
     QToolBar,
@@ -89,14 +90,23 @@ class TestRunDetailRendering:
         assert table.item(0, 0) is None or table.item(0, 0).text() == ""
         assert not table.item(0, 1).flags() & Qt.ItemFlag.ItemIsSelectable
 
-    def test_a_heading_stands_apart_from_its_stages_in_a_larger_font_on_a_band_of_its_own(self):
-        widget = RunDetailWidget()
-        widget.show_record(make_run_record(stages=[
-            {"name": "strays", "status": "completed", "duration_seconds": 1.0}]))
+    def test_a_heading_stands_apart_from_its_stages_in_bold_on_a_band_of_its_own(self):
+        app = QApplication.instance()
+        before = app.font()
+        large = QFont(before)
+        large.setPointSizeF(13.5)
+        app.setFont(large)
+        try:
+            widget = RunDetailWidget()
+            widget.show_record(make_run_record(stages=[
+                {"name": "strays", "status": "completed", "duration_seconds": 1.0}]))
+        finally:
+            app.setFont(before)
 
         table = widget._table
-        heading, stage = table.item(0, 1), table.item(1, 1)
-        assert heading.font().pointSizeF() > stage.font().pointSizeF()
+        heading = table.item(0, 1)
+        assert heading.font().bold()
+        assert heading.font().pointSizeF() >= table.font().pointSizeF() == 13.5
         assert heading.background().style() != Qt.BrushStyle.NoBrush
         assert table.rowHeight(0) > table.rowHeight(1)
 
@@ -453,6 +463,12 @@ class TestNonAiUpscaleSummary:
         summary = self._result(pending=84, percent_complete=44, remaining_seconds=117_000.0)
 
         assert summary == "nothing to do (84 queued, 32.5h left, 44% done)"
+
+    def test_a_low_disk_hold_puts_how_far_along_in_parentheses(self):
+        summary = self._result(deferred_low_disk=True, pending=84, percent_complete=44,
+                               remaining_seconds=117_000.0)
+
+        assert summary == "held back because the disk is nearly full (84 queued, 32.5h left, 44% done)"
 
     def test_a_low_disk_hold_is_called_out(self):
         summary = self._result(deferred_low_disk=True, start_deferred="")

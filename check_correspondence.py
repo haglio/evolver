@@ -179,17 +179,17 @@ def _log_result(result: CorrespondenceResult) -> None:
 def _popup_message(result: CorrespondenceResult) -> str:
     flicks = config.GENAU_FLICKS_WORD
     lines = [
-        "Evolver found 1_sorted videos and enhanced videos that do not match.",
+        "Evolver found `1_sorted` videos and enhanced videos that do not match.",
         "",
         "Check the log for full details:",
         str(config.LOG_FILE),
         "",
-        f"1_sorted videos: {result.sorted_count}",
+        f"`1_sorted` videos: {result.sorted_count}",
         f"Enhanced videos in the Kino and Genau folders: {result.upscale_count}",
     ]
     sections = (
-        ("Enhanced videos without their 1_sorted video", result.orphan_upscales),
-        ("1_sorted videos without their enhanced video", result.orphan_sorted),
+        ("Enhanced videos without their `1_sorted` video", result.orphan_upscales),
+        ("`1_sorted` videos without their enhanced video", result.orphan_sorted),
         ("Enhanced video names in more than one place",
          [f"{name} -> {', '.join(paths[:2])}" for name, paths in sorted(result.duplicates.items())]),
         (f"Genau {flicks} missing from Genau's folder", result.missing_flicks),

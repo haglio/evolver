@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
 from shared_ui import colors
 from shared_ui.chrome import toolbar_rules
 from shared_ui.flow_layout import FlowLayout
-from shared_ui.fonts import SIZE_BODY, make_font
 from shared_ui.icons import inline_icon
 from shared_ui.spacing import (
     BUTTON_GAP,
@@ -146,7 +145,8 @@ class RunDetailWidget(QWidget):
                 self._show_stage(i, row)
 
     def _show_heading(self, i: int, heading: str):
-        font = make_font(size=SIZE_BODY, bold=True)
+        font = self._table.font()
+        font.setBold(True)
         band = QBrush(colors.BG_TERTIARY)
         for column in range(self._table.columnCount()):
             item = QTableWidgetItem(heading if column == 1 else "")
