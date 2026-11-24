@@ -30,6 +30,7 @@ _CURSOR_FIELD = "applied_through"
 @dataclass
 class WatchWeightsResult(StageResult):
     stamped: int = 0
+    already: int = 0
     favorites_added: int = 0
     favorites_removed: int = 0
     unmapped: int = 0
@@ -78,7 +79,9 @@ def _records_brought_up_to_what_was_watched(gallery: GalleryRecords) -> WatchWei
     ai_videos = [video for video in played if is_ai_video(video)]
     if ai_videos:
         handed = gallery.watched(_ai_totals(ai_videos, fun_time_counts, phone_counts))
-        result.stamped += 0 if handed is None else _weights_changed(handed)
+        changed = 0 if handed is None else _weights_changed(handed)
+        result.stamped += changed
+        result.already += 0 if handed is None else handed.done - changed
         result.gallery_untold = handed is None
     for video in played:
         if is_ai_video(video):
@@ -92,6 +95,8 @@ def _records_brought_up_to_what_was_watched(gallery: GalleryRecords) -> WatchWei
 
         if sidecar.update(sidecar.sidecar_path(video), stamp_the_watching) is not None:
             result.stamped += 1
+        else:
+            result.already += 1
     log.info(
         "Watch weights: stamped %d record(s); phone favorites added %d, removed %d; "
         "%d journal line(s) named no video here.",
