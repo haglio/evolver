@@ -230,6 +230,20 @@ class TestTheGenauLane(unittest.TestCase):
                 assert kept.exists()
                 assert not delivered.exists()
 
+    def test_what_it_deletes_from_the_genau_lane_is_counted_apart_from_the_videos(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            source = lanes.ORIGENERATOR_SOURCE
+            db = _gallery(root / "gallery.db", [("p4", "made_00004.mp4", "evolver_unsent_at"),
+                                                ("p5", "loop_00005.mp4", "genau_unsent_at")])
+            with lib.config(ORIGENERATOR_DB_PATH=db):
+                touch_video(lib.kino_upscales / "portrait" / source / "made_00004_topaz.mp4")
+                touch_video(lib.genau_flicks / "2D" / "AI" / "loop_00005_topaz.mp4")
+
+                result = unsent_videos.run()
+
+        assert (result.deleted, result.deleted_flicks) == (1, 1)
+
 
 def _gallery_of_videos_with_sound(path: Path, stems) -> Path:
     conn = sqlite3.connect(path)

@@ -177,7 +177,7 @@ def _log_result(result: CorrespondenceResult) -> None:
 
 
 def _popup_message(result: CorrespondenceResult) -> str:
-    flicks = config.GENAU_FLICKS_WORD
+    _, flicks = config.GENAU_FLICK_WORDS
     lines = [
         "Evolver found `1_sorted` videos and enhanced videos that do not match.",
         "",

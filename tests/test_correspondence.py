@@ -302,7 +302,7 @@ class TestTheExitCodeAShellOrScheduledTaskReads:
         assert "[FAIL]" in out
 
     def test_a_missing_flick_is_named_in_the_word_genau_shows(self, capsys):
-        with _library() as lib, patch("config.GENAU_FLICKS_WORD", "loopies"):
+        with _library() as lib, patch("config.GENAU_FLICK_WORDS", ("loopy", "loopies")):
             _sent_to_genau(lib, "loop_1.mp4")
 
             check_correspondence.main()

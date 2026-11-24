@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import functools
 import logging
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ log = logging.getLogger(__name__)
 @dataclass
 class UnsentVideosResult(StageResult):
     deleted: int = 0
+    deleted_flicks: int = 0
     deleted_scripts: int = 0
     failed: int = 0
 
@@ -29,8 +31,12 @@ class UnsentVideosResult(StageResult):
     def __add__(self, other: UnsentVideosResult) -> UnsentVideosResult:
         return UnsentVideosResult(
             deleted=self.deleted + other.deleted,
+            deleted_flicks=self.deleted_flicks + other.deleted_flicks,
             deleted_scripts=self.deleted_scripts + other.deleted_scripts,
             failed=self.failed + other.failed)
+
+    def counted_as_flicks(self) -> UnsentVideosResult:
+        return dataclasses.replace(self, deleted=0, deleted_flicks=self.deleted_flicks + self.deleted)
 
 
 def run() -> UnsentVideosResult:
@@ -43,10 +49,12 @@ def run() -> UnsentVideosResult:
     log.info("=== Stage: videos unsent in Origenerator ===")
     for lane in lanes.sent_lanes():
         files = _LaneFiles(lane)
-        result = result + files.emptied_of(_names_only_withdrawn_videos_hold(rows, lane))
-        result = result + files.emptied_of(_soundless_copies_beside_their_sound(rows, files.reachable))
+        emptied = (files.emptied_of(_names_only_withdrawn_videos_hold(rows, lane))
+                   + files.emptied_of(_soundless_copies_beside_their_sound(rows, files.reachable)))
+        result = result + (emptied.counted_as_flicks() if lane.genau else emptied)
 
-    log.info("Withdrawn done. Deleted: %d, failed: %d", result.deleted, result.failed)
+    log.info("Withdrawn done. Deleted: %d from the Kino lane, %d from the Genau lane; failed: %d",
+             result.deleted, result.deleted_flicks, result.failed)
     return result
 
 

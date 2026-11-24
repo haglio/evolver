@@ -52,7 +52,8 @@ WARNING = "warning"
 ERROR = "error"
 SKIPPED = "skipped"
 
-_FLICK = config.GENAU_FLICK_WORD
+FLICK_WORDS = config.GENAU_FLICK_WORDS
+_FLICK = FLICK_WORDS[0]
 _NO_PENDING_WORK = "no_pending_work"
 _ORIGENERATOR_TRAINING = "origenerator_training"
 

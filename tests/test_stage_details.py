@@ -32,6 +32,7 @@ from tasks.upscale import UpscaleResult
 from tasks.video_kinds import VideoKindsResult
 from tasks.watch_weights import WatchWeightsResult
 
+FLICK_WORDS = ("loopy", "loopies")
 RESULT_OF_STAGE = {
     "strays": StrayFilesResult, "withdrawn": UnsentVideosResult, "metadata": PromptScrapeResult,
     "sort": SortResult, "origenerator_downtime": DowntimeResult, "upscale": UpscaleResult,
@@ -116,7 +117,7 @@ def test_every_count_a_stage_records_reaches_its_sentence():
 
 
 def test_a_skipped_stage_says_why_in_words():
-    assert details_of(None, "cpu_busy", "upscale") == "waited because the computer's processor was too busy"
+    assert details_of(None, "cpu_busy", "upscale", FLICK_WORDS) == "waited because the computer's processor was too busy"
 
 
 _NAMES_A_DETAIL_MAY_OPEN_WITH = {"Evolver", "Origenerator", "GoblinScript", "Topaz", "Chrome", "Fun"}
@@ -133,45 +134,52 @@ def test_a_detail_never_opens_with_a_word_and_a_colon(said):
 
 
 def test_an_older_skip_reason_with_no_sentence_is_shown_as_it_was_recorded():
-    assert details_of(None, "made_up_reason", "upscale") == "made_up_reason"
+    assert details_of(None, "made_up_reason", "upscale", FLICK_WORDS) == "made_up_reason"
 
 
 def test_counts_read_as_a_sentence_and_a_zero_is_left_out():
     said = details_of({"moved": 3, "made_again": 0, "deleted_collisions": 1,
-                       "skipped_unknown": 0, "moved_files": ["a.mp4"]}, None, "sort")
+                       "skipped_unknown": 0, "moved_files": ["a.mp4"]}, None, "sort", FLICK_WORDS)
 
     assert said == "3 moved into `1_sorted`, 1 already in `1_sorted` and deleted from `0_inbox`"
 
 
 def test_one_of_a_thing_is_said_in_the_singular():
-    assert details_of({"deleted": 1, "deleted_scripts": 2}, None, "withdrawn") == (
+    assert details_of({"deleted": 1, "deleted_scripts": 2}, None, "withdrawn", FLICK_WORDS) == (
         "1 video deleted, 2 funscripts deleted")
 
 
+def test_genau_flicks_deleted_are_named_with_the_settings_word_apart_from_the_videos():
+    said = details_of({"deleted": 2, "deleted_flicks": 1, "deleted_scripts": 0}, None, "withdrawn",
+                      FLICK_WORDS)
+
+    assert said == "2 videos deleted, 1 loopy deleted"
+
+
 def test_a_stage_that_found_no_work_says_so():
-    assert details_of({"deleted": 0, "deleted_scripts": 0, "failed": 0}, None, "withdrawn") == (
-        NOTHING_TO_DO)
+    assert details_of({"deleted": 0, "deleted_flicks": 0, "deleted_scripts": 0, "failed": 0},
+                      None, "withdrawn", FLICK_WORDS) == NOTHING_TO_DO
 
 
 def test_a_stage_that_did_nothing_says_so_first_and_what_it_found_in_parentheses():
     said = details_of({"newly_scraped": 0, "handed_over": 0, "errors": 0, "already_scraped": 1064,
-                       "skipped_failed": 0, "no_scrape_strat": 528}, None, "metadata")
+                       "skipped_failed": 0, "no_scrape_strat": 528}, None, "metadata", FLICK_WORDS)
 
     assert said == "nothing to do (1064 already read, 528 from a site Evolver hasn't been taught how to read prompts from yet)"
 
 
 def test_a_scripts_sync_that_moved_nothing_says_so_first():
-    assert details_of({"already_aligned": 4174}, None, "scripts") == "nothing to do (4174 already aligned)"
+    assert details_of({"already_aligned": 4174}, None, "scripts", FLICK_WORDS) == "nothing to do (4174 already aligned)"
 
 
 def test_a_stage_that_did_something_is_not_said_to_have_had_nothing_to_do():
-    said = details_of({"written": 2, "already_scripted": 98}, None, "clip_scripts")
+    said = details_of({"written": 2, "already_scripted": 98}, None, "clip_scripts", FLICK_WORDS)
 
     assert said == "2 clips given a funscript, 98 clips already had one"
 
 
 def test_a_stage_whose_work_failed_is_not_said_to_have_had_nothing_to_do():
-    said = details_of({"deleted": 0, "deleted_scripts": 0, "failed": 3}, None, "withdrawn")
+    said = details_of({"deleted": 0, "deleted_scripts": 0, "failed": 3}, None, "withdrawn", FLICK_WORDS)
 
     assert said == "3 could not be deleted"
 
@@ -183,7 +191,7 @@ def test_every_part_of_a_sentence_says_whether_it_is_work_done_a_fault_or_a_find
 
 
 def test_prompts_read_and_failures_are_shown_even_at_zero():
-    said = details_of({"newly_scraped": 0, "errors": 58, "already_scraped": 0}, None, "metadata")
+    said = details_of({"newly_scraped": 0, "errors": 58, "already_scraped": 0}, None, "metadata", FLICK_WORDS)
 
     assert said == "0 prompts read, 58 failed to read", (
         "a hidden zero makes a total failure read as a partial one")
@@ -193,7 +201,7 @@ def test_the_correspondence_check_names_what_does_not_match():
     said = details_of({"sorted_count": 412, "upscale_count": 411,
                        "orphan_sorted": ["Example Studio/portrait/video one.mp4"],
                        "orphan_upscales": [], "duplicates": {}, "missing_flicks": []},
-                      None, "verify")
+                      None, "verify", FLICK_WORDS)
 
     assert said == ("412 `1_sorted` videos, 411 enhanced videos, 1 `1_sorted` video without its "
                     "enhanced video (Example Studio/portrait/video one.mp4)")
@@ -201,13 +209,13 @@ def test_the_correspondence_check_names_what_does_not_match():
 
 def test_a_flag_and_a_sentence_from_another_app_are_shown_as_words():
     said = details_of({"did": "started the experiments", "holds_the_graphics_card": True,
-                       "failed": False}, None, "origenerator_downtime")
+                       "failed": False}, None, "origenerator_downtime", FLICK_WORDS)
 
     assert said == "started the experiments, a LoRA is training on the graphics card"
 
 
 def test_duplicate_sizes_count_their_groups():
-    said = details_of({"scanned_count": 90, "duplicate_groups": {"100": ["a", "b"]}}, None, "dupes")
+    said = details_of({"scanned_count": 90, "duplicate_groups": {"100": ["a", "b"]}}, None, "dupes", FLICK_WORDS)
 
     assert said == "90 videos checked, 1 group of videos with the same size"
 
@@ -223,13 +231,13 @@ def _a_record_with_every_count_set(stage: str) -> dict:
 def test_no_count_is_shown_as_the_codes_name_for_it():
     for stage in SENTENCES:
         record = _a_record_with_every_count_set(stage)
-        said = details_of(record, None, stage)
+        said = details_of(record, None, stage, FLICK_WORDS)
         assert ("=" in said, [key for key in record if "_" in key and key in said]) == (
             False, []), stage
 
 
 def test_a_stage_since_taken_out_still_reads_as_a_sentence_in_older_runs():
-    assert details_of({"copied": 2, "already": 40}, None, "labels") == (
+    assert details_of({"copied": 2, "already": 40}, None, "labels", FLICK_WORDS) == (
         "2 videos given their actions, 40 already had them")
 
 
