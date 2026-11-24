@@ -38,6 +38,10 @@ class SentLane:
     def stamps(self) -> tuple[str, str]:
         return self.sent_column, self.unsent_column
 
+    @property
+    def genau(self) -> bool:
+        return is_genau_lane(self.source)
+
     def still_sent(self, row: dict) -> bool:
         return bool(row.get(self.sent_column)) and not row.get(self.unsent_column)
 
@@ -131,7 +135,7 @@ def genau_sound_of(flick: Path) -> Path:
 
 
 def genau_sent_lane() -> SentLane:
-    return next(lane for lane in sent_lanes() if lane.source == genau_source())
+    return next(lane for lane in sent_lanes() if lane.genau)
 
 
 def sent_by_origenerator(source: str) -> bool:

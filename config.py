@@ -105,8 +105,8 @@ SORTED_DIR   = AI_DIR / "1_sorted"
 KINO_DIR = kino_folder.kino_dir()
 
 GENAU_SOURCE    = haglio_settings.value("genau_source")
-GENAU_FLICK_WORD = haglio_settings.value("genau_flick_words", "one")
-GENAU_FLICKS_WORD = haglio_settings.value("genau_flick_words", "many")
+GENAU_FLICK_WORDS = (haglio_settings.value("genau_flick_words", "one"),
+                     haglio_settings.value("genau_flick_words", "many"))
 GENAU_DIR = Path(haglio_settings.value("genau_dir"))
 GENAU_AUDIO_DIR = Path(haglio_settings.value("genau_audio_dir"))
 GENAU_TRASH_DIR = trash_folder_in(GENAU_DIR)

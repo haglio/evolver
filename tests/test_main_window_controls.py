@@ -303,7 +303,7 @@ class TestScriptsSyncSummary:
             "discarded_duplicates": 0, "unmatched_paths": [],
         }
         result.update(overrides)
-        return _summarize_result(result, None, "scripts")
+        return _summarize_result(result, None, "scripts", ("loopy", "loopies"))
 
     def test_says_what_is_wrong_in_words(self):
         summary = self._result(already_aligned=53, unmatched=15)
@@ -364,7 +364,8 @@ class TestScriptsSyncSummary:
         assert "2 followed a video renamed by hand" in self._result(followed_renames=2)
 
     def test_an_old_record_without_the_paths_still_summarizes(self):
-        summary = _summarize_result({"already_aligned": 53, "unmatched": 15}, None, "scripts")
+        summary = _summarize_result({"already_aligned": 53, "unmatched": 15}, None, "scripts",
+                                    ("loopy", "loopies"))
         assert "15 match no video" in summary
 
     def test_says_how_many_were_not_checked_and_which_folder_could_not_be_reached(self):
@@ -393,7 +394,7 @@ class TestNonAiUpscaleSummary:
             "on_request": False,
         }
         result.update(overrides)
-        return _summarize_result(result, None, "upscale_non_ai")
+        return _summarize_result(result, None, "upscale_non_ai", ("loopy", "loopies"))
 
     def test_names_the_video_being_encoded(self):
         summary = self._result(in_flight="lagoon/1 clips/Delia Moss.mp4",

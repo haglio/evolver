@@ -34,7 +34,7 @@ from shared_ui.spacing import (
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
-from evolver import STAGE_NUMBER, STAGE_SECTION, STAGE_TOOLTIPS, stage_label
+from evolver import FLICK_WORDS, STAGE_NUMBER, STAGE_SECTION, STAGE_TOOLTIPS, stage_label
 from gui.commands import (
     NONAI,
     PAUSE,
@@ -216,7 +216,7 @@ class RunDetailWidget(QWidget):
         dur_item.setFlags(no_edit)
         self._table.setItem(i, 3, dur_item)
 
-        details = details_of(stage.get("result"), stage.get("skip_reason"), stage_key)
+        details = details_of(stage.get("result"), stage.get("skip_reason"), stage_key, FLICK_WORDS)
         details_item = QTableWidgetItem(details)
         self._table.setItem(i, 4, details_item)
 

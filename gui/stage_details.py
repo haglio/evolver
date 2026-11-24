@@ -10,8 +10,12 @@ NOTHING_TO_DO = "nothing to do"
 DONE, WRONG, FOUND = "done", "wrong", "found"
 
 
-def _which(count: int, many: str, one: str) -> str:
-    return one if count == 1 and one else many
+FlickWords = tuple[str, str]
+
+
+def _which(count: int, many: str, one: str, flick_words: FlickWords) -> str:
+    flick, flicks = flick_words
+    return (one if count == 1 and one else many).format(flick=flick, flicks=flicks)
 
 
 @dataclass(frozen=True)
@@ -22,13 +26,13 @@ class Count:
     even_at_zero: bool = False
     kind: str = FOUND
 
-    def said(self, result: dict[str, Any]) -> str | None:
+    def said(self, result: dict[str, Any], flick_words: FlickWords) -> str | None:
         value = result.get(self.key)
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             return None
         if not value and not self.even_at_zero:
             return None
-        return f"{value} {_which(value, self.many, self.one)}"
+        return f"{value} {_which(value, self.many, self.one, flick_words)}"
 
     def happened(self, result: dict[str, Any]) -> bool:
         value = result.get(self.key)
@@ -42,11 +46,11 @@ class Named:
     one: str = ""
     kind: str = WRONG
 
-    def said(self, result: dict[str, Any]) -> str | None:
+    def said(self, result: dict[str, Any], flick_words: FlickWords) -> str | None:
         names = list(result.get(self.key) or [])
         if not names:
             return None
-        return f"{len(names)} {_which(len(names), self.many, self.one)} ({_name_sample(names)})"
+        return f"{len(names)} {_which(len(names), self.many, self.one, flick_words)} ({_name_sample(names)})"
 
     def happened(self, result: dict[str, Any]) -> bool:
         return bool(result.get(self.key))
@@ -59,9 +63,9 @@ class Groups:
     one: str = ""
     kind: str = WRONG
 
-    def said(self, result: dict[str, Any]) -> str | None:
+    def said(self, result: dict[str, Any], flick_words: FlickWords) -> str | None:
         count = len(result.get(self.key) or ())
-        return f"{count} {_which(count, self.many, self.one)}" if count else None
+        return f"{count} {_which(count, self.many, self.one, flick_words)}" if count else None
 
     def happened(self, result: dict[str, Any]) -> bool:
         return bool(result.get(self.key))
@@ -73,7 +77,7 @@ class Flag:
     words: str
     kind: str = WRONG
 
-    def said(self, result: dict[str, Any]) -> str | None:
+    def said(self, result: dict[str, Any], flick_words: FlickWords) -> str | None:
         return self.words if result.get(self.key) is True else None
 
     def happened(self, result: dict[str, Any]) -> bool:
@@ -86,22 +90,23 @@ class Text:
     words: str = "{}"
     kind: str = DONE
 
-    def said(self, result: dict[str, Any]) -> str | None:
+    def said(self, result: dict[str, Any], flick_words: FlickWords) -> str | None:
         value = result.get(self.key)
         return self.words.format(value) if isinstance(value, str) and value else None
 
     def happened(self, result: dict[str, Any]) -> bool:
-        return self.said(result) is not None
+        value = result.get(self.key)
+        return isinstance(value, str) and bool(value)
 
 
 @dataclass(frozen=True)
 class Sentence:
     parts: tuple[Count | Named | Groups | Flag | Text, ...]
 
-    def said(self, result: dict[str, Any]) -> str:
+    def said(self, result: dict[str, Any], flick_words: FlickWords) -> str:
         if any(part.kind != FOUND and part.happened(result) for part in self.parts):
-            return ", ".join(words for part in self.parts if (words := part.said(result)))
-        return nothing_to_do([part.said(result) for part in self.parts if part.happened(result)])
+            return ", ".join(words for part in self.parts if (words := part.said(result, flick_words)))
+        return nothing_to_do([part.said(result, flick_words) for part in self.parts if part.happened(result)])
 
 
 def nothing_to_do(found: list[str]) -> str:
@@ -119,6 +124,7 @@ SENTENCES: dict[str, Sentence] = {
     )),
     "withdrawn": Sentence((
         Count("deleted", "videos deleted", "video deleted", kind=DONE),
+        Count("deleted_flicks", "{flicks} deleted", "{flick} deleted", kind=DONE),
         Count("deleted_scripts", "funscripts deleted", "funscript deleted", kind=DONE),
         Count("failed", "could not be deleted", kind=WRONG),
     )),
@@ -279,8 +285,9 @@ SKIP_REASONS: dict[str, str] = {
 
 def details_of(
     result: dict[str, Any] | None,
-    skip_reason: str | None = None,
-    stage_key: str = "",
+    skip_reason: str | None,
+    stage_key: str,
+    flick_words: FlickWords,
 ) -> str:
     if skip_reason:
         return SKIP_REASONS.get(skip_reason, skip_reason)
@@ -290,7 +297,7 @@ def details_of(
     if summarize is not None:
         return summarize(result)
     sentence = SENTENCES.get(stage_key)
-    return sentence.said(result) if sentence is not None else ""
+    return sentence.said(result, flick_words) if sentence is not None else ""
 
 
 _SCRIPTS_PROBLEMS = (
