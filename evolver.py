@@ -43,7 +43,7 @@ from tasks import (
 from tasks.origenerator_commands import DowntimeResult
 from tasks.sort import SortResult
 from tasks.upscale import UpscaleResult
-from util import run_lock, run_log, run_reads, system_resources, topaz
+from util import origenerator_gallery, run_lock, run_log, run_reads, system_resources, topaz
 from util import upscale_queue as upscale_queue_shape
 from util.stage_result import StageResult
 
@@ -165,7 +165,8 @@ def _make_funscripts(this_run: ThisRun) -> StageResult | Skipped:
     library = funscript_drafts.Library(
         videos=config.VIDEO_LIBRARY_DIR, sorted_videos=config.SORTED_DIR, gallery=config.ORIGENERATOR_DB_PATH,
         origenerator_videos=config.ORIGENERATOR_VIDEOS_DIR, origenerator_scripts=config.ORIGENERATOR_SCRIPTS_DIR,
-        actions_given_no_funscript=config.VIDEO_ACTIONS_GIVEN_NO_FUNSCRIPT)
+        actions_given_no_funscript=config.VIDEO_ACTIONS_GIVEN_NO_FUNSCRIPT,
+        flick_workflows=origenerator_gallery.flick_workflows(origenerator_gallery.origenerators_checkout()))
     return funscript_drafts.run(library=library, goblin=goblin, drafting=drafting)
 
 

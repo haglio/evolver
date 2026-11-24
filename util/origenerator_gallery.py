@@ -22,6 +22,8 @@ import config
 PUBLISHED = "origenerator_gallery_contract.json"
 WORKFLOW_PREFIXES = "outside_workflow_prefixes"
 GENERATED_FPS_BY_WORKFLOW = "generated_fps_by_workflow"
+ITEM_TYPE_BY_WORKFLOW = "item_type_by_workflow"
+FLICK = "flick"
 
 
 def published(checkout: Path) -> dict:
@@ -47,6 +49,13 @@ def _rate(published_rate) -> Fraction | None:
     except (ValueError, TypeError):
         return None
     return rate if rate > 0 else None
+
+
+def flick_workflows(checkout: Path) -> frozenset[str]:
+    by_workflow = published(checkout).get(ITEM_TYPE_BY_WORKFLOW)
+    if not isinstance(by_workflow, dict):
+        return frozenset()
+    return frozenset(workflow for workflow, item_type in by_workflow.items() if item_type == FLICK)
 
 
 @dataclass(frozen=True)
@@ -77,8 +86,12 @@ STARRED = "starred"
 WEB_URL = "web_url"
 
 
+def origenerators_checkout() -> Path:
+    return config.ORIGENERATOR_PROJECT_DIR
+
+
 def made_from_words_alone(video: Path) -> bool | None:
-    prefixes = workflow_prefixes(config.ORIGENERATOR_PROJECT_DIR)
+    prefixes = workflow_prefixes(origenerators_checkout())
     if prefixes is None:
         return None
     workflow = _workflow_of(video)
