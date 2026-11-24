@@ -288,7 +288,10 @@ It looks where Evolver keeps a funscript for each file in Genau's folder and
 trash, the Genau lane's `1_sorted` and `0_inbox` copies, and the files in
 Origenerator's own videos folder whose workflow Origenerator's published
 contract calls a flick (`--origenerator <checkout>` reads another checkout's
-contract). It deletes only the ones GoblinScript made or no person wrote,
+contract). It also finds the ones Scripts sync left with no video: under the
+Genau lane's place in the scripts folder, and in `unmatched_scripts` and the
+non-AI archive under a name a flick has had (as made, as sorted, as
+enhanced). It deletes only the ones GoblinScript made or no person wrote,
 leaves every one a person wrote and every one a video of the same name may
 use, prints counts and never a name, and finds nothing more to delete when
 run again. Once it has been run, it and this section come out.
