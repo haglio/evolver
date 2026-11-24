@@ -189,6 +189,7 @@ SENTENCES: dict[str, Sentence] = {
         Count("removed", "bookmarks removed", "bookmark removed", kind=DONE),
         Count("already", "already bookmarked"),
         Count("untaught", "for a site Evolver hasn't been taught to link to yet"),
+        Count("no_url", "favorites have no web page", "favorite has no web page"),
         Count("bad_url", "favorites have a page that is not a web address",
               "favorite has a page that is not a web address", kind=WRONG),
         Flag("profile_missing", "Chrome profile not found"),
