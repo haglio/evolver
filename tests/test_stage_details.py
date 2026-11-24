@@ -207,6 +207,17 @@ def test_the_correspondence_check_names_what_does_not_match():
                     "enhanced video (Example Studio/portrait/video one.mp4)")
 
 
+def test_the_correspondence_check_names_the_genau_lanes_copies_with_the_settings_word():
+    said = details_of({"sorted_count": 412, "upscale_count": 411, "sorted_flicks": 1, "upscale_flicks": 30,
+                       "orphan_sorted_flicks": ["example-loop-clips/portrait/loop one.mp4"],
+                       "duplicate_flicks": {"loop two_topaz.mp4": ["a", "b"]}},
+                      None, "verify", FLICK_WORDS)
+
+    assert said == ("412 `1_sorted` videos, 1 `1_sorted` loopy, 411 enhanced videos, 30 enhanced loopies, "
+                    "1 `1_sorted` loopy without its enhanced loopy (example-loop-clips/portrait/loop one.mp4), "
+                    "1 enhanced loopy name in more than one place (loop two_topaz.mp4)")
+
+
 def test_a_flag_and_a_sentence_from_another_app_are_shown_as_words():
     said = details_of({"did": "started the experiments", "holds_the_graphics_card": True,
                        "failed": False}, None, "origenerator_downtime", FLICK_WORDS)

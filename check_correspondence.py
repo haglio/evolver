@@ -27,14 +27,19 @@ TRIMMED_FROM = "trimmed_from"
 class CorrespondenceResult(StageResult):
     sorted_count: int
     upscale_count: int
+    sorted_flicks: int = 0
+    upscale_flicks: int = 0
     orphan_upscales: list[str] = field(default_factory=list)
     orphan_sorted: list[str] = field(default_factory=list)
+    orphan_sorted_flicks: list[str] = field(default_factory=list)
     duplicates: dict[str, list[str]] = field(default_factory=dict)
+    duplicate_flicks: dict[str, list[str]] = field(default_factory=dict)
     missing_flicks: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
-        return not (self.orphan_upscales or self.orphan_sorted or self.duplicates or self.missing_flicks)
+        return not (self.orphan_upscales or self.orphan_sorted or self.orphan_sorted_flicks
+                    or self.duplicates or self.duplicate_flicks or self.missing_flicks)
 
 
 def upscale_name(sorted_file: Path) -> str:
@@ -45,14 +50,22 @@ def upscale_name(sorted_file: Path) -> str:
 class _Lane:
     sorted_copies: list[Path]
     upscales: list[Path]
-    kept_once_sorted_copy_retired: bool
+    genau: bool
+
+
+@dataclass
+class _Found:
+    sorted_count: int = 0
+    upscale_count: int = 0
+    orphan_sorted: list[str] = field(default_factory=list)
+    duplicates: dict[str, list[str]] = field(default_factory=dict)
 
 
 def _lanes(sorted_by_source: dict[Path, str]) -> list[_Lane]:
     return [_Lane([copy for copy, source in sorted_by_source.items() if lane.is_for(source)],
                   [] if lane.upscales is None
                   else [*library_videos(lane.upscales), *library_videos(lane.trash)],
-                  kept_once_sorted_copy_retired=lane.genau)
+                  genau=lane.genau)
             for lane in lanes.upscale_lanes()]
 
 
@@ -67,37 +80,39 @@ def run(show_popup: bool = False) -> CorrespondenceResult:
     sorted_root = config.SORTED_DIR
     sorted_by_source = {copy: copy.relative_to(sorted_root).parts[0]
                         for copy in sorted(library_videos(sorted_root))}
-    sorted_files = list(sorted_by_source)
-    made: set[str] = set()
-    upscale_count = 0
-    duplicates: dict[str, list[str]] = {}
+    found = {False: _Found(), True: _Found()}
     orphan_upscales: list[str] = []
-    orphan_sorted: list[str] = []
     genau_names: set[str] = set()
     awaited: set[str] = set()
     for lane in _lanes(sorted_by_source):
+        in_lane = found[lane.genau]
         expected = {upscale_name(p) for p in lane.sorted_copies}
         by_name: dict[str, list[str]] = {}
         for upscale in sorted(lane.upscales):
             name = name_before_trash(upscale.name)
             by_name.setdefault(name, []).append(_shown(upscale))
-            if name not in expected and not lane.kept_once_sorted_copy_retired:
+            if name not in expected and not lane.genau:
                 orphan_upscales.append(_shown(upscale))
-        orphan_sorted += [str(p.relative_to(sorted_root)) for p in lane.sorted_copies
-                          if upscale_name(p) not in by_name]
-        made |= set(by_name)
-        if lane.kept_once_sorted_copy_retired:
+        in_lane.orphan_sorted += [str(p.relative_to(sorted_root)) for p in lane.sorted_copies
+                                  if upscale_name(p) not in by_name]
+        if lane.genau:
             genau_names |= set(by_name)
             awaited = {_made_as(copy.name) for copy in lane.sorted_copies}
-        upscale_count += len(lane.upscales)
-        duplicates |= {name: sorted(paths) for name, paths in by_name.items() if len(paths) > 1}
+        in_lane.sorted_count += len(lane.sorted_copies)
+        in_lane.upscale_count += len(lane.upscales)
+        in_lane.duplicates |= {name: sorted(paths) for name, paths in by_name.items() if len(paths) > 1}
 
+    videos, flicks = found[False], found[True]
     result = CorrespondenceResult(
-        sorted_count=len(sorted_files),
-        upscale_count=upscale_count,
+        sorted_count=videos.sorted_count,
+        upscale_count=videos.upscale_count,
+        sorted_flicks=flicks.sorted_count,
+        upscale_flicks=flicks.upscale_count,
         orphan_upscales=sorted(orphan_upscales),
-        orphan_sorted=sorted(orphan_sorted),
-        duplicates=duplicates,
+        orphan_sorted=sorted(videos.orphan_sorted),
+        orphan_sorted_flicks=sorted(flicks.orphan_sorted),
+        duplicates=videos.duplicates,
+        duplicate_flicks=flicks.duplicates,
         missing_flicks=_flicks_sent_and_gone(_sent_to_genau(), genau_names, awaited),
     )
     _log_result(result)
@@ -156,15 +171,18 @@ def _flicks_sent_and_gone(sent: list[_Sent] | None, present: set[str], awaited: 
 
 def _log_result(result: CorrespondenceResult) -> None:
     log.info("=== Stage: correspondence check ===")
-    log.info("1_sorted: %d video file(s)", result.sorted_count)
-    log.info("Enhanced videos: %d video file(s) in the Kino and Genau folders and their trash",
-             result.upscale_count)
+    log.info("1_sorted: %d file(s) down the Kino lane, %d down the Genau lane",
+             result.sorted_count, result.sorted_flicks)
+    log.info("Enhanced: %d file(s) in Kino's folder and its trash, %d in Genau's folder and its trash",
+             result.upscale_count, result.upscale_flicks)
     for orphan in result.orphan_upscales:
         log.error("ENHANCED VIDEO WITHOUT ITS 1_SORTED VIDEO: %s", orphan)
     for orphan in result.orphan_sorted:
         log.error("1_SORTED VIDEO WITHOUT ITS ENHANCED VIDEO: %s", orphan)
-    for name, paths in sorted(result.duplicates.items()):
-        log.error("ENHANCED VIDEO'S NAME IN MORE THAN ONE PLACE: %s", name)
+    for orphan in result.orphan_sorted_flicks:
+        log.error("1_SORTED GENAU-LANE COPY WITHOUT ITS ENHANCED COPY: %s", orphan)
+    for name, paths in sorted({**result.duplicates, **result.duplicate_flicks}.items()):
+        log.error("ENHANCED COPY'S NAME IN MORE THAN ONE PLACE: %s", name)
         for path in paths:
             log.error("  -> %s", path)
     for missing in result.missing_flicks:
@@ -177,27 +195,34 @@ def _log_result(result: CorrespondenceResult) -> None:
 
 
 def _popup_message(result: CorrespondenceResult) -> str:
-    _, flicks = config.GENAU_FLICK_WORDS
+    flick, flicks = config.GENAU_FLICK_WORDS
     lines = [
-        "Evolver found `1_sorted` videos and enhanced videos that do not match.",
+        f"Evolver found `1_sorted` and enhanced videos or {flicks} that do not match.",
         "",
         "Check the log for full details:",
         str(config.LOG_FILE),
         "",
         f"`1_sorted` videos: {result.sorted_count}",
-        f"Enhanced videos in the Kino and Genau folders: {result.upscale_count}",
+        f"`1_sorted` {flicks}: {result.sorted_flicks}",
+        f"Enhanced videos in Kino's folder: {result.upscale_count}",
+        f"Enhanced {flicks} in Genau's folder: {result.upscale_flicks}",
     ]
     sections = (
         ("Enhanced videos without their `1_sorted` video", result.orphan_upscales),
         ("`1_sorted` videos without their enhanced video", result.orphan_sorted),
-        ("Enhanced video names in more than one place",
-         [f"{name} -> {', '.join(paths[:2])}" for name, paths in sorted(result.duplicates.items())]),
+        (f"`1_sorted` {flicks} without their enhanced {flick}", result.orphan_sorted_flicks),
+        ("Enhanced video names in more than one place", _places_of(result.duplicates)),
+        (f"Enhanced {flick} names in more than one place", _places_of(result.duplicate_flicks)),
         (f"Genau {flicks} missing from Genau's folder", result.missing_flicks),
     )
     for heading, items in sections:
         if items:
             lines.extend(["", f"{heading}: {len(items)}", *_truncate(items)])
     return "\n".join(lines)
+
+
+def _places_of(duplicates: dict[str, list[str]]) -> list[str]:
+    return [f"{name} -> {', '.join(paths[:2])}" for name, paths in sorted(duplicates.items())]
 
 
 def _truncate(items: list[str]) -> list[str]:
