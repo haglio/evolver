@@ -14,13 +14,15 @@ from PySide6.QtWidgets import (
     QToolBar,
     QToolButton,
 )
+from shared_ui.code_text import as_rich_text
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
 from shared_ui.icons import icon_pixmap, inline_icon
 from shared_ui.spacing import BUTTON_GAP, MARGIN_STANDARD
 from shared_ui.testing import questions_answered
+from shared_ui.type_scale import FONT_CODE
 
 from evolver import STAGE_LABELS, STAGE_TOOLTIPS
-from gui.main_window import EvolverMainWindow, RunDetailWidget
+from gui.main_window import EvolverMainWindow, RunDetailWidget, details_document
 from gui.schedule_state import ScheduleStatus
 from gui.stage_details import details_of as _summarize_result
 from gui.tray import EvolverTray
@@ -67,7 +69,7 @@ class TestRunDetailRendering:
         widget.show_record(self._record())
 
         row = _row_of(widget, STAGE_LABELS["metadata"])
-        assert widget._table.item(row, 1).toolTip() == STAGE_TOOLTIPS["metadata"]
+        assert widget._table.item(row, 1).toolTip() == as_rich_text(STAGE_TOOLTIPS["metadata"])
 
     def test_each_section_heading_sits_above_its_stages_in_the_order_they_run(self):
         widget = RunDetailWidget()
@@ -136,6 +138,23 @@ class TestRunDetailRendering:
         ))
 
         assert widget._table.item(0, 0).text() == "—"
+
+
+class TestFolderNamesInTheDetails:
+    def test_a_folder_name_in_backticks_is_drawn_in_the_code_font_without_its_backticks(self):
+        document = details_document("nothing to do (5 `1_sorted` videos)", QApplication.instance().font())
+
+        assert document.toPlainText() == "nothing to do (5 1_sorted videos)"
+        assert FONT_CODE in document.toHtml()
+
+    def test_a_stage_tooltip_naming_a_folder_shows_it_in_the_code_font(self):
+        widget = RunDetailWidget()
+        widget.show_record(make_run_record(stages=[
+            {"name": "sort", "status": "completed", "duration_seconds": 1.0}]))
+
+        tooltip = widget._table.item(_row_of(widget, STAGE_LABELS["sort"]), 1).toolTip()
+        assert "`" not in tooltip
+        assert FONT_CODE in tooltip
 
 
 class TestRunHistoryMarks:

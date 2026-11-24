@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QIcon
+from PySide6.QtGui import QAbstractTextDocumentLayout, QBrush, QIcon, QPalette, QTextDocument
 from PySide6.QtWidgets import (
     QHeaderView,
     QItemDelegate,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 from shared_ui import colors
 from shared_ui.chrome import toolbar_rules
+from shared_ui.code_text import as_rich_text
 from shared_ui.flow_layout import FlowLayout
 from shared_ui.icons import inline_icon
 from shared_ui.spacing import (
@@ -53,6 +54,8 @@ from gui.stage_details import details_of
 from gui.status_symbols import GRAY, status_icon, symbol_for
 from gui.switches import SwitchButton, toolbar_button
 
+_TEXT_INSET = GAP_SMALL
+
 
 class _NoFocusRectDelegate(QItemDelegate):
     # QItemDelegate, not QStyledItemDelegate: only it exposes drawFocus().
@@ -61,6 +64,10 @@ class _NoFocusRectDelegate(QItemDelegate):
         pass
 
     def paint(self, painter, option, index):
+        text = index.data(Qt.ItemDataRole.DisplayRole)
+        if isinstance(text, str) and "`" in text:
+            self._paint_with_code(painter, option, index, text)
+            return
         mark = index.data(Qt.ItemDataRole.DecorationRole)
         if index.data(Qt.ItemDataRole.DisplayRole) or not isinstance(mark, QIcon) or mark.isNull():
             super().paint(painter, option, index)
@@ -70,6 +77,28 @@ class _NoFocusRectDelegate(QItemDelegate):
         painter.drawPixmap(QStyle.alignedRect(option.direction, Qt.AlignmentFlag.AlignCenter,
                                               pixmap.deviceIndependentSize().toSize(), option.rect),
                            pixmap)
+
+    def _paint_with_code(self, painter, option, index, text: str):
+        self.drawBackground(painter, option, index)
+        document = details_document(text, option.font)
+        selected = bool(option.state & QStyle.StateFlag.State_Selected)
+        role = QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.Text
+        context = QAbstractTextDocumentLayout.PaintContext()
+        context.palette.setColor(QPalette.ColorRole.Text, option.palette.color(role))
+        inset = (option.rect.height() - document.size().height()) / 2
+        painter.save()
+        painter.translate(option.rect.left() + _TEXT_INSET, option.rect.top() + inset)
+        painter.setClipRect(0, 0, option.rect.width() - _TEXT_INSET, option.rect.height())
+        document.documentLayout().draw(painter, context)
+        painter.restore()
+
+
+def details_document(text: str, font) -> QTextDocument:
+    document = QTextDocument()
+    document.setDefaultFont(font)
+    document.setDocumentMargin(0)
+    document.setHtml(as_rich_text(text))
+    return document
 
 
 _NO_RUN_PICKED = "Select a run to view details"
@@ -171,7 +200,7 @@ class RunDetailWidget(QWidget):
         self._table.setItem(i, 0, num_item)
 
         name_item = QTableWidgetItem(stage_label(stage_key))
-        name_item.setToolTip(STAGE_TOOLTIPS.get(stage_key, ""))
+        name_item.setToolTip(as_rich_text(STAGE_TOOLTIPS.get(stage_key, "")))
         name_item.setFlags(no_edit)
         self._table.setItem(i, 1, name_item)
 
