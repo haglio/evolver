@@ -178,8 +178,15 @@ def _recorded_in_the_gallery() -> Callable[[Path], bool] | None:
     return lambda upscale: found(upscale) is not None
 
 
+_PAGE_ID_AFTER_THE_SITES_NAME = re.compile(
+    r"-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$")
+
+
 def _provider_image_url(video: Path, base_url: str) -> str:
-    return f"{base_url}/image/{source_stem(video.stem)}"
+    stem = source_stem(video.stem)
+    named_with_the_site = _PAGE_ID_AFTER_THE_SITES_NAME.search(stem)
+    page_id = named_with_the_site.group(1) if named_with_the_site else stem
+    return f"{base_url}/image/{page_id}"
 
 
 @dataclass(frozen=True)
