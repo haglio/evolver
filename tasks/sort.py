@@ -81,6 +81,7 @@ def run(*, inbox_dir: Path | None = None, sorted_dir: Path | None = None,
                 result.made_again += 1
                 result.moved_files.append(dest)
             elif _move_unique(src, dest):
+                _carry_its_script(src, (dest,), made_by_a_program=lanes.sent_by_origenerator(source))
                 result.moved += 1
                 result.moved_files.append(dest)
             else:
@@ -139,7 +140,7 @@ def _take_the_remake(src: Path, dest: Path, upscale: Path | None,
                      gallery: GalleryRecords) -> None:
     log.info("MADE AGAIN (taking the place of its sorted copy): %s  ->  %s", src, dest)
     src.replace(dest)
-    _carry_its_script(src, (dest,) if upscale is None else (dest, upscale))
+    _carry_its_script(src, (dest,) if upscale is None else (dest, upscale), made_by_a_program=True)
     if upscale is not None:
         _upscale_again(upscale, gallery)
 
@@ -151,14 +152,15 @@ def _upscale_again(upscale: Path, gallery: GalleryRecords) -> None:
                     "it may not be enhanced again", upscale)
 
 
-def _carry_its_script(handed_over: Path, copies: tuple[Path, ...]) -> None:
-    for script in (handed_over.with_suffix(config.FUNSCRIPT_EXTENSION),
-                   script_library.script_path_for_video(handed_over)):
+def _carry_its_script(handed_over: Path, copies: tuple[Path, ...], *, made_by_a_program: bool) -> None:
+    beside = handed_over.with_suffix(config.FUNSCRIPT_EXTENSION)
+    for script in (beside, *script_library.scripts_held_for(handed_over)):
         if script.is_file():
             for copy in copies:
                 copied_to = script_library.script_path_for_video(copy)
                 script_library.copy_script(script, copied_to)
-                script_library.mark_generated(copied_to)
+                if made_by_a_program:
+                    script_library.mark_generated(copied_to)
             script_library.delete_script(script)
             return
 
