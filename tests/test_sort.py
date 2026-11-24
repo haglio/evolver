@@ -195,5 +195,38 @@ class TestAVideoOrigeneratorMadeAgain(unittest.TestCase):
         assert any("did not forget what made" in line for line in said.output)
 
 
+class TestAScriptHandedOverBesideItsVideo(unittest.TestCase):
+    def _handed_over(self, lib: LaneLibrary, source: str) -> Path:
+        video = touch_video(lib.inbox / source / "clip one.mp4")
+        video.with_suffix(".funscript").write_text("{}", encoding="utf-8")
+        with patch("tasks.sort.orientation_of", return_value="landscape"):
+            sort_task.run(gallery=FakeGallery())
+        return video
+
+    def _sorted_script(self, lib: LaneLibrary, source: str) -> Path:
+        return lib.scripts / "2D" / "AI" / "1_sorted" / source / "landscape" / "clip one.funscript"
+
+    def test_goes_with_its_video_into_the_sorted_scripts_marked_as_made_by_a_program(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                handed_over = self._handed_over(lib, lanes.ORIGENERATOR_SOURCE)
+
+                script = self._sorted_script(lib, lanes.ORIGENERATOR_SOURCE)
+                assert script.read_text(encoding="utf-8") == "{}"
+                assert script_library.is_marked_generated(script)
+                assert not handed_over.with_suffix(".funscript").exists()
+
+    def test_from_another_source_goes_with_its_video_unmarked(self):
+        with workspace_temp_dir() as root:
+            lib = LaneLibrary(root)
+            with lib.config():
+                self._handed_over(lib, "examplesource")
+
+                script = self._sorted_script(lib, "examplesource")
+                assert script.is_file()
+                assert not script_library.is_marked_generated(script)
+
+
 if __name__ == "__main__":
     unittest.main()
