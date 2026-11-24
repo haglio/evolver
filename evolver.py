@@ -271,7 +271,8 @@ SECTIONS: tuple[Section, ...] = (
         Stage("funscript_drafts", "Make funscripts",
               "Have GoblinScript draft a funscript for each video in the library that has none, newest first, "
               "marked as a script no person wrote; a Kino video and the `1_sorted` video it was made from "
-              "get one funscript between them through Scripts sync, so the two are never drafted twice",
+              "get one funscript between them through Scripts sync, so the two are never drafted twice, "
+              f"and a Genau {_FLICK} gets none",
               (0x00, 0x9E, 0xD8), run=_make_funscripts),
         Stage("clip_scripts", "Transfer scene funscripts to clips",
               "Cut each clip's funscript out of its scene's, from the point where the clip was found in the scene",
