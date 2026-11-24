@@ -3,7 +3,6 @@ from __future__ import annotations
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QHeaderView,
     QItemDelegate,
     QLabel,
@@ -15,14 +14,21 @@ from PySide6.QtWidgets import (
     QStyle,
     QTableWidget,
     QTableWidgetItem,
-    QToolBar,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
-from shared_ui.chrome import style_toolbar
+from shared_ui.chrome import toolbar_rules
+from shared_ui.flow_layout import FlowLayout
 from shared_ui.icons import inline_icon
-from shared_ui.spacing import BUTTON_GAP, BUTTON_ICON, GAP_SMALL, MARGIN_STANDARD
+from shared_ui.spacing import (
+    BUTTON_GAP,
+    BUTTON_GROUP_GAP,
+    BUTTON_ICON,
+    BUTTON_ROW_GAP,
+    GAP_SMALL,
+    MARGIN_STANDARD,
+)
 from shared_ui.toggle_switch import ToggleSwitch
 
 import config
@@ -171,16 +177,17 @@ class EvolverMainWindow(QMainWindow):
         self.setWindowTitle("Evolver")
         self.setContentsMargins(0, MARGIN_STANDARD, 0, 0)
         self.setMinimumSize(800, 500)
-        toolbar = self._build_toolbar()
-        self.resize(max(1000, self._toolbar_width_when_paused(toolbar)), 600)
+        header = self._build_header()
 
         central = QWidget()
         self.setCentralWidget(central)
-        main_layout = QHBoxLayout(central)
+        main_layout = QVBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        main_layout.addWidget(header)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, stretch=1)
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
@@ -197,72 +204,62 @@ class EvolverMainWindow(QMainWindow):
         splitter.addWidget(self._detail_widget)
 
         splitter.setSizes([300, 700])
+        self.resize(max(1000, self._width_on_one_row_when_paused()), 600)
 
         self._records: list[RunRecord] = []
         self._runs_shown = config.RUNS_SHOWN
 
-    def _build_toolbar(self):
-        toolbar = QToolBar()
-        toolbar.setMovable(False)
-        toolbar.setFloatable(False)
-        toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        toolbar.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
-        style_toolbar(toolbar)
-        self.addToolBar(toolbar)
-        toolbar.addWidget(_toolbar_end())
-
+    def _build_header(self) -> QWidget:
         history_header = QLabel("Run history")
         font = history_header.font()
         font.setBold(True)
         history_header.setFont(font)
-        toolbar.addWidget(history_header)
         self._next_run_label = QLabel("")
-        toolbar.addWidget(self._next_run_label)
-
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        toolbar.addWidget(spacer)
+        self._header_labels = (history_header, self._next_run_label)
 
         self.run_now_action = RUN_NOW.action(self)
-        toolbar.addAction(self.run_now_action)
-
         self.pause_action = PAUSE.action(self)
-        toolbar.addAction(self.pause_action)
-
         self.nonai_action = NONAI.action(self)
         self.nonai_switch = ToggleSwitch()
         self.nonai_action.triggered.connect(self.nonai_switch.click)
-        toolbar.addWidget(SwitchButton(self.nonai_action, self.nonai_switch))
-
-        toolbar.addSeparator()
-
         self.settings_action = SETTINGS.action(self)
-        toolbar.addAction(self.settings_action)
-
         self.stats_action = STATS.action(self)
-        toolbar.addAction(self.stats_action)
-
-        toolbar.addSeparator()
-
         self.queue_action = QUEUE.action(self)
-        toolbar.addAction(self.queue_action)
-
         self.review_trash_action = REVIEW_TRASH.action(self)
-        toolbar.addAction(self.review_trash_action)
-
-        toolbar.addSeparator()
-
         self.restart_action = RESTART.action(self)
-        toolbar.addAction(self.restart_action)
-
         self.quit_action = QUIT.action(self)
-        toolbar.addAction(self.quit_action)
-        toolbar.addWidget(_toolbar_end())
-        return toolbar
+        self._button_groups = [
+            [_toolbar_button(self.run_now_action), _toolbar_button(self.pause_action),
+             SwitchButton(self.nonai_action, self.nonai_switch)],
+            [_toolbar_button(self.settings_action), _toolbar_button(self.stats_action)],
+            [_toolbar_button(self.queue_action), _toolbar_button(self.review_trash_action)],
+            [_toolbar_button(self.restart_action), _toolbar_button(self.quit_action)],
+        ]
 
-    def _toolbar_width_when_paused(self, toolbar: QToolBar) -> int:
-        pause = toolbar.widgetForAction(self.pause_action)
-        return (toolbar.sizeHint().width() + _growth(pause, pause_or_resume(is_paused=True))
+        self._button_row = QWidget()
+        self._button_row.setStyleSheet(toolbar_rules())
+        policy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        policy.setHeightForWidth(True)
+        self._button_row.setSizePolicy(policy)
+        row = FlowLayout(self._button_row, spacing=BUTTON_GAP, row_spacing=BUTTON_ROW_GAP,
+                         group_spacing=BUTTON_GROUP_GAP, least_row_height=self._tallest_button)
+        row.setContentsMargins(MARGIN_STANDARD, 0, MARGIN_STANDARD, 0)
+        for label in self._header_labels:
+            row.addWidget(label)
+        for group in self._button_groups:
+            row.add_group(group, trailing=True)
+        return self._button_row
+
+    def _tallest_button(self) -> int:
+        return max(button.sizeHint().height() for group in self._button_groups for button in group)
+
+    def _width_on_one_row_when_paused(self) -> int:
+        margins = self._button_row.layout().contentsMargins()
+        items = [*self._header_labels, *(button for group in self._button_groups for button in group)]
+        gaps = BUTTON_GAP * (len(items) - len(self._button_groups)) + BUTTON_GROUP_GAP * (len(self._button_groups) - 1)
+        pause = _button_for(self._button_groups, self.pause_action)
+        return (margins.left() + sum(item.sizeHint().width() for item in items) + gaps + margins.right()
+                + _growth(pause, pause_or_resume(is_paused=True))
                 + _growth(self._next_run_label, _in_parentheses(ScheduleStatus.longest_activity())))
 
     def commands(self):
@@ -315,10 +312,17 @@ class EvolverMainWindow(QMainWindow):
         self.hide()
 
 
-def _toolbar_end() -> QWidget:
-    end = QWidget()
-    end.setFixedWidth(MARGIN_STANDARD - BUTTON_GAP)
-    return end
+def _toolbar_button(action) -> QToolButton:
+    button = QToolButton()
+    button.setDefaultAction(action)
+    button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+    button.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
+    return button
+
+
+def _button_for(groups: list[list[QToolButton]], action) -> QToolButton:
+    [button] = [button for group in groups for button in group if button.defaultAction() is action]
+    return button
 
 
 def _in_parentheses(words: str) -> str:

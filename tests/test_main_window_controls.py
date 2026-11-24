@@ -8,7 +8,6 @@ import pytest
 from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QIcon, QPalette, QTextDocument
 from PySide6.QtWidgets import (
-    QAbstractButton,
     QLabel,
     QMessageBox,
     QToolBar,
@@ -16,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 from shared_ui.colors import BG_BUTTON, BORDER_SUBTLE, GREEN, RED, TOGGLE_ON
 from shared_ui.icons import icon_pixmap, inline_icon
-from shared_ui.spacing import MARGIN_STANDARD
+from shared_ui.spacing import BUTTON_GAP, MARGIN_STANDARD
 from shared_ui.testing import questions_answered
 
 from evolver import STAGE_LABELS, STAGE_TOOLTIPS
@@ -422,14 +421,12 @@ def _menu_entries(tray):
 
 
 def _toolbar_entries(window):
-    [toolbar] = window.findChildren(QToolBar)
-    entries = ["---" if action.isSeparator() else _words_on(toolbar.widgetForAction(action))
-               for action in toolbar.actions()]
-    return [entry for entry in entries if entry]
-
-
-def _words_on(widget):
-    return widget.text() if isinstance(widget, QAbstractButton | QLabel) else ""
+    entries = []
+    for group in window._button_groups:
+        if entries:
+            entries.append("---")
+        entries += [button.text() for button in group]
+    return entries
 
 
 class TestToolbarMatchesTheTrayMenu:
@@ -447,26 +444,20 @@ class TestToolbarMatchesTheTrayMenu:
         assert bar[bar.index("Run now"):] == menu[menu.index("Run now"):]
 
 
-def test_the_toolbar_is_styled_the_way_that_holds_on_any_address():
-    with patch("gui.main_window.style_toolbar") as styled:
-        window = EvolverMainWindow()
-
-    [toolbar] = window.findChildren(QToolBar)
-    styled.assert_called_once_with(toolbar)
-
-
 def _shown(window):
     window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
     window.show()
     QAPP.processEvents()
-    [toolbar] = window.findChildren(QToolBar)
-    return toolbar
+    return window._button_row
 
 
-def _button_for(toolbar, action):
-    [button] = [widget for widget in map(toolbar.widgetForAction, toolbar.actions())
-                if isinstance(widget, QToolButton) and widget.defaultAction() is action]
+def _button_for(row, action):
+    [button] = [widget for widget in row.findChildren(QToolButton) if widget.defaultAction() is action]
     return button
+
+
+def _top_left(widget, window) -> QPoint:
+    return widget.mapTo(window, QPoint(0, 0))
 
 
 def _columns_wearing(image, color) -> list[int]:
@@ -477,8 +468,7 @@ def _columns_wearing(image, color) -> list[int]:
 def _as_painted(window, action):
     window.show()
     QAPP.processEvents()
-    [toolbar] = window.findChildren(QToolBar)
-    button = _button_for(toolbar, action)
+    button = _button_for(window._button_row, action)
     painted = QAPP.primaryScreen().grabWindow(window.winId()).toImage()
     return button, painted.copy(QRect(button.mapTo(window, QPoint(0, 0)), button.size()))
 
@@ -519,7 +509,7 @@ class TestToolbarSpacing:
         toolbar = _shown(window)
 
         def room_around_the_words(action):
-            button = toolbar.widgetForAction(action)
+            button = _button_for(toolbar, action)
             return button.width() - button.fontMetrics().horizontalAdvance(button.text())
 
         assert (room_around_the_words(window.pause_action)
@@ -527,14 +517,14 @@ class TestToolbarSpacing:
 
     def test_quit_stands_the_familys_margin_in_from_the_windows_right_edge(self, window):
         toolbar = _shown(window)
-        quit_button = toolbar.widgetForAction(window.quit_action)
+        quit_button = _button_for(toolbar, window.quit_action)
 
         assert window.width() - (quit_button.mapTo(window, QPoint(0, 0)).x() + quit_button.width()) == MARGIN_STANDARD
 
     def test_the_buttons_stand_the_familys_margin_below_the_windows_top_edge(self, window):
         toolbar = _shown(window)
 
-        assert toolbar.widgetForAction(window.run_now_action).mapTo(window, QPoint(0, 0)).y() == MARGIN_STANDARD
+        assert _button_for(toolbar, window.run_now_action).mapTo(window, QPoint(0, 0)).y() == MARGIN_STANDARD
 
 
 class TestTheNextRunSitsBesideRunHistory:
@@ -560,16 +550,25 @@ class TestTheNextRunSitsBesideRunHistory:
 
     def test_run_history_sits_on_the_buttons_row_so_it_takes_no_line_of_its_own(self, window):
         heading = self._shown_with(window, ScheduleStatus(is_running=True))
-        [toolbar] = window.findChildren(QToolBar)
+        run_now = _button_for(window._button_row, window.run_now_action)
 
-        assert toolbar.isAncestorOf(heading)
-        assert toolbar.isAncestorOf(window._next_run_label)
+        assert (_top_left(heading, window).y() + heading.height() // 2
+                == _top_left(run_now, window).y() + run_now.height() // 2)
+        assert _top_left(window._history_list, window).y() > _top_left(run_now, window).y() + run_now.height()
 
     def test_run_history_starts_where_the_list_under_it_starts(self, window):
         heading = self._shown_with(window, ScheduleStatus(is_running=True))
 
         assert (heading.mapTo(window, QPoint(0, 0)).x()
                 == window._history_list.mapTo(window, QPoint(0, 0)).x())
+
+
+def _rows_of(window) -> dict[int, list[QToolButton]]:
+    rows: dict[int, list[QToolButton]] = {}
+    for group in window._button_groups:
+        for button in group:
+            rows.setdefault(_top_left(button, window).y(), []).append(button)
+    return rows
 
 
 class TestTheWholeToolbarShows:
@@ -579,15 +578,47 @@ class TestTheWholeToolbarShows:
         ScheduleStatus(is_running=True),
         ScheduleStatus(is_paused=True),
     ], ids=["scheduled", "running", "paused"])
-    def test_in_the_window_as_it_opens_whatever_the_schedule_line_says(self, window, status):
-        window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
+    def test_on_one_row_as_the_window_opens_whatever_the_next_run_line_says(self, window, status):
         window.show_schedule(status)
-        window.show()
-        QAPP.processEvents()
+        _shown(window)
 
-        [toolbar] = window.findChildren(QToolBar)
-        more = toolbar.findChild(QToolButton, "qt_toolbar_ext_button")
-        assert not more.isVisible()
+        assert len(_rows_of(window)) == 1
+
+    def test_no_button_hides_behind_a_more_button(self, window):
+        assert window.findChildren(QToolBar) == []
+
+
+class TestANarrowWindowWrapsItsButtons:
+
+    def _narrow(self, window):
+        _shown(window)
+        widest_group = max(sum(button.width() for button in group) + BUTTON_GAP * (len(group) - 1)
+                           for group in window._button_groups)
+        window.resize(max(window.minimumWidth(), widest_group + 2 * MARGIN_STANDARD + 10), window.height())
+        QAPP.processEvents()
+        return _rows_of(window)
+
+    def test_buttons_that_do_not_fit_move_down_to_a_second_row(self, window):
+        assert len(self._narrow(window)) >= 2
+
+    def test_no_group_is_split_across_two_rows(self, window):
+        self._narrow(window)
+
+        for group in window._button_groups:
+            assert len({_top_left(button, window).y() for button in group}) == 1, [b.text() for b in group]
+
+    def test_every_row_lines_up_with_the_right_edge(self, window):
+        rows = self._narrow(window)
+
+        right_edges = {max(_top_left(button, window).x() + button.width() for button in row)
+                       for row in rows.values()}
+        assert right_edges == {window.width() - MARGIN_STANDARD}
+
+    def test_run_history_stays_on_the_first_row(self, window):
+        rows = self._narrow(window)
+        [heading] = [label for label in window.findChildren(QLabel) if label.text() == "Run history"]
+
+        assert _top_left(heading, window).y() <= min(rows)
 
 
 class TestMainWindowToolbarExists:
