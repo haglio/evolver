@@ -653,6 +653,11 @@ class TestProviderImageUrl(unittest.TestCase):
         video = Path(f"C:/videos/0_inbox/provider/example-site-{page_id}.mp4")
         assert prompt_scrape._provider_image_url(video, config.PROVIDER_BASE_URL) == f"{config.PROVIDER_BASE_URL}/image/{page_id}"
 
+    def test_words_after_the_id_do_not_hide_its_page(self):
+        page_id = "0a1b2c3d-0000-4000-8000-00000000abcd"
+        video = Path(f"C:/videos/0_inbox/provider/example site {page_id} (1).mp4")
+        assert prompt_scrape._provider_image_url(video, config.PROVIDER_BASE_URL) == f"{config.PROVIDER_BASE_URL}/image/{page_id}"
+
 
 class TestExtractMetadataFields(unittest.TestCase):
     def test_extracts_label_value_pairs(self):
