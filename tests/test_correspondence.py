@@ -154,7 +154,31 @@ class TestTheGenauLane:
             result = check_correspondence.run()
 
             assert result.ok
-            assert result.upscale_count == 2
+            assert (result.upscale_count, result.upscale_flicks) == (1, 1)
+
+    def test_the_genau_lanes_copies_are_counted_apart_from_the_videos(self):
+        with _library() as lib:
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            _kino(lib, "sourceA", "landscape", "clip-a_topaz.mp4")
+            _sorted(lib, GENAU_SOURCE, "portrait", "loop_2.mp4")
+            _sorted(lib, GENAU_SOURCE, "portrait", "loop_3.mp4")
+            _flick(lib, "loop_2_topaz.mp4")
+            _flick(lib, "loop_3_topaz.mp4")
+            _flick(lib, "loop_4_topaz.mp4")
+
+            result = check_correspondence.run()
+
+            assert ((result.sorted_count, result.sorted_flicks), (result.upscale_count, result.upscale_flicks)) == (
+                (1, 2), (1, 3))
+
+    def test_a_flick_in_genaus_folder_and_its_trash_is_a_duplicate_flick(self):
+        with _library() as lib:
+            _flick(lib, "loop_5_topaz.mp4")
+            touch_video(lib.genau_trash / "loop_5_topaz.mp4")
+
+            result = check_correspondence.run()
+
+            assert (list(result.duplicates), list(result.duplicate_flicks)) == ([], ["loop_5_topaz.mp4"])
 
     def test_a_sorted_flicks_upscale_counts_only_where_genau_plays_it(self):
         with _library() as lib:
@@ -163,7 +187,8 @@ class TestTheGenauLane:
 
             result = check_correspondence.run()
 
-            assert result.orphan_sorted == [str(Path(GENAU_SOURCE) / "landscape" / "loop_1.mp4")]
+            assert result.orphan_sorted == []
+            assert result.orphan_sorted_flicks == [str(Path(GENAU_SOURCE) / "landscape" / "loop_1.mp4")]
             assert result.orphan_upscales == [
                 str(Path("videos") / "videos" / "kino" / "2D" / "AI" / "landscape" / GENAU_SOURCE / "loop_1_topaz.mp4")]
 
@@ -294,8 +319,7 @@ class TestTheExitCodeAShellOrScheduledTaskReads:
 
         out = capsys.readouterr().out
         assert exit_code == 1
-        assert "Evolver found `1_sorted` videos and enhanced videos that do not match." in out
-        assert "Enhanced videos in the Kino and Genau folders: 1" in out
+        assert "Enhanced videos in Kino's folder: 1" in out
         assert "Enhanced videos without their `1_sorted` video: 1" in out
         assert "clip-b_topaz.mp4" in out
         assert "`1_sorted` videos without their enhanced video: 1" in out
@@ -310,3 +334,21 @@ class TestTheExitCodeAShellOrScheduledTaskReads:
         out = capsys.readouterr().out
         assert "Genau loopies missing from Genau's folder: 1" in out
         assert "Genau flicks" not in out
+
+    def test_the_genau_lanes_copies_are_counted_and_named_apart_in_the_word_genau_shows(self, capsys):
+        with _library() as lib, patch("config.GENAU_FLICK_WORDS", ("loopy", "loopies")):
+            _sorted(lib, "sourceA", "landscape", "clip-a.mp4")
+            _sorted(lib, GENAU_SOURCE, "portrait", "loop_6.mp4")
+            _flick(lib, "loop_7_topaz.mp4")
+            touch_video(lib.genau_trash / "loop_7_topaz.mp4")
+
+            check_correspondence.main()
+
+        out = capsys.readouterr().out
+        assert [line for line in out.splitlines() if "loop" in line and ".mp4" not in line] == [
+            "Evolver found `1_sorted` and enhanced videos or loopies that do not match.",
+            "`1_sorted` loopies: 1",
+            "Enhanced loopies in Genau's folder: 2",
+            "`1_sorted` loopies without their enhanced loopy: 1",
+            "Enhanced loopy names in more than one place: 1",
+        ]
