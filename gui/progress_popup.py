@@ -28,10 +28,7 @@ class ProgressPopup(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Evolver - Pipeline progress")
-        self.setWindowFlags(
-            Qt.WindowType.Tool
-            | Qt.WindowType.WindowCloseButtonHint
-        )
+        self.setWindowFlags(Qt.WindowType.Window)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)
 

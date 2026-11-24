@@ -61,10 +61,11 @@ class TestPopupConstruction(unittest.TestCase):
     def test_total_bar_range_is_100_per_stage(self):
         assert self.popup._total_bar.maximum() == 100 * len(ALL_STAGES)
 
-    def test_window_flags_include_tool_without_stay_on_top(self):
+    def test_it_is_a_normal_window_that_does_not_stay_on_top(self):
         flags = self.popup.windowFlags()
         assert not flags & Qt.WindowType.WindowStaysOnTopHint
-        assert flags & Qt.WindowType.Tool
+        assert self.popup.windowType() == Qt.WindowType.Window, (
+            "a tool window wears Windows' thin title bar and small X, unlike every other Haglio window")
 
 
 class TestPopupStageLifecycle(unittest.TestCase):
@@ -161,7 +162,6 @@ class TestPopupPositioning(unittest.TestCase):
         popup = ProgressPopup()
         popup.show_over(anchor)
 
-        # Tool windows have a smaller title bar than QMainWindow on Windows.
         anchor_center = anchor.frameGeometry().center()
         popup_center = popup.frameGeometry().center()
         assert popup_center.x() == pytest.approx(anchor_center.x(), abs=5)
