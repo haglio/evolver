@@ -144,20 +144,17 @@ class TestBookmarksSync(unittest.TestCase):
             assert [(folder["name"], folder["guid"]) for folder in folders] == [("Fun Time Faves", "folder-guid")]
             assert [child["url"] for child in folders[0]["children"]] == ["https://example.com/a"]
 
-    def test_a_favorite_from_a_site_evolver_knows_is_bookmarked_at_the_page_its_name_gives(self):
+    def test_a_favorite_from_a_site_evolver_knows_with_no_recorded_page_is_counted_and_not_guessed(self):
         with workspace_temp_dir() as root:
             library = LaneLibrary(root)
             faves = SiteFavorites(library)
-            user_data_dir, bookmarks_path = chrome_profile(root)
+            user_data_dir, _bookmarks_path = chrome_profile(root)
             faves.add("1234-abcd_topaz.mp4")
 
             with override_config(SITE_PAGE_BASES={"a-site": "https://a-site.example"}):
                 result = self._sync(library, user_data_dir)
 
-            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
-            urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
-        assert urls == ["https://a-site.example/image/1234-abcd"]
-        assert (result.added, result.untaught) == (1, 0)
+        assert (result.added, result.no_url, result.untaught) == (0, 1, 0)
 
     def test_a_favorite_from_a_site_evolver_was_never_taught_is_counted_apart(self):
         with workspace_temp_dir() as root:

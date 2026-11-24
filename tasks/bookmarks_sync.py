@@ -16,7 +16,7 @@ from app_support.gallery_rows import OUTSIDE, source_of
 from app_support.kino_folder import is_ai_video
 
 import config
-from util import lanes, origenerator_gallery, site_pages
+from util import lanes, origenerator_gallery
 from util.origenerator_gallery import EVOLVER_UPSCALE, STARRED, WEB_URL
 from util.stage_result import StageResult
 
@@ -34,6 +34,7 @@ class BookmarksSyncResult(StageResult):
     removed: int = 0
     already: int = 0
     untaught: int = 0
+    no_url: int = 0
     bad_url: int = 0
     profile_missing: bool = False
     write_error: str = ""
@@ -48,6 +49,7 @@ class BookmarksSyncResult(StageResult):
 class _Favorites:
     urls: list[str] = field(default_factory=list)
     untaught: int = 0
+    no_url: int = 0
     bad_url: int = 0
 
 
@@ -76,12 +78,13 @@ def run(
     if not lanes.kino_upscales_dir().is_dir():
         log.info("Kino's folder cannot be reached. Skipping bookmarks sync.")
         return result
-    starred = _starred_site_videos(config.SITE_PAGE_BASES)
+    starred = _starred_site_videos()
     if starred is None:
         result.gallery_unread = True
         return result
-    favorites = _pages_of(starred)
+    favorites = _pages_of(starred, config.SITE_PAGE_BASES)
     result.untaught = favorites.untaught
+    result.no_url = favorites.no_url
     result.bad_url = favorites.bad_url
 
     profile_dir = _find_profile_dir(chrome_user_data_dir, chrome_profile_name)
@@ -111,18 +114,19 @@ def run(
 
     log.info(
         "Bookmarks sync done. Added: %d, Removed: %d, Already there: %d, Untaught site: %d, "
-        "Bad URL: %d, Target: %s",
+        "No page: %d, Bad URL: %d, Target: %s",
         result.added,
         result.removed,
         result.already,
         result.untaught,
+        result.no_url,
         result.bad_url,
         bookmarks_path,
     )
     return result
 
 
-def _starred_site_videos(site_page_bases: Mapping[str, str]) -> list[Favorite] | None:
+def _starred_site_videos() -> list[Favorite] | None:
     try:
         rows = origenerator_gallery.rows(("prompt_id", "output_files"),
                                          optional=(EVOLVER_UPSCALE, STARRED, WEB_URL, "source"))
@@ -132,7 +136,7 @@ def _starred_site_videos(site_page_bases: Mapping[str, str]) -> list[Favorite] |
         log.warning("Could not read Origenerator's gallery; the bookmarks are left as they were.",
                     exc_info=True)
         return None
-    return [Favorite(video=video, page=row.get(WEB_URL) or site_pages.page_of(video, site_page_bases) or "")
+    return [Favorite(video=video, page=row.get(WEB_URL) or "")
             for row in rows if row.get(STARRED) and source_of(row) == OUTSIDE
             for video in _ai_videos_of(row)]
 
@@ -142,10 +146,13 @@ def _ai_videos_of(row: dict) -> list[Path]:
             if is_ai_video(place) and place.is_file()]
 
 
-def _pages_of(favorites: Iterable[Favorite]) -> _Favorites:
+def _pages_of(favorites: Iterable[Favorite], site_page_bases: Mapping[str, str]) -> _Favorites:
     urls: list[str] = []
-    untaught = bad_url = 0
+    untaught = no_url = bad_url = 0
     for favorite in favorites:
+        if not favorite.page and favorite.video.parent.name in site_page_bases:
+            no_url += 1
+            continue
         if not favorite.page:
             untaught += 1
             continue
@@ -155,7 +162,7 @@ def _pages_of(favorites: Iterable[Favorite]) -> _Favorites:
             log.warning("Skipping a favorite whose page is no web address: %s", favorite.video)
             continue
         urls.append(favorite.page)
-    return _Favorites(urls=list(dict.fromkeys(urls)), untaught=untaught, bad_url=bad_url)
+    return _Favorites(urls=list(dict.fromkeys(urls)), untaught=untaught, no_url=no_url, bad_url=bad_url)
 
 
 def _find_profile_dir(user_data_dir: Path, profile_name: str) -> Path | None:
