@@ -4,6 +4,7 @@ import os
 import tempfile
 from datetime import tzinfo
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -118,6 +119,8 @@ def kept_by_other_apps() -> tuple[Path, Path]:
 _SCRAPE_PROVIDER = overlay_value(_CONTENT, "scrape_provider", path=LOCAL_CONTENT)
 PROVIDER_SOURCE   = _SCRAPE_PROVIDER["source"]
 PROVIDER_BASE_URL = _SCRAPE_PROVIDER["base_url"]
+SITE_PAGE_BASES = MappingProxyType({**(_CONTENT.get("site_page_bases") or {}),
+                                    PROVIDER_SOURCE: PROVIDER_BASE_URL})
 CAMERA_PREFIXES = tuple(
     camera["prefix"] for camera in overlay_value(_CONTENT, "cameras", path=LOCAL_CONTENT))
 PROMPT_BROWSER_PROFILE_DIR = Path(tempfile.gettempdir()) / "evolver-prompt-browser-profile"
