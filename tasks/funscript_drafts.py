@@ -19,7 +19,12 @@ from app_support.subprocess_utils import hidden_subprocess_kwargs
 from tasks import vr_draft
 from util import lanes
 from util.media_files import library_videos
-from util.script_library import is_marked_generated, mark_generated, script_path_for_video
+from util.script_library import (
+    made_by_goblinscript,
+    mark_generated,
+    script_path_for_video,
+    written_by_no_person,
+)
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -290,13 +295,8 @@ class _Settled:
         return script.is_file() and not self._written_by_no_person_and_not_by_goblinscript(script)
 
     def _written_by_no_person_and_not_by_goblinscript(self, script: Path) -> bool:
-        written_by_no_person = script.is_relative_to(self._origenerators) or is_marked_generated(script)
-        return written_by_no_person and not _made_by_goblinscript(script)
-
-
-def _made_by_goblinscript(script: Path) -> bool:
-    metadata = funscript.read(script).get(funscript.METADATA)
-    return isinstance(metadata, dict) and str(metadata.get("creator") or "").startswith("GoblinScript")
+        return (written_by_no_person(script, origenerator_scripts=self._origenerators)
+                and not made_by_goblinscript(script))
 
 
 def _sorted_videos_not_yet_upscaled(library: Library) -> list[Path]:

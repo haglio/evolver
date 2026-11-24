@@ -14,6 +14,7 @@ from app_support.funscript import (
     generated_mark_of,
     script_of,
 )
+from app_support.funscript import read as read_script
 
 import config
 from util import provenance
@@ -54,6 +55,15 @@ def mark_generated(script: Path) -> None:
 def is_marked_generated(script: Path) -> bool:
     mark = generated_mark(script)
     return mark is not None and mark.exists()
+
+
+def written_by_no_person(script: Path, *, origenerator_scripts: Path) -> bool:
+    return script.is_relative_to(origenerator_scripts) or is_marked_generated(script)
+
+
+def made_by_goblinscript(script: Path) -> bool:
+    metadata = read_script(script).get(METADATA)
+    return isinstance(metadata, dict) and str(metadata.get("creator") or "").startswith("GoblinScript")
 
 
 def copy_mark(script: Path, copied_to: Path) -> None:
