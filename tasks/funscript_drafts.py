@@ -64,6 +64,7 @@ class Library:
     origenerator_videos: Path
     origenerator_scripts: Path
     actions_given_no_funscript: frozenset[str] = frozenset()
+    flick_workflows: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -308,17 +309,19 @@ def _sorted_videos_not_yet_upscaled(library: Library) -> list[Path]:
 
 def _given_no_funscript(library: Library) -> Callable[[Path], bool]:
     left_out = library.actions_given_no_funscript
-    if not left_out:
+    flicks = library.flick_workflows
+    if not (left_out or flicks):
         return lambda video: False
     found = gallery_rows.rows(("prompt_id", "output_files", "evolver_upscale", "video_actions"),
-                              db_path=library.gallery)
-    actions_by_id = {row["prompt_id"]: _actions_in(row) for row in found}
+                              optional=("workflow_name",), db_path=library.gallery)
+    by_id = {row["prompt_id"]: row for row in found}
     row_of = gallery_rows.VideoRows(found)
 
-    def every_action_is_given_no_funscript(video: Path) -> bool:
-        actions = actions_by_id.get(row_of(video) or "", set())
-        return bool(actions) and actions <= left_out
-    return every_action_is_given_no_funscript
+    def is_a_flick_or_every_action_is_given_no_funscript(video: Path) -> bool:
+        row = by_id.get(row_of(video) or "", {})
+        actions = _actions_in(row)
+        return row.get("workflow_name") in flicks or (bool(actions) and actions <= left_out)
+    return is_a_flick_or_every_action_is_given_no_funscript
 
 
 def _actions_in(row: dict) -> set[str]:

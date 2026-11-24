@@ -53,14 +53,16 @@ def _origenerator_scripts(tmp_path: Path) -> Path:
 
 
 def _drafted(goblin_home: Path, tmp_path: Path, fake: FakeGoblin, *,
-             actions_given_no_funscript: frozenset[str] = frozenset(), **given):
+             actions_given_no_funscript: frozenset[str] = frozenset(),
+             flick_workflows: frozenset[str] = frozenset(), **given):
     lanes = LaneLibrary(tmp_path)
     return funscript_drafts.run(
         library=funscript_drafts.Library(videos=lanes.library, sorted_videos=lanes.sorted_dir,
                                          gallery=lanes.gallery_db,
                                          origenerator_videos=lanes.origenerator,
                                          origenerator_scripts=_origenerator_scripts(tmp_path),
-                                         actions_given_no_funscript=actions_given_no_funscript),
+                                         actions_given_no_funscript=actions_given_no_funscript,
+                                         flick_workflows=flick_workflows),
         goblin=funscript_drafts.Goblin(goblin_home),
         drafting=funscript_drafts.Drafting.kept_in(tmp_path / "state"),
         start=fake.start, still_running=fake.still_running, **given)
@@ -130,6 +132,32 @@ def test_only_a_video_whose_actions_are_set_and_all_given_no_funscript_is_skippe
     _drafted(goblin_home, tmp_path, fake, actions_given_no_funscript=frozenset({"alpha"}))
 
     assert sorted(fake.started[0][3:-7]) == sorted([str(with_one_drafted), str(not_set)])
+
+
+def _gallery_with_workflows(path: Path, workflow_of: dict[Path, str]) -> None:
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE generations (prompt_id TEXT, output_files TEXT, evolver_upscale TEXT, "
+                 "video_actions TEXT, workflow_name TEXT)")
+    for number, (video, workflow) in enumerate(workflow_of.items()):
+        conn.execute("INSERT INTO generations VALUES (?, ?, '', '[]', ?)",
+                     (f"made-{number}", json.dumps([{"filename": video.name, "path": str(video)}]),
+                      workflow))
+    conn.commit()
+    conn.close()
+
+
+def test_an_origenerator_video_whose_item_is_a_genau_flick_gets_no_funscript(library, goblin_home, tmp_path):
+    flick = touch_video(library.origenerator / "video" / "loop one.mp4")
+    video = touch_video(library.origenerator / "video" / "video one.mp4")
+    unknown = touch_video(library.origenerator / "video" / "video two.mp4")
+    _gallery_with_workflows(library.gallery_db, {flick: "made-up loop", video: "made-up motion",
+                                                 unknown: "made-up workflow published nowhere"})
+    fake = FakeGoblin()
+
+    result = _drafted(goblin_home, tmp_path, fake, flick_workflows=frozenset({"made-up loop"}))
+
+    assert sorted(fake.started[0][3:-7]) == sorted([str(video), str(unknown)])
+    assert result.waiting == 0
 
 
 def test_a_video_still_in_the_inbox_waits_until_it_is_sorted(library, goblin_home, tmp_path):

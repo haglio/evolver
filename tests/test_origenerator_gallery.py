@@ -109,6 +109,31 @@ _FABRICATED = {"video": "made-up:", "image_to_video": "made-up picture:",
                "text_to_video": "made-up words:", "image": "made-up still:"}
 
 
+def _flick_workflows_published_in(document: str) -> frozenset[str]:
+    with workspace_temp_dir() as checkout:
+        (checkout / origenerator_gallery.PUBLISHED).write_text(document, encoding="utf-8")
+        return origenerator_gallery.flick_workflows(checkout)
+
+
+class TestTheWorkflowsThatMakeGenauFlicks(unittest.TestCase):
+    def test_are_the_ones_the_document_its_checkout_publishes_calls_flick(self):
+        document = json.dumps({origenerator_gallery.ITEM_TYPE_BY_WORKFLOW: {
+            "made-up still": "image", "made-up motion": "video", "made-up loop": "flick",
+            "made-up other loop": "flick"}})
+
+        assert _flick_workflows_published_in(document) == {"made-up loop", "made-up other loop"}
+
+    def test_are_none_with_no_origenerator_beside_this_one(self):
+        with workspace_temp_dir() as root:
+            assert origenerator_gallery.flick_workflows(root / "origenerator") == frozenset()
+
+    def test_are_none_to_a_document_written_before_origenerator_published_them(self):
+        for document in ('{"table": "generations"}', "{not json", "[]",
+                         json.dumps({origenerator_gallery.ITEM_TYPE_BY_WORKFLOW: ["made-up loop"]})):
+            with self.subTest(document=document):
+                assert _flick_workflows_published_in(document) == frozenset()
+
+
 class TestHowASiteMadeAVideoIsReadFromOrigeneratorsWorkflowName(unittest.TestCase):
     def test_the_prefixes_are_read_from_the_document_its_checkout_publishes(self):
         with workspace_temp_dir() as checkout:
