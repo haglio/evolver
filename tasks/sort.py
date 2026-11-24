@@ -14,7 +14,7 @@ from tasks.origenerator_commands import GalleryRecords
 from util import lanes, orientation, origenerator_gallery, provenance, script_library
 from util.ffprobe import orientation_of
 from util.library_moves import move_with_its_script
-from util.media_files import child_dirs, library_videos, remove_empty_dirs
+from util.media_files import child_dirs, library_videos, remove_empty_dirs, retry_while_in_use
 from util.stage_result import StageResult
 
 log = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ def _the_flick_it_remakes(handed_over: Path, source: str, orient: str, dest: Pat
 def _make_way_for_the_remake(played: Path, upscale: Path, gallery: GalleryRecords) -> None:
     log.info("MADE AGAIN (to be enhanced in place of the one Genau plays): %s", played)
     if played != upscale:
-        move_with_its_script(played, upscale)
+        retry_while_in_use(lambda: played.replace(upscale))
         sound = lanes.genau_sound_of(played)
         if sound.is_file():
             sound.replace(lanes.genau_sound_of(upscale))
