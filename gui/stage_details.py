@@ -175,7 +175,8 @@ SENTENCES: dict[str, Sentence] = {
         Named("missing_flicks", "sent to Genau but missing from Genau's folder"),
     )),
     "watch_weights": Sentence((
-        Count("stamped", "weights saved", "weight saved", kind=DONE),
+        Count("stamped", "weights updated", "weight updated", kind=DONE),
+        Count("already", "weights already up to date", "weight already up to date"),
         Count("favorites_added", "phone favorites added", "phone favorite added", kind=DONE),
         Count("favorites_removed", "phone favorites removed", "phone favorite removed", kind=DONE),
         Count("unmapped", "Fun Time or Warm Gun records name no video here",
@@ -186,7 +187,8 @@ SENTENCES: dict[str, Sentence] = {
     "bookmarks": Sentence((
         Count("added", "bookmarks added", "bookmark added", kind=DONE),
         Count("removed", "bookmarks removed", "bookmark removed", kind=DONE),
-        Count("no_url", "favorites have no web page", "favorite has no web page"),
+        Count("already", "already bookmarked"),
+        Count("untaught", "for a site Evolver hasn't been taught to link to yet"),
         Count("bad_url", "favorites have a page that is not a web address",
               "favorite has a page that is not a web address", kind=WRONG),
         Flag("profile_missing", "Chrome profile not found"),

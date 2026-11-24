@@ -4,7 +4,7 @@ import json
 import logging
 import sqlite3
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,7 +16,7 @@ from app_support.gallery_rows import OUTSIDE, source_of
 from app_support.kino_folder import is_ai_video
 
 import config
-from util import origenerator_gallery
+from util import lanes, origenerator_gallery, site_pages
 from util.origenerator_gallery import EVOLVER_UPSCALE, STARRED, WEB_URL
 from util.stage_result import StageResult
 
@@ -32,7 +32,8 @@ _FOLDER_FORMER_NAME = "Fun Time Favs"
 class BookmarksSyncResult(StageResult):
     added: int = 0
     removed: int = 0
-    no_url: int = 0
+    already: int = 0
+    untaught: int = 0
     bad_url: int = 0
     profile_missing: bool = False
     write_error: str = ""
@@ -46,7 +47,7 @@ class BookmarksSyncResult(StageResult):
 @dataclass(frozen=True)
 class _Favorites:
     urls: list[str] = field(default_factory=list)
-    no_url: int = 0
+    untaught: int = 0
     bad_url: int = 0
 
 
@@ -72,15 +73,15 @@ def run(
     log.info("=== Stage: bookmarks -> Chrome profile %s ===", chrome_profile_name)
     log.info("CHROME USER DATA: %s", chrome_user_data_dir)
 
-    if not config.METADATA_DIR.is_dir():
-        log.info("The library's records cannot be reached. Skipping bookmarks sync.")
+    if not lanes.kino_upscales_dir().is_dir():
+        log.info("Kino's folder cannot be reached. Skipping bookmarks sync.")
         return result
-    starred = _starred_site_videos()
+    starred = _starred_site_videos(config.SITE_PAGE_BASES)
     if starred is None:
         result.gallery_unread = True
         return result
     favorites = _pages_of(starred)
-    result.no_url = favorites.no_url
+    result.untaught = favorites.untaught
     result.bad_url = favorites.bad_url
 
     profile_dir = _find_profile_dir(chrome_user_data_dir, chrome_profile_name)
@@ -96,7 +97,8 @@ def run(
     bookmarks_path = profile_dir / "Bookmarks"
     try:
         data = _load_bookmarks(bookmarks_path)
-        result.added, result.removed = _upsert_folder(data, favorites.urls, bookmarks_folder_name)
+        result.added, result.removed, result.already = _upsert_folder(
+            data, favorites.urls, bookmarks_folder_name)
         _atomic_write_json(bookmarks_path, data)
     except OSError as exc:
         result.write_error = str(exc)
@@ -108,17 +110,19 @@ def run(
         return result
 
     log.info(
-        "Bookmarks sync done. Added: %d, Removed: %d, No URL: %d, Bad URL: %d, Target: %s",
+        "Bookmarks sync done. Added: %d, Removed: %d, Already there: %d, Untaught site: %d, "
+        "Bad URL: %d, Target: %s",
         result.added,
         result.removed,
-        result.no_url,
+        result.already,
+        result.untaught,
         result.bad_url,
         bookmarks_path,
     )
     return result
 
 
-def _starred_site_videos() -> list[Favorite] | None:
+def _starred_site_videos(site_page_bases: Mapping[str, str]) -> list[Favorite] | None:
     try:
         rows = origenerator_gallery.rows(("prompt_id", "output_files"),
                                          optional=(EVOLVER_UPSCALE, STARRED, WEB_URL, "source"))
@@ -128,7 +132,7 @@ def _starred_site_videos() -> list[Favorite] | None:
         log.warning("Could not read Origenerator's gallery; the bookmarks are left as they were.",
                     exc_info=True)
         return None
-    return [Favorite(video=video, page=row.get(WEB_URL) or "")
+    return [Favorite(video=video, page=row.get(WEB_URL) or site_pages.page_of(video, site_page_bases) or "")
             for row in rows if row.get(STARRED) and source_of(row) == OUTSIDE
             for video in _ai_videos_of(row)]
 
@@ -140,10 +144,10 @@ def _ai_videos_of(row: dict) -> list[Path]:
 
 def _pages_of(favorites: Iterable[Favorite]) -> _Favorites:
     urls: list[str] = []
-    no_url = bad_url = 0
+    untaught = bad_url = 0
     for favorite in favorites:
         if not favorite.page:
-            no_url += 1
+            untaught += 1
             continue
         parsed = urlparse(favorite.page)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -151,7 +155,7 @@ def _pages_of(favorites: Iterable[Favorite]) -> _Favorites:
             log.warning("Skipping a favorite whose page is no web address: %s", favorite.video)
             continue
         urls.append(favorite.page)
-    return _Favorites(urls=list(dict.fromkeys(urls)), no_url=no_url, bad_url=bad_url)
+    return _Favorites(urls=list(dict.fromkeys(urls)), untaught=untaught, bad_url=bad_url)
 
 
 def _find_profile_dir(user_data_dir: Path, profile_name: str) -> Path | None:
@@ -205,7 +209,7 @@ def _new_root_folder(folder_id: str, name: str) -> dict:
     }
 
 
-def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> tuple[int, int]:
+def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> tuple[int, int, int]:
     roots = data["roots"]
     bookmark_bar = roots[_BOOKMARKS_BAR_KEY]
     children = bookmark_bar.setdefault("children", [])
@@ -257,7 +261,7 @@ def _upsert_folder(data: dict, urls: list[str], folder_name: str) -> tuple[int, 
         next_id += 1
 
     bookmark_bar["date_modified"] = now
-    return len(wanted - set(kept)), len(set(had) - wanted)
+    return len(wanted - set(kept)), len(set(had) - wanted), len(set(kept))
 
 
 def _next_bookmark_id(data: dict) -> int:

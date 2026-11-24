@@ -56,7 +56,7 @@ CONFIG_REFERENCE_CEILINGS = {
     "util/nonai_library.py": 4,
     "util/contract.py": 3,
     "util/nonai_retire.py": 1,
-    "util/sidecar.py": 4,
+    "util/sidecar.py": 3,
     "util/topaz.py": 3,
     "util/warm_gun.py": 3,
     "util/trash_folders.py": 6,
@@ -64,6 +64,7 @@ CONFIG_REFERENCE_CEILINGS = {
 
 OVERLAY_KEYS = {
     "cameras",
+    "site_page_bases",
     "chrome_profile",
     "display_timezone",
     "excerpt_folders",
@@ -81,6 +82,7 @@ OVERLAY_KEYS = {
 }
 
 OPTIONAL_OVERLAY_KEYS = {
+    "site_page_bases",
     "display_timezone", "goblinscript_dir", "retired_root", "topaz_ffmpeg",
     "topaz_models", "version_overrides", "video_actions_given_no_funscript", "vr_videos",
     "warm_gun_outbox",

@@ -120,7 +120,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             assert result.ok
             assert (result.added, result.removed) == (2, 1)
-            assert result.no_url == 1
+            assert result.untaught == 1
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             folder = written["roots"]["bookmark_bar"]["children"][0]
             assert folder["name"] == "Fun Time Faves"
@@ -143,6 +143,45 @@ class TestBookmarksSync(unittest.TestCase):
             folders = written["roots"]["bookmark_bar"]["children"]
             assert [(folder["name"], folder["guid"]) for folder in folders] == [("Fun Time Faves", "folder-guid")]
             assert [child["url"] for child in folders[0]["children"]] == ["https://example.com/a"]
+
+    def test_a_favorite_from_a_site_evolver_knows_is_bookmarked_at_the_page_its_name_gives(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            faves = SiteFavorites(library)
+            user_data_dir, bookmarks_path = chrome_profile(root)
+            faves.add("1234-abcd_topaz.mp4")
+
+            with override_config(SITE_PAGE_BASES={"a-site": "https://a-site.example"}):
+                result = self._sync(library, user_data_dir)
+
+            written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
+            urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
+        assert urls == ["https://a-site.example/image/1234-abcd"]
+        assert (result.added, result.untaught) == (1, 0)
+
+    def test_a_favorite_from_a_site_evolver_was_never_taught_is_counted_apart(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            faves = SiteFavorites(library)
+            user_data_dir, _bookmarks_path = chrome_profile(root)
+            faves.add("scene one_topaz.mp4")
+
+            with override_config(SITE_PAGE_BASES={}):
+                result = self._sync(library, user_data_dir)
+
+        assert (result.added, result.untaught) == (0, 1)
+
+    def test_a_bookmark_already_in_the_folder_is_counted_as_already_there(self):
+        with workspace_temp_dir() as root:
+            library = LaneLibrary(root)
+            faves = SiteFavorites(library)
+            user_data_dir, _bookmarks_path = chrome_profile(root)
+            faves.add("scene one.mp4", "https://example.com/a")
+            self._sync(library, user_data_dir)
+
+            again = self._sync(library, user_data_dir)
+
+        assert (again.added, again.removed, again.already) == (0, 0, 1)
 
     def test_a_run_that_changes_nothing_adds_and_removes_no_bookmark(self):
         with workspace_temp_dir() as root:
@@ -279,7 +318,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-        assert (result.added, result.no_url) == (0, 0)
+        assert (result.added, result.untaught) == (0, 0)
 
     def test_a_non_ai_favorite_has_no_page_to_bookmark_and_is_not_counted(self):
         with workspace_temp_dir() as root:
@@ -295,7 +334,7 @@ class TestBookmarksSync(unittest.TestCase):
             written = json.loads(bookmarks_path.read_text(encoding="utf-8"))
             urls = [child["url"] for child in written["roots"]["bookmark_bar"]["children"][0]["children"]]
         assert urls == ["https://example.com/site"]
-        assert (result.added, result.no_url) == (1, 0)
+        assert (result.added, result.untaught) == (1, 0)
 
     def test_a_starred_ai_video_whose_file_is_gone_is_left_out(self):
         with workspace_temp_dir() as root:
@@ -308,7 +347,7 @@ class TestBookmarksSync(unittest.TestCase):
 
             result = self._sync(library, user_data_dir)
 
-        assert (result.added, result.no_url) == (0, 0)
+        assert (result.added, result.untaught) == (0, 0)
 
     def test_a_gallery_that_cannot_be_read_leaves_the_folder_as_it_was(self):
         with workspace_temp_dir() as root:
