@@ -69,6 +69,11 @@ def made_by_goblinscript(script: Path) -> bool:
     return isinstance(metadata, dict) and str(metadata.get("creator") or "").startswith("GoblinScript")
 
 
+def written_by_a_person(script: Path) -> bool:
+    return not (made_by_goblinscript(script)
+                or written_by_no_person(script, origenerator_scripts=config.ORIGENERATOR_SCRIPTS_DIR))
+
+
 def copy_mark(script: Path, copied_to: Path) -> None:
     if is_marked_generated(script):
         mark_generated(copied_to)
