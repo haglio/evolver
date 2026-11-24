@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QHeaderView,
@@ -24,7 +24,6 @@ from shared_ui.icons import inline_icon
 from shared_ui.spacing import (
     BUTTON_GAP,
     BUTTON_GROUP_GAP,
-    BUTTON_ICON,
     BUTTON_ROW_GAP,
     GAP_SMALL,
     MARGIN_STANDARD,
@@ -50,7 +49,7 @@ from gui.run_record import RunRecord, format_run_label, format_run_start, newest
 from gui.schedule_state import ScheduleStatus
 from gui.stage_details import details_of
 from gui.status_symbols import GRAY, status_icon, symbol_for
-from gui.switches import SwitchButton
+from gui.switches import SwitchButton, toolbar_button
 
 
 class _NoFocusRectDelegate(QItemDelegate):
@@ -229,11 +228,11 @@ class EvolverMainWindow(QMainWindow):
         self.restart_action = RESTART.action(self)
         self.quit_action = QUIT.action(self)
         self._button_groups = [
-            [_toolbar_button(self.run_now_action), _toolbar_button(self.pause_action),
+            [toolbar_button(self.run_now_action), toolbar_button(self.pause_action),
              SwitchButton(self.nonai_action, self.nonai_switch)],
-            [_toolbar_button(self.settings_action), _toolbar_button(self.stats_action)],
-            [_toolbar_button(self.queue_action), _toolbar_button(self.review_trash_action)],
-            [_toolbar_button(self.restart_action), _toolbar_button(self.quit_action)],
+            [toolbar_button(self.settings_action), toolbar_button(self.stats_action)],
+            [toolbar_button(self.queue_action), toolbar_button(self.review_trash_action)],
+            [toolbar_button(self.restart_action), toolbar_button(self.quit_action)],
         ]
 
         self._button_row = QWidget()
@@ -310,14 +309,6 @@ class EvolverMainWindow(QMainWindow):
     def closeEvent(self, event):
         event.ignore()
         self.hide()
-
-
-def _toolbar_button(action) -> QToolButton:
-    button = QToolButton()
-    button.setDefaultAction(action)
-    button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-    button.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
-    return button
 
 
 def _button_for(groups: list[list[QToolButton]], action) -> QToolButton:

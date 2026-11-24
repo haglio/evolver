@@ -67,13 +67,19 @@ class MenuWithSwitches(QMenu):
         painter.end()
 
 
+def toolbar_button(action: QAction, button: QToolButton | None = None) -> QToolButton:
+    button = QToolButton() if button is None else button
+    button.setDefaultAction(action)
+    button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+    button.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
+    return button
+
+
 class SwitchButton(QToolButton):
 
     def __init__(self, action: QAction, switch: ToggleSwitch):
         super().__init__()
-        self.setDefaultAction(action)
-        self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.setIconSize(QSize(BUTTON_ICON, BUTTON_ICON))
+        toolbar_button(action, self)
         self.setAutoRaise(True)
         _repaint_on_toggle(switch, self)
         self._switch = switch
