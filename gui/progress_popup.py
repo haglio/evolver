@@ -46,8 +46,6 @@ class ProgressPopup(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG, MARGIN_DIALOG)
 
-        layout.addWidget(_heading("Pipeline progress"))
-
         self._bars: dict[str, QProgressBar] = {}
         self._stage_values: dict[str, int] = {}
 

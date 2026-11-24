@@ -49,16 +49,20 @@ class TestPopupConstruction(unittest.TestCase):
                     for line, bold in ((section.heading, True),
                                        *((stage.label, False) for stage in section.stages))]
 
-        assert lines[1:1 + len(expected)] == expected
+        assert lines[:len(expected)] == expected
 
-    def test_the_title_and_every_heading_wear_totals_font_on_his_large_app_font(self):
+    def test_the_window_says_pipeline_progress_only_in_its_title(self):
+        assert "Pipeline progress" in self.popup.windowTitle()
+        assert "Pipeline progress" not in {label.text() for label in self.popup.findChildren(QLabel)}
+
+    def test_every_heading_wears_totals_font_on_his_large_app_font(self):
         with _the_app_font_at(13.5):
             popup = ProgressPopup()
             labels = {label.text(): label.font() for label in popup.findChildren(QLabel)}
             popup.close()
         total = labels["Total"]
 
-        for text in ("Pipeline progress", *(section.heading for section in SECTIONS)):
+        for text in (section.heading for section in SECTIONS):
             with self.subTest(label=text):
                 assert (labels[text].pointSizeF(), labels[text].bold()) == (total.pointSizeF(), True)
         assert total.pointSizeF() >= labels[STAGE_LABELS["strays"]].pointSizeF()
