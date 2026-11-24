@@ -20,7 +20,8 @@ BY_A_PERSON = {"actions": []}
 def library(tmp_path):
     lanes = LaneLibrary(tmp_path)
     with lanes.config(genau_source=GENAU_SOURCE, ORIGENERATOR_SCRIPTS_DIR=tmp_path / "origenerator scripts",
-                      ORIGENERATOR_PROJECT_DIR=tmp_path / "no origenerator here"):
+                      ORIGENERATOR_PROJECT_DIR=tmp_path / "no origenerator here",
+                      NONAI_RETIRED_ROOT=tmp_path / "archive"):
         yield lanes
 
 
@@ -58,12 +59,16 @@ def test_with_no_flag_it_counts_each_place_and_kind_and_deletes_nothing(library,
 
     said = _run(capsys=capsys)
 
-    assert said[1:7] == [
+    assert said[1:10] == [
         "  Genau's folder: 1 made by GoblinScript, 0 written by no person, 0 written by a person",
         "  Genau's trash: 0 made by GoblinScript, 1 written by no person, 0 written by a person",
         "  `1_sorted`, Genau lane: 0 made by GoblinScript, 0 written by no person, 1 written by a person",
         "  `0_inbox`, Genau lane: 1 made by GoblinScript, 0 written by no person, 0 written by a person",
         "  Origenerator has not said which of its files are flicks yet: 0 looked at",
+        "  Scripts folder, Genau lane, video gone: 0 made by GoblinScript, 0 written by no person, "
+        "0 written by a person",
+        "  `unmatched_scripts`: 0 made by GoblinScript, 0 written by no person, 0 written by a person",
+        "  Non-AI archive: 0 made by GoblinScript, 0 written by no person, 0 written by a person",
         "  Total: 2 made by GoblinScript, 1 written by no person, 1 written by a person",
     ]
     assert all(script.is_file() for script in [*scripts.values(), its_script])
@@ -157,3 +162,77 @@ def test_a_funscript_a_video_of_the_same_name_would_also_take_is_left(library, t
 
     assert by_its_name_alone.is_file()
     assert "Left, since a video of the same name may use them: 1" in said
+
+
+def _written(script: Path, written: dict) -> Path:
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(json.dumps(written), encoding="utf-8")
+    return script
+
+
+def test_a_funscript_parked_under_a_flicks_name_is_found_in_unmatched_scripts(library, capsys):
+    touch_video(library.genau_flicks / "2D" / "AI" / "loop six_topaz.mp4")
+    parked = [_written(library.unmatched / name, BY_GOBLINSCRIPT)
+              for name in ("loop six.funscript", "loop six (2).funscript", "loop six_topaz.funscript")]
+    not_a_flicks = _written(library.unmatched / "nothing known.funscript", BY_GOBLINSCRIPT)
+
+    said = _run("--apply", capsys=capsys)
+
+    assert ([script.is_file() for script in parked], not_a_flicks.is_file()) == ([False, False, False], True)
+    assert "  `unmatched_scripts`: 3 made by GoblinScript, 0 written by no person, 0 written by a person" in said
+
+
+def test_a_funscript_left_where_a_retired_genau_lane_copy_was_is_found_by_where_it_is(library, capsys):
+    left = _written(library.scripts / "2D" / "AI" / "1_sorted" / GENAU_SOURCE / "portrait" / "loop gone.funscript",
+                    BY_GOBLINSCRIPT)
+
+    said = _run("--apply", capsys=capsys)
+
+    assert not left.is_file()
+    assert said[6] == ("  Scripts folder, Genau lane, video gone: 1 made by GoblinScript, 0 written by no person, "
+                       "0 written by a person")
+
+
+def test_a_parked_funscript_a_video_outside_the_genau_lane_is_also_named_for_is_left(library, capsys):
+    touch_video(library.genau_flicks / "2D" / "AI" / "same name.mp4")
+    touch_video(library.kino_upscales / "portrait" / "example-source" / "same name.mp4")
+    parked = _written(library.unmatched / "same name.funscript", BY_GOBLINSCRIPT)
+
+    said = _run("--apply", capsys=capsys)
+
+    assert parked.is_file()
+    assert "Left, since a video of the same name may use them: 1" in said
+
+
+def test_a_funscript_beside_an_archived_video_is_that_videos(library, tmp_path, capsys):
+    touch_video(library.genau_flicks / "2D" / "AI" / "kept name.mp4")
+    touch_video(tmp_path / "archive" / "Jane Doe" / "kept name.mp4")
+    beside_it = _written(tmp_path / "archive" / "Jane Doe" / "kept name.funscript", BY_GOBLINSCRIPT)
+
+    said = _run("--apply", capsys=capsys)
+
+    assert beside_it.is_file()
+    assert "Left, since a video of the same name may use them: 1" in said
+
+
+def test_a_parked_funscript_under_the_enhanced_name_of_an_origenerator_flick_is_found(library, tmp_path, capsys):
+    checkout = _origenerator_saying(tmp_path, {"made-up loop": "flick"})
+    a_gallery_of(library.gallery_db, [kept_at("made-1", library.origenerator / "gone loop.mp4",
+                                              workflow_name="made-up loop")])
+    parked = _written(library.unmatched / "gone loop_topaz.funscript", BY_GOBLINSCRIPT)
+
+    _run("--origenerator", str(checkout), "--apply", capsys=capsys)
+
+    assert not parked.is_file()
+
+
+def test_until_origenerator_says_which_of_its_files_are_flicks_a_parked_one_of_its_names_is_left(
+        library, tmp_path, capsys):
+    a_gallery_of(library.gallery_db, [kept_at("made-1", library.origenerator / "gone loop.mp4",
+                                              workflow_name="made-up loop")])
+    parked = _written(library.unmatched / "gone loop_topaz.funscript", BY_GOBLINSCRIPT)
+
+    _run(capsys=capsys)
+    _run("--apply", capsys=capsys)
+
+    assert parked.is_file()

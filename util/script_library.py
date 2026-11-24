@@ -25,6 +25,11 @@ def mirrored_script_of(video: Path) -> Path | None:
     return script_of(video, library=config.VIDEO_LIBRARY_DIR, scripts_tree=config.SCRIPT_LIBRARY_DIR)
 
 
+def scripts_folder_for(folder: Path) -> Path | None:
+    script = mirrored_script_of(folder / "a video.mp4")
+    return None if script is None else script.parent
+
+
 def script_path_for_video(video: Path) -> Path:
     script = None if kept_by_another_app(video) else mirrored_script_of(video)
     if script is None:
