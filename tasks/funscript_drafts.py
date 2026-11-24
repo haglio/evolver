@@ -302,7 +302,8 @@ def _sorted_videos_not_yet_upscaled(library: Library) -> list[Path]:
     if not library.sorted_videos.is_dir():
         return []
     return [video for video in library_videos(library.sorted_videos)
-            if not (lanes.upscale_filed_for(video) or Path()).is_file()]
+            if not lanes.is_genau_lane(video.relative_to(library.sorted_videos).parts[0])
+            and not (lanes.upscale_filed_for(video) or Path()).is_file()]
 
 
 def _given_no_funscript(library: Library) -> Callable[[Path], bool]:

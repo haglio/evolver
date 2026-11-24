@@ -97,6 +97,16 @@ def test_a_sorted_ai_video_not_yet_upscaled_and_a_non_ai_video_are_sent_too(libr
     assert result.started == 2
 
 
+def test_a_sorted_copy_in_the_genau_lane_gets_no_funscript(library, goblin_home, tmp_path):
+    sorted_video = touch_video(library.sorted_dir / "example-source" / "portrait" / "video one.mp4")
+    touch_video(library.sorted_dir / "example-loop-clips" / "portrait" / "loop one.mp4")
+    fake = FakeGoblin()
+
+    _drafted(goblin_home, tmp_path, fake)
+
+    assert fake.started[0][3:-7] == [str(sorted_video)]
+
+
 def _gallery_with_actions(path: Path, actions_of: dict[Path, list[str]]) -> None:
     conn = sqlite3.connect(path)
     conn.execute("CREATE TABLE generations (prompt_id TEXT, output_files TEXT, evolver_upscale TEXT, "
