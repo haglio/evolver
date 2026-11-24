@@ -109,7 +109,7 @@ class TestCountsOfAnAiVideo(unittest.TestCase):
 
             result = watch_weights.run(gallery=gallery)
 
-        assert result.stamped == 0
+        assert (result.stamped, result.already) == (0, 1)
 
     def test_counts_kept_under_its_old_record_id_and_under_its_path_are_added_together(self):
         gallery = FakeGallery()
@@ -192,6 +192,16 @@ class TestCountsOfANonAiVideo(unittest.TestCase):
 
             assert _watch(scene) == {"completions": 3, "skips": 0, "locks": 0, "weight": 2.0}
         assert result.stamped == 1
+
+    def test_a_sidecar_already_holding_its_counts_is_counted_as_up_to_date(self):
+        with _setting() as s:
+            scene = s.non_ai_scene("scene one")
+            s.fun_time_counts(a=(scene, {"completions": 3, "skips": 0, "locks": 0}))
+            watch_weights.run(gallery=FakeGallery())
+
+            again = watch_weights.run(gallery=FakeGallery())
+
+        assert (again.stamped, again.already) == (0, 1)
 
     def test_fun_time_s_counts_kept_under_the_video_s_id_land_on_its_sidecar(self):
         with _setting() as s:
