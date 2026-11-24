@@ -45,6 +45,8 @@ LEFT_AMBIENT = {
     "NONAI_FALLBACK_DONE_DIR_NAME": "a folder name, resolved under NON_AI_DIR",
     "NONAI_OUTPUT_SUFFIX": "not a place",
     "NONAI_PROCESSED_DIR_NAME": "a folder name, resolved under NON_AI_DIR",
+    "ORIGENERATOR_SCRIPTS_DIR": "only asked whether a funscript sits under it, to tell who wrote "
+                                "the funscript; nothing under it is opened or written",
     "TVAI_MODEL_DIR": "the Topaz install; goes into the encoder's environment, "
                       "and no test launches one",
 }

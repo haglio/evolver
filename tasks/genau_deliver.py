@@ -6,7 +6,7 @@ from pathlib import Path
 
 import config
 from tasks import upscale
-from util import genau_flicks, lanes
+from util import genau_flicks, lanes, script_library
 from util.media_files import child_dirs, library_videos, listed_videos, remove_empty_dirs
 from util.stage_result import StageResult
 from util.versions import is_upscaled_stem, sorted_stem_of
@@ -63,6 +63,9 @@ def _retire_the_sorted_copy(flick: Path, original: Path) -> bool:
         log.warning("Could not retire %s; leaving it for the next run",
                     original.name, exc_info=True)
         return False
+    for script in script_library.scripts_held_for(original):
+        if not script_library.written_by_a_person(script):
+            script_library.delete_script(script)
     return True
 
 

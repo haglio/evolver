@@ -43,9 +43,7 @@ class Found:
 def _kind_of(script: Path) -> str:
     if script_library.made_by_goblinscript(script):
         return GOBLINSCRIPT
-    if script_library.written_by_no_person(script, origenerator_scripts=config.ORIGENERATOR_SCRIPTS_DIR):
-        return NO_PERSON
-    return A_PERSON
+    return A_PERSON if script_library.written_by_a_person(script) else NO_PERSON
 
 
 def _mirrored_scripts(videos: Iterable[Path]) -> list[Path]:

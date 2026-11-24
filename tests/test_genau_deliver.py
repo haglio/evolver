@@ -17,7 +17,7 @@ from tests.temp_helpers import (
     touch_video,
     workspace_temp_dir,
 )
-from util import lanes, provenance, sidecar
+from util import lanes, provenance, script_library, sidecar
 
 GENAU_SOURCE = "example-loop-clips"
 
@@ -50,6 +50,26 @@ class TestFinishingAGenauUpscale(unittest.TestCase):
             assert flick == lib.genau_flicks / "2D" / "AI" / "loop_1_topaz.mp4"
             assert flick.read_text(encoding="utf-8") == "upscaled"
             assert not original.exists()
+
+    def test_a_retired_sorted_copy_takes_the_funscript_no_person_wrote_with_it(self):
+        with _genau_lane() as lib:
+            scripts = {}
+            for stem, written, generated in (("loop_7", "GoblinScript v0.6.0", False),
+                                             ("loop_8", "", True), ("loop_9", "", False)):
+                _flick, original = _upscaled(lib, stem=stem)
+                script = (lib.scripts / original.relative_to(lib.library)).with_suffix(".funscript")
+                script.parent.mkdir(parents=True, exist_ok=True)
+                script.write_text(json.dumps({"metadata": {"creator": written}, "actions": []}),
+                                  encoding="utf-8")
+                if generated:
+                    script_library.mark_generated(script)
+                scripts[stem] = script
+
+            genau_deliver.run()
+
+            assert {stem: script.is_file() for stem, script in scripts.items()} == {
+                "loop_7": False, "loop_8": False, "loop_9": True}
+            assert not script_library.is_marked_generated(scripts["loop_8"])
 
     def test_a_finished_flick_leaves_the_correspondence_check_satisfied(self):
         with _genau_lane() as lib:
