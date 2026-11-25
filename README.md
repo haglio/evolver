@@ -274,28 +274,6 @@ decoded, and a clip's own version family (the one `tasks/nonai_group.py`
 records) is offered the winner's answer rather than told it, since a family read
 off names can hold two genuinely different cuts.
 
-## One-off: delete the funscripts of Genau flicks
-
-A Genau flick gets no funscript (the user's ruling, 2026-11-24), so the ones
-made before that are deleted once, by hand, with the app closed:
-
-```bash
-python tools/delete_flick_funscripts.py            # counts only, per place and kind
-python tools/delete_flick_funscripts.py --apply    # deletes those no person wrote
-```
-
-It looks where Evolver keeps a funscript for each file in Genau's folder and
-trash, the Genau lane's `1_sorted` and `0_inbox` copies, and the files in
-Origenerator's own videos folder whose workflow Origenerator's published
-contract calls a flick (`--origenerator <checkout>` reads another checkout's
-contract). It also finds the ones Scripts sync left with no video: under the
-Genau lane's place in the scripts folder, and in `unmatched_scripts` and the
-non-AI archive under a name a flick has had (as made, as sorted, as
-enhanced). It deletes only the ones GoblinScript made or no person wrote,
-leaves every one a person wrote and every one a video of the same name may
-use, prints counts and never a name, and finds nothing more to delete when
-run again. Once it has been run, it and this section come out.
-
 ## One-time correspondence check
 
 To run the same check by hand:
